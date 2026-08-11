@@ -7,16 +7,21 @@ import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
+import com.spacesim.components.CombatComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.MiningComponent;
 import com.spacesim.components.ProductionComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.model.ItemType;
 import com.spacesim.model.Recipe;
+import com.spacesim.model.ShipType;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -43,9 +48,6 @@ public class EntityDetailsUI extends Table {
     private static final float PANEL_PADDING = 14f;
     private static final float CONTENT_WIDTH = RECOMMENDED_WIDTH - PANEL_PADDING * 2f - 16f;
     private static final String NO_VALUE = "—";
-    private static final String[] LOCALIZED_ITEM_NAMES = {
-            "Руда", "Энергия", "Продовольствие", "Сталь", "Вооружение"
-    };
 
     private final Label titleLabel;
     private final Label contentLabel;
@@ -141,11 +143,14 @@ public class EntityDetailsUI extends Table {
         MarketComponent market = entity.getComponent(MarketComponent.class);
         ProductionComponent production = entity.getComponent(ProductionComponent.class);
         TradeAIComponent tradeAI = entity.getComponent(TradeAIComponent.class);
+        ShipComponent ship = entity.getComponent(ShipComponent.class);
+        MiningComponent mining = entity.getComponent(MiningComponent.class);
+        CombatComponent combat = entity.getComponent(CombatComponent.class);
         TransformComponent transform = entity.getComponent(TransformComponent.class);
         FactionComponent faction = entity.getComponent(FactionComponent.class);
         ReputationComponent reputation = entity.getComponent(ReputationComponent.class);
 
-        String type = resolveType(identity, market, tradeAI);
+        String type = resolveType(identity, market, ship, tradeAI);
         String title = identity == null ? "Безымянный объект" : identity.name;
         StringBuilder body = new StringBuilder();
         body.append("Тип: ").append(type).append('\n');
@@ -154,12 +159,21 @@ public class EntityDetailsUI extends Table {
                 .append(faction == null ? "не указана" : faction.getFactionName())
                 .append('\n');
 
+        if (ship != null) {
+            appendShipProfile(body, ship);
+        }
         appendInventory(body, inventory);
         if (market != null) {
             appendMarket(body, market, inventory);
         }
         if (production != null) {
             appendProduction(body, production);
+        }
+        if (mining != null) {
+            appendMining(body, mining);
+        }
+        if (combat != null) {
+            appendCombat(body, combat);
         }
         if (tradeAI != null) {
             appendShip(body, tradeAI, inventory);
@@ -198,7 +212,8 @@ public class EntityDetailsUI extends Table {
                 continue;
             }
             hasItems = true;
-            text.append("  ").append(itemName(itemId)).append(": ").append(amount).append(" ед.\n");
+            text.append("  ").append(itemLabel(itemId)).append(": ")
+                    .append(amount).append(" ед.\n");
         }
         if (!hasItems) {
             text.append("  пусто\n");
@@ -217,7 +232,7 @@ public class EntityDetailsUI extends Table {
                 continue;
             }
             hasTradableItems = true;
-            text.append("  ").append(itemName(itemId)).append('\n')
+            text.append("  ").append(itemLabel(itemId)).append('\n')
                     .append("    Запас: ")
                     .append(inventory == null ? NO_VALUE : inventory.stock[itemId]).append(" ед.\n")
                     .append("    Цель: ").append(market.targetStock[itemId]).append(" ед.\n")
@@ -260,6 +275,61 @@ public class EntityDetailsUI extends Table {
         return items.length() == 0 ? "нет" : items.toString();
     }
 
+    /** Добавляет функциональный класс корабля и назначение его грузового отсека. */
+    private static void appendShipProfile(StringBuilder text, ShipComponent ship) {
+        text.append("\nНазначение корабля\n");
+        ShipType type = ship.type;
+        if (type == null) {
+            text.append("  Класс: не задан\n")
+                    .append("  Грузовое назначение: не определено\n");
+            return;
+        }
+
+        text.append("  Класс: ").append(type.getDisplayName()).append('\n')
+                .append("  Грузовое назначение: ").append(cargoPurpose(type)).append('\n');
+    }
+
+    /** Возвращает понятное назначение отсека без дублирования категорий в типах кораблей. */
+    private static String cargoPurpose(ShipType type) {
+        if (type.isMining()) {
+            return "добываемые ресурсы";
+        }
+        if (type.isCombat()) {
+            return "коммерческий груз не предусмотрен";
+        }
+        for (ItemType item : ItemType.values()) {
+            if (type.canPurchase(item)) {
+                return item.getCategory().getDisplayName();
+            }
+        }
+        return "не определено";
+    }
+
+    /** Добавляет состояние и накопленную статистику добывающего оборудования. */
+    private static void appendMining(StringBuilder text, MiningComponent mining) {
+        text.append("\nДобыча\n")
+                .append("  Состояние: ").append(mining.active ? "активна" : "остановлена").append('\n')
+                .append("  Ресурс: ").append(targetItemName(mining.resourceItem)).append('\n')
+                .append("  Скорость: ").append(formatNumber(mining.extractionPerSecond))
+                .append(" ед./с\n")
+                .append("  Дробный остаток: ").append(formatNumber(mining.extractionRemainder))
+                .append(" ед.\n")
+                .append("  Всего добыто: ").append(mining.totalMined).append(" ед.\n");
+    }
+
+    /** Добавляет текущее состояние корпуса, щитов и вооружения боевого корабля. */
+    private static void appendCombat(StringBuilder text, CombatComponent combat) {
+        text.append("\nБоевая система\n")
+                .append("  Состояние: ")
+                .append(combat.isOperational() ? "боеготов" : "небоеспособен").append('\n')
+                .append("  Корпус: ").append(formatNumber(combat.hull)).append(" / ")
+                .append(formatNumber(combat.maxHull)).append('\n')
+                .append("  Щиты: ").append(formatNumber(combat.shields)).append(" / ")
+                .append(formatNumber(combat.maxShields)).append('\n')
+                .append("  Урон: ").append(formatNumber(combat.damagePerSecond)).append(" ед./с\n")
+                .append("  Дальность: ").append(formatNumber(combat.weaponRange)).append(" ед.\n");
+    }
+
     /** Добавляет оперативные характеристики торгового корабля и его маршрута. */
     private static void appendShip(StringBuilder text, TradeAIComponent tradeAI,
                                    InventoryComponent inventory) {
@@ -288,9 +358,15 @@ public class EntityDetailsUI extends Table {
 
     /** Определяет отображаемый тип, предпочитая явный компонент идентичности. */
     private static String resolveType(IdentityComponent identity, MarketComponent market,
-                                      TradeAIComponent tradeAI) {
-        if (identity != null) {
-            return identity.kind == IdentityComponent.Kind.STATION ? "Станция" : "Торговый корабль";
+                                      ShipComponent ship, TradeAIComponent tradeAI) {
+        if (identity != null && identity.kind == IdentityComponent.Kind.STATION) {
+            return "Станция";
+        }
+        if (ship != null) {
+            return ship.type == null ? "Корабль (тип не задан)" : ship.type.getDisplayName();
+        }
+        if (identity != null && identity.kind == IdentityComponent.Kind.FLEET) {
+            return tradeAI == null ? "Корабль" : "Торговый корабль";
         }
         if (tradeAI != null) {
             return "Торговый корабль";
@@ -339,9 +415,17 @@ public class EntityDetailsUI extends Table {
 
     /** Возвращает русское имя товара по корректному идентификатору. */
     private static String itemName(int itemId) {
-        return itemId < LOCALIZED_ITEM_NAMES.length
-                ? LOCALIZED_ITEM_NAMES[itemId]
-                : Constants.ITEM_NAMES[itemId];
+        ItemType item = ItemType.fromId(itemId);
+        return item == null ? "Неизвестный товар (id=" + itemId + ")" : item.getDisplayName();
+    }
+
+    /** Дополняет имя товара категорией физического хранения и перевозки. */
+    private static String itemLabel(int itemId) {
+        ItemType item = ItemType.fromId(itemId);
+        if (item == null) {
+            return itemName(itemId);
+        }
+        return item.getDisplayName() + " [" + item.getCategory().getDisplayName() + "]";
     }
 
     /** Форматирует конечное число с одним десятичным знаком, а ошибочное заменяет прочерком. */
@@ -350,6 +434,15 @@ public class EntityDetailsUI extends Table {
             return NO_VALUE;
         }
         float normalized = value == 0f ? 0f : value;
+        return String.format(Locale.ROOT, "%.1f", normalized);
+    }
+
+    /** Форматирует конечное значение двойной точности с одним десятичным знаком. */
+    private static String formatNumber(double value) {
+        if (!Double.isFinite(value)) {
+            return NO_VALUE;
+        }
+        double normalized = value == 0d ? 0d : value;
         return String.format(Locale.ROOT, "%.1f", normalized);
     }
 

@@ -1,16 +1,20 @@
 package com.spacesim.ui;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.CombatComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.MiningComponent;
 import com.spacesim.components.ProductionComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.model.Recipe;
+import com.spacesim.model.ShipType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,8 +57,8 @@ class EntityDetailsUITest {
         assertTrue(details.body().contains("Тип: Станция"));
         assertTrue(details.body().contains("Позиция: x=120.3, y=-30.0"));
         assertTrue(details.body().contains("Фракция: Шахтёры"));
-        assertTrue(details.body().contains("Руда: 125 ед."));
-        assertTrue(details.body().contains("Энергия: 40 ед."));
+        assertTrue(details.body().contains("Руда [Материалы]: 125 ед."));
+        assertTrue(details.body().contains("Энергия [Газы и жидкости]: 40 ед."));
         assertFalse(details.body().contains("Продовольствие:"));
         assertTrue(details.body().contains("Заполнено: 165 / 700 ед."));
         assertTrue(details.body().contains("Цель: 300 ед."));
@@ -95,13 +99,17 @@ class EntityDetailsUITest {
         Entity fleet = new Entity()
                 .add(new IdentityComponent("Караван Альфа", IdentityComponent.Kind.FLEET))
                 .add(inventory)
+                .add(new ShipComponent(ShipType.FINISHED_GOODS_CARRIER))
                 .add(tradeAI)
                 .add(reputation);
 
         EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(fleet);
 
         assertEquals("Караван Альфа", details.title());
-        assertTrue(details.body().contains("Тип: Торговый корабль"));
+        assertTrue(details.body().contains("Тип: Перевозчик готовых товаров"));
+        assertTrue(details.body().contains("Класс: Перевозчик готовых товаров"));
+        assertTrue(details.body().contains("Грузовое назначение: Готовые товары"));
+        assertTrue(details.body().contains("Продовольствие [Готовые товары]: 24 ед."));
         assertTrue(details.body().contains("Позиция: не задана"));
         assertTrue(details.body().contains("Состояние: летит к станции продажи"));
         assertTrue(details.body().contains("Скорость: 75.0 ед./с"));
@@ -116,6 +124,61 @@ class EntityDetailsUITest {
         assertTrue(details.body().contains("Нейтралы: 0.0"));
         assertTrue(details.body().contains("Торговая лига: 18.0"));
         assertTrue(details.body().contains("Шахтёры: -7.5"));
+    }
+
+    @Test
+    void описываетДобывающийКорабльБезТорговогоИи() {
+        InventoryComponent inventory = new InventoryComponent();
+        inventory.capacity = 40;
+        inventory.stock[Constants.ITEM_ORE] = 7;
+
+        MiningComponent mining = new MiningComponent(Constants.ITEM_ORE, 1.25f);
+        mining.active = false;
+        mining.extractionRemainder = 0.75d;
+        mining.totalMined = 18L;
+
+        Entity miner = new Entity()
+                .add(new IdentityComponent("Старатель", IdentityComponent.Kind.FLEET))
+                .add(new ShipComponent(ShipType.MINING_SHIP))
+                .add(inventory)
+                .add(mining);
+
+        EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(miner);
+
+        assertEquals("Старатель", details.title());
+        assertTrue(details.body().contains("Тип: Добывающий корабль"));
+        assertTrue(details.body().contains("Грузовое назначение: добываемые ресурсы"));
+        assertTrue(details.body().contains("Добыча\n"));
+        assertTrue(details.body().contains("Состояние: остановлена"));
+        assertTrue(details.body().contains("Ресурс: Руда"));
+        assertTrue(details.body().contains("Скорость: 1.3 ед./с"));
+        assertTrue(details.body().contains("Дробный остаток: 0.8 ед."));
+        assertTrue(details.body().contains("Всего добыто: 18 ед."));
+        assertFalse(details.body().contains("Ожидаемая прибыль:"));
+    }
+
+    @Test
+    void описываетБоевойКорабльИОтражаетПотерюБоеготовности() {
+        CombatComponent combat = new CombatComponent(80f, 120f, 25f, 60f, 14.5f, 180f);
+        Entity fighter = new Entity()
+                .add(new IdentityComponent("Корвет Страж", IdentityComponent.Kind.FLEET))
+                .add(new ShipComponent(ShipType.COMBAT_SHIP))
+                .add(combat);
+
+        EntityDetailsUI.DetailsText operational = EntityDetailsUI.describe(fighter);
+
+        assertTrue(operational.body().contains("Тип: Боевой корабль"));
+        assertTrue(operational.body().contains(
+                "Грузовое назначение: коммерческий груз не предусмотрен"));
+        assertTrue(operational.body().contains("Боевая система\n"));
+        assertTrue(operational.body().contains("Состояние: боеготов"));
+        assertTrue(operational.body().contains("Корпус: 80.0 / 120.0"));
+        assertTrue(operational.body().contains("Щиты: 25.0 / 60.0"));
+        assertTrue(operational.body().contains("Урон: 14.5 ед./с"));
+        assertTrue(operational.body().contains("Дальность: 180.0 ед."));
+
+        combat.hull = 0f;
+        assertTrue(EntityDetailsUI.describe(fighter).body().contains("Состояние: небоеспособен"));
     }
 
     @Test
@@ -137,5 +200,11 @@ class EntityDetailsUITest {
         assertTrue(partial.body().contains("Груз: — / 100 ед."));
         assertTrue(partial.body().contains("Цель: не выбрана"));
         assertTrue(partial.body().contains("Товар: не выбран"));
+
+        Entity unconfiguredShip = new Entity().add(new ShipComponent());
+        EntityDetailsUI.DetailsText unconfigured = EntityDetailsUI.describe(unconfiguredShip);
+        assertTrue(unconfigured.body().contains("Тип: Корабль (тип не задан)"));
+        assertTrue(unconfigured.body().contains("Класс: не задан"));
+        assertTrue(unconfigured.body().contains("Грузовое назначение: не определено"));
     }
 }

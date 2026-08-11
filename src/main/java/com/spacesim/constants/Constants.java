@@ -1,5 +1,7 @@
 package com.spacesim.constants;
 
+import com.spacesim.model.ItemType;
+
 /**
  * Единый каталог идентификаторов и числовых параметров экономической модели.
  *
@@ -46,14 +48,27 @@ public class Constants {
      * Длина массива равна {@link #MAX_ITEMS}; массив следует считать
      * неизменяемым справочником.
      */
-    public static final String[] ITEM_NAMES = {"Ore", "Energy", "Food", "Steel", "Weapons"};
+    public static final String[] ITEM_NAMES = createItemNames();
 
     /**
      * Базовые цены товаров в кредитах за одну целую единицу товара.
      * {@link com.spacesim.systems.MarketSystem} масштабирует эти положительные
      * значения в зависимости от запасов и экономических событий.
      */
-    public static final float[] BASE_PRICES = {10f, 5f, 20f, 50f, 150f};
+    public static final float[] BASE_PRICES = createBasePrices();
+
+    /**
+     * Безопасно возвращает объектное описание товара по его числовому идентификатору.
+     *
+     * <p>Метод служит мостом от исторического API констант и массивов к типизированному каталогу.
+     * Для некорректного идентификатора он не обращается к массиву и не выбрасывает исключение.</p>
+     *
+     * @param itemId проверяемый идентификатор товара
+     * @return соответствующий товар либо {@code null}, если идентификатор вне каталога
+     */
+    public static ItemType getItemType(int itemId) {
+        return ItemType.fromId(itemId);
+    }
 
     /**
      * Число фракций и обязательная длина массива репутации.
@@ -96,4 +111,20 @@ public class Constants {
      * Размер стороны ячейки пространственного хеша в единицах координат мира.
      */
     public static final int CELL_SIZE = 200;
+
+    private static String[] createItemNames() {
+        String[] names = new String[MAX_ITEMS];
+        for (ItemType item : ItemType.values()) {
+            names[item.getId()] = item.getCodeName();
+        }
+        return names;
+    }
+
+    private static float[] createBasePrices() {
+        float[] prices = new float[MAX_ITEMS];
+        for (ItemType item : ItemType.values()) {
+            prices[item.getId()] = item.getBasePrice();
+        }
+        return prices;
+    }
 }

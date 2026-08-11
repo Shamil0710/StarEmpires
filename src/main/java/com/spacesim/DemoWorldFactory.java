@@ -1,17 +1,21 @@
 package com.spacesim;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.CombatComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.MiningComponent;
 import com.spacesim.components.PriceHistoryComponent;
 import com.spacesim.components.ProductionComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.model.Recipe;
+import com.spacesim.model.ShipType;
 
 import java.util.List;
 
@@ -28,8 +32,10 @@ import java.util.List;
  * </pre>
  * <p>Шестая станция является конечным потребителем энергии, продовольствия, стали и вооружения.
  * Производительность звеньев и базовое потребление подобраны так, чтобы их номинальные темпы были
- * сбалансированы. Для каждого из пяти товаров создаётся отдельный специализированный транспорт:
- * это не позволяет всем пустым кораблям одновременно переключиться на самый дорогой товар.</p>
+ * сбалансированы. Для каждого из пяти товаров создаётся отдельный специализированный совместимый
+ * транспорт: это не позволяет всем пустым кораблям одновременно переключиться на самый дорогой
+ * товар. Дополнительный добывающий корабль абстрактно наполняет свой трюм рудой, а боевой корабль
+ * демонстрирует отдельный профиль корпуса без участия в торговле.</p>
  *
  * <p>Фабрика не обращается к libGDX/OpenGL и не регистрирует системы Ashley. Каждый вызов
  * {@link #createEntities()} возвращает новый независимый граф сущностей и компонентов, который
@@ -38,7 +44,6 @@ import java.util.List;
  */
 public final class DemoWorldFactory {
     private static final int STATION_CAPACITY = 2_500;
-    private static final int FLEET_CARGO_SPACE = 100;
     private static final float FLEET_STARTING_CREDITS = 12_000f;
 
     private DemoWorldFactory() {
@@ -49,11 +54,11 @@ public final class DemoWorldFactory {
      * Создаёт полный набор станций и кораблей демонстрационной сцены.
      *
      * <p>Порядок результата стабилен: сначала шесть станций от первичных источников к конечному
-     * потребителю, затем пять специализированных транспортов в порядке идентификаторов товаров.
-     * Список неизменяем, однако сами сущности и их ECS-компоненты предназначены для изменения
-     * игровыми системами.</p>
+     * потребителю, затем пять специализированных транспортов в порядке идентификаторов товаров,
+     * добывающий и боевой корабли. Список неизменяем, однако сами сущности и их ECS-компоненты
+     * предназначены для изменения игровыми системами.</p>
      *
-     * @return неизменяемый список из шести новых станций и пяти новых кораблей
+     * @return неизменяемый список из шести новых станций и семи новых кораблей
      */
     public static List<Entity> createEntities() {
         Entity mine = createStation("Рудник Ковчег", 90f, 380f, Constants.FACTION_MINERS);
@@ -97,16 +102,25 @@ public final class DemoWorldFactory {
         configureMarket(colony, Constants.ITEM_STEEL, 80, 120, 1f / 6f);
         configureMarket(colony, Constants.ITEM_WEAPONS, 80, 120, 1f / 6f);
 
-        Entity oreTransport = createFleet(
-                "Рудовоз Атлас", 170f, 300f, 64f, Constants.ITEM_ORE);
-        Entity energyTransport = createFleet(
-                "Энергокурьер Луч", 270f, 300f, 70f, Constants.ITEM_ENERGY);
-        Entity foodTransport = createFleet(
-                "Агрокараван", 370f, 250f, 74f, Constants.ITEM_FOOD);
-        Entity steelTransport = createFleet(
-                "Сталевоз Вулкан", 470f, 200f, 80f, Constants.ITEM_STEEL);
-        Entity weaponsTransport = createFleet(
-                "Оружейный транспорт", 590f, 260f, 86f, Constants.ITEM_WEAPONS);
+        Entity oreTransport = createTradingShip(
+                "Материаловоз Атлас", 170f, 300f, 64f, 140,
+                Constants.ITEM_ORE, ShipType.MATERIAL_CARRIER, Constants.FACTION_MINERS);
+        Entity energyTransport = createTradingShip(
+                "Танкер Луч", 270f, 300f, 70f, 160,
+                Constants.ITEM_ENERGY, ShipType.GAS_LIQUID_CARRIER, Constants.FACTION_NEUTRAL);
+        Entity foodTransport = createTradingShip(
+                "Контейнеровоз Аврора", 370f, 250f, 74f, 100,
+                Constants.ITEM_FOOD, ShipType.FINISHED_GOODS_CARRIER,
+                Constants.FACTION_TRADE_LEAGUE);
+        Entity steelTransport = createTradingShip(
+                "Материаловоз Вулкан", 470f, 200f, 80f, 140,
+                Constants.ITEM_STEEL, ShipType.MATERIAL_CARRIER, Constants.FACTION_MINERS);
+        Entity weaponsTransport = createTradingShip(
+                "Контейнеровоз Щит", 590f, 260f, 86f, 80,
+                Constants.ITEM_WEAPONS, ShipType.FINISHED_GOODS_CARRIER,
+                Constants.FACTION_TRADE_LEAGUE);
+        Entity miningShip = createMiningShip("Добытчик Старатель", 210f, 335f);
+        Entity combatShip = createCombatShip("Фрегат Страж", 560f, 360f);
 
         return List.of(
                 mine,
@@ -119,7 +133,9 @@ public final class DemoWorldFactory {
                 energyTransport,
                 foodTransport,
                 steelTransport,
-                weaponsTransport);
+                weaponsTransport,
+                miningShip,
+                combatShip);
     }
 
     /** Создаёт базовую станцию с пустым рынком, историей цен и складом. */
@@ -158,24 +174,33 @@ public final class DemoWorldFactory {
         station.add(production);
     }
 
-    /** Создаёт пустой специализированный транспорт с репутацией и конечными параметрами. */
-    private static Entity createFleet(
+    /** Создаёт пустой специализированный транспорт с совместимым отсеком и репутацией. */
+    private static Entity createTradingShip(
             String name,
             float x,
             float y,
             float movementSpeed,
-            int specializedItem) {
+            int cargoSpace,
+            int specializedItem,
+            ShipType shipType,
+            int factionId) {
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
 
         InventoryComponent inventory = new InventoryComponent();
-        inventory.capacity = FLEET_CARGO_SPACE;
+        inventory.capacity = cargoSpace;
 
         TradeAIComponent tradeAI = new TradeAIComponent();
-        tradeAI.cargoSpace = FLEET_CARGO_SPACE;
+        tradeAI.cargoSpace = cargoSpace;
         tradeAI.credits = FLEET_STARTING_CREDITS;
         tradeAI.movementSpeed = movementSpeed;
         tradeAI.specializedItem = specializedItem;
+
+        ShipComponent ship = new ShipComponent(shipType);
+        if (!ship.canPurchaseItem(specializedItem)) {
+            throw new IllegalArgumentException(
+                    "Тип корабля не совместим со специализацией: " + name);
+        }
 
         ReputationComponent reputation = new ReputationComponent();
         reputation.addReputation(Constants.FACTION_TRADE_LEAGUE, 25f);
@@ -185,7 +210,52 @@ public final class DemoWorldFactory {
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
                 .add(inventory)
+                .add(ship)
                 .add(tradeAI)
-                .add(reputation);
+                .add(reputation)
+                .add(new FactionComponent(factionId));
+    }
+
+    /** Создаёт автономный добывающий корабль, постепенно наполняющий собственный трюм рудой. */
+    private static Entity createMiningShip(String name, float x, float y) {
+        TransformComponent transform = new TransformComponent();
+        transform.position.set(x, y);
+
+        InventoryComponent inventory = new InventoryComponent();
+        inventory.capacity = 80;
+
+        return new Entity()
+                .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
+                .add(transform)
+                .add(inventory)
+                .add(new ShipComponent(ShipType.MINING_SHIP))
+                .add(new MiningComponent(Constants.ITEM_ORE, 0.5f))
+                .add(new FactionComponent(Constants.FACTION_MINERS));
+    }
+
+    /** Создаёт боевой корабль с отдельными характеристиками и без торгового автомата. */
+    private static Entity createCombatShip(String name, float x, float y) {
+        TransformComponent transform = new TransformComponent();
+        transform.position.set(x, y);
+        transform.velocity.set(1f, 0.35f);
+
+        InventoryComponent inventory = new InventoryComponent();
+        inventory.capacity = 0;
+
+        CombatComponent combat = new CombatComponent(
+                320f,
+                320f,
+                180f,
+                180f,
+                42f,
+                150f);
+
+        return new Entity()
+                .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
+                .add(transform)
+                .add(inventory)
+                .add(new ShipComponent(ShipType.COMBAT_SHIP))
+                .add(combat)
+                .add(new FactionComponent(Constants.FACTION_TRADE_LEAGUE));
     }
 }

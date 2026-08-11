@@ -75,7 +75,7 @@ public class SpaceSimGame extends ApplicationAdapter {
      *
      * <p>Метод вызывается libGDX один раз после инициализации графического
      * контекста. Порядок регистрации систем значим: сначала формируются цены и
-     * потребление, затем выполняются производство, торговый ИИ и запись истории.</p>
+     * потребление, затем выполняются производство, добыча, торговый ИИ и запись истории.</p>
      */
     @Override
     public void create() {
@@ -103,6 +103,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine.addSystem(new MarketSystem(eventManager));
         engine.addSystem(new ConsumptionSystem(eventManager));
         engine.addSystem(new ProductionSystem());
+        engine.addSystem(new MiningSystem());
         engine.addSystem(new TradeAISystem(grid));
         engine.addSystem(new PriceRecorderSystem());
 

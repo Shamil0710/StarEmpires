@@ -6,9 +6,11 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.model.ShipType;
 import com.spacesim.util.SpatialHashGrid;
 import org.junit.jupiter.api.Test;
 
@@ -123,6 +125,103 @@ class TradeAISystemTest {
             assertNull(ai.targetStation);
             assertEquals(1f, ai.routeSearchCooldown, FLOAT_EPSILON);
         }
+    }
+
+    @Test
+    void типКорабляОтбрасываетБолееПрибыльныйНесовместимыйТовар() {
+        Engine engine = createEngine();
+        Entity supplier = createStation(
+                0f, 0f, 5, 100, 5, 10f, 0f, Constants.FACTION_NEUTRAL);
+        configureTradableItem(supplier, Constants.ITEM_STEEL, 5, 5, 20f, 0f);
+        Entity buyer = createStation(
+                0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        configureTradableItem(buyer, Constants.ITEM_STEEL, 0, 5, 0f, 100f);
+        Entity fleet = createFleet(0f, 0f, 0, 1_000f)
+                .add(new ShipComponent(ShipType.FINISHED_GOODS_CARRIER));
+        engine.addEntity(supplier);
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_BUY, ai.state);
+        assertEquals(Constants.ITEM_FOOD, ai.targetItem);
+        assertEquals(50f, ai.expectedProfit, FLOAT_EPSILON);
+    }
+
+    @Test
+    void неторговыеТипыКораблейНеНачинаютПокупку() {
+        for (ShipType shipType : new ShipType[]{ShipType.MINING_SHIP, ShipType.COMBAT_SHIP}) {
+            Engine engine = createEngine();
+            Entity supplier = createStation(
+                    0f, 0f, 0, 100, 1, 0f, 0f, Constants.FACTION_NEUTRAL);
+            configureTradableItem(supplier, Constants.ITEM_ORE, 5, 5, 10f, 0f);
+            Entity buyer = createStation(
+                    0f, 0f, 0, 100, 1, 0f, 0f, Constants.FACTION_NEUTRAL);
+            configureTradableItem(buyer, Constants.ITEM_ORE, 0, 5, 0f, 30f);
+            Entity fleet = createFleet(0f, 0f, 0, 1_000f)
+                    .add(new ShipComponent(shipType));
+            TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+            ai.specializedItem = Constants.ITEM_ORE;
+            engine.addEntity(supplier);
+            engine.addEntity(buyer);
+            engine.addEntity(fleet);
+
+            engine.update(0f);
+
+            assertEquals(TradeAIComponent.State.IDLE, ai.state, shipType.name());
+            assertEquals(-1, ai.targetItem, shipType.name());
+            assertNull(ai.buyStation, shipType.name());
+            assertEquals(1f, ai.routeSearchCooldown, FLOAT_EPSILON, shipType.name());
+        }
+    }
+
+    @Test
+    void сменаТипаПередПокупкойАтомарноОтменяетЗагрузку() {
+        Engine engine = createEngine();
+        Entity supplier = createStation(
+                0f, 0f, 5, 100, 5, 10f, 0f, Constants.FACTION_NEUTRAL);
+        Entity buyer = createStation(
+                0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        ShipComponent ship = new ShipComponent(ShipType.FINISHED_GOODS_CARRIER);
+        Entity fleet = createFleet(0f, 0f, 0, 100f).add(ship);
+        engine.addEntity(supplier);
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+        engine.update(0f);
+        ship.type = ShipType.MATERIAL_CARRIER;
+        engine.update(0f);
+
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        assertEquals(TradeAIComponent.State.IDLE, ai.state);
+        assertEquals(0, inventory(fleet).stock[Constants.ITEM_FOOD]);
+        assertEquals(5, inventory(supplier).stock[Constants.ITEM_FOOD]);
+        assertEquals(100f, ai.credits, FLOAT_EPSILON);
+        assertNull(ai.buyStation);
+    }
+
+    @Test
+    void несовместимыйУжеЗагруженныйГрузМожноБезопасноПродать() {
+        Engine engine = createEngine();
+        Entity buyer = createStation(
+                0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        Entity fleet = createFleet(0f, 0f, 3, 0f)
+                .add(new ShipComponent(ShipType.MATERIAL_CARRIER));
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+        engine.update(0f);
+        engine.update(0f);
+
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        assertEquals(TradeAIComponent.State.IDLE, ai.state);
+        assertEquals(0, inventory(fleet).stock[Constants.ITEM_FOOD]);
+        assertEquals(3, inventory(buyer).stock[Constants.ITEM_FOOD]);
+        assertEquals(60f, ai.credits, FLOAT_EPSILON);
     }
 
     @Test

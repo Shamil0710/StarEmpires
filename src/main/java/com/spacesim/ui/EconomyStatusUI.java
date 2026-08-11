@@ -8,6 +8,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 
 import java.util.Objects;
@@ -15,8 +16,11 @@ import java.util.Objects;
 /**
  * Компактная сводка состояния экономической симуляции.
  *
- * <p>Панель показывает количество станций и кораблей, число кораблей в пути и
- * общий объём перевозимого груза, а также краткую легенду условных обозначений.
+ * <p>Панель показывает количество станций и кораблей, число кораблей в пути,
+ * общий объём груза и распределение корпусов по трём крупным ролям. Корабли
+ * старого формата без {@link ShipComponent}, но с {@link TradeAIComponent},
+ * учитываются как перевозчики. Краткая легенда условных обозначений остаётся
+ * компактной и помещается рядом с картой при размере окна {@code 800x600}.
  * Подробные данные конкретной сущности выводит {@link EntityDetailsUI}, поэтому
  * сводка остаётся короткой и не закрывает карту.</p>
  *
@@ -56,32 +60,66 @@ public class EconomyStatusUI extends Table {
     /**
      * Пересчитывает агрегированную сводку по актуальному набору сущностей.
      *
-     * <p>Сущность с рынком считается станцией, а сущность с торговым ИИ —
-     * кораблём. Груз суммируется только для кораблей и насыщается границей
-     * {@code int}, если модель была заполнена экстремальными значениями.</p>
+     * <p>Агрегация отделена от Scene2D в {@link #summarize(Iterable)}, поэтому правила подсчёта
+     * типов можно проверять без графического контекста.</p>
      *
      * @param entities ненулевое представление сущностей экономической модели
      * @throws NullPointerException если {@code entities == null}
      */
     public void update(Iterable<Entity> entities) {
+        contentLabel.setText(formatSummary(summarize(entities)));
+    }
+
+    /**
+     * Собирает независимый от Scene2D снимок экономической сводки.
+     *
+     * <p>Явный {@link ShipComponent} определяет современный класс корабля. Только при его
+     * отсутствии торговый ИИ считается признаком legacy-перевозчика. Груз суммируется для всех
+     * распознанных кораблей и насыщается границей {@code int}.</p>
+     *
+     * @param entities ненулевое представление сущностей мира; отдельные элементы могут быть null
+     * @return неизменяемые агрегированные счётчики
+     * @throws NullPointerException если {@code entities == null}
+     */
+    static Summary summarize(Iterable<Entity> entities) {
         Objects.requireNonNull(entities, "Entities must not be null");
         int stationCount = 0;
         int shipCount = 0;
         int travellingCount = 0;
+        int carrierCount = 0;
+        int miningCount = 0;
+        int combatCount = 0;
         long cargoUnits = 0L;
 
         for (Entity entity : entities) {
+            if (entity == null) {
+                continue;
+            }
             InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
             MarketComponent market = entity.getComponent(MarketComponent.class);
+            ShipComponent ship = entity.getComponent(ShipComponent.class);
             TradeAIComponent tradeAI = entity.getComponent(TradeAIComponent.class);
 
             if (market != null) {
                 stationCount++;
             }
-            if (tradeAI != null) {
+            boolean isLegacyShip = ship == null && tradeAI != null;
+            if (ship != null || isLegacyShip) {
                 shipCount++;
-                if (tradeAI.state == TradeAIComponent.State.TRAVEL_TO_BUY
-                        || tradeAI.state == TradeAIComponent.State.TRAVEL_TO_SELL) {
+                if (ship == null) {
+                    carrierCount++;
+                } else if (ship.type != null) {
+                    if (ship.type.isCarrier()) {
+                        carrierCount++;
+                    } else if (ship.type.isMining()) {
+                        miningCount++;
+                    } else if (ship.type.isCombat()) {
+                        combatCount++;
+                    }
+                }
+                if (tradeAI != null
+                        && (tradeAI.state == TradeAIComponent.State.TRAVEL_TO_BUY
+                        || tradeAI.state == TradeAIComponent.State.TRAVEL_TO_SELL)) {
                     travellingCount++;
                 }
                 if (inventory != null) {
@@ -91,12 +129,48 @@ public class EconomyStatusUI extends Table {
             }
         }
 
-        contentLabel.setText("Станции: " + stationCount
-                + "   Корабли: " + shipCount
-                + "\nВ пути: " + travellingCount
-                + "   Груз: " + cargoUnits
-                + "\nКруг — станция   Треугольник — корабль"
-                + "\nЛиния — текущий маршрут"
-                + "\nЛКМ — выбрать объект");
+        return new Summary(
+                stationCount,
+                shipCount,
+                travellingCount,
+                (int) cargoUnits,
+                carrierCount,
+                miningCount,
+                combatCount);
+    }
+
+    /** Формирует компактный текст панели из чистой модели сводки. */
+    static String formatSummary(Summary summary) {
+        Objects.requireNonNull(summary, "Summary must not be null");
+        return "Станции: " + summary.stationCount()
+                + "   Корабли: " + summary.shipCount()
+                + "\nВ пути: " + summary.travellingCount()
+                + "   Груз: " + summary.cargoUnits()
+                + "\nТранспорт: " + summary.carrierCount()
+                + "   Добыча: " + summary.miningCount()
+                + "   Боевые: " + summary.combatCount()
+                + "\nФорма и цвет — класс корабля"
+                + "\nЛиния — маршрут   ЛКМ — выбрать";
+    }
+
+    /**
+     * Неизменяемый набор счётчиков для текста экономической панели.
+     *
+     * @param stationCount число рыночных станций
+     * @param shipCount общее число современных и legacy-кораблей
+     * @param travellingCount число торговых кораблей с активным перелётом
+     * @param cargoUnits суммарное неотрицательное количество груза
+     * @param carrierCount число коммерческих перевозчиков
+     * @param miningCount число добывающих кораблей
+     * @param combatCount число боевых кораблей
+     */
+    record Summary(
+            int stationCount,
+            int shipCount,
+            int travellingCount,
+            int cargoUnits,
+            int carrierCount,
+            int miningCount,
+            int combatCount) {
     }
 }

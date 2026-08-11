@@ -10,6 +10,7 @@ import com.badlogic.gdx.math.Vector2;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
@@ -39,8 +40,10 @@ import java.util.List;
  * запасом станции-источника, средствами флота, его грузовым лимитом и физической вместимостью
  * инвентаря, свободным местом назначения и, если он положителен, спросом назначения. Среди
  * исполнимых вариантов выбирается маршрут с наибольшей конечной ожидаемой прибылью. Поле
- * {@link TradeAIComponent#specializedItem} может сузить новые маршруты до одного товара, не мешая
- * аварийно продать уже имеющийся груз.</p>
+ * {@link TradeAIComponent#specializedItem} может сузить новые маршруты до одного товара, а
+ * {@link ShipComponent} — до допустимой для корпуса категории груза. Отсутствующий корабельный
+ * компонент сохраняет прежнее универсальное поведение. Оба ограничения действуют только на новые
+ * покупки и не мешают аварийно продать уже имеющийся груз.</p>
  *
  * <p>Перемещение выполняется по прямой с постоянной скоростью, без поиска пути и учёта препятствий.
  * Цены и доступный объём повторно проверяются непосредственно перед сделкой. Все денежные расчёты
@@ -72,6 +75,8 @@ public class TradeAISystem extends IteratingSystem {
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
     /** Быстрый доступ к необязательной репутации торгового флота. */
     private final ComponentMapper<ReputationComponent> rm = ComponentMapper.getFor(ReputationComponent.class);
+    /** Доступ к необязательному типу корабля и его ограничениям грузового отсека. */
+    private final ComponentMapper<ShipComponent> sm = ComponentMapper.getFor(ShipComponent.class);
 
     /**
      * Создаёт торговую AI-систему.
@@ -242,7 +247,7 @@ public class TradeAISystem extends IteratingSystem {
                 MarketComponent sellMarket = mm.get(sellStation);
 
                 for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-                    if (!acceptsNewRouteItem(ai, itemId)
+                    if (!acceptsNewRouteItem(fleet, ai, itemId)
                             || !buyMarket.isTradable(itemId)
                             || !sellMarket.isTradable(itemId)) {
                         continue;
@@ -454,7 +459,7 @@ public class TradeAISystem extends IteratingSystem {
      * @param ai изменяемое состояние и параметры выбранного маршрута
      */
     private void buyCargo(Entity fleet, TradeAIComponent ai) {
-        if (!isBuyRouteValid(ai)) {
+        if (!isBuyRouteValid(fleet, ai)) {
             abandonRoute(ai);
             return;
         }
@@ -556,11 +561,14 @@ public class TradeAISystem extends IteratingSystem {
     /**
      * Проверяет структурную пригодность маршрута перед покупкой.
      *
+     * @param fleet покупающий флот с необязательным типом корпуса
      * @param ai состояние с выбранными станциями и товаром
-     * @return {@code true}, если товар допустим, станции различны, всё ещё активны и обе торгуют им
+     * @return {@code true}, если корпус принимает товар, станции различны, всё ещё активны и обе
+     *         торгуют им
      */
-    private boolean isBuyRouteValid(TradeAIComponent ai) {
+    private boolean isBuyRouteValid(Entity fleet, TradeAIComponent ai) {
         return isValidItem(ai.targetItem)
+                && canShipPurchaseItem(fleet, ai.targetItem)
                 && ai.buyStation != ai.sellStation
                 && isActiveMarketStation(null, ai.buyStation)
                 && isActiveMarketStation(null, ai.sellStation)
@@ -619,12 +627,31 @@ public class TradeAISystem extends IteratingSystem {
      * <p>Универсальное значение {@code -1} разрешает любой товар. Уже имеющийся груз этим
      * фильтром не ограничивается и может быть продан системой восстановления маршрута.</p>
      *
+     * @param fleet сущность флота с необязательным ограничением типа корабля
      * @param ai состояние флота с конфигурацией специализации
      * @param itemId проверяемый допустимый идентификатор товара
      * @return {@code true}, если товар разрешён для нового полного маршрута
      */
-    private boolean acceptsNewRouteItem(TradeAIComponent ai, int itemId) {
-        return ai.specializedItem == -1 || ai.specializedItem == itemId;
+    private boolean acceptsNewRouteItem(Entity fleet, TradeAIComponent ai, int itemId) {
+        return (ai.specializedItem == -1 || ai.specializedItem == itemId)
+                && canShipPurchaseItem(fleet, itemId);
+    }
+
+    /**
+     * Проверяет физическую пригодность корабля для новой покупки.
+     *
+     * <p>Сущности старого формата без {@link ShipComponent} считаются универсальными. Наличие
+     * компонента включает строгую политику его типа: добывающие и боевые корпуса не закупают товар,
+     * а транспорт принимает только свою категорию. Проверка повторяется перед самой покупкой, чтобы
+     * смена типа во время полёта не позволила загрузить несовместимый груз.</p>
+     *
+     * @param fleet проверяемая сущность флота
+     * @param itemId допустимый идентификатор планируемого товара
+     * @return {@code true}, если покупка разрешена либо тип корабля не задан
+     */
+    private boolean canShipPurchaseItem(Entity fleet, int itemId) {
+        ShipComponent ship = sm.get(fleet);
+        return ship == null || ship.canPurchaseItem(itemId);
     }
 
     /**

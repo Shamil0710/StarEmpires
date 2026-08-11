@@ -18,5 +18,10 @@
  *
  * <p>{@link com.spacesim.components.TradeAIComponent#specializedItem} позволяет тестовому миру
  * закреплять транспорт за одним товаром, не меняя универсальное поведение остальных флотов.</p>
+ *
+ * <p>{@link com.spacesim.components.ShipComponent} задаёт тип корабля,
+ * {@link com.spacesim.components.MiningComponent} хранит состояние абстрактной добычи, а
+ * {@link com.spacesim.components.CombatComponent} описывает его базовые боевые характеристики.
+ * Эти компоненты независимы от наличия торгового автомата.</p>
  */
 package com.spacesim.components;
