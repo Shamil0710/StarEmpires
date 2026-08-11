@@ -13,6 +13,7 @@ import com.spacesim.util.SpatialHashGrid;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -193,6 +194,83 @@ class TradeAISystemTest {
         assertEquals(0, inventory(fleet).stock[Constants.ITEM_FOOD]);
         assertEquals(1, inventory(supplier).stock[Constants.ITEM_FOOD]);
         assertEquals(10f, ai.credits, FLOAT_EPSILON);
+    }
+
+    @Test
+    void некорректныйШагВремениНеМеняетМаршрутИПозицию() {
+        Engine engine = createEngine();
+        Entity buyer = createStation(100f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        Entity fleet = createFleet(0f, 0f, 5, 0f);
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+        engine.update(0f);
+
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        TransformComponent transform = fleet.getComponent(TransformComponent.class);
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_SELL, ai.state);
+
+        engine.update(-1f);
+        engine.update(Float.NaN);
+        engine.update(Float.POSITIVE_INFINITY);
+
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_SELL, ai.state);
+        assertEquals(0f, transform.position.x, FLOAT_EPSILON);
+        assertEquals(0f, transform.position.y, FLOAT_EPSILON);
+        assertSame(buyer, ai.sellStation);
+    }
+
+    @Test
+    void повреждённыйБалансНеПриводитКИсключениюИлиПередачеГруза() {
+        Engine engine = createEngine();
+        Entity buyer = createStation(0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        Entity fleet = createFleet(0f, 0f, 5, 0f);
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        ai.state = TradeAIComponent.State.SELLING;
+        ai.sellStation = buyer;
+        ai.targetStation = buyer;
+        ai.targetItem = Constants.ITEM_FOOD;
+        ai.targetAmount = 5;
+        ai.credits = Float.NaN;
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+
+        assertDoesNotThrow(() -> engine.update(0f));
+
+        assertEquals(TradeAIComponent.State.IDLE, ai.state);
+        assertEquals(5, inventory(fleet).stock[Constants.ITEM_FOOD]);
+        assertEquals(0, inventory(buyer).stock[Constants.ITEM_FOOD]);
+        assertNull(ai.sellStation);
+    }
+
+    @Test
+    void поискНеВыбираетПродажуКотораяНеМожетИзменитьБаланс() {
+        Engine roundedEngine = createEngine();
+        Entity roundedBuyer = createStation(
+                0f, 0f, 0, 100, 5, 0f, 1f, Constants.FACTION_NEUTRAL);
+        Entity richFleet = createFleet(0f, 0f, 5, Float.MAX_VALUE);
+        roundedEngine.addEntity(roundedBuyer);
+        roundedEngine.addEntity(richFleet);
+
+        roundedEngine.update(0f);
+
+        TradeAIComponent richAi = richFleet.getComponent(TradeAIComponent.class);
+        assertEquals(TradeAIComponent.State.IDLE, richAi.state);
+        assertNull(richAi.sellStation);
+        assertEquals(5, inventory(richFleet).stock[Constants.ITEM_FOOD]);
+
+        Engine overflowEngine = createEngine();
+        Entity overflowBuyer = createStation(
+                0f, 0f, 0, 100, 5, 0f, Float.MAX_VALUE, Constants.FACTION_NEUTRAL);
+        Entity loadedFleet = createFleet(0f, 0f, 2, 0f);
+        overflowEngine.addEntity(overflowBuyer);
+        overflowEngine.addEntity(loadedFleet);
+
+        overflowEngine.update(0f);
+
+        TradeAIComponent loadedAi = loadedFleet.getComponent(TradeAIComponent.class);
+        assertEquals(TradeAIComponent.State.IDLE, loadedAi.state);
+        assertNull(loadedAi.sellStation);
+        assertEquals(2, inventory(loadedFleet).stock[Constants.ITEM_FOOD]);
     }
 
     private Engine createEngine() {

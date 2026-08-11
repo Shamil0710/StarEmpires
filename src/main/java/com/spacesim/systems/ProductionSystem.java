@@ -7,9 +7,11 @@ import com.spacesim.constants.Constants;
 import com.spacesim.model.Recipe;
 
 public class ProductionSystem extends IteratingSystem {
-    private ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
-    private ComponentMapper<ProductionComponent> pm = ComponentMapper.getFor(ProductionComponent.class);
-    private ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
+    private static final long UNLIMITED_CYCLES = Long.MAX_VALUE;
+
+    private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
+    private final ComponentMapper<ProductionComponent> pm = ComponentMapper.getFor(ProductionComponent.class);
+    private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
 
     public ProductionSystem() {
         super(Family.all(InventoryComponent.class, ProductionComponent.class).get());
@@ -17,60 +19,118 @@ public class ProductionSystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
-        InventoryComponent inventory = im.get(entity);
-        ProductionComponent production = pm.get(entity);
-
-        if (production.recipes.isEmpty()) {
+        if (!Float.isFinite(deltaTime) || deltaTime <= 0f) {
             return;
         }
 
-        Recipe recipe = production.recipes.get(production.activeRecipeIndex % production.recipes.size());
+        InventoryComponent inventory = im.get(entity);
+        ProductionComponent production = pm.get(entity);
+        Recipe recipe = production.getActiveRecipe();
+
+        if (recipe == null) {
+            production.progressSeconds = 0f;
+            return;
+        }
+
         if (!canProduce(inventory, recipe)) {
             production.progressSeconds = 0f;
             return;
         }
 
-        production.progressSeconds += deltaTime;
-        if (production.progressSeconds < recipe.durationSeconds) {
+        double elapsedSeconds = normalizedProgress(production.progressSeconds) + deltaTime;
+        double completedCycles = Math.floor(elapsedSeconds / recipe.durationSeconds);
+        if (completedCycles < 1d) {
+            production.progressSeconds = (float) elapsedSeconds;
             return;
         }
 
-        production.progressSeconds -= recipe.durationSeconds;
-        consumeInputs(inventory, recipe);
-        addOutputs(inventory, recipe);
+        long maximumCycles = getMaximumProducibleCycles(inventory, recipe);
+        boolean resourcesExhausted = false;
+        boolean inventoryChanged = maximumCycles != UNLIMITED_CYCLES;
 
-        if (mm.has(entity)) {
+        if (inventoryChanged) {
+            long cyclesToApply = completedCycles >= maximumCycles
+                    ? maximumCycles
+                    : (long) completedCycles;
+            applyRecipe(inventory, recipe, cyclesToApply);
+            resourcesExhausted = !canProduce(inventory, recipe);
+        }
+
+        production.progressSeconds = resourcesExhausted
+                ? 0f
+                : (float) (elapsedSeconds % recipe.durationSeconds);
+
+        if (inventoryChanged && mm.has(entity)) {
             mm.get(entity).isDirty = true;
         }
     }
 
-    private boolean canProduce(InventoryComponent inventory, Recipe recipe) {
-        int totalStock = 0;
-        int totalInputs = 0;
-        int totalOutputs = 0;
+    private long getMaximumProducibleCycles(InventoryComponent inventory, Recipe recipe) {
+        long maximumCycles = UNLIMITED_CYCLES;
+        long totalStock = 0L;
+        long totalDeltaPerCycle = 0L;
 
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-            if (inventory.stock[itemId] < recipe.inputItems[itemId]) {
+            long stock = inventory.stock[itemId];
+            long inputAmount = recipe.getInputAmount(itemId);
+            long outputAmount = recipe.getOutputAmount(itemId);
+            long itemDeltaPerCycle = outputAmount - inputAmount;
+
+            totalStock += stock;
+            totalDeltaPerCycle += itemDeltaPerCycle;
+
+            if (itemDeltaPerCycle < 0L) {
+                long cyclesUntilExhaustion = (stock - inputAmount) / -itemDeltaPerCycle + 1L;
+                maximumCycles = Math.min(maximumCycles, cyclesUntilExhaustion);
+            } else if (itemDeltaPerCycle > 0L) {
+                long cyclesUntilOverflow = (Integer.MAX_VALUE - stock) / itemDeltaPerCycle;
+                maximumCycles = Math.min(maximumCycles, cyclesUntilOverflow);
+            }
+        }
+
+        if (totalDeltaPerCycle > 0L) {
+            long cyclesUntilCapacity = ((long) inventory.capacity - totalStock) / totalDeltaPerCycle;
+            maximumCycles = Math.min(maximumCycles, cyclesUntilCapacity);
+        }
+
+        return maximumCycles;
+    }
+
+    private boolean canProduce(InventoryComponent inventory, Recipe recipe) {
+        long resultingTotalStock = 0L;
+
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            int stock = inventory.stock[itemId];
+            int inputAmount = recipe.getInputAmount(itemId);
+            int outputAmount = recipe.getOutputAmount(itemId);
+
+            if (stock < 0 || stock < inputAmount) {
                 return false;
             }
 
-            totalStock += inventory.stock[itemId];
-            totalInputs += recipe.inputItems[itemId];
-            totalOutputs += recipe.outputItems[itemId];
+            long resultingItemStock = (long) stock - inputAmount + outputAmount;
+            if (resultingItemStock > Integer.MAX_VALUE) {
+                return false;
+            }
+            resultingTotalStock += resultingItemStock;
         }
 
-        return totalStock - totalInputs + totalOutputs <= inventory.capacity;
+        return resultingTotalStock <= inventory.capacity;
     }
 
-    private void consumeInputs(InventoryComponent inventory, Recipe recipe) {
+    private void applyRecipe(InventoryComponent inventory, Recipe recipe, long cycles) {
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-            inventory.stock[itemId] -= recipe.inputItems[itemId];
+            long itemDeltaPerCycle = (long) recipe.getOutputAmount(itemId)
+                    - recipe.getInputAmount(itemId);
+            long resultingStock = inventory.stock[itemId] + itemDeltaPerCycle * cycles;
+            inventory.stock[itemId] = (int) resultingStock;
         }
     }
 
-    private void addOutputs(InventoryComponent inventory, Recipe recipe) {
-        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-            inventory.stock[itemId] += recipe.outputItems[itemId];
+    private double normalizedProgress(float progressSeconds) {
+        if (!Float.isFinite(progressSeconds) || progressSeconds < 0f) {
+            return 0d;
         }
+        return progressSeconds;
     }
 }

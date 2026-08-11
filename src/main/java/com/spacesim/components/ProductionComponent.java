@@ -9,4 +9,11 @@ public class ProductionComponent implements Component {
     public final List<Recipe> recipes = new ArrayList<>();
     public int activeRecipeIndex = 0;
     public float progressSeconds = 0f;
+
+    public Recipe getActiveRecipe() {
+        if (activeRecipeIndex < 0 || activeRecipeIndex >= recipes.size()) {
+            return null;
+        }
+        return recipes.get(activeRecipeIndex);
+    }
 }

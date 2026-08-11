@@ -50,6 +50,19 @@ class ReputationTradeControllerTest {
         assertEquals(Constants.MAX_REPUTATION, reputation.getReputation(Constants.FACTION_MINERS));
     }
 
+    @Test
+    void некорректноеИзменениеРепутацииОтклоняется() {
+        ReputationComponent reputation = new ReputationComponent();
+
+        assertAll(
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> reputation.addReputation(Constants.FACTION_MINERS, Float.NaN)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> reputation.addReputation(Constants.FACTION_MINERS, Float.POSITIVE_INFINITY)),
+                () -> assertEquals(0f, reputation.getReputation(Constants.FACTION_MINERS))
+        );
+    }
+
     private Entity createStation(int factionId) {
         Entity station = new Entity();
         station.add(new InventoryComponent());

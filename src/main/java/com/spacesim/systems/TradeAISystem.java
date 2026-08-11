@@ -51,6 +51,10 @@ public class TradeAISystem extends IteratingSystem {
 
     @Override
     public void update(float deltaTime) {
+        if (!Float.isFinite(deltaTime) || deltaTime < 0f) {
+            return;
+        }
+
         rebuildSpatialIndex();
         super.update(deltaTime);
     }
@@ -59,6 +63,11 @@ public class TradeAISystem extends IteratingSystem {
     protected void processEntity(Entity entity, float deltaTime) {
         TradeAIComponent ai = am.get(entity);
         TransformComponent transform = tm.get(entity);
+
+        if (ai.state == null || !Float.isFinite(ai.credits) || ai.credits < 0f) {
+            abandonRoute(ai);
+            return;
+        }
 
         switch (ai.state) {
             case IDLE:
@@ -155,7 +164,17 @@ public class TradeAISystem extends IteratingSystem {
                         continue;
                     }
 
-                    float routeProfit = (salePrice - purchasePrice) * amount;
+                    float purchaseCost = getExecutableCost(ai.credits, purchasePrice, amount);
+                    if (!isPositiveFinitePrice(purchaseCost)) {
+                        continue;
+                    }
+                    float creditsAfterPurchase = ai.credits - purchaseCost;
+                    float saleRevenue = getExecutableRevenue(creditsAfterPurchase, salePrice, amount);
+                    if (!isPositiveFinitePrice(saleRevenue)) {
+                        continue;
+                    }
+
+                    float routeProfit = saleRevenue - purchaseCost;
                     if (routeProfit > bestProfit) {
                         bestProfit = routeProfit;
                         ai.buyStation = buyStation;
@@ -209,7 +228,7 @@ public class TradeAISystem extends IteratingSystem {
                 }
 
                 int amount = Math.min(cargoAmount, freeCapacity);
-                float revenue = salePrice * amount;
+                float revenue = getExecutableRevenue(ai.credits, salePrice, amount);
                 if (revenue > bestRevenue) {
                     bestRevenue = revenue;
                     ai.buyStation = null;
@@ -393,6 +412,45 @@ public class TradeAISystem extends IteratingSystem {
 
     private boolean isPositiveFinitePrice(float price) {
         return Float.isFinite(price) && price > 0f;
+    }
+
+    private float getExecutableCost(float balance, float unitPrice, int amount) {
+        float cost = getFiniteTotal(unitPrice, amount);
+        float resultingBalance = balance - cost;
+        if (!Float.isFinite(balance)
+                || balance < 0f
+                || !isPositiveFinitePrice(cost)
+                || !Float.isFinite(resultingBalance)
+                || resultingBalance < 0f
+                || resultingBalance >= balance) {
+            return Float.NaN;
+        }
+        return cost;
+    }
+
+    private float getExecutableRevenue(float balance, float unitPrice, int amount) {
+        float revenue = getFiniteTotal(unitPrice, amount);
+        float resultingBalance = balance + revenue;
+        if (!Float.isFinite(balance)
+                || balance < 0f
+                || !isPositiveFinitePrice(revenue)
+                || !Float.isFinite(resultingBalance)
+                || resultingBalance <= balance) {
+            return Float.NaN;
+        }
+        return revenue;
+    }
+
+    private float getFiniteTotal(float unitPrice, int amount) {
+        double total = (double) unitPrice * amount;
+        if (!isPositiveFinitePrice(unitPrice)
+                || amount <= 0
+                || !Double.isFinite(total)
+                || total <= 0d
+                || total > Float.MAX_VALUE) {
+            return Float.NaN;
+        }
+        return (float) total;
     }
 
     private void abandonRoute(TradeAIComponent ai) {
