@@ -1,9 +1,13 @@
 package com.spacesim.ui;
 
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.Value;
+import com.badlogic.gdx.utils.Align;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.FactionComponent;
@@ -13,18 +17,31 @@ import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
 
 public class EconomyStatusUI extends Table {
+    private static final float MIN_PANEL_WIDTH = 280f;
+    private static final float MAX_PANEL_WIDTH = 480f;
+    private static final float HORIZONTAL_GAP = 20f;
+
     private final Skin skin;
     private final Label contentLabel;
 
     public EconomyStatusUI(Skin skin) {
         this.skin = skin;
         this.contentLabel = new Label("", skin);
+        contentLabel.setWrap(true);
+        contentLabel.setAlignment(Align.topRight);
 
         setFillParent(true);
+        setTouchable(Touchable.childrenOnly);
         top().right();
         pad(10);
         add(new Label("Экономика", skin)).right().row();
-        add(contentLabel).right();
+        add(contentLabel).right().width(new Value() {
+            @Override
+            public float get(Actor context) {
+                float availableHalf = EconomyStatusUI.this.getWidth() * 0.5f - HORIZONTAL_GAP;
+                return Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, availableHalf));
+            }
+        });
     }
 
     public void update(Iterable<Entity> entities) {

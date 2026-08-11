@@ -7,6 +7,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.kotcrab.vis.ui.VisUI;
 import com.spacesim.components.*;
 import com.spacesim.constants.Constants;
@@ -20,6 +21,8 @@ import com.spacesim.ui.PriceGraphRenderer;
 import com.spacesim.util.SpatialHashGrid;
 
 public class SpaceSimGame extends ApplicationAdapter {
+    private static final float ECONOMY_UI_UPDATE_INTERVAL_SECONDS = 0.25f;
+
     private Engine engine;
     private GlobalEventManager eventManager;
     private SpatialHashGrid grid;
@@ -29,6 +32,7 @@ public class SpaceSimGame extends ApplicationAdapter {
     private NewsUI newsUI;
     private EconomyStatusUI economyStatusUI;
     private PriceGraphRenderer graphRenderer;
+    private float economyUiUpdateAccumulator;
 
     @Override
     public void create() {
@@ -38,13 +42,14 @@ public class SpaceSimGame extends ApplicationAdapter {
         grid = new SpatialHashGrid(200);
 
         // UI Init
-        stage = new Stage();
+        stage = new Stage(new ScreenViewport());
         Skin skin = VisUI.getSkin();
         newsUI = new NewsUI(skin);
         stage.addActor(newsUI);
         economyStatusUI = new EconomyStatusUI(skin);
         stage.addActor(economyStatusUI);
         graphRenderer = new PriceGraphRenderer();
+        Gdx.input.setInputProcessor(stage);
 
         // Systems Init
         engine.addSystem(new MarketSystem(eventManager));
@@ -61,6 +66,8 @@ public class SpaceSimGame extends ApplicationAdapter {
         createStation(500, 100, 100, 1000, 5.0f, Constants.FACTION_NEUTRAL);
         // Тестовый торговый флот
         createFleet(300, 300);
+
+        economyStatusUI.update(engine.getEntities());
     }
 
     private void createStation(float x, float y, int foodStock, int targetFoodStock, float foodConsumption, int factionId) {
@@ -69,7 +76,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         e.getComponent(TransformComponent.class).position.set(x, y);
 
         InventoryComponent inv = new InventoryComponent();
-        inv.stock[2] = foodStock;
+        inv.stock[Constants.ITEM_FOOD] = foodStock;
         e.add(inv);
 
         MarketComponent m = new MarketComponent();
@@ -130,7 +137,11 @@ public class SpaceSimGame extends ApplicationAdapter {
             newsUI.addNews(article);
         }
         engine.update(delta);
-        economyStatusUI.update(engine.getEntities());
+        economyUiUpdateAccumulator += delta;
+        if (economyUiUpdateAccumulator >= ECONOMY_UI_UPDATE_INTERVAL_SECONDS) {
+            economyUiUpdateAccumulator %= ECONOMY_UI_UPDATE_INTERVAL_SECONDS;
+            economyStatusUI.update(engine.getEntities());
+        }
         stage.act(delta);
 
         // Draw
@@ -138,20 +149,43 @@ public class SpaceSimGame extends ApplicationAdapter {
         stage.draw();
 
         // Рисуем график для первой попавшейся станции (для теста)
-        if(engine.getEntities().size() > 0) {
+        if (engine.getEntities().size() > 0) {
             Entity s = engine.getEntities().first();
             if (s.getComponent(PriceHistoryComponent.class) != null) {
-                // Рисуем график товара ID 2 (Food)
-                graphRenderer.render(s.getComponent(PriceHistoryComponent.class).history[2],
-                        50, 50, 200, 100);
+                graphRenderer.render(
+                        stage.getCamera().combined,
+                        s.getComponent(PriceHistoryComponent.class).history[Constants.ITEM_FOOD],
+                        50f,
+                        50f,
+                        200f,
+                        100f);
             }
         }
     }
 
     @Override
+    public void resize(int width, int height) {
+        if (width <= 0 || height <= 0 || stage == null) {
+            return;
+        }
+        stage.getViewport().update(width, height, true);
+    }
+
+    @Override
     public void dispose() {
-        VisUI.dispose();
-        stage.dispose();
-        graphRenderer.dispose();
+        if (Gdx.input != null && Gdx.input.getInputProcessor() == stage) {
+            Gdx.input.setInputProcessor(null);
+        }
+        if (stage != null) {
+            stage.dispose();
+            stage = null;
+        }
+        if (graphRenderer != null) {
+            graphRenderer.dispose();
+            graphRenderer = null;
+        }
+        if (VisUI.isLoaded()) {
+            VisUI.dispose();
+        }
     }
 }
