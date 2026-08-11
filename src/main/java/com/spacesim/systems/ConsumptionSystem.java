@@ -21,14 +21,52 @@ public class ConsumptionSystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
+        if (!Float.isFinite(deltaTime) || deltaTime <= 0f) {
+            return;
+        }
+
         InventoryComponent inv = im.get(entity);
         MarketComponent market = mm.get(entity);
         TransformComponent transform = tm.get(entity);
 
         for (int i = 0; i < Constants.MAX_ITEMS; i++) {
-            if (inv.stock[i] > 0 && market.baseConsumption[i] > 0) {
-                float consume = market.baseConsumption[i] * getConsumptionMultiplier(i, transform) * deltaTime;
-                inv.stock[i] = Math.max(0, (int)(inv.stock[i] - consume));
+            if (inv.stock[i] <= 0) {
+                market.consumptionRemainder[i] = 0d;
+                continue;
+            }
+
+            float baseConsumption = market.baseConsumption[i];
+            if (!Float.isFinite(baseConsumption) || baseConsumption <= 0f) {
+                market.consumptionRemainder[i] = 0d;
+                continue;
+            }
+
+            float multiplier = getConsumptionMultiplier(i, transform);
+            if (!Float.isFinite(multiplier) || multiplier <= 0f) {
+                continue;
+            }
+
+            double accumulatedConsumption = market.consumptionRemainder[i]
+                    + (double) baseConsumption * multiplier * deltaTime;
+            if (!Double.isFinite(accumulatedConsumption)) {
+                market.consumptionRemainder[i] = 0d;
+                continue;
+            }
+
+            double wholeConsumption = Math.floor(accumulatedConsumption);
+            if (wholeConsumption < 1d) {
+                market.consumptionRemainder[i] = accumulatedConsumption;
+                continue;
+            }
+
+            int unitsToConsume = wholeConsumption >= Integer.MAX_VALUE
+                    ? Integer.MAX_VALUE
+                    : (int) wholeConsumption;
+            int consumedUnits = Math.min(inv.stock[i], unitsToConsume);
+            inv.stock[i] -= consumedUnits;
+            market.consumptionRemainder[i] = accumulatedConsumption - wholeConsumption;
+
+            if (consumedUnits > 0) {
                 market.isDirty = true;
             }
         }
@@ -37,7 +75,10 @@ public class ConsumptionSystem extends IteratingSystem {
     private float getConsumptionMultiplier(int itemId, TransformComponent transform) {
         float multiplier = 1.0f;
         for (EconomyEvent event : eventManager.activeEvents) {
-            if (event.targetItemId == itemId && transform.position.dst(event.location) < event.radius) {
+            if (event != null
+                    && event.location != null
+                    && event.targetItemId == itemId
+                    && transform.position.dst(event.location) < event.radius) {
                 multiplier *= event.consumptionMultiplier;
             }
         }

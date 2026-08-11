@@ -8,5 +8,6 @@ public class MarketComponent implements Component {
     public float[] buyPrices = new float[Constants.MAX_ITEMS];
     public int[] targetStock = new int[Constants.MAX_ITEMS]; // "Идеальное" кол-во
     public float[] baseConsumption = new float[Constants.MAX_ITEMS];
+    public double[] consumptionRemainder = new double[Constants.MAX_ITEMS];
     public boolean isDirty = true;
 }
