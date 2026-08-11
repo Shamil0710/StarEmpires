@@ -19,7 +19,7 @@ public class MarketSystem extends EntitySystem {
 
     @Override
     public void addedToEngine(Engine engine) {
-        entities = engine.getEntitiesFor(Family.all(MarketComponent.class, InventoryComponent.class).get());
+        entities = engine.getEntitiesFor(Family.all(MarketComponent.class, InventoryComponent.class, TransformComponent.class).get());
     }
 
     @Override

@@ -7,6 +7,7 @@ import java.util.List;
 
 public class GlobalEventManager {
     public List<EconomyEvent> activeEvents = new ArrayList<>();
+    private final List<NewsArticle> pendingNews = new ArrayList<>();
 
     public void update(float delta) {
         activeEvents.removeIf(e -> {
@@ -24,6 +25,13 @@ public class GlobalEventManager {
             e.location = new Vector2(100, 100);
             e.radius = 500;
             activeEvents.add(e);
+            pendingNews.add(NewsGenerator.generate(e));
         }
+    }
+
+    public List<NewsArticle> consumePendingNews() {
+        List<NewsArticle> news = new ArrayList<>(pendingNews);
+        pendingNews.clear();
+        return news;
     }
 }
