@@ -73,8 +73,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         e.add(inv);
 
         MarketComponent m = new MarketComponent();
-        m.targetStock[2] = targetFoodStock;
-        m.baseConsumption[2] = foodConsumption;
+        m.configureTradableItem(Constants.ITEM_FOOD, targetFoodStock, foodConsumption);
         e.add(m);
         e.add(new FactionComponent(factionId));
 
@@ -93,7 +92,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         e.add(inv);
 
         MarketComponent m = new MarketComponent();
-        m.targetStock[Constants.ITEM_STEEL] = 300;
+        m.configureTradableItem(Constants.ITEM_STEEL, 300, 0f);
         e.add(m);
         e.add(new FactionComponent(factionId));
 

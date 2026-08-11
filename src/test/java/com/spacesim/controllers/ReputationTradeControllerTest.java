@@ -53,7 +53,10 @@ class ReputationTradeControllerTest {
     private Entity createStation(int factionId) {
         Entity station = new Entity();
         station.add(new InventoryComponent());
-        station.add(new MarketComponent());
+        MarketComponent market = new MarketComponent();
+        market.configureTradableItem(Constants.ITEM_FOOD, 100, 0f);
+        market.configureTradableItem(Constants.ITEM_STEEL, 100, 0f);
+        station.add(market);
         station.add(new FactionComponent(factionId));
         return station;
     }

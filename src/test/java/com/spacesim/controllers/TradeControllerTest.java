@@ -19,6 +19,7 @@ class TradeControllerTest {
         station.add(stationInventory);
 
         MarketComponent market = new MarketComponent();
+        market.configureTradableItem(Constants.ITEM_FOOD, 100, 0f);
         market.sellPrices[Constants.ITEM_FOOD] = 10f;
         station.add(market);
 
@@ -41,6 +42,7 @@ class TradeControllerTest {
         station.add(stationInventory);
 
         MarketComponent market = new MarketComponent();
+        market.configureTradableItem(Constants.ITEM_STEEL, 100, 0f);
         market.buyPrices[Constants.ITEM_STEEL] = 25f;
         station.add(market);
 
@@ -55,5 +57,28 @@ class TradeControllerTest {
         assertEquals(1, sellerInventory.stock[Constants.ITEM_STEEL]);
         assertEquals(85f, credits.credits);
         assertTrue(market.isDirty);
+    }
+
+    @Test
+    void отключенныйТоварНельзяКупить() {
+        Entity station = new Entity();
+        InventoryComponent stationInventory = new InventoryComponent();
+        stationInventory.stock[Constants.ITEM_FOOD] = 10;
+        station.add(stationInventory);
+
+        MarketComponent market = new MarketComponent();
+        market.sellPrices[Constants.ITEM_FOOD] = 1f;
+        station.add(market);
+
+        InventoryComponent buyerInventory = new InventoryComponent();
+        TradeController.CreditAccount credits = new TradeController.CreditAccount(100f);
+
+        boolean result = tradeController.buyFromStation(
+                station, buyerInventory, Constants.ITEM_FOOD, 1, credits);
+
+        assertFalse(result);
+        assertEquals(10, stationInventory.stock[Constants.ITEM_FOOD]);
+        assertEquals(0, buyerInventory.stock[Constants.ITEM_FOOD]);
+        assertEquals(100f, credits.credits);
     }
 }

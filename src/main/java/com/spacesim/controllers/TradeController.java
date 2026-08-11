@@ -14,6 +14,18 @@ public class TradeController {
     public static class PlayerProfile { public float credits; public int[] cargo = new int[20]; }
 
     public boolean buy(Entity station, int itemId, int amount, PlayerProfile player) {
+        if (station == null
+                || player == null
+                || amount <= 0
+                || itemId < 0
+                || itemId >= Constants.MAX_ITEMS
+                || itemId >= player.cargo.length
+                || !im.has(station)
+                || !mm.has(station)
+                || !mm.get(station).isTradable(itemId)) {
+            return false;
+        }
+
         InventoryComponent inv = im.get(station);
         MarketComponent market = mm.get(station);
 
@@ -121,6 +133,7 @@ public class TradeController {
                 && mm.has(station)
                 && itemId >= 0
                 && itemId < Constants.MAX_ITEMS
+                && mm.get(station).isTradable(itemId)
                 && amount > 0;
     }
 

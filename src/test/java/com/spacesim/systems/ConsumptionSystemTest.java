@@ -2,10 +2,12 @@ package com.spacesim.systems;
 
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.gdx.math.Vector2;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.events.EconomyEvent;
 import com.spacesim.events.GlobalEventManager;
 import org.junit.jupiter.api.Test;
 
@@ -81,6 +83,27 @@ class ConsumptionSystemTest {
         assertFalse(world.market.isDirty);
     }
 
+    @Test
+    void событиеУсиливаетПотреблениеТолькоЦелевогоТовара() {
+        GlobalEventManager eventManager = new GlobalEventManager(0d);
+        TestWorld world = createWorld(10, 1f, eventManager);
+        world.inventory.stock[Constants.ITEM_STEEL] = 10;
+        world.market.configureTradableItem(Constants.ITEM_STEEL, 100, 1f);
+        eventManager.activateEvent(new EconomyEvent(
+                "Продовольственный кризис",
+                Constants.ITEM_FOOD,
+                1f,
+                2f,
+                10f,
+                new Vector2(0f, 0f),
+                100f));
+
+        world.engine.update(1f);
+
+        assertEquals(8, world.inventory.stock[Constants.ITEM_FOOD]);
+        assertEquals(9, world.inventory.stock[Constants.ITEM_STEEL]);
+    }
+
     private int simulateConsumption(int framesPerSecond, int seconds) {
         TestWorld world = createWorld(100, 5f);
         float deltaTime = 1f / framesPerSecond;
@@ -93,14 +116,19 @@ class ConsumptionSystemTest {
     }
 
     private TestWorld createWorld(int initialStock, float consumptionPerSecond) {
+        return createWorld(initialStock, consumptionPerSecond, new GlobalEventManager(0d));
+    }
+
+    private TestWorld createWorld(int initialStock, float consumptionPerSecond,
+                                  GlobalEventManager eventManager) {
         Engine engine = new Engine();
-        engine.addSystem(new ConsumptionSystem(new GlobalEventManager()));
+        engine.addSystem(new ConsumptionSystem(eventManager));
 
         Entity station = new Entity();
         InventoryComponent inventory = new InventoryComponent();
         inventory.stock[Constants.ITEM_FOOD] = initialStock;
         MarketComponent market = new MarketComponent();
-        market.baseConsumption[Constants.ITEM_FOOD] = consumptionPerSecond;
+        market.configureTradableItem(Constants.ITEM_FOOD, 100, consumptionPerSecond);
 
         station.add(inventory);
         station.add(market);

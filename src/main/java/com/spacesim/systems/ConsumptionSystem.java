@@ -74,12 +74,9 @@ public class ConsumptionSystem extends IteratingSystem {
 
     private float getConsumptionMultiplier(int itemId, TransformComponent transform) {
         float multiplier = 1.0f;
-        for (EconomyEvent event : eventManager.activeEvents) {
-            if (event != null
-                    && event.location != null
-                    && event.targetItemId == itemId
-                    && transform.position.dst(event.location) < event.radius) {
-                multiplier *= event.consumptionMultiplier;
+        for (EconomyEvent event : eventManager.getActiveEvents()) {
+            if (event.affects(itemId, transform.position)) {
+                multiplier *= event.getConsumptionMultiplier();
             }
         }
         return multiplier;

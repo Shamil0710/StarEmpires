@@ -88,13 +88,17 @@ public class TradeAISystem extends IteratingSystem {
                 if(sellStation == buyStation || !isMarketStation(fleet, sellStation)) continue;
 
                 InventoryComponent sellInventory = im.get(sellStation);
+                MarketComponent buyMarket = mm.get(buyStation);
+                MarketComponent sellMarket = mm.get(sellStation);
 
                 for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+                    if (!buyMarket.isTradable(itemId) || !sellMarket.isTradable(itemId)) continue;
+
                     float profitPerUnit = tradeController.getEffectiveBuyPrice(sellStation, itemId, reputation)
                             - tradeController.getEffectiveSellPrice(buyStation, itemId, reputation);
                     if (profitPerUnit <= 0f) continue;
 
-                    int amount = calculateTradeAmount(ai, buyStation, buyInventory, sellInventory, mm.get(sellStation), itemId, reputation);
+                    int amount = calculateTradeAmount(ai, buyStation, buyInventory, sellInventory, sellMarket, itemId, reputation);
                     if (amount <= 0) continue;
 
                     float routeProfit = profitPerUnit * amount;
