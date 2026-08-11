@@ -25,7 +25,7 @@ import java.util.Objects;
 public class NewsUI extends Table {
     private static final int MAX_ARTICLES = 50;
     private static final float MIN_PANEL_WIDTH = 280f;
-    private static final float MAX_PANEL_WIDTH = 520f;
+    private static final float MAX_PANEL_WIDTH = 360f;
     private static final float HORIZONTAL_GAP = 20f;
 
     private final Skin skin;
@@ -48,17 +48,23 @@ public class NewsUI extends Table {
         scrollPane.setFadeScrollBars(false);
         scrollPane.setOverscroll(false, false);
 
+        Table panel = new Table(this.skin);
+        panel.setBackground(this.skin.getDrawable("window-bg"));
+        panel.pad(8f);
+        panel.add(new Label("Новости", this.skin)).left().row();
+        panel.add(scrollPane).grow().height(155f);
+
         setFillParent(true);
         setTouchable(Touchable.childrenOnly);
         top().left();
-        pad(10f);
-        add(scrollPane).top().left().width(new Value() {
+        pad(12f);
+        add(panel).top().left().width(new Value() {
             @Override
             public float get(Actor context) {
                 float availableHalf = NewsUI.this.getWidth() * 0.5f - HORIZONTAL_GAP;
                 return Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, availableHalf));
             }
-        }).height(240f);
+        }).height(195f);
     }
 
     /**

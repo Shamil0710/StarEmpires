@@ -104,6 +104,16 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.15</version>
+                <configuration>
+                    <!-- Эти классы являются тонкой границей с реальным OpenGL/LWJGL-контекстом.
+                         Их геометрия и выбор вынесены в отдельно тестируемые чистые классы,
+                         а сам графический цикл проверяется desktop smoke-тестом. -->
+                    <excludes>
+                        <exclude>com/spacesim/SpaceSimGame*</exclude>
+                        <exclude>com/spacesim/desktop/**</exclude>
+                        <exclude>com/spacesim/ui/WorldMapRenderer*</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-coverage-agent</id>

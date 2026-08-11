@@ -220,6 +220,60 @@ class TradeAISystemTest {
     }
 
     @Test
+    void пользовательскаяСкоростьОпределяетПройденноеРасстояние() {
+        Engine engine = createEngine();
+        Entity buyer = createStation(100f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        Entity fleet = createFleet(0f, 0f, 5, 0f);
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        ai.movementSpeed = 25f;
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+        engine.update(1f);
+
+        TransformComponent transform = fleet.getComponent(TransformComponent.class);
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_SELL, ai.state);
+        assertEquals(25f, transform.position.x, FLOAT_EPSILON);
+        assertEquals(0f, transform.position.y, FLOAT_EPSILON);
+        assertSame(buyer, ai.sellStation);
+    }
+
+    @Test
+    void некорректнаяСкоростьПриостанавливаетНоНеЛомаетМаршрут() {
+        Engine engine = createEngine();
+        Entity buyer = createStation(100f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        Entity fleet = createFleet(0f, 0f, 5, 0f);
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+        engine.update(0f);
+
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        TransformComponent transform = fleet.getComponent(TransformComponent.class);
+        float[] invalidSpeeds = {-1f, Float.NaN, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY};
+
+        for (float invalidSpeed : invalidSpeeds) {
+            ai.movementSpeed = invalidSpeed;
+            engine.update(1f);
+
+            assertEquals(TradeAIComponent.State.TRAVEL_TO_SELL, ai.state);
+            assertEquals(0f, transform.position.x, FLOAT_EPSILON);
+            assertEquals(0f, transform.position.y, FLOAT_EPSILON);
+            assertSame(buyer, ai.sellStation);
+        }
+
+        ai.movementSpeed = 25f;
+        engine.update(1f);
+        assertEquals(25f, transform.position.x, FLOAT_EPSILON);
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_SELL, ai.state);
+    }
+
+    @Test
+    void скоростьФлотаПоУмолчаниюРавнаСтаМировымЕдиницамВСекунду() {
+        assertEquals(100f, new TradeAIComponent().movementSpeed, FLOAT_EPSILON);
+    }
+
+    @Test
     void повреждённыйБалансНеПриводитКИсключениюИлиПередачеГруза() {
         Engine engine = createEngine();
         Entity buyer = createStation(0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);

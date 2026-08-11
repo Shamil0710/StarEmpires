@@ -46,8 +46,6 @@ import java.util.List;
  * точности числа не изменили бы баланс.</p>
  */
 public class TradeAISystem extends IteratingSystem {
-    /** Линейная скорость флота в мировых единицах в секунду. */
-    private static final float FLEET_SPEED = 100f;
     /** Расстояние, меньше которого флот считается прибывшим без дополнительного шага. */
     private static final float ARRIVAL_DISTANCE = 10f;
     /** Задержка нового поиска после отмены или отсутствия исполнимого маршрута. */
@@ -404,8 +402,9 @@ public class TradeAISystem extends IteratingSystem {
      *
      * <p>Если цель больше не является активной рыночной станцией, маршрут отменяется. Когда
      * оставшееся расстояние не превышает шаг текущего кадра либо порог прибытия, позиция точно
-     * совмещается со станцией и автомат переводится в заданное состояние. Иначе выполняется шаг с
-     * постоянной скоростью.</p>
+     * совмещается со станцией и автомат переводится в заданное состояние. Иначе выполняется шаг со
+     * скоростью из {@link TradeAIComponent#movementSpeed}. Некорректная скорость приостанавливает
+     * движение, не сбрасывая маршрут.</p>
      *
      * @param fleetPosition изменяемое положение флота
      * @param target целевая рыночная станция
@@ -420,10 +419,14 @@ public class TradeAISystem extends IteratingSystem {
             return;
         }
 
+        if (!Float.isFinite(ai.movementSpeed) || ai.movementSpeed < 0f) {
+            return;
+        }
+
         Vector2 targetPosition = tm.get(target).position;
         Vector2 toTarget = targetPosition.cpy().sub(fleetPosition.position);
         float distance = toTarget.len();
-        float step = FLEET_SPEED * Math.max(0f, deltaTime);
+        float step = ai.movementSpeed * Math.max(0f, deltaTime);
 
         if (distance <= step || distance < ARRIVAL_DISTANCE) {
             fleetPosition.position.set(targetPosition);
