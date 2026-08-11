@@ -68,7 +68,7 @@ public class EconomyStatusUI extends Table {
         text.append("Флот ").append(fleetIndex).append(formatPosition(transform)).append("\n");
         text.append("  Состояние: ").append(tradeAI.state).append("\n");
         text.append("  Кредиты: ").append(formatFloat(tradeAI.credits)).append("\n");
-        text.append("  Груз: ").append(tradeAI.cargoAmount).append("/").append(tradeAI.cargoSpace).append("\n");
+        text.append("  Груз: ").append(inventory.getTotalStock()).append("/").append(tradeAI.cargoSpace).append("\n");
         appendReputationLine(text, reputation, Constants.FACTION_TRADE_LEAGUE);
         appendReputationLine(text, reputation, Constants.FACTION_MINERS);
         appendInventoryLine(text, inventory, Constants.ITEM_FOOD);

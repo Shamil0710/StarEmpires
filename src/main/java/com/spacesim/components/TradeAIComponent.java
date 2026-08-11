@@ -12,9 +12,9 @@ public class TradeAIComponent implements Component {
     public int targetItem = -1;
     public int targetAmount = 0;
     public int cargoSpace = 100;
-    public int cargoAmount = 0;
     public float credits = 1000f;
     public float expectedProfit = 0f;
+    public float routeSearchCooldown = 0f;
 
     public void resetRoute() {
         buyStation = null;
