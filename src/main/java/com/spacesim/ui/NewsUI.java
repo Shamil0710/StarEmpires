@@ -14,6 +14,14 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Прокручиваемая лента экономических новостей в левом верхнем углу сцены.
+ *
+ * <p>Новые публикации располагаются сверху. Лента хранит не более пятидесяти
+ * последних статей, чтобы длительная сессия не приводила к неограниченному росту
+ * Scene2D-акторов и памяти. Горизонтальная прокрутка отключена, а подписи
+ * переносятся в пределах адаптивной ширины панели.</p>
+ */
 public class NewsUI extends Table {
     private static final int MAX_ARTICLES = 50;
     private static final float MIN_PANEL_WIDTH = 280f;
@@ -25,6 +33,12 @@ public class NewsUI extends Table {
     private final ScrollPane scrollPane;
     private final ArticleBuffer articleBuffer = new ArticleBuffer(MAX_ARTICLES);
 
+    /**
+     * Создаёт пустую ленту новостей.
+     *
+     * @param skin скин для полосы прокрутки и подписей; не {@code null}
+     * @throws NullPointerException если {@code skin == null}
+     */
     public NewsUI(Skin skin) {
         this.skin = Objects.requireNonNull(skin, "Skin must not be null");
         articlesTable = new Table();
@@ -47,6 +61,15 @@ public class NewsUI extends Table {
         }).height(240f);
     }
 
+    /**
+     * Помещает публикацию в начало ленты и обновляет отображаемые подписи.
+     *
+     * <p>Если лимит достигнут, самая старая публикация удаляется. Цвет заголовка
+     * берётся из статьи, если он задан.</p>
+     *
+     * @param article добавляемая публикация; не {@code null}
+     * @throws NullPointerException если статья равна {@code null}
+     */
     public void addNews(NewsArticle article) {
         NewsArticle checkedArticle = Objects.requireNonNull(article, "Article must not be null");
         articleBuffer.add(checkedArticle);
@@ -63,14 +86,26 @@ public class NewsUI extends Table {
         scrollPane.setScrollY(0f);
     }
 
+    /**
+     * Возвращает фактическое число публикаций в ограниченном буфере.
+     *
+     * @return значение от нуля до пятидесяти включительно
+     */
     public int getArticleCount() {
         return articleBuffer.size();
     }
 
+    /** Ограниченный буфер, сохраняющий публикации от новых к старым. */
     static final class ArticleBuffer {
         private final int capacity;
         private final Deque<NewsArticle> articles;
 
+        /**
+         * Создаёт буфер указанной ёмкости.
+         *
+         * @param capacity максимальное количество публикаций
+         * @throws IllegalArgumentException если ёмкость неположительна
+         */
         ArticleBuffer(int capacity) {
             if (capacity <= 0) {
                 throw new IllegalArgumentException("Capacity must be positive");
@@ -79,6 +114,7 @@ public class NewsUI extends Table {
             articles = new ArrayDeque<>(capacity);
         }
 
+        /** Добавляет публикацию в начало и при необходимости удаляет хвост. */
         void add(NewsArticle article) {
             articles.addFirst(Objects.requireNonNull(article, "Article must not be null"));
             if (articles.size() > capacity) {
@@ -86,10 +122,12 @@ public class NewsUI extends Table {
             }
         }
 
+        /** Возвращает текущее количество публикаций. */
         int size() {
             return articles.size();
         }
 
+        /** Возвращает неизменяемый снимок публикаций от новых к старым. */
         List<NewsArticle> snapshot() {
             return List.copyOf(articles);
         }

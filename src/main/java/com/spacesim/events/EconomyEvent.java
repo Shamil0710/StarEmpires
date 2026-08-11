@@ -11,6 +11,15 @@ import java.util.Objects;
  * <p>Параметры события неизменяемы для внешнего кода. Оставшееся время жизни изменяет только
  * {@link GlobalEventManager}, поэтому любые изменения набора экономических эффектов проходят
  * через единый менеджер и корректно отражаются в его ревизии.</p>
+ *
+ * <p>Экземпляр не является потокобезопасным: менеджер изменяет оставшуюся продолжительность без
+ * синхронизации. Событие следует создавать и обслуживать в одном потоке игрового цикла. Координаты
+ * защищены от внешней мутации: конструктор сохраняет копию вектора, а {@link #getLocation()}
+ * возвращает новую копию.</p>
+ *
+ * <p>Геометрические вычисления выполняются в {@code float}. Конечные, но экстремально большие
+ * координаты или радиус могут переполнить квадрат расстояния; для предсказуемой проверки области
+ * следует использовать величины игрового масштаба.</p>
  */
 public final class EconomyEvent {
     private final String name;
@@ -33,7 +42,9 @@ public final class EconomyEvent {
      * @param location центр области действия в мировых координатах; значение копируется
      * @param radius положительный радиус области действия в мировых единицах
      * @throws NullPointerException если {@code name} или {@code location} равен {@code null}
-     * @throws IllegalArgumentException если аргумент не удовлетворяет описанным ограничениям
+     * @throws IllegalArgumentException если идентификатор товара находится вне диапазона
+     *         {@code [0, Constants.MAX_ITEMS)}, строка пуста либо числовой аргумент не удовлетворяет
+     *         описанным ограничениям
      */
     public EconomyEvent(String name, int targetItemId, float priceMultiplier,
                         float consumptionMultiplier, float durationSeconds,
@@ -144,6 +155,8 @@ public final class EconomyEvent {
      *
      * @param deltaSeconds прошедшее неотрицательное время в секундах
      * @return {@code true}, если событие завершилось
+     * @throws IllegalArgumentException если время отрицательно, бесконечно или равно
+     *         {@link Float#NaN}
      */
     boolean advance(float deltaSeconds) {
         if (!Float.isFinite(deltaSeconds) || deltaSeconds < 0f) {

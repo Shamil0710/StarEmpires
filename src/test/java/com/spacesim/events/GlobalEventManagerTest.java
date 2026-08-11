@@ -4,6 +4,7 @@ import com.badlogic.gdx.math.Vector2;
 import com.spacesim.constants.Constants;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Random;
 
@@ -12,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GlobalEventManagerTest {
@@ -132,6 +134,38 @@ class GlobalEventManagerTest {
                     () -> assertEquals(expected.getLocation(), actual.getLocation())
             );
         }
+    }
+
+    @Test
+    void extremeFiniteDeltaUsesBoundedAutomaticSpawnWork() {
+        GlobalEventManager manager = new GlobalEventManager(new Random(RANDOM_SEED), 1d);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(1), () -> manager.update(Float.MAX_VALUE));
+
+        int generatedNews = manager.consumePendingNews().size();
+        assertAll(
+                () -> assertEquals(1_024, generatedNews),
+                () -> assertTrue(manager.getActiveEvents().isEmpty())
+        );
+    }
+
+    @Test
+    void exactSpawnLimitPreservesCountdownWhenNoEventIsSkipped() {
+        Random oneSecondIntervals = new Random(0L) {
+            @Override
+            public double nextDouble() {
+                return Math.exp(-1d);
+            }
+        };
+        GlobalEventManager manager = new GlobalEventManager(oneSecondIntervals, 1d);
+
+        manager.update(1_024.5f);
+
+        assertEquals(1_024, manager.consumePendingNews().size());
+        manager.update(0.49f);
+        assertTrue(manager.consumePendingNews().isEmpty());
+        manager.update(0.01f);
+        assertEquals(1, manager.consumePendingNews().size());
     }
 
     @Test

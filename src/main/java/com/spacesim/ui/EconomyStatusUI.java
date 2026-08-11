@@ -16,6 +16,17 @@ import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
 
+/**
+ * Правая информационная панель с текущим состоянием станций и торговых флотов.
+ *
+ * <p>Панель получает представление Ashley-сущностей извне и формирует компактное
+ * текстовое представление запасов, цен, состояния ИИ, кредитов и репутации.
+ * Ширина вычисляется относительно окна и ограничена диапазоном, поэтому панель
+ * сосуществует с лентой новостей даже при минимальном поддерживаемом разрешении.</p>
+ *
+ * <p>Класс не владеет переданным {@link Skin}; его жизненным циклом управляет
+ * приложение.</p>
+ */
 public class EconomyStatusUI extends Table {
     private static final float MIN_PANEL_WIDTH = 280f;
     private static final float MAX_PANEL_WIDTH = 480f;
@@ -24,6 +35,12 @@ public class EconomyStatusUI extends Table {
     private final Skin skin;
     private final Label contentLabel;
 
+    /**
+     * Создаёт панель, закреплённую в правом верхнем углу родительской сцены.
+     *
+     * @param skin ненулевой скин Scene2D для заголовка и содержимого
+     * @throws NullPointerException если {@code skin == null}
+     */
     public EconomyStatusUI(Skin skin) {
         this.skin = skin;
         this.contentLabel = new Label("", skin);
@@ -44,6 +61,16 @@ public class EconomyStatusUI extends Table {
         });
     }
 
+    /**
+     * Полностью перестраивает текст панели по актуальному набору сущностей.
+     *
+     * <p>Сущность с инвентарём и рынком считается станцией, а сущность с
+     * инвентарём и торговым ИИ — флотом. Остальные сущности пропускаются.
+     * Порядковые номера отражают порядок обхода переданной коллекции.</p>
+     *
+     * @param entities ненулевое представление сущностей экономической модели
+     * @throws NullPointerException если {@code entities == null}
+     */
     public void update(Iterable<Entity> entities) {
         StringBuilder text = new StringBuilder();
         int stationIndex = 1;
@@ -71,6 +98,7 @@ public class EconomyStatusUI extends Table {
         contentLabel.setText(text.length() == 0 ? "Нет экономических сущностей" : text.toString());
     }
 
+    /** Добавляет в буфер состояние одной станции. */
     private void appendStation(StringBuilder text, int stationIndex, InventoryComponent inventory,
                                MarketComponent market, TransformComponent transform, FactionComponent faction) {
         text.append("Станция ").append(stationIndex).append(formatPosition(transform)).append("\n");
@@ -80,6 +108,7 @@ public class EconomyStatusUI extends Table {
         text.append("\n");
     }
 
+    /** Добавляет в буфер состояние одного торгового флота. */
     private void appendFleet(StringBuilder text, int fleetIndex, InventoryComponent inventory,
                              TradeAIComponent tradeAI, TransformComponent transform, ReputationComponent reputation) {
         text.append("Флот ").append(fleetIndex).append(formatPosition(transform)).append("\n");
@@ -93,6 +122,7 @@ public class EconomyStatusUI extends Table {
         text.append("\n");
     }
 
+    /** Добавляет строку репутации, если у флота есть соответствующий компонент. */
     private void appendReputationLine(StringBuilder text, ReputationComponent reputation, int factionId) {
         if (reputation == null) {
             return;
@@ -102,6 +132,7 @@ public class EconomyStatusUI extends Table {
                 .append("\n");
     }
 
+    /** Добавляет строку рыночного товара с запасом, целью и обеими ценами. */
     private void appendItemLine(StringBuilder text, InventoryComponent inventory, MarketComponent market, int itemId) {
         text.append("  ").append(Constants.ITEM_NAMES[itemId])
                 .append(": ").append(inventory.stock[itemId])
@@ -111,12 +142,14 @@ public class EconomyStatusUI extends Table {
                 .append("\n");
     }
 
+    /** Добавляет строку товара из грузового инвентаря. */
     private void appendInventoryLine(StringBuilder text, InventoryComponent inventory, int itemId) {
         text.append("  ").append(Constants.ITEM_NAMES[itemId])
                 .append(": ").append(inventory.stock[itemId])
                 .append("\n");
     }
 
+    /** Возвращает координаты сущности либо пустую строку при отсутствии позиции. */
     private String formatPosition(TransformComponent transform) {
         if (transform == null) {
             return "";
@@ -124,6 +157,7 @@ public class EconomyStatusUI extends Table {
         return " (" + formatFloat(transform.position.x) + ", " + formatFloat(transform.position.y) + ")";
     }
 
+    /** Форматирует число с одним десятичным знаком для стабильного вида панели. */
     private String formatFloat(float value) {
         return String.format("%.1f", value);
     }

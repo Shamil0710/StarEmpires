@@ -20,6 +20,18 @@ import com.spacesim.ui.NewsUI;
 import com.spacesim.ui.PriceGraphRenderer;
 import com.spacesim.util.SpatialHashGrid;
 
+/**
+ * Главный объект приложения Star Empires и точка сборки демонстрационной сцены.
+ *
+ * <p>Класс управляет жизненным циклом libGDX: создаёт Ashley-движок, регистрирует
+ * экономические системы в порядке их выполнения, наполняет мир начальными
+ * станциями и флотом, а затем на каждом кадре обновляет симуляцию и интерфейс.
+ * Экономическая панель намеренно обновляется не чаще четырёх раз в секунду,
+ * тогда как модель продолжает получать фактическое время кадра.</p>
+ *
+ * <p>Экземпляр создаётся desktop-запускателем. Все графические ресурсы,
+ * созданные в {@link #create()}, освобождаются в {@link #dispose()}.</p>
+ */
 public class SpaceSimGame extends ApplicationAdapter {
     private static final float ECONOMY_UI_UPDATE_INTERVAL_SECONDS = 0.25f;
 
@@ -27,13 +39,28 @@ public class SpaceSimGame extends ApplicationAdapter {
     private GlobalEventManager eventManager;
     private SpatialHashGrid grid;
 
-    // UI
     private Stage stage;
     private NewsUI newsUI;
     private EconomyStatusUI economyStatusUI;
     private PriceGraphRenderer graphRenderer;
     private float economyUiUpdateAccumulator;
 
+    /**
+     * Создаёт неинициализированный объект приложения.
+     *
+     * <p>Ресурсы libGDX здесь не создаются: графический контекст становится
+     * доступен только при последующем вызове {@link #create()}.</p>
+     */
+    public SpaceSimGame() {
+    }
+
+    /**
+     * Создаёт экономическую модель, пользовательский интерфейс и начальный мир.
+     *
+     * <p>Метод вызывается libGDX один раз после инициализации графического
+     * контекста. Порядок регистрации систем значим: сначала формируются цены и
+     * потребление, затем выполняются производство, торговый ИИ и запись истории.</p>
+     */
     @Override
     public void create() {
         VisUI.load();
@@ -41,7 +68,6 @@ public class SpaceSimGame extends ApplicationAdapter {
         eventManager = new GlobalEventManager();
         grid = new SpatialHashGrid(200);
 
-        // UI Init
         stage = new Stage(new ScreenViewport());
         Skin skin = VisUI.getSkin();
         newsUI = new NewsUI(skin);
@@ -51,25 +77,37 @@ public class SpaceSimGame extends ApplicationAdapter {
         graphRenderer = new PriceGraphRenderer();
         Gdx.input.setInputProcessor(stage);
 
-        // Systems Init
         engine.addSystem(new MarketSystem(eventManager));
         engine.addSystem(new ConsumptionSystem(eventManager));
         engine.addSystem(new ProductionSystem());
         engine.addSystem(new TradeAISystem(grid));
         engine.addSystem(new PriceRecorderSystem());
 
-        // Тестовая производственная станция с рудой и энергией
+        // Демонстрационная производственная станция с рудой и энергией.
         createProductionStation(100, 400, Constants.FACTION_MINERS);
-        // Тестовая станция-продавец с избытком еды
+        // Демонстрационная станция-продавец с избытком еды.
         createStation(100, 100, 1200, 500, 0.0f, Constants.FACTION_TRADE_LEAGUE);
-        // Тестовая станция-покупатель с дефицитом еды
+        // Демонстрационная станция-покупатель с дефицитом еды.
         createStation(500, 100, 100, 1000, 5.0f, Constants.FACTION_NEUTRAL);
-        // Тестовый торговый флот
+        // Демонстрационный торговый флот.
         createFleet(300, 300);
 
         economyStatusUI.update(engine.getEntities());
     }
 
+    /**
+     * Добавляет обычную торговую станцию с рынком продовольствия.
+     *
+     * <p>Если начальный запас превышает стандартную вместимость склада, она
+     * увеличивается до величины запаса, чтобы сохранить инвариант инвентаря.</p>
+     *
+     * @param x координата станции по горизонтали
+     * @param y координата станции по вертикали
+     * @param foodStock начальный запас продовольствия
+     * @param targetFoodStock целевой запас, относительно которого рынок формирует цену
+     * @param foodConsumption расход продовольствия в единицах товара за секунду
+     * @param factionId идентификатор фракции-владельца
+     */
     private void createStation(float x, float y, int foodStock, int targetFoodStock, float foodConsumption, int factionId) {
         Entity e = new Entity();
         e.add(new TransformComponent());
@@ -77,6 +115,7 @@ public class SpaceSimGame extends ApplicationAdapter {
 
         InventoryComponent inv = new InventoryComponent();
         inv.stock[Constants.ITEM_FOOD] = foodStock;
+        inv.capacity = Math.max(inv.capacity, foodStock);
         e.add(inv);
 
         MarketComponent m = new MarketComponent();
@@ -88,6 +127,13 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine.addEntity(e);
     }
 
+    /**
+     * Добавляет станцию, которая выплавляет сталь из руды и энергии.
+     *
+     * @param x координата станции по горизонтали
+     * @param y координата станции по вертикали
+     * @param factionId идентификатор фракции-владельца
+     */
     private void createProductionStation(float x, float y, int factionId) {
         Entity e = new Entity();
         e.add(new TransformComponent());
@@ -114,6 +160,12 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine.addEntity(e);
     }
 
+    /**
+     * Добавляет автономный торговый флот с пустым трюмом и стартовой репутацией.
+     *
+     * @param x начальная координата флота по горизонтали
+     * @param y начальная координата флота по вертикали
+     */
     private void createFleet(float x, float y) {
         Entity e = new Entity();
         e.add(new TransformComponent());
@@ -127,11 +179,17 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine.addEntity(e);
     }
 
+    /**
+     * Выполняет один кадр симуляции и отрисовки.
+     *
+     * <p>Сначала обновляются глобальные события и Ashley-системы, затем Scene2D.
+     * После отрисовки интерфейса поверх него строится демонстрационный график,
+     * если первая сущность движка содержит историю цен.</p>
+     */
     @Override
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        // Update Logic
         eventManager.update(delta);
         for (NewsArticle article : eventManager.consumePendingNews()) {
             newsUI.addNews(article);
@@ -144,11 +202,10 @@ public class SpaceSimGame extends ApplicationAdapter {
         }
         stage.act(delta);
 
-        // Draw
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         stage.draw();
 
-        // Рисуем график для первой попавшейся станции (для теста)
+        // Демонстрационный график для первой сущности с историей цен.
         if (engine.getEntities().size() > 0) {
             Entity s = engine.getEntities().first();
             if (s.getComponent(PriceHistoryComponent.class) != null) {
@@ -163,6 +220,15 @@ public class SpaceSimGame extends ApplicationAdapter {
         }
     }
 
+    /**
+     * Подгоняет виртуальную сцену под новый размер окна.
+     *
+     * <p>Нулевые размеры, которые возможны при сворачивании окна, игнорируются,
+     * чтобы не передавать некорректную геометрию во viewport.</p>
+     *
+     * @param width новая ширина окна в пикселях
+     * @param height новая высота окна в пикселях
+     */
     @Override
     public void resize(int width, int height) {
         if (width <= 0 || height <= 0 || stage == null) {
@@ -171,6 +237,12 @@ public class SpaceSimGame extends ApplicationAdapter {
         stage.getViewport().update(width, height, true);
     }
 
+    /**
+     * Освобождает Scene2D, отрисовщик графика и глобальный скин VisUI.
+     *
+     * <p>Перед освобождением сцена снимается с обработчика ввода, если она всё
+     * ещё установлена. Повторный вызов безопасен для локальных ресурсов.</p>
+     */
     @Override
     public void dispose() {
         if (Gdx.input != null && Gdx.input.getInputProcessor() == stage) {

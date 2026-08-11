@@ -18,27 +18,81 @@ import com.spacesim.util.SpatialHashGrid;
 
 import java.util.List;
 
+/**
+ * Управляет автономными торговыми флотами и выполняет полный цикл покупки и продажи груза.
+ *
+ * <p>Система обрабатывает сущности с {@link TradeAIComponent}, {@link TransformComponent} и
+ * {@link InventoryComponent}. Перед каждым корректным обновлением она заново строит
+ * {@link SpatialHashGrid} по всем активным рыночным станциям, а затем обновляет конечный автомат
+ * каждого флота:</p>
+ * <pre>
+ * IDLE -&gt; TRAVEL_TO_BUY -&gt; BUYING -&gt; TRAVEL_TO_SELL -&gt; SELLING -&gt; IDLE
+ * </pre>
+ * <p>Если флот уже несёт груз, из {@code IDLE} он ищет только станцию продажи и переходит сразу в
+ * {@code TRAVEL_TO_SELL}. Любая недействительная ссылка на станцию, некорректная цена, баланс или
+ * невозможная операция отменяет маршрут, возвращает флот в {@code IDLE} и включает секундную
+ * задержку повторного поиска. Успешное завершение маршрута снимает задержку.</p>
+ *
+ * <p>При выборе нового полного маршрута обе станции должны находиться в пределах текущего
+ * пространственного запроса, быть различными активными рынками и торговать выбранным товаром.
+ * Эффективная цена продажи должна превышать цену покупки с учётом репутации. Объём ограничивается
+ * запасом станции-источника, средствами флота, его грузовым лимитом и физической вместимостью
+ * инвентаря, свободным местом назначения и, если он положителен, спросом назначения. Среди
+ * исполнимых вариантов выбирается маршрут с наибольшей конечной ожидаемой прибылью.</p>
+ *
+ * <p>Перемещение выполняется по прямой с постоянной скоростью, без поиска пути и учёта препятствий.
+ * Цены и доступный объём повторно проверяются непосредственно перед сделкой. Все денежные расчёты
+ * отбрасывают {@code NaN}, бесконечность, переполнение {@code float} и операции, которые из-за
+ * точности числа не изменили бы баланс.</p>
+ */
 public class TradeAISystem extends IteratingSystem {
+    /** Линейная скорость флота в мировых единицах в секунду. */
     private static final float FLEET_SPEED = 100f;
+    /** Расстояние, меньше которого флот считается прибывшим без дополнительного шага. */
     private static final float ARRIVAL_DISTANCE = 10f;
+    /** Задержка нового поиска после отмены или отсутствия исполнимого маршрута. */
     private static final float ROUTE_SEARCH_RETRY_SECONDS = 1f;
+    /** Радиус пространственного запроса, выраженный в количестве ячеек в каждую сторону. */
     private static final int ROUTE_SEARCH_RADIUS_CELLS = 5;
 
+    /** Перестраиваемый индекс рыночных станций. */
     private final SpatialHashGrid grid;
+    /** Контроллер, атомарно проверяющий и выполняющий перемещение товаров и кредитов. */
     private final TradeController tradeController = new TradeController();
+    /** Живое представление сущностей, способных выступать рыночными станциями. */
     private ImmutableArray<Entity> marketStations;
 
+    /** Быстрый доступ к состоянию конечного автомата флота. */
     private final ComponentMapper<TradeAIComponent> am = ComponentMapper.getFor(TradeAIComponent.class);
+    /** Быстрый доступ к позициям флотов и станций. */
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
+    /** Быстрый доступ к торговым настройкам и ценам станций. */
     private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
+    /** Быстрый доступ к запасам флотов и станций. */
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
+    /** Быстрый доступ к необязательной репутации торгового флота. */
     private final ComponentMapper<ReputationComponent> rm = ComponentMapper.getFor(ReputationComponent.class);
 
+    /**
+     * Создаёт торговую AI-систему.
+     *
+     * @param grid пространственный индекс, предназначенный для перестроения этой системой на каждом
+     *             обновлении; во время работы не должен быть {@code null}
+     */
     public TradeAISystem(SpatialHashGrid grid) {
         super(Family.all(TradeAIComponent.class, TransformComponent.class, InventoryComponent.class).get());
         this.grid = grid;
     }
 
+    /**
+     * Сохраняет живое представление всех сущностей, пригодных для роли рыночной станции.
+     *
+     * <p>Станции должны одновременно иметь положение, рынок и инвентарь. Ashley поддерживает
+     * представление актуальным при изменении состава движка.</p>
+     *
+     * @param engine движок, к которому добавлена система
+     * @throws NullPointerException если {@code engine} равен {@code null}
+     */
     @Override
     public void addedToEngine(Engine engine) {
         super.addedToEngine(engine);
@@ -49,6 +103,15 @@ public class TradeAISystem extends IteratingSystem {
         ).get());
     }
 
+    /**
+     * Перестраивает индекс станций и обновляет конечные автоматы всех флотов.
+     *
+     * <p>Отрицательное, бесконечное время и {@code NaN} полностью игнорируются. Нулевой интервал
+     * допустим: движение не продвигается, но поиск маршрутов и сделки в дискретных состояниях могут
+     * быть выполнены.</p>
+     *
+     * @param deltaTime прошедшее с предыдущего обновления время в секундах
+     */
     @Override
     public void update(float deltaTime) {
         if (!Float.isFinite(deltaTime) || deltaTime < 0f) {
@@ -59,6 +122,15 @@ public class TradeAISystem extends IteratingSystem {
         super.update(deltaTime);
     }
 
+    /**
+     * Выполняет действие, соответствующее текущему состоянию одного флота.
+     *
+     * <p>Отсутствующее состояние, неконечный или отрицательный баланс считаются повреждённым
+     * маршрутом и переводят флот в ожидание с задержкой повторного поиска.</p>
+     *
+     * @param entity сущность флота с обязательными компонентами семейства системы
+     * @param deltaTime прошедшее время в секундах, уже проверенное методом {@link #update(float)}
+     */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         TradeAIComponent ai = am.get(entity);
@@ -88,6 +160,18 @@ public class TradeAISystem extends IteratingSystem {
         }
     }
 
+    /**
+     * Обрабатывает ожидание и, когда задержка истекла, запускает поиск маршрута.
+     *
+     * <p>Флот с любым положительным суммарным запасом ищет только вариант продажи имеющегося груза;
+     * пустой флот ищет полную пару покупки и продажи. Неудачный поиск откладывается на одну секунду,
+     * чтобы не выполнять дорогой перебор на каждом кадре.</p>
+     *
+     * @param fleet сущность флота
+     * @param ai состояние торгового автомата
+     * @param position положение флота
+     * @param deltaTime прошедшее время в секундах
+     */
     private void processIdle(Entity fleet, TradeAIComponent ai, TransformComponent position, float deltaTime) {
         if (ai.routeSearchCooldown > 0f) {
             ai.routeSearchCooldown = Math.max(0f, ai.routeSearchCooldown - Math.max(0f, deltaTime));
@@ -108,6 +192,12 @@ public class TradeAISystem extends IteratingSystem {
         }
     }
 
+    /**
+     * Полностью перестраивает пространственный индекс по текущему набору рыночных станций.
+     *
+     * <p>Очистка перед вставкой исключает устаревшие позиции станций, перемещённых или удалённых с
+     * предыдущего кадра.</p>
+     */
     private void rebuildSpatialIndex() {
         grid.clear();
         for (Entity station : marketStations) {
@@ -115,6 +205,19 @@ public class TradeAISystem extends IteratingSystem {
         }
     }
 
+    /**
+     * Ищет наиболее прибыльный полный маршрут для пустого флота.
+     *
+     * <p>Перед поиском прежние данные маршрута очищаются. Перебираются все упорядоченные пары
+     * различных активных станций из окрестности флота и все товары. В компонент AI записывается
+     * только вариант с максимальной строго положительной исполнимой прибылью. Успех переводит автомат
+     * в {@code TRAVEL_TO_BUY}; при неудаче компонент остаётся без маршрута.</p>
+     *
+     * @param fleet сущность ищущего маршрут флота
+     * @param ai изменяемое состояние AI
+     * @param position текущее положение флота, являющееся центром пространственного запроса
+     * @return {@code true}, если прибыльный исполнимый маршрут найден и записан
+     */
     private boolean findTradeRoute(Entity fleet, TradeAIComponent ai, TransformComponent position) {
         ai.resetRoute();
         List<Entity> nearby = grid.getNearby(position.position, ROUTE_SEARCH_RADIUS_CELLS);
@@ -197,6 +300,18 @@ public class TradeAISystem extends IteratingSystem {
         return true;
     }
 
+    /**
+     * Ищет лучший вариант продажи уже имеющегося груза.
+     *
+     * <p>Для каждого товара в инвентаре перебираются ближайшие активные рынки. Объём ограничивается
+     * наличием груза и свободной вместимостью станции; выбирается вариант с наибольшей конечной
+     * выручкой. Успех переводит автомат непосредственно в {@code TRAVEL_TO_SELL}.</p>
+     *
+     * @param fleet сущность флота с грузом
+     * @param ai изменяемое состояние AI
+     * @param position положение флота, являющееся центром пространственного запроса
+     * @return {@code true}, если найдена станция, способная принять часть груза по корректной цене
+     */
     private boolean findSellRoute(Entity fleet, TradeAIComponent ai, TransformComponent position) {
         ai.resetRoute();
         List<Entity> nearby = grid.getNearby(position.position, ROUTE_SEARCH_RADIUS_CELLS);
@@ -250,6 +365,23 @@ public class TradeAISystem extends IteratingSystem {
         return true;
     }
 
+    /**
+     * Рассчитывает максимальный исполнимый объём покупки для выбранного товара.
+     *
+     * <p>Результат одновременно ограничивается грузовым лимитом AI, общей вместимостью инвентаря
+     * флота, вместимостью станции назначения, запасом станции покупки и доступными кредитами. Если
+     * целевой рынок испытывает дефицит относительно {@link MarketComponent#targetStock}, объём также
+     * ограничивается этим спросом; иначе разрешено заполнить весь переносимый объём.</p>
+     *
+     * @param ai состояние флота с балансом и грузовым лимитом
+     * @param fleetInventory инвентарь флота
+     * @param buyInventory инвентарь станции покупки
+     * @param sellInventory инвентарь станции назначения
+     * @param sellMarket рынок станции назначения
+     * @param itemId идентификатор товара
+     * @param purchasePrice эффективная цена одной единицы при покупке
+     * @return неотрицательное число единиц, которое можно приобрести и затем разместить
+     */
     private int calculateTradeAmount(TradeAIComponent ai, InventoryComponent fleetInventory,
                                      InventoryComponent buyInventory, InventoryComponent sellInventory,
                                      MarketComponent sellMarket, int itemId, float purchasePrice) {
@@ -267,6 +399,20 @@ public class TradeAISystem extends IteratingSystem {
         );
     }
 
+    /**
+     * Перемещает флот по прямой к целевой станции.
+     *
+     * <p>Если цель больше не является активной рыночной станцией, маршрут отменяется. Когда
+     * оставшееся расстояние не превышает шаг текущего кадра либо порог прибытия, позиция точно
+     * совмещается со станцией и автомат переводится в заданное состояние. Иначе выполняется шаг с
+     * постоянной скоростью.</p>
+     *
+     * @param fleetPosition изменяемое положение флота
+     * @param target целевая рыночная станция
+     * @param deltaTime прошедшее время в секундах
+     * @param ai изменяемое состояние AI
+     * @param arrivalState состояние, устанавливаемое после прибытия
+     */
     private void move(TransformComponent fleetPosition, Entity target, float deltaTime, TradeAIComponent ai,
                       TradeAIComponent.State arrivalState) {
         if (!isActiveMarketStation(null, target)) {
@@ -289,6 +435,17 @@ public class TradeAISystem extends IteratingSystem {
         fleetPosition.position.mulAdd(toTarget.nor(), step);
     }
 
+    /**
+     * Повторно проверяет маршрут покупки и выполняет фактическую передачу груза.
+     *
+     * <p>Перед сделкой заново вычисляются эффективные цены и доступный объём. Это защищает маршрут
+     * от изменений запасов, спроса, репутации и цен, произошедших во время перелёта. После успешной
+     * покупки обновлённый баланс возвращается в компонент AI, а целью становится станция продажи.
+     * Любая неисполняемая операция отменяет маршрут.</p>
+     *
+     * @param fleet сущность покупающего флота
+     * @param ai изменяемое состояние и параметры выбранного маршрута
+     */
     private void buyCargo(Entity fleet, TradeAIComponent ai) {
         if (!isBuyRouteValid(ai)) {
             abandonRoute(ai);
@@ -340,6 +497,17 @@ public class TradeAISystem extends IteratingSystem {
         ai.state = TradeAIComponent.State.TRAVEL_TO_SELL;
     }
 
+    /**
+     * Продаёт доступную часть целевого груза станции назначения.
+     *
+     * <p>Количество повторно ограничивается фактическим грузом и текущей свободной вместимостью
+     * станции. После успешной сделки баланс переносится обратно в компонент AI, маршрут очищается и
+     * флот немедленно возвращается в {@code IDLE}. Ошибка сделки отменяет маршрут с задержкой
+     * повторного поиска.</p>
+     *
+     * @param fleet сущность продающего флота
+     * @param ai изменяемое состояние и параметры выбранного маршрута
+     */
     private void sellCargo(Entity fleet, TradeAIComponent ai) {
         if (!isSellRouteValid(ai)) {
             abandonRoute(ai);
@@ -378,6 +546,12 @@ public class TradeAISystem extends IteratingSystem {
         finishRoute(ai);
     }
 
+    /**
+     * Проверяет структурную пригодность маршрута перед покупкой.
+     *
+     * @param ai состояние с выбранными станциями и товаром
+     * @return {@code true}, если товар допустим, станции различны, всё ещё активны и обе торгуют им
+     */
     private boolean isBuyRouteValid(TradeAIComponent ai) {
         return isValidItem(ai.targetItem)
                 && ai.buyStation != ai.sellStation
@@ -387,12 +561,28 @@ public class TradeAISystem extends IteratingSystem {
                 && mm.get(ai.sellStation).isTradable(ai.targetItem);
     }
 
+    /**
+     * Проверяет структурную пригодность маршрута перед продажей.
+     *
+     * @param ai состояние с выбранной станцией и товаром
+     * @return {@code true}, если товар допустим, а станция активна и продолжает им торговать
+     */
     private boolean isSellRouteValid(TradeAIComponent ai) {
         return isValidItem(ai.targetItem)
                 && isActiveMarketStation(null, ai.sellStation)
                 && mm.get(ai.sellStation).isTradable(ai.targetItem);
     }
 
+    /**
+     * Проверяет принадлежность сущности текущему живому набору рыночных станций.
+     *
+     * <p>Проверка выполняется по идентичности объектов. При переданном флоте он дополнительно не
+     * может выступать собственной станцией; значение {@code null} отключает только это исключение.</p>
+     *
+     * @param fleet флот, который следует исключить, либо {@code null}
+     * @param entity проверяемая сущность
+     * @return {@code true}, если сущность присутствует в наборе активных рыночных станций
+     */
     private boolean isActiveMarketStation(Entity fleet, Entity entity) {
         if (entity == null || entity == fleet || marketStations == null) {
             return false;
@@ -406,14 +596,36 @@ public class TradeAISystem extends IteratingSystem {
         return false;
     }
 
+    /**
+     * Проверяет границы идентификатора товара.
+     *
+     * @param itemId идентификатор товара
+     * @return {@code true}, если идентификатор адресует массивы товарных компонентов
+     */
     private boolean isValidItem(int itemId) {
         return itemId >= 0 && itemId < Constants.MAX_ITEMS;
     }
 
+    /**
+     * Проверяет пригодность цены или денежного результата для сделки.
+     *
+     * @param price проверяемое значение
+     * @return {@code true} только для конечного строго положительного числа
+     */
     private boolean isPositiveFinitePrice(float price) {
         return Float.isFinite(price) && price > 0f;
     }
 
+    /**
+     * Вычисляет стоимость покупки и проверяет представимость уменьшенного баланса.
+     *
+     * @param balance исходный баланс флота
+     * @param unitPrice цена одной единицы
+     * @param amount число единиц
+     * @return конечная положительная стоимость либо {@link Float#NaN}, если параметры некорректны,
+     *         средств недостаточно, возникает переполнение или точности {@code float} недостаточно
+     *         для фактического уменьшения баланса
+     */
     private float getExecutableCost(float balance, float unitPrice, int amount) {
         float cost = getFiniteTotal(unitPrice, amount);
         float resultingBalance = balance - cost;
@@ -428,6 +640,15 @@ public class TradeAISystem extends IteratingSystem {
         return cost;
     }
 
+    /**
+     * Вычисляет выручку и проверяет представимость увеличенного баланса.
+     *
+     * @param balance исходный баланс флота
+     * @param unitPrice цена одной единицы
+     * @param amount число единиц
+     * @return конечная положительная выручка либо {@link Float#NaN}, если параметры некорректны,
+     *         возникает переполнение или прибавление не изменяет баланс в точности {@code float}
+     */
     private float getExecutableRevenue(float balance, float unitPrice, int amount) {
         float revenue = getFiniteTotal(unitPrice, amount);
         float resultingBalance = balance + revenue;
@@ -441,6 +662,13 @@ public class TradeAISystem extends IteratingSystem {
         return revenue;
     }
 
+    /**
+     * Безопасно умножает цену единицы на целое количество через промежуточный {@code double}.
+     *
+     * @param unitPrice цена одной единицы
+     * @param amount число единиц
+     * @return представимое конечное положительное значение {@code float} либо {@link Float#NaN}
+     */
     private float getFiniteTotal(float unitPrice, int amount) {
         double total = (double) unitPrice * amount;
         if (!isPositiveFinitePrice(unitPrice)
@@ -453,12 +681,22 @@ public class TradeAISystem extends IteratingSystem {
         return (float) total;
     }
 
+    /**
+     * Отменяет текущий маршрут и откладывает следующую попытку поиска.
+     *
+     * @param ai очищаемое состояние AI
+     */
     private void abandonRoute(TradeAIComponent ai) {
         ai.resetRoute();
         ai.state = TradeAIComponent.State.IDLE;
         ai.routeSearchCooldown = ROUTE_SEARCH_RETRY_SECONDS;
     }
 
+    /**
+     * Завершает успешный маршрут и разрешает новый поиск без задержки.
+     *
+     * @param ai очищаемое состояние AI
+     */
     private void finishRoute(TradeAIComponent ai) {
         ai.resetRoute();
         ai.state = TradeAIComponent.State.IDLE;

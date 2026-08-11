@@ -17,10 +17,17 @@ import java.util.random.RandomGenerator;
  * <p>Менеджер рассчитан на последовательное использование из игрового цикла. Все добавления и
  * удаления событий проходят через него и изменяют ревизию, по которой зависимые системы могут
  * определить необходимость пересчёта.</p>
+ *
+ * <p>Класс изменяем и не является потокобезопасным. Возвращаемое методом {@link #getActiveEvents()}
+ * представление также нельзя обходить одновременно с обновлением менеджера из другого потока.
+ * Очередь новостей и генератор случайных чисел принадлежат менеджеру и обслуживаются тем же
+ * последовательным потоком.</p>
  */
 public class GlobalEventManager {
     private static final double DEFAULT_SPAWN_RATE_PER_SECOND = -60d * Math.log1p(-0.001d);
     private static final float DEFAULT_EVENT_DURATION_SECONDS = 30f;
+    /** Верхняя граница материализованных автособытий за один вызов {@link #update(float)}. */
+    private static final int MAX_AUTOMATIC_EVENTS_PER_UPDATE = 1_024;
 
     private final List<EconomyEvent> activeEvents = new ArrayList<>();
     private final List<EconomyEvent> activeEventsView = Collections.unmodifiableList(activeEvents);
@@ -61,6 +68,8 @@ public class GlobalEventManager {
      * @param spawnRatePerSecond среднее число автоматически создаваемых событий в секунду
      * @throws NullPointerException если источник случайных чисел не задан
      * @throws IllegalArgumentException если частота отрицательна или не является конечным числом
+     * @throws IllegalStateException если источник случайных чисел нарушает контракт и возвращает
+     *         значение вне диапазона {@code [0, 1)}
      */
     public GlobalEventManager(RandomGenerator random, double spawnRatePerSecond) {
         this.random = Objects.requireNonNull(random, "Источник случайных чисел не задан");
@@ -75,10 +84,17 @@ public class GlobalEventManager {
      * Продвигает время активных событий и создаёт события, запланированные на прошедший интервал.
      *
      * <p>Моменты автоматического появления задаются экспоненциально распределёнными интервалами.
-     * Поэтому их расписание при одинаковом источнике случайности не зависит от частоты кадров.</p>
+     * Поэтому при обычной нагрузке их расписание с одинаковым источником случайности не зависит
+     * от частоты кадров. За один вызов материализуется не более 1024 автоматических событий. Если
+     * этот защитный предел достигнут и в оставшемся интервале ожидается ещё одно появление,
+     * оставшееся время применяется к уже активным событиям, пропущенные появления не создают
+     * новости, а следующее ожидание планируется от конца кадра. Такая политика сохраняет
+     * отзывчивость при экстремальном времени или частоте появления.</p>
      *
      * @param deltaSeconds прошедшее время в секундах
      * @throws IllegalArgumentException если время отрицательно, бесконечно или равно {@code NaN}
+     * @throws IllegalStateException если пользовательский источник случайных чисел возвращает
+     *         значение вне диапазона {@code [0, 1)} при планировании следующего события
      */
     public void update(float deltaSeconds) {
         if (!Float.isFinite(deltaSeconds) || deltaSeconds < 0f) {
@@ -86,6 +102,7 @@ public class GlobalEventManager {
         }
 
         double remainingSeconds = deltaSeconds;
+        int spawnedEvents = 0;
         while (remainingSeconds > 0d) {
             if (secondsUntilNextSpawn > remainingSeconds) {
                 advanceActiveEvents((float) remainingSeconds);
@@ -98,7 +115,15 @@ public class GlobalEventManager {
             remainingSeconds -= stepUntilSpawn;
 
             activateEvent(createDefaultEvent());
+            spawnedEvents++;
             secondsUntilNextSpawn = sampleNextSpawnDelay();
+
+            if (spawnedEvents >= MAX_AUTOMATIC_EVENTS_PER_UPDATE
+                    && secondsUntilNextSpawn <= remainingSeconds) {
+                advanceActiveEvents((float) remainingSeconds);
+                secondsUntilNextSpawn = sampleNextSpawnDelay();
+                return;
+            }
         }
     }
 
@@ -144,6 +169,9 @@ public class GlobalEventManager {
      * <p>Представление является «живым»: последующие изменения менеджера отражаются в ранее
      * полученном списке. Добавлять и удалять элементы через него нельзя.</p>
      *
+     * <p>Элементы списка — те же экземпляры {@link EconomyEvent}, которые обслуживает менеджер.
+     * Итератор представления не предназначен для параллельного обхода во время обновления.</p>
+     *
      * @return неизменяемое представление списка активных событий
      */
     public List<EconomyEvent> getActiveEvents() {
@@ -165,7 +193,10 @@ public class GlobalEventManager {
     /**
      * Извлекает все накопленные новости и очищает внутреннюю очередь.
      *
-     * @return новый изменяемый список накопленных новостей
+     * <p>Возвращается новый изменяемый список, однако содержащиеся в нём статьи не копируются и
+     * остаются изменяемыми объектами.</p>
+     *
+     * @return новый изменяемый список накопленных новостей в порядке их постановки в очередь
      */
     public List<NewsArticle> consumePendingNews() {
         List<NewsArticle> news = new ArrayList<>(pendingNews);

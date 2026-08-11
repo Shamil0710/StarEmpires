@@ -5,9 +5,40 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.FloatArray;
 
+/**
+ * Отрисовывает историю цены в виде линейного графика средствами libGDX.
+ *
+ * <p>Масштаб по вертикали вычисляется отдельно для каждого ряда. Минимальный
+ * диапазон равен единице, поэтому постоянная цена отображается устойчиво.
+ * Неконечные точки, некорректная геометрия и слишком короткие ряды безопасно
+ * пропускаются: такие данные не передаются OpenGL.</p>
+ *
+ * <p>Экземпляр владеет внутренним {@link ShapeRenderer}; после использования
+ * необходимо вызвать {@link #dispose()}.</p>
+ */
 public class PriceGraphRenderer {
     private final ShapeRenderer sr = new ShapeRenderer();
 
+    /** Создаёт отрисовщик и принадлежащий ему {@link ShapeRenderer}. */
+    public PriceGraphRenderer() {
+    }
+
+    /**
+     * Рисует последовательные отрезки истории цены в заданном прямоугольнике.
+     *
+     * <p>Координаты интерпретируются в системе, заданной матрицей проекции.
+     * Первая точка располагается у левой границы, последняя — у правой. Метод
+     * ничего не рисует, если матрица отсутствует, ряд содержит менее двух точек,
+     * в данных встречается {@code NaN}/бесконечность либо прямоугольник не может
+     * быть представлен конечными {@code float}-координатами.</p>
+     *
+     * @param projectionMatrix матрица камеры Scene2D; при {@code null} отрисовка пропускается
+     * @param history значения цены в хронологическом порядке
+     * @param x координата левой границы графика
+     * @param y координата нижней границы графика
+     * @param w ширина графика; должна быть положительной
+     * @param h высота графика; должна быть положительной
+     */
     public void render(Matrix4 projectionMatrix, FloatArray history, float x, float y, float w, float h) {
         PriceRange priceRange = calculateRange(history);
         if (projectionMatrix == null || priceRange == null || !isValidGeometry(x, y, w, h)) {
@@ -30,6 +61,11 @@ public class PriceGraphRenderer {
         sr.end();
     }
 
+    /**
+     * Вычисляет конечный минимум и безопасный вертикальный диапазон ряда.
+     *
+     * @return диапазон либо {@code null}, если ряд нельзя отрисовать
+     */
     static PriceRange calculateRange(FloatArray history) {
         if (history == null || history.size < 2) {
             return null;
@@ -54,6 +90,7 @@ public class PriceGraphRenderer {
         return new PriceRange(min, span);
     }
 
+    /** Проверяет конечность размеров и вычисленных правой и верхней границ. */
     static boolean isValidGeometry(float x, float y, float width, float height) {
         if (!Float.isFinite(x)
                 || !Float.isFinite(y)
@@ -72,13 +109,18 @@ public class PriceGraphRenderer {
                 && top <= Float.MAX_VALUE;
     }
 
+    /** Проецирует цену в вертикальную координату внутри области графика. */
     private float projectPrice(float price, float y, float height, PriceRange range) {
         double normalized = ((double) price - range.min()) / range.span();
         return (float) ((double) y + normalized * height);
     }
 
-    public void dispose() { sr.dispose(); }
+    /** Освобождает GPU-ресурсы внутреннего {@link ShapeRenderer}. */
+    public void dispose() {
+        sr.dispose();
+    }
 
+    /** Нормализованный диапазон ряда: минимум и гарантированно положительный размах. */
     record PriceRange(float min, double span) {
     }
 }
