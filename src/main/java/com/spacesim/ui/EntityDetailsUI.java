@@ -20,6 +20,7 @@ import com.spacesim.model.Recipe;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 /**
  * Прокручиваемая правая карточка выбранной станции или торгового корабля.
@@ -239,8 +240,24 @@ public class EntityDetailsUI extends Table {
             return;
         }
         text.append("  Активный рецепт: ").append(recipe.name).append('\n')
+                .append("  Входы: ").append(formatRecipeItems(recipe, true)).append('\n')
+                .append("  Выходы: ").append(formatRecipeItems(recipe, false)).append('\n')
                 .append("  Прогресс: ").append(formatNumber(production.progressSeconds))
                 .append(" / ").append(formatNumber(recipe.durationSeconds)).append(" с\n");
+    }
+
+    /** Форматирует ненулевые входы либо выходы рецепта в одну компактную строку. */
+    private static String formatRecipeItems(Recipe recipe, boolean inputs) {
+        StringJoiner items = new StringJoiner(", ");
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            int amount = inputs
+                    ? recipe.getInputAmount(itemId)
+                    : recipe.getOutputAmount(itemId);
+            if (amount > 0) {
+                items.add(itemName(itemId) + " × " + amount);
+            }
+        }
+        return items.length() == 0 ? "нет" : items.toString();
     }
 
     /** Добавляет оперативные характеристики торгового корабля и его маршрута. */
@@ -249,6 +266,7 @@ public class EntityDetailsUI extends Table {
         text.append("\nКорабль\n")
                 .append("  Состояние: ").append(localizeState(tradeAI.state)).append('\n')
                 .append("  Скорость: ").append(formatNumber(tradeAI.movementSpeed)).append(" ед./с\n")
+                .append("  Специализация: ").append(specializationName(tradeAI.specializedItem)).append('\n')
                 .append("  Кредиты: ").append(formatMoney(tradeAI.credits)).append('\n')
                 .append("  Груз: ").append(inventory == null ? NO_VALUE : inventory.getTotalStock())
                 .append(" / ").append(tradeAI.cargoSpace).append(" ед.\n")
@@ -312,6 +330,11 @@ public class EntityDetailsUI extends Table {
             return "неизвестный товар (id=" + itemId + ")";
         }
         return itemName(itemId);
+    }
+
+    /** Возвращает понятное описание универсальной либо товарной специализации флота. */
+    private static String specializationName(int itemId) {
+        return itemId == -1 ? "любой товар" : targetItemName(itemId);
     }
 
     /** Возвращает русское имя товара по корректному идентификатору. */

@@ -62,6 +62,8 @@ class EntityDetailsUITest {
         assertTrue(details.body().contains("Продажа: 11.3 кр."));
         assertTrue(details.body().contains("Потребление: 1.5 ед./с"));
         assertTrue(details.body().contains("Активный рецепт: Выплавка стали"));
+        assertTrue(details.body().contains("Входы: Руда × 2"));
+        assertTrue(details.body().contains("Выходы: Сталь × 1"));
         assertTrue(details.body().contains("Прогресс: 4.5 / 12.0 с"));
     }
 
@@ -77,6 +79,7 @@ class EntityDetailsUITest {
         TradeAIComponent tradeAI = new TradeAIComponent();
         tradeAI.state = TradeAIComponent.State.TRAVEL_TO_SELL;
         tradeAI.movementSpeed = 75f;
+        tradeAI.specializedItem = Constants.ITEM_FOOD;
         tradeAI.credits = 2450.75f;
         tradeAI.cargoSpace = 60;
         tradeAI.targetStation = target;
@@ -102,6 +105,7 @@ class EntityDetailsUITest {
         assertTrue(details.body().contains("Позиция: не задана"));
         assertTrue(details.body().contains("Состояние: летит к станции продажи"));
         assertTrue(details.body().contains("Скорость: 75.0 ед./с"));
+        assertTrue(details.body().contains("Специализация: Продовольствие"));
         assertTrue(details.body().contains("Кредиты: 2450.8 кр."));
         assertTrue(details.body().contains("Груз: 24 / 60 ед."));
         assertTrue(details.body().contains("Цель: Аграрный узел"));
@@ -129,6 +133,7 @@ class EntityDetailsUITest {
         assertTrue(partial.body().contains("Фракция: не указана"));
         assertTrue(partial.body().contains("Инвентарь\n  отсутствует"));
         assertTrue(partial.body().contains("Состояние: ожидает маршрут"));
+        assertTrue(partial.body().contains("Специализация: любой товар"));
         assertTrue(partial.body().contains("Груз: — / 100 ед."));
         assertTrue(partial.body().contains("Цель: не выбрана"));
         assertTrue(partial.body().contains("Товар: не выбран"));

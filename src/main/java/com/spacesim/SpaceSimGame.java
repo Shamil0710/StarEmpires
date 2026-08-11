@@ -18,7 +18,6 @@ import com.spacesim.components.*;
 import com.spacesim.constants.Constants;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.events.NewsArticle;
-import com.spacesim.model.Recipe;
 import com.spacesim.systems.*;
 import com.spacesim.ui.EconomyStatusUI;
 import com.spacesim.ui.EntityDetailsUI;
@@ -107,119 +106,13 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine.addSystem(new TradeAISystem(grid));
         engine.addSystem(new PriceRecorderSystem());
 
-        // Три станции образуют на карте заметный экономический треугольник.
-        createProductionStation("Кузница Гелиос", 350, 390, Constants.FACTION_MINERS);
-        createStation("Биржа Аврора", 120, 135, 1200, 500, 0.0f,
-                Constants.FACTION_TRADE_LEAGUE);
-        createStation("Фронтир-Хаб", 580, 135, 100, 1000, 5.0f,
-                Constants.FACTION_NEUTRAL);
-
-        // Несколько флотов с разной скоростью делают торговые маршруты наглядными.
-        createFleet("Купец-01", 300, 280, 58f, 1200f);
-        createFleet("Караван Вега", 350, 330, 72f, 1600f);
-        createFleet("Стриж", 430, 270, 88f, 900f);
+        for (Entity entity : DemoWorldFactory.createEntities()) {
+            engine.addEntity(entity);
+        }
 
         economyStatusUI.update(engine.getEntities());
         entityDetailsUI.refresh();
         Gdx.gl.glClearColor(0.018f, 0.025f, 0.045f, 1f);
-    }
-
-    /**
-     * Добавляет обычную торговую станцию с рынком продовольствия.
-     *
-     * <p>Если начальный запас превышает стандартную вместимость склада, она
-     * увеличивается до величины запаса, чтобы сохранить инвариант инвентаря.</p>
-     *
-     * @param name отображаемое имя станции
-     * @param x координата станции по горизонтали
-     * @param y координата станции по вертикали
-     * @param foodStock начальный запас продовольствия
-     * @param targetFoodStock целевой запас, относительно которого рынок формирует цену
-     * @param foodConsumption расход продовольствия в единицах товара за секунду
-     * @param factionId идентификатор фракции-владельца
-     */
-    private void createStation(String name, float x, float y, int foodStock, int targetFoodStock,
-                               float foodConsumption, int factionId) {
-        Entity e = new Entity();
-        e.add(new IdentityComponent(name, IdentityComponent.Kind.STATION));
-        e.add(new TransformComponent());
-        e.getComponent(TransformComponent.class).position.set(x, y);
-
-        InventoryComponent inv = new InventoryComponent();
-        inv.stock[Constants.ITEM_FOOD] = foodStock;
-        inv.capacity = Math.max(inv.capacity, foodStock);
-        e.add(inv);
-
-        MarketComponent m = new MarketComponent();
-        m.configureTradableItem(Constants.ITEM_FOOD, targetFoodStock, foodConsumption);
-        e.add(m);
-        e.add(new FactionComponent(factionId));
-
-        e.add(new PriceHistoryComponent());
-        engine.addEntity(e);
-    }
-
-    /**
-     * Добавляет станцию, которая выплавляет сталь из руды и энергии.
-     *
-     * @param name отображаемое имя станции
-     * @param x координата станции по горизонтали
-     * @param y координата станции по вертикали
-     * @param factionId идентификатор фракции-владельца
-     */
-    private void createProductionStation(String name, float x, float y, int factionId) {
-        Entity e = new Entity();
-        e.add(new IdentityComponent(name, IdentityComponent.Kind.STATION));
-        e.add(new TransformComponent());
-        e.getComponent(TransformComponent.class).position.set(x, y);
-
-        InventoryComponent inv = new InventoryComponent();
-        inv.stock[Constants.ITEM_ORE] = 500;
-        inv.stock[Constants.ITEM_ENERGY] = 250;
-        e.add(inv);
-
-        MarketComponent m = new MarketComponent();
-        m.configureTradableItem(Constants.ITEM_STEEL, 300, 0f);
-        e.add(m);
-        e.add(new FactionComponent(factionId));
-
-        ProductionComponent production = new ProductionComponent();
-        production.recipes.add(new Recipe("Выплавка стали", 2.0f)
-                .input(Constants.ITEM_ORE, 2)
-                .input(Constants.ITEM_ENERGY, 1)
-                .output(Constants.ITEM_STEEL, 1));
-        e.add(production);
-
-        e.add(new PriceHistoryComponent());
-        engine.addEntity(e);
-    }
-
-    /**
-     * Добавляет автономный торговый флот с пустым трюмом и стартовой репутацией.
-     *
-     * @param name отображаемое имя корабля
-     * @param x начальная координата флота по горизонтали
-     * @param y начальная координата флота по вертикали
-     * @param movementSpeed скорость движения в мировых единицах в секунду
-     * @param credits стартовый денежный баланс в кредитах
-     */
-    private void createFleet(String name, float x, float y, float movementSpeed, float credits) {
-        Entity e = new Entity();
-        e.add(new IdentityComponent(name, IdentityComponent.Kind.FLEET));
-        e.add(new TransformComponent());
-        e.getComponent(TransformComponent.class).position.set(x, y);
-        TradeAIComponent tradeAI = new TradeAIComponent();
-        tradeAI.movementSpeed = movementSpeed;
-        tradeAI.credits = credits;
-        e.add(tradeAI);
-        ReputationComponent reputation = new ReputationComponent();
-        reputation.addReputation(Constants.FACTION_TRADE_LEAGUE, 25f);
-        reputation.addReputation(Constants.FACTION_MINERS, 10f);
-        e.add(reputation);
-        InventoryComponent inventory = new InventoryComponent();
-        inventory.capacity = tradeAI.cargoSpace;
-        e.add(inventory);
-        engine.addEntity(e);
     }
 
     /**

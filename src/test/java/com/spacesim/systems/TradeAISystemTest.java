@@ -21,6 +21,111 @@ class TradeAISystemTest {
     private static final float FLOAT_EPSILON = 0.001f;
 
     @Test
+    void специализацияПоУмолчаниюСохраняетВыборСамогоПрибыльногоТовара() {
+        Engine engine = createEngine();
+        Entity supplier = createStation(
+                0f, 0f, 5, 100, 5, 10f, 0f, Constants.FACTION_NEUTRAL);
+        configureTradableItem(supplier, Constants.ITEM_WEAPONS, 5, 5, 20f, 0f);
+        Entity buyer = createStation(
+                0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        configureTradableItem(buyer, Constants.ITEM_WEAPONS, 0, 5, 0f, 100f);
+        Entity fleet = createFleet(0f, 0f, 0, 1_000f);
+        engine.addEntity(supplier);
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        assertEquals(-1, ai.specializedItem);
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_BUY, ai.state);
+        assertEquals(Constants.ITEM_WEAPONS, ai.targetItem);
+        assertSame(supplier, ai.buyStation);
+        assertSame(buyer, ai.sellStation);
+        assertEquals(400f, ai.expectedProfit, FLOAT_EPSILON);
+    }
+
+    @Test
+    void специализацияЗаставляетВыбратьМенееПрибыльныйРазрешённыйТовар() {
+        Engine engine = createEngine();
+        Entity supplier = createStation(
+                0f, 0f, 5, 100, 5, 10f, 0f, Constants.FACTION_NEUTRAL);
+        configureTradableItem(supplier, Constants.ITEM_WEAPONS, 5, 5, 20f, 0f);
+        Entity buyer = createStation(
+                0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        configureTradableItem(buyer, Constants.ITEM_WEAPONS, 0, 5, 0f, 100f);
+        Entity fleet = createFleet(0f, 0f, 0, 1_000f);
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        ai.specializedItem = Constants.ITEM_FOOD;
+        engine.addEntity(supplier);
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_BUY, ai.state);
+        assertEquals(Constants.ITEM_FOOD, ai.targetItem);
+        assertSame(supplier, ai.buyStation);
+        assertSame(buyer, ai.sellStation);
+        assertEquals(50f, ai.expectedProfit, FLOAT_EPSILON);
+    }
+
+    @Test
+    void специализированныйФлотПродаётУжеЗагруженныйДругойТовар() {
+        Engine engine = createEngine();
+        Entity buyer = createStation(
+                0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+        Entity fleet = createFleet(0f, 0f, 3, 0f);
+        TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+        ai.specializedItem = Constants.ITEM_WEAPONS;
+        engine.addEntity(buyer);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_SELL, ai.state);
+        assertEquals(Constants.ITEM_FOOD, ai.targetItem);
+        assertSame(buyer, ai.sellStation);
+
+        engine.update(0f);
+        engine.update(0f);
+
+        assertEquals(TradeAIComponent.State.IDLE, ai.state);
+        assertEquals(Constants.ITEM_WEAPONS, ai.specializedItem);
+        assertEquals(0, inventory(fleet).stock[Constants.ITEM_FOOD]);
+        assertEquals(3, inventory(buyer).stock[Constants.ITEM_FOOD]);
+        assertEquals(60f, ai.credits, FLOAT_EPSILON);
+    }
+
+    @Test
+    void некорректнаяСпециализацияБезопасноОставляетФлотВОжидании() {
+        int[] invalidSpecializations = {-2, Constants.MAX_ITEMS};
+
+        for (int invalidSpecialization : invalidSpecializations) {
+            Engine engine = createEngine();
+            Entity supplier = createStation(
+                    0f, 0f, 5, 100, 5, 10f, 0f, Constants.FACTION_NEUTRAL);
+            Entity buyer = createStation(
+                    0f, 0f, 0, 100, 5, 0f, 20f, Constants.FACTION_NEUTRAL);
+            Entity fleet = createFleet(0f, 0f, 0, 100f);
+            TradeAIComponent ai = fleet.getComponent(TradeAIComponent.class);
+            ai.specializedItem = invalidSpecialization;
+            engine.addEntity(supplier);
+            engine.addEntity(buyer);
+            engine.addEntity(fleet);
+
+            assertDoesNotThrow(() -> engine.update(0f));
+
+            assertEquals(TradeAIComponent.State.IDLE, ai.state);
+            assertEquals(-1, ai.targetItem);
+            assertNull(ai.buyStation);
+            assertNull(ai.sellStation);
+            assertNull(ai.targetStation);
+            assertEquals(1f, ai.routeSearchCooldown, FLOAT_EPSILON);
+        }
+    }
+
+    @Test
     void флотСНачальнымГрузомСначалаИщетПокупателя() {
         Engine engine = createEngine();
         Entity buyer = createStation(0f, 0f, 0, 100, 10, 0f, 20f, Constants.FACTION_NEUTRAL);
@@ -364,6 +469,16 @@ class TradeAISystemTest {
         station.add(market);
         station.add(new FactionComponent(factionId));
         return station;
+    }
+
+    private void configureTradableItem(Entity station, int itemId, int stock, int targetStock,
+                                       float sellPrice, float buyPrice) {
+        InventoryComponent inventory = station.getComponent(InventoryComponent.class);
+        MarketComponent market = station.getComponent(MarketComponent.class);
+        inventory.stock[itemId] = stock;
+        market.configureTradableItem(itemId, targetStock, 0f);
+        market.sellPrices[itemId] = sellPrice;
+        market.buyPrices[itemId] = buyPrice;
     }
 
     private InventoryComponent inventory(Entity entity) {

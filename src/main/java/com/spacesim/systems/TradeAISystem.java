@@ -38,7 +38,9 @@ import java.util.List;
  * Эффективная цена продажи должна превышать цену покупки с учётом репутации. Объём ограничивается
  * запасом станции-источника, средствами флота, его грузовым лимитом и физической вместимостью
  * инвентаря, свободным местом назначения и, если он положителен, спросом назначения. Среди
- * исполнимых вариантов выбирается маршрут с наибольшей конечной ожидаемой прибылью.</p>
+ * исполнимых вариантов выбирается маршрут с наибольшей конечной ожидаемой прибылью. Поле
+ * {@link TradeAIComponent#specializedItem} может сузить новые маршруты до одного товара, не мешая
+ * аварийно продать уже имеющийся груз.</p>
  *
  * <p>Перемещение выполняется по прямой с постоянной скоростью, без поиска пути и учёта препятствий.
  * Цены и доступный объём повторно проверяются непосредственно перед сделкой. Все денежные расчёты
@@ -240,7 +242,9 @@ public class TradeAISystem extends IteratingSystem {
                 MarketComponent sellMarket = mm.get(sellStation);
 
                 for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-                    if (!buyMarket.isTradable(itemId) || !sellMarket.isTradable(itemId)) {
+                    if (!acceptsNewRouteItem(ai, itemId)
+                            || !buyMarket.isTradable(itemId)
+                            || !sellMarket.isTradable(itemId)) {
                         continue;
                     }
 
@@ -607,6 +611,20 @@ public class TradeAISystem extends IteratingSystem {
      */
     private boolean isValidItem(int itemId) {
         return itemId >= 0 && itemId < Constants.MAX_ITEMS;
+    }
+
+    /**
+     * Проверяет товарную специализацию перед планированием новой покупки.
+     *
+     * <p>Универсальное значение {@code -1} разрешает любой товар. Уже имеющийся груз этим
+     * фильтром не ограничивается и может быть продан системой восстановления маршрута.</p>
+     *
+     * @param ai состояние флота с конфигурацией специализации
+     * @param itemId проверяемый допустимый идентификатор товара
+     * @return {@code true}, если товар разрешён для нового полного маршрута
+     */
+    private boolean acceptsNewRouteItem(TradeAIComponent ai, int itemId) {
+        return ai.specializedItem == -1 || ai.specializedItem == itemId;
     }
 
     /**
