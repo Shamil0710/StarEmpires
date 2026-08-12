@@ -16,6 +16,8 @@ import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.content.ContentCatalog;
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.economy.Money;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
@@ -40,6 +42,10 @@ import java.util.Objects;
  * Все станции и экономические корабли получают конечные {@link WalletComponent} с начальным
  * капиталом. Authoritative деньги существуют только в этих кошельках.</p>
  *
+ * <p>Производственные рецепты разрешаются через {@link ContentCatalog} по устойчивым строковым
+ * content ID. Это позволяет менять производственные коэффициенты в data-файле без изменения
+ * simulation-кода, сохраняя текущие плотные runtime ID товарных массивов.</p>
+ *
  * <p>Все bootstrap-сущности получают устойчивые {@link EntityIdComponent} в стабильном порядке
  * результата. Перегрузка с внешним {@link EntityIdAllocator} позволяет продолжить ту же ID-
  * последовательность для динамических объектов текущей игровой сессии. Persistent-связи между
@@ -54,6 +60,7 @@ public final class DemoWorldFactory {
     private static final double STATION_STARTING_CREDITS = 250_000d;
     private static final double FLEET_STARTING_CREDITS = 12_000d;
     private static final double MINER_STARTING_CREDITS = 1_000d;
+    private static final ContentCatalog DEFAULT_CONTENT = ContentCatalogLoader.loadDefault();
 
     private DemoWorldFactory() {
         throw new AssertionError("Фабрика демонстрационного мира не создаёт экземпляров");
@@ -65,11 +72,22 @@ public final class DemoWorldFactory {
      * @return неизменяемый список из шести новых станций и семи новых кораблей
      */
     public static List<Entity> createEntities() {
-        return createEntities(new EntityIdAllocator());
+        return createEntities(new EntityIdAllocator(), DEFAULT_CONTENT);
     }
 
     /**
      * Создаёт полный набор станций и кораблей, используя общую ID-последовательность сессии.
+     *
+     * @param idAllocator общий детерминированный аллокатор persistent ID
+     * @return неизменяемый список из шести новых станций и семи новых кораблей
+     * @throws NullPointerException если аллокатор не задан
+     */
+    public static List<Entity> createEntities(EntityIdAllocator idAllocator) {
+        return createEntities(idAllocator, DEFAULT_CONTENT);
+    }
+
+    /**
+     * Создаёт демонстрационный мир с явно заданным валидированным content catalog.
      *
      * <p>Порядок результата стабилен: сначала шесть станций от первичных источников к конечному
      * потребителю, затем пять специализированных транспортов, добывающий и боевой корабли. ID
@@ -77,11 +95,16 @@ public final class DemoWorldFactory {
      * предпочтительной базы разгрузки.</p>
      *
      * @param idAllocator общий детерминированный аллокатор persistent ID
+     * @param contentCatalog versioned каталог, определяющий производственные рецепты
      * @return неизменяемый список из шести новых станций и семи новых кораблей
-     * @throws NullPointerException если аллокатор не задан
+     * @throws NullPointerException если аллокатор или каталог не заданы
+     * @throws IllegalArgumentException если обязательный recipe content ID отсутствует в каталоге
      */
-    public static List<Entity> createEntities(EntityIdAllocator idAllocator) {
+    public static List<Entity> createEntities(
+            EntityIdAllocator idAllocator,
+            ContentCatalog contentCatalog) {
         Objects.requireNonNull(idAllocator, "EntityIdAllocator не задан");
+        Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
 
         Entity mine = createStation(
                 "Шахтёрская база Ковчег", 420f, 880f, Constants.FACTION_MINERS);
@@ -90,36 +113,27 @@ public final class DemoWorldFactory {
         Entity powerPlant = createStation(
                 "Энергоузел Корона", 470f, 430f, Constants.FACTION_NEUTRAL);
         configureMarket(powerPlant, Constants.ITEM_ENERGY, 400, 300, 0f);
-        addProduction(powerPlant, new Recipe("Генерация энергии", 4f)
-                .output(Constants.ITEM_ENERGY, 7));
+        addProduction(powerPlant, contentCatalog.createRuntimeRecipe("recipe.energy_generation"));
 
         Entity farm = createStation(
                 "Агрокупол Аврора", 850f, 280f, Constants.FACTION_TRADE_LEAGUE);
         configureMarket(farm, Constants.ITEM_ENERGY, 80, 120, 0f);
         configureMarket(farm, Constants.ITEM_FOOD, 320, 240, 0f);
-        addProduction(farm, new Recipe("Выращивание продовольствия", 6f)
-                .input(Constants.ITEM_ENERGY, 2)
-                .output(Constants.ITEM_FOOD, 6));
+        addProduction(farm, contentCatalog.createRuntimeRecipe("recipe.food_growing"));
 
         Entity foundry = createStation(
                 "Кузница Гелиос", 900f, 900f, Constants.FACTION_MINERS);
         configureMarket(foundry, Constants.ITEM_ORE, 200, 300, 0f);
         configureMarket(foundry, Constants.ITEM_ENERGY, 80, 120, 0f);
         configureMarket(foundry, Constants.ITEM_STEEL, 240, 180, 0f);
-        addProduction(foundry, new Recipe("Выплавка стали", 4f)
-                .input(Constants.ITEM_ORE, 2)
-                .input(Constants.ITEM_ENERGY, 1)
-                .output(Constants.ITEM_STEEL, 2));
+        addProduction(foundry, contentCatalog.createRuntimeRecipe("recipe.steel_smelting"));
 
         Entity arsenal = createStation(
                 "Арсенал Титан", 1350f, 730f, Constants.FACTION_TRADE_LEAGUE);
         configureMarket(arsenal, Constants.ITEM_ENERGY, 80, 120, 0f);
         configureMarket(arsenal, Constants.ITEM_STEEL, 80, 120, 0f);
         configureMarket(arsenal, Constants.ITEM_WEAPONS, 120, 90, 0f);
-        addProduction(arsenal, new Recipe("Сборка вооружения", 6f)
-                .input(Constants.ITEM_STEEL, 2)
-                .input(Constants.ITEM_ENERGY, 1)
-                .output(Constants.ITEM_WEAPONS, 1));
+        addProduction(arsenal, contentCatalog.createRuntimeRecipe("recipe.weapons_assembly"));
 
         Entity colony = createStation(
                 "Колония Фронтир", 1600f, 330f, Constants.FACTION_NEUTRAL);
