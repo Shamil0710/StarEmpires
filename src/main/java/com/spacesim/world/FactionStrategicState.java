@@ -8,12 +8,14 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Persistent strategic policy одной faction: diplomacy, territory, stock/production policy и goals.
+ * Persistent strategic policy одной faction: diplomacy, territory, fiscal, stock/production и goals.
  *
  * @param factionContentId stable owner faction content ID
  * @param minimumMarketAccessRelation минимальное directed relation для доступа к рынкам faction
  * @param relations directed relations к другим factions
  * @param controlledSystems стратегически контролируемые StarSystem IDs
+ * @param stationTaxBasisPoints налог со surplus собственных station wallets, 0..10000 bps
+ * @param foreignTerritoryTariffBasisPoints levy со surplus чужих markets в controlled territory
  * @param stockPolicies базовые target-stock floors faction
  * @param productionPolicies desired recipe по station archetype
  * @param strategicGoals active military/expansion goals, создающие дополнительные demand floors
@@ -23,12 +25,14 @@ public record FactionStrategicState(
         int minimumMarketAccessRelation,
         List<FactionRelationState> relations,
         List<StarSystemId> controlledSystems,
+        int stationTaxBasisPoints,
+        int foreignTerritoryTariffBasisPoints,
         List<FactionStockPolicyState> stockPolicies,
         List<FactionProductionPolicyState> productionPolicies,
         List<FactionStrategicGoalState> strategicGoals) implements Comparable<FactionStrategicState> {
 
     /**
-     * Source-compatible constructor diplomacy/territory state без economic production goals.
+     * Source-compatible diplomacy/territory constructor с нулевой fiscal/economic policy.
      *
      * @param factionContentId stable owner faction content ID
      * @param minimumMarketAccessRelation threshold
@@ -45,9 +49,42 @@ public record FactionStrategicState(
                 minimumMarketAccessRelation,
                 relations,
                 controlledSystems,
+                0,
+                0,
                 List.of(),
                 List.of(),
                 List.of());
+    }
+
+    /**
+     * Source-compatible policy constructor с нулевыми tax/tariff rates.
+     *
+     * @param factionContentId stable owner faction content ID
+     * @param minimumMarketAccessRelation threshold
+     * @param relations directed relations
+     * @param controlledSystems controlled systems
+     * @param stockPolicies stock floors
+     * @param productionPolicies production policies
+     * @param strategicGoals active goals
+     */
+    public FactionStrategicState(
+            String factionContentId,
+            int minimumMarketAccessRelation,
+            List<FactionRelationState> relations,
+            List<StarSystemId> controlledSystems,
+            List<FactionStockPolicyState> stockPolicies,
+            List<FactionProductionPolicyState> productionPolicies,
+            List<FactionStrategicGoalState> strategicGoals) {
+        this(
+                factionContentId,
+                minimumMarketAccessRelation,
+                relations,
+                controlledSystems,
+                0,
+                0,
+                stockPolicies,
+                productionPolicies,
+                strategicGoals);
     }
 
     /**
@@ -57,6 +94,8 @@ public record FactionStrategicState(
      * @param minimumMarketAccessRelation threshold в диапазоне [-100, 100]
      * @param relations directed relation list
      * @param controlledSystems controlled system IDs
+     * @param stationTaxBasisPoints own-station tax rate
+     * @param foreignTerritoryTariffBasisPoints foreign-market tariff rate
      * @param stockPolicies базовые stock floors
      * @param productionPolicies production policies
      * @param strategicGoals active strategic goals
@@ -66,6 +105,8 @@ public record FactionStrategicState(
         if (minimumMarketAccessRelation < -100 || minimumMarketAccessRelation > 100) {
             throw new IllegalArgumentException("Market-access threshold должен быть в диапазоне [-100, 100]");
         }
+        validateBasisPoints(stationTaxBasisPoints, "Station tax");
+        validateBasisPoints(foreignTerritoryTariffBasisPoints, "Foreign territory tariff");
         Objects.requireNonNull(relations, "Faction relations не заданы");
         Objects.requireNonNull(controlledSystems, "Controlled systems не заданы");
         Objects.requireNonNull(stockPolicies, "Faction stock policies не заданы");
@@ -228,5 +269,11 @@ public record FactionStrategicState(
             throw new IllegalArgumentException(label + " не может быть пустым");
         }
         return normalized;
+    }
+
+    private static void validateBasisPoints(int value, String label) {
+        if (value < 0 || value > 10_000) {
+            throw new IllegalArgumentException(label + " должен быть в диапазоне [0, 10000] bps");
+        }
     }
 }

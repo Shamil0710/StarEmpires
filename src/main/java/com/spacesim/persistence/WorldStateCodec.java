@@ -40,8 +40,8 @@ import java.util.Objects;
  *
  * <p>Local economic payload кодируется существующим {@link GameStateCodec}. World schema v1
  * содержит topology + local sessions, v2 добавляет treasury, а текущая v3 — strategic faction
- * state: diplomacy, territory, stock/production policies и military/expansion goals. Legacy v1/v2
- * мигрируются нейтрально без создания отсутствующих денег или strategic policies.</p>
+ * state: diplomacy, territory, fiscal rates, stock/production policies и military/expansion goals.
+ * Legacy v1/v2 мигрируются нейтрально без создания отсутствующих денег или strategic policies.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
@@ -274,6 +274,8 @@ public final class WorldStateCodec {
             for (StarSystemId systemId : value.controlledSystems()) {
                 output.writeLong(systemId.value());
             }
+            output.writeInt(value.stationTaxBasisPoints());
+            output.writeInt(value.foreignTerritoryTariffBasisPoints());
             writeCount(output, value.stockPolicies().size(), MAX_POLICIES_PER_FACTION, "stockPolicies");
             for (FactionStockPolicyState policy : value.stockPolicies()) {
                 writeString(output, policy.itemContentId());
@@ -313,6 +315,8 @@ public final class WorldStateCodec {
             for (int systemIndex = 0; systemIndex < systemCount; systemIndex++) {
                 controlledSystems.add(new StarSystemId(input.readLong()));
             }
+            int stationTaxBasisPoints = input.readInt();
+            int foreignTerritoryTariffBasisPoints = input.readInt();
             int stockCount = readCount(input, MAX_POLICIES_PER_FACTION, "stockPolicies");
             List<FactionStockPolicyState> stockPolicies = new ArrayList<>(stockCount);
             for (int policyIndex = 0; policyIndex < stockCount; policyIndex++) {
@@ -345,6 +349,8 @@ public final class WorldStateCodec {
                     threshold,
                     List.copyOf(relations),
                     List.copyOf(controlledSystems),
+                    stationTaxBasisPoints,
+                    foreignTerritoryTariffBasisPoints,
                     List.copyOf(stockPolicies),
                     List.copyOf(productionPolicies),
                     List.copyOf(goals)));
