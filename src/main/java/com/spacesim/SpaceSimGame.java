@@ -4,32 +4,81 @@ import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.kotcrab.vis.ui.VisUI;
 import com.spacesim.components.*;
 import com.spacesim.constants.Constants;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.events.NewsArticle;
-import com.spacesim.model.Recipe;
+import com.spacesim.model.AsteroidSpawnConfig;
 import com.spacesim.systems.*;
 import com.spacesim.ui.EconomyStatusUI;
+import com.spacesim.ui.EntityDetailsUI;
+import com.spacesim.ui.EntityPicker;
 import com.spacesim.ui.NewsUI;
 import com.spacesim.ui.PriceGraphRenderer;
+import com.spacesim.ui.WorldMapLayout;
+import com.spacesim.ui.WorldMapRenderer;
 import com.spacesim.util.SpatialHashGrid;
 
+/**
+ * Главный объект приложения Star Empires и точка сборки демонстрационной сцены.
+ *
+ * <p>Класс управляет жизненным циклом libGDX: создаёт Ashley-движок, регистрирует
+ * экономические системы в порядке их выполнения, наполняет мир начальными
+ * станциями и флотом, а затем на каждом кадре обновляет симуляцию и интерфейс.
+ * Экономическая панель намеренно обновляется не чаще четырёх раз в секунду,
+ * тогда как модель продолжает получать фактическое время кадра.</p>
+ *
+ * <p>Экземпляр создаётся desktop-запускателем. Все графические ресурсы,
+ * созданные в {@link #create()}, освобождаются в {@link #dispose()}.</p>
+ */
 public class SpaceSimGame extends ApplicationAdapter {
+    private static final float ECONOMY_UI_UPDATE_INTERVAL_SECONDS = 0.25f;
+    private static final float MAP_PADDING = 18f;
+    private static final float MAP_PICK_RADIUS = 24f;
+    private static final float DETAILS_AREA_GAP = 20f;
+
     private Engine engine;
     private GlobalEventManager eventManager;
     private SpatialHashGrid grid;
 
-    // UI
     private Stage stage;
     private NewsUI newsUI;
     private EconomyStatusUI economyStatusUI;
+    private EntityDetailsUI entityDetailsUI;
     private PriceGraphRenderer graphRenderer;
+    private WorldMapRenderer worldMapRenderer;
+    private Actor mapInteractionLayer;
+    private WorldMapLayout mapLayout;
+    private Entity selectedEntity;
+    private float economyUiUpdateAccumulator;
 
+    /**
+     * Создаёт неинициализированный объект приложения.
+     *
+     * <p>Ресурсы libGDX здесь не создаются: графический контекст становится
+     * доступен только при последующем вызове {@link #create()}.</p>
+     */
+    public SpaceSimGame() {
+    }
+
+    /**
+     * Создаёт экономическую модель, пользовательский интерфейс и начальный мир.
+     *
+     * <p>Метод вызывается libGDX один раз после инициализации графического
+     * контекста. Порядок регистрации систем значим: сначала формируются цены и
+     * потребление, затем выполняются производство, появление астероидов, добыча, торговый ИИ и
+     * запись истории.</p>
+     */
     @Override
     public void create() {
         VisUI.load();
@@ -37,122 +86,296 @@ public class SpaceSimGame extends ApplicationAdapter {
         eventManager = new GlobalEventManager();
         grid = new SpatialHashGrid(200);
 
-        // UI Init
-        stage = new Stage();
+        stage = new Stage(new ScreenViewport());
         Skin skin = VisUI.getSkin();
+        graphRenderer = new PriceGraphRenderer();
+        worldMapRenderer = new WorldMapRenderer(skin.get(Label.LabelStyle.class).font);
+
+        mapInteractionLayer = createMapInteractionLayer();
+        stage.addActor(mapInteractionLayer);
         newsUI = new NewsUI(skin);
         stage.addActor(newsUI);
         economyStatusUI = new EconomyStatusUI(skin);
         stage.addActor(economyStatusUI);
-        graphRenderer = new PriceGraphRenderer();
+        entityDetailsUI = new EntityDetailsUI(skin);
+        stage.addActor(entityDetailsUI);
+        updateMapLayout();
+        Gdx.input.setInputProcessor(stage);
 
-        // Systems Init
         engine.addSystem(new MarketSystem(eventManager));
         engine.addSystem(new ConsumptionSystem(eventManager));
         engine.addSystem(new ProductionSystem());
+        engine.addSystem(new AsteroidSpawnSystem(AsteroidSpawnConfig.demoWorld()));
+        engine.addSystem(new MiningSystem());
         engine.addSystem(new TradeAISystem(grid));
         engine.addSystem(new PriceRecorderSystem());
 
-        // Тестовая производственная станция с рудой и энергией
-        createProductionStation(100, 400, Constants.FACTION_MINERS);
-        // Тестовая станция-продавец с избытком еды
-        createStation(100, 100, 1200, 500, 0.0f, Constants.FACTION_TRADE_LEAGUE);
-        // Тестовая станция-покупатель с дефицитом еды
-        createStation(500, 100, 100, 1000, 5.0f, Constants.FACTION_NEUTRAL);
-        // Тестовый торговый флот
-        createFleet(300, 300);
+        for (Entity entity : DemoWorldFactory.createEntities()) {
+            engine.addEntity(entity);
+        }
+
+        economyStatusUI.update(engine.getEntities());
+        entityDetailsUI.refresh();
+        Gdx.gl.glClearColor(0.018f, 0.025f, 0.045f, 1f);
     }
 
-    private void createStation(float x, float y, int foodStock, int targetFoodStock, float foodConsumption, int factionId) {
-        Entity e = new Entity();
-        e.add(new TransformComponent());
-        e.getComponent(TransformComponent.class).position.set(x, y);
+    /**
+     * Создаёт прозрачный нижний слой выбора, масштабирования и перемещения карты.
+     *
+     * <p>Панели добавляются на сцену после этого слоя и поэтому получают ввод первыми. Щелчок
+     * по свободному месту карты снимает текущий выбор и позволяет перетащить обзор. Средняя или
+     * правая кнопка перемещает карту независимо от выбора, а колесо масштабирует её вокруг
+     * курсора. Все изменения вида проходят через {@link WorldMapLayout}, поэтому отрисовка и
+     * hit-test используют одно преобразование.</p>
+     *
+     * @return настроенный Scene2D-актор без собственного визуального представления
+     */
+    private Actor createMapInteractionLayer() {
+        Actor interactionLayer = new Actor();
+        interactionLayer.addListener(new InputListener() {
+            private int dragPointer = -1;
+            private float previousX;
+            private float previousY;
 
-        InventoryComponent inv = new InventoryComponent();
-        inv.stock[2] = foodStock;
-        e.add(inv);
+            @Override
+            public void enter(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    Actor fromActor) {
+                if (pointer == -1 && event.getStage() != null) {
+                    event.getStage().setScrollFocus(event.getListenerActor());
+                }
+            }
 
-        MarketComponent m = new MarketComponent();
-        m.targetStock[2] = targetFoodStock;
-        m.baseConsumption[2] = foodConsumption;
-        e.add(m);
-        e.add(new FactionComponent(factionId));
+            @Override
+            public void exit(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    Actor toActor) {
+                if (pointer == -1
+                        && event.getStage() != null
+                        && event.getStage().getScrollFocus() == event.getListenerActor()) {
+                    event.getStage().setScrollFocus(null);
+                }
+            }
 
-        e.add(new PriceHistoryComponent());
-        engine.addEntity(e);
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                if (mapLayout == null || !mapLayout.containsMapPoint(x, y)) {
+                    return false;
+                }
+
+                if (button == Input.Buttons.LEFT) {
+                    selectedEntity = EntityPicker.pick(
+                            engine.getEntities(), mapLayout, x, y, MAP_PICK_RADIUS);
+                    entityDetailsUI.select(selectedEntity);
+                    if (selectedEntity == null) {
+                        beginDrag(pointer, x, y);
+                    }
+                    return true;
+                }
+                if (button == Input.Buttons.MIDDLE || button == Input.Buttons.RIGHT) {
+                    beginDrag(pointer, x, y);
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public void touchDragged(InputEvent event, float x, float y, int pointer) {
+                if (pointer != dragPointer || mapLayout == null) {
+                    return;
+                }
+                mapLayout = mapLayout.panByScreen(x - previousX, y - previousY);
+                previousX = x;
+                previousY = y;
+            }
+
+            @Override
+            public void touchUp(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    int button) {
+                if (pointer == dragPointer) {
+                    dragPointer = -1;
+                }
+            }
+
+            @Override
+            public boolean scrolled(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    float amountX,
+                    float amountY) {
+                if (mapLayout == null || !mapLayout.containsMapPoint(x, y)) {
+                    return false;
+                }
+                mapLayout = mapLayout.zoomByScroll(x, y, amountY);
+                return true;
+            }
+
+            /** Запоминает указатель и начальную точку панорамирования. */
+            private void beginDrag(int pointer, float x, float y) {
+                dragPointer = pointer;
+                previousX = x;
+                previousY = y;
+            }
+        });
+        return interactionLayer;
     }
 
-    private void createProductionStation(float x, float y, int factionId) {
-        Entity e = new Entity();
-        e.add(new TransformComponent());
-        e.getComponent(TransformComponent.class).position.set(x, y);
+    /**
+     * Пересчитывает вписанную карту и область обработки ввода по текущему размеру сцены.
+     *
+     * <p>Справа всегда резервируется место под карточку объекта. Для необычно маленького
+     * viewport сохраняется минимальная корректная геометрия, чтобы сворачивание и восстановление
+     * окна не передавали нулевые размеры в преобразование координат.</p>
+     */
+    private void updateMapLayout() {
+        float stageWidth = Math.max(64f, stage.getWidth());
+        float stageHeight = Math.max(64f, stage.getHeight());
+        float availableWidth = Math.max(
+                64f,
+                stageWidth - EntityDetailsUI.RECOMMENDED_WIDTH - DETAILS_AREA_GAP);
+        float padding = Math.min(MAP_PADDING, Math.min(availableWidth, stageHeight) * 0.2f);
 
-        InventoryComponent inv = new InventoryComponent();
-        inv.stock[Constants.ITEM_ORE] = 500;
-        inv.stock[Constants.ITEM_ENERGY] = 250;
-        e.add(inv);
-
-        MarketComponent m = new MarketComponent();
-        m.targetStock[Constants.ITEM_STEEL] = 300;
-        e.add(m);
-        e.add(new FactionComponent(factionId));
-
-        ProductionComponent production = new ProductionComponent();
-        production.recipes.add(new Recipe("Выплавка стали", 2.0f)
-                .input(Constants.ITEM_ORE, 2)
-                .input(Constants.ITEM_ENERGY, 1)
-                .output(Constants.ITEM_STEEL, 1));
-        e.add(production);
-
-        e.add(new PriceHistoryComponent());
-        engine.addEntity(e);
+        if (mapLayout == null) {
+            mapLayout = new WorldMapLayout(0f, 0f, availableWidth, stageHeight, padding);
+        } else {
+            mapLayout = mapLayout.resize(0f, 0f, availableWidth, stageHeight, padding);
+        }
+        mapInteractionLayer.setBounds(0f, 0f, availableWidth, stageHeight);
     }
 
-    private void createFleet(float x, float y) {
-        Entity e = new Entity();
-        e.add(new TransformComponent());
-        e.getComponent(TransformComponent.class).position.set(x, y);
-        e.add(new TradeAIComponent());
-        ReputationComponent reputation = new ReputationComponent();
-        reputation.addReputation(Constants.FACTION_TRADE_LEAGUE, 25f);
-        reputation.addReputation(Constants.FACTION_MINERS, 10f);
-        e.add(reputation);
-        e.add(new InventoryComponent());
-        engine.addEntity(e);
+    /** Рисует график первого торгуемого товара выбранной станции в нижней части карты. */
+    private void renderSelectedPriceGraph() {
+        if (selectedEntity == null || mapLayout == null || mapLayout.getMapWidth() < 600f) {
+            return;
+        }
+
+        PriceHistoryComponent priceHistory = selectedEntity.getComponent(PriceHistoryComponent.class);
+        MarketComponent market = selectedEntity.getComponent(MarketComponent.class);
+        if (priceHistory == null || market == null) {
+            return;
+        }
+
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            if (!market.isTradable(itemId) || priceHistory.history[itemId].size < 2) {
+                continue;
+            }
+
+            float graphWidth = Math.min(220f, mapLayout.getMapWidth() * 0.38f);
+            float graphHeight = Math.min(90f, mapLayout.getMapHeight() * 0.22f);
+            graphRenderer.render(
+                    stage.getCamera().combined,
+                    priceHistory.history[itemId],
+                    mapLayout.getMapX() + mapLayout.getMapWidth() - graphWidth - 16f,
+                    mapLayout.getMapY() + 16f,
+                    graphWidth,
+                    graphHeight);
+            return;
+        }
     }
 
+    /** Снимает выбор, если динамический объект уже удалён из Ashley-движка. */
+    private void clearInactiveSelection() {
+        if (selectedEntity == null || engine == null) {
+            return;
+        }
+        for (Entity entity : engine.getEntities()) {
+            if (entity == selectedEntity) {
+                return;
+            }
+        }
+        selectedEntity = null;
+        entityDetailsUI.select(null);
+    }
+
+    /**
+     * Выполняет один кадр симуляции и отрисовки.
+     *
+     * <p>Сначала обновляются глобальные события и Ashley-системы, затем с ограниченной частотой
+     * актуализируются текстовые панели. Карта и выбранный ценовой график рисуются под Scene2D,
+     * поэтому интерактивные панели и карточка объекта всегда остаются читаемыми.</p>
+     */
     @Override
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        // Update Logic
         eventManager.update(delta);
         for (NewsArticle article : eventManager.consumePendingNews()) {
             newsUI.addNews(article);
         }
         engine.update(delta);
-        economyStatusUI.update(engine.getEntities());
+        clearInactiveSelection();
+        economyUiUpdateAccumulator += delta;
+        if (economyUiUpdateAccumulator >= ECONOMY_UI_UPDATE_INTERVAL_SECONDS) {
+            economyUiUpdateAccumulator %= ECONOMY_UI_UPDATE_INTERVAL_SECONDS;
+            economyStatusUI.update(engine.getEntities());
+            entityDetailsUI.refresh();
+        }
         stage.act(delta);
 
-        // Draw
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        worldMapRenderer.render(
+                stage.getCamera().combined,
+                engine.getEntities(),
+                mapLayout,
+                selectedEntity);
+        renderSelectedPriceGraph();
         stage.draw();
-
-        // Рисуем график для первой попавшейся станции (для теста)
-        if(engine.getEntities().size() > 0) {
-            Entity s = engine.getEntities().first();
-            if (s.getComponent(PriceHistoryComponent.class) != null) {
-                // Рисуем график товара ID 2 (Food)
-                graphRenderer.render(s.getComponent(PriceHistoryComponent.class).history[2],
-                        50, 50, 200, 100);
-            }
-        }
     }
 
+    /**
+     * Подгоняет виртуальную сцену под новый размер окна.
+     *
+     * <p>Нулевые размеры, которые возможны при сворачивании окна, игнорируются,
+     * чтобы не передавать некорректную геометрию во viewport.</p>
+     *
+     * @param width новая ширина окна в пикселях
+     * @param height новая высота окна в пикселях
+     */
+    @Override
+    public void resize(int width, int height) {
+        if (width <= 0 || height <= 0 || stage == null) {
+            return;
+        }
+        stage.getViewport().update(width, height, true);
+        updateMapLayout();
+    }
+
+    /**
+     * Освобождает Scene2D, отрисовщик графика и глобальный скин VisUI.
+     *
+     * <p>Перед освобождением сцена снимается с обработчика ввода, если она всё
+     * ещё установлена. Повторный вызов безопасен для локальных ресурсов.</p>
+     */
     @Override
     public void dispose() {
-        VisUI.dispose();
-        stage.dispose();
-        graphRenderer.dispose();
+        if (Gdx.input != null && Gdx.input.getInputProcessor() == stage) {
+            Gdx.input.setInputProcessor(null);
+        }
+        if (stage != null) {
+            stage.dispose();
+            stage = null;
+        }
+        if (worldMapRenderer != null) {
+            worldMapRenderer.dispose();
+            worldMapRenderer = null;
+        }
+        if (graphRenderer != null) {
+            graphRenderer.dispose();
+            graphRenderer = null;
+        }
+        if (VisUI.isLoaded()) {
+            VisUI.dispose();
+        }
     }
 }
