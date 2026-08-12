@@ -19,6 +19,9 @@ public record BenchmarkReport(
         DeterministicMetrics deterministic,
         PerformanceMetrics performance) {
 
+    /** Версия machine-readable JSON report contract. */
+    public static final int REPORT_SCHEMA_VERSION = 1;
+
     /**
      * Проверяет обязательные части отчёта.
      *
@@ -38,8 +41,9 @@ public record BenchmarkReport(
      * @return JSON object с scenario, deterministic и performance секциями
      */
     public String toJson() {
-        StringBuilder out = new StringBuilder(2048);
-        out.append('{');
+        StringBuilder out = new StringBuilder(4096);
+        out.append('{')
+                .append("\"reportSchemaVersion\":").append(REPORT_SCHEMA_VERSION).append(',');
         out.append("\"scenario\":{")
                 .append("\"name\":\"").append(escapeJson(scenario.name())).append("\",")
                 .append("\"version\":").append(scenario.version()).append(',')
@@ -78,8 +82,10 @@ public record BenchmarkReport(
                 .append("\"sampledSellPriceVariance\":").append(d.sampledSellPriceVariance()).append(',')
                 .append("\"activeRouteObservations\":").append(d.activeRouteObservations()).append(',')
                 .append("\"expectedRouteProfitMilliCreditsSum\":")
-                .append(d.expectedRouteProfitMilliCreditsSum())
-                .append("},");
+                .append(d.expectedRouteProfitMilliCreditsSum()).append(',')
+                .append("\"observability\":");
+        appendObservability(out, d.observability());
+        out.append("},");
 
         PerformanceMetrics p = performance;
         out.append("\"performance\":{")
@@ -92,6 +98,28 @@ public record BenchmarkReport(
                 .append("\"heapUsedDeltaBytes\":").append(p.heapUsedDeltaBytes())
                 .append("}}");
         return out.toString();
+    }
+
+    private static void appendObservability(StringBuilder out, BenchmarkObservability o) {
+        out.append('{')
+                .append("\"minerCount\":").append(o.minerCount()).append(',')
+                .append("\"economicAgentCount\":").append(o.economicAgentCount()).append(',')
+                .append("\"walletCount\":").append(o.walletCount()).append(',')
+                .append("\"walletMinMilliCredits\":").append(o.walletMinMilliCredits()).append(',')
+                .append("\"walletMedianMilliCredits\":").append(o.walletMedianMilliCredits()).append(',')
+                .append("\"walletP90MilliCredits\":").append(o.walletP90MilliCredits()).append(',')
+                .append("\"walletMaxMilliCredits\":").append(o.walletMaxMilliCredits()).append(',')
+                .append("\"walletGini\":").append(o.walletGini()).append(',')
+                .append("\"totalMinedUnits\":").append(o.totalMinedUnits()).append(',')
+                .append("\"totalDeliveredUnits\":").append(o.totalDeliveredUnits()).append(',')
+                .append("\"productionTransformCycles\":").append(o.productionTransformCycles()).append(',')
+                .append("\"productionOutputUnits\":").append(o.productionOutputUnits()).append(',')
+                .append("\"marketOpportunitySampleSum\":").append(o.marketOpportunitySampleSum()).append(',')
+                .append("\"marketOpportunitySampleMax\":").append(o.marketOpportunitySampleMax()).append(',')
+                .append("\"resourceAccountingConserved\":").append(o.resourceAccountingConserved()).append(',')
+                .append("\"resourceAccountingDeltaByItem\":");
+        appendLongArray(out, o.resourceAccountingDeltaByItem());
+        out.append('}');
     }
 
     private static void appendLongArray(StringBuilder out, List<Long> values) {
@@ -148,7 +176,7 @@ public record BenchmarkReport(
      * @param finalMoneyMilliCredits деньги всех WalletComponent после run
      * @param moneyConserved выполняется ли ledger-adjusted money conservation
      * @param nonNegativeInventories остались ли все inventory slots неотрицательными
-     * @param finalStockByItem итоговые физические остатки по active catalog item runtime order
+     * @param finalStockByItem итоговые inventory-остатки по active catalog item runtime order
      * @param stockoutObservations число station/item observations с нулевым stock
      * @param unmetDemandUnitObservations сумма observed target-stock deficits
      * @param sampledSellPriceCount число валидных sampled sell prices
@@ -156,6 +184,7 @@ public record BenchmarkReport(
      * @param sampledSellPriceVariance population variance sampled sell prices
      * @param activeRouteObservations число observations активных/запланированных TradeAI routes
      * @param expectedRouteProfitMilliCreditsSum сумма expectedProfit по route observations
+     * @param observability дополнительные deterministic diagnostics
      */
     public record DeterministicMetrics(
             long finalTick,
@@ -183,7 +212,8 @@ public record BenchmarkReport(
             double sampledSellPriceMean,
             double sampledSellPriceVariance,
             long activeRouteObservations,
-            long expectedRouteProfitMilliCreditsSum) {
+            long expectedRouteProfitMilliCreditsSum,
+            BenchmarkObservability observability) {
 
         /**
          * Копирует item totals и проверяет базовые диапазоны.
@@ -206,7 +236,7 @@ public record BenchmarkReport(
          * @param finalMoneyMilliCredits деньги всех WalletComponent после run
          * @param moneyConserved выполняется ли ledger-adjusted money conservation
          * @param nonNegativeInventories остались ли все inventory slots неотрицательными
-         * @param finalStockByItem итоговые физические остатки по active catalog item runtime order
+         * @param finalStockByItem итоговые inventory-остатки по active catalog item runtime order
          * @param stockoutObservations число station/item observations с нулевым stock
          * @param unmetDemandUnitObservations сумма observed target-stock deficits
          * @param sampledSellPriceCount число валидных sampled sell prices
@@ -214,10 +244,12 @@ public record BenchmarkReport(
          * @param sampledSellPriceVariance population variance sampled sell prices
          * @param activeRouteObservations число observations активных/запланированных TradeAI routes
          * @param expectedRouteProfitMilliCreditsSum сумма expectedProfit по route observations
+         * @param observability дополнительные deterministic diagnostics
          */
         public DeterministicMetrics {
             finalStockByItem = List.copyOf(Objects.requireNonNull(
                     finalStockByItem, "finalStockByItem не задан"));
+            Objects.requireNonNull(observability, "BenchmarkObservability не задан");
             if (finalTick < 0L || sampleCount < 0L || entityCount < 0 || stationCount < 0
                     || traderCount < 0 || ledgerEntries < 0 || tradeTransactions < 0L
                     || tradedUnits < 0L || tradedMoneyMilliCredits < 0L
