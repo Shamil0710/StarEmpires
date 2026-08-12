@@ -6,6 +6,8 @@ import com.spacesim.DemoWorldFactory;
 import com.spacesim.constants.Constants;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.model.AsteroidSpawnConfig;
+import com.spacesim.persistence.EntityIdAllocator;
+import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.simulation.SimulationClock;
 import com.spacesim.simulation.SimulationLoop;
 import com.spacesim.simulation.SimulationRandom;
@@ -59,7 +61,10 @@ class EconomicLedgerDeterminismTest {
         SimulationRandom random = new SimulationRandom(ROOT_SEED);
         GlobalEventManager events = new GlobalEventManager(random.createStream("economy-events"), 0d);
         EconomicLedger ledger = new EconomicLedger();
+        EntityIdAllocator ids = new EntityIdAllocator();
+        EntityRegistry registry = new EntityRegistry();
         Engine engine = new Engine();
+        registry.track(engine);
         SpatialHashGrid grid = new SpatialHashGrid(Constants.CELL_SIZE);
 
         engine.addSystem(new MarketSystem(events));
@@ -68,12 +73,13 @@ class EconomicLedgerDeterminismTest {
         engine.addSystem(new AsteroidSpawnSystem(
                 AsteroidSpawnConfig.demoWorld(),
                 random.createStream("asteroid-spawn"),
-                ledger));
-        engine.addSystem(new MiningSystem(ledger));
-        engine.addSystem(new TradeAISystem(grid, ledger));
+                ledger,
+                ids));
+        engine.addSystem(new MiningSystem(ledger, registry));
+        engine.addSystem(new TradeAISystem(grid, ledger, registry));
         engine.addSystem(new PriceRecorderSystem());
 
-        for (Entity entity : DemoWorldFactory.createEntities()) {
+        for (Entity entity : DemoWorldFactory.createEntities(ids)) {
             engine.addEntity(entity);
         }
 
