@@ -16,6 +16,8 @@ import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.content.ContentCatalog;
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.controllers.TradeController;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
@@ -34,12 +36,14 @@ import java.util.Objects;
  * {@link EntityRegistry}; удалённая или не зарегистрированная станция делает маршрут невалидным без
  * висячей Ashley-ссылки.</p>
  *
+ * <p>Набор доступных товаров и их cargo metadata берутся из {@link ContentCatalog}. Поэтому выбор
+ * торгового маршрута не зависит от Java enum {@code ItemType}; плотный runtime ID остаётся только
+ * индексом hot-path массивов.</p>
+ *
  * <p>Authoritative деньги хранятся только в {@link WalletComponent}. При выборе маршрута система
- * проверяет ликвидность обеих сторон: флот должен оплатить покупку, станция назначения — иметь
- * средства выкупить груз, а кошельки-получатели — свободный диапазон {@code long}. Фактические
- * сделки выполняет {@link TradeController}, поэтому товар и деньги переходят атомарно и записываются
- * в общий {@link EconomicLedger}. Критерий маршрута пока остаётся максимальной валовой прибылью;
- * profit/time относится к Stage 5.</p>
+ * проверяет ликвидность обеих сторон. Фактические сделки выполняет {@link TradeController}, поэтому
+ * товар и деньги переходят атомарно и записываются в общий {@link EconomicLedger}. Критерий
+ * маршрута пока остаётся максимальной валовой прибылью; profit/time относится к Stage 5.</p>
  */
 public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
@@ -50,6 +54,7 @@ public class TradeAISystem extends IteratingSystem {
     private final SpatialHashGrid grid;
     private final TradeController tradeController;
     private final EntityRegistry registry;
+    private final ContentCatalog contentCatalog;
     private ImmutableArray<Entity> marketStations;
 
     private final ComponentMapper<TradeAIComponent> am = ComponentMapper.getFor(TradeAIComponent.class);
@@ -62,28 +67,28 @@ public class TradeAISystem extends IteratingSystem {
     private final ComponentMapper<EntityIdComponent> idm = ComponentMapper.getFor(EntityIdComponent.class);
 
     /**
-     * Создаёт торговую AI-систему с собственными ledger и registry.
+     * Создаёт торговую AI-систему с собственными ledger/registry и встроенным catalog.
      *
      * @param grid пространственный индекс рыночных станций
      * @throws NullPointerException если индекс не задан
      */
     public TradeAISystem(SpatialHashGrid grid) {
-        this(grid, new EconomicLedger(), new EntityRegistry());
+        this(grid, new EconomicLedger(), new EntityRegistry(), ContentCatalogLoader.loadDefault());
     }
 
     /**
-     * Создаёт торговую AI-систему с общим ledger и собственным registry.
+     * Создаёт торговую AI-систему с общим ledger и встроенным catalog.
      *
      * @param grid пространственный индекс рыночных станций
      * @param ledger общий экономический журнал
      * @throws NullPointerException если зависимость не задана
      */
     public TradeAISystem(SpatialHashGrid grid, EconomicLedger ledger) {
-        this(grid, ledger, new EntityRegistry());
+        this(grid, ledger, new EntityRegistry(), ContentCatalogLoader.loadDefault());
     }
 
     /**
-     * Создаёт торговую AI-систему с общими ledger и persistent-ID registry игровой сессии.
+     * Создаёт торговую AI-систему с общими ledger/registry и встроенным catalog.
      *
      * @param grid пространственный индекс рыночных станций
      * @param ledger общий экономический журнал
@@ -91,6 +96,23 @@ public class TradeAISystem extends IteratingSystem {
      * @throws NullPointerException если зависимость не задана
      */
     public TradeAISystem(SpatialHashGrid grid, EconomicLedger ledger, EntityRegistry registry) {
+        this(grid, ledger, registry, ContentCatalogLoader.loadDefault());
+    }
+
+    /**
+     * Создаёт торговую AI-систему с явно заданным versioned content catalog.
+     *
+     * @param grid пространственный индекс рыночных станций
+     * @param ledger общий экономический журнал
+     * @param registry runtime-индекс устойчивых EntityId
+     * @param contentCatalog каталог товаров текущей simulation session
+     * @throws NullPointerException если зависимость не задана
+     */
+    public TradeAISystem(
+            SpatialHashGrid grid,
+            EconomicLedger ledger,
+            EntityRegistry registry,
+            ContentCatalog contentCatalog) {
         super(Family.all(
                 EntityIdComponent.class,
                 TradeAIComponent.class,
@@ -101,6 +123,7 @@ public class TradeAISystem extends IteratingSystem {
         this.tradeController = new TradeController(
                 Objects.requireNonNull(ledger, "EconomicLedger не задан"));
         this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
+        this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
     }
 
     /** @return ledger, в который система записывает успешные сделки */
@@ -201,8 +224,9 @@ public class TradeAISystem extends IteratingSystem {
                 }
                 MarketComponent sellMarket = mm.get(sellStation);
 
-                for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-                    if (!acceptsNewRouteItem(fleet, ai, itemId)
+                for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
+                    int itemId = item.runtimeId();
+                    if (!acceptsNewRouteItem(fleet, ai, item)
                             || !buyMarket.isTradable(itemId)
                             || !sellMarket.isTradable(itemId)) {
                         continue;
@@ -270,7 +294,8 @@ public class TradeAISystem extends IteratingSystem {
                 continue;
             }
 
-            for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
+                int itemId = item.runtimeId();
                 int cargo = fleetInventory.stock[itemId];
                 if (cargo <= 0 || !market.isTradable(itemId)) {
                     continue;
@@ -389,7 +414,7 @@ public class TradeAISystem extends IteratingSystem {
         Entity buyStation = resolveActiveMarketStation(ai.buyStationId);
         Entity sellStation = resolveActiveMarketStation(ai.sellStationId);
         if (!isValidItem(ai.targetItem)
-                || !canShipPurchaseItem(fleet, ai.targetItem)
+                || !canShipPurchaseItem(fleet, contentCatalog.findItem(ai.targetItem))
                 || buyStation == null
                 || sellStation == null
                 || buyStation == sellStation
@@ -491,18 +516,25 @@ public class TradeAISystem extends IteratingSystem {
         return component.id;
     }
 
-    private boolean acceptsNewRouteItem(Entity fleet, TradeAIComponent ai, int itemId) {
-        return (ai.specializedItem == -1 || ai.specializedItem == itemId)
-                && canShipPurchaseItem(fleet, itemId);
+    private boolean acceptsNewRouteItem(
+            Entity fleet,
+            TradeAIComponent ai,
+            ContentCatalog.ItemDefinition item) {
+        return (ai.specializedItem == -1 || ai.specializedItem == item.runtimeId())
+                && canShipPurchaseItem(fleet, item);
     }
 
-    private boolean canShipPurchaseItem(Entity fleet, int itemId) {
+    private boolean canShipPurchaseItem(Entity fleet, ContentCatalog.ItemDefinition item) {
+        if (item == null) {
+            return false;
+        }
         ShipComponent ship = sm.get(fleet);
-        return ship == null || ship.canPurchaseItem(itemId);
+        return ship == null
+                || (ship.type != null && ship.type.canPurchase(item.category(), item.mineable()));
     }
 
     private boolean isValidItem(int itemId) {
-        return itemId >= 0 && itemId < Constants.MAX_ITEMS;
+        return contentCatalog.findItem(itemId) != null;
     }
 
     private boolean isPositiveFinitePrice(float price) {
