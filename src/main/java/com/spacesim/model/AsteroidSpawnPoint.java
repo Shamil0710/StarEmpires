@@ -11,6 +11,9 @@ public record AsteroidSpawnPoint(String id, float x, float y) {
     /**
      * Проверяет и нормализует параметры точки появления.
      *
+     * @param id устойчивый непустой идентификатор точки
+     * @param x конечная мировая координата X
+     * @param y конечная мировая координата Y
      * @throws IllegalArgumentException если идентификатор пуст либо одна из координат не является
      *                                  конечным числом
      */
