@@ -2,31 +2,40 @@ package com.spacesim.ui;
 
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.HdpiUtils;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
+import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
+import com.spacesim.components.MiningComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.model.ItemType;
 import com.spacesim.model.ShipType;
 
 /**
- * Рисует интерактивную карту станций и торговых флотов средствами libGDX.
+ * Рисует интерактивную карту космических объектов средствами libGDX.
  *
  * <p>Фон, сетка, маршруты и геометрические значки формируются кодом без внешних текстур.
- * Станции показаны кругами с цветом фракции, а пять типов кораблей различаются одновременно
- * силуэтом и контрастным цветом. Корабельный маркер направлен к текущей станции назначения.
+ * Станции показаны кругами с цветом фракции, астероиды — неровными минеральными силуэтами,
+ * а пять типов кораблей различаются одновременно силуэтом и контрастным цветом. Корабельный
+ * маркер направлен к текущему астероиду, базе или торговой станции назначения.
  * Если цели нет, направление берётся из конечного ненулевого вектора скорости, а затем — вдоль
  * положительной оси {@code X}. Маршрут торгового ИИ окрашен в цвет типа корабля. Имена станций
- * и выбранного флота выводятся переданным шрифтом.</p>
+ * и выбранного корабля либо астероида выводятся переданным шрифтом. Геометрия увеличенного обзора
+ * ограничивается экранным прямоугольником карты через scissor-test и не перекрывает панели
+ * Scene2D.</p>
  *
  * <p>Экземпляр владеет внутренними {@link ShapeRenderer} и {@link SpriteBatch}; их освобождает
  * {@link #dispose()}. Переданный {@link BitmapFont} остаётся собственностью VisUI/вызывающего
@@ -36,6 +45,7 @@ import com.spacesim.model.ShipType;
 public final class WorldMapRenderer {
     private static final float GRID_STEP = 100f;
     private static final float STATION_RADIUS = 9f;
+    private static final float ASTEROID_RADIUS = 13f;
     private static final float FLEET_LENGTH = 12f;
     private static final float FLEET_REAR_OFFSET = 7f;
     private static final float FLEET_HALF_WIDTH = 7f;
@@ -52,6 +62,15 @@ public final class WorldMapRenderer {
     private static final Color TRADE_LEAGUE_COLOR = new Color(0.24f, 0.78f, 0.58f, 1f);
     private static final Color MINERS_COLOR = new Color(0.93f, 0.56f, 0.22f, 1f);
     private static final Color UNKNOWN_FACTION_COLOR = new Color(0.72f, 0.55f, 0.82f, 1f);
+    private static final Color ASTEROID_COLOR = new Color(0.49f, 0.45f, 0.39f, 1f);
+    private static final Color ASTEROID_RESOURCE_COLOR = new Color(0.82f, 0.65f, 0.32f, 1f);
+
+    private static final float[] ASTEROID_SHAPE_X = {
+            1f, 0.62f, -0.08f, -0.78f, -1f, -0.68f, 0.04f, 0.77f
+    };
+    private static final float[] ASTEROID_SHAPE_Y = {
+            0.18f, 0.86f, 1f, 0.7f, -0.12f, -0.82f, -1f, -0.66f
+    };
 
     private static final MarkerStyle GENERIC_FLEET_STYLE =
             new MarkerStyle(MarkerShape.GENERIC_ARROW, 0.72f, 0.9f, 1f);
@@ -76,6 +95,10 @@ public final class WorldMapRenderer {
             ComponentMapper.getFor(TradeAIComponent.class);
     private static final ComponentMapper<ShipComponent> SHIPS =
             ComponentMapper.getFor(ShipComponent.class);
+    private static final ComponentMapper<AsteroidComponent> ASTEROIDS =
+            ComponentMapper.getFor(AsteroidComponent.class);
+    private static final ComponentMapper<MiningComponent> MINING =
+            ComponentMapper.getFor(MiningComponent.class);
 
     private final BitmapFont font;
     private final GlyphLayout labelLayout = new GlyphLayout();
@@ -108,7 +131,7 @@ public final class WorldMapRenderer {
      * освобождён, матрица, layout или коллекция отсутствуют либо матрица содержит неконечные
      * значения. Отдельные некорректные сущности просто пропускаются. Объект считается видимым,
      * только если имеет {@link IdentityComponent}, конечную позицию и находится в границах
-     * фиксированного мира.</p>
+     * полного мира и текущего обзора.</p>
      *
      * @param projectionMatrix конечная матрица камеры Scene2D
      * @param entities актуальные сущности мира; коллекция может содержать {@code null}
@@ -130,10 +153,16 @@ public final class WorldMapRenderer {
         collectVisibleEntities(entities, layout);
         shapeRenderer.setProjectionMatrix(projectionMatrix);
         drawBackground(layout);
-        drawGridAndRoutes(layout);
-        drawObjects(layout);
-        drawBordersAndSelection(layout, selected);
-        drawLabels(projectionMatrix, layout, selected);
+        beginMapClip(layout);
+        try {
+            drawGridAndRoutes(layout);
+            drawObjects(layout);
+            drawSelection(layout, selected);
+            drawLabels(projectionMatrix, layout, selected);
+        } finally {
+            Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
+        }
+        drawBorder(layout);
     }
 
     /** Собирает ссылки на сущности, которые имеют корректный визуальный образ на карте. */
@@ -160,28 +189,49 @@ public final class WorldMapRenderer {
     private void drawGridAndRoutes(WorldMapLayout layout) {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         shapeRenderer.setColor(GRID_COLOR);
-        for (float worldX = 0f; worldX <= WorldMapLayout.WORLD_WIDTH; worldX += GRID_STEP) {
-            if (layout.worldToScreen(worldX, 0f, firstPoint)
-                    && layout.worldToScreen(worldX, WorldMapLayout.WORLD_HEIGHT, secondPoint)) {
+        float firstGridX = (float) (Math.ceil(layout.getVisibleWorldMinX() / GRID_STEP) * GRID_STEP);
+        float firstGridY = (float) (Math.ceil(layout.getVisibleWorldMinY() / GRID_STEP) * GRID_STEP);
+        for (float worldX = firstGridX;
+             worldX <= layout.getVisibleWorldMaxX();
+             worldX += GRID_STEP) {
+            if (layout.worldToScreen(worldX, layout.getVisibleWorldMinY(), firstPoint)
+                    && layout.worldToScreen(
+                            worldX,
+                            layout.getVisibleWorldMaxY(),
+                            secondPoint)) {
                 shapeRenderer.line(firstPoint, secondPoint);
             }
         }
-        for (float worldY = 0f; worldY <= WorldMapLayout.WORLD_HEIGHT; worldY += GRID_STEP) {
-            if (layout.worldToScreen(0f, worldY, firstPoint)
-                    && layout.worldToScreen(WorldMapLayout.WORLD_WIDTH, worldY, secondPoint)) {
+        for (float worldY = firstGridY;
+             worldY <= layout.getVisibleWorldMaxY();
+             worldY += GRID_STEP) {
+            if (layout.worldToScreen(layout.getVisibleWorldMinX(), worldY, firstPoint)
+                    && layout.worldToScreen(
+                            layout.getVisibleWorldMaxX(),
+                            worldY,
+                            secondPoint)) {
                 shapeRenderer.line(firstPoint, secondPoint);
             }
         }
 
         for (Entity entity : visibleEntities) {
             IdentityComponent identity = IDENTITIES.get(entity);
-            TradeAIComponent ai = TRADE_AI.get(entity);
             TransformComponent transform = TRANSFORMS.get(entity);
+            Entity target = navigationTarget(entity);
             if (identity.kind != IdentityComponent.Kind.FLEET
-                    || ai == null
-                    || ai.targetStation == null
+                    || target == null
                     || !projectPosition(transform, layout, firstPoint)
-                    || !projectEntityPosition(ai.targetStation, layout, secondPoint)) {
+                    || !projectEntityPosition(target, layout, secondPoint)) {
+                continue;
+            }
+            MiningComponent mining = MINING.get(entity);
+            if (isActiveMiningRoute(mining)) {
+                shapeRenderer.setColor(
+                        MINING_STYLE.red(),
+                        MINING_STYLE.green(),
+                        MINING_STYLE.blue(),
+                        1f);
+                shapeRenderer.line(firstPoint, secondPoint);
                 continue;
             }
             ShipComponent ship = SHIPS.get(entity);
@@ -196,7 +246,7 @@ public final class WorldMapRenderer {
         shapeRenderer.end();
     }
 
-    /** Рисует станции кругами, а флоты направленными маркерами своего класса. */
+    /** Рисует станции, астероиды и направленные маркеры кораблей. */
     private void drawObjects(WorldMapLayout layout) {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         for (Entity entity : visibleEntities) {
@@ -209,6 +259,8 @@ public final class WorldMapRenderer {
             if (identity.kind == IdentityComponent.Kind.STATION) {
                 shapeRenderer.setColor(stationColor(entity));
                 shapeRenderer.circle(firstPoint.x, firstPoint.y, STATION_RADIUS, 24);
+            } else if (identity.kind == IdentityComponent.Kind.ASTEROID) {
+                drawAsteroid(entity, firstPoint.x, firstPoint.y);
             } else if (identity.kind == IdentityComponent.Kind.FLEET) {
                 ShipComponent ship = SHIPS.get(entity);
                 MarkerStyle style = markerStyle(ship == null ? null : ship.type);
@@ -219,12 +271,35 @@ public final class WorldMapRenderer {
         shapeRenderer.end();
     }
 
-    /** Рисует рамку карты и кольцо вокруг выбранного видимого объекта. */
-    private void drawBordersAndSelection(WorldMapLayout layout, Entity selected) {
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        shapeRenderer.setColor(BORDER_COLOR);
-        shapeRenderer.rect(layout.getMapX(), layout.getMapY(), layout.getMapWidth(), layout.getMapHeight());
+    /** Рисует неровный каменный силуэт и ядро, размер которого отражает остаток ресурса. */
+    private void drawAsteroid(Entity entity, float screenX, float screenY) {
+        shapeRenderer.setColor(ASTEROID_COLOR);
+        for (int index = 0; index < ASTEROID_SHAPE_X.length; index++) {
+            int next = (index + 1) % ASTEROID_SHAPE_X.length;
+            shapeRenderer.triangle(
+                    screenX,
+                    screenY,
+                    screenX + ASTEROID_SHAPE_X[index] * ASTEROID_RADIUS,
+                    screenY + ASTEROID_SHAPE_Y[index] * ASTEROID_RADIUS,
+                    screenX + ASTEROID_SHAPE_X[next] * ASTEROID_RADIUS,
+                    screenY + ASTEROID_SHAPE_Y[next] * ASTEROID_RADIUS);
+        }
 
+        AsteroidComponent asteroid = ASTEROIDS.get(entity);
+        float coreRadius = asteroidCoreRadius(asteroid);
+        if (coreRadius > 0f) {
+            shapeRenderer.setColor(ASTEROID_RESOURCE_COLOR);
+            shapeRenderer.circle(
+                    screenX,
+                    screenY,
+                    coreRadius,
+                    16);
+        }
+    }
+
+    /** Рисует кольцо вокруг выбранного видимого объекта. */
+    private void drawSelection(WorldMapLayout layout, Entity selected) {
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         if (selected != null
                 && visibleEntities.contains(selected, true)
                 && projectEntityPosition(selected, layout, firstPoint)) {
@@ -235,8 +310,36 @@ public final class WorldMapRenderer {
         shapeRenderer.end();
     }
 
+    /** Рисует рамку поверх обрезанного содержимого карты. */
+    private void drawBorder(WorldMapLayout layout) {
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(BORDER_COLOR);
+        shapeRenderer.rect(
+                layout.getMapX(),
+                layout.getMapY(),
+                layout.getMapWidth(),
+                layout.getMapHeight());
+        shapeRenderer.end();
+    }
+
     /**
-     * Выводит имена станций и выбранного флота, удерживая подписи внутри карты.
+     * Включает экранное отсечение содержимого карты с учётом HDPI-коэффициента libGDX.
+     *
+     * <p>{@link WorldMapLayout} использует координаты {@code ScreenViewport}; при стандартном
+     * {@code unitsPerPixel=1} они совпадают с логическими экранными пикселями. {@link HdpiUtils}
+     * преобразует их в координаты back buffer на мониторах с масштабированием интерфейса.</p>
+     */
+    private void beginMapClip(WorldMapLayout layout) {
+        int left = (int) Math.floor(layout.getMapX());
+        int bottom = (int) Math.floor(layout.getMapY());
+        int right = (int) Math.ceil(layout.getMapX() + layout.getMapWidth());
+        int top = (int) Math.ceil(layout.getMapY() + layout.getMapHeight());
+        Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
+        HdpiUtils.glScissor(left, bottom, Math.max(1, right - left), Math.max(1, top - bottom));
+    }
+
+    /**
+     * Выводит имена станций и выбранного корабля либо астероида внутри карты.
      *
      * <p>Подписи всех кораблей намеренно не показываются одновременно: при стыковке несколько
      * флотов могут занимать одну позицию и превращать текст в нечитаемое пятно. Имя конкретного
@@ -253,12 +356,13 @@ public final class WorldMapRenderer {
         for (Entity entity : visibleEntities) {
             IdentityComponent identity = IDENTITIES.get(entity);
             if (identity.name == null
-                    || identity.kind == IdentityComponent.Kind.FLEET && entity != selected
+                    || identity.kind != IdentityComponent.Kind.STATION && entity != selected
                     || !projectEntityPosition(entity, layout, firstPoint)) {
                 continue;
             }
 
-            labelLayout.setText(font, identity.name);
+            String label = labelText(entity, identity);
+            labelLayout.setText(font, label);
             float labelX = firstPoint.x + 13f;
             if (labelX + labelLayout.width > layout.getMapX() + layout.getMapWidth() - 4f) {
                 labelX = firstPoint.x - labelLayout.width - 13f;
@@ -269,10 +373,36 @@ public final class WorldMapRenderer {
                     layout.getMapY() + layout.getMapHeight() - 4f);
 
             font.setColor(entity == selected ? SELECTED_COLOR : LABEL_COLOR);
-            font.draw(spriteBatch, identity.name, labelX, labelY);
+            font.draw(spriteBatch, label, labelX, labelY);
         }
+        String controls = "Масштаб: " + Math.round(layout.getZoom() * 100f) + "%";
+        if (layout.getMapWidth() >= 430f) {
+            controls += "  •  колесо — масштаб  •  перетаскивание — обзор";
+        }
+        font.setColor(BORDER_COLOR);
+        font.draw(spriteBatch, controls, layout.getMapX() + 8f, layout.getMapY() + 18f);
         spriteBatch.end();
         font.setColor(oldRed, oldGreen, oldBlue, oldAlpha);
+    }
+
+    /** Формирует подпись объекта; остаток астероида раскрывается только после его выбора. */
+    private String labelText(Entity entity, IdentityComponent identity) {
+        if (identity.kind != IdentityComponent.Kind.ASTEROID) {
+            return identity.name;
+        }
+        AsteroidComponent asteroid = ASTEROIDS.get(entity);
+        if (asteroid == null) {
+            return identity.name;
+        }
+        ItemType resource = ItemType.fromId(asteroid.resourceItem);
+        String resourceName = resource == null ? "Ресурс" : resource.getDisplayName();
+        return identity.name
+                + " — "
+                + resourceName
+                + ": "
+                + Math.max(0L, asteroid.remainingResource)
+                + " / "
+                + asteroid.initialResource;
     }
 
     /** Рисует направленный значок флота с учётом цели или последнего вектора скорости. */
@@ -284,10 +414,9 @@ public final class WorldMapRenderer {
             MarkerShape shape) {
         float directionX = 0f;
         float directionY = 0f;
-        TradeAIComponent ai = TRADE_AI.get(fleet);
-
-        if (ai != null && ai.targetStation != null) {
-            TransformComponent targetTransform = TRANSFORMS.get(ai.targetStation);
+        Entity target = navigationTarget(fleet);
+        if (target != null) {
+            TransformComponent targetTransform = TRANSFORMS.get(target);
             if (hasFinitePosition(targetTransform)) {
                 directionX = targetTransform.position.x - transform.position.x;
                 directionY = targetTransform.position.y - transform.position.y;
@@ -379,6 +508,65 @@ public final class WorldMapRenderer {
         }
     }
 
+    /**
+     * Возвращает актуальную навигационную цель торгового или добывающего корабля.
+     *
+     * <p>Цель добычи имеет приоритет над legacy-торговым ИИ: на пути к астероиду и во время
+     * добычи нос направлен к источнику, а при возвращении и разгрузке — к базе.</p>
+     */
+    private Entity navigationTarget(Entity fleet) {
+        MiningComponent mining = MINING.get(fleet);
+        if (mining != null) {
+            return miningNavigationTarget(mining);
+        }
+        TradeAIComponent ai = TRADE_AI.get(fleet);
+        return ai == null ? null : ai.targetStation;
+    }
+
+    /**
+     * Возвращает цель текущего участка добывающего цикла без обращения к OpenGL.
+     *
+     * @param mining состояние добывающего оборудования либо {@code null}
+     * @return астероид, база или {@code null}, если корабль сейчас не летит
+     */
+    static Entity miningNavigationTarget(MiningComponent mining) {
+        if (mining == null || mining.state == null) {
+            return null;
+        }
+        return switch (mining.state) {
+            case TRAVEL_TO_ASTEROID, MINING -> mining.targetAsteroid;
+            case RETURNING_TO_BASE, UNLOADING -> mining.homeBase;
+            case SEARCHING, PAUSED -> null;
+        };
+    }
+
+    /**
+     * Проверяет, принадлежит ли текущая линия автономному добывающему циклу.
+     *
+     * @param mining состояние добывающего оборудования либо {@code null}
+     * @return {@code true} для этапа с астероидом или базой назначения
+     */
+    static boolean isActiveMiningRoute(MiningComponent mining) {
+        if (mining == null || mining.state == null) {
+            return false;
+        }
+        return switch (mining.state) {
+            case TRAVEL_TO_ASTEROID, MINING, RETURNING_TO_BASE, UNLOADING -> true;
+            case SEARCHING, PAUSED -> false;
+        };
+    }
+
+    /**
+     * Вычисляет экранный радиус ресурсного ядра астероида.
+     *
+     * @param asteroid компонент конечного источника либо {@code null}
+     * @return ноль для пустого источника или радиус от {@code 2} до {@code 6.5} пикселя
+     */
+    static float asteroidCoreRadius(AsteroidComponent asteroid) {
+        float remainingRatio = asteroid == null ? 0f : asteroid.getRemainingRatio();
+        return remainingRatio <= 0f ? 0f : 2f + 4.5f * remainingRatio;
+    }
+
     /** Рисует треугольник по локальным продольным и поперечным координатам корабля. */
     private void drawLocalTriangle(
             float centerX, float centerY,
@@ -466,7 +654,9 @@ public final class WorldMapRenderer {
         return identity != null
                 && identity.kind != null
                 && hasFinitePosition(transform)
-                && layout.containsWorldPoint(transform.position.x, transform.position.y);
+                && layout.containsVisibleWorldPoint(
+                        transform.position.x,
+                        transform.position.y);
     }
 
     /** Проецирует позицию сущности после полной проверки компонента и границ мира. */

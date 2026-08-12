@@ -7,6 +7,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
+import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.CombatComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
@@ -134,7 +135,7 @@ public class EntityDetailsUI extends Table {
         if (entity == null) {
             return new DetailsText(
                     "Объект не выбран",
-                    "Нажмите на станцию или корабль на карте, чтобы увидеть его характеристики."
+                    "Нажмите на станцию, корабль или астероид на карте, чтобы увидеть характеристики."
             );
         }
 
@@ -145,6 +146,7 @@ public class EntityDetailsUI extends Table {
         TradeAIComponent tradeAI = entity.getComponent(TradeAIComponent.class);
         ShipComponent ship = entity.getComponent(ShipComponent.class);
         MiningComponent mining = entity.getComponent(MiningComponent.class);
+        AsteroidComponent asteroid = entity.getComponent(AsteroidComponent.class);
         CombatComponent combat = entity.getComponent(CombatComponent.class);
         TransformComponent transform = entity.getComponent(TransformComponent.class);
         FactionComponent faction = entity.getComponent(FactionComponent.class);
@@ -162,7 +164,12 @@ public class EntityDetailsUI extends Table {
         if (ship != null) {
             appendShipProfile(body, ship);
         }
-        appendInventory(body, inventory);
+        if (asteroid != null) {
+            appendAsteroid(body, asteroid);
+        }
+        if (asteroid == null) {
+            appendInventory(body, inventory);
+        }
         if (market != null) {
             appendMarket(body, market, inventory);
         }
@@ -305,16 +312,39 @@ public class EntityDetailsUI extends Table {
         return "не определено";
     }
 
-    /** Добавляет состояние и накопленную статистику добывающего оборудования. */
+    /** Добавляет конечный запас и происхождение выбранного астероида. */
+    private static void appendAsteroid(StringBuilder text, AsteroidComponent asteroid) {
+        long remaining = Math.max(0L, Math.min(asteroid.remainingResource, asteroid.initialResource));
+        text.append("\nИсточник ресурса\n")
+                .append("  Ресурс: ").append(targetItemName(asteroid.resourceItem)).append('\n')
+                .append("  Осталось: ").append(remaining).append(" / ")
+                .append(asteroid.initialResource).append(" ед.\n")
+                .append("  Заполненность: ")
+                .append(formatNumber(asteroid.getRemainingRatio() * 100f)).append(" %\n")
+                .append("  Точка пояса: ").append(asteroid.spawnPointId).append('\n');
+    }
+
+    /** Добавляет состояние автономного цикла и статистику добывающего оборудования. */
     private static void appendMining(StringBuilder text, MiningComponent mining) {
         text.append("\nДобыча\n")
                 .append("  Состояние: ").append(mining.active ? "активна" : "остановлена").append('\n')
+                .append("  Этап: ")
+                .append(mining.state == null ? "неизвестно" : mining.state.getDisplayName())
+                .append('\n')
                 .append("  Ресурс: ").append(targetItemName(mining.resourceItem)).append('\n')
                 .append("  Скорость: ").append(formatNumber(mining.extractionPerSecond))
                 .append(" ед./с\n")
+                .append("  Скорость полёта: ").append(formatNumber(mining.movementSpeed))
+                .append(" ед./с\n")
+                .append("  Радиус добычи: ").append(formatNumber(mining.extractionRange))
+                .append(" ед.\n")
+                .append("  Целевой астероид: ").append(targetName(mining.targetAsteroid)).append('\n')
+                .append("  База разгрузки: ").append(targetName(mining.homeBase)).append('\n')
                 .append("  Дробный остаток: ").append(formatNumber(mining.extractionRemainder))
                 .append(" ед.\n")
-                .append("  Всего добыто: ").append(mining.totalMined).append(" ед.\n");
+                .append("  Всего добыто: ").append(mining.totalMined).append(" ед.\n")
+                .append("  Доставлено: ").append(mining.totalDelivered).append(" ед.\n")
+                .append("  Кредиты: ").append(formatMoney(mining.credits)).append('\n');
     }
 
     /** Добавляет текущее состояние корпуса, щитов и вооружения боевого корабля. */
@@ -359,6 +389,9 @@ public class EntityDetailsUI extends Table {
     /** Определяет отображаемый тип, предпочитая явный компонент идентичности. */
     private static String resolveType(IdentityComponent identity, MarketComponent market,
                                       ShipComponent ship, TradeAIComponent tradeAI) {
+        if (identity != null && identity.kind == IdentityComponent.Kind.ASTEROID) {
+            return "Астероид";
+        }
         if (identity != null && identity.kind == IdentityComponent.Kind.STATION) {
             return "Станция";
         }

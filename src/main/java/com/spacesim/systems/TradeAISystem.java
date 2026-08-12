@@ -55,8 +55,11 @@ public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
     /** Задержка нового поиска после отмены или отсутствия исполнимого маршрута. */
     private static final float ROUTE_SEARCH_RETRY_SECONDS = 1f;
-    /** Радиус пространственного запроса, выраженный в количестве ячеек в каждую сторону. */
-    private static final int ROUTE_SEARCH_RADIUS_CELLS = 5;
+    /**
+     * Радиус пространственного запроса, охватывающий расширенный мир по самой длинной оси.
+     */
+    private static final int ROUTE_SEARCH_RADIUS_CELLS =
+            (int) Math.ceil(Constants.WORLD_WIDTH / Constants.CELL_SIZE);
 
     /** Перестраиваемый индекс рыночных станций. */
     private final SpatialHashGrid grid;

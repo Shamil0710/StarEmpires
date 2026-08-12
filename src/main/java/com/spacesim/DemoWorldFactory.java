@@ -22,10 +22,11 @@ import java.util.List;
 /**
  * Создаёт детерминированный демонстрационный мир с полной производственной экономикой.
  *
- * <p>Сценарий содержит пять одновременно работающих производств:</p>
+ * <p>Сценарий содержит четыре одновременно работающих стационарных производства и
+ * автономную добычу руды из периодически появляющихся астероидов:</p>
  * <pre>
- * первичный ресурс: руда
  * первичный ресурс: энергия
+ * астероидная руда -&gt; шахтёрская база
  * энергия -&gt; продовольствие
  * руда + энергия -&gt; сталь
  * сталь + энергия -&gt; вооружение
@@ -34,8 +35,9 @@ import java.util.List;
  * Производительность звеньев и базовое потребление подобраны так, чтобы их номинальные темпы были
  * сбалансированы. Для каждого из пяти товаров создаётся отдельный специализированный совместимый
  * транспорт: это не позволяет всем пустым кораблям одновременно переключиться на самый дорогой
- * товар. Дополнительный добывающий корабль абстрактно наполняет свой трюм рудой, а боевой корабль
- * демонстрирует отдельный профиль корпуса без участия в торговле.</p>
+ * товар. Дополнительный добывающий корабль ищет конечные астероидные источники, доставляет руду
+ * на шахтёрскую базу и продаёт её рынку, а боевой корабль демонстрирует отдельный профиль корпуса
+ * без участия в торговле.</p>
  *
  * <p>Фабрика не обращается к libGDX/OpenGL и не регистрирует системы Ashley. Каждый вызов
  * {@link #createEntities()} возвращает новый независимый граф сущностей и компонентов, который
@@ -61,24 +63,26 @@ public final class DemoWorldFactory {
      * @return неизменяемый список из шести новых станций и семи новых кораблей
      */
     public static List<Entity> createEntities() {
-        Entity mine = createStation("Рудник Ковчег", 90f, 380f, Constants.FACTION_MINERS);
+        Entity mine = createStation(
+                "Шахтёрская база Ковчег", 420f, 880f, Constants.FACTION_MINERS);
         configureMarket(mine, Constants.ITEM_ORE, 400, 300, 0f);
-        addProduction(mine, new Recipe("Добыча руды", 4f)
-                .output(Constants.ITEM_ORE, 2));
 
-        Entity powerPlant = createStation("Энергоузел Корона", 90f, 230f, Constants.FACTION_NEUTRAL);
+        Entity powerPlant = createStation(
+                "Энергоузел Корона", 470f, 430f, Constants.FACTION_NEUTRAL);
         configureMarket(powerPlant, Constants.ITEM_ENERGY, 400, 300, 0f);
         addProduction(powerPlant, new Recipe("Генерация энергии", 4f)
                 .output(Constants.ITEM_ENERGY, 7));
 
-        Entity farm = createStation("Агрокупол Аврора", 260f, 110f, Constants.FACTION_TRADE_LEAGUE);
+        Entity farm = createStation(
+                "Агрокупол Аврора", 850f, 280f, Constants.FACTION_TRADE_LEAGUE);
         configureMarket(farm, Constants.ITEM_ENERGY, 80, 120, 0f);
         configureMarket(farm, Constants.ITEM_FOOD, 320, 240, 0f);
         addProduction(farm, new Recipe("Выращивание продовольствия", 6f)
                 .input(Constants.ITEM_ENERGY, 2)
                 .output(Constants.ITEM_FOOD, 6));
 
-        Entity foundry = createStation("Кузница Гелиос", 330f, 390f, Constants.FACTION_MINERS);
+        Entity foundry = createStation(
+                "Кузница Гелиос", 900f, 900f, Constants.FACTION_MINERS);
         configureMarket(foundry, Constants.ITEM_ORE, 200, 300, 0f);
         configureMarket(foundry, Constants.ITEM_ENERGY, 80, 120, 0f);
         configureMarket(foundry, Constants.ITEM_STEEL, 240, 180, 0f);
@@ -87,7 +91,8 @@ public final class DemoWorldFactory {
                 .input(Constants.ITEM_ENERGY, 1)
                 .output(Constants.ITEM_STEEL, 2));
 
-        Entity arsenal = createStation("Арсенал Титан", 500f, 290f, Constants.FACTION_TRADE_LEAGUE);
+        Entity arsenal = createStation(
+                "Арсенал Титан", 1350f, 730f, Constants.FACTION_TRADE_LEAGUE);
         configureMarket(arsenal, Constants.ITEM_ENERGY, 80, 120, 0f);
         configureMarket(arsenal, Constants.ITEM_STEEL, 80, 120, 0f);
         configureMarket(arsenal, Constants.ITEM_WEAPONS, 120, 90, 0f);
@@ -96,31 +101,32 @@ public final class DemoWorldFactory {
                 .input(Constants.ITEM_ENERGY, 1)
                 .output(Constants.ITEM_WEAPONS, 1));
 
-        Entity colony = createStation("Колония Фронтир", 620f, 160f, Constants.FACTION_NEUTRAL);
+        Entity colony = createStation(
+                "Колония Фронтир", 1600f, 330f, Constants.FACTION_NEUTRAL);
         configureMarket(colony, Constants.ITEM_ENERGY, 80, 120, 1f);
         configureMarket(colony, Constants.ITEM_FOOD, 200, 300, 1f);
         configureMarket(colony, Constants.ITEM_STEEL, 80, 120, 1f / 6f);
         configureMarket(colony, Constants.ITEM_WEAPONS, 80, 120, 1f / 6f);
 
         Entity oreTransport = createTradingShip(
-                "Материаловоз Атлас", 170f, 300f, 64f, 140,
+                "Материаловоз Атлас", 660f, 820f, 150f, 140,
                 Constants.ITEM_ORE, ShipType.MATERIAL_CARRIER, Constants.FACTION_MINERS);
         Entity energyTransport = createTradingShip(
-                "Танкер Луч", 270f, 300f, 70f, 160,
+                "Танкер Луч", 650f, 500f, 165f, 160,
                 Constants.ITEM_ENERGY, ShipType.GAS_LIQUID_CARRIER, Constants.FACTION_NEUTRAL);
         Entity foodTransport = createTradingShip(
-                "Контейнеровоз Аврора", 370f, 250f, 74f, 100,
+                "Контейнеровоз Аврора", 1050f, 350f, 175f, 100,
                 Constants.ITEM_FOOD, ShipType.FINISHED_GOODS_CARRIER,
                 Constants.FACTION_TRADE_LEAGUE);
         Entity steelTransport = createTradingShip(
-                "Материаловоз Вулкан", 470f, 200f, 80f, 140,
+                "Материаловоз Вулкан", 1100f, 800f, 185f, 140,
                 Constants.ITEM_STEEL, ShipType.MATERIAL_CARRIER, Constants.FACTION_MINERS);
         Entity weaponsTransport = createTradingShip(
-                "Контейнеровоз Щит", 590f, 260f, 86f, 80,
+                "Контейнеровоз Щит", 1450f, 500f, 200f, 80,
                 Constants.ITEM_WEAPONS, ShipType.FINISHED_GOODS_CARRIER,
                 Constants.FACTION_TRADE_LEAGUE);
-        Entity miningShip = createMiningShip("Добытчик Старатель", 210f, 335f);
-        Entity combatShip = createCombatShip("Фрегат Страж", 560f, 360f);
+        Entity miningShip = createMiningShip("Добытчик Старатель", 450f, 930f, mine);
+        Entity combatShip = createCombatShip("Фрегат Страж", 1500f, 1050f);
 
         return List.of(
                 mine,
@@ -216,20 +222,26 @@ public final class DemoWorldFactory {
                 .add(new FactionComponent(factionId));
     }
 
-    /** Создаёт автономный добывающий корабль, постепенно наполняющий собственный трюм рудой. */
-    private static Entity createMiningShip(String name, float x, float y) {
+    /** Создаёт автономный добывающий корабль с предпочтительным рынком разгрузки. */
+    private static Entity createMiningShip(String name, float x, float y, Entity homeBase) {
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
 
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = 80;
 
+        MiningComponent mining = new MiningComponent(Constants.ITEM_ORE, 2f);
+        mining.movementSpeed = 150f;
+        mining.extractionRange = 18f;
+        mining.dockingRange = 12f;
+        mining.homeBase = homeBase;
+
         return new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
                 .add(inventory)
                 .add(new ShipComponent(ShipType.MINING_SHIP))
-                .add(new MiningComponent(Constants.ITEM_ORE, 0.5f))
+                .add(mining)
                 .add(new FactionComponent(Constants.FACTION_MINERS));
     }
 

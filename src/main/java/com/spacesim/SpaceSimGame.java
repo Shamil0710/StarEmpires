@@ -18,6 +18,7 @@ import com.spacesim.components.*;
 import com.spacesim.constants.Constants;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.events.NewsArticle;
+import com.spacesim.model.AsteroidSpawnConfig;
 import com.spacesim.systems.*;
 import com.spacesim.ui.EconomyStatusUI;
 import com.spacesim.ui.EntityDetailsUI;
@@ -75,7 +76,8 @@ public class SpaceSimGame extends ApplicationAdapter {
      *
      * <p>Метод вызывается libGDX один раз после инициализации графического
      * контекста. Порядок регистрации систем значим: сначала формируются цены и
-     * потребление, затем выполняются производство, добыча, торговый ИИ и запись истории.</p>
+     * потребление, затем выполняются производство, появление астероидов, добыча, торговый ИИ и
+     * запись истории.</p>
      */
     @Override
     public void create() {
@@ -103,6 +105,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine.addSystem(new MarketSystem(eventManager));
         engine.addSystem(new ConsumptionSystem(eventManager));
         engine.addSystem(new ProductionSystem());
+        engine.addSystem(new AsteroidSpawnSystem(AsteroidSpawnConfig.demoWorld()));
         engine.addSystem(new MiningSystem());
         engine.addSystem(new TradeAISystem(grid));
         engine.addSystem(new PriceRecorderSystem());
@@ -117,26 +120,112 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
-     * Создаёт прозрачный нижний слой сцены, преобразующий щелчок по карте в выбор сущности.
+     * Создаёт прозрачный нижний слой выбора, масштабирования и перемещения карты.
      *
      * <p>Панели добавляются на сцену после этого слоя и поэтому получают ввод первыми. Щелчок
-     * по свободному месту карты снимает текущий выбор; остальные кнопки мыши игнорируются.</p>
+     * по свободному месту карты снимает текущий выбор и позволяет перетащить обзор. Средняя или
+     * правая кнопка перемещает карту независимо от выбора, а колесо масштабирует её вокруг
+     * курсора. Все изменения вида проходят через {@link WorldMapLayout}, поэтому отрисовка и
+     * hit-test используют одно преобразование.</p>
      *
      * @return настроенный Scene2D-актор без собственного визуального представления
      */
     private Actor createMapInteractionLayer() {
         Actor interactionLayer = new Actor();
         interactionLayer.addListener(new InputListener() {
+            private int dragPointer = -1;
+            private float previousX;
+            private float previousY;
+
+            @Override
+            public void enter(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    Actor fromActor) {
+                if (pointer == -1 && event.getStage() != null) {
+                    event.getStage().setScrollFocus(event.getListenerActor());
+                }
+            }
+
+            @Override
+            public void exit(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    Actor toActor) {
+                if (pointer == -1
+                        && event.getStage() != null
+                        && event.getStage().getScrollFocus() == event.getListenerActor()) {
+                    event.getStage().setScrollFocus(null);
+                }
+            }
+
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                if (button != Input.Buttons.LEFT || mapLayout == null) {
+                if (mapLayout == null || !mapLayout.containsMapPoint(x, y)) {
                     return false;
                 }
 
-                selectedEntity = EntityPicker.pick(
-                        engine.getEntities(), mapLayout, x, y, MAP_PICK_RADIUS);
-                entityDetailsUI.select(selectedEntity);
+                if (button == Input.Buttons.LEFT) {
+                    selectedEntity = EntityPicker.pick(
+                            engine.getEntities(), mapLayout, x, y, MAP_PICK_RADIUS);
+                    entityDetailsUI.select(selectedEntity);
+                    if (selectedEntity == null) {
+                        beginDrag(pointer, x, y);
+                    }
+                    return true;
+                }
+                if (button == Input.Buttons.MIDDLE || button == Input.Buttons.RIGHT) {
+                    beginDrag(pointer, x, y);
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public void touchDragged(InputEvent event, float x, float y, int pointer) {
+                if (pointer != dragPointer || mapLayout == null) {
+                    return;
+                }
+                mapLayout = mapLayout.panByScreen(x - previousX, y - previousY);
+                previousX = x;
+                previousY = y;
+            }
+
+            @Override
+            public void touchUp(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    int button) {
+                if (pointer == dragPointer) {
+                    dragPointer = -1;
+                }
+            }
+
+            @Override
+            public boolean scrolled(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    float amountX,
+                    float amountY) {
+                if (mapLayout == null || !mapLayout.containsMapPoint(x, y)) {
+                    return false;
+                }
+                mapLayout = mapLayout.zoomByScroll(x, y, amountY);
                 return true;
+            }
+
+            /** Запоминает указатель и начальную точку панорамирования. */
+            private void beginDrag(int pointer, float x, float y) {
+                dragPointer = pointer;
+                previousX = x;
+                previousY = y;
             }
         });
         return interactionLayer;
@@ -157,7 +246,11 @@ public class SpaceSimGame extends ApplicationAdapter {
                 stageWidth - EntityDetailsUI.RECOMMENDED_WIDTH - DETAILS_AREA_GAP);
         float padding = Math.min(MAP_PADDING, Math.min(availableWidth, stageHeight) * 0.2f);
 
-        mapLayout = new WorldMapLayout(0f, 0f, availableWidth, stageHeight, padding);
+        if (mapLayout == null) {
+            mapLayout = new WorldMapLayout(0f, 0f, availableWidth, stageHeight, padding);
+        } else {
+            mapLayout = mapLayout.resize(0f, 0f, availableWidth, stageHeight, padding);
+        }
         mapInteractionLayer.setBounds(0f, 0f, availableWidth, stageHeight);
     }
 
@@ -191,6 +284,20 @@ public class SpaceSimGame extends ApplicationAdapter {
         }
     }
 
+    /** Снимает выбор, если динамический объект уже удалён из Ashley-движка. */
+    private void clearInactiveSelection() {
+        if (selectedEntity == null || engine == null) {
+            return;
+        }
+        for (Entity entity : engine.getEntities()) {
+            if (entity == selectedEntity) {
+                return;
+            }
+        }
+        selectedEntity = null;
+        entityDetailsUI.select(null);
+    }
+
     /**
      * Выполняет один кадр симуляции и отрисовки.
      *
@@ -207,6 +314,7 @@ public class SpaceSimGame extends ApplicationAdapter {
             newsUI.addNews(article);
         }
         engine.update(delta);
+        clearInactiveSelection();
         economyUiUpdateAccumulator += delta;
         if (economyUiUpdateAccumulator >= ECONOMY_UI_UPDATE_INTERVAL_SECONDS) {
             economyUiUpdateAccumulator %= ECONOMY_UI_UPDATE_INTERVAL_SECONDS;

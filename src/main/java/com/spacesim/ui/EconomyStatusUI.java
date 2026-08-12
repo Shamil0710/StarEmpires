@@ -6,8 +6,10 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
+import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.MiningComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 
@@ -16,8 +18,8 @@ import java.util.Objects;
 /**
  * Компактная сводка состояния экономической симуляции.
  *
- * <p>Панель показывает количество станций и кораблей, число кораблей в пути,
- * общий объём груза и распределение корпусов по трём крупным ролям. Корабли
+ * <p>Панель показывает количество станций, активных астероидов и кораблей, остаток ресурсов
+ * пояса, число кораблей в пути, общий объём груза и распределение корпусов по трём ролям. Корабли
  * старого формата без {@link ShipComponent}, но с {@link TradeAIComponent},
  * учитываются как перевозчики. Краткая легенда условных обозначений остаётся
  * компактной и помещается рядом с картой при размере окна {@code 800x600}.
@@ -36,7 +38,7 @@ public class EconomyStatusUI extends Table {
      * Создаёт панель, закреплённую в левом нижнем углу родительской сцены.
      *
      * @param skin ненулевой скин Scene2D для заголовка и содержимого
-    * @throws NullPointerException если {@code skin == null}
+     * @throws NullPointerException если {@code skin == null}
      */
     public EconomyStatusUI(Skin skin) {
         Skin checkedSkin = Objects.requireNonNull(skin, "Skin must not be null");
@@ -89,7 +91,9 @@ public class EconomyStatusUI extends Table {
         int carrierCount = 0;
         int miningCount = 0;
         int combatCount = 0;
+        int asteroidCount = 0;
         long cargoUnits = 0L;
+        long asteroidResourceUnits = 0L;
 
         for (Entity entity : entities) {
             if (entity == null) {
@@ -97,11 +101,20 @@ public class EconomyStatusUI extends Table {
             }
             InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
             MarketComponent market = entity.getComponent(MarketComponent.class);
+            AsteroidComponent asteroid = entity.getComponent(AsteroidComponent.class);
             ShipComponent ship = entity.getComponent(ShipComponent.class);
             TradeAIComponent tradeAI = entity.getComponent(TradeAIComponent.class);
+            MiningComponent mining = entity.getComponent(MiningComponent.class);
 
             if (market != null) {
                 stationCount++;
+            }
+            if (asteroid != null && asteroid.remainingResource > 0L) {
+                asteroidCount++;
+                long validRemaining = Math.min(
+                        asteroid.remainingResource,
+                        Math.max(0L, asteroid.initialResource));
+                asteroidResourceUnits = saturatedAdd(asteroidResourceUnits, validRemaining);
             }
             boolean isLegacyShip = ship == null && tradeAI != null;
             if (ship != null || isLegacyShip) {
@@ -117,9 +130,14 @@ public class EconomyStatusUI extends Table {
                         combatCount++;
                     }
                 }
-                if (tradeAI != null
+                boolean isTravelling = tradeAI != null
                         && (tradeAI.state == TradeAIComponent.State.TRAVEL_TO_BUY
-                        || tradeAI.state == TradeAIComponent.State.TRAVEL_TO_SELL)) {
+                        || tradeAI.state == TradeAIComponent.State.TRAVEL_TO_SELL);
+                if (!isTravelling && mining != null) {
+                    isTravelling = mining.state == MiningComponent.State.TRAVEL_TO_ASTEROID
+                            || mining.state == MiningComponent.State.RETURNING_TO_BASE;
+                }
+                if (isTravelling) {
                     travellingCount++;
                 }
                 if (inventory != null) {
@@ -136,21 +154,30 @@ public class EconomyStatusUI extends Table {
                 (int) cargoUnits,
                 carrierCount,
                 miningCount,
-                combatCount);
+                combatCount,
+                asteroidCount,
+                asteroidResourceUnits);
     }
 
     /** Формирует компактный текст панели из чистой модели сводки. */
     static String formatSummary(Summary summary) {
         Objects.requireNonNull(summary, "Summary must not be null");
         return "Станции: " + summary.stationCount()
+                + "   Астероиды: " + summary.asteroidCount()
+                + "\nЗапас пояса: " + summary.asteroidResourceUnits()
                 + "   Корабли: " + summary.shipCount()
                 + "\nВ пути: " + summary.travellingCount()
                 + "   Груз: " + summary.cargoUnits()
                 + "\nТранспорт: " + summary.carrierCount()
                 + "   Добыча: " + summary.miningCount()
                 + "   Боевые: " + summary.combatCount()
-                + "\nФорма и цвет — класс корабля"
+                + "\nКолесо — масштаб   ПКМ — обзор"
                 + "\nЛиния — маршрут   ЛКМ — выбрать";
+    }
+
+    /** Складывает неотрицательные счётчики без переполнения диапазона {@code long}. */
+    private static long saturatedAdd(long current, long addition) {
+        return Long.MAX_VALUE - current < addition ? Long.MAX_VALUE : current + addition;
     }
 
     /**
@@ -158,11 +185,13 @@ public class EconomyStatusUI extends Table {
      *
      * @param stationCount число рыночных станций
      * @param shipCount общее число современных и legacy-кораблей
-     * @param travellingCount число торговых кораблей с активным перелётом
+     * @param travellingCount число кораблей с активным торговым или добывающим перелётом
      * @param cargoUnits суммарное неотрицательное количество груза
      * @param carrierCount число коммерческих перевозчиков
      * @param miningCount число добывающих кораблей
      * @param combatCount число боевых кораблей
+     * @param asteroidCount число активных непустых астероидов
+     * @param asteroidResourceUnits суммарный корректный остаток ресурсов астероидов
      */
     record Summary(
             int stationCount,
@@ -171,6 +200,8 @@ public class EconomyStatusUI extends Table {
             int cargoUnits,
             int carrierCount,
             int miningCount,
-            int combatCount) {
+            int combatCount,
+            int asteroidCount,
+            long asteroidResourceUnits) {
     }
 }

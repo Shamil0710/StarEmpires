@@ -1,6 +1,10 @@
 package com.spacesim.ui;
 
+import com.badlogic.ashley.core.Entity;
 import com.badlogic.gdx.math.Matrix4;
+import com.spacesim.components.AsteroidComponent;
+import com.spacesim.components.MiningComponent;
+import com.spacesim.constants.Constants;
 import com.spacesim.model.ShipType;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +15,8 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorldMapRendererTest {
@@ -54,5 +60,45 @@ class WorldMapRendererTest {
         assertTrue(Float.isFinite(style.red()));
         assertTrue(Float.isFinite(style.green()));
         assertTrue(Float.isFinite(style.blue()));
+    }
+
+    @Test
+    void вычисляетЯдроАстероидаПоОставшемусяРесурсу() {
+        AsteroidComponent asteroid = new AsteroidComponent(
+                "A-1", Constants.ITEM_ORE, 100L);
+
+        assertEquals(6.5f, WorldMapRenderer.asteroidCoreRadius(asteroid), 0.0001f);
+        asteroid.remainingResource = 50L;
+        assertEquals(4.25f, WorldMapRenderer.asteroidCoreRadius(asteroid), 0.0001f);
+        asteroid.remainingResource = 0L;
+        assertEquals(0f, WorldMapRenderer.asteroidCoreRadius(asteroid), 0f);
+        assertEquals(0f, WorldMapRenderer.asteroidCoreRadius(null), 0f);
+    }
+
+    @Test
+    void выбираетНавигационнуюЦельПоЭтапуДобычи() {
+        MiningComponent mining = new MiningComponent();
+        Entity asteroid = new Entity();
+        Entity base = new Entity();
+        mining.targetAsteroid = asteroid;
+        mining.homeBase = base;
+
+        mining.state = MiningComponent.State.TRAVEL_TO_ASTEROID;
+        assertSame(asteroid, WorldMapRenderer.miningNavigationTarget(mining));
+        assertTrue(WorldMapRenderer.isActiveMiningRoute(mining));
+        mining.state = MiningComponent.State.MINING;
+        assertSame(asteroid, WorldMapRenderer.miningNavigationTarget(mining));
+        mining.state = MiningComponent.State.RETURNING_TO_BASE;
+        assertSame(base, WorldMapRenderer.miningNavigationTarget(mining));
+        mining.state = MiningComponent.State.UNLOADING;
+        assertSame(base, WorldMapRenderer.miningNavigationTarget(mining));
+        mining.state = MiningComponent.State.SEARCHING;
+        assertNull(WorldMapRenderer.miningNavigationTarget(mining));
+        assertFalse(WorldMapRenderer.isActiveMiningRoute(mining));
+        mining.state = MiningComponent.State.PAUSED;
+        assertNull(WorldMapRenderer.miningNavigationTarget(mining));
+        assertFalse(WorldMapRenderer.isActiveMiningRoute(mining));
+        assertNull(WorldMapRenderer.miningNavigationTarget(null));
+        assertFalse(WorldMapRenderer.isActiveMiningRoute(null));
     }
 }

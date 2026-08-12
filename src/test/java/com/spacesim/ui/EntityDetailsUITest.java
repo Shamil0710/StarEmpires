@@ -1,6 +1,7 @@
 package com.spacesim.ui;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.CombatComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
@@ -134,8 +135,17 @@ class EntityDetailsUITest {
 
         MiningComponent mining = new MiningComponent(Constants.ITEM_ORE, 1.25f);
         mining.active = false;
+        mining.state = MiningComponent.State.RETURNING_TO_BASE;
+        mining.movementSpeed = 140f;
+        mining.extractionRange = 16f;
         mining.extractionRemainder = 0.75d;
         mining.totalMined = 18L;
+        mining.totalDelivered = 11L;
+        mining.credits = 96.5f;
+        mining.targetAsteroid = new Entity().add(
+                new IdentityComponent("Астероид W-1", IdentityComponent.Kind.ASTEROID));
+        mining.homeBase = new Entity().add(
+                new IdentityComponent("База Ковчег", IdentityComponent.Kind.STATION));
 
         Entity miner = new Entity()
                 .add(new IdentityComponent("Старатель", IdentityComponent.Kind.FLEET))
@@ -150,11 +160,43 @@ class EntityDetailsUITest {
         assertTrue(details.body().contains("Грузовое назначение: добываемые ресурсы"));
         assertTrue(details.body().contains("Добыча\n"));
         assertTrue(details.body().contains("Состояние: остановлена"));
+        assertTrue(details.body().contains("Этап: Возврат на базу"));
         assertTrue(details.body().contains("Ресурс: Руда"));
         assertTrue(details.body().contains("Скорость: 1.3 ед./с"));
+        assertTrue(details.body().contains("Скорость полёта: 140.0 ед./с"));
+        assertTrue(details.body().contains("Радиус добычи: 16.0 ед."));
+        assertTrue(details.body().contains("Целевой астероид: Астероид W-1"));
+        assertTrue(details.body().contains("База разгрузки: База Ковчег"));
         assertTrue(details.body().contains("Дробный остаток: 0.8 ед."));
         assertTrue(details.body().contains("Всего добыто: 18 ед."));
+        assertTrue(details.body().contains("Доставлено: 11 ед."));
+        assertTrue(details.body().contains("Кредиты: 96.5 кр."));
         assertFalse(details.body().contains("Ожидаемая прибыль:"));
+    }
+
+    @Test
+    void описываетКонечныйЗапасАстероида() {
+        AsteroidComponent asteroid = new AsteroidComponent(
+                "NW-1", Constants.ITEM_ORE, 80L);
+        asteroid.remainingResource = 30L;
+        TransformComponent transform = new TransformComponent();
+        transform.position.set(150f, 1230f);
+        Entity entity = new Entity()
+                .add(new IdentityComponent("Астероид NW-1-7", IdentityComponent.Kind.ASTEROID))
+                .add(transform)
+                .add(asteroid);
+
+        EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(entity);
+
+        assertEquals("Астероид NW-1-7", details.title());
+        assertTrue(details.body().contains("Тип: Астероид"));
+        assertTrue(details.body().contains("Позиция: x=150.0, y=1230.0"));
+        assertTrue(details.body().contains("Источник ресурса"));
+        assertTrue(details.body().contains("Ресурс: Руда"));
+        assertTrue(details.body().contains("Осталось: 30 / 80 ед."));
+        assertTrue(details.body().contains("Заполненность: 37.5 %"));
+        assertTrue(details.body().contains("Точка пояса: NW-1"));
+        assertFalse(details.body().contains("Инвентарь"));
     }
 
     @Test
@@ -186,7 +228,7 @@ class EntityDetailsUITest {
         EntityDetailsUI.DetailsText empty = EntityDetailsUI.describe(null);
 
         assertEquals("Объект не выбран", empty.title());
-        assertTrue(empty.body().contains("Нажмите на станцию или корабль"));
+        assertTrue(empty.body().contains("Нажмите на станцию, корабль или астероид"));
 
         Entity partialEntity = new Entity().add(new TradeAIComponent());
         EntityDetailsUI.DetailsText partial = EntityDetailsUI.describe(partialEntity);

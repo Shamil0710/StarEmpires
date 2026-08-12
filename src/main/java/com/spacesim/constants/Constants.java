@@ -112,6 +112,12 @@ public class Constants {
      */
     public static final int CELL_SIZE = 200;
 
+    /** Ширина расширенного игрового мира в условных координатных единицах. */
+    public static final float WORLD_WIDTH = 2_000f;
+
+    /** Высота расширенного игрового мира в условных координатных единицах. */
+    public static final float WORLD_HEIGHT = 1_400f;
+
     private static String[] createItemNames() {
         String[] names = new String[MAX_ITEMS];
         for (ItemType item : ItemType.values()) {

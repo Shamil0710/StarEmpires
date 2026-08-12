@@ -10,10 +10,11 @@ import com.spacesim.components.TransformComponent;
  * Выполняет hit-test отображаемых ECS-сущностей на интерактивной карте.
  *
  * <p>Расстояние вычисляется после проекции позиции объекта в экранные координаты, поэтому
- * радиус выбора остаётся одинаковым при любом размере карты. Сущности без идентичности,
- * пространственного компонента, конечной позиции или находящиеся за пределами фиксированного
- * мира не участвуют в выборе. Если станция и флот расположены на одинаковом расстоянии от
- * указателя, приоритет получает флот: небольшой подвижный объект проще выбрать поверх станции.</p>
+ * радиус выбора остаётся одинаковым при любом размере и увеличении карты. Сущности без
+ * идентичности, пространственного компонента, конечной позиции, находящиеся за пределами мира
+ * или текущего обзора не участвуют в выборе. При равном расстоянии приоритет типов равен
+ * {@code флот > астероид > станция}: так небольшой подвижный корабль или источник ресурса проще
+ * выбрать поверх крупного стационарного объекта.</p>
  */
 public final class EntityPicker {
     private static final ComponentMapper<IdentityComponent> IDENTITIES =
@@ -75,11 +76,10 @@ public final class EntityPicker {
             }
 
             boolean closer = best == null || distanceSquared < bestDistanceSquared;
-            boolean fleetWinsTie = best != null
+            boolean higherKindWinsTie = best != null
                     && Double.compare(distanceSquared, bestDistanceSquared) == 0
-                    && identity.kind == IdentityComponent.Kind.FLEET
-                    && bestKind != IdentityComponent.Kind.FLEET;
-            if (closer || fleetWinsTie) {
+                    && kindPriority(identity.kind) > kindPriority(bestKind);
+            if (closer || higherKindWinsTie) {
                 best = entity;
                 bestKind = identity.kind;
                 bestDistanceSquared = distanceSquared;
@@ -98,6 +98,20 @@ public final class EntityPicker {
                 && identity.kind != null
                 && transform != null
                 && transform.position != null
-                && layout.containsWorldPoint(transform.position.x, transform.position.y);
+                && layout.containsVisibleWorldPoint(
+                        transform.position.x,
+                        transform.position.y);
+    }
+
+    /** Возвращает приоритет объекта при точном равенстве экранного расстояния. */
+    private static int kindPriority(IdentityComponent.Kind kind) {
+        if (kind == null) {
+            return -1;
+        }
+        return switch (kind) {
+            case STATION -> 0;
+            case ASTEROID -> 1;
+            case FLEET -> 2;
+        };
     }
 }

@@ -3,6 +3,7 @@ package com.spacesim;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.gdx.math.Vector2;
+import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.CombatComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
@@ -18,9 +19,11 @@ import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.model.ItemType;
+import com.spacesim.model.AsteroidSpawnConfig;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
 import com.spacesim.systems.ConsumptionSystem;
+import com.spacesim.systems.AsteroidSpawnSystem;
 import com.spacesim.systems.MarketSystem;
 import com.spacesim.systems.MiningSystem;
 import com.spacesim.systems.PriceRecorderSystem;
@@ -82,6 +85,12 @@ class DemoWorldFactoryTest {
                     second.getComponent(InventoryComponent.class).stock);
             assertTrue(Float.isFinite(firstTransform.position.x), firstIdentity.name);
             assertTrue(Float.isFinite(firstTransform.position.y), firstIdentity.name);
+            assertTrue(firstTransform.position.x >= 0f
+                            && firstTransform.position.x <= Constants.WORLD_WIDTH,
+                    firstIdentity.name);
+            assertTrue(firstTransform.position.y >= 0f
+                            && firstTransform.position.y <= Constants.WORLD_HEIGHT,
+                    firstIdentity.name);
             assertInventoryIsValid(firstInventory, firstIdentity.name);
 
             if (firstIdentity.kind == IdentityComponent.Kind.STATION) {
@@ -133,6 +142,11 @@ class DemoWorldFactoryTest {
                                     && mining.extractionPerSecond > 0f,
                             firstIdentity.name);
                     assertEquals(0L, mining.totalMined, firstIdentity.name);
+                    assertEquals(0L, mining.totalDelivered, firstIdentity.name);
+                    assertNotNull(mining.homeBase, firstIdentity.name);
+                    assertNotSame(mining.homeBase, secondMining.homeBase, firstIdentity.name);
+                    assertNotNull(mining.homeBase.getComponent(MarketComponent.class),
+                            firstIdentity.name);
                     assertNull(first.getComponent(TradeAIComponent.class), firstIdentity.name);
                     assertNull(first.getComponent(CombatComponent.class), firstIdentity.name);
                 } else if (ship.type == ShipType.COMBAT_SHIP) {
@@ -219,7 +233,7 @@ class DemoWorldFactoryTest {
         List<Recipe> recipes = activeRecipes(DemoWorldFactory.createEntities());
         Recipe[] producerByItem = new Recipe[Constants.MAX_ITEMS];
 
-        assertEquals(Constants.MAX_ITEMS, recipes.size());
+        assertEquals(Constants.MAX_ITEMS - 1, recipes.size());
         for (Recipe recipe : recipes) {
             int outputCount = 0;
             for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
@@ -234,13 +248,17 @@ class DemoWorldFactoryTest {
             assertEquals(1, outputCount, () -> "Рецепт должен иметь один выход: " + recipe.name);
         }
 
+        assertNull(producerByItem[Constants.ITEM_ORE],
+                "Руда должна поступать из конечных астероидов, а не из бесконечного рецепта");
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            if (itemId == Constants.ITEM_ORE) {
+                continue;
+            }
             int checkedItemId = itemId;
             assertNotNull(producerByItem[itemId],
                     () -> "Нет активного рецепта для " + Constants.ITEM_NAMES[checkedItemId]);
         }
 
-        assertInputItems(producerByItem[Constants.ITEM_ORE]);
         assertInputItems(producerByItem[Constants.ITEM_ENERGY]);
         assertInputItems(producerByItem[Constants.ITEM_FOOD], Constants.ITEM_ENERGY);
         assertInputItems(producerByItem[Constants.ITEM_STEEL],
@@ -249,6 +267,7 @@ class DemoWorldFactoryTest {
                 Constants.ITEM_ENERGY, Constants.ITEM_STEEL);
 
         boolean[] reachableItems = new boolean[Constants.MAX_ITEMS];
+        reachableItems[Constants.ITEM_ORE] = true;
         Set<Recipe> completedRecipes = Collections.newSetFromMap(new IdentityHashMap<>());
         boolean madeProgress;
         do {
@@ -284,7 +303,7 @@ class DemoWorldFactoryTest {
                 producers.add(entity);
             }
         }
-        assertEquals(Constants.MAX_ITEMS, producers.size());
+        assertEquals(Constants.MAX_ITEMS - 1, producers.size());
 
         for (Entity producer : producers) {
             IdentityComponent identity = producer.getComponent(IdentityComponent.class);
@@ -377,6 +396,9 @@ class DemoWorldFactoryTest {
         engine.addSystem(new MarketSystem(eventManager));
         engine.addSystem(new ConsumptionSystem(eventManager));
         engine.addSystem(new ProductionSystem());
+        AsteroidSpawnSystem asteroidSpawnSystem =
+                new AsteroidSpawnSystem(AsteroidSpawnConfig.demoWorld());
+        engine.addSystem(asteroidSpawnSystem);
         engine.addSystem(new MiningSystem());
         engine.addSystem(new TradeAISystem(new SpatialHashGrid(Constants.CELL_SIZE)));
         engine.addSystem(new PriceRecorderSystem());
@@ -394,6 +416,8 @@ class DemoWorldFactoryTest {
         Vector2 initialCombatPosition = combatTransform.position.cpy();
         int initialMiningStock = miningInventory.stock[mining.resourceItem];
         long initialTotalMined = mining.totalMined;
+        long initialTotalDelivered = mining.totalDelivered;
+        float initialMiningCredits = mining.credits;
         float initialHull = combat.hull;
         float initialShields = combat.shields;
         float initialDamage = combat.damagePerSecond;
@@ -434,18 +458,45 @@ class DemoWorldFactoryTest {
 
         int finalMiningStock = miningInventory.stock[mining.resourceItem];
         long minedDuringRun = mining.totalMined - initialTotalMined;
-        assertTrue(finalMiningStock > initialMiningStock,
-                "Добывающий корабль не пополнил трюм");
+        long deliveredDuringRun = mining.totalDelivered - initialTotalDelivered;
         assertTrue(minedDuringRun > 0L,
                 "Счётчик добычи не увеличился");
-        assertEquals(initialMiningStock + minedDuringRun, finalMiningStock,
-                "Склад и счётчик добычи разошлись");
+        assertTrue(deliveredDuringRun > 0L,
+                "Добывающий корабль не доставил руду на рынок");
+        assertTrue(mining.credits > initialMiningCredits,
+                "Продажа добытой руды не увеличила баланс");
+        assertEquals(initialMiningStock + minedDuringRun,
+                (long) finalMiningStock + deliveredDuringRun,
+                "Добытая руда потерялась между трюмом и рынком");
         assertTrue(finalMiningStock <= miningInventory.capacity,
                 "Добывающий корабль переполнил трюм");
         assertTrue(Double.isFinite(mining.extractionRemainder)
                         && mining.extractionRemainder >= 0d
                         && mining.extractionRemainder < 1d,
                 "Некорректный остаток добычи");
+
+        int activeAsteroids = 0;
+        for (Entity entity : engine.getEntities()) {
+            AsteroidComponent asteroid = entity.getComponent(AsteroidComponent.class);
+            if (asteroid == null) {
+                continue;
+            }
+            activeAsteroids++;
+            assertTrue(asteroid.remainingResource > 0L
+                            && asteroid.remainingResource <= asteroid.initialResource,
+                    "Некорректный остаток астероида");
+            TransformComponent transform = entity.getComponent(TransformComponent.class);
+            assertNotNull(transform);
+            assertTrue(transform.position.x >= 0f
+                            && transform.position.x <= Constants.WORLD_WIDTH);
+            assertTrue(transform.position.y >= 0f
+                            && transform.position.y <= Constants.WORLD_HEIGHT);
+        }
+        assertTrue(activeAsteroids > 0
+                        && activeAsteroids <= AsteroidSpawnConfig.demoWorld().maxActiveAsteroids(),
+                "Спавнер не поддерживает допустимое число астероидов");
+        assertTrue(asteroidSpawnSystem.getSpawnedAsteroidCount() >= activeAsteroids,
+                "Счётчик появлений меньше числа активных астероидов");
 
         assertTrue(combat.isOperational(), "Боевой корабль потерял работоспособность");
         assertEquals(initialCombatPosition.x, combatTransform.position.x, 0f);
