@@ -9,8 +9,8 @@ package com.spacesim.simulation;
  * наносекундах. Это исключает накопление двоичной ошибки вида {@code 0.1f ~= 0.10000000149} и делает
  * границы шагов стабильными при разном разбиении кадров.</p>
  *
- * <p>Пауза не накапливает пропущенное реальное время. Дробная наносекунда, возникающая только при
- * нецелом масштабе времени, сохраняется отдельно и переносится на последующие кадры.</p>
+ * <p>Весь mutable state часов сериализуется через {@link State}; восстановленный экземпляр
+ * продолжает накопление с той же доли следующего tick, включая pause и time scale.</p>
  */
 public final class SimulationClock {
     private static final double NANOS_PER_SECOND = 1_000_000_000d;
@@ -24,10 +24,58 @@ public final class SimulationClock {
     private long tick;
 
     /**
+     * Полный сериализуемый снимок часов.
+     *
+     * @param fixedStepSeconds длительность authoritative fixed tick
+     * @param accumulatorNanos целые наносекунды, уже накопленные к следующему tick
+     * @param fractionalNanos дробная наносекунда после применения time scale
+     * @param timeScale текущий множитель игрового времени
+     * @param paused состояние паузы
+     * @param tick число уже исполненных ticks
+     */
+    public record State(
+            float fixedStepSeconds,
+            long accumulatorNanos,
+            double fractionalNanos,
+            double timeScale,
+            boolean paused,
+            long tick) {
+        /**
+         * Проверяет численные инварианты сохраняемого состояния.
+         *
+         * @param fixedStepSeconds длительность authoritative fixed tick
+         * @param accumulatorNanos целые накопленные наносекунды
+         * @param fractionalNanos дробная накопленная наносекунда
+         * @param timeScale множитель игрового времени
+         * @param paused состояние паузы
+         * @param tick число уже исполненных ticks
+         */
+        public State {
+            if (!Float.isFinite(fixedStepSeconds) || fixedStepSeconds <= 0f) {
+                throw new IllegalArgumentException("Fixed step состояния должен быть положительным");
+            }
+            long stepNanos = secondsToRoundedNanos(fixedStepSeconds);
+            if (stepNanos <= 0L || accumulatorNanos < 0L || accumulatorNanos >= stepNanos) {
+                throw new IllegalArgumentException("Accumulator состояния находится вне fixed tick");
+            }
+            if (!Double.isFinite(fractionalNanos)
+                    || fractionalNanos < 0d
+                    || fractionalNanos >= 1d) {
+                throw new IllegalArgumentException("Fractional nanos должны принадлежать [0, 1)");
+            }
+            if (!Double.isFinite(timeScale) || timeScale < 0d) {
+                throw new IllegalArgumentException("Time scale состояния некорректен");
+            }
+            if (tick < 0L) {
+                throw new IllegalArgumentException("Tick состояния не может быть отрицательным");
+            }
+        }
+    }
+
+    /**
      * Создаёт часы с заданной длительностью одного simulation tick.
      *
-     * @param fixedStepSeconds конечная строго положительная длительность шага в секундах; после
-     *                         перевода в наносекунды должна быть не меньше одной наносекунды
+     * @param fixedStepSeconds конечная строго положительная длительность шага в секундах
      * @throws IllegalArgumentException если длительность некорректна или слишком мала
      */
     public SimulationClock(float fixedStepSeconds) {
@@ -40,6 +88,36 @@ public final class SimulationClock {
         }
         this.fixedStepSeconds = fixedStepSeconds;
         this.fixedStepNanos = nanos;
+    }
+
+    /**
+     * Восстанавливает часы из полного сохранённого состояния.
+     *
+     * @param state валидный снимок часов
+     * @throws NullPointerException если снимок не задан
+     */
+    public SimulationClock(State state) {
+        this(requireState(state).fixedStepSeconds());
+        accumulatorNanos = state.accumulatorNanos();
+        fractionalNanos = state.fractionalNanos();
+        timeScale = state.timeScale();
+        paused = state.paused();
+        tick = state.tick();
+    }
+
+    /**
+     * Возвращает полный immutable снимок для save-state.
+     *
+     * @return состояние, достаточное для точного продолжения clock
+     */
+    public State snapshotState() {
+        return new State(
+                fixedStepSeconds,
+                accumulatorNanos,
+                fractionalNanos,
+                timeScale,
+                paused,
+                tick);
     }
 
     /**
@@ -106,18 +184,13 @@ public final class SimulationClock {
         return tick;
     }
 
-    /**
-     * Возвращает игровое время полностью исполненных ticks.
-     *
-     * @return точное относительно внутренней наносекундной шкалы время в секундах
-     */
+    /** @return игровое время полностью исполненных ticks в секундах */
     public double getSimulationTimeSeconds() {
         return tick * (double) fixedStepNanos / NANOS_PER_SECOND;
     }
 
     /**
      * Возвращает долю следующего tick, уже накопленную реальным временем.
-     * Значение удобно для будущей интерполяции визуального положения объектов.
      *
      * @return значение в диапазоне {@code [0, 1)} при штатном состоянии
      */
@@ -138,7 +211,6 @@ public final class SimulationClock {
      * Задаёт множитель игрового времени. Ноль останавливает накопление так же, как пауза.
      *
      * @param timeScale конечный неотрицательный множитель
-     * @throws IllegalArgumentException если значение отрицательно, бесконечно или NaN
      */
     public void setTimeScale(double timeScale) {
         if (!Double.isFinite(timeScale) || timeScale < 0d) {
@@ -153,12 +225,19 @@ public final class SimulationClock {
     }
 
     /**
-     * Включает или снимает паузу. Время, прошедшее во время паузы, не добавляется в accumulator.
+     * Включает или снимает паузу.
      *
      * @param paused новое состояние паузы
      */
     public void setPaused(boolean paused) {
         this.paused = paused;
+    }
+
+    private static State requireState(State state) {
+        if (state == null) {
+            throw new NullPointerException("Состояние SimulationClock не задано");
+        }
+        return state;
     }
 
     private static long secondsToRoundedNanos(float seconds) {
