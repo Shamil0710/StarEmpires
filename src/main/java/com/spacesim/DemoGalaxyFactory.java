@@ -44,7 +44,12 @@ public final class DemoGalaxyFactory {
      */
     public static WorldSimulation create(long rootSeed) {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
-        return WorldSimulation.restore(createState(rootSeed, content), content, ACTIVE_SYSTEM_ID);
+        return WorldSimulation.restore(
+                createState(rootSeed, content),
+                content,
+                ACTIVE_SYSTEM_ID,
+                WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS,
+                WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME);
     }
 
     /**
