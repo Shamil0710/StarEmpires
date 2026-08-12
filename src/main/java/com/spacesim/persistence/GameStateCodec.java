@@ -32,7 +32,9 @@ import java.util.Objects;
  *
  * <p>{@link #write(Path, GameState)} сначала создаёт временный файл рядом с целевым, затем заменяет
  * сохранение atomic move, если файловая система его поддерживает. {@link #decode(byte[])} принимает
- * текущую schema и Stage-3 schema v1, которую сразу переводит через {@link GameStateMigration}.</p>
+ * текущую schema и Stage-3 schema v1, которую сразу переводит через {@link GameStateMigration}.
+ * Entity archetype появился только в schema v2 и читается условно, поэтому byte layout v1 остаётся
+ * полностью совместимым.</p>
  */
 public final class GameStateCodec {
     private static final int MAGIC = 0x5354454D; // STEM — Star Empires save magic.
@@ -209,7 +211,7 @@ public final class GameStateCodec {
         int entityCount = readCount(input, MAX_ENTITIES, "entities");
         List<EntityState> entities = new ArrayList<>(entityCount);
         for (int index = 0; index < entityCount; index++) {
-            entities.add(readEntity(input));
+            entities.add(readEntity(input, schemaVersion));
         }
         GameState decoded = new GameState(
                 schemaVersion,
@@ -450,9 +452,10 @@ public final class GameStateCodec {
             output.writeLong(value.initialResource());
             output.writeLong(value.remainingResource());
         });
+        writeOptional(output, entity.archetype(), value -> writeString(output, value.contentId()));
     }
 
-    private static EntityState readEntity(DataInputStream input) throws IOException {
+    private static EntityState readEntity(DataInputStream input, int schemaVersion) throws IOException {
         EntityId id = new EntityId(input.readLong());
         EntityState.IdentityState identity = readOptional(input,
                 () -> new EntityState.IdentityState(readString(input), readString(input)));
@@ -538,9 +541,12 @@ public final class GameStateCodec {
         EntityState.AsteroidState asteroid = readOptional(input,
                 () -> new EntityState.AsteroidState(
                         readString(input), input.readInt(), input.readLong(), input.readLong()));
+        EntityState.ArchetypeState archetype = schemaVersion >= GameState.CURRENT_VERSION
+                ? readOptional(input, () -> new EntityState.ArchetypeState(readString(input)))
+                : null;
         return new EntityState(
                 id, identity, transform, inventory, wallet, market, production, history,
-                faction, reputation, ship, tradeAi, mining, combat, asteroid);
+                faction, reputation, ship, tradeAi, mining, combat, asteroid, archetype);
     }
 
     private static void writeEntityId(DataOutputStream output, EntityId id) throws IOException {
