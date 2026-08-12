@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "item.ore",
+      "runtimeId": 0,
+      "codeName": "Ore",
+      "displayName": "Руда",
+      "category": "MATERIAL",
+      "basePrice": 10.0,
+      "mineable": true
+    },
+    {
+      "id": "item.energy",
+      "runtimeId": 1,
+      "codeName": "Energy",
+      "displayName": "Энергия",
+      "category": "GAS_LIQUID",
+      "basePrice": 5.0,
+      "mineable": false
+    },
+    {
+      "id": "item.food",
+      "runtimeId": 2,
+      "codeName": "Food",
+      "displayName": "Продовольствие",
+      "category": "FINISHED_GOODS",
+      "basePrice": 20.0,
+      "mineable": false
+    },
+    {
+      "id": "item.steel",
+      "runtimeId": 3,
+      "codeName": "Steel",
+      "displayName": "Сталь",
+      "category": "MATERIAL",
+      "basePrice": 50.0,
+      "mineable": false
+    },
+    {
+      "id": "item.weapons",
+      "runtimeId": 4,
+      "codeName": "Weapons",
+      "displayName": "Вооружение",
+      "category": "FINISHED_GOODS",
+      "basePrice": 150.0,
+      "mineable": false
+    }
+  ],
+  "recipes": [
+    {
+      "id": "recipe.energy_generation",
+      "displayName": "Генерация энергии",
+      "durationSeconds": 4.0,
+      "inputs": {},
+      "outputs": {
+        "item.energy": 7
+      }
+    },
+    {
+      "id": "recipe.food_growing",
+      "displayName": "Выращивание продовольствия",
+      "durationSeconds": 6.0,
+      "inputs": {
+        "item.energy": 2
+      },
+      "outputs": {
+        "item.food": 6
+      }
+    },
+    {
+      "id": "recipe.steel_smelting",
+      "displayName": "Выплавка стали",
+      "durationSeconds": 4.0,
+      "inputs": {
+        "item.ore": 2,
+        "item.energy": 1
+      },
+      "outputs": {
+        "item.steel": 2
+      }
+    },
+    {
+      "id": "recipe.weapons_assembly",
+      "displayName": "Сборка вооружения",
+      "durationSeconds": 6.0,
+      "inputs": {
+        "item.steel": 2,
+        "item.energy": 1
+      },
+      "outputs": {
+        "item.weapons": 1
+      }
+    }
+  ]
+}
