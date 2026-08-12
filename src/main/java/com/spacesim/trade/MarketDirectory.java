@@ -114,6 +114,7 @@ public final class MarketDirectory {
         }
 
         stationBuilder.sort(Comparator.comparing(StationMarket::id));
+        DistanceTable distanceTable = new DistanceTable(stationBuilder);
         List<List<TradeOpportunity>> opportunityBuilder = mutableOpportunityIndex();
         for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
             int itemId = item.runtimeId();
@@ -129,14 +130,15 @@ public final class MarketDirectory {
 
             List<TradeOpportunity> opportunities = opportunityBuilder.get(itemId);
             for (StationMarket supplier : suppliers) {
-                for (StationMarket consumer : selectConsumers(supplier, consumers, itemId)) {
+                for (StationMarket consumer : selectConsumers(
+                        supplier, consumers, itemId, distanceTable)) {
                     opportunities.add(new TradeOpportunity(
                             supplier.id(),
                             consumer.id(),
                             itemId,
                             supplier.sellPrice(itemId),
                             consumer.buyPrice(itemId),
-                            distance(supplier, consumer)));
+                            distanceTable.distance(supplier, consumer)));
                 }
             }
             opportunities.sort(
@@ -199,7 +201,8 @@ public final class MarketDirectory {
     private List<StationMarket> selectConsumers(
             StationMarket supplier,
             List<StationMarket> consumers,
-            int itemId) {
+            int itemId,
+            DistanceTable distanceTable) {
         LinkedHashMap<EntityId, StationMarket> selected = new LinkedHashMap<>();
         StationMarket[] efficiencyCandidates = new StationMarket[MAX_CONSUMERS_PER_SUPPLIER];
         double[] efficiencyScores = new double[MAX_CONSUMERS_PER_SUPPLIER];
@@ -213,7 +216,11 @@ public final class MarketDirectory {
                 selected.put(consumer.id(), consumer);
             }
 
-            double score = optimisticEfficiency(supplier, consumer, itemId);
+            double score = optimisticEfficiency(
+                    supplier,
+                    consumer,
+                    itemId,
+                    distanceTable.distance(supplier, consumer));
             int insertionIndex = efficiencyCount;
             for (int index = 0; index < efficiencyCount; index++) {
                 int scoreCompare = Double.compare(score, efficiencyScores[index]);
@@ -266,13 +273,14 @@ public final class MarketDirectory {
     private static double optimisticEfficiency(
             StationMarket supplier,
             StationMarket consumer,
-            int itemId) {
+            int itemId,
+            float stationDistance) {
         double minimumPurchase = supplier.sellPrice(itemId)
                 * (1d - Constants.MAX_REPUTATION_PRICE_BONUS);
         double maximumSale = consumer.buyPrice(itemId)
                 * (1d + Constants.MAX_REPUTATION_PRICE_BONUS);
         double margin = Math.max(0d, maximumSale - minimumPurchase);
-        return margin / Math.max(1d, distance(supplier, consumer));
+        return margin / Math.max(1d, stationDistance);
     }
 
     private StationMarket snapshot(Entity entity) {
@@ -360,6 +368,38 @@ public final class MarketDirectory {
             result.add(List.copyOf(values));
         }
         return List.copyOf(result);
+    }
+
+    private static final class DistanceTable {
+        private final Map<EntityId, Integer> indexById;
+        private final float[][] values;
+
+        private DistanceTable(List<StationMarket> stationMarkets) {
+            indexById = new LinkedHashMap<>(stationMarkets.size());
+            values = new float[stationMarkets.size()][stationMarkets.size()];
+            for (int index = 0; index < stationMarkets.size(); index++) {
+                indexById.put(stationMarkets.get(index).id(), index);
+            }
+            for (int firstIndex = 0; firstIndex < stationMarkets.size(); firstIndex++) {
+                StationMarket first = stationMarkets.get(firstIndex);
+                for (int secondIndex = firstIndex + 1;
+                        secondIndex < stationMarkets.size();
+                        secondIndex++) {
+                    float value = MarketDirectory.distance(first, stationMarkets.get(secondIndex));
+                    values[firstIndex][secondIndex] = value;
+                    values[secondIndex][firstIndex] = value;
+                }
+            }
+        }
+
+        private float distance(StationMarket first, StationMarket second) {
+            Integer firstIndex = indexById.get(first.id());
+            Integer secondIndex = indexById.get(second.id());
+            if (firstIndex == null || secondIndex == null) {
+                return MarketDirectory.distance(first, second);
+            }
+            return values[firstIndex][secondIndex];
+        }
     }
 
     /** Immutable снимок одной торговой станции. */
