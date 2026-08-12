@@ -31,8 +31,8 @@ import java.util.Objects;
  * лимиты, поэтому повреждённый файл не может запросить неограниченное выделение памяти.</p>
  *
  * <p>{@link #write(Path, GameState)} сначала создаёт временный файл рядом с целевым, затем заменяет
- * сохранение atomic move, если файловая система его поддерживает. {@link #decode(byte[])} отклоняет
- * неизвестную file/schema version, повреждённые размеры и любой лишний хвост после последнего поля.</p>
+ * сохранение atomic move, если файловая система его поддерживает. {@link #decode(byte[])} принимает
+ * текущую schema и Stage-3 schema v1, которую сразу переводит через {@link GameStateMigration}.</p>
  */
 public final class GameStateCodec {
     private static final int MAGIC = 0x5354454D; // STEM — Star Empires save magic.
@@ -82,10 +82,10 @@ public final class GameStateCodec {
     }
 
     /**
-     * Декодирует и полностью валидирует бинарный snapshot.
+     * Декодирует, мигрирует и полностью валидирует бинарный snapshot.
      *
      * @param bytes содержимое файла сохранения
-     * @return новый immutable value-based snapshot
+     * @return новый immutable snapshot текущей schema
      * @throws NullPointerException если массив не задан
      * @throws IllegalArgumentException если формат повреждён, слишком велик или не поддерживается
      */
@@ -190,7 +190,8 @@ public final class GameStateCodec {
 
     private static GameState readGameState(DataInputStream input) throws IOException {
         int schemaVersion = input.readInt();
-        if (schemaVersion != GameState.CURRENT_VERSION) {
+        if (schemaVersion != GameState.CURRENT_VERSION
+                && schemaVersion != GameState.LEGACY_STAGE3_VERSION) {
             throw new IllegalArgumentException("Неподдерживаемая schema version: " + schemaVersion);
         }
         long rootSeed = input.readLong();
@@ -210,7 +211,7 @@ public final class GameStateCodec {
         for (int index = 0; index < entityCount; index++) {
             entities.add(readEntity(input));
         }
-        return new GameState(
+        GameState decoded = new GameState(
                 schemaVersion,
                 rootSeed,
                 clock,
@@ -222,6 +223,7 @@ public final class GameStateCodec {
                 recorder,
                 ledger,
                 List.copyOf(entities));
+        return GameStateMigration.toCurrent(decoded);
     }
 
     private static void writeClock(DataOutputStream output, SimulationClock.State state) throws IOException {
