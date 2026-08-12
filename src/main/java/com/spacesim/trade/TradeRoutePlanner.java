@@ -8,19 +8,20 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Pure planner новых торговых рейсов поверх immutable {@link MarketDirectory}.
+ * Pure planner торговых рейсов поверх immutable {@link MarketDirectory}.
  *
- * <p>Planner не читает Ashley ECS и не меняет состояние мира. Он применяет те же ограничения
- * ликвидности, вместимости, спроса, cargo policy и репутационной цены, которые используются при
- * фактической сделке. Supplier-consumer pairing выполняет общий directory один раз за market
- * snapshot; конкретный fleet оценивает только bounded {@link TradeOpportunity} shortlist.</p>
+ * <p>Planner не читает Ashley ECS и не меняет состояние мира. Для нового груза он применяет
+ * ограничения ликвидности, вместимости, спроса, cargo policy и репутационной цены. Pairing
+ * supplier-consumer выполняет общий directory один раз за market snapshot; конкретный fleet
+ * оценивает bounded {@link TradeOpportunity} shortlist. Уже имеющийся груз продаётся через
+ * отдельный pure sale-route path без supplier pairing.</p>
  */
 public final class TradeRoutePlanner {
     /** Политика сравнения допустимых маршрутов. */
     public enum ScoringMode {
-        /** Legacy-поведение: максимальная абсолютная валовая прибыль. */
+        /** Legacy-поведение: максимальная абсолютная валовая прибыль/выручка. */
         GROSS_PROFIT,
-        /** Целевая Stage-5 политика: максимальная валовая прибыль на секунду движения. */
+        /** Целевая Stage-5 политика: максимальная прибыль/выручка на секунду движения. */
         PROFIT_PER_SECOND
     }
 
@@ -104,6 +105,64 @@ public final class TradeRoutePlanner {
         return Optional.ofNullable(best);
     }
 
+    /**
+     * Ищет лучшую точку реализации уже находящегося на борту груза.
+     *
+     * <p>Закупочная цена является sunk cost. В legacy режиме сравнивается абсолютная выручка, в
+     * Stage-5 режиме — выручка на секунду движения до consumer.</p>
+     *
+     * @param fleet immutable профиль флота с текущим cargo snapshot
+     * @param directory общий snapshot рынков текущего tick
+     * @return лучший sale route либо empty
+     */
+    public Optional<TradeSaleRoute> findBestExistingCargoSale(
+            FleetTradeProfile fleet,
+            MarketDirectory directory) {
+        Objects.requireNonNull(fleet, "FleetTradeProfile не задан");
+        Objects.requireNonNull(directory, "MarketDirectory не задан");
+
+        TradeSaleRoute best = null;
+        for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
+            int itemId = item.runtimeId();
+            int cargo = fleet.stock(itemId);
+            if (cargo <= 0) {
+                continue;
+            }
+            for (MarketDirectory.StationMarket consumer : directory.consumers(itemId)) {
+                float salePrice = effectiveBuyPrice(consumer, itemId, fleet);
+                if (!isPositiveFinite(salePrice)) {
+                    continue;
+                }
+                int amount = Math.min(cargo, consumer.freeCapacity());
+                amount = Math.min(amount,
+                        safeMaximumAffordable(
+                                consumer.walletBalanceMilliCredits(), salePrice, amount));
+                amount = Math.min(amount,
+                        safeMaximumAffordable(
+                                Long.MAX_VALUE - fleet.walletBalanceMilliCredits(), salePrice, amount));
+                if (amount <= 0) {
+                    continue;
+                }
+                long revenue = safeTradeValue(salePrice, amount);
+                if (revenue <= 0L) {
+                    continue;
+                }
+                float distance = directDistance(fleet, consumer);
+                TradeSaleRoute candidate = new TradeSaleRoute(
+                        consumer.id(),
+                        itemId,
+                        amount,
+                        revenue,
+                        distance,
+                        travelSeconds(distance, fleet.movementSpeed()));
+                if (isBetter(candidate, best)) {
+                    best = candidate;
+                }
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
     private int calculateAmount(
             FleetTradeProfile fleet,
             MarketDirectory.StationMarket supplier,
@@ -170,6 +229,32 @@ public final class TradeRoutePlanner {
         return candidate.sellStationId().compareTo(current.sellStationId()) < 0;
     }
 
+    private boolean isBetter(TradeSaleRoute candidate, TradeSaleRoute current) {
+        if (current == null) {
+            return true;
+        }
+        int primary = scoringMode == ScoringMode.GROSS_PROFIT
+                ? Long.compare(candidate.saleRevenueMilliCredits(), current.saleRevenueMilliCredits())
+                : Double.compare(candidate.revenuePerSecond(), current.revenuePerSecond());
+        if (primary != 0) {
+            return primary > 0;
+        }
+        int revenueTie = Long.compare(
+                candidate.saleRevenueMilliCredits(), current.saleRevenueMilliCredits());
+        if (revenueTie != 0) {
+            return revenueTie > 0;
+        }
+        int timeTie = Double.compare(candidate.travelSeconds(), current.travelSeconds());
+        if (timeTie != 0) {
+            return timeTie < 0;
+        }
+        int itemTie = Integer.compare(candidate.itemId(), current.itemId());
+        if (itemTie != 0) {
+            return itemTie < 0;
+        }
+        return candidate.sellStationId().compareTo(current.sellStationId()) < 0;
+    }
+
     private float effectiveSellPrice(
             MarketDirectory.StationMarket station,
             int itemId,
@@ -206,6 +291,16 @@ public final class TradeRoutePlanner {
             return Float.MAX_VALUE;
         }
         return (float) total;
+    }
+
+    private static float directDistance(
+            FleetTradeProfile fleet,
+            MarketDirectory.StationMarket consumer) {
+        double distance = Math.hypot(consumer.x() - fleet.x(), consumer.y() - fleet.y());
+        if (!Double.isFinite(distance) || distance > Float.MAX_VALUE) {
+            return Float.MAX_VALUE;
+        }
+        return (float) distance;
     }
 
     private static double travelSeconds(float distance, float movementSpeed) {
