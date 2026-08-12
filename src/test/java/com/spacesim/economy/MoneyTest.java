@@ -47,8 +47,7 @@ class MoneyTest {
         assertEquals(
                 referenceMaximumAffordable(Long.MAX_VALUE, Float.MAX_VALUE, Integer.MAX_VALUE),
                 Money.maximumAffordable(Long.MAX_VALUE, Float.MAX_VALUE, Integer.MAX_VALUE));
-        assertEquals(
-                referenceMaximumAffordable(Long.MAX_VALUE, 0.0005f, Integer.MAX_VALUE),
+        assertEquals(Integer.MAX_VALUE,
                 Money.maximumAffordable(Long.MAX_VALUE, 0.0005f, Integer.MAX_VALUE));
     }
 
@@ -72,7 +71,7 @@ class MoneyTest {
         int low = 0;
         int high = maximumAmount;
         while (low < high) {
-            int middle = low + (high - low + 1) / 2;
+            int middle = low + (high - low) / 2 + 1;
             if (referenceAffordable(balance, price, middle)) {
                 low = middle;
             } else {
