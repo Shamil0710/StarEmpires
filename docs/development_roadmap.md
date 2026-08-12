@@ -18,7 +18,7 @@
 - [x] деньги передаются между экономическими агентами, а не создаются/исчезают внутри обычной сделки;
 - [x] save/load сохраняет экономическое состояние и ссылки между сущностями через устойчивые ID;
 - [x] товары, рецепты, корабли, станции и фракционные параметры загружаются из data-driven каталога;
-- [ ] торговый AI оценивает прибыль с учётом времени/стоимости маршрута;
+- [x] торговый AI оценивает прибыль с учётом времени маршрута и имеет extension seam для дополнительных route costs;
 - [ ] существует headless benchmark минимум на 100 станций, 500 экономических агентов и 100 игровых часов;
 - [ ] benchmark собирает ключевые экономические метрики и выявляет разрушение supply chain.
 
@@ -158,52 +158,72 @@ Post-merge `main` CI: SUCCESS.
 
 ## Этап 5 — Логистика и Trade Route Planner
 
-**Статус:** ACTIVE — следующий рабочий этап
+**Статус:** COMPLETE — MERGED TO `main` VIA PR #6
 
-### Цель
+### Основные результаты
 
-Отделить поиск экономически выгодного маршрута от исполнения рейса конкретным кораблём и перестать выбирать маршрут только по gross profit.
+- [x] route discovery отделён от исполнения FSM корабля;
+- [x] создан `MarketDirectory` с immutable defensive snapshots рынков;
+- [x] созданы value objects `FleetTradeProfile`, `TradeOpportunity`, `TradeRoute`, `TradeSaleRoute` без Ashley `Entity` references;
+- [x] создан pure `TradeRoutePlanner`;
+- [x] production default оценивает новые грузы по net profit per travel second вместо gross profit;
+- [x] уже купленный cargo оценивается по net sale revenue per travel second;
+- [x] учитываются purchase amount, cargo capacity, specialization, cargo policy, спрос, stock, капитал и рыночная ликвидность;
+- [x] score учитывает `fleet -> supplier -> consumer` distance/time;
+- [x] создан `TradeRouteCostModel` как extension seam для fuel/risk/tariffs без введения вымышленных balancing costs на этом этапе;
+- [x] supplier-consumer pairing выполняется один раз на общий market snapshot вместо глобального `stations² × goods` перебора каждым агентом;
+- [x] shortlist ограничен максимум 8 consumers на supplier/item и сохраняет ценовые и margin/distance кандидаты;
+- [x] stale-route/replan policy определена и реализована: execution повторно валидирует stations/prices/capacity/liquidity, invalid route сбрасывается с cooldown без partial transfer;
+- [x] deterministic tie-breaks не используют RNG;
+- [x] Stage 2 money/resource invariants остаются зелёными;
+- [x] Stage 3 save/load continuation остаётся зелёным, persistent route schema не менялась;
+- [x] performance-oriented regression с 40 suppliers + 40 consumers доказывает bounded candidate count;
+- [x] архитектурный и экономический контракт описан в `docs/trade_route_planning.md`.
 
-### Задачи
-
-- [ ] отделить route discovery от исполнения FSM корабля;
-- [ ] создать `MarketDirectory` как индекс доступных рынков и торговых предложений;
-- [ ] создать value-object `TradeRoute`/`TradeOpportunity` без Ashley `Entity` references;
-- [ ] создать `TradeRoutePlanner`;
-- [ ] оценивать минимум profit/time вместо gross profit;
-- [ ] учитывать purchase amount, cargo capacity, доступный капитал и рыночную ликвидность;
-- [ ] добавить travel-distance/time cost;
-- [ ] подготовить интерфейсы для fuel/risk/tariffs без преждевременного наполнения механиками;
-- [ ] исключить глобальный `stations² × goods` поиск на каждого агента;
-- [ ] определить stale-route/replan policy;
-- [ ] сохранить deterministic behaviour при одинаковом seed/tick count;
-- [ ] сохранить Stage 2 money/resource invariants;
-- [ ] сохранить Stage 3 save/load continuation;
-- [ ] добавить performance-oriented tests для route discovery на увеличенном количестве рынков.
+Verified final PR head: `ac80376130f7680b0b59e0fab59c63719a75795d`.
+Push CI exact head: SUCCESS.
+Pull-request CI exact head: SUCCESS.
+Exact-head suite: **235 tests, 0 failures, 0 errors, 0 skipped**; Javadoc SUCCESS; JaCoCo thresholds SUCCESS.
+Merge commit: `fd7c0ece140487aa13a661225c8c9034e9333537`.
+Post-merge `main` CI: SUCCESS.
 
 ### Definition of Done
 
-Торговый AI предпочитает лучший маршрут по экономической отдаче на единицу времени, route discovery не находится внутри ship FSM, а каждый агент больше не выполняет глобальный квадратичный перебор всех пар станций и товаров.
+Торговый AI предпочитает лучший маршрут по экономической отдаче на единицу времени, route discovery находится вне ship FSM, а каждый агент больше не выполняет глобальный квадратичный перебор всех пар станций и товаров. **Выполнено.**
 
 ---
 
 ## Этап 6 — Headless economic benchmark и observability
 
-**Статус:** PLANNED
+**Статус:** ACTIVE — следующий рабочий этап
+
+### Цель
+
+Получить воспроизводимый количественный контур, который показывает не только корректность инвариантов, но и устойчивость экономики и стоимость симуляции на масштабе до перехода к multi-system миру.
 
 ### Задачи
 
-- [ ] создать headless simulation runner без OpenGL;
-- [ ] сценарий минимум 100 станций / 500 агентов / расширенный каталог товаров;
+- [ ] создать headless simulation/benchmark runner без OpenGL;
+- [ ] определить versioned benchmark scenario и его seed;
+- [ ] сценарий минимум 100 станций / 500 экономических агентов / расширенный каталог товаров;
 - [ ] прогон минимум 100 игровых часов;
-- [ ] собирать TPS/CPU и allocation baseline;
-- [ ] собирать stockouts, unmet demand, price variance, trade volume, production volume;
-- [ ] собирать wealth distribution и route profitability;
-- [ ] добавить regression thresholds для ключевых инвариантов.
+- [ ] собирать wall-clock duration, simulated-time/real-time ratio и ticks/second;
+- [ ] собрать allocation/heap baseline доступными JVM-инструментами без привязки core к profiler library;
+- [ ] собирать stockouts и длительность дефицитов;
+- [ ] собирать unmet demand;
+- [ ] собирать price variance/volatility;
+- [ ] собирать trade volume и transaction count;
+- [ ] собирать production/mining/consumption volume;
+- [ ] собирать wealth distribution и wallet concentration;
+- [ ] собирать route profitability и planner opportunity counts;
+- [ ] явно проверять money/resource conservation в benchmark run;
+- [ ] добавить machine-readable benchmark report;
+- [ ] определить regression thresholds только после получения первого baseline, не подгоняя их заранее;
+- [ ] добавить smaller deterministic benchmark smoke-test в CI, а тяжёлый 100-hour profile оставить отдельным reproducible command, если runtime окажется неприемлемым для каждого PR.
 
 ### Definition of Done
 
-Экономический core можно автоматически стресс-тестировать без UI, а деградации поведения и производительности видны количественно.
+Экономический core автоматически стресс-тестируется без UI; benchmark минимум 100 stations / 500 agents / 100 simulated hours воспроизводим; отчёт показывает производительность, дефициты, цены, торговлю, производство, wealth и route-planner metrics; экономические инварианты остаются доказанными.
 
 ---
 
@@ -297,4 +317,4 @@ Supply chain может самостоятельно перестраивать�
 
 ## Текущий следующий шаг
 
-**Этап 5 — Логистика и Trade Route Planner.** После зелёного CI status/docs commit создать отдельную ветку от актуального `main`. Первый вертикальный срез: `MarketDirectory` + immutable `TradeOpportunity/TradeRoute` + pure `TradeRoutePlanner`, сохранив существующий TradeAI FSM как execution layer. Затем переключить один маршрутный decision path на planner и сравнить deterministic/economic regression tests до масштабной оптимизации.
+**Этап 6 — Headless economic benchmark и observability.** После зелёного CI этого status-коммита создать отдельную ветку от актуального `main`. Первый вертикальный срез: benchmark scenario + headless runner + machine-readable metrics для малого deterministic smoke-run. Затем масштабировать этот же runner до 100 stations / 500 agents / 100 simulated hours и только по фактическим данным вводить performance/regression thresholds.
