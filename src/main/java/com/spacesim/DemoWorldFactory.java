@@ -42,7 +42,9 @@ import java.util.Objects;
  *
  * <p>Все bootstrap-сущности получают устойчивые {@link EntityIdComponent} в стабильном порядке
  * результата. Перегрузка с внешним {@link EntityIdAllocator} позволяет продолжить ту же ID-
- * последовательность для динамических объектов текущей игровой сессии.</p>
+ * последовательность для динамических объектов текущей игровой сессии. Persistent-связи между
+ * bootstrap-сущностями назначаются только после выдачи ID и никогда не сохраняют Ashley
+ * {@code Entity} внутри компонентов состояния.</p>
  *
  * <p>Фабрика не обращается к libGDX/OpenGL и не регистрирует системы Ashley. Каждый вызов
  * {@link #createEntities()} возвращает новый независимый граф сущностей и компонентов.</p>
@@ -71,8 +73,8 @@ public final class DemoWorldFactory {
      *
      * <p>Порядок результата стабилен: сначала шесть станций от первичных источников к конечному
      * потребителю, затем пять специализированных транспортов, добывающий и боевой корабли. ID
-     * выдаются в этом же порядке только после полной сборки графа, поэтому внутренние runtime-ссылки
-     * вроде базы добытчика не влияют на идентичность.</p>
+     * выдаются в этом же порядке после полной сборки графа, затем добытчик получает persistent ID
+     * предпочтительной базы разгрузки.</p>
      *
      * @param idAllocator общий детерминированный аллокатор persistent ID
      * @return неизменяемый список из шести новых станций и семи новых кораблей
@@ -143,7 +145,7 @@ public final class DemoWorldFactory {
                 "Контейнеровоз Щит", 1450f, 500f, 200f, 80,
                 Constants.ITEM_WEAPONS, ShipType.FINISHED_GOODS_CARRIER,
                 Constants.FACTION_TRADE_LEAGUE);
-        Entity miningShip = createMiningShip("Добытчик Старатель", 450f, 930f, mine);
+        Entity miningShip = createMiningShip("Добытчик Старатель", 450f, 930f);
         Entity combatShip = createCombatShip("Фрегат Страж", 1500f, 1050f);
 
         List<Entity> entities = List.of(
@@ -163,6 +165,8 @@ public final class DemoWorldFactory {
         for (Entity entity : entities) {
             entity.add(new EntityIdComponent(idAllocator.allocate()));
         }
+        miningShip.getComponent(MiningComponent.class).homeBaseId =
+                mine.getComponent(EntityIdComponent.class).id;
         return entities;
     }
 
@@ -245,8 +249,8 @@ public final class DemoWorldFactory {
                 .add(new FactionComponent(factionId));
     }
 
-    /** Создаёт автономный добывающий корабль с предпочтительным рынком разгрузки и кошельком. */
-    private static Entity createMiningShip(String name, float x, float y, Entity homeBase) {
+    /** Создаёт автономный добывающий корабль с кошельком; ID базы назначается после bootstrap-ID. */
+    private static Entity createMiningShip(String name, float x, float y) {
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
 
@@ -257,7 +261,6 @@ public final class DemoWorldFactory {
         mining.movementSpeed = 150f;
         mining.extractionRange = 18f;
         mining.dockingRange = 12f;
-        mining.homeBase = homeBase;
 
         return new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
