@@ -27,36 +27,31 @@ import com.spacesim.trade.FleetTradeProfile;
 import com.spacesim.trade.MarketDirectory;
 import com.spacesim.trade.TradeRoute;
 import com.spacesim.trade.TradeRoutePlanner;
+import com.spacesim.trade.TradeSaleRoute;
 import com.spacesim.util.SpatialHashGrid;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
- * Управляет автономными торговыми флотами и исполняет маршруты через физические склады и кошельки.
+ * Исполняет автономные торговые FSM поверх маршрутов, рассчитанных pure planner-слоем.
  *
- * <p>Persistent-план маршрута в {@link TradeAIComponent} содержит только устойчивые
- * {@link EntityId}. Перед каждым движением и каждой сделкой система заново разрешает ID через
- * {@link EntityRegistry}; удалённая или не зарегистрированная станция делает маршрут невалидным без
- * висячей Ashley-ссылки.</p>
+ * <p>Все route decisions — как поиск нового груза, так и реализация уже имеющегося cargo —
+ * делегированы {@link TradeRoutePlanner}, который работает только с immutable
+ * {@link MarketDirectory} и {@link FleetTradeProfile}. Этот system отвечает за cooldown, движение,
+ * повторную валидацию сделки и переходы FSM, но не выполняет supplier-consumer search.</p>
  *
- * <p>Поиск нового груза делегирован pure {@link TradeRoutePlanner}, который работает поверх общего
- * immutable {@link MarketDirectory}. Система только строит {@link FleetTradeProfile} конкретного
- * корабля и копирует найденный value-route в существующее persistent состояние FSM. Продажа уже
- * имеющегося груза пока использует legacy spatial path и будет вынесена отдельным Stage-5 срезом.</p>
+ * <p>Persistent-план в {@link TradeAIComponent} содержит только устойчивые {@link EntityId}.
+ * Перед движением и сделкой ID разрешается через {@link EntityRegistry}; stale route безопасно
+ * отбрасывается и будет перепланирован после короткого cooldown.</p>
  *
- * <p>Authoritative деньги хранятся только в {@link WalletComponent}. Фактические сделки выполняет
- * {@link TradeController}, поэтому товар и деньги переходят атомарно и записываются в общий
- * {@link EconomicLedger}. По умолчанию новые маршруты сравниваются по прибыли на игровую секунду;
- * legacy gross-profit scoring доступен явно для regression-тестов.</p>
+ * <p>Authoritative деньги хранятся в {@link WalletComponent}, сделки выполняет
+ * {@link TradeController} и записывает в общий {@link EconomicLedger}. По умолчанию новые грузы
+ * сравниваются по gross profit/second, а уже купленный cargo — по revenue/second.</p>
  */
 public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
     private static final float ROUTE_SEARCH_RETRY_SECONDS = 1f;
-    private static final int ROUTE_SEARCH_RADIUS_CELLS =
-            (int) Math.ceil(Constants.WORLD_WIDTH / Constants.CELL_SIZE);
 
-    private final SpatialHashGrid grid;
     private final TradeController tradeController;
     private final EntityRegistry registry;
     private final ContentCatalog contentCatalog;
@@ -71,12 +66,11 @@ public class TradeAISystem extends IteratingSystem {
     private final ComponentMapper<ReputationComponent> rm = ComponentMapper.getFor(ReputationComponent.class);
     private final ComponentMapper<ShipComponent> sm = ComponentMapper.getFor(ShipComponent.class);
     private final ComponentMapper<WalletComponent> wm = ComponentMapper.getFor(WalletComponent.class);
-    private final ComponentMapper<EntityIdComponent> idm = ComponentMapper.getFor(EntityIdComponent.class);
 
     /**
      * Создаёт торговую AI-систему с собственными ledger/registry и встроенным catalog.
      *
-     * @param grid пространственный индекс рыночных станций
+     * @param grid compatibility spatial index; route planning больше его не использует
      * @throws NullPointerException если индекс не задан
      */
     public TradeAISystem(SpatialHashGrid grid) {
@@ -86,7 +80,7 @@ public class TradeAISystem extends IteratingSystem {
     /**
      * Создаёт торговую AI-систему с общим ledger и встроенным catalog.
      *
-     * @param grid пространственный индекс рыночных станций
+     * @param grid compatibility spatial index; route planning больше его не использует
      * @param ledger общий экономический журнал
      * @throws NullPointerException если зависимость не задана
      */
@@ -97,7 +91,7 @@ public class TradeAISystem extends IteratingSystem {
     /**
      * Создаёт торговую AI-систему с общими ledger/registry и встроенным catalog.
      *
-     * @param grid пространственный индекс рыночных станций
+     * @param grid compatibility spatial index; route planning больше его не использует
      * @param ledger общий экономический журнал
      * @param registry runtime-индекс устойчивых EntityId
      * @throws NullPointerException если зависимость не задана
@@ -109,7 +103,7 @@ public class TradeAISystem extends IteratingSystem {
     /**
      * Создаёт торговую AI-систему с явно заданным catalog и Stage-5 profit/time scoring.
      *
-     * @param grid пространственный индекс рыночных станций
+     * @param grid compatibility spatial index; route planning больше его не использует
      * @param ledger общий экономический журнал
      * @param registry runtime-индекс устойчивых EntityId
      * @param contentCatalog каталог товаров текущей simulation session
@@ -126,11 +120,11 @@ public class TradeAISystem extends IteratingSystem {
     /**
      * Создаёт торговую AI-систему с явно заданной политикой route scoring.
      *
-     * @param grid пространственный индекс рыночных станций
+     * @param grid compatibility spatial index; route planning больше его не использует
      * @param ledger общий экономический журнал
      * @param registry runtime-индекс устойчивых EntityId
      * @param contentCatalog каталог товаров текущей simulation session
-     * @param scoringMode политика сравнения новых торговых маршрутов
+     * @param scoringMode политика сравнения торговых маршрутов
      * @throws NullPointerException если зависимость не задана
      */
     public TradeAISystem(
@@ -145,7 +139,7 @@ public class TradeAISystem extends IteratingSystem {
                 TransformComponent.class,
                 InventoryComponent.class,
                 WalletComponent.class).get());
-        this.grid = Objects.requireNonNull(grid, "SpatialHashGrid не задан");
+        Objects.requireNonNull(grid, "SpatialHashGrid не задан");
         this.tradeController = new TradeController(
                 Objects.requireNonNull(ledger, "EconomicLedger не задан"));
         this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
@@ -179,7 +173,7 @@ public class TradeAISystem extends IteratingSystem {
     }
 
     /**
-     * Перестраивает общие market indexes и обновляет торговые автоматы.
+     * Перестраивает общий market snapshot и исполняет торговые автоматы.
      *
      * @param deltaTime прошедшее игровое время в секундах
      */
@@ -188,7 +182,6 @@ public class TradeAISystem extends IteratingSystem {
         if (!Float.isFinite(deltaTime) || deltaTime < 0f) {
             return;
         }
-        rebuildSpatialIndex();
         marketDirectory.rebuild(marketStations);
         super.update(deltaTime);
     }
@@ -222,25 +215,18 @@ public class TradeAISystem extends IteratingSystem {
             }
         }
 
+        FleetTradeProfile profile = createFleetTradeProfile(fleet, ai, position);
         boolean routeFound = im.get(fleet).getTotalStock() > 0
-                ? findSellRoute(fleet, ai, position)
-                : findTradeRoute(fleet, ai, position);
+                ? findSellRoute(ai, profile)
+                : findTradeRoute(ai, profile);
         if (!routeFound) {
             ai.routeSearchCooldown = ROUTE_SEARCH_RETRY_SECONDS;
         }
     }
 
-    private void rebuildSpatialIndex() {
-        grid.clear();
-        for (Entity station : marketStations) {
-            grid.insert(station, tm.get(station).position);
-        }
-    }
-
-    private boolean findTradeRoute(Entity fleet, TradeAIComponent ai, TransformComponent position) {
+    private boolean findTradeRoute(TradeAIComponent ai, FleetTradeProfile profile) {
         ai.resetRoute();
-        TradeRoute route = routePlanner.findBestNewCargoRoute(
-                createFleetTradeProfile(fleet, ai, position), marketDirectory).orElse(null);
+        TradeRoute route = routePlanner.findBestNewCargoRoute(profile, marketDirectory).orElse(null);
         if (route == null) {
             return false;
         }
@@ -253,6 +239,24 @@ public class TradeAISystem extends IteratingSystem {
         ai.expectedProfitMilliCredits = route.grossProfitMilliCredits();
         ai.routeSearchCooldown = 0f;
         ai.state = TradeAIComponent.State.TRAVEL_TO_BUY;
+        return true;
+    }
+
+    private boolean findSellRoute(TradeAIComponent ai, FleetTradeProfile profile) {
+        ai.resetRoute();
+        TradeSaleRoute route = routePlanner.findBestExistingCargoSale(profile, marketDirectory).orElse(null);
+        if (route == null) {
+            return false;
+        }
+
+        ai.buyStationId = null;
+        ai.sellStationId = route.sellStationId();
+        ai.targetStationId = route.sellStationId();
+        ai.targetItem = route.itemId();
+        ai.targetAmount = route.amount();
+        ai.expectedProfitMilliCredits = route.saleRevenueMilliCredits();
+        ai.routeSearchCooldown = 0f;
+        ai.state = TradeAIComponent.State.TRAVEL_TO_SELL;
         return true;
     }
 
@@ -283,69 +287,6 @@ public class TradeAISystem extends IteratingSystem {
                 ship == null ? null : ship.type,
                 inventory.stock,
                 reputation);
-    }
-
-    private boolean findSellRoute(Entity fleet, TradeAIComponent ai, TransformComponent position) {
-        ai.resetRoute();
-        List<Entity> nearby = grid.getNearby(position.position, ROUTE_SEARCH_RADIUS_CELLS);
-        InventoryComponent fleetInventory = im.get(fleet);
-        WalletComponent fleetWallet = wm.get(fleet);
-        ReputationComponent reputation = rm.get(fleet);
-        long bestRevenue = 0L;
-
-        for (Entity station : nearby) {
-            if (!isActiveMarketStation(fleet, station)) {
-                continue;
-            }
-            InventoryComponent stationInventory = im.get(station);
-            MarketComponent market = mm.get(station);
-            WalletComponent stationWallet = wm.get(station);
-            int freeCapacity = stationInventory.getFreeCapacity();
-            if (freeCapacity <= 0 || stationWallet.getBalanceMilliCredits() <= 0L) {
-                continue;
-            }
-
-            for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
-                int itemId = item.runtimeId();
-                int cargo = fleetInventory.stock[itemId];
-                if (cargo <= 0 || !market.isTradable(itemId)) {
-                    continue;
-                }
-                float salePrice = tradeController.getEffectiveBuyPrice(station, itemId, reputation);
-                if (!isPositiveFinitePrice(salePrice)) {
-                    continue;
-                }
-                int maxAmount = Math.min(cargo, freeCapacity);
-                maxAmount = Math.min(maxAmount,
-                        safeMaximumAffordable(
-                                stationWallet.getBalanceMilliCredits(), salePrice, maxAmount));
-                maxAmount = Math.min(maxAmount,
-                        safeMaximumAffordable(
-                                Long.MAX_VALUE - fleetWallet.getBalanceMilliCredits(),
-                                salePrice,
-                                maxAmount));
-                if (maxAmount <= 0) {
-                    continue;
-                }
-                long revenue = safeTradeValue(salePrice, maxAmount);
-                if (revenue > bestRevenue) {
-                    bestRevenue = revenue;
-                    ai.buyStationId = null;
-                    ai.sellStationId = idOf(station);
-                    ai.targetStationId = ai.sellStationId;
-                    ai.targetItem = itemId;
-                    ai.targetAmount = maxAmount;
-                    ai.expectedProfitMilliCredits = revenue;
-                }
-            }
-        }
-
-        if (bestRevenue <= 0L) {
-            return false;
-        }
-        ai.routeSearchCooldown = 0f;
-        ai.state = TradeAIComponent.State.TRAVEL_TO_SELL;
-        return true;
     }
 
     private int calculateTradeAmount(
@@ -504,11 +445,11 @@ public class TradeAISystem extends IteratingSystem {
 
     private Entity resolveActiveMarketStation(EntityId id) {
         Entity entity = registry.find(id);
-        return isActiveMarketStation(null, entity) ? entity : null;
+        return isActiveMarketStation(entity) ? entity : null;
     }
 
-    private boolean isActiveMarketStation(Entity fleet, Entity entity) {
-        if (entity == null || entity == fleet || marketStations == null) {
+    private boolean isActiveMarketStation(Entity entity) {
+        if (entity == null || marketStations == null) {
             return false;
         }
         for (Entity station : marketStations) {
@@ -517,14 +458,6 @@ public class TradeAISystem extends IteratingSystem {
             }
         }
         return false;
-    }
-
-    private EntityId idOf(Entity entity) {
-        EntityIdComponent component = idm.get(entity);
-        if (component == null) {
-            throw new IllegalStateException("Экономическая Entity не имеет EntityIdComponent");
-        }
-        return component.id;
     }
 
     private boolean canShipPurchaseItem(Entity fleet, ContentCatalog.ItemDefinition item) {
@@ -542,14 +475,6 @@ public class TradeAISystem extends IteratingSystem {
 
     private boolean isPositiveFinitePrice(float price) {
         return Float.isFinite(price) && price > 0f;
-    }
-
-    private long safeTradeValue(float price, int amount) {
-        try {
-            return Money.tradeValue(price, amount);
-        } catch (IllegalArgumentException exception) {
-            return -1L;
-        }
     }
 
     private int safeMaximumAffordable(long balance, float price, int maxAmount) {
