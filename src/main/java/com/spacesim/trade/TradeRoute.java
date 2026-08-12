@@ -32,7 +32,19 @@ public record TradeRoute(
         float travelDistance,
         double travelSeconds) {
 
-    /** Проверяет структурные инварианты маршрута. */
+    /**
+     * Проверяет структурные инварианты маршрута.
+     *
+     * @param buyStationId станция-поставщик, у которой корабль покупает товар
+     * @param sellStationId станция-потребитель, которой корабль продаёт товар
+     * @param itemId плотный runtime ID товара
+     * @param amount планируемое количество товара
+     * @param purchaseCostMilliCredits полная стоимость закупки
+     * @param saleRevenueMilliCredits полная ожидаемая выручка
+     * @param grossProfitMilliCredits ожидаемая валовая прибыль
+     * @param travelDistance полная дистанция fleet -> supplier -> consumer
+     * @param travelSeconds оценка времени движения без docking/trade overhead
+     */
     public TradeRoute {
         Objects.requireNonNull(buyStationId, "buyStationId не задан");
         Objects.requireNonNull(sellStationId, "sellStationId не задан");
