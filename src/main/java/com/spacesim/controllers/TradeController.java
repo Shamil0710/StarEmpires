@@ -3,6 +3,7 @@ package com.spacesim.controllers;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.FactionComponent;
+import com.spacesim.components.FactionMarketAccessComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
@@ -17,20 +18,17 @@ import java.util.Objects;
 /**
  * Выполняет синхронные атомарные операции покупки и продажи.
  *
- * <p>Единственный денежный API работает с двумя Ashley-сущностями, имеющими
- * {@link InventoryComponent} и {@link WalletComponent}. Обычная сделка физически переносит товар в
- * одну сторону и целочисленные milli-credits в другую; успешная операция фиксируется в
- * {@link EconomicLedger}. До мутации проверяются склады, вместимость, оба кошелька, рынок, цена и
- * переполнение, поэтому отказ не меняет состояние.</p>
- *
- * <p>Контроллер не создаёт и не уничтожает деньги. Покупка переводит сумму от покупателя станции,
- * продажа — от станции продавцу. Любая эмиссия или изъятие должны происходить только через явно
- * классифицированные source/sink-операции экономического слоя.</p>
+ * <p>Обычная сделка физически переносит товар в одну сторону и целочисленные milli-credits в
+ * другую; успешная операция фиксируется в {@link EconomicLedger}. До мутации проверяются склады,
+ * вместимость, оба кошелька, рынок, faction market access, цена и переполнение, поэтому отказ не
+ * меняет состояние.</p>
  */
 public class TradeController {
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
     private final ComponentMapper<FactionComponent> fm = ComponentMapper.getFor(FactionComponent.class);
+    private final ComponentMapper<FactionMarketAccessComponent> accessMapper =
+            ComponentMapper.getFor(FactionMarketAccessComponent.class);
     private final ComponentMapper<WalletComponent> wm = ComponentMapper.getFor(WalletComponent.class);
     private final ComponentMapper<IdentityComponent> identityMapper =
             ComponentMapper.getFor(IdentityComponent.class);
@@ -51,11 +49,7 @@ public class TradeController {
         this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");
     }
 
-    /**
-     * Возвращает журнал, используемый этим контроллером.
-     *
-     * @return ненулевой ledger
-     */
+    /** @return журнал, используемый этим контроллером */
     public EconomicLedger getLedger() {
         return ledger;
     }
@@ -68,7 +62,7 @@ public class TradeController {
      * @param itemId идентификатор товара
      * @param amount строго положительное количество
      * @param buyerReputation репутация покупателя или {@code null}
-     * @return {@code true}, если товар и деньги полностью переведены; при {@code false} состояние не меняется
+     * @return {@code true}, если товар и деньги полностью переведены
      */
     public boolean buyFromStation(
             Entity station,
@@ -76,7 +70,8 @@ public class TradeController {
             int itemId,
             int amount,
             ReputationComponent buyerReputation) {
-        if (!isValidWalletTradeRequest(station, buyer, itemId, amount)) {
+        if (!canTradeWithStation(buyer, station)
+                || !isValidWalletTradeRequest(station, buyer, itemId, amount)) {
             return false;
         }
 
@@ -128,7 +123,7 @@ public class TradeController {
      * @param itemId идентификатор товара
      * @param amount строго положительное количество
      * @param sellerReputation репутация продавца или {@code null}
-     * @return {@code true}, если товар и деньги полностью переведены; при {@code false} состояние не меняется
+     * @return {@code true}, если товар и деньги полностью переведены
      */
     public boolean sellToStation(
             Entity station,
@@ -136,7 +131,8 @@ public class TradeController {
             int itemId,
             int amount,
             ReputationComponent sellerReputation) {
-        if (!isValidWalletTradeRequest(station, seller, itemId, amount)) {
+        if (!canTradeWithStation(seller, station)
+                || !isValidWalletTradeRequest(station, seller, itemId, amount)) {
             return false;
         }
 
@@ -178,6 +174,28 @@ public class TradeController {
      */
     public boolean sellToStation(Entity station, Entity seller, int itemId, int amount) {
         return sellToStation(station, seller, itemId, amount, null);
+    }
+
+    /**
+     * Проверяет strategic faction access участника к station market.
+     *
+     * <p>Отсутствующий {@link FactionMarketAccessComponent} означает unrestricted legacy market.
+     * Сущность без {@link FactionComponent} проверяется как unfactioned participant.</p>
+     *
+     * @param participant участник сделки
+     * @param station market station
+     * @return {@code true}, если доступ разрешён
+     */
+    public boolean canTradeWithStation(Entity participant, Entity station) {
+        if (participant == null || station == null) {
+            return false;
+        }
+        FactionMarketAccessComponent access = accessMapper.get(station);
+        if (access == null) {
+            return true;
+        }
+        FactionComponent faction = fm.get(participant);
+        return access.canTrade(faction == null ? -1 : faction.factionId);
     }
 
     /**
