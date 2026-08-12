@@ -49,9 +49,9 @@
 - deterministic fixed-tick simulation;
 - versioned binary persistence.
 
-**Технологическое решение на текущем roadmap считается зафиксированным.**
+**Технологическое решение считается предварительно зафиксированным до завершения Stage 8.5.**
 
-Миграция на другой движок или основной язык не является плановой задачей и может рассматриваться только как отдельное архитектурное решение с оценкой стоимости миграции и потери уже реализованной инфраструктуры.
+Stage 8.5 выполняет последнюю целевую проверку визуального потенциала и актуальности rendering stack до дальнейшего масштабного развития simulation/gameplay core. Миграция на другой движок или основной язык допускается только как результат этого evidence-based decision gate с оценкой стоимости миграции и потери уже реализованной инфраструктуры.
 
 ---
 
@@ -60,7 +60,7 @@
 | Milestone | Цель | Основные этапы | Статус |
 | --- | --- | --- | --- |
 | **v0.1 Economic Sandbox** | доказать корректность и масштабируемость экономического core | Stage 0–6 | COMPLETE |
-| **v0.2 Living Galactic Economy** | получить несколько живых систем, реальные фракции, строительство, межсистемную логистику и автономное расширение | Stage 7–11 | ACTIVE |
+| **v0.2 Living Galactic Economy** | подтвердить presentation stack, получить несколько живых систем, реальные фракции, строительство, межсистемную логистику и автономное расширение | Stage 7–11, включая Stage 8.5 | ACTIVE |
 | **v0.3 Playable Space Sandbox** | превратить симуляцию в игру: игрок, путешествия, торговля, добыча и базовый бой | Stage 12–14 | PLANNED |
 | **v0.4 Fleet & Empire Sandbox** | дать игроку собственные флоты, станции, фракцию и стратегическую войну | Stage 15–18 | PLANNED |
 | **v0.5 RPG & Living World** | исследования, NPC, миссии, события и персональная прогрессия | Stage 19–20 | PLANNED |
@@ -254,7 +254,7 @@ Trade AI выбирает экономически лучший локальны
 
 **Статус:** ACTIVE
 
-Цель: перейти от стабильной локальной экономики к **самоизменяющейся галактической экономике**, где системы связаны физическими перевозками, станции могут строиться и исчезать, а фракции способны самостоятельно реагировать на дефицит и расширяться.
+Цель: перейти от стабильной локальной экономики к **самоизменяющейся галактической экономике**, одновременно подтвердив до дальнейшего масштабирования, что presentation stack способен поддержать целевой визуальный уровень игры.
 
 ---
 
@@ -305,9 +305,250 @@ Trade AI выбирает экономически лучший локальны
 
 ---
 
-## Stage 9 — Dynamic Economy: строительство, lifecycle и воспроизводство экономики
+## Stage 8.5 — Graphics / Technology Validation
 
 **Статус:** ACTIVE
+
+### Цель
+
+До дальнейшего расширения simulation/gameplay core доказать на работающем vertical slice, что текущий Java + libGDX/LWJGL3 presentation stack способен обеспечить целевой визуальный уровень Star Empires и требуемую производительность для большой 2D top-down космической sandbox.
+
+Stage не является косметическим polish-pass. Это **technology decision gate**: после него либо libGDX подтверждается как production rendering framework, либо создаётся отдельное архитектурное решение о миграции с измеримыми доказательствами ограничения текущего стека.
+
+### Главный принцип
+
+Simulation core не должен зависеть от конкретного renderer, sprite asset или VFX implementation.
+
+```text
+Simulation / WorldState / Ashley ECS
+                ↓
+       Presentation snapshot/view
+                ↓
+          RenderPipeline
+                ↓
+ ┌──────────────┼──────────────┐
+ ↓              ↓              ↓
+Sprites       VFX/PostFX    Scene2D UI
+```
+
+Renderer читает состояние мира, но не становится authoritative owner gameplay state.
+
+### Stage 8.5A — Dependency и compatibility validation
+
+Текущий baseline репозитория на момент планирования:
+
+- Java 17;
+- libGDX `1.12.1`;
+- Ashley `1.7.4`;
+- VisUI `1.5.2`;
+- LWJGL3 backend.
+
+Целевой spike:
+
+- [ ] проверить обновление libGDX `1.12.1 -> 1.14.2`;
+- [ ] проверить обновление VisUI `1.5.2 -> 1.5.9`;
+- [ ] Ashley `1.7.4` оставить без изменения, если compatibility audit не выявит причины для замены;
+- [ ] `./mvnw clean verify` остаётся зелёным;
+- [ ] существующие headless simulation tests не получают OpenGL dependency;
+- [ ] desktop launcher проходит smoke-check;
+- [ ] save/load и content fingerprint semantics не меняются из-за presentation upgrade;
+- [ ] зафиксировать migration notes для breaking/deprecated APIs.
+
+Обновление библиотек не считается самоцелью: версия принимается только после regression и desktop validation.
+
+### Stage 8.5B — Presentation architecture
+
+Ввести минимальную структуру presentation layer, достаточную для дальнейшего роста без создания нового engine внутри игры.
+
+Предпочтительные responsibilities:
+
+- `RenderPipeline` — порядок render passes;
+- `WorldRenderer` — orchestration world presentation;
+- `SpriteRenderer` — ships/stations/asteroids;
+- `ParticleRenderer` — engines/explosions/debris;
+- `LightingRenderer` или emissive pass — glow/lights;
+- `PostProcessRenderer` — framebuffer/post effects;
+- `UiRenderer` / Scene2D boundary — HUD и panels.
+
+#### Требования
+
+- [ ] simulation systems не вызывают rendering APIs;
+- [ ] renderer не мутирует authoritative economic/gameplay state;
+- [ ] Ashley `Entity` не обязан быть presentation object;
+- [ ] presentation использует stable archetype/entity identity там, где нужна привязка asset/effect;
+- [ ] visual interpolation допускается между fixed simulation ticks;
+- [ ] render order/layers определены явно;
+- [ ] camera zoom не меняет simulation semantics;
+- [ ] rendering может быть полностью отключён для headless benchmark.
+
+### Stage 8.5C — Ship sprite и asset pipeline
+
+Проверить production-подход на реальном корабельном sprite, а не на геометрическом placeholder.
+
+Минимальный asset contract:
+
+```text
+ship_base.png
+ship_emissive.png      optional
+ship_damage.png        optional
+ship_normal.png        optional / experimental
+engine animation
+presentation metadata
+```
+
+#### Зафиксировать
+
+- [ ] world-units-to-pixels / sprite scale convention;
+- [ ] pivot/origin convention;
+- [ ] small / medium / large size grammar;
+- [ ] texture-atlas policy;
+- [ ] engine hardpoints;
+- [ ] weapon hardpoint seam;
+- [ ] faction tint/markings seam;
+- [ ] collision footprint не выводится неявно из прозрачных краёв PNG;
+- [ ] asset ID является presentation metadata поверх archetype, а не gameplay identity;
+- [ ] missing asset имеет безопасный fallback/debug representation.
+
+### Stage 8.5D — Engine animation и emissive rendering
+
+На одном production-like ship реализовать минимум:
+
+- [ ] idle engine state;
+- [ ] thrust animation;
+- [ ] интенсивность engine glow зависит от реального movement/thrust state;
+- [ ] emissive engine/windows pass;
+- [ ] additive glow;
+- [ ] optional maneuver/reverse thruster seam;
+- [ ] animation timing не использует simulation RNG;
+- [ ] visual-only animation не влияет на determinism gameplay state.
+
+### Stage 8.5E — Visual Technology Spike scene
+
+Создать отдельную reproducible desktop scene/режим, демонстрирующий одновременно:
+
+- [ ] реальный ship sprite;
+- [ ] несколько визуально различимых размеров/ролей кораблей или масштабирование одного test set;
+- [ ] десятки ships;
+- [ ] сотни asteroids;
+- [ ] parallax star field;
+- [ ] nebula/background layer;
+- [ ] animated engine exhaust;
+- [ ] emissive/additive engine glow;
+- [ ] projectile weapon;
+- [ ] beam/laser effect;
+- [ ] explosion particles;
+- [ ] shield-hit effect;
+- [ ] debris/salvage visual seam;
+- [ ] bloom или эквивалентный framebuffer post-effect;
+- [ ] screen-space distortion/heat/shockwave prototype, если реализация остаётся достаточно дешёвой;
+- [ ] damage overlay prototype;
+- [ ] production-like sci-fi HUD fragment;
+- [ ] плавный zoom от tactical ship view к обзорному системному масштабу.
+
+Эффекты этого spike не обязаны становиться финальным art direction. Их задача — доказать rendering capabilities и сформировать reusable pipeline.
+
+### Stage 8.5F — Rendering observability и performance baseline
+
+Visual spike должен измеряться так же дисциплинированно, как economic core.
+
+Собирать/показывать минимум:
+
+- FPS;
+- CPU frame time;
+- GPU frame time, если доступен надёжный measurement path;
+- render calls / draw calls;
+- sprites/objects rendered;
+- active particles;
+- texture bindings или batch flushes, если метрика доступна;
+- framebuffer/post-process pass count;
+- JVM heap delta;
+- viewport/resolution;
+- reference hardware/OS/GPU.
+
+#### Minimum representative scene
+
+Для repeatable baseline использовать не меньше:
+
+- 50 ships;
+- 500 asteroids/background objects;
+- 2 000 active particles в пиковом эффекте;
+- emissive/glow pass;
+- минимум один post-process pass;
+- HUD.
+
+Целевой ориентир — **60 FPS при 1920x1080 на зафиксированной reference developer machine**, но итоговый gate принимается по frame-time evidence и визуальному результату, а не по одной магической цифре. Stress profile с более высоким object/particle count измеряется отдельно и не обязан быть release gate Stage 8.5.
+
+### Stage 8.5G — Technology decision record
+
+По итогам spike создать документ вроде `docs/stage8_5_graphics_validation.md` или ADR, который фиксирует:
+
+1. проверенные версии libraries;
+2. архитектуру renderer;
+3. screenshots/описание реализованных capabilities;
+4. measured baseline;
+5. найденные ограничения;
+6. стоимость дальнейшего развития;
+7. решение `KEEP_LIBGDX` или `MIGRATION_RECOMMENDED`;
+8. если migration recommended — конкретный кандидат и причины, почему ограничение невозможно/нерационально решить внутри libGDX/LWJGL3.
+
+### Engine decision rule
+
+**Оставить libGDX**, если spike подтверждает нужный визуальный результат, batching/render performance и возможность построения необходимых shader/FBO/VFX layers без нарушения simulation architecture.
+
+Рассматривать миграцию только если обнаружено фундаментальное ограничение framework, а не отсутствие готового эффекта, shader или asset pipeline.
+
+Если gate не пройден, кандидат сравнивается отдельным prototype/evidence pass. Приоритетные направления для сравнения:
+
+- FXGL — если главной проблемой окажется high-level 2D/UI tooling;
+- jMonkeyEngine — если подтверждён переход к преимущественно 3D presentation;
+- прямой LWJGL — только если доказана необходимость низкоуровневого renderer, которую невозможно разумно закрыть libGDX.
+
+### Acceptance scenario
+
+```text
+current simulation snapshot
+        ↓
+presentation layer
+        ↓
+production ship sprites + engines
+        ↓
+large 2D scene
+        ↓
+particles + emissive + post-processing + HUD
+        ↓
+measured frame/render metrics
+        ↓
+written technology decision
+```
+
+### Definition of Done
+
+Stage 8.5 завершён, когда:
+
+- dependency upgrade/compatibility decision проверен реальным build + desktop smoke;
+- headless simulation остаётся полностью отделена от OpenGL;
+- существует reusable presentation/render pipeline вместо дальнейшего роста монолитного debug renderer;
+- production-like ship sprite и engine animation работают через установленный asset contract;
+- visual technology scene демонстрирует sprites, масштаб, particles, emissive/glow, weapons, shield/explosion feedback, post-processing и HUD;
+- performance baseline сохранён вместе с reference hardware и scene parameters;
+- целевая визуальная концепция признана достижимой на выбранном stack либо документировано доказано обратное;
+- technology decision record явно фиксирует дальнейший stack;
+- только после этого **Stage 9 становится ACTIVE**.
+
+### Рекомендуемое PR-разбиение
+
+1. dependency upgrade + compatibility regression;
+2. presentation/render-pipeline boundary;
+3. sprite/atlas/hardpoint asset pipeline;
+4. engine animation + particles + emissive pass;
+5. framebuffer/post-processing + HUD spike;
+6. visual performance baseline + technology decision document.
+
+---
+
+## Stage 9 — Dynamic Economy: строительство, lifecycle и воспроизводство экономики
+
+**Статус:** PLANNED — BLOCKED BY STAGE 8.5
 
 ### Цель
 
@@ -1368,11 +1609,11 @@ Candidate можно отдать внешнему игроку без developer
 
 # 4. Parallel Visual / UX Track
 
-Этот трек идёт параллельно, но не заменяет core stages.
+Этот трек идёт параллельно, но не заменяет core stages. Stage 8.5 создаёт базовую rendering/asset infrastructure, на которую опираются все последующие visual tasks.
 
 ## V1 — Ship sprite pipeline
 
-Можно вести параллельно Stage 9–10.
+Базовый production contract начинается в Stage 8.5 и далее развивается параллельно Stage 9–10.
 
 - единый top-down grounded near-future visual language;
 - small / medium / large size grammar;
@@ -1385,7 +1626,7 @@ Candidate можно отдать внешнему игроку без developer
 
 ## V2 — Engine / movement animation
 
-Параллельно Stage 10–12.
+Первый production spike начинается в Stage 8.5, дальнейшее развитие — параллельно Stage 10–12.
 
 - idle;
 - thrust;
@@ -1410,7 +1651,7 @@ Construction stages желательно визуализировать чере
 
 ## V4 — Combat VFX
 
-Параллельно Stage 13.
+Базовые capabilities проверяются Stage 8.5; production content развивается параллельно Stage 13.
 
 - muzzle/beam/projectile;
 - shields;
@@ -1473,6 +1714,7 @@ Construction stages желательно визуализировать чере
 
 Для major systems добавлять измеримые метрики:
 
+- rendering frame time/draw calls начиная со Stage 8.5;
 - construction;
 - faction investment;
 - inter-system throughput;
@@ -1511,8 +1753,9 @@ Construction stages желательно визуализировать чере
 14. Remote simulation может иметь reduced fidelity, но не должна создавать вторую несовместимую экономическую модель.
 15. После завершения Stage обновить этот файл: статус, exact verification evidence, merge commit и следующий активный этап.
 16. Для каждого milestone должна существовать хотя бы одна end-to-end acceptance scenario.
-17. Visual/UX work может идти параллельно, но не считается выполнением simulation Definition of Done.
+17. Visual/UX work может идти параллельно, но не считается выполнением simulation Definition of Done, кроме explicit Stage 8.5 technology gate.
 18. Новая система должна сначала доказать минимальную working loop; только потом расширяется глубиной и количеством контента.
+19. Stage 9 не становится ACTIVE, пока Stage 8.5 не зафиксировал production technology decision.
 
 ---
 
@@ -1538,6 +1781,18 @@ Construction stages желательно визуализировать чере
 # 8. Milestone acceptance scenarios
 
 ## v0.2 Living Galactic Economy
+
+Technology gate перед экономической частью milestone:
+
+```text
+current simulation
+→ visual technology spike
+→ measured rendering baseline
+→ stack decision recorded
+→ Stage 9 unblocked
+```
+
+Затем основной systemic scenario:
 
 ```text
 critical producer destroyed
@@ -1586,21 +1841,19 @@ world shortage/war/discovery
 
 # 9. Текущий следующий шаг
 
-**ACTIVE: Stage 9 — Dynamic Economy: строительство, lifecycle и воспроизводство экономики.**
-
-Начинать с **Stage 9A — Entity lifecycle infrastructure**, а не с faction AI.
+**ACTIVE: Stage 8.5 — Graphics / Technology Validation.**
 
 Первый implementation sequence:
 
-1. определить безопасный create/destroy/unregister lifecycle для station/ship;
-2. доказать save/load после runtime creation/removal;
-3. ввести persistent `ConstructionProject`;
-4. сделать construction site физическим economic demand;
-5. подключить реальные доставки материалов;
-6. завершать station только после fulfillment;
-7. интегрировать destruction;
-8. добавить bottleneck analyzer;
-9. добавить faction investment planner;
-10. завершить Stage 9 economic resilience benchmark.
+1. создать отдельную stage branch от актуального зелёного `main` после merge roadmap PR;
+2. проверить migration libGDX/VisUI на актуальные совместимые stable versions;
+3. сохранить headless simulation isolation и пройти regression suite;
+4. выделить presentation/render-pipeline boundary;
+5. подключить production-like ship sprite/atlas contract;
+6. реализовать engine animation + emissive/additive pass;
+7. собрать visual technology spike с particles, weapons, shields, post-processing и HUD;
+8. добавить rendering observability;
+9. снять representative/stress baseline;
+10. зафиксировать technology decision record.
 
-После Stage 9 следующий core этап — **Stage 10: Inter-system logistics**, затем **Stage 11: Autonomous Faction Expansion**. Полноценный combat intentionally переносится в playable milestone после появления межсистемной экономики и player state.
+После успешного Stage 8.5 следующий core этап — **Stage 9: Dynamic Economy**, затем **Stage 10: Inter-system logistics** и **Stage 11: Autonomous Faction Expansion**. Полноценный combat intentionally переносится в playable milestone после появления межсистемной экономики и player state.
