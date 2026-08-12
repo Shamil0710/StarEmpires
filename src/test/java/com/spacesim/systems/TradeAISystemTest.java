@@ -2,6 +2,7 @@ package com.spacesim.systems;
 
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
@@ -14,16 +15,18 @@ import com.spacesim.constants.Constants;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
 import com.spacesim.model.ShipType;
+import com.spacesim.persistence.EntityId;
 import com.spacesim.util.SpatialHashGrid;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TradeAISystemTest {
+    private long nextEntityId = 1L;
+
     @Test
     void выбираетПрибыльныйМаршрутИХранитОжидаемуюПрибыльВMilliCredits() {
         EconomicLedger ledger = new EconomicLedger();
@@ -39,8 +42,9 @@ class TradeAISystemTest {
 
         TradeAIComponent ai = ai(fleet);
         assertEquals(TradeAIComponent.State.TRAVEL_TO_BUY, ai.state);
-        assertSame(source, ai.buyStation);
-        assertSame(destination, ai.sellStation);
+        assertEquals(id(source), ai.buyStationId);
+        assertEquals(id(destination), ai.sellStationId);
+        assertEquals(id(source), ai.targetStationId);
         assertEquals(Constants.ITEM_FOOD, ai.targetItem);
         assertEquals(10, ai.targetAmount);
         assertEquals(Money.fromCredits(100d), ai.expectedProfitMilliCredits);
@@ -61,11 +65,11 @@ class TradeAISystemTest {
         long moneyBefore = totalMoney(source, destination, fleet);
         int goodsBefore = totalFood(source, destination, fleet);
 
-        engine.update(0f); // route
-        engine.update(0f); // arrive source
-        engine.update(0f); // buy
-        engine.update(1f); // arrive destination
-        engine.update(0f); // sell
+        engine.update(0f);
+        engine.update(0f);
+        engine.update(0f);
+        engine.update(1f);
+        engine.update(0f);
 
         assertEquals(goodsBefore, totalFood(source, destination, fleet));
         assertEquals(moneyBefore, totalMoney(source, destination, fleet));
@@ -77,6 +81,7 @@ class TradeAISystemTest {
         assertEquals(Money.fromCredits(1_100d), wallet(fleet).getBalanceMilliCredits());
         assertEquals(TradeAIComponent.State.IDLE, ai(fleet).state);
         assertEquals(0L, ai(fleet).expectedProfitMilliCredits);
+        assertNull(ai(fleet).targetStationId);
         assertEquals(2, ledger.size());
     }
 
@@ -93,7 +98,7 @@ class TradeAISystemTest {
         engine.update(0f);
 
         assertEquals(TradeAIComponent.State.IDLE, ai(fleet).state);
-        assertNull(ai(fleet).buyStation);
+        assertNull(ai(fleet).buyStationId);
         assertTrue(ai(fleet).routeSearchCooldown > 0f);
     }
 
@@ -144,7 +149,7 @@ class TradeAISystemTest {
 
         engine.update(0f);
         assertEquals(TradeAIComponent.State.TRAVEL_TO_SELL, ai(fleet).state);
-        assertSame(destination, ai(fleet).sellStation);
+        assertEquals(id(destination), ai(fleet).sellStationId);
 
         engine.update(1f);
         engine.update(0f);
@@ -171,7 +176,7 @@ class TradeAISystemTest {
         engine.update(0.1f);
 
         assertEquals(TradeAIComponent.State.IDLE, ai(fleet).state);
-        assertNull(ai(fleet).targetStation);
+        assertNull(ai(fleet).targetStationId);
         assertEquals(1f, ai(fleet).routeSearchCooldown, 0f);
     }
 
@@ -223,6 +228,19 @@ class TradeAISystemTest {
     }
 
     @Test
+    void объектБезPersistentIdНеУчаствуетВТорговойСимуляции() {
+        Engine engine = engine(new EconomicLedger());
+        Entity fleet = fleet("Trader", 0f, 100d, 10);
+        fleet.remove(EntityIdComponent.class);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+
+        assertEquals(TradeAIComponent.State.IDLE, ai(fleet).state);
+        assertEquals(0f, ai(fleet).routeSearchCooldown, 0f);
+    }
+
+    @Test
     void отрицательныйИНеконечныйDeltaИгнорируются() {
         Engine engine = engine(new EconomicLedger());
         Entity fleet = fleet("Trader", 0f, 100d, 10);
@@ -258,12 +276,12 @@ class TradeAISystemTest {
         market.buyPrices[Constants.ITEM_FOOD] = buyPrice;
         market.sellPrices[Constants.ITEM_FOOD] = sellPrice;
         market.isDirty = false;
-        return new Entity()
+        return identified(new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.STATION))
                 .add(transform)
                 .add(inventory)
                 .add(market)
-                .add(new WalletComponent(Money.fromCredits(credits)));
+                .add(new WalletComponent(Money.fromCredits(credits))));
     }
 
     private Entity fleet(String name, float x, double credits, int capacity) {
@@ -274,13 +292,21 @@ class TradeAISystemTest {
         TradeAIComponent ai = new TradeAIComponent();
         ai.cargoSpace = capacity;
         ai.movementSpeed = 100f;
-        return new Entity()
+        return identified(new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
                 .add(inventory)
                 .add(new WalletComponent(Money.fromCredits(credits)))
                 .add(ai)
-                .add(new ReputationComponent());
+                .add(new ReputationComponent()));
+    }
+
+    private Entity identified(Entity entity) {
+        return entity.add(new EntityIdComponent(new EntityId(nextEntityId++)));
+    }
+
+    private EntityId id(Entity entity) {
+        return entity.getComponent(EntityIdComponent.class).id;
     }
 
     private TradeAIComponent ai(Entity entity) {
