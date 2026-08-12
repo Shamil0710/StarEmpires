@@ -17,7 +17,9 @@ import java.util.Objects;
  * @param amount планируемое количество товара
  * @param purchaseCostMilliCredits полная стоимость закупки
  * @param saleRevenueMilliCredits полная ожидаемая выручка
- * @param grossProfitMilliCredits ожидаемая валовая прибыль
+ * @param grossProfitMilliCredits валовая прибыль до route costs
+ * @param estimatedRouteCostMilliCredits внешние fuel/tariff/risk costs
+ * @param netProfitMilliCredits ожидаемая прибыль после route costs
  * @param travelDistance полная дистанция fleet -> supplier -> consumer
  * @param travelSeconds оценка времени движения без docking/trade overhead
  */
@@ -29,6 +31,8 @@ public record TradeRoute(
         long purchaseCostMilliCredits,
         long saleRevenueMilliCredits,
         long grossProfitMilliCredits,
+        long estimatedRouteCostMilliCredits,
+        long netProfitMilliCredits,
         float travelDistance,
         double travelSeconds) {
 
@@ -41,7 +45,9 @@ public record TradeRoute(
      * @param amount планируемое количество товара
      * @param purchaseCostMilliCredits полная стоимость закупки
      * @param saleRevenueMilliCredits полная ожидаемая выручка
-     * @param grossProfitMilliCredits ожидаемая валовая прибыль
+     * @param grossProfitMilliCredits валовая прибыль до route costs
+     * @param estimatedRouteCostMilliCredits внешние fuel/tariff/risk costs
+     * @param netProfitMilliCredits ожидаемая прибыль после route costs
      * @param travelDistance полная дистанция fleet -> supplier -> consumer
      * @param travelSeconds оценка времени движения без docking/trade overhead
      */
@@ -51,15 +57,15 @@ public record TradeRoute(
         if (buyStationId.equals(sellStationId)) {
             throw new IllegalArgumentException("Покупка и продажа не могут происходить на одной станции");
         }
-        if (itemId < 0) {
-            throw new IllegalArgumentException("itemId не может быть отрицательным");
-        }
-        if (amount <= 0) {
-            throw new IllegalArgumentException("Количество маршрута должно быть положительным");
+        if (itemId < 0 || amount <= 0) {
+            throw new IllegalArgumentException("Некорректный itemId/amount маршрута");
         }
         if (purchaseCostMilliCredits <= 0L
                 || saleRevenueMilliCredits <= purchaseCostMilliCredits
-                || grossProfitMilliCredits != saleRevenueMilliCredits - purchaseCostMilliCredits) {
+                || grossProfitMilliCredits != saleRevenueMilliCredits - purchaseCostMilliCredits
+                || estimatedRouteCostMilliCredits < 0L
+                || netProfitMilliCredits != grossProfitMilliCredits - estimatedRouteCostMilliCredits
+                || netProfitMilliCredits <= 0L) {
             throw new IllegalArgumentException("Денежные значения маршрута несогласованы");
         }
         if (!Float.isFinite(travelDistance) || travelDistance < 0f) {
@@ -73,14 +79,22 @@ public record TradeRoute(
     /**
      * Возвращает валовую прибыль на игровую секунду движения.
      *
-     * <p>Нулевая дистанция считается мгновенным рейсом и даёт положительную бесконечность. Такое
-     * значение допустимо только как score planner-а и никогда не записывается в persistent state.</p>
-     *
-     * @return milli-credits прибыли на секунду либо {@link Double#POSITIVE_INFINITY}
+     * @return gross milli-credits/second либо positive infinity для нулевого времени
      */
     public double grossProfitPerSecond() {
         return travelSeconds == 0d
                 ? Double.POSITIVE_INFINITY
                 : grossProfitMilliCredits / travelSeconds;
+    }
+
+    /**
+     * Возвращает ожидаемую чистую прибыль на игровую секунду движения.
+     *
+     * @return net milli-credits/second либо positive infinity для нулевого времени
+     */
+    public double netProfitPerSecond() {
+        return travelSeconds == 0d
+                ? Double.POSITIVE_INFINITY
+                : netProfitMilliCredits / travelSeconds;
     }
 }
