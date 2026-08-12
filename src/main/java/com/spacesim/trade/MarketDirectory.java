@@ -285,27 +285,52 @@ public final class MarketDirectory {
             return Math.max(0, inventoryCapacity - totalStock);
         }
 
-        /** @param itemId runtime ID; @return stock либо 0 */
+        /**
+         * Возвращает текущий запас товара станции.
+         *
+         * @param itemId runtime ID товара
+         * @return количество товара либо {@code 0} для некорректного ID
+         */
         public int stock(int itemId) {
             return validItemId(itemId) ? stock[itemId] : 0;
         }
 
-        /** @param itemId runtime ID; @return target stock либо 0 */
+        /**
+         * Возвращает целевой запас товара станции.
+         *
+         * @param itemId runtime ID товара
+         * @return целевой запас либо {@code 0} для некорректного ID
+         */
         public int targetStock(int itemId) {
             return validItemId(itemId) ? targetStock[itemId] : 0;
         }
 
-        /** @param itemId runtime ID; @return raw station sell price либо 0 */
+        /**
+         * Возвращает raw цену продажи станции.
+         *
+         * @param itemId runtime ID товара
+         * @return цена продажи либо {@code 0} для некорректного ID
+         */
         public float sellPrice(int itemId) {
             return validItemId(itemId) ? sellPrices[itemId] : 0f;
         }
 
-        /** @param itemId runtime ID; @return raw station buy price либо 0 */
+        /**
+         * Возвращает raw закупочную цену станции.
+         *
+         * @param itemId runtime ID товара
+         * @return закупочная цена либо {@code 0} для некорректного ID
+         */
         public float buyPrice(int itemId) {
             return validItemId(itemId) ? buyPrices[itemId] : 0f;
         }
 
-        /** @param itemId runtime ID; @return разрешена ли торговля */
+        /**
+         * Проверяет доступность торговли товаром.
+         *
+         * @param itemId runtime ID товара
+         * @return {@code true}, если товар включён и имеет положительный target stock
+         */
         public boolean isTradable(int itemId) {
             return validItemId(itemId)
                     && tradable[itemId]
