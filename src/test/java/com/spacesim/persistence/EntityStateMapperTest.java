@@ -2,6 +2,7 @@ package com.spacesim.persistence;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoWorldFactory;
+import com.spacesim.components.ArchetypeComponent;
 import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.CombatComponent;
 import com.spacesim.components.EntityIdComponent;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class EntityStateMapperTest {
@@ -31,6 +33,12 @@ class EntityStateMapperTest {
             assertEquals(
                     entity.getComponent(EntityIdComponent.class).id,
                     restored.getComponent(EntityIdComponent.class).id);
+            ArchetypeComponent originalArchetype = entity.getComponent(ArchetypeComponent.class);
+            if (originalArchetype != null) {
+                ArchetypeComponent restoredArchetype = restored.getComponent(ArchetypeComponent.class);
+                assertNotNull(restoredArchetype);
+                assertEquals(originalArchetype.contentId, restoredArchetype.contentId);
+            }
         }
     }
 
@@ -110,7 +118,7 @@ class EntityStateMapperTest {
                 null,
                 null,
                 new EntityState.InventoryState(10, List.of(1, 2)),
-                null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null);
         assertThrows(IllegalArgumentException.class,
                 () -> EntityStateMapper.restore(malformed));
     }
