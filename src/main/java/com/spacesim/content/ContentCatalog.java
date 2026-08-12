@@ -139,7 +139,17 @@ public final class ContentCatalog {
             ItemCategory category,
             float basePrice,
             boolean mineable) {
-        /** Проверяет обязательные ссылочные значения record. */
+        /**
+         * Проверяет обязательные ссылочные значения определения товара.
+         *
+         * @param id стабильный persistent content ID
+         * @param runtimeId плотный runtime ID для simulation-массивов
+         * @param codeName английское техническое имя
+         * @param displayName отображаемое имя
+         * @param category категория грузового хранения
+         * @param basePrice базовая цена в кредитах
+         * @param mineable может ли ресурс добываться напрямую
+         */
         public ItemDefinition {
             Objects.requireNonNull(id, "Item ID не задан");
             Objects.requireNonNull(codeName, "Item codeName не задан");
@@ -163,7 +173,15 @@ public final class ContentCatalog {
             float durationSeconds,
             Map<String, Integer> inputs,
             Map<String, Integer> outputs) {
-        /** Делает входные карты неизменяемыми и сохраняет deterministic порядок. */
+        /**
+         * Делает входные карты неизменяемыми и сохраняет deterministic порядок.
+         *
+         * @param id стабильный persistent content ID
+         * @param displayName отображаемое имя рецепта
+         * @param durationSeconds длительность цикла в игровых секундах
+         * @param inputs входные количества по item content ID
+         * @param outputs выходные количества по item content ID
+         */
         public RecipeDefinition {
             Objects.requireNonNull(id, "Recipe ID не задан");
             Objects.requireNonNull(displayName, "Recipe displayName не задан");
