@@ -306,27 +306,35 @@ Post-merge `main` CI: SUCCESS.
 
 ## Этап 8 — Фракции как экономические акторы
 
-**Статус:** ACTIVE
+**Статус:** COMPLETE — MERGED TO `main` VIA PR #10
 
 ### Задачи
 
-- [ ] treasury и бюджет;
-- [ ] отношения и территория;
-- [ ] production/stock policies;
-- [ ] military и expansion demand;
-- [ ] ограничения доступа к рынкам;
-- [ ] налоги/тарифы/субсидии;
-- [ ] стратегические цели, создающие экономический спрос.
+- [x] treasury и бюджет;
+- [x] отношения и территория;
+- [x] production/stock policies;
+- [x] military и expansion demand;
+- [x] ограничения доступа к рынкам;
+- [x] налоги/тарифы/субсидии;
+- [x] стратегические цели, создающие экономический спрос.
+
+Verified final PR head: `63494d0a4ceabbf276cefde24e56aef15fc09e74`.
+Push CI exact head: SUCCESS.
+Pull-request CI exact head: SUCCESS.
+Functional suite: **289 tests, 0 failures, 0 errors, 0 skipped**; Javadoc SUCCESS; JaCoCo thresholds SUCCESS.
+Merge commit: `c5921e6af7a1dba8c08e89d45ca9f1e2b944ac8e`.
+Post-merge `main` CI: SUCCESS.
+Detailed evidence: `docs/stage8_verification.md`.
 
 ### Definition of Done
 
-Фракционные решения физически изменяют спрос, производство, логистику и финансовые потоки мира.
+Фракционные решения физически изменяют спрос, производство, логистику и финансовые потоки мира. **Выполнено.**
 
 ---
 
 ## Этап 9 — Строительство и воспроизводство экономики
 
-**Статус:** PLANNED
+**Статус:** ACTIVE
 
 ### Задачи
 
@@ -376,4 +384,4 @@ Supply chain может самостоятельно перестраивать�
 
 ## Текущий следующий шаг
 
-**Этап 8 — фракции как экономические акторы.** Начать с authoritative persistent состояния фракции: treasury/budget, relations/territory и явных economic policies. Первый vertical slice должен доказать, что решение faction-layer физически изменяет существующую экономику через уже имеющиеся рынки, production/logistics и `EconomicLedger`, не создавая параллельный финансовый контур. Затем расширить слой market access, taxes/tariffs/subsidies и strategic military/expansion demand.
+**Этап 9 — строительство и воспроизводство экономики.** Начать с construction project как persistent physical demand: строительство станции должно резервировать и потреблять реальные ресурсы, получать supply через существующий market/logistics core и создавать новую станцию только после фактического material fulfillment. Затем подключить AI investment/bottleneck response, destruction-driven deficit и replacement production capacity.
