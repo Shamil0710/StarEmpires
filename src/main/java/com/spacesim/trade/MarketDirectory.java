@@ -201,40 +201,50 @@ public final class MarketDirectory {
             List<StationMarket> consumers,
             int itemId) {
         LinkedHashMap<EntityId, StationMarket> selected = new LinkedHashMap<>();
+        StationMarket[] efficiencyCandidates = new StationMarket[MAX_CONSUMERS_PER_SUPPLIER];
+        double[] efficiencyScores = new double[MAX_CONSUMERS_PER_SUPPLIER];
+        int efficiencyCount = 0;
+
         for (StationMarket consumer : consumers) {
-            if (selected.size() >= PRICE_CANDIDATE_SLOTS) {
-                break;
+            if (!isPotentiallyProfitable(supplier, consumer, itemId)) {
+                continue;
             }
-            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
+            if (selected.size() < PRICE_CANDIDATE_SLOTS) {
                 selected.put(consumer.id(), consumer);
+            }
+
+            double score = optimisticEfficiency(supplier, consumer, itemId);
+            int insertionIndex = efficiencyCount;
+            for (int index = 0; index < efficiencyCount; index++) {
+                int scoreCompare = Double.compare(score, efficiencyScores[index]);
+                if (scoreCompare > 0
+                        || (scoreCompare == 0
+                        && consumer.id().compareTo(efficiencyCandidates[index].id()) < 0)) {
+                    insertionIndex = index;
+                    break;
+                }
+            }
+            if (insertionIndex >= MAX_CONSUMERS_PER_SUPPLIER) {
+                continue;
+            }
+
+            int last = Math.min(efficiencyCount, MAX_CONSUMERS_PER_SUPPLIER - 1);
+            for (int index = last; index > insertionIndex; index--) {
+                efficiencyCandidates[index] = efficiencyCandidates[index - 1];
+                efficiencyScores[index] = efficiencyScores[index - 1];
+            }
+            efficiencyCandidates[insertionIndex] = consumer;
+            efficiencyScores[insertionIndex] = score;
+            if (efficiencyCount < MAX_CONSUMERS_PER_SUPPLIER) {
+                efficiencyCount++;
             }
         }
 
-        List<StationMarket> byEfficiency = new ArrayList<>();
-        for (StationMarket consumer : consumers) {
-            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
-                byEfficiency.add(consumer);
-            }
-        }
-        byEfficiency.sort((left, right) -> {
-            int scoreCompare = Double.compare(
-                    optimisticEfficiency(supplier, right, itemId),
-                    optimisticEfficiency(supplier, left, itemId));
-            return scoreCompare != 0 ? scoreCompare : left.id().compareTo(right.id());
-        });
-        for (StationMarket consumer : byEfficiency) {
-            if (selected.size() >= MAX_CONSUMERS_PER_SUPPLIER) {
-                break;
-            }
+        for (int index = 0;
+                index < efficiencyCount && selected.size() < MAX_CONSUMERS_PER_SUPPLIER;
+                index++) {
+            StationMarket consumer = efficiencyCandidates[index];
             selected.putIfAbsent(consumer.id(), consumer);
-        }
-        for (StationMarket consumer : consumers) {
-            if (selected.size() >= MAX_CONSUMERS_PER_SUPPLIER) {
-                break;
-            }
-            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
-                selected.putIfAbsent(consumer.id(), consumer);
-            }
         }
         return List.copyOf(selected.values());
     }
