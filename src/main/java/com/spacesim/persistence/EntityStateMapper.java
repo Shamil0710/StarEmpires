@@ -100,13 +100,9 @@ public final class EntityStateMapper {
 
         if (state.identity() != null) {
             EntityState.IdentityState value = state.identity();
-            IdentityComponent.Kind kind = value.kindName() == null
-                    ? null
-                    : IdentityComponent.Kind.valueOf(value.kindName());
-            IdentityComponent component = new IdentityComponent();
-            component.name = value.name();
-            component.kind = kind;
-            entity.add(component);
+            IdentityComponent.Kind kind = IdentityComponent.Kind.valueOf(
+                    Objects.requireNonNull(value.kindName(), "Identity kind не задан"));
+            entity.add(new IdentityComponent(value.name(), kind));
         }
         if (state.transform() != null) {
             EntityState.TransformState value = state.transform();
@@ -258,7 +254,7 @@ public final class EntityStateMapper {
         if (component == null) {
             return null;
         }
-        List<EntityState.RecipeState> recipes = new ArrayList<>(component.recipes.size);
+        List<EntityState.RecipeState> recipes = new ArrayList<>(component.recipes.size());
         for (Recipe recipe : component.recipes) {
             List<Integer> inputs = new ArrayList<>(Constants.MAX_ITEMS);
             List<Integer> outputs = new ArrayList<>(Constants.MAX_ITEMS);
@@ -287,6 +283,9 @@ public final class EntityStateMapper {
             for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
                 int input = recipeState.inputs().get(itemId);
                 int output = recipeState.outputs().get(itemId);
+                if (input < 0 || output < 0) {
+                    throw new IllegalArgumentException("Количество ресурса рецепта не может быть отрицательным");
+                }
                 if (input > 0) {
                     recipe.input(itemId, input);
                 }
@@ -308,8 +307,8 @@ public final class EntityStateMapper {
         List<List<Float>> history = new ArrayList<>(Constants.MAX_ITEMS);
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
             List<Float> points = new ArrayList<>(component.history[itemId].size);
-            for (Float point : component.history[itemId]) {
-                points.add(point);
+            for (int pointIndex = 0; pointIndex < component.history[itemId].size; pointIndex++) {
+                points.add(component.history[itemId].get(pointIndex));
             }
             history.add(List.copyOf(points));
         }
