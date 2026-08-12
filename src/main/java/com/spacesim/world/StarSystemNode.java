@@ -17,6 +17,10 @@ public record StarSystemNode(StarSystemId id, String name, double x, double y) {
     /**
      * Нормализует имя и валидирует topology-данные.
      *
+     * @param id устойчивый ID системы
+     * @param name отображаемое имя
+     * @param x стратегическая координата X
+     * @param y стратегическая координата Y
      * @throws NullPointerException если ID или имя не заданы
      * @throws IllegalArgumentException если имя пустое или координаты неконечны
      */

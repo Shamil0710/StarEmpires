@@ -16,6 +16,8 @@ public record JumpConnection(StarSystemId first, StarSystemId second)
     /**
      * Канонизирует порядок концов и запрещает self-jump.
      *
+     * @param first первый конец до канонизации
+     * @param second второй конец до канонизации
      * @throws NullPointerException если конец не задан
      * @throws IllegalArgumentException если оба конца совпадают
      */

@@ -9,6 +9,7 @@ public record SectorId(long value) implements Comparable<SectorId> {
     /**
      * Проверяет допустимость ID.
      *
+     * @param value положительное числовое значение ID
      * @throws IllegalArgumentException если значение не положительное
      */
     public SectorId {

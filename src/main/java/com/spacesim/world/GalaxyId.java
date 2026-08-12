@@ -9,6 +9,7 @@ public record GalaxyId(long value) implements Comparable<GalaxyId> {
     /**
      * Проверяет допустимость ID.
      *
+     * @param value положительное числовое значение ID
      * @throws IllegalArgumentException если значение не положительное
      */
     public GalaxyId {

@@ -18,6 +18,9 @@ public record SectorNode(SectorId id, String name, List<StarSystemNode> systems)
     /**
      * Нормализует имя, защищает коллекцию и сортирует системы по persistent ID.
      *
+     * @param id устойчивый ID сектора
+     * @param name отображаемое имя
+     * @param systems системы сектора в произвольном входном порядке
      * @throws NullPointerException если обязательное значение не задано
      * @throws IllegalArgumentException если имя пустое или ID системы повторяется внутри сектора
      */
