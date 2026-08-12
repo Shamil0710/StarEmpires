@@ -2,7 +2,6 @@ package com.spacesim;
 
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
-import com.badlogic.ashley.core.Family;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -42,10 +41,10 @@ import com.spacesim.util.SpatialHashGrid;
  * <p>Модель получает только fixed simulation ticks через {@link SimulationLoop}. Все экономические
  * системы одной игровой сессии используют единый {@link EconomicLedger}: обычная торговля
  * фиксируется как transfer, а создание/уничтожение/преобразование ресурсов имеет явный тип записи.
- * Все runtime-сущности получают устойчивый {@link EntityIdComponent}; общий
- * {@link EntityRegistry} разрешает эти ID в текущие Ashley-объекты и автоматически отслеживает их
- * жизненный цикл. UI и Scene2D продолжают использовать render delta и не влияют на authoritative
- * состояние.</p>
+ * Все runtime-сущности получают устойчивый {@link EntityIdComponent}; один общий
+ * {@link EntityRegistry} разрешает эти ID в текущие Ashley-объекты для систем и UI и автоматически
+ * отслеживает их жизненный цикл. UI и Scene2D продолжают использовать render delta и не влияют на
+ * authoritative состояние.</p>
  */
 public class SpaceSimGame extends ApplicationAdapter {
     private static final float SIMULATION_FIXED_STEP_SECONDS = 0.1f;
@@ -85,8 +84,8 @@ public class SpaceSimGame extends ApplicationAdapter {
      *
      * <p>Порядок Ashley-систем значим: рынок → потребление → производство → появление астероидов →
      * добыча → торговый ИИ → запись истории. Глобальные события обновляются перед Ashley-движком
-     * внутри {@link SimulationLoop}. Registry listener подключается до добавления любых сущностей,
-     * поэтому одинаково отслеживает bootstrap-мир и динамические астероиды.</p>
+     * внутри {@link SimulationLoop}. Общий registry привязывается к Engine до добавления любых
+     * сущностей, поэтому одинаково отслеживает bootstrap-мир и динамические астероиды.</p>
      */
     @Override
     public void create() {
@@ -97,7 +96,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         economicLedger = new EconomicLedger();
         entityIdAllocator = new EntityIdAllocator();
         entityRegistry = new EntityRegistry();
-        engine.addEntityListener(Family.all(EntityIdComponent.class).get(), entityRegistry);
+        entityRegistry.track(engine);
         grid = new SpatialHashGrid(200);
         simulationClock = new SimulationClock(SIMULATION_FIXED_STEP_SECONDS);
 
@@ -112,7 +111,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         stage.addActor(newsUI);
         economyStatusUI = new EconomyStatusUI(skin);
         stage.addActor(economyStatusUI);
-        entityDetailsUI = new EntityDetailsUI(skin);
+        entityDetailsUI = new EntityDetailsUI(skin, entityRegistry);
         stage.addActor(entityDetailsUI);
         updateMapLayout();
         Gdx.input.setInputProcessor(stage);
@@ -125,8 +124,8 @@ public class SpaceSimGame extends ApplicationAdapter {
                 simulationRandom.createStream("asteroid-spawn"),
                 economicLedger,
                 entityIdAllocator));
-        engine.addSystem(new MiningSystem(economicLedger));
-        engine.addSystem(new TradeAISystem(grid, economicLedger));
+        engine.addSystem(new MiningSystem(economicLedger, entityRegistry));
+        engine.addSystem(new TradeAISystem(grid, economicLedger, entityRegistry));
         engine.addSystem(new PriceRecorderSystem());
 
         for (Entity entity : DemoWorldFactory.createEntities(entityIdAllocator)) {
