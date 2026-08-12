@@ -174,6 +174,34 @@ public final class SimulationClock {
         return fixedStepSeconds;
     }
 
+    /**
+     * Продвигает authoritative game time на несколько эквивалентных fixed ticks без создания
+     * промежуточных callback boundaries.
+     *
+     * <p>Метод предназначен только для Stage-7 strategic reduced-rate simulation. Он не изменяет
+     * accumulator/fractional frame time: local render cadence остаётся полностью сохранённой, если
+     * система позднее снова будет исполняться на полном fixed rate.</p>
+     *
+     * @param stepCount строго положительное число эквивалентных fixed ticks
+     * @return суммарное игровое время этих ticks в секундах
+     * @throws IllegalArgumentException если число шагов неположительно
+     * @throws IllegalStateException если диапазон tick counter будет исчерпан
+     */
+    public float advanceStrategicSteps(int stepCount) {
+        if (stepCount <= 0) {
+            throw new IllegalArgumentException("Strategic step count должен быть положительным");
+        }
+        if (tick > Long.MAX_VALUE - stepCount) {
+            throw new IllegalStateException("Счётчик simulation ticks исчерпан");
+        }
+        tick += stepCount;
+        double seconds = stepCount * (double) fixedStepNanos / NANOS_PER_SECOND;
+        if (!Double.isFinite(seconds) || seconds > Float.MAX_VALUE) {
+            throw new IllegalStateException("Strategic time span нельзя представить как float delta");
+        }
+        return (float) seconds;
+    }
+
     /** @return длительность одного simulation tick в секундах */
     public float getFixedStepSeconds() {
         return fixedStepSeconds;

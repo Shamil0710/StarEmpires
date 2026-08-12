@@ -33,8 +33,13 @@ import java.util.Objects;
  * Headless authoritative игровая сессия, владеющая всеми stateful-узлами симуляции.
  *
  * <p>Класс не создаёт OpenGL/Scene2D-ресурсов и потому подходит для save/load, continuation-тестов и
- * будущего benchmark runner. Один {@link ContentCatalog} принадлежит всей сессии и передаётся
- * фабрике мира, рынкам и торговому AI, поэтому data metadata не расходится между системами.</p>
+ * benchmark runner. Один {@link ContentCatalog} принадлежит всей сессии и передаётся фабрике мира,
+ * рынкам и торговому AI, поэтому data metadata не расходится между системами.</p>
+ *
+ * <p>Stage 7 использует этот класс как локальный economic core одной StarSystem. Обычный
+ * {@link #advanceFrame(float)} сохраняет точный fixed-rate pipeline, а
+ * {@link #advanceStrategicSteps(int)} даёт world-orchestrator намеренно reduced-rate способ
+ * продвинуть удалённую систему без создания второй экономической реализации.</p>
  */
 public final class SimulationSession {
     /** Fixed tick демонстрационной экономики. */
@@ -152,9 +157,8 @@ public final class SimulationSession {
     /**
      * Восстанавливает runtime-сессию на явно заданном content catalog.
      *
-     * <p>До введения content fingerprint в следующей миграции вызывающая сторона отвечает за то,
-     * что переданный каталог соответствует сохранённой игре. Сам state при этом восстанавливается
-     * точным Stage-3 механизмом без изменения persistent schema v1.</p>
+     * <p>Content compatibility проверяется внешней persistence-границей; этот метод восстанавливает
+     * уже валидированный authoritative GameState без изменения persistent schema.</p>
      *
      * @param state сохранённое состояние текущей поддерживаемой версии
      * @param contentCatalog каталог, который будет использовать продолженная simulation session
@@ -245,6 +249,25 @@ public final class SimulationSession {
     }
 
     /**
+     * Выполняет один reduced-rate update, представляющий несколько authoritative fixed ticks.
+     *
+     * <p>Clock продвигается на указанное число эквивалентных ticks, после чего events и весь Ashley
+     * Engine вызываются ровно по одному разу с суммарным delta. Это намеренная Stage-7 аппроксимация
+     * для удалённых систем; local/player system должна продолжать использовать
+     * {@link #advanceFrame(float)}.</p>
+     *
+     * @param equivalentFixedTicks число fixed ticks, агрегируемых в один strategic update
+     * @return суммарный simulation delta, переданный events и Engine
+     * @throws IllegalArgumentException если число ticks неположительно
+     */
+    public float advanceStrategicSteps(int equivalentFixedTicks) {
+        float strategicDelta = clock.advanceStrategicSteps(equivalentFixedTicks);
+        eventManager.update(strategicDelta);
+        engine.update(strategicDelta);
+        return strategicDelta;
+    }
+
+    /**
      * Собирает полный value-based snapshot текущей сессии.
      *
      * @return immutable состояние текущей persistent schema
@@ -292,6 +315,16 @@ public final class SimulationSession {
     /** @return общий ledger текущей сессии */
     public EconomicLedger getLedger() {
         return ledger;
+    }
+
+    /** @return менеджер событий текущей локальной сессии */
+    public GlobalEventManager getEventManager() {
+        return eventManager;
+    }
+
+    /** @return значение EntityId, которое следующим выдаст локальный allocator */
+    public long getNextEntityIdValue() {
+        return entityIdAllocator.getNextValue();
     }
 
     /** @return общий registry текущей сессии */
