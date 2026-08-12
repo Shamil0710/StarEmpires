@@ -175,6 +175,41 @@ public final class GalaxyTopology {
         return neighborsBySystemId.getOrDefault(systemId, List.of());
     }
 
+    /**
+     * Сравнивает topology как persistent value, игнорируя производные runtime indexes.
+     *
+     * @param other сравниваемый объект
+     * @return {@code true}, если canonical topology-данные совпадают
+     */
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof GalaxyTopology topology)) {
+            return false;
+        }
+        return id.equals(topology.id)
+                && name.equals(topology.name)
+                && sectors.equals(topology.sectors)
+                && connections.equals(topology.connections);
+    }
+
+    /** @return hash persistent topology-данных */
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, name, sectors, connections);
+    }
+
+    /** @return компактное представление persistent topology */
+    @Override
+    public String toString() {
+        return "GalaxyTopology[id=" + id
+                + ", name=" + name
+                + ", sectors=" + sectors
+                + ", connections=" + connections + ']';
+    }
+
     private static String normalizedName(String name) {
         String value = Objects.requireNonNull(name, "Имя галактики не задано").trim();
         if (value.isEmpty()) {
