@@ -3,158 +3,96 @@ package com.spacesim.controllers;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.Money;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TradeControllerTest {
     private final TradeController tradeController = new TradeController();
 
     @Test
-    void покупкаСоСтанцииПереноситТоварИДеньги() {
-        Entity station = new Entity();
-        InventoryComponent stationInventory = new InventoryComponent();
-        stationInventory.stock[Constants.ITEM_FOOD] = 50;
-        station.add(stationInventory);
+    void отключенныйТоварИНекорректноеКоличествоНеМеняютСостояние() {
+        Entity station = station(10, 10f, 9f, false);
+        Entity buyer = participant(0, 100d);
+        long stationMoney = wallet(station).getBalanceMilliCredits();
+        long buyerMoney = wallet(buyer).getBalanceMilliCredits();
 
-        MarketComponent market = new MarketComponent();
-        market.configureTradableItem(Constants.ITEM_FOOD, 100, 0f);
-        market.sellPrices[Constants.ITEM_FOOD] = 10f;
-        station.add(market);
+        assertFalse(tradeController.buyFromStation(station, buyer, Constants.ITEM_FOOD, 1));
+        assertFalse(tradeController.buyFromStation(station, buyer, Constants.ITEM_FOOD, 0));
+        assertFalse(tradeController.buyFromStation(station, buyer, -1, 1));
+        assertFalse(tradeController.buyFromStation(
+                station, buyer, Constants.MAX_ITEMS, 1));
 
-        InventoryComponent buyerInventory = new InventoryComponent();
-        TradeController.CreditAccount credits = new TradeController.CreditAccount(100f);
-
-        boolean result = tradeController.buyFromStation(station, buyerInventory, Constants.ITEM_FOOD, 5, credits);
-
-        assertTrue(result);
-        assertEquals(45, stationInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(5, buyerInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(50f, credits.credits);
-        assertTrue(market.isDirty);
-    }
-
-    @Test
-    void продажаНаСтанциюПереноситТоварИДеньги() {
-        Entity station = new Entity();
-        InventoryComponent stationInventory = new InventoryComponent();
-        station.add(stationInventory);
-
-        MarketComponent market = new MarketComponent();
-        market.configureTradableItem(Constants.ITEM_STEEL, 100, 0f);
-        market.buyPrices[Constants.ITEM_STEEL] = 25f;
-        station.add(market);
-
-        InventoryComponent sellerInventory = new InventoryComponent();
-        sellerInventory.stock[Constants.ITEM_STEEL] = 4;
-        TradeController.CreditAccount credits = new TradeController.CreditAccount(10f);
-
-        boolean result = tradeController.sellToStation(station, sellerInventory, Constants.ITEM_STEEL, 3, credits);
-
-        assertTrue(result);
-        assertEquals(3, stationInventory.stock[Constants.ITEM_STEEL]);
-        assertEquals(1, sellerInventory.stock[Constants.ITEM_STEEL]);
-        assertEquals(85f, credits.credits);
-        assertTrue(market.isDirty);
-    }
-
-    @Test
-    void отключенныйТоварНельзяКупить() {
-        Entity station = new Entity();
-        InventoryComponent stationInventory = new InventoryComponent();
-        stationInventory.stock[Constants.ITEM_FOOD] = 10;
-        station.add(stationInventory);
-
-        MarketComponent market = new MarketComponent();
-        market.sellPrices[Constants.ITEM_FOOD] = 1f;
-        station.add(market);
-
-        InventoryComponent buyerInventory = new InventoryComponent();
-        TradeController.CreditAccount credits = new TradeController.CreditAccount(100f);
-
-        boolean result = tradeController.buyFromStation(
-                station, buyerInventory, Constants.ITEM_FOOD, 1, credits);
-
-        assertFalse(result);
-        assertEquals(10, stationInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(0, buyerInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(100f, credits.credits);
-    }
-
-    @Test
-    void отрицательноеКоличествоНеМеняетСостояниеУпрощённойПокупки() {
-        Entity station = createFoodStation(10, 10f);
-        TradeController.PlayerProfile player = new TradeController.PlayerProfile();
-        player.credits = 100f;
-
-        boolean result = tradeController.buy(station, Constants.ITEM_FOOD, -1, player);
-
-        assertFalse(result);
-        assertEquals(10, station.getComponent(InventoryComponent.class).stock[Constants.ITEM_FOOD]);
-        assertEquals(100f, player.credits);
-        assertEquals(0, player.cargo[Constants.ITEM_FOOD]);
+        assertEquals(10, inventory(station).stock[Constants.ITEM_FOOD]);
+        assertEquals(0, inventory(buyer).stock[Constants.ITEM_FOOD]);
+        assertEquals(stationMoney, wallet(station).getBalanceMilliCredits());
+        assertEquals(buyerMoney, wallet(buyer).getBalanceMilliCredits());
     }
 
     @Test
     void некорректнаяЦенаОтклоняетсяБезЧастичныхИзменений() {
-        Entity station = createFoodStation(10, Float.NaN);
-        InventoryComponent buyerInventory = new InventoryComponent();
-        TradeController.CreditAccount credits = new TradeController.CreditAccount(100f);
+        Entity station = station(10, Float.NaN, 9f, true);
+        Entity buyer = participant(0, 100d);
+        long totalMoney = totalMoney(station, buyer);
 
-        boolean result = tradeController.buyFromStation(
-                station, buyerInventory, Constants.ITEM_FOOD, 1, credits);
+        assertFalse(tradeController.buyFromStation(
+                station, buyer, Constants.ITEM_FOOD, 1));
 
-        assertFalse(result);
-        assertEquals(10, station.getComponent(InventoryComponent.class).stock[Constants.ITEM_FOOD]);
-        assertEquals(0, buyerInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(100f, credits.credits);
+        assertEquals(10, inventory(station).stock[Constants.ITEM_FOOD]);
+        assertEquals(0, inventory(buyer).stock[Constants.ITEM_FOOD]);
+        assertEquals(totalMoney, totalMoney(station, buyer));
     }
 
     @Test
-    void повреждённыйБалансОтклоняетсяБезИзмененияСкладов() {
-        Entity station = createFoodStation(10, 10f);
-        InventoryComponent buyerInventory = new InventoryComponent();
-        TradeController.CreditAccount credits = new TradeController.CreditAccount(100f);
-        credits.credits = Float.NaN;
+    void собственнаяСущностьИОбщиеКомпонентыНеМогутБытьВторойСторонойСделки() {
+        Entity station = station(10, 10f, 9f, true);
+        assertFalse(tradeController.buyFromStation(
+                station, station, Constants.ITEM_FOOD, 1));
 
-        boolean result = tradeController.buyFromStation(
-                station, buyerInventory, Constants.ITEM_FOOD, 1, credits);
+        Entity sharedInventoryBuyer = participant(0, 100d);
+        sharedInventoryBuyer.remove(InventoryComponent.class);
+        sharedInventoryBuyer.add(inventory(station));
+        assertFalse(tradeController.buyFromStation(
+                station, sharedInventoryBuyer, Constants.ITEM_FOOD, 1));
 
-        assertFalse(result);
-        assertEquals(10, station.getComponent(InventoryComponent.class).stock[Constants.ITEM_FOOD]);
-        assertEquals(0, buyerInventory.stock[Constants.ITEM_FOOD]);
-        assertTrue(Float.isNaN(credits.credits));
+        Entity sharedWalletBuyer = participant(0, 100d);
+        sharedWalletBuyer.remove(WalletComponent.class);
+        sharedWalletBuyer.add(wallet(station));
+        assertFalse(tradeController.buyFromStation(
+                station, sharedWalletBuyer, Constants.ITEM_FOOD, 1));
     }
 
     @Test
-    void кредитныйСчётОтклоняетНекорректныйНачальныйБаланс() {
-        assertAll(
-                () -> assertThrows(IllegalArgumentException.class,
-                        () -> new TradeController.CreditAccount(-1f)),
-                () -> assertThrows(IllegalArgumentException.class,
-                        () -> new TradeController.CreditAccount(Float.NaN)),
-                () -> assertThrows(IllegalArgumentException.class,
-                        () -> new TradeController.CreditAccount(Float.POSITIVE_INFINITY))
-        );
+    void отсутствующиеКомпонентыОтклоняютСделку() {
+        Entity station = station(10, 10f, 9f, true);
+        Entity buyerWithoutWallet = new Entity().add(new InventoryComponent());
+        Entity buyerWithoutInventory = new Entity()
+                .add(new WalletComponent(Money.fromCredits(100d)));
+
+        assertFalse(tradeController.buyFromStation(
+                station, buyerWithoutWallet, Constants.ITEM_FOOD, 1));
+        assertFalse(tradeController.buyFromStation(
+                station, buyerWithoutInventory, Constants.ITEM_FOOD, 1));
+
+        station.remove(WalletComponent.class);
+        assertFalse(tradeController.buyFromStation(
+                station, participant(0, 100d), Constants.ITEM_FOOD, 1));
     }
 
     @Test
-    void складСтанцииНеМожетБытьВторойСторонойСобственнойСделки() {
-        Entity station = createFoodStation(10, 10f);
-        InventoryComponent stationInventory = station.getComponent(InventoryComponent.class);
-        station.getComponent(MarketComponent.class).buyPrices[Constants.ITEM_FOOD] = 9f;
-        TradeController.CreditAccount credits = new TradeController.CreditAccount(100f);
+    void повреждённыйСкладОтклоняется() {
+        Entity station = station(10, 10f, 9f, true);
+        Entity buyer = participant(0, 100d);
+        inventory(station).stock[Constants.ITEM_ORE] = -1;
 
-        boolean purchase = tradeController.buyFromStation(
-                station, stationInventory, Constants.ITEM_FOOD, 1, credits);
-        boolean sale = tradeController.sellToStation(
-                station, stationInventory, Constants.ITEM_FOOD, 1, credits);
-
-        assertFalse(purchase);
-        assertFalse(sale);
-        assertEquals(10, stationInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(100f, credits.credits);
+        assertFalse(tradeController.buyFromStation(
+                station, buyer, Constants.ITEM_FOOD, 1));
+        assertEquals(10, inventory(station).stock[Constants.ITEM_FOOD]);
     }
 
     @Test
@@ -164,67 +102,78 @@ class TradeControllerTest {
         inventory.stock[Constants.ITEM_FOOD] = Integer.MAX_VALUE;
         inventory.stock[Constants.ITEM_ORE] = Integer.MAX_VALUE;
 
-        assertEquals(Integer.MAX_VALUE, inventory.getTotalStock());
-        assertEquals(0, inventory.getFreeCapacity());
-
-        inventory.stock[Constants.ITEM_FOOD] = -1;
-        inventory.stock[Constants.ITEM_ORE] = 0;
-        assertEquals(0, inventory.getFreeCapacity());
+        assertEquals(Integer.MAX_VALUE, tradeController.getTotalStock(inventory));
+        assertEquals(0, tradeController.getFreeCapacity(inventory));
+        assertEquals(0, tradeController.getTotalStock(null));
+        assertEquals(0, tradeController.getFreeCapacity(null));
     }
 
     @Test
-    void суммаСделкиДолжнаФактическиИзменятьБольшойБаланс() {
-        Entity station = createFoodStation(10, 1f);
-        InventoryComponent stationInventory = station.getComponent(InventoryComponent.class);
-        station.getComponent(MarketComponent.class).buyPrices[Constants.ITEM_FOOD] = 1f;
-
-        TradeController.PlayerProfile player = new TradeController.PlayerProfile();
-        player.credits = Float.MAX_VALUE;
-        InventoryComponent buyerInventory = new InventoryComponent();
-        TradeController.CreditAccount buyerCredits =
-                new TradeController.CreditAccount(Float.MAX_VALUE);
-        InventoryComponent sellerInventory = new InventoryComponent();
-        sellerInventory.stock[Constants.ITEM_FOOD] = 1;
-        TradeController.CreditAccount sellerCredits =
-                new TradeController.CreditAccount(Float.MAX_VALUE);
-
-        assertFalse(tradeController.buy(station, Constants.ITEM_FOOD, 1, player));
-        assertFalse(tradeController.buyFromStation(
-                station, buyerInventory, Constants.ITEM_FOOD, 1, buyerCredits));
-        assertFalse(tradeController.sellToStation(
-                station, sellerInventory, Constants.ITEM_FOOD, 1, sellerCredits));
-
-        assertEquals(10, stationInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(0, player.cargo[Constants.ITEM_FOOD]);
-        assertEquals(0, buyerInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(1, sellerInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(Float.MAX_VALUE, player.credits);
-        assertEquals(Float.MAX_VALUE, buyerCredits.credits);
-        assertEquals(Float.MAX_VALUE, sellerCredits.credits);
+    void структурноНекорректныйЗапросЦеныВозвращаетNaN() {
+        Entity noMarket = new Entity();
+        assertTrue(Float.isNaN(tradeController.getEffectiveSellPrice(
+                noMarket, Constants.ITEM_FOOD, null)));
+        assertTrue(Float.isNaN(tradeController.getEffectiveBuyPrice(
+                noMarket, Constants.ITEM_FOOD, null)));
+        assertTrue(Float.isNaN(tradeController.getEffectiveSellPrice(
+                null, Constants.ITEM_FOOD, null)));
+        assertTrue(Float.isNaN(tradeController.getEffectiveBuyPrice(
+                station(0, 10f, 9f, true), Constants.MAX_ITEMS, null)));
     }
 
     @Test
-    void упрощённаяПокупкаОтклоняетПсевдонимСкладскогоМассива() {
-        Entity station = createFoodStation(10, 1f);
-        InventoryComponent stationInventory = station.getComponent(InventoryComponent.class);
-        TradeController.PlayerProfile player = new TradeController.PlayerProfile();
-        player.credits = 100f;
-        player.cargo = stationInventory.stock;
+    void успешнаяСделкаПомечаетРынокИИспользуетЕдинственныйWalletApi() {
+        Entity station = station(10, 10f, 9f, true);
+        Entity buyer = participant(0, 100d);
+        MarketComponent market = station.getComponent(MarketComponent.class);
+        market.isDirty = false;
 
-        assertFalse(tradeController.buy(station, Constants.ITEM_FOOD, 1, player));
-        assertEquals(10, stationInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(100f, player.credits);
+        assertTrue(tradeController.buyFromStation(
+                station, buyer, Constants.ITEM_FOOD, 2));
+
+        assertTrue(market.isDirty);
+        assertEquals(Money.fromCredits(80d), wallet(buyer).getBalanceMilliCredits());
+        assertEquals(Money.fromCredits(1_020d), wallet(station).getBalanceMilliCredits());
     }
 
-    private Entity createFoodStation(int stock, float sellPrice) {
-        Entity station = new Entity();
+    private Entity station(
+            int stock,
+            float sellPrice,
+            float buyPrice,
+            boolean tradable) {
         InventoryComponent inventory = new InventoryComponent();
         inventory.stock[Constants.ITEM_FOOD] = stock;
         MarketComponent market = new MarketComponent();
-        market.configureTradableItem(Constants.ITEM_FOOD, 100, 0f);
+        if (tradable) {
+            market.configureTradableItem(Constants.ITEM_FOOD, 100, 0f);
+        }
         market.sellPrices[Constants.ITEM_FOOD] = sellPrice;
-        station.add(inventory);
-        station.add(market);
-        return station;
+        market.buyPrices[Constants.ITEM_FOOD] = buyPrice;
+        return new Entity()
+                .add(inventory)
+                .add(market)
+                .add(new WalletComponent(Money.fromCredits(1_000d)));
+    }
+
+    private Entity participant(int foodStock, double credits) {
+        InventoryComponent inventory = new InventoryComponent();
+        inventory.stock[Constants.ITEM_FOOD] = foodStock;
+        return new Entity()
+                .add(inventory)
+                .add(new WalletComponent(Money.fromCredits(credits)));
+    }
+
+    private InventoryComponent inventory(Entity entity) {
+        return entity.getComponent(InventoryComponent.class);
+    }
+
+    private WalletComponent wallet(Entity entity) {
+        return entity.getComponent(WalletComponent.class);
+    }
+
+    private long totalMoney(Entity first, Entity second) {
+        return Math.addExact(
+                wallet(first).getBalanceMilliCredits(),
+                wallet(second).getBalanceMilliCredits());
     }
 }
