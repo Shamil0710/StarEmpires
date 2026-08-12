@@ -1,0 +1,315 @@
+package com.spacesim.trade;
+
+import com.badlogic.ashley.core.ComponentMapper;
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EntityIdComponent;
+import com.spacesim.components.FactionComponent;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
+import com.spacesim.components.TransformComponent;
+import com.spacesim.components.WalletComponent;
+import com.spacesim.constants.Constants;
+import com.spacesim.content.ContentCatalog;
+import com.spacesim.persistence.EntityId;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Общий read-only снимок доступных рынков для поиска торговых маршрутов.
+ *
+ * <p>Directory перестраивается один раз из ECS-состояния, после чего ship planners работают только
+ * с immutable {@link StationMarket}. По каждому active item дополнительно поддерживаются списки
+ * поставщиков и покупателей, поэтому route discovery больше не обязан самостоятельно сканировать
+ * Ashley entities и проверять наличие компонентов.</p>
+ */
+public final class MarketDirectory {
+    private final ContentCatalog contentCatalog;
+    private final ComponentMapper<EntityIdComponent> idm = ComponentMapper.getFor(EntityIdComponent.class);
+    private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
+    private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
+    private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
+    private final ComponentMapper<WalletComponent> wm = ComponentMapper.getFor(WalletComponent.class);
+    private final ComponentMapper<FactionComponent> fm = ComponentMapper.getFor(FactionComponent.class);
+
+    private List<StationMarket> stations = List.of();
+    private Map<EntityId, StationMarket> byId = Map.of();
+    private List<List<StationMarket>> suppliersByItem = emptyIndex();
+    private List<List<StationMarket>> consumersByItem = emptyIndex();
+
+    /**
+     * Создаёт пустой directory для указанного каталога.
+     *
+     * @param contentCatalog authoritative content catalog текущей session
+     */
+    public MarketDirectory(ContentCatalog contentCatalog) {
+        this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
+    }
+
+    /**
+     * Перестраивает immutable snapshot из текущих ECS entities.
+     *
+     * <p>Сущности без полного market-набора компонентов игнорируются. Дублирующий persistent ID
+     * считается повреждением runtime state и отклоняется.</p>
+     *
+     * @param entities кандидаты рынков
+     * @throws NullPointerException если iterable не задан
+     * @throws IllegalStateException если обнаружены два рынка с одинаковым EntityId
+     */
+    public void rebuild(Iterable<Entity> entities) {
+        Objects.requireNonNull(entities, "Market entities не заданы");
+        List<StationMarket> stationBuilder = new ArrayList<>();
+        Map<EntityId, StationMarket> idBuilder = new LinkedHashMap<>();
+        List<List<StationMarket>> supplierBuilder = mutableIndex();
+        List<List<StationMarket>> consumerBuilder = mutableIndex();
+
+        for (Entity entity : entities) {
+            if (entity == null
+                    || !idm.has(entity)
+                    || !tm.has(entity)
+                    || !mm.has(entity)
+                    || !im.has(entity)
+                    || !wm.has(entity)) {
+                continue;
+            }
+            EntityId id = idm.get(entity).id;
+            if (id == null) {
+                throw new IllegalStateException("Market entity не имеет persistent EntityId");
+            }
+            StationMarket snapshot = snapshot(entity);
+            if (idBuilder.putIfAbsent(id, snapshot) != null) {
+                throw new IllegalStateException("Дублирующий market EntityId: " + id);
+            }
+            stationBuilder.add(snapshot);
+
+            for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
+                int itemId = item.runtimeId();
+                if (!snapshot.isTradable(itemId)) {
+                    continue;
+                }
+                if (snapshot.stock(itemId) > 0 && isPositiveFinite(snapshot.sellPrice(itemId))) {
+                    supplierBuilder.get(itemId).add(snapshot);
+                }
+                if (snapshot.freeCapacity() > 0
+                        && snapshot.walletBalanceMilliCredits() > 0L
+                        && isPositiveFinite(snapshot.buyPrice(itemId))) {
+                    consumerBuilder.get(itemId).add(snapshot);
+                }
+            }
+        }
+
+        stationBuilder.sort(Comparator.comparing(StationMarket::id));
+        for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
+            int itemId = item.runtimeId();
+            supplierBuilder.get(itemId).sort(
+                    Comparator.comparingDouble((StationMarket station) -> station.sellPrice(itemId))
+                            .thenComparing(StationMarket::id));
+            consumerBuilder.get(itemId).sort(
+                    Comparator.comparingDouble((StationMarket station) -> station.buyPrice(itemId))
+                            .reversed()
+                            .thenComparing(StationMarket::id));
+        }
+
+        stations = List.copyOf(stationBuilder);
+        byId = Collections.unmodifiableMap(new LinkedHashMap<>(idBuilder));
+        suppliersByItem = immutableIndex(supplierBuilder);
+        consumersByItem = immutableIndex(consumerBuilder);
+    }
+
+    /** @return все market snapshots в deterministic EntityId-порядке */
+    public List<StationMarket> stations() {
+        return stations;
+    }
+
+    /**
+     * Ищет market snapshot по persistent ID.
+     *
+     * @param id station ID
+     * @return snapshot либо {@code null}
+     */
+    public StationMarket find(EntityId id) {
+        return id == null ? null : byId.get(id);
+    }
+
+    /**
+     * Возвращает станции, способные продать товар, в порядке raw sell price ASC.
+     *
+     * @param itemId runtime item ID
+     * @return immutable список или пустой список
+     */
+    public List<StationMarket> suppliers(int itemId) {
+        return validItemId(itemId) ? suppliersByItem.get(itemId) : List.of();
+    }
+
+    /**
+     * Возвращает станции, способные купить товар, в порядке raw buy price DESC.
+     *
+     * @param itemId runtime item ID
+     * @return immutable список или пустой список
+     */
+    public List<StationMarket> consumers(int itemId) {
+        return validItemId(itemId) ? consumersByItem.get(itemId) : List.of();
+    }
+
+    private StationMarket snapshot(Entity entity) {
+        EntityId id = idm.get(entity).id;
+        TransformComponent transform = tm.get(entity);
+        MarketComponent market = mm.get(entity);
+        InventoryComponent inventory = im.get(entity);
+        WalletComponent wallet = wm.get(entity);
+        int factionId = fm.has(entity) ? fm.get(entity).factionId : -1;
+        return new StationMarket(
+                id,
+                transform.position.x,
+                transform.position.y,
+                factionId,
+                wallet.getBalanceMilliCredits(),
+                inventory.capacity,
+                inventory.getTotalStock(),
+                inventory.stock,
+                market.targetStock,
+                market.sellPrices,
+                market.buyPrices,
+                market.tradableItems);
+    }
+
+    private static boolean isPositiveFinite(float value) {
+        return Float.isFinite(value) && value > 0f;
+    }
+
+    private static boolean validItemId(int itemId) {
+        return itemId >= 0 && itemId < Constants.MAX_ITEMS;
+    }
+
+    private static List<List<StationMarket>> mutableIndex() {
+        List<List<StationMarket>> index = new ArrayList<>(Constants.MAX_ITEMS);
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            index.add(new ArrayList<>());
+        }
+        return index;
+    }
+
+    private static List<List<StationMarket>> emptyIndex() {
+        List<List<StationMarket>> index = new ArrayList<>(Constants.MAX_ITEMS);
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            index.add(List.of());
+        }
+        return List.copyOf(index);
+    }
+
+    private static List<List<StationMarket>> immutableIndex(List<List<StationMarket>> source) {
+        List<List<StationMarket>> result = new ArrayList<>(source.size());
+        for (List<StationMarket> values : source) {
+            result.add(List.copyOf(values));
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Immutable снимок одной торговой станции.
+     */
+    public static final class StationMarket {
+        private final EntityId id;
+        private final float x;
+        private final float y;
+        private final int factionId;
+        private final long walletBalanceMilliCredits;
+        private final int inventoryCapacity;
+        private final int totalStock;
+        private final int[] stock;
+        private final int[] targetStock;
+        private final float[] sellPrices;
+        private final float[] buyPrices;
+        private final boolean[] tradable;
+
+        private StationMarket(
+                EntityId id,
+                float x,
+                float y,
+                int factionId,
+                long walletBalanceMilliCredits,
+                int inventoryCapacity,
+                int totalStock,
+                int[] stock,
+                int[] targetStock,
+                float[] sellPrices,
+                float[] buyPrices,
+                boolean[] tradable) {
+            this.id = Objects.requireNonNull(id, "Station EntityId не задан");
+            this.x = x;
+            this.y = y;
+            this.factionId = factionId;
+            this.walletBalanceMilliCredits = walletBalanceMilliCredits;
+            this.inventoryCapacity = inventoryCapacity;
+            this.totalStock = totalStock;
+            this.stock = Arrays.copyOf(stock, stock.length);
+            this.targetStock = Arrays.copyOf(targetStock, targetStock.length);
+            this.sellPrices = Arrays.copyOf(sellPrices, sellPrices.length);
+            this.buyPrices = Arrays.copyOf(buyPrices, buyPrices.length);
+            this.tradable = Arrays.copyOf(tradable, tradable.length);
+        }
+
+        /** @return persistent station ID */
+        public EntityId id() {
+            return id;
+        }
+
+        /** @return X-coordinate */
+        public float x() {
+            return x;
+        }
+
+        /** @return Y-coordinate */
+        public float y() {
+            return y;
+        }
+
+        /** @return runtime faction ID или {@code -1} */
+        public int factionId() {
+            return factionId;
+        }
+
+        /** @return station wallet balance */
+        public long walletBalanceMilliCredits() {
+            return walletBalanceMilliCredits;
+        }
+
+        /** @return свободная вместимость station inventory */
+        public int freeCapacity() {
+            return Math.max(0, inventoryCapacity - totalStock);
+        }
+
+        /** @param itemId runtime ID; @return stock либо 0 */
+        public int stock(int itemId) {
+            return validItemId(itemId) ? stock[itemId] : 0;
+        }
+
+        /** @param itemId runtime ID; @return target stock либо 0 */
+        public int targetStock(int itemId) {
+            return validItemId(itemId) ? targetStock[itemId] : 0;
+        }
+
+        /** @param itemId runtime ID; @return raw station sell price либо 0 */
+        public float sellPrice(int itemId) {
+            return validItemId(itemId) ? sellPrices[itemId] : 0f;
+        }
+
+        /** @param itemId runtime ID; @return raw station buy price либо 0 */
+        public float buyPrice(int itemId) {
+            return validItemId(itemId) ? buyPrices[itemId] : 0f;
+        }
+
+        /** @param itemId runtime ID; @return разрешена ли торговля */
+        public boolean isTradable(int itemId) {
+            return validItemId(itemId)
+                    && tradable[itemId]
+                    && targetStock[itemId] > 0;
+        }
+    }
+}
