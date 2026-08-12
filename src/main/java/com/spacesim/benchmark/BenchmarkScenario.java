@@ -19,6 +19,9 @@ public record BenchmarkScenario(
         long simulationTicks,
         long sampleEveryTicks) {
 
+    /** Fixed ticks в 100 игровых часах при production step {@code 0.1s}. */
+    public static final long ONE_HUNDRED_HOURS_TICKS = 3_600_000L;
+
     /**
      * Проверяет benchmark contract.
      *
@@ -39,7 +42,7 @@ public record BenchmarkScenario(
     }
 
     /**
-     * Возвращает малый deterministic scenario для обязательного CI smoke-test.
+     * Возвращает малый deterministic scenario для обязательного CI smoke-test demo world.
      *
      * @return demo-world benchmark на 600 fixed ticks с sampling каждые 60 ticks
      */
@@ -50,5 +53,40 @@ public record BenchmarkScenario(
                 0xB3E6_2026L,
                 600L,
                 60L);
+    }
+
+    /**
+     * Возвращает короткий CI scenario масштабного мира 100/500.
+     *
+     * <p>Он проверяет bootstrap и несколько полных simulation ticks на реальном масштабе, но не
+     * заменяет тяжёлый 100-hour benchmark и не задаёт performance thresholds.</p>
+     *
+     * @return 20-tick scenario с двумя observations
+     */
+    public static BenchmarkScenario scaleCiSmoke() {
+        return new BenchmarkScenario(
+                "economic-scale-100x500-ci",
+                1,
+                0xB3E6_500L,
+                20L,
+                10L);
+    }
+
+    /**
+     * Возвращает полный milestone scenario 100 stations / 500 agents / 100 simulated hours.
+     *
+     * <p>Sampling каждые 6000 ticks соответствует 10 игровым минутам и даёт 600 observations за
+     * 100 часов. Этот profile предназначен для отдельного reproducible benchmark run, а не для
+     * обязательного выполнения на каждом pull request.</p>
+     *
+     * @return масштабный benchmark на 3 600 000 fixed ticks
+     */
+    public static BenchmarkScenario scale100Hours() {
+        return new BenchmarkScenario(
+                "economic-scale-100x500-100h",
+                1,
+                0xB3E6_500L,
+                ONE_HUNDRED_HOURS_TICKS,
+                6_000L);
     }
 }
