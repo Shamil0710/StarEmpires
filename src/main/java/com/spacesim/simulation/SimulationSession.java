@@ -317,6 +317,16 @@ public final class SimulationSession {
         return ledger;
     }
 
+    /** @return менеджер событий текущей локальной сессии */
+    public GlobalEventManager getEventManager() {
+        return eventManager;
+    }
+
+    /** @return значение EntityId, которое следующим выдаст локальный allocator */
+    public long getNextEntityIdValue() {
+        return entityIdAllocator.getNextValue();
+    }
+
     /** @return общий registry текущей сессии */
     public EntityRegistry getEntityRegistry() {
         return entityRegistry;

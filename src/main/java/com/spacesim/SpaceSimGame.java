@@ -14,18 +14,15 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.kotcrab.vis.ui.VisUI;
-import com.spacesim.components.*;
+import com.spacesim.components.MarketComponent;
+import com.spacesim.components.PriceHistoryComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.events.NewsArticle;
-import com.spacesim.model.AsteroidSpawnConfig;
-import com.spacesim.persistence.EntityIdAllocator;
 import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.simulation.SimulationClock;
-import com.spacesim.simulation.SimulationLoop;
-import com.spacesim.simulation.SimulationRandom;
-import com.spacesim.systems.*;
+import com.spacesim.simulation.SimulationSession;
 import com.spacesim.ui.EconomyStatusUI;
 import com.spacesim.ui.EntityDetailsUI;
 import com.spacesim.ui.EntityPicker;
@@ -33,36 +30,31 @@ import com.spacesim.ui.NewsUI;
 import com.spacesim.ui.PriceGraphRenderer;
 import com.spacesim.ui.WorldMapLayout;
 import com.spacesim.ui.WorldMapRenderer;
-import com.spacesim.util.SpatialHashGrid;
+import com.spacesim.world.WorldSimulation;
 
 /**
- * Главный объект приложения Star Empires и точка сборки демонстрационной сцены.
+ * Главный объект приложения Star Empires и локальный UI-view Stage-7 multi-system мира.
  *
- * <p>Модель получает только fixed simulation ticks через {@link SimulationLoop}. Все экономические
- * системы одной игровой сессии используют единый {@link EconomicLedger}: обычная торговля
- * фиксируется как transfer, а создание/уничтожение/преобразование ресурсов имеет явный тип записи.
- * Все runtime-сущности получают устойчивый {@link EntityIdComponent}; один общий
- * {@link EntityRegistry} разрешает эти ID в текущие Ashley-объекты для систем и UI и автоматически
- * отслеживает их жизненный цикл. UI и Scene2D продолжают использовать render delta и не влияют на
- * authoritative состояние.</p>
+ * <p>Desktop больше не собирает отдельный экономический pipeline. Он владеет
+ * {@link WorldSimulation}, а карта/UI читают только active {@link SimulationSession}. Эта система
+ * исполняется на полном fixed rate; удалённые StarSystem продолжают жить через budgeted strategic
+ * updates того же economic core. UI/Scene2D используют render delta и не входят в authoritative
+ * state.</p>
  */
 public class SpaceSimGame extends ApplicationAdapter {
-    private static final float SIMULATION_FIXED_STEP_SECONDS = 0.1f;
     private static final long SIMULATION_ROOT_SEED = 0x5EED_2026L;
     private static final float ECONOMY_UI_UPDATE_INTERVAL_SECONDS = 0.25f;
     private static final float MAP_PADDING = 18f;
     private static final float MAP_PICK_RADIUS = 24f;
     private static final float DETAILS_AREA_GAP = 20f;
 
+    private WorldSimulation worldSimulation;
+    private SimulationSession activeSession;
     private Engine engine;
     private GlobalEventManager eventManager;
     private EconomicLedger economicLedger;
-    private EntityIdAllocator entityIdAllocator;
     private EntityRegistry entityRegistry;
-    private SpatialHashGrid grid;
     private SimulationClock simulationClock;
-    private SimulationLoop simulationLoop;
-    private SimulationRandom simulationRandom;
 
     private Stage stage;
     private NewsUI newsUI;
@@ -80,25 +72,17 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
-     * Создаёт экономическую модель, persistent-ID инфраструктуру, общий ledger, pipeline и UI.
+     * Создаёт multi-system simulation runtime и Scene2D UI active системы.
      *
-     * <p>Порядок Ashley-систем значим: рынок → потребление → производство → появление астероидов →
-     * добыча → торговый ИИ → запись истории. Глобальные события обновляются перед Ashley-движком
-     * внутри {@link SimulationLoop}. Общий registry привязывается к Engine до добавления любых
-     * сущностей, поэтому одинаково отслеживает bootstrap-мир и динамические астероиды.</p>
+     * <p>Active local session и remote strategic sessions создаются одним
+     * {@link DemoGalaxyFactory}. Затем desktop только связывает UI с engine/registry active system;
+     * Ashley systems уже собраны внутри production {@link SimulationSession}.</p>
      */
     @Override
     public void create() {
         VisUI.load();
-        engine = new Engine();
-        simulationRandom = new SimulationRandom(SIMULATION_ROOT_SEED);
-        eventManager = new GlobalEventManager(simulationRandom.createStream("economy-events"));
-        economicLedger = new EconomicLedger();
-        entityIdAllocator = new EntityIdAllocator();
-        entityRegistry = new EntityRegistry();
-        entityRegistry.track(engine);
-        grid = new SpatialHashGrid(200);
-        simulationClock = new SimulationClock(SIMULATION_FIXED_STEP_SECONDS);
+        worldSimulation = DemoGalaxyFactory.create(SIMULATION_ROOT_SEED);
+        bindActiveSession();
 
         stage = new Stage(new ScreenViewport());
         Skin skin = VisUI.getSkin();
@@ -116,30 +100,24 @@ public class SpaceSimGame extends ApplicationAdapter {
         updateMapLayout();
         Gdx.input.setInputProcessor(stage);
 
-        engine.addSystem(new MarketSystem(eventManager));
-        engine.addSystem(new ConsumptionSystem(eventManager, economicLedger));
-        engine.addSystem(new ProductionSystem(economicLedger));
-        engine.addSystem(new AsteroidSpawnSystem(
-                AsteroidSpawnConfig.demoWorld(),
-                simulationRandom.createStream("asteroid-spawn"),
-                economicLedger,
-                entityIdAllocator));
-        engine.addSystem(new MiningSystem(economicLedger, entityRegistry));
-        engine.addSystem(new TradeAISystem(grid, economicLedger, entityRegistry));
-        engine.addSystem(new PriceRecorderSystem());
-
-        for (Entity entity : DemoWorldFactory.createEntities(entityIdAllocator)) {
-            engine.addEntity(entity);
-        }
-        simulationLoop = new SimulationLoop(simulationClock, eventManager, engine);
-
         economyStatusUI.update(engine.getEntities());
         entityDetailsUI.refresh();
         Gdx.gl.glClearColor(0.018f, 0.025f, 0.045f, 1f);
     }
 
     /**
-     * @return общий экономический журнал текущей игровой сессии
+     * @return Stage-7 runtime всей текущей demo galaxy
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     */
+    public WorldSimulation getWorldSimulation() {
+        if (worldSimulation == null) {
+            throw new IllegalStateException("World simulation ещё не инициализирована");
+        }
+        return worldSimulation;
+    }
+
+    /**
+     * @return общий экономический журнал active локальной системы
      * @throws IllegalStateException если приложение ещё не инициализировано
      */
     public EconomicLedger getEconomicLedger() {
@@ -150,7 +128,7 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
-     * @return runtime registry устойчивых ID текущей игровой сессии
+     * @return runtime registry устойчивых ID active локальной системы
      * @throws IllegalStateException если приложение ещё не инициализировано
      */
     public EntityRegistry getEntityRegistry() {
@@ -161,18 +139,21 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
-     * @return значение persistent ID, которое будет выдано следующей созданной сущности
+     * @return значение persistent ID, которое следующим получит сущность active системы
      * @throws IllegalStateException если приложение ещё не инициализировано
      */
     public long getNextEntityIdValue() {
-        if (entityIdAllocator == null) {
-            throw new IllegalStateException("Аллокатор EntityId ещё не инициализирован");
+        if (activeSession == null) {
+            throw new IllegalStateException("Active simulation session ещё не инициализирована");
         }
-        return entityIdAllocator.getNextValue();
+        return activeSession.getNextEntityIdValue();
     }
 
     /**
-     * Включает или снимает паузу игрового времени.
+     * Включает или снимает паузу игрового времени active clock.
+     *
+     * <p>Remote scheduler следует clock active system, поэтому при паузе local clock не создаёт lag
+     * и весь world естественно остаётся остановленным.</p>
      *
      * @param paused новое состояние паузы
      */
@@ -186,7 +167,7 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
-     * Задаёт скорость игрового времени независимо от скорости UI/рендера.
+     * Задаёт скорость игрового времени active system; remote systems догоняют её strategic budget.
      *
      * @param timeScale конечный неотрицательный множитель
      */
@@ -194,14 +175,25 @@ public class SpaceSimGame extends ApplicationAdapter {
         requireSimulationClock().setTimeScale(timeScale);
     }
 
-    /** @return текущий множитель игрового времени */
+    /** @return текущий множитель скорости игрового времени */
     public double getSimulationTimeScale() {
         return requireSimulationClock().getTimeScale();
     }
 
-    /** @return игровое время полностью исполненных fixed ticks в секундах */
+    /** @return game time active system в секундах */
     public double getSimulationTimeSeconds() {
         return requireSimulationClock().getSimulationTimeSeconds();
+    }
+
+    private void bindActiveSession() {
+        WorldSimulation world = getWorldSimulation();
+        activeSession = world.findSession(world.getActiveSystemId()).orElseThrow(
+                () -> new IllegalStateException("Active StarSystem не имеет SimulationSession"));
+        engine = activeSession.getEngine();
+        eventManager = activeSession.getEventManager();
+        economicLedger = activeSession.getLedger();
+        entityRegistry = activeSession.getEntityRegistry();
+        simulationClock = activeSession.getClock();
     }
 
     private SimulationClock requireSimulationClock() {
@@ -349,12 +341,12 @@ public class SpaceSimGame extends ApplicationAdapter {
         entityDetailsUI.select(null);
     }
 
-    /** Выполняет один render frame и доступные fixed simulation ticks. */
+    /** Выполняет render frame, full-rate active ticks и budgeted strategic remote updates. */
     @Override
     public void render() {
         float renderDelta = Gdx.graphics.getDeltaTime();
 
-        simulationLoop.advanceFrame(renderDelta);
+        worldSimulation.advanceFrame(renderDelta);
         for (NewsArticle article : eventManager.consumePendingNews()) {
             newsUI.addNews(article);
         }
