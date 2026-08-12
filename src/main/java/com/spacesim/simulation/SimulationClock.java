@@ -3,18 +3,22 @@ package com.spacesim.simulation;
 /**
  * Накопительный fixed-step таймер игровой симуляции.
  *
- * <p>Часы отделяют реальное время кадра от игрового времени. Реальный delta умножается на
- * {@link #getTimeScale() time scale} и накапливается; вызывающий код затем последовательно
- * извлекает шаги неизменной длины через {@link #consumeStep()}. Пауза не накапливает пропущенное
- * реальное время. Благодаря этому одинаковая последовательность simulation ticks не зависит от
- * частоты рендера.</p>
+ * <p>Часы отделяют реальное время кадра от игрового времени. Входной {@code float} сначала
+ * канонизируется через его десятичное представление и переводится в целые наносекунды, после чего
+ * применяется {@link #getTimeScale() time scale}. Полные simulation ticks также хранятся в целых
+ * наносекундах. Это исключает накопление двоичной ошибки вида {@code 0.1f ~= 0.10000000149} и делает
+ * границы шагов стабильными при разном разбиении кадров.</p>
+ *
+ * <p>Пауза не накапливает пропущенное реальное время. Дробная наносекунда, возникающая только при
+ * нецелом масштабе времени, сохраняется отдельно и переносится на последующие кадры.</p>
  */
 public final class SimulationClock {
-    private static final double MIN_EPSILON_SECONDS = 1e-12d;
+    private static final double NANOS_PER_SECOND = 1_000_000_000d;
 
     private final float fixedStepSeconds;
-    private final double stepEpsilonSeconds;
-    private double accumulatorSeconds;
+    private final long fixedStepNanos;
+    private long accumulatorNanos;
+    private double fractionalNanos;
     private double timeScale = 1d;
     private boolean paused;
     private long tick;
@@ -22,22 +26,29 @@ public final class SimulationClock {
     /**
      * Создаёт часы с заданной длительностью одного simulation tick.
      *
-     * @param fixedStepSeconds конечная строго положительная длительность шага в секундах
-     * @throws IllegalArgumentException если длительность некорректна
+     * @param fixedStepSeconds конечная строго положительная длительность шага в секундах; после
+     *                         перевода в наносекунды должна быть не меньше одной наносекунды
+     * @throws IllegalArgumentException если длительность некорректна или слишком мала
      */
     public SimulationClock(float fixedStepSeconds) {
         if (!Float.isFinite(fixedStepSeconds) || fixedStepSeconds <= 0f) {
             throw new IllegalArgumentException("Fixed step должен быть конечным и положительным");
         }
+        long nanos = secondsToRoundedNanos(fixedStepSeconds);
+        if (nanos <= 0L) {
+            throw new IllegalArgumentException("Fixed step должен быть не меньше одной наносекунды");
+        }
         this.fixedStepSeconds = fixedStepSeconds;
-        this.stepEpsilonSeconds = Math.max(MIN_EPSILON_SECONDS, fixedStepSeconds * 1e-9d);
+        this.fixedStepNanos = nanos;
     }
 
     /**
      * Добавляет прошедшее реальное время кадра с учётом паузы и масштаба времени.
      *
      * @param realDeltaSeconds конечное неотрицательное реальное время кадра
-     * @throws IllegalArgumentException если delta некорректен либо масштабирование переполняет double
+     * @throws IllegalArgumentException если delta некорректен или масштабированное значение нельзя
+     *                                  представить внутренним диапазоном времени
+     * @throws IllegalStateException если накопитель игрового времени переполняется
      */
     public void addFrameTime(float realDeltaSeconds) {
         if (!Float.isFinite(realDeltaSeconds) || realDeltaSeconds < 0f) {
@@ -47,19 +58,23 @@ public final class SimulationClock {
             return;
         }
 
-        double scaledDelta = realDeltaSeconds * timeScale;
-        if (!Double.isFinite(scaledDelta)) {
+        long realDeltaNanos = secondsToRoundedNanos(realDeltaSeconds);
+        double scaledNanos = realDeltaNanos * timeScale + fractionalNanos;
+        if (!Double.isFinite(scaledNanos) || scaledNanos < 0d || scaledNanos > Long.MAX_VALUE) {
             throw new IllegalArgumentException("Масштабированный frame delta вышел за допустимый диапазон");
         }
-        accumulatorSeconds += scaledDelta;
-        if (!Double.isFinite(accumulatorSeconds)) {
+
+        long wholeNanos = (long) Math.floor(scaledNanos);
+        fractionalNanos = scaledNanos - wholeNanos;
+        if (Long.MAX_VALUE - accumulatorNanos < wholeNanos) {
             throw new IllegalStateException("Накопленное игровое время вышло за допустимый диапазон");
         }
+        accumulatorNanos += wholeNanos;
     }
 
     /** @return {@code true}, если накоплено достаточно времени для ещё одного полного tick */
     public boolean hasPendingStep() {
-        return accumulatorSeconds + stepEpsilonSeconds >= fixedStepSeconds;
+        return accumulatorNanos >= fixedStepNanos;
     }
 
     /**
@@ -76,10 +91,7 @@ public final class SimulationClock {
             throw new IllegalStateException("Счётчик simulation ticks исчерпан");
         }
 
-        accumulatorSeconds -= fixedStepSeconds;
-        if (accumulatorSeconds < 0d && accumulatorSeconds > -stepEpsilonSeconds) {
-            accumulatorSeconds = 0d;
-        }
+        accumulatorNanos -= fixedStepNanos;
         tick++;
         return fixedStepSeconds;
     }
@@ -94,9 +106,13 @@ public final class SimulationClock {
         return tick;
     }
 
-    /** @return игровое время полностью исполненных ticks в секундах */
+    /**
+     * Возвращает игровое время полностью исполненных ticks.
+     *
+     * @return точное относительно внутренней наносекундной шкалы время в секундах
+     */
     public double getSimulationTimeSeconds() {
-        return tick * (double) fixedStepSeconds;
+        return tick * (double) fixedStepNanos / NANOS_PER_SECOND;
     }
 
     /**
@@ -106,10 +122,11 @@ public final class SimulationClock {
      * @return значение в диапазоне {@code [0, 1)} при штатном состоянии
      */
     public double getInterpolationAlpha() {
-        if (accumulatorSeconds <= 0d) {
+        double accumulated = accumulatorNanos + fractionalNanos;
+        if (accumulated <= 0d) {
             return 0d;
         }
-        return Math.min(0.999999999d, accumulatorSeconds / fixedStepSeconds);
+        return Math.min(0.999999999999d, accumulated / fixedStepNanos);
     }
 
     /** @return текущий множитель скорости игрового времени */
@@ -142,5 +159,14 @@ public final class SimulationClock {
      */
     public void setPaused(boolean paused) {
         this.paused = paused;
+    }
+
+    private static long secondsToRoundedNanos(float seconds) {
+        double canonicalSeconds = Double.parseDouble(Float.toString(seconds));
+        double nanos = canonicalSeconds * NANOS_PER_SECOND;
+        if (!Double.isFinite(nanos) || nanos > Long.MAX_VALUE) {
+            throw new IllegalArgumentException("Время в секундах нельзя представить в наносекундах");
+        }
+        return Math.round(nanos);
     }
 }
