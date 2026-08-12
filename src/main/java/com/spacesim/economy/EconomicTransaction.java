@@ -44,6 +44,14 @@ public record EconomicTransaction(
     /**
      * Проверяет общие структурные инварианты записи.
      *
+     * @param sequence монотонный положительный номер записи внутри ledger
+     * @param type тип экономического движения
+     * @param source имя источника либо пустая строка для внешнего source
+     * @param destination имя получателя либо пустая строка для внешнего sink
+     * @param itemId идентификатор товара или {@code -1}, если операция только денежная
+     * @param itemAmount неотрицательное количество товара
+     * @param moneyMilliCredits неотрицательная денежная сумма в milli-credits
+     * @param reason непустое диагностическое объяснение операции
      * @throws IllegalArgumentException если номер, количество, сумма или reason некорректны
      * @throws NullPointerException если обязательные ссылки не заданы
      */
