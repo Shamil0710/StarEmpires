@@ -12,11 +12,10 @@ import java.util.List;
  * Версионированный value-based снимок authoritative состояния игровой симуляции.
  *
  * <p>Формат содержит clock, точные RNG states, системные таймеры, ledger, следующий EntityId и
- * полный список {@link EntityState}. Начиная со schema v2 snapshot также фиксирует semantic
- * fingerprint content catalog, чтобы сохранение нельзя было продолжить на несовместимых данных.</p>
+ * полный список {@link EntityState}. Schema v2 сохраняет ту же бинарную структуру v1, но переводит
+ * item-indexed списки с пяти исторических элементов на расширяемую runtime slot-capacity.</p>
  *
  * @param schemaVersion версия бинарной/логической схемы
- * @param contentFingerprint SHA-256 semantic fingerprint каталога текущей сессии
  * @param rootSeed корневой seed игровой сессии
  * @param clock полное состояние fixed-step часов
  * @param nextEntityIdValue следующее значение общего ID allocator
@@ -30,7 +29,6 @@ import java.util.List;
  */
 public record GameState(
         int schemaVersion,
-        String contentFingerprint,
         long rootSeed,
         SimulationClock.State clock,
         long nextEntityIdValue,
@@ -44,6 +42,6 @@ public record GameState(
     /** Текущая версия persistent schema. */
     public static final int CURRENT_VERSION = 2;
 
-    /** Последняя schema до введения content fingerprint и расширяемой item slot-capacity. */
+    /** Последняя schema до расширяемой item slot-capacity. */
     public static final int LEGACY_STAGE3_VERSION = 1;
 }
