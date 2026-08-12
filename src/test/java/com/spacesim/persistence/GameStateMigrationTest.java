@@ -1,0 +1,104 @@
+package com.spacesim.persistence;
+
+import com.spacesim.constants.Constants;
+import com.spacesim.simulation.SimulationSession;
+import org.junit.jupiter.api.Test;
+
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+class GameStateMigrationTest {
+    @Test
+    void stage3BinaryV1МигрируетПятьItemSlotsВТекущуюCapacity() {
+        GameState baseline = SimulationSession.createDemo(0x51A7E4L).snapshot();
+        EntityState legacyEntity = new EntityState(
+                new EntityId(1L),
+                null,
+                null,
+                new EntityState.InventoryState(100, List.of(11, 22, 33, 44, 55)),
+                null,
+                new EntityState.MarketState(
+                        List.of(1, 2, 3, 4, 5),
+                        List.of(0f, 1f, 2f, 3f, 4f),
+                        List.of(10f, 20f, 30f, 40f, 50f),
+                        List.of(9f, 18f, 27f, 36f, 45f),
+                        List.of(0d, 0.1d, 0.2d, 0.3d, 0.4d),
+                        List.of(true, false, true, false, true),
+                        true),
+                new EntityState.ProductionState(
+                        List.of(new EntityState.RecipeState(
+                                "legacy",
+                                2f,
+                                List.of(1, 0, 2, 0, 0),
+                                List.of(0, 0, 0, 3, 0))),
+                        0,
+                        0.75f),
+                new EntityState.PriceHistoryState(
+                        20,
+                        List.of(
+                                List.of(1f),
+                                List.of(2f, 3f),
+                                List.of(),
+                                List.of(4f),
+                                List.of(5f))),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        GameState v2WithLegacyShape = new GameState(
+                GameState.CURRENT_VERSION,
+                baseline.rootSeed(),
+                baseline.clock(),
+                baseline.nextEntityIdValue(),
+                baseline.eventRandomState(),
+                baseline.asteroidRandomState(),
+                baseline.events(),
+                baseline.asteroidSpawner(),
+                baseline.priceRecorder(),
+                baseline.ledger(),
+                List.of(legacyEntity));
+
+        byte[] v2Bytes = GameStateCodec.encode(v2WithLegacyShape);
+        // Schema v2 appends one optional-archetype presence byte to every Entity. With exactly one
+        // entity and a null archetype this is the final byte. Remove it to obtain the exact v1
+        // entity layout, then rewrite the logical schema version in the header.
+        byte[] legacyBytes = Arrays.copyOf(v2Bytes, v2Bytes.length - 1);
+        ByteBuffer.wrap(legacyBytes).putInt(8, GameState.LEGACY_STAGE3_VERSION);
+
+        GameState migrated = GameStateCodec.decode(legacyBytes);
+        EntityState entity = migrated.entities().get(0);
+
+        assertEquals(GameState.CURRENT_VERSION, migrated.schemaVersion());
+        assertEquals(Constants.MAX_ITEMS, entity.inventory().stock().size());
+        assertEquals(List.of(11, 22, 33, 44, 55), entity.inventory().stock().subList(0, 5));
+        assertEquals(0, entity.inventory().stock().get(5));
+        assertEquals(0, entity.inventory().stock().get(Constants.MAX_ITEMS - 1));
+
+        assertEquals(Constants.MAX_ITEMS, entity.market().tradableItems().size());
+        assertEquals(true, entity.market().tradableItems().get(0));
+        assertFalse(entity.market().tradableItems().get(5));
+        assertEquals(0f, entity.market().sellPrices().get(5), 0f);
+        assertEquals(0d, entity.market().consumptionRemainder().get(5), 0d);
+
+        EntityState.RecipeState recipe = entity.production().recipes().get(0);
+        assertEquals(Constants.MAX_ITEMS, recipe.inputs().size());
+        assertEquals(2, recipe.inputs().get(2));
+        assertEquals(3, recipe.outputs().get(3));
+        assertEquals(0, recipe.outputs().get(5));
+
+        assertEquals(Constants.MAX_ITEMS, entity.priceHistory().history().size());
+        assertEquals(List.of(2f, 3f), entity.priceHistory().history().get(1));
+        assertEquals(List.of(), entity.priceHistory().history().get(5));
+        assertNull(entity.archetype());
+    }
+}

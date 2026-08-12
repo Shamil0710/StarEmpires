@@ -5,8 +5,9 @@ package com.spacesim.model;
  *
  * <p>Тип задаёт только роль и совместимость грузового отсека. Индивидуальная вместимость,
  * скорость, состояние добычи и боевые характеристики принадлежат соответствующим ECS-компонентам.
- * Раздельные методы {@link #canCarry(ItemType)} и {@link #canPurchase(ItemType)} позволяют
- * добывающему кораблю хранить извлечённую руду, не превращая его в обычного торговца.</p>
+ * Основная политика совместимости принимает категорию и признак добываемости напрямую, поэтому
+ * data-driven товары не обязаны существовать как Java enum-константы. Методы с {@link ItemType}
+ * остаются временным compatibility facade.</p>
  */
 public enum ShipType {
     /** Контейнеровоз продовольствия, вооружения и другой готовой продукции. */
@@ -44,36 +45,51 @@ public enum ShipType {
     }
 
     /**
-     * Проверяет физическую совместимость грузового отсека с товаром.
+     * Проверяет физическую совместимость грузового отсека с data-driven описанием товара.
      *
-     * <p>Три транспортных типа принимают всю свою категорию. Добывающий корабль принимает только
-     * товары с признаком {@link ItemType#isMineable()}, а боевой корабль не принимает коммерческий
-     * груз. Значение {@code null} всегда отклоняется.</p>
+     * @param category категория хранения товара; {@code null} всегда отклоняется
+     * @param mineable можно ли добывать товар напрямую
+     * @return {@code true}, если товар допустимо хранить в корабле этого типа
+     */
+    public boolean canCarry(ItemCategory category, boolean mineable) {
+        if (category == null) {
+            return false;
+        }
+        if (this == MINING_SHIP) {
+            return mineable;
+        }
+        return carrier && category == cargoCategory;
+    }
+
+    /**
+     * Проверяет, разрешено ли покупать data-driven товар для нового торгового маршрута.
+     *
+     * @param category категория хранения товара
+     * @param mineable можно ли добывать товар напрямую
+     * @return {@code true}, если товар совместим и тип является коммерческим перевозчиком
+     */
+    public boolean canPurchase(ItemCategory category, boolean mineable) {
+        return carrier && canCarry(category, mineable);
+    }
+
+    /**
+     * Compatibility-проверка физической совместимости с историческим {@link ItemType}.
      *
      * @param item проверяемый товар либо {@code null}
      * @return {@code true}, если товар допустимо хранить в корабле этого типа
      */
     public boolean canCarry(ItemType item) {
-        if (item == null) {
-            return false;
-        }
-        if (this == MINING_SHIP) {
-            return item.isMineable();
-        }
-        return carrier && item.getCategory() == cargoCategory;
+        return item != null && canCarry(item.getCategory(), item.isMineable());
     }
 
     /**
-     * Проверяет, разрешено ли кораблю покупать товар для нового торгового маршрута.
-     *
-     * <p>Покупку выполняют только три транспортных типа. Добывающий корабль получает ресурс через
-     * добычу, а боевой корабль не участвует в коммерческой перевозке.</p>
+     * Compatibility-проверка покупки исторического {@link ItemType}.
      *
      * @param item проверяемый товар либо {@code null}
      * @return {@code true}, если товар совместим и тип является коммерческим перевозчиком
      */
     public boolean canPurchase(ItemType item) {
-        return carrier && canCarry(item);
+        return item != null && canPurchase(item.getCategory(), item.isMineable());
     }
 
     /**

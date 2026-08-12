@@ -5,6 +5,8 @@ import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoWorldFactory;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.content.ContentCatalog;
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.model.AsteroidSpawnConfig;
@@ -31,9 +33,8 @@ import java.util.Objects;
  * Headless authoritative игровая сессия, владеющая всеми stateful-узлами симуляции.
  *
  * <p>Класс не создаёт OpenGL/Scene2D-ресурсов и потому подходит для save/load, continuation-тестов и
- * будущего benchmark runner. {@link #snapshot()} собирает полный {@link GameState};
- * {@link #restore(GameState)} создаёт новый Ashley Engine и новые runtime-сущности, сохраняя
- * persistent ID, RNG, системные таймеры и fixed-step accumulator.</p>
+ * будущего benchmark runner. Один {@link ContentCatalog} принадлежит всей сессии и передаётся
+ * фабрике мира, рынкам и торговому AI, поэтому data metadata не расходится между системами.</p>
  */
 public final class SimulationSession {
     /** Fixed tick демонстрационной экономики. */
@@ -51,6 +52,7 @@ public final class SimulationSession {
     private final AsteroidSpawnSystem asteroidSpawnSystem;
     private final PriceRecorderSystem priceRecorderSystem;
     private final SimulationClock clock;
+    private final ContentCatalog contentCatalog;
     private final SimulationLoop loop;
 
     private SimulationSession(
@@ -65,7 +67,8 @@ public final class SimulationSession {
             EntityRegistry entityRegistry,
             AsteroidSpawnSystem asteroidSpawnSystem,
             PriceRecorderSystem priceRecorderSystem,
-            SimulationClock clock) {
+            SimulationClock clock,
+            ContentCatalog contentCatalog) {
         this.rootSeed = rootSeed;
         this.engine = engine;
         this.simulationRandom = simulationRandom;
@@ -78,16 +81,30 @@ public final class SimulationSession {
         this.asteroidSpawnSystem = asteroidSpawnSystem;
         this.priceRecorderSystem = priceRecorderSystem;
         this.clock = clock;
+        this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
         this.loop = new SimulationLoop(clock, eventManager, engine);
     }
 
     /**
-     * Создаёт новую демонстрационную headless-сессию от заданного root seed.
+     * Создаёт новую демонстрационную headless-сессию на встроенном content catalog.
      *
      * @param rootSeed корневой seed deterministic simulation streams
      * @return полностью собранная новая сессия
      */
     public static SimulationSession createDemo(long rootSeed) {
+        return createDemo(rootSeed, ContentCatalogLoader.loadDefault());
+    }
+
+    /**
+     * Создаёт новую демонстрационную headless-сессию на явно заданном content catalog.
+     *
+     * @param rootSeed корневой seed deterministic simulation streams
+     * @param contentCatalog versioned каталог текущей сессии
+     * @return полностью собранная новая сессия
+     * @throws NullPointerException если каталог не задан
+     */
+    public static SimulationSession createDemo(long rootSeed, ContentCatalog contentCatalog) {
+        ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
         SimulationRandom random = new SimulationRandom(rootSeed);
         StatefulRandom eventRandom = random.createStream("economy-events");
         StatefulRandom asteroidRandom = random.createStream("asteroid-spawn");
@@ -100,8 +117,8 @@ public final class SimulationSession {
         AsteroidSpawnSystem spawner = new AsteroidSpawnSystem(
                 AsteroidSpawnConfig.demoWorld(), asteroidRandom, ledger, ids);
         PriceRecorderSystem recorder = new PriceRecorderSystem();
-        addSystems(engine, events, ledger, registry, spawner, recorder);
-        for (Entity entity : DemoWorldFactory.createEntities(ids)) {
+        addSystems(engine, events, ledger, registry, spawner, recorder, content);
+        for (Entity entity : DemoWorldFactory.createEntities(ids, content)) {
             engine.addEntity(entity);
         }
         return new SimulationSession(
@@ -116,11 +133,12 @@ public final class SimulationSession {
                 registry,
                 spawner,
                 recorder,
-                new SimulationClock(DEFAULT_FIXED_STEP_SECONDS));
+                new SimulationClock(DEFAULT_FIXED_STEP_SECONDS),
+                content);
     }
 
     /**
-     * Восстанавливает новую runtime-сессию из value-based snapshot.
+     * Восстанавливает новую runtime-сессию на встроенном content catalog.
      *
      * @param state сохранённое состояние текущей поддерживаемой версии
      * @return новая независимая сессия
@@ -128,7 +146,25 @@ public final class SimulationSession {
      * @throws IllegalArgumentException если версия или обязательное состояние некорректны
      */
     public static SimulationSession restore(GameState state) {
+        return restore(state, ContentCatalogLoader.loadDefault());
+    }
+
+    /**
+     * Восстанавливает runtime-сессию на явно заданном content catalog.
+     *
+     * <p>До введения content fingerprint в следующей миграции вызывающая сторона отвечает за то,
+     * что переданный каталог соответствует сохранённой игре. Сам state при этом восстанавливается
+     * точным Stage-3 механизмом без изменения persistent schema v1.</p>
+     *
+     * @param state сохранённое состояние текущей поддерживаемой версии
+     * @param contentCatalog каталог, который будет использовать продолженная simulation session
+     * @return новая независимая сессия
+     * @throws NullPointerException если state или каталог не заданы
+     * @throws IllegalArgumentException если версия или обязательное состояние некорректны
+     */
+    public static SimulationSession restore(GameState state, ContentCatalog contentCatalog) {
         GameState checked = Objects.requireNonNull(state, "GameState не задан");
+        ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
         if (checked.schemaVersion() != GameState.CURRENT_VERSION) {
             throw new IllegalArgumentException(
                     "Неподдерживаемая версия GameState: " + checked.schemaVersion());
@@ -156,7 +192,7 @@ public final class SimulationSession {
                 Objects.requireNonNull(checked.asteroidSpawner(), "Состояние spawner не задано"));
         PriceRecorderSystem recorder = new PriceRecorderSystem(
                 Objects.requireNonNull(checked.priceRecorder(), "Состояние recorder не задано"));
-        addSystems(engine, events, ledger, registry, spawner, recorder);
+        addSystems(engine, events, ledger, registry, spawner, recorder, content);
 
         List<EntityState> entityStates = Objects.requireNonNull(
                 checked.entities(), "Список сущностей GameState не задан");
@@ -176,7 +212,8 @@ public final class SimulationSession {
                 registry,
                 spawner,
                 recorder,
-                new SimulationClock(Objects.requireNonNull(checked.clock(), "Состояние clock не задано")));
+                new SimulationClock(Objects.requireNonNull(checked.clock(), "Состояние clock не задано")),
+                content);
     }
 
     private static void addSystems(
@@ -185,14 +222,15 @@ public final class SimulationSession {
             EconomicLedger ledger,
             EntityRegistry registry,
             AsteroidSpawnSystem spawner,
-            PriceRecorderSystem recorder) {
-        engine.addSystem(new MarketSystem(events));
+            PriceRecorderSystem recorder,
+            ContentCatalog contentCatalog) {
+        engine.addSystem(new MarketSystem(events, contentCatalog));
         engine.addSystem(new ConsumptionSystem(events, ledger));
         engine.addSystem(new ProductionSystem(ledger));
         engine.addSystem(spawner);
         engine.addSystem(new MiningSystem(ledger, registry));
         engine.addSystem(new TradeAISystem(
-                new SpatialHashGrid(Constants.CELL_SIZE), ledger, registry));
+                new SpatialHashGrid(Constants.CELL_SIZE), ledger, registry, contentCatalog));
         engine.addSystem(recorder);
     }
 
@@ -259,6 +297,11 @@ public final class SimulationSession {
     /** @return общий registry текущей сессии */
     public EntityRegistry getEntityRegistry() {
         return entityRegistry;
+    }
+
+    /** @return versioned content catalog текущей сессии */
+    public ContentCatalog getContentCatalog() {
+        return contentCatalog;
     }
 
     /** @return deterministic RNG service текущей сессии */

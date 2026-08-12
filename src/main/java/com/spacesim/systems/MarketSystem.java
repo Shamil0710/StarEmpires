@@ -1,11 +1,20 @@
 package com.spacesim.systems;
 
-import com.badlogic.ashley.core.*;
+import com.badlogic.ashley.core.ComponentMapper;
+import com.badlogic.ashley.core.Engine;
+import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.EntitySystem;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.utils.ImmutableArray;
-import com.spacesim.components.*;
-import com.spacesim.constants.Constants;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
+import com.spacesim.components.TransformComponent;
+import com.spacesim.content.ContentCatalog;
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.events.EconomyEvent;
 import com.spacesim.events.GlobalEventManager;
+
+import java.util.Objects;
 
 /**
  * Рассчитывает цены покупки и продажи на всех активных рынках.
@@ -17,54 +26,57 @@ import com.spacesim.events.GlobalEventManager;
  * принудительно обновляет все рынки, поскольку активация, отмена или завершение события может
  * изменить пространственный множитель цены даже при неизменном инвентаре.</p>
  *
- * <p>Цена продажи вычисляется по формуле
+ * <p>Базовая цена и список существующих runtime item ID берутся из {@link ContentCatalog}, а не
+ * из Java-констант. Цена продажи вычисляется по формуле
  * {@code basePrice * (targetStock / max(1, currentStock))^1.2 * eventMultiplier}; цена покупки
- * составляет 90 процентов от неё. Множители всех подходящих событий перемножаются. Для товаров,
- * не разрешённых к торговле, обе цены принудительно равны нулю. После успешного прохода флаг
- * {@code isDirty} очищается.</p>
+ * составляет 90 процентов от неё. Для товаров, не разрешённых к торговле, обе цены равны нулю.</p>
  */
 public class MarketSystem extends EntitySystem {
-    /** Живое представление всех сущностей, удовлетворяющих семейству рынка. */
     private ImmutableArray<Entity> entities;
-    /** Менеджер событий, влияющих на локальные множители цены. */
     private final GlobalEventManager eventManager;
-    /** Ревизия событий, уже учтённая последним полным или частичным пересчётом. */
+    private final ContentCatalog contentCatalog;
     private long lastEventRevision = Long.MIN_VALUE;
 
-    /** Быстрый доступ к рассчитываемым параметрам рынка. */
-    private ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
-    /** Быстрый доступ к текущим запасам рынка. */
-    private ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
-    /** Быстрый доступ к позиции рынка для применения пространственных событий. */
-    private ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
+    private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
+    private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
+    private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
 
     /**
-     * Создаёт систему расчёта рыночных цен.
+     * Создаёт систему на встроенном production content catalog.
      *
-     * @param em менеджер активных экономических событий; во время работы системы не должен быть
-     *           {@code null}
+     * @param em менеджер активных экономических событий
+     * @throws NullPointerException если менеджер не задан
      */
-    public MarketSystem(GlobalEventManager em) { this.eventManager = em; }
+    public MarketSystem(GlobalEventManager em) {
+        this(em, ContentCatalogLoader.loadDefault());
+    }
+
+    /**
+     * Создаёт систему с явно заданным versioned content catalog.
+     *
+     * @param em менеджер активных экономических событий
+     * @param contentCatalog каталог метаданных товаров
+     * @throws NullPointerException если зависимость не задана
+     */
+    public MarketSystem(GlobalEventManager em, ContentCatalog contentCatalog) {
+        this.eventManager = Objects.requireNonNull(em, "GlobalEventManager не задан");
+        this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
+    }
 
     /**
      * Получает живое представление сущностей, составляющих рынки.
-     *
-     * <p>Ashley автоматически поддерживает возвращённый массив при добавлении и удалении
-     * компонентов, поэтому повторно формировать семейство на каждом кадре не требуется.</p>
      *
      * @param engine движок, к которому добавлена система
      * @throws NullPointerException если {@code engine} равен {@code null}
      */
     @Override
     public void addedToEngine(Engine engine) {
-        entities = engine.getEntitiesFor(Family.all(MarketComponent.class, InventoryComponent.class, TransformComponent.class).get());
+        entities = Objects.requireNonNull(engine, "Engine не задан").getEntitiesFor(
+                Family.all(MarketComponent.class, InventoryComponent.class, TransformComponent.class).get());
     }
 
     /**
      * Пересчитывает только изменившиеся рынки либо все рынки при новой ревизии событий.
-     *
-     * <p>Начальное значение сохранённой ревизии гарантирует полный расчёт при первом обновлении.
-     * Параметр времени на формулу не влияет: цены зависят от текущего снимка запасов и событий.</p>
      *
      * @param deltaTime время кадра в секундах; системой непосредственно не используется
      */
@@ -74,27 +86,30 @@ public class MarketSystem extends EntitySystem {
         boolean eventsChanged = eventRevision != lastEventRevision;
 
         for (Entity entity : entities) {
-            MarketComponent m = mm.get(entity);
-            InventoryComponent inv = im.get(entity);
-            TransformComponent pos = tm.get(entity);
+            MarketComponent market = mm.get(entity);
+            InventoryComponent inventory = im.get(entity);
+            TransformComponent position = tm.get(entity);
 
-            if (m.isDirty || eventsChanged) {
-                for (int i = 0; i < Constants.MAX_ITEMS; i++) {
-                    if (!m.isTradable(i)) {
-                        m.sellPrices[i] = 0f;
-                        m.buyPrices[i] = 0f;
-                        continue;
-                    }
-
-                    float ratio = (float)m.targetStock[i] / Math.max(1, inv.stock[i]);
-                    float base = Constants.BASE_PRICES[i];
-                    float priceMultiplier = getPriceMultiplier(i, pos);
-
-                    m.sellPrices[i] = base * (float)Math.pow(ratio, 1.2) * priceMultiplier;
-                    m.buyPrices[i] = m.sellPrices[i] * 0.9f;
-                }
-                m.isDirty = false;
+            if (!market.isDirty && !eventsChanged) {
+                continue;
             }
+
+            for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
+                int itemId = item.runtimeId();
+                if (!market.isTradable(itemId)) {
+                    market.sellPrices[itemId] = 0f;
+                    market.buyPrices[itemId] = 0f;
+                    continue;
+                }
+
+                float ratio = (float) market.targetStock[itemId] / Math.max(1, inventory.stock[itemId]);
+                float priceMultiplier = getPriceMultiplier(itemId, position);
+                market.sellPrices[itemId] = item.basePrice()
+                        * (float) Math.pow(ratio, 1.2)
+                        * priceMultiplier;
+                market.buyPrices[itemId] = market.sellPrices[itemId] * 0.9f;
+            }
+            market.isDirty = false;
         }
 
         lastEventRevision = eventRevision;

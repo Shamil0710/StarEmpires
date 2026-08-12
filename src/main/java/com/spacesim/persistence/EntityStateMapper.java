@@ -1,6 +1,7 @@
 package com.spacesim.persistence;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.ArchetypeComponent;
 import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.CombatComponent;
 import com.spacesim.components.EntityIdComponent;
@@ -30,7 +31,8 @@ import java.util.Objects;
  * <p>Mapper является единственной границей между ECS и persistent DTO. Capture копирует все
  * поддерживаемые mutable поля по значениям. Restore всегда создаёт новый экземпляр Ashley
  * {@link Entity}; persistent-связи TradeAI/Mining остаются {@link EntityId} и позднее разрешаются
- * через {@link EntityRegistry}.</p>
+ * через {@link EntityRegistry}. Data-driven archetype сохраняется как стабильная строка, а не как
+ * runtime-ссылка на объект каталога.</p>
  */
 public final class EntityStateMapper {
     private EntityStateMapper() {
@@ -66,6 +68,7 @@ public final class EntityStateMapper {
         MiningComponent mining = entity.getComponent(MiningComponent.class);
         CombatComponent combat = entity.getComponent(CombatComponent.class);
         AsteroidComponent asteroid = entity.getComponent(AsteroidComponent.class);
+        ArchetypeComponent archetype = entity.getComponent(ArchetypeComponent.class);
 
         return new EntityState(
                 idComponent.id,
@@ -82,7 +85,8 @@ public final class EntityStateMapper {
                 captureTradeAi(tradeAi),
                 captureMining(mining),
                 captureCombat(combat),
-                captureAsteroid(asteroid));
+                captureAsteroid(asteroid),
+                archetype == null ? null : new EntityState.ArchetypeState(archetype.contentId));
     }
 
     /**
@@ -167,6 +171,9 @@ public final class EntityStateMapper {
             }
             component.remainingResource = value.remainingResource();
             entity.add(component);
+        }
+        if (state.archetype() != null) {
+            entity.add(new ArchetypeComponent(state.archetype().contentId()));
         }
         return entity;
     }

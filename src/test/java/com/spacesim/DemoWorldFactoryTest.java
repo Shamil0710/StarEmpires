@@ -16,6 +16,7 @@ import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.economy.Money;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
@@ -142,7 +143,7 @@ class DemoWorldFactoryTest {
         }
 
         assertEquals(5, traders);
-        assertEquals(Constants.MAX_ITEMS, specializedItems.size());
+        assertEquals(ContentCatalogLoader.loadDefault().getItems().size(), specializedItems.size());
     }
 
     @Test

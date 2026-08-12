@@ -12,7 +12,8 @@ import java.util.List;
  * Версионированный value-based снимок authoritative состояния игровой симуляции.
  *
  * <p>Формат содержит clock, точные RNG states, системные таймеры, ledger, следующий EntityId и
- * полный список {@link EntityState}. UI/render state намеренно не входит в сохранение.</p>
+ * полный список {@link EntityState}. Schema v2 сохраняет ту же бинарную структуру v1, но переводит
+ * item-indexed списки с пяти исторических элементов на расширяемую runtime slot-capacity.</p>
  *
  * @param schemaVersion версия бинарной/логической схемы
  * @param rootSeed корневой seed игровой сессии
@@ -39,5 +40,8 @@ public record GameState(
         EconomicLedger.State ledger,
         List<EntityState> entities) {
     /** Текущая версия persistent schema. */
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
+
+    /** Последняя schema до расширяемой item slot-capacity. */
+    public static final int LEGACY_STAGE3_VERSION = 1;
 }
