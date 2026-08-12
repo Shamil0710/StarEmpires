@@ -11,39 +11,65 @@ import com.spacesim.constants.Constants;
  * <p>Общий для системы таймер накапливает положительное конечное время кадров. При достижении
  * секундного интервала выставляется кратковременный флаг записи, после чего Ashley одним проходом
  * добавляет по одной точке истории каждой подходящей сущности. Остаток времени сохраняется операцией
- * по модулю интервала, поэтому небольшая погрешность кадров не накапливается.</p>
- *
- * <p>Даже если один кадр перекрывает несколько интервалов, за этот вызов записывается только один
- * снимок: система хранит историю наблюдаемых состояний, а не дублирует одну и ту же цену для
- * пропущенных моментов. После прохода флаг записи обязательно сбрасывается. Неконечное или
- * неположительное время игнорируется.</p>
+ * по модулю интервала. Этот остаток входит в {@link State}, поэтому загрузка не сдвигает момент
+ * следующего снимка цен.</p>
  */
 public class PriceRecorderSystem extends IteratingSystem {
     /** Период между соседними снимками цен в секундах симуляции. */
-    private static final float RECORD_INTERVAL_SECONDS = 1.0f;
-
-    /** Накопленное время внутри текущего интервала записи. */
-    private float timer = 0;
-    /** Признак единственного прохода записи, действующий только в текущем вызове обновления. */
-    private boolean shouldRecordThisFrame = false;
-
-    /** Быстрый доступ к текущим рыночным ценам. */
-    private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
-    /** Быстрый доступ к ограниченным массивам истории цен. */
-    private final ComponentMapper<PriceHistoryComponent> hm = ComponentMapper.getFor(PriceHistoryComponent.class);
+    public static final float RECORD_INTERVAL_SECONDS = 1.0f;
 
     /**
-     * Создаёт регистратор для сущностей с рынком и компонентом истории цен.
+     * Сериализуемое состояние системного таймера.
+     *
+     * @param timerSeconds накопленное время внутри текущего интервала
      */
+    public record State(float timerSeconds) {
+        /**
+         * Проверяет диапазон таймера.
+         *
+         * @param timerSeconds накопленное время внутри текущего интервала
+         */
+        public State {
+            if (!Float.isFinite(timerSeconds)
+                    || timerSeconds < 0f
+                    || timerSeconds >= RECORD_INTERVAL_SECONDS) {
+                throw new IllegalArgumentException("Таймер PriceRecorder должен принадлежать [0, interval)");
+            }
+        }
+    }
+
+    private float timer;
+    private boolean shouldRecordThisFrame;
+
+    private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
+    private final ComponentMapper<PriceHistoryComponent> hm = ComponentMapper.getFor(PriceHistoryComponent.class);
+
+    /** Создаёт регистратор с пустым внутренним таймером. */
     public PriceRecorderSystem() {
+        this(new State(0f));
+    }
+
+    /**
+     * Восстанавливает регистратор из сохранённого системного таймера.
+     *
+     * @param state состояние таймера
+     * @throws NullPointerException если состояние не задано
+     */
+    public PriceRecorderSystem(State state) {
         super(Family.all(MarketComponent.class, PriceHistoryComponent.class).get());
+        State checked = java.util.Objects.requireNonNull(state, "Состояние PriceRecorder не задано");
+        timer = checked.timerSeconds();
+    }
+
+    /** @return immutable снимок внутреннего таймера */
+    public State snapshotState() {
+        return new State(timer);
     }
 
     /**
      * Продвигает таймер записи и при необходимости запускает один проход сохранения цен.
      *
-     * @param deltaTime прошедшее с предыдущего обновления время в секундах; неположительные,
-     *                  бесконечные значения и {@code NaN} игнорируются
+     * @param deltaTime прошедшее с предыдущего обновления время в секундах
      */
     @Override
     public void update(float deltaTime) {
@@ -54,7 +80,6 @@ public class PriceRecorderSystem extends IteratingSystem {
 
         timer += deltaTime;
         shouldRecordThisFrame = timer >= RECORD_INTERVAL_SECONDS;
-
         if (shouldRecordThisFrame) {
             timer %= RECORD_INTERVAL_SECONDS;
         }
@@ -63,29 +88,20 @@ public class PriceRecorderSystem extends IteratingSystem {
         shouldRecordThisFrame = false;
     }
 
-    /**
-     * Добавляет один снимок всех цен продажи в историю сущности.
-     *
-     * <p>После добавления самой старой точки она удаляется, если число элементов превысило
-     * {@link PriceHistoryComponent#maxPoints}. В кадрах без активного флага записи метод ничего не
-     * изменяет.</p>
-     *
-     * @param entity сущность с компонентами {@link MarketComponent} и
-     *               {@link PriceHistoryComponent}
-     * @param deltaTime время кадра в секундах; при непосредственной записи не используется
-     */
+    /** Добавляет один снимок всех цен продажи в историю сущности при активном флаге записи. */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         if (!shouldRecordThisFrame) {
             return;
         }
 
-        MarketComponent m = mm.get(entity);
-        PriceHistoryComponent h = hm.get(entity);
-
-        for(int i=0; i<Constants.MAX_ITEMS; i++) {
-            h.history[i].add(m.sellPrices[i]);
-            if(h.history[i].size > h.maxPoints) h.history[i].removeIndex(0);
+        MarketComponent market = mm.get(entity);
+        PriceHistoryComponent history = hm.get(entity);
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            history.history[itemId].add(market.sellPrices[itemId]);
+            if (history.history[itemId].size > history.maxPoints) {
+                history.history[itemId].removeIndex(0);
+            }
         }
     }
 }
