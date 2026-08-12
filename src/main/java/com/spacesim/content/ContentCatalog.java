@@ -3,11 +3,18 @@ package com.spacesim.content;
 import com.spacesim.model.ItemCategory;
 import com.spacesim.model.Recipe;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * Неизменяемый runtime-каталог versioned игрового контента.
@@ -15,6 +22,10 @@ import java.util.Objects;
  * <p>Persistent контент адресуется стабильными строковыми ID, а горячий simulation path продолжает
  * работать с плотными целочисленными runtime ID. Каталог является единственной границей между
  * этими двумя представлениями для вынесенных в данные сущностей.</p>
+ *
+ * <p>Каталог также вычисляет semantic SHA-256 fingerprint. Он не зависит от пробелов JSON или
+ * порядка recipe-записей, но меняется при изменении любого игрового параметра товара/рецепта.
+ * Fingerprint используется save schema для fail-fast проверки совместимости контента.</p>
  */
 public final class ContentCatalog {
     private final int schemaVersion;
@@ -23,6 +34,7 @@ public final class ContentCatalog {
     private final Map<String, ItemDefinition> itemsById;
     private final Map<Integer, ItemDefinition> itemsByRuntimeId;
     private final Map<String, RecipeDefinition> recipesById;
+    private final String fingerprint;
 
     ContentCatalog(
             int schemaVersion,
@@ -37,6 +49,7 @@ public final class ContentCatalog {
         this.itemsById = immutableOrderedCopy(itemsById);
         this.itemsByRuntimeId = immutableOrderedCopy(itemsByRuntimeId);
         this.recipesById = immutableOrderedCopy(recipesById);
+        this.fingerprint = computeFingerprint();
     }
 
     /** @return версия schema загруженного каталога */
@@ -52,6 +65,15 @@ public final class ContentCatalog {
     /** @return неизменяемый список рецептов в порядке файла */
     public List<RecipeDefinition> getRecipes() {
         return recipes;
+    }
+
+    /**
+     * Возвращает semantic fingerprint каталога.
+     *
+     * @return lowercase SHA-256 hex string длиной 64 символа
+     */
+    public String getFingerprint() {
+        return fingerprint;
     }
 
     /**
@@ -113,6 +135,51 @@ public final class ContentCatalog {
             } else {
                 recipe.output(item.runtimeId(), entry.getValue());
             }
+        }
+    }
+
+    private String computeFingerprint() {
+        StringBuilder canonical = new StringBuilder(1024);
+        canonical.append("schema=").append(schemaVersion).append('\n');
+        for (ItemDefinition item : items) {
+            canonical.append("item|")
+                    .append(item.runtimeId()).append('|')
+                    .append(item.id()).append('|')
+                    .append(item.codeName()).append('|')
+                    .append(item.displayName()).append('|')
+                    .append(item.category().name()).append('|')
+                    .append(Float.floatToIntBits(item.basePrice())).append('|')
+                    .append(item.mineable()).append('\n');
+        }
+        List<RecipeDefinition> orderedRecipes = new ArrayList<>(recipes);
+        orderedRecipes.sort(Comparator.comparing(RecipeDefinition::id));
+        for (RecipeDefinition recipe : orderedRecipes) {
+            canonical.append("recipe|")
+                    .append(recipe.id()).append('|')
+                    .append(recipe.displayName()).append('|')
+                    .append(Float.floatToIntBits(recipe.durationSeconds())).append('|');
+            appendAmounts(canonical, recipe.inputs());
+            canonical.append('|');
+            appendAmounts(canonical, recipe.outputs());
+            canonical.append('\n');
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(
+                    canonical.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("JVM не поддерживает обязательный SHA-256", exception);
+        }
+    }
+
+    private static void appendAmounts(StringBuilder target, Map<String, Integer> amounts) {
+        boolean first = true;
+        for (Map.Entry<String, Integer> entry : new TreeMap<>(amounts).entrySet()) {
+            if (!first) {
+                target.append(',');
+            }
+            target.append(entry.getKey()).append('=').append(entry.getValue());
+            first = false;
         }
     }
 
