@@ -47,7 +47,8 @@ import java.util.Objects;
  *
  * <p>Authoritative деньги хранятся только в {@link WalletComponent}. Фактические сделки выполняет
  * {@link TradeController}, поэтому товар и деньги переходят атомарно и записываются в общий
- * {@link EconomicLedger}. Scoring новых маршрутов задаётся явно и не влияет на execution layer.</p>
+ * {@link EconomicLedger}. По умолчанию новые маршруты сравниваются по прибыли на игровую секунду;
+ * legacy gross-profit scoring доступен явно для regression-тестов.</p>
  */
 public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
@@ -106,7 +107,7 @@ public class TradeAISystem extends IteratingSystem {
     }
 
     /**
-     * Создаёт торговую AI-систему с явно заданным catalog и legacy gross-profit scoring.
+     * Создаёт торговую AI-систему с явно заданным catalog и Stage-5 profit/time scoring.
      *
      * @param grid пространственный индекс рыночных станций
      * @param ledger общий экономический журнал
@@ -119,7 +120,7 @@ public class TradeAISystem extends IteratingSystem {
             EconomicLedger ledger,
             EntityRegistry registry,
             ContentCatalog contentCatalog) {
-        this(grid, ledger, registry, contentCatalog, TradeRoutePlanner.ScoringMode.GROSS_PROFIT);
+        this(grid, ledger, registry, contentCatalog, TradeRoutePlanner.ScoringMode.PROFIT_PER_SECOND);
     }
 
     /**
