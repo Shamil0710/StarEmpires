@@ -5,10 +5,12 @@ import com.spacesim.simulation.SimulationSession;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class GameStateMigrationTest {
     @Test
@@ -50,6 +52,7 @@ class GameStateMigrationTest {
                 null,
                 null,
                 null,
+                null,
                 null);
 
         GameState v2WithLegacyShape = new GameState(
@@ -65,7 +68,11 @@ class GameStateMigrationTest {
                 baseline.ledger(),
                 List.of(legacyEntity));
 
-        byte[] legacyBytes = GameStateCodec.encode(v2WithLegacyShape);
+        byte[] v2Bytes = GameStateCodec.encode(v2WithLegacyShape);
+        // Schema v2 appends one optional-archetype presence byte to every Entity. With exactly one
+        // entity and a null archetype this is the final byte. Remove it to obtain the exact v1
+        // entity layout, then rewrite the logical schema version in the header.
+        byte[] legacyBytes = Arrays.copyOf(v2Bytes, v2Bytes.length - 1);
         ByteBuffer.wrap(legacyBytes).putInt(8, GameState.LEGACY_STAGE3_VERSION);
 
         GameState migrated = GameStateCodec.decode(legacyBytes);
@@ -92,5 +99,6 @@ class GameStateMigrationTest {
         assertEquals(Constants.MAX_ITEMS, entity.priceHistory().history().size());
         assertEquals(List.of(2f, 3f), entity.priceHistory().history().get(1));
         assertEquals(List.of(), entity.priceHistory().history().get(5));
+        assertNull(entity.archetype());
     }
 }
