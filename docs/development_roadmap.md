@@ -11,9 +11,9 @@
 Критерии milestone:
 
 - [x] проект стабильно собирается из чистого clone одной командой;
-- [ ] CI зелёный и блокирует сломанные изменения;
-- [ ] симуляция использует фиксированный игровой tick и поддерживает pause/time scale;
-- [ ] одинаковый seed даёт воспроизводимую экономическую симуляцию;
+- [ ] CI зелёный и блокирует сломанные изменения — CI зелёный; обязательная branch protection для `main` пока не настроена доступным connector API;
+- [x] симуляция использует фиксированный игровой tick и поддерживает pause/time scale;
+- [x] одинаковый seed даёт воспроизводимую экономическую симуляцию;
 - [ ] товары сохраняются физически: source / transform / sink всегда явны;
 - [ ] деньги передаются между экономическими агентами, а не создаются/исчезают внутри обычной сделки;
 - [ ] save/load сохраняет экономическое состояние и ссылки между сущностями через устойчивые ID;
@@ -26,29 +26,27 @@
 
 ## Этап 0 — Repository health и зелёная сборка
 
-**Статус:** VERIFIED — READY TO MERGE
+**Статус:** COMPLETE — MERGED TO `main` VIA PR #1
 
 ### Задачи
 
 - [x] восстановить отсутствующие `AsteroidComponent`, `AsteroidSpawnPoint`, `AsteroidSpawnConfig`, `AsteroidSpawnSystem`;
 - [x] устранить все compile errors;
 - [x] запустить полный `clean verify` в GitHub Actions;
-- [x] добиться прохождения всех тестов — 140/140 на проверенном HEAD;
+- [x] добиться прохождения всех тестов;
 - [x] добиться прохождения JaCoCo thresholds;
 - [x] обновить `actions/setup-java` с v4 на v5;
 - [x] убедиться, что README соответствует фактическому HEAD;
 - [ ] выполнить desktop smoke-check по существующему checklist — **MANUAL / NON-BLOCKING FOR CORE DoD**;
 - [x] открыть PR `fix/economy-stability -> main` — PR #1;
-- [ ] merge только после зелёного CI;
-- [ ] после merge использовать `main` как стабильную базу, feature/fix-ветки — для разработки.
+- [x] merge только после зелёного CI — merge commit `483dad87b03eb2a1eb355be6c29e503dc7d872e5`;
+- [x] после merge использовать `main` как стабильную базу, feature/fix-ветки — для разработки.
 
 ### Результат автоматической проверки
 
 - `./mvnw --batch-mode --no-transfer-progress clean verify` — SUCCESS;
-- 140 тестов, 0 failures, 0 errors, 0 skipped;
-- Javadoc с `failOnWarnings=true` — SUCCESS;
-- JaCoCo line/branch gates — SUCCESS;
-- runnable `star-empires-*-all.jar` и отчёты успешно публикуются как GitHub Actions artifacts.
+- JUnit, Javadoc с `failOnWarnings=true` и JaCoCo line/branch gates — SUCCESS;
+- runnable `star-empires-*-all.jar` и отчёты публикуются как GitHub Actions artifacts.
 
 ### Definition of Done
 
@@ -60,22 +58,34 @@
 
 ## Этап 1 — SimulationClock и детерминированное игровое время
 
-**Статус:** PLANNED
+**Статус:** VERIFIED — READY TO MERGE
 
 ### Задачи
 
-- [ ] ввести `SimulationClock` с fixed step;
-- [ ] отделить render delta от simulation delta;
-- [ ] добавить pause и time scale;
-- [ ] все экономические события и новости перевести на game time;
-- [ ] ввести единый seeded RNG / RNG service;
-- [ ] определить порядок систем как явный simulation pipeline;
-- [ ] добавить тесты эквивалентности при разных render frame patterns;
-- [ ] определить допустимые численные tolerance для экономического состояния.
+- [x] ввести `SimulationClock` с fixed step — accumulator хранится в целых наносекундах;
+- [x] отделить render delta от simulation delta через `SimulationLoop`;
+- [x] добавить pause и time scale без изменения размера fixed tick;
+- [x] все экономические события и новости перевести на game time;
+- [x] ввести единый seeded RNG / RNG service — `SimulationRandom` с именованными потоками;
+- [x] определить порядок систем как явный simulation pipeline;
+- [x] добавить тесты эквивалентности при разных render frame patterns;
+- [x] определить допустимые численные tolerance для экономического состояния — `docs/simulation_time_model.md`.
+
+### Результат проверки
+
+- fixed step демонстрационной игры: `0.1` игровой секунды;
+- render/UI time отделён от authoritative simulation time;
+- backlog fixed ticks не отбрасывается при защитном `maxStepsPerFrame`;
+- `NewsArticle.timestamp` теперь означает миллисекунды игрового времени, а не Unix/wall-clock;
+- события и астероиды используют независимые RNG-потоки от одного root seed;
+- `EconomicSimulationDeterminismTest` сравнивает экономическое состояние после 300 ticks при `30 × 1s` и `300 × 0.1s` render patterns;
+- сравниваются позиции, склады, рыночные цены, торговые состояния, маршруты, астероиды и активные события;
+- полный `clean verify` на HEAD Этапа 1 — SUCCESS;
+- 156 тестов на интеграционном наборе, Javadoc и JaCoCo gates — SUCCESS.
 
 ### Definition of Done
 
-Одинаковый initial state + seed + количество simulation ticks приводит к одинаковому экономическому состоянию независимо от FPS/рендеринга.
+Одинаковый initial state + seed + количество simulation ticks приводит к одинаковому экономическому состоянию независимо от FPS/рендеринга. **Выполнено.**
 
 ---
 
@@ -266,4 +276,4 @@ Supply chain может самостоятельно перестраивать�
 
 ## Текущий следующий шаг
 
-**Переход Этап 0 → Этап 1:** получить зелёный CI на этом status-коммите, merge PR #1 в `main`, затем создать отдельную ветку Этапа 1 и начать `SimulationClock`.
+**Переход Этап 1 → Этап 2:** получить зелёный CI на status/docs HEAD, открыть PR `feat/simulation-clock -> main`, merge только после зелёной проверки, затем создать отдельную ветку Этапа 2 для денег и экономических инвариантов.

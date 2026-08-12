@@ -19,6 +19,9 @@ import com.spacesim.constants.Constants;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.events.NewsArticle;
 import com.spacesim.model.AsteroidSpawnConfig;
+import com.spacesim.simulation.SimulationClock;
+import com.spacesim.simulation.SimulationLoop;
+import com.spacesim.simulation.SimulationRandom;
 import com.spacesim.systems.*;
 import com.spacesim.ui.EconomyStatusUI;
 import com.spacesim.ui.EntityDetailsUI;
@@ -32,16 +35,17 @@ import com.spacesim.util.SpatialHashGrid;
 /**
  * Главный объект приложения Star Empires и точка сборки демонстрационной сцены.
  *
- * <p>Класс управляет жизненным циклом libGDX: создаёт Ashley-движок, регистрирует
- * экономические системы в порядке их выполнения, наполняет мир начальными
- * станциями и флотом, а затем на каждом кадре обновляет симуляцию и интерфейс.
- * Экономическая панель намеренно обновляется не чаще четырёх раз в секунду,
- * тогда как модель продолжает получать фактическое время кадра.</p>
+ * <p>Класс управляет жизненным циклом libGDX, но модель больше не получает render delta напрямую.
+ * {@link SimulationLoop} преобразует реальное время кадров в fixed simulation ticks; пауза и time
+ * scale воздействуют только на игровое время, тогда как Scene2D и частота обновления UI продолжают
+ * использовать реальное время кадра.</p>
  *
  * <p>Экземпляр создаётся desktop-запускателем. Все графические ресурсы,
  * созданные в {@link #create()}, освобождаются в {@link #dispose()}.</p>
  */
 public class SpaceSimGame extends ApplicationAdapter {
+    private static final float SIMULATION_FIXED_STEP_SECONDS = 0.1f;
+    private static final long SIMULATION_ROOT_SEED = 0x5EED_2026L;
     private static final float ECONOMY_UI_UPDATE_INTERVAL_SECONDS = 0.25f;
     private static final float MAP_PADDING = 18f;
     private static final float MAP_PICK_RADIUS = 24f;
@@ -50,6 +54,9 @@ public class SpaceSimGame extends ApplicationAdapter {
     private Engine engine;
     private GlobalEventManager eventManager;
     private SpatialHashGrid grid;
+    private SimulationClock simulationClock;
+    private SimulationLoop simulationLoop;
+    private SimulationRandom simulationRandom;
 
     private Stage stage;
     private NewsUI newsUI;
@@ -72,19 +79,20 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
-     * Создаёт экономическую модель, пользовательский интерфейс и начальный мир.
+     * Создаёт экономическую модель, fixed-step pipeline, пользовательский интерфейс и начальный мир.
      *
-     * <p>Метод вызывается libGDX один раз после инициализации графического
-     * контекста. Порядок регистрации систем значим: сначала формируются цены и
-     * потребление, затем выполняются производство, появление астероидов, добыча, торговый ИИ и
-     * запись истории.</p>
+     * <p>Порядок Ashley-систем значим: рынок → потребление → производство → появление астероидов →
+     * добыча → торговый ИИ → запись истории. Глобальные события обновляются
+     * {@link SimulationLoop} перед Ashley-движком на каждом fixed tick.</p>
      */
     @Override
     public void create() {
         VisUI.load();
         engine = new Engine();
-        eventManager = new GlobalEventManager();
+        simulationRandom = new SimulationRandom(SIMULATION_ROOT_SEED);
+        eventManager = new GlobalEventManager(simulationRandom.createStream("economy-events"));
         grid = new SpatialHashGrid(200);
+        simulationClock = new SimulationClock(SIMULATION_FIXED_STEP_SECONDS);
 
         stage = new Stage(new ScreenViewport());
         Skin skin = VisUI.getSkin();
@@ -105,7 +113,9 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine.addSystem(new MarketSystem(eventManager));
         engine.addSystem(new ConsumptionSystem(eventManager));
         engine.addSystem(new ProductionSystem());
-        engine.addSystem(new AsteroidSpawnSystem(AsteroidSpawnConfig.demoWorld()));
+        engine.addSystem(new AsteroidSpawnSystem(
+                AsteroidSpawnConfig.demoWorld(),
+                simulationRandom.createStream("asteroid-spawn")));
         engine.addSystem(new MiningSystem());
         engine.addSystem(new TradeAISystem(grid));
         engine.addSystem(new PriceRecorderSystem());
@@ -113,10 +123,63 @@ public class SpaceSimGame extends ApplicationAdapter {
         for (Entity entity : DemoWorldFactory.createEntities()) {
             engine.addEntity(entity);
         }
+        simulationLoop = new SimulationLoop(simulationClock, eventManager, engine);
 
         economyStatusUI.update(engine.getEntities());
         entityDetailsUI.refresh();
         Gdx.gl.glClearColor(0.018f, 0.025f, 0.045f, 1f);
+    }
+
+    /**
+     * Включает или снимает паузу игрового времени.
+     *
+     * @param paused новое состояние паузы
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     */
+    public void setSimulationPaused(boolean paused) {
+        requireSimulationClock().setPaused(paused);
+    }
+
+    /**
+     * @return текущее состояние паузы игрового времени
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     */
+    public boolean isSimulationPaused() {
+        return requireSimulationClock().isPaused();
+    }
+
+    /**
+     * Задаёт скорость игрового времени независимо от скорости UI/рендера.
+     *
+     * @param timeScale конечный неотрицательный множитель
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     * @throws IllegalArgumentException если множитель некорректен
+     */
+    public void setSimulationTimeScale(double timeScale) {
+        requireSimulationClock().setTimeScale(timeScale);
+    }
+
+    /**
+     * @return текущий множитель игрового времени
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     */
+    public double getSimulationTimeScale() {
+        return requireSimulationClock().getTimeScale();
+    }
+
+    /**
+     * @return игровое время полностью исполненных fixed ticks в секундах
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     */
+    public double getSimulationTimeSeconds() {
+        return requireSimulationClock().getSimulationTimeSeconds();
+    }
+
+    private SimulationClock requireSimulationClock() {
+        if (simulationClock == null) {
+            throw new IllegalStateException("Игровая симуляция ещё не инициализирована");
+        }
+        return simulationClock;
     }
 
     /**
@@ -299,29 +362,27 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
-     * Выполняет один кадр симуляции и отрисовки.
+     * Выполняет один render frame и доступные fixed simulation ticks.
      *
-     * <p>Сначала обновляются глобальные события и Ashley-системы, затем с ограниченной частотой
-     * актуализируются текстовые панели. Карта и выбранный ценовой график рисуются под Scene2D,
-     * поэтому интерактивные панели и карточка объекта всегда остаются читаемыми.</p>
+     * <p>Экономика продвигается через {@link SimulationLoop}; UI и Scene2D используют render delta,
+     * поэтому остаются отзывчивыми при паузе и изменении скорости игрового времени.</p>
      */
     @Override
     public void render() {
-        float delta = Gdx.graphics.getDeltaTime();
+        float renderDelta = Gdx.graphics.getDeltaTime();
 
-        eventManager.update(delta);
+        simulationLoop.advanceFrame(renderDelta);
         for (NewsArticle article : eventManager.consumePendingNews()) {
             newsUI.addNews(article);
         }
-        engine.update(delta);
         clearInactiveSelection();
-        economyUiUpdateAccumulator += delta;
+        economyUiUpdateAccumulator += renderDelta;
         if (economyUiUpdateAccumulator >= ECONOMY_UI_UPDATE_INTERVAL_SECONDS) {
             economyUiUpdateAccumulator %= ECONOMY_UI_UPDATE_INTERVAL_SECONDS;
             economyStatusUI.update(engine.getEntities());
             entityDetailsUI.refresh();
         }
-        stage.act(delta);
+        stage.act(renderDelta);
 
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         worldMapRenderer.render(

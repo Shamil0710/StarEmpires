@@ -16,7 +16,8 @@ import java.util.random.RandomGenerator;
  *
  * <p>Менеджер рассчитан на последовательное использование из игрового цикла. Все добавления и
  * удаления событий проходят через него и изменяют ревизию, по которой зависимые системы могут
- * определить необходимость пересчёта.</p>
+ * определить необходимость пересчёта. Время менеджера является игровым временем симуляции, а не
+ * wall-clock временем компьютера.</p>
  *
  * <p>Класс изменяем и не является потокобезопасным. Возвращаемое методом {@link #getActiveEvents()}
  * представление также нельзя обходить одновременно с обновлением менеджера из другого потока.
@@ -26,6 +27,7 @@ import java.util.random.RandomGenerator;
 public class GlobalEventManager {
     private static final double DEFAULT_SPAWN_RATE_PER_SECOND = -60d * Math.log1p(-0.001d);
     private static final float DEFAULT_EVENT_DURATION_SECONDS = 30f;
+    private static final double EVENT_TIME_EPSILON_SECONDS = 1e-9d;
     /** Верхняя граница материализованных автособытий за один вызов {@link #update(float)}. */
     private static final int MAX_AUTOMATIC_EVENTS_PER_UPDATE = 1_024;
 
@@ -37,12 +39,22 @@ public class GlobalEventManager {
 
     private long eventRevision;
     private double secondsUntilNextSpawn;
+    private double simulationTimeSeconds;
 
-    /**
-     * Создаёт менеджер со стандартной средней частотой автоматических событий.
-     */
+    /** Создаёт менеджер со стандартной средней частотой автоматических событий и независимым RNG. */
     public GlobalEventManager() {
         this(new Random(), DEFAULT_SPAWN_RATE_PER_SECOND);
+    }
+
+    /**
+     * Создаёт менеджер со стандартной средней частотой и переданным источником случайности.
+     *
+     * @param random источник случайных чисел игровой сессии
+     * @throws NullPointerException если источник не задан
+     * @throws IllegalStateException если источник нарушает контракт {@link RandomGenerator}
+     */
+    public GlobalEventManager(RandomGenerator random) {
+        this(random, DEFAULT_SPAWN_RATE_PER_SECOND);
     }
 
     /**
@@ -61,9 +73,6 @@ public class GlobalEventManager {
     /**
      * Создаёт менеджер с заданным источником случайности и средней частотой событий.
      *
-     * <p>Значение {@code spawnRatePerSecond == 0} полностью отключает автоматическое создание
-     * событий, но не мешает ручной активации и завершению уже активных событий.</p>
-     *
      * @param random источник случайных чисел
      * @param spawnRatePerSecond среднее число автоматически создаваемых событий в секунду
      * @throws NullPointerException если источник случайных чисел не задан
@@ -81,17 +90,14 @@ public class GlobalEventManager {
     }
 
     /**
-     * Продвигает время активных событий и создаёт события, запланированные на прошедший интервал.
+     * Продвигает игровое время активных событий и создаёт события, запланированные на интервал.
      *
-     * <p>Моменты автоматического появления задаются экспоненциально распределёнными интервалами.
-     * Поэтому при обычной нагрузке их расписание с одинаковым источником случайности не зависит
-     * от частоты кадров. За один вызов материализуется не более 1024 автоматических событий. Если
-     * этот защитный предел достигнут и в оставшемся интервале ожидается ещё одно появление,
-     * оставшееся время применяется к уже активным событиям, пропущенные появления не создают
-     * новости, а следующее ожидание планируется от конца кадра. Такая политика сохраняет
-     * отзывчивость при экстремальном времени или частоте появления.</p>
+     * <p>Входной {@code float} канонизируется через его десятичное представление перед накоплением
+     * игрового времени. Моменты автоматического появления задаются экспоненциально распределёнными
+     * интервалами. Сравнение точных границ использует наносекундный epsilon исключительно для
+     * компенсации арифметики {@code double}; расписание и RNG-последовательность не меняются.</p>
      *
-     * @param deltaSeconds прошедшее время в секундах
+     * @param deltaSeconds прошедшее игровое время в секундах
      * @throws IllegalArgumentException если время отрицательно, бесконечно или равно {@code NaN}
      * @throws IllegalStateException если пользовательский источник случайных чисел возвращает
      *         значение вне диапазона {@code [0, 1)} при планировании следующего события
@@ -101,26 +107,29 @@ public class GlobalEventManager {
             throw new IllegalArgumentException("Прошедшее время должно быть конечным и неотрицательным");
         }
 
-        double remainingSeconds = deltaSeconds;
+        double remainingSeconds = canonicalSeconds(deltaSeconds);
         int spawnedEvents = 0;
         while (remainingSeconds > 0d) {
-            if (secondsUntilNextSpawn > remainingSeconds) {
-                advanceActiveEvents((float) remainingSeconds);
+            if (secondsUntilNextSpawn > remainingSeconds + EVENT_TIME_EPSILON_SECONDS) {
+                advanceSimulationTime(remainingSeconds);
                 secondsUntilNextSpawn -= remainingSeconds;
                 return;
             }
 
-            double stepUntilSpawn = secondsUntilNextSpawn;
-            advanceActiveEvents((float) stepUntilSpawn);
+            double stepUntilSpawn = Math.min(secondsUntilNextSpawn, remainingSeconds);
+            advanceSimulationTime(stepUntilSpawn);
             remainingSeconds -= stepUntilSpawn;
+            if (remainingSeconds < EVENT_TIME_EPSILON_SECONDS) {
+                remainingSeconds = 0d;
+            }
 
             activateEvent(createDefaultEvent());
             spawnedEvents++;
             secondsUntilNextSpawn = sampleNextSpawnDelay();
 
             if (spawnedEvents >= MAX_AUTOMATIC_EVENTS_PER_UPDATE
-                    && secondsUntilNextSpawn <= remainingSeconds) {
-                advanceActiveEvents((float) remainingSeconds);
+                    && secondsUntilNextSpawn <= remainingSeconds + EVENT_TIME_EPSILON_SECONDS) {
+                advanceSimulationTime(remainingSeconds);
                 secondsUntilNextSpawn = sampleNextSpawnDelay();
                 return;
             }
@@ -128,7 +137,7 @@ public class GlobalEventManager {
     }
 
     /**
-     * Активирует событие и помещает соответствующую статью в очередь новостей.
+     * Активирует событие и помещает соответствующую статью с текущим game timestamp в очередь.
      *
      * @param event новое событие
      * @throws NullPointerException если событие не задано
@@ -143,7 +152,7 @@ public class GlobalEventManager {
             throw new IllegalArgumentException("Этот экземпляр события уже активен");
         }
 
-        NewsArticle article = NewsGenerator.generate(checkedEvent);
+        NewsArticle article = NewsGenerator.generate(checkedEvent, simulationTimeSeconds);
         activeEvents.add(checkedEvent);
         pendingNews.add(article);
         eventRevision++;
@@ -166,35 +175,24 @@ public class GlobalEventManager {
     /**
      * Возвращает доступное только для чтения представление активных событий.
      *
-     * <p>Представление является «живым»: последующие изменения менеджера отражаются в ранее
-     * полученном списке. Добавлять и удалять элементы через него нельзя.</p>
-     *
-     * <p>Элементы списка — те же экземпляры {@link EconomyEvent}, которые обслуживает менеджер.
-     * Итератор представления не предназначен для параллельного обхода во время обновления.</p>
-     *
-     * @return неизменяемое представление списка активных событий
+     * @return неизменяемое живое представление списка активных событий
      */
     public List<EconomyEvent> getActiveEvents() {
         return activeEventsView;
     }
 
-    /**
-     * Возвращает ревизию набора активных событий.
-     *
-     * <p>Значение изменяется при каждой успешной активации, отмене или естественном завершении.
-     * Его следует использовать только для сравнения с ранее сохранённым значением.</p>
-     *
-     * @return текущая ревизия набора событий
-     */
+    /** @return текущая ревизия набора событий */
     public long getEventRevision() {
         return eventRevision;
     }
 
+    /** @return неотрицательное игровое время в секундах от начала симуляции */
+    public double getSimulationTimeSeconds() {
+        return simulationTimeSeconds;
+    }
+
     /**
      * Извлекает все накопленные новости и очищает внутреннюю очередь.
-     *
-     * <p>Возвращается новый изменяемый список, однако содержащиеся в нём статьи не копируются и
-     * остаются изменяемыми объектами.</p>
      *
      * @return новый изменяемый список накопленных новостей в порядке их постановки в очередь
      */
@@ -202,6 +200,17 @@ public class GlobalEventManager {
         List<NewsArticle> news = new ArrayList<>(pendingNews);
         pendingNews.clear();
         return news;
+    }
+
+    private void advanceSimulationTime(double deltaSeconds) {
+        if (deltaSeconds <= 0d) {
+            return;
+        }
+        advanceActiveEvents((float) deltaSeconds);
+        simulationTimeSeconds += deltaSeconds;
+        if (!Double.isFinite(simulationTimeSeconds)) {
+            throw new IllegalStateException("Игровое время событий вышло за допустимый диапазон");
+        }
     }
 
     private void advanceActiveEvents(float deltaSeconds) {
@@ -241,5 +250,9 @@ public class GlobalEventManager {
                 DEFAULT_EVENT_DURATION_SECONDS,
                 new Vector2(100f, 100f),
                 500f);
+    }
+
+    private double canonicalSeconds(float seconds) {
+        return Double.parseDouble(Float.toString(seconds));
     }
 }
