@@ -53,7 +53,7 @@ class ConstructionSystemIntegrationTest {
 
         Entity financier = economicActor("Инвестор", 0, Money.fromCredits(10_000d));
         session.addEntityWithAllocatedId(financier);
-        long constructionCapital = Money.fromCredits(1_000d);
+        long constructionCapital = Money.fromCredits(5_000d);
         assertTrue(financier.getComponent(WalletComponent.class)
                 .transferTo(site.getComponent(WalletComponent.class), constructionCapital));
         session.getLedger().recordMoneyTransfer(
