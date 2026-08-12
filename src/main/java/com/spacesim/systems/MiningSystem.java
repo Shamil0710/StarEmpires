@@ -392,7 +392,7 @@ public final class MiningSystem extends IteratingSystem {
         Entity closest = null;
         double closestDistance = Double.POSITIVE_INFINITY;
         for (Entity candidate : marketBases) {
-            if (!isUsableBase(candidate, miner, mining.resourceItem, reputation)) {
+            if (!isUsableBaseCandidate(candidate, miner, mining.resourceItem, reputation)) {
                 continue;
             }
             double distance = distanceSquared(transform, transformMapper.get(candidate));
@@ -409,7 +409,7 @@ public final class MiningSystem extends IteratingSystem {
         Entity closest = null;
         double closestDistance = Double.POSITIVE_INFINITY;
         for (Entity candidate : asteroids) {
-            if (!isUsableAsteroid(candidate, resourceItem)) {
+            if (!isUsableAsteroidCandidate(candidate, resourceItem)) {
                 continue;
             }
             double distance = distanceSquared(transform, transformMapper.get(candidate));
@@ -456,9 +456,14 @@ public final class MiningSystem extends IteratingSystem {
     }
 
     private boolean isUsableAsteroid(Entity entity, int resourceItem) {
+        return entity != null
+                && asteroids != null
+                && asteroids.contains(entity, true)
+                && isUsableAsteroidCandidate(entity, resourceItem);
+    }
+
+    private boolean isUsableAsteroidCandidate(Entity entity, int resourceItem) {
         if (entity == null
-                || asteroids == null
-                || !asteroids.contains(entity, true)
                 || !idMapper.has(entity)
                 || !asteroidMapper.has(entity)
                 || !transformMapper.has(entity)) {
@@ -476,10 +481,19 @@ public final class MiningSystem extends IteratingSystem {
             Entity miner,
             int resourceItem,
             ReputationComponent reputation) {
+        return entity != null
+                && marketBases != null
+                && marketBases.contains(entity, true)
+                && isUsableBaseCandidate(entity, miner, resourceItem, reputation);
+    }
+
+    private boolean isUsableBaseCandidate(
+            Entity entity,
+            Entity miner,
+            int resourceItem,
+            ReputationComponent reputation) {
         if (entity == null
                 || entity == miner
-                || marketBases == null
-                || !marketBases.contains(entity, true)
                 || !idMapper.has(entity)
                 || !marketMapper.has(entity)
                 || !inventoryMapper.has(entity)
