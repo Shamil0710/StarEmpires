@@ -161,7 +161,12 @@ public record FactionStrategicState(
         return 0;
     }
 
-    /** @param systemId stable system ID @return true, если system входит в controlled territory */
+    /**
+     * Проверяет strategic владение системой.
+     *
+     * @param systemId stable system ID
+     * @return {@code true}, если system входит в controlled territory
+     */
     public boolean controls(StarSystemId systemId) {
         return systemId != null && controlledSystems.contains(systemId);
     }
