@@ -270,25 +270,43 @@ Post-merge `main` CI: SUCCESS.
 
 ## Этап 7 — Иерархия мира и уровни симуляции
 
-**Статус:** ACTIVE
+**Статус:** COMPLETE — MERGED TO `main` VIA PR #9
 
-### Задачи
+### Основные результаты
 
-- [ ] `Galaxy -> Sector -> StarSystem`;
-- [ ] планеты, станции, астероидные поля, флоты и jump connections;
-- [ ] разделить local и strategic simulation frequency;
-- [ ] определить update budget для удалённых систем;
-- [ ] внедрить spatial/system-level indexes.
+- [x] реализована immutable persistent hierarchy `Galaxy -> Sector -> StarSystem` с typed stable IDs;
+- [x] добавлены strategic planets и asteroid fields со stable IDs; stations, fleets и individual asteroids остаются локальными ECS entities соответствующей `SimulationSession`;
+- [x] реализованы canonical jump connections и deterministic neighbor/system/landmark indexes;
+- [x] создан `WorldState`: каждая StarSystem topology имеет ровно один authoritative local `GameState`;
+- [x] создан bounded deterministic `WorldStateCodec`, который переиспользует существующий `GameStateCodec`, не меняя Stage 3–6 economic save schema;
+- [x] создан content-bound `WorldPersistence` с сохранением active system и scheduler config;
+- [x] legacy `STEC` и raw `STEM` single-session saves автоматически загружаются как default single-system world;
+- [x] active StarSystem продолжает использовать точный fixed-rate `SimulationSession` с шагом `0.1s`;
+- [x] remote StarSystems используют тот же economic core через coarse strategic updates без второй экономической реализации;
+- [x] default strategic cadence агрегирует 10 fixed ticks в один remote object-level `Engine.update()`;
+- [x] установлен bounded remote update budget и deterministic largest-lag-first scheduler со stable `StarSystemId` tie-break;
+- [x] scheduler не имеет hidden mutable cursor: exact continuation выводится из persistent clocks и system IDs;
+- [x] production `DemoGalaxyFactory` создаёт 2 sectors / 3 экономически живые systems / 4 planets / 3 asteroid fields / 2 jump connections;
+- [x] desktop `SpaceSimGame` переведён на `WorldSimulation` и больше не собирает дублирующий economic pipeline;
+- [x] world save/load continuation, scheduler budget, reduced-rate remote economy, legacy saves и topology indexes защищены regression-тестами;
+- [x] implementation/verification contract описан в `docs/stage7_world_simulation.md`.
+
+Verified final PR head: `688460e984613450816528e4a4ade1762a916655`.
+Push CI exact head: SUCCESS.
+Pull-request CI exact head: SUCCESS.
+Implementation-head suite: **274 tests, 0 failures, 0 errors, 0 skipped**; Javadoc SUCCESS; JaCoCo thresholds SUCCESS.
+Merge commit: `5190c23cc9c62352730b7773c2423c143c5eb482`.
+Post-merge `main` CI: SUCCESS.
 
 ### Definition of Done
 
-Мир содержит несколько систем, удалённые системы продолжают экономически жить без симуляции каждого объекта на полном local tick.
+Мир содержит несколько систем, удалённые системы продолжают экономически жить без симуляции каждого объекта на полном local tick. **Выполнено.**
 
 ---
 
 ## Этап 8 — Фракции как экономические акторы
 
-**Статус:** PLANNED
+**Статус:** ACTIVE
 
 ### Задачи
 
@@ -358,4 +376,4 @@ Supply chain может самостоятельно перестраивать�
 
 ## Текущий следующий шаг
 
-**Этап 7 — иерархия мира и уровни симуляции.** Начать с минимальной persistent модели `Galaxy -> Sector -> StarSystem`, устойчивых ID и jump connections, затем определить границу между local full-rate simulation и strategic reduced-rate updates для удалённых систем. Не дублировать экономический core: новые уровни мира должны оркестрировать уже существующую deterministic `SimulationSession`, а не создавать вторую экономическую реализацию.
+**Этап 8 — фракции как экономические акторы.** Начать с authoritative persistent состояния фракции: treasury/budget, relations/territory и явных economic policies. Первый vertical slice должен доказать, что решение faction-layer физически изменяет существующую экономику через уже имеющиеся рынки, production/logistics и `EconomicLedger`, не создавая параллельный финансовый контур. Затем расширить слой market access, taxes/tariffs/subsidies и strategic military/expansion demand.
