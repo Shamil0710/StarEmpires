@@ -2,6 +2,7 @@ package com.spacesim;
 
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -20,6 +21,8 @@ import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.events.NewsArticle;
 import com.spacesim.model.AsteroidSpawnConfig;
+import com.spacesim.persistence.EntityIdAllocator;
+import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.simulation.SimulationClock;
 import com.spacesim.simulation.SimulationLoop;
 import com.spacesim.simulation.SimulationRandom;
@@ -39,7 +42,10 @@ import com.spacesim.util.SpatialHashGrid;
  * <p>Модель получает только fixed simulation ticks через {@link SimulationLoop}. Все экономические
  * системы одной игровой сессии используют единый {@link EconomicLedger}: обычная торговля
  * фиксируется как transfer, а создание/уничтожение/преобразование ресурсов имеет явный тип записи.
- * UI и Scene2D продолжают использовать render delta и не влияют на authoritative состояние.</p>
+ * Все runtime-сущности получают устойчивый {@link EntityIdComponent}; общий
+ * {@link EntityRegistry} разрешает эти ID в текущие Ashley-объекты и автоматически отслеживает их
+ * жизненный цикл. UI и Scene2D продолжают использовать render delta и не влияют на authoritative
+ * состояние.</p>
  */
 public class SpaceSimGame extends ApplicationAdapter {
     private static final float SIMULATION_FIXED_STEP_SECONDS = 0.1f;
@@ -52,6 +58,8 @@ public class SpaceSimGame extends ApplicationAdapter {
     private Engine engine;
     private GlobalEventManager eventManager;
     private EconomicLedger economicLedger;
+    private EntityIdAllocator entityIdAllocator;
+    private EntityRegistry entityRegistry;
     private SpatialHashGrid grid;
     private SimulationClock simulationClock;
     private SimulationLoop simulationLoop;
@@ -73,11 +81,12 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
-     * Создаёт экономическую модель, общий ledger, fixed-step pipeline, UI и начальный мир.
+     * Создаёт экономическую модель, persistent-ID инфраструктуру, общий ledger, pipeline и UI.
      *
      * <p>Порядок Ashley-систем значим: рынок → потребление → производство → появление астероидов →
      * добыча → торговый ИИ → запись истории. Глобальные события обновляются перед Ashley-движком
-     * внутри {@link SimulationLoop}.</p>
+     * внутри {@link SimulationLoop}. Registry listener подключается до добавления любых сущностей,
+     * поэтому одинаково отслеживает bootstrap-мир и динамические астероиды.</p>
      */
     @Override
     public void create() {
@@ -86,6 +95,9 @@ public class SpaceSimGame extends ApplicationAdapter {
         simulationRandom = new SimulationRandom(SIMULATION_ROOT_SEED);
         eventManager = new GlobalEventManager(simulationRandom.createStream("economy-events"));
         economicLedger = new EconomicLedger();
+        entityIdAllocator = new EntityIdAllocator();
+        entityRegistry = new EntityRegistry();
+        engine.addEntityListener(Family.all(EntityIdComponent.class).get(), entityRegistry);
         grid = new SpatialHashGrid(200);
         simulationClock = new SimulationClock(SIMULATION_FIXED_STEP_SECONDS);
 
@@ -111,12 +123,13 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine.addSystem(new AsteroidSpawnSystem(
                 AsteroidSpawnConfig.demoWorld(),
                 simulationRandom.createStream("asteroid-spawn"),
-                economicLedger));
+                economicLedger,
+                entityIdAllocator));
         engine.addSystem(new MiningSystem(economicLedger));
         engine.addSystem(new TradeAISystem(grid, economicLedger));
         engine.addSystem(new PriceRecorderSystem());
 
-        for (Entity entity : DemoWorldFactory.createEntities()) {
+        for (Entity entity : DemoWorldFactory.createEntities(entityIdAllocator)) {
             engine.addEntity(entity);
         }
         simulationLoop = new SimulationLoop(simulationClock, eventManager, engine);
@@ -135,6 +148,28 @@ public class SpaceSimGame extends ApplicationAdapter {
             throw new IllegalStateException("Экономическая симуляция ещё не инициализирована");
         }
         return economicLedger;
+    }
+
+    /**
+     * @return runtime registry устойчивых ID текущей игровой сессии
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     */
+    public EntityRegistry getEntityRegistry() {
+        if (entityRegistry == null) {
+            throw new IllegalStateException("Registry сущностей ещё не инициализирован");
+        }
+        return entityRegistry;
+    }
+
+    /**
+     * @return значение persistent ID, которое будет выдано следующей созданной сущности
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     */
+    public long getNextEntityIdValue() {
+        if (entityIdAllocator == null) {
+            throw new IllegalStateException("Аллокатор EntityId ещё не инициализирован");
+        }
+        return entityIdAllocator.getNextValue();
     }
 
     /**
