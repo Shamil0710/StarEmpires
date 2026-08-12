@@ -195,35 +195,56 @@ Post-merge `main` CI: SUCCESS.
 
 ## Этап 6 — Headless economic benchmark и observability
 
-**Статус:** ACTIVE — следующий рабочий этап
+**Статус:** ACTIVE — Stage 6A MERGED VIA PR #7; Stage 6B performance remediation
 
 ### Цель
 
 Получить воспроизводимый количественный контур, который показывает не только корректность инвариантов, но и устойчивость экономики и стоимость симуляции на масштабе до перехода к multi-system миру.
 
-### Задачи
+### Stage 6A — выполненная инфраструктура
 
-- [ ] создать headless simulation/benchmark runner без OpenGL;
-- [ ] определить versioned benchmark scenario и его seed;
-- [ ] сценарий минимум 100 станций / 500 экономических агентов / расширенный каталог товаров;
-- [ ] прогон минимум 100 игровых часов;
-- [ ] собирать wall-clock duration, simulated-time/real-time ratio и ticks/second;
-- [ ] собрать allocation/heap baseline доступными JVM-инструментами без привязки core к profiler library;
-- [ ] собирать stockouts и длительность дефицитов;
-- [ ] собирать unmet demand;
-- [ ] собирать price variance/volatility;
-- [ ] собирать trade volume и transaction count;
-- [ ] собирать production/mining/consumption volume;
-- [ ] собирать wealth distribution и wallet concentration;
-- [ ] собирать route profitability и planner opportunity counts;
-- [ ] явно проверять money/resource conservation в benchmark run;
-- [ ] добавить machine-readable benchmark report;
-- [ ] определить regression thresholds только после получения первого baseline, не подгоняя их заранее;
-- [ ] добавить smaller deterministic benchmark smoke-test в CI, а тяжёлый 100-hour profile оставить отдельным reproducible command, если runtime окажется неприемлемым для каждого PR.
+- [x] создан headless simulation/benchmark runner без OpenGL на authoritative `SimulationSession`;
+- [x] определены versioned benchmark scenarios и deterministic seeds;
+- [x] создан deterministic world на 100 станций / 500 экономических агентов через production archetype + persistence/bootstrap path;
+- [x] определён отдельный `scale100h` профиль на 3 600 000 fixed ticks = 100 игровых часов;
+- [x] собираются wall-clock duration, simulated-time/real-time ratio и ticks/second;
+- [x] собирается JVM heap baseline до/после run; точный allocation profiling оставлен Stage 6B;
+- [x] собираются stockout observations и unmet demand;
+- [x] собираются price mean/variance;
+- [x] собираются trade transaction count, traded units и monetary turnover;
+- [x] собираются production cycles/output, mining mined/delivered и resource sink/source volumes;
+- [x] собираются wealth distribution, percentiles и Gini;
+- [x] собираются route profitability observations и shared `MarketDirectory` opportunity counts;
+- [x] benchmark явно проверяет money conservation;
+- [x] benchmark выполняет item-by-item resource accounting через inventories + asteroids + source/sink + recipe transform deltas;
+- [x] добавлен machine-readable JSON report с отделением deterministic и machine-dependent metrics;
+- [x] demo smoke benchmark deterministic и входит в CI;
+- [x] scale CI smoke проверяет ровно 100 stations, 450 traders и 50 miners = 500 economic agents;
+- [x] полный regression suite после Stage 6A: 241 tests, Javadoc и JaCoCo gates зелёные.
+
+Verified final PR head: `9b356cd9941ee7785724e66f51608687c7fa98a7`.
+Push CI exact head: SUCCESS.
+Pull-request CI exact head: SUCCESS.
+Merge commit: `835260b8f2a780fab8f477adfa3271819f067c38`.
+Post-merge `main` CI: SUCCESS.
+
+### Stage 6B — незакрытый scalability gate
+
+- [ ] профилировать 100/500 world и определить долю времени `TradeAISystem`/`MarketDirectory`, mining/asteroid processing, ledger retention и прочих систем;
+- [ ] проверить рост entity count/asteroid count и ledger size на 1k -> 10k -> 100k ticks;
+- [ ] убрать подтверждённые superlinear/hot-path bottlenecks без изменения экономических инвариантов и deterministic semantics;
+- [ ] при необходимости разделить authoritative ledger history и benchmark aggregation/streaming так, чтобы 100h run не требовал бесконечного diagnostic retention;
+- [ ] добавить точный allocation/profile baseline после выбора инструмента, не привязывая simulation core к profiler library;
+- [ ] завершить полный `100 stations / 500 agents / 100 simulated hours` run;
+- [ ] сохранить machine-readable baseline report и отдельно зафиксировать stockouts/unmet demand/price/trade/production/wealth/route metrics;
+- [ ] только после первого полного baseline определить performance/regression thresholds;
+- [ ] проверить, что benchmark способен количественно обнаруживать искусственно нарушенный supply chain.
+
+Диагностический probe exact CI artifact `9b356cd`: 1000 ticks на 100/500 завершились с сохранёнными money/resource invariants и 7013 ledger entries; 10 000 ticks и полный 100h профиль не завершились в 120-секундном интерактивном diagnostic window. Это **не baseline**, а доказательство необходимости Stage 6B profiling/remediation.
 
 ### Definition of Done
 
-Экономический core автоматически стресс-тестируется без UI; benchmark минимум 100 stations / 500 agents / 100 simulated hours воспроизводим; отчёт показывает производительность, дефициты, цены, торговлю, производство, wealth и route-planner metrics; экономические инварианты остаются доказанными.
+Экономический core автоматически стресс-тестируется без UI; benchmark минимум 100 stations / 500 agents / 100 simulated hours воспроизводим; отчёт показывает производительность, дефициты, цены, торговлю, производство, wealth и route-planner metrics; экономические инварианты остаются доказанными. **Пока не выполнено: блокер — полный 100h scalability gate.**
 
 ---
 
@@ -317,4 +338,4 @@ Supply chain может самостоятельно перестраивать�
 
 ## Текущий следующий шаг
 
-**Этап 6 — Headless economic benchmark и observability.** После зелёного CI этого status-коммита создать отдельную ветку от актуального `main`. Первый вертикальный срез: benchmark scenario + headless runner + machine-readable metrics для малого deterministic smoke-run. Затем масштабировать этот же runner до 100 stations / 500 agents / 100 simulated hours и только по фактическим данным вводить performance/regression thresholds.
+**Этап 6B — profiling и scalability remediation headless benchmark.** Начать с воспроизводимых scale probes 1k -> 10k -> 100k ticks на 100/500 world и измерить рост wall-clock, entity/asteroid count и ledger size. Затем профилировать hot paths, устранять только подтверждённые bottlenecks, повторять probes после каждого изменения и не переходить к Stage 7, пока полный `scale100h` не завершится с сохранёнными money/resource invariants и зафиксированным machine-readable baseline.
