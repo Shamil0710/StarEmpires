@@ -1,23 +1,22 @@
 package com.spacesim.components;
 
 import com.badlogic.ashley.core.Component;
-import com.badlogic.ashley.core.Entity;
 import com.spacesim.constants.Constants;
 import com.spacesim.model.ItemType;
+import com.spacesim.persistence.EntityId;
 
 /**
- * Конфигурация и состояние автономного цикла добывающего корабля.
+ * Конфигурация и сериализуемое состояние автономного цикла добывающего корабля.
  *
  * <p>{@link com.spacesim.systems.MiningSystem} выбирает совместимый
  * {@link AsteroidComponent астероид}, перемещает корабль к нему, извлекает конечный запас в
- * собственный {@link InventoryComponent трюм}, возвращает груз на рынок и продаёт его. Ссылки на
- * цель и базу принадлежат конечному автомату и могут быть равны {@code null}, когда подходящий
- * объект отсутствует.</p>
+ * собственный {@link InventoryComponent трюм}, возвращает груз на рынок и продаёт его. Persistent-
+ * ссылки на цель и базу хранятся как устойчивые {@link EntityId}; runtime-система разрешает их
+ * через registry.</p>
  *
  * <p>Компонент не хранит деньги: authoritative баланс добывающего корабля находится только в
- * {@link WalletComponent}. Это исключает расхождение между торговлей добытчика и остальной
- * экономикой. Производительность выражена в единицах товара за секунду, скорости и радиусы — в
- * мировых единицах.</p>
+ * {@link WalletComponent}. Производительность выражена в единицах товара за секунду, скорости и
+ * радиусы — в мировых единицах.</p>
  */
 public class MiningComponent implements Component {
     /** Состояние полного автономного цикла добычи и доставки. */
@@ -67,15 +66,15 @@ public class MiningComponent implements Component {
     public boolean active = true;
     /** Текущий этап автономного цикла; повреждённый {@code null} безопасно восстанавливается. */
     public State state = State.SEARCHING;
-    /** Выбранный астероид либо {@code null}, если источник ещё не найден или уже истощён. */
-    public Entity targetAsteroid;
+    /** Persistent ID выбранного астероида либо {@code null}, если источник отсутствует. */
+    public EntityId targetAsteroidId;
 
     /**
-     * Предпочтительный рынок разгрузки либо {@code null} для автоматического выбора ближайшего.
+     * Persistent ID предпочтительного рынка разгрузки либо {@code null} для автоматического выбора.
      * Если рынок исчез, перестал торговать ресурсом, заполнился или не может оплатить хотя бы одну
      * единицу груза, система выбирает другую станцию.
      */
-    public Entity homeBase;
+    public EntityId homeBaseId;
 
     /** Создаёт активное оборудование для добычи руды со скоростью {@code 0.5} единицы в секунду. */
     public MiningComponent() {

@@ -2,6 +2,7 @@ package com.spacesim;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.CombatComponent;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
@@ -18,6 +19,7 @@ import com.spacesim.constants.Constants;
 import com.spacesim.economy.Money;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
+import com.spacesim.persistence.EntityId;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
@@ -33,16 +35,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DemoWorldFactoryTest {
     @Test
-    void создаётСтабильныйНаборИзШестиСтанцийИСемиКораблей() {
+    void создаётСтабильныйНаборИзШестиСтанцийИСемиКораблейСУникальнымиId() {
         List<Entity> entities = DemoWorldFactory.createEntities();
 
         assertEquals(13, entities.size());
         Set<String> names = new HashSet<>();
+        Set<EntityId> ids = new HashSet<>();
         int stations = 0;
         int fleets = 0;
-        for (Entity entity : entities) {
+        for (int index = 0; index < entities.size(); index++) {
+            Entity entity = entities.get(index);
             IdentityComponent identity = entity.getComponent(IdentityComponent.class);
+            EntityIdComponent entityId = entity.getComponent(EntityIdComponent.class);
             assertNotNull(identity);
+            assertNotNull(entityId);
+            assertEquals(new EntityId(index + 1L), entityId.id);
+            assertTrue(ids.add(entityId.id));
             assertTrue(names.add(identity.name));
             assertNotNull(entity.getComponent(TransformComponent.class));
             assertNotNull(entity.getComponent(InventoryComponent.class));
@@ -138,7 +146,7 @@ class DemoWorldFactoryTest {
     }
 
     @Test
-    void добытчикИмеетОтдельныйКошелёкДомашнююБазуИНетTradeAI() {
+    void добытчикИмеетОтдельныйКошелёкИДомашнююБазуПоPersistentId() {
         List<Entity> entities = DemoWorldFactory.createEntities();
         Entity miner = byName(entities, "Добытчик Старатель");
         Entity mine = byName(entities, "Шахтёрская база Ковчег");
@@ -149,7 +157,7 @@ class DemoWorldFactoryTest {
 
         assertNotNull(mining);
         assertSame(ShipType.MINING_SHIP, ship.type);
-        assertSame(mine, mining.homeBase);
+        assertEquals(mine.getComponent(EntityIdComponent.class).id, mining.homeBaseId);
         assertEquals(Constants.ITEM_ORE, mining.resourceItem);
         assertEquals(2f, mining.extractionPerSecond, 0f);
         assertEquals(Money.fromCredits(1_000d), wallet.getBalanceMilliCredits());
@@ -169,7 +177,7 @@ class DemoWorldFactoryTest {
     }
 
     @Test
-    void фабрикаКаждыйРазВозвращаетНезависимыйГрафСущностей() {
+    void фабрикаКаждыйРазВозвращаетНезависимыйГрафСОдинаковымиStableId() {
         List<Entity> first = DemoWorldFactory.createEntities();
         List<Entity> second = DemoWorldFactory.createEntities();
 
@@ -178,6 +186,9 @@ class DemoWorldFactoryTest {
             assertFalse(first.get(index) == second.get(index));
             assertFalse(first.get(index).getComponent(InventoryComponent.class)
                     == second.get(index).getComponent(InventoryComponent.class));
+            assertEquals(
+                    first.get(index).getComponent(EntityIdComponent.class).id,
+                    second.get(index).getComponent(EntityIdComponent.class).id);
         }
     }
 

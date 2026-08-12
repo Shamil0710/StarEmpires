@@ -1,11 +1,11 @@
 package com.spacesim.ui;
 
-import com.badlogic.ashley.core.Entity;
 import com.badlogic.gdx.math.Matrix4;
 import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.MiningComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.model.ShipType;
+import com.spacesim.persistence.EntityId;
 import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
@@ -16,7 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorldMapRendererTest {
@@ -76,22 +75,22 @@ class WorldMapRendererTest {
     }
 
     @Test
-    void выбираетНавигационнуюЦельПоЭтапуДобычи() {
+    void выбираетPersistentНавигационнуюЦельПоЭтапуДобычи() {
         MiningComponent mining = new MiningComponent();
-        Entity asteroid = new Entity();
-        Entity base = new Entity();
-        mining.targetAsteroid = asteroid;
-        mining.homeBase = base;
+        EntityId asteroidId = new EntityId(41L);
+        EntityId baseId = new EntityId(42L);
+        mining.targetAsteroidId = asteroidId;
+        mining.homeBaseId = baseId;
 
         mining.state = MiningComponent.State.TRAVEL_TO_ASTEROID;
-        assertSame(asteroid, WorldMapRenderer.miningNavigationTarget(mining));
+        assertEquals(asteroidId, WorldMapRenderer.miningNavigationTarget(mining));
         assertTrue(WorldMapRenderer.isActiveMiningRoute(mining));
         mining.state = MiningComponent.State.MINING;
-        assertSame(asteroid, WorldMapRenderer.miningNavigationTarget(mining));
+        assertEquals(asteroidId, WorldMapRenderer.miningNavigationTarget(mining));
         mining.state = MiningComponent.State.RETURNING_TO_BASE;
-        assertSame(base, WorldMapRenderer.miningNavigationTarget(mining));
+        assertEquals(baseId, WorldMapRenderer.miningNavigationTarget(mining));
         mining.state = MiningComponent.State.UNLOADING;
-        assertSame(base, WorldMapRenderer.miningNavigationTarget(mining));
+        assertEquals(baseId, WorldMapRenderer.miningNavigationTarget(mining));
         mining.state = MiningComponent.State.SEARCHING;
         assertNull(WorldMapRenderer.miningNavigationTarget(mining));
         assertFalse(WorldMapRenderer.isActiveMiningRoute(mining));

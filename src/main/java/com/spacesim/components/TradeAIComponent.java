@@ -1,14 +1,15 @@
 package com.spacesim.components;
 
 import com.badlogic.ashley.core.Component;
-import com.badlogic.ashley.core.Entity;
+import com.spacesim.persistence.EntityId;
 
 /**
  * Состояние конечного автомата автономного торгового флота.
  *
- * <p>Компонент хранит только поведенческое состояние и план маршрута. Authoritative денежный
- * баланс вынесен в {@link WalletComponent}; фактический груз хранится в {@link InventoryComponent}.
- * Поэтому AI-состояние больше не может случайно расходиться с общим экономическим балансом сущности.</p>
+ * <p>Компонент хранит только сериализуемое поведенческое состояние и план маршрута. Ссылки на
+ * станции представлены устойчивыми {@link EntityId}, а не runtime-объектами Ashley. Authoritative
+ * денежный баланс вынесен в {@link WalletComponent}; фактический груз хранится в
+ * {@link InventoryComponent}. Runtime-система разрешает ID через registry.</p>
  */
 public class TradeAIComponent implements Component {
     /** Этап выполнения торгового маршрута. */
@@ -27,12 +28,12 @@ public class TradeAIComponent implements Component {
 
     /** Текущий этап автомата. */
     public State state = State.IDLE;
-    /** Станция запланированной покупки или {@code null}. */
-    public Entity buyStation;
-    /** Станция запланированной продажи или {@code null}. */
-    public Entity sellStation;
-    /** Текущая навигационная цель или {@code null}. */
-    public Entity targetStation;
+    /** Persistent ID станции запланированной покупки или {@code null}. */
+    public EntityId buyStationId;
+    /** Persistent ID станции запланированной продажи или {@code null}. */
+    public EntityId sellStationId;
+    /** Persistent ID текущей навигационной цели или {@code null}. */
+    public EntityId targetStationId;
     /** Идентификатор товара либо {@code -1}, если маршрут не выбран. */
     public int targetItem = -1;
     /** Товарная специализация новых маршрутов; {@code -1} означает любой совместимый товар. */
@@ -53,13 +54,13 @@ public class TradeAIComponent implements Component {
     }
 
     /**
-     * Очищает оперативный план маршрута, не меняя конфигурацию корабля и фактические компоненты
+     * Очищает persistent-план маршрута, не меняя конфигурацию корабля и фактические компоненты
      * склада/кошелька.
      */
     public void resetRoute() {
-        buyStation = null;
-        sellStation = null;
-        targetStation = null;
+        buyStationId = null;
+        sellStationId = null;
+        targetStationId = null;
         targetItem = -1;
         targetAmount = 0;
         expectedProfitMilliCredits = 0L;

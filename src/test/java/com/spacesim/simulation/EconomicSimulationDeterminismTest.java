@@ -4,6 +4,7 @@ import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoWorldFactory;
 import com.spacesim.components.AsteroidComponent;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
@@ -15,6 +16,9 @@ import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.EconomyEvent;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.model.AsteroidSpawnConfig;
+import com.spacesim.persistence.EntityId;
+import com.spacesim.persistence.EntityIdAllocator;
+import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.systems.AsteroidSpawnSystem;
 import com.spacesim.systems.ConsumptionSystem;
 import com.spacesim.systems.MarketSystem;
@@ -61,18 +65,23 @@ class EconomicSimulationDeterminismTest {
         Engine engine = new Engine();
         SpatialHashGrid grid = new SpatialHashGrid(Constants.CELL_SIZE);
         EconomicLedger ledger = new EconomicLedger();
+        EntityIdAllocator ids = new EntityIdAllocator();
+        EntityRegistry registry = new EntityRegistry();
+        registry.track(engine);
 
         engine.addSystem(new MarketSystem(events));
-        engine.addSystem(new ConsumptionSystem(events));
-        engine.addSystem(new ProductionSystem());
+        engine.addSystem(new ConsumptionSystem(events, ledger));
+        engine.addSystem(new ProductionSystem(ledger));
         engine.addSystem(new AsteroidSpawnSystem(
                 AsteroidSpawnConfig.demoWorld(),
-                random.createStream("asteroid-spawn")));
-        engine.addSystem(new MiningSystem(ledger));
-        engine.addSystem(new TradeAISystem(grid, ledger));
+                random.createStream("asteroid-spawn"),
+                ledger,
+                ids));
+        engine.addSystem(new MiningSystem(ledger, registry));
+        engine.addSystem(new TradeAISystem(grid, ledger, registry));
         engine.addSystem(new PriceRecorderSystem());
 
-        for (Entity entity : DemoWorldFactory.createEntities()) {
+        for (Entity entity : DemoWorldFactory.createEntities(ids)) {
             engine.addEntity(entity);
         }
 
@@ -101,11 +110,14 @@ class EconomicSimulationDeterminismTest {
         for (Entity entity : fixture.engine.getEntities()) {
             entities.add(entity);
         }
-        entities.sort(Comparator.comparing(this::identityName));
+        entities.sort(Comparator.comparingLong(entity ->
+                entity.getComponent(EntityIdComponent.class).id.value()));
 
         for (Entity entity : entities) {
+            EntityIdComponent entityId = entity.getComponent(EntityIdComponent.class);
             IdentityComponent identity = entity.getComponent(IdentityComponent.class);
-            snapshot.append("entity=").append(identity.name).append('|').append(identity.kind);
+            snapshot.append("entity=").append(entityId.id).append('|')
+                    .append(identity.name).append('|').append(identity.kind);
 
             TransformComponent transform = entity.getComponent(TransformComponent.class);
             if (transform != null) {
@@ -138,9 +150,9 @@ class EconomicSimulationDeterminismTest {
                         .append(',').append(trade.targetAmount)
                         .append(',').append(trade.specializedItem)
                         .append(',').append(trade.expectedProfitMilliCredits)
-                        .append(',').append(identityName(trade.buyStation))
-                        .append(',').append(identityName(trade.sellStation))
-                        .append(',').append(identityName(trade.targetStation));
+                        .append(',').append(idText(trade.buyStationId))
+                        .append(',').append(idText(trade.sellStationId))
+                        .append(',').append(idText(trade.targetStationId));
             }
 
             AsteroidComponent asteroid = entity.getComponent(AsteroidComponent.class);
@@ -154,6 +166,10 @@ class EconomicSimulationDeterminismTest {
         return snapshot.toString();
     }
 
+    private String idText(EntityId id) {
+        return id == null ? "-" : id.toString();
+    }
+
     private String floatBits(float[] values) {
         StringBuilder result = new StringBuilder("[");
         for (int index = 0; index < values.length; index++) {
@@ -163,14 +179,6 @@ class EconomicSimulationDeterminismTest {
             result.append(Float.floatToIntBits(values[index]));
         }
         return result.append(']').toString();
-    }
-
-    private String identityName(Entity entity) {
-        if (entity == null) {
-            return "-";
-        }
-        IdentityComponent identity = entity.getComponent(IdentityComponent.class);
-        return identity == null ? "?" : identity.name;
     }
 
     private record Fixture(

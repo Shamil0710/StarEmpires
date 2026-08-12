@@ -14,6 +14,7 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.spacesim.components.AsteroidComponent;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.MiningComponent;
@@ -23,19 +24,16 @@ import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.model.ItemType;
 import com.spacesim.model.ShipType;
+import com.spacesim.persistence.EntityId;
 
 /**
  * Рисует интерактивную карту космических объектов средствами libGDX.
  *
  * <p>Фон, сетка, маршруты и геометрические значки формируются кодом без внешних текстур.
  * Станции показаны кругами с цветом фракции, астероиды — неровными минеральными силуэтами,
- * а пять типов кораблей различаются одновременно силуэтом и контрастным цветом. Корабельный
- * маркер направлен к текущему астероиду, базе или торговой станции назначения.
- * Если цели нет, направление берётся из конечного ненулевого вектора скорости, а затем — вдоль
- * положительной оси {@code X}. Маршрут торгового ИИ окрашен в цвет типа корабля. Имена станций
- * и выбранного корабля либо астероида выводятся переданным шрифтом. Геометрия увеличенного обзора
- * ограничивается экранным прямоугольником карты через scissor-test и не перекрывает панели
- * Scene2D.</p>
+ * а пять типов кораблей различаются одновременно силуэтом и контрастным цветом. Навигационные
+ * цели читаются из persistent {@link EntityId} компонентов AI и разрешаются только внутри текущего
+ * кадра по актуальному набору сущностей; renderer не хранит persistent runtime-ссылки.</p>
  *
  * <p>Экземпляр владеет внутренними {@link ShapeRenderer} и {@link SpriteBatch}; их освобождает
  * {@link #dispose()}. Переданный {@link BitmapFont} остаётся собственностью VisUI/вызывающего
@@ -99,11 +97,14 @@ public final class WorldMapRenderer {
             ComponentMapper.getFor(AsteroidComponent.class);
     private static final ComponentMapper<MiningComponent> MINING =
             ComponentMapper.getFor(MiningComponent.class);
+    private static final ComponentMapper<EntityIdComponent> ENTITY_IDS =
+            ComponentMapper.getFor(EntityIdComponent.class);
 
     private final BitmapFont font;
     private final GlyphLayout labelLayout = new GlyphLayout();
     private final ShapeRenderer shapeRenderer;
     private final SpriteBatch spriteBatch;
+    private final Array<Entity> worldEntities = new Array<>(false, 32);
     private final Array<Entity> visibleEntities = new Array<>(false, 16);
     private final Vector2 firstPoint = new Vector2();
     private final Vector2 secondPoint = new Vector2();
@@ -127,12 +128,6 @@ public final class WorldMapRenderer {
     /**
      * Отрисовывает один кадр карты.
      *
-     * <p>Метод безопасно завершается до первого графического вызова, если отрисовщик уже
-     * освобождён, матрица, layout или коллекция отсутствуют либо матрица содержит неконечные
-     * значения. Отдельные некорректные сущности просто пропускаются. Объект считается видимым,
-     * только если имеет {@link IdentityComponent}, конечную позицию и находится в границах
-     * полного мира и текущего обзора.</p>
-     *
      * @param projectionMatrix конечная матрица камеры Scene2D
      * @param entities актуальные сущности мира; коллекция может содержать {@code null}
      * @param layout вычисленная область и масштаб карты
@@ -150,7 +145,7 @@ public final class WorldMapRenderer {
             return;
         }
 
-        collectVisibleEntities(entities, layout);
+        collectEntities(entities, layout);
         shapeRenderer.setProjectionMatrix(projectionMatrix);
         drawBackground(layout);
         beginMapClip(layout);
@@ -165,10 +160,15 @@ public final class WorldMapRenderer {
         drawBorder(layout);
     }
 
-    /** Собирает ссылки на сущности, которые имеют корректный визуальный образ на карте. */
-    private void collectVisibleEntities(Iterable<Entity> entities, WorldMapLayout layout) {
+    /** Собирает полный runtime-набор для разрешения ID и подмножество видимых объектов. */
+    private void collectEntities(Iterable<Entity> entities, WorldMapLayout layout) {
+        worldEntities.clear();
         visibleEntities.clear();
         for (Entity entity : entities) {
+            if (entity == null) {
+                continue;
+            }
+            worldEntities.add(entity);
             if (isVisible(entity, layout)) {
                 visibleEntities.add(entity);
             }
@@ -289,11 +289,7 @@ public final class WorldMapRenderer {
         float coreRadius = asteroidCoreRadius(asteroid);
         if (coreRadius > 0f) {
             shapeRenderer.setColor(ASTEROID_RESOURCE_COLOR);
-            shapeRenderer.circle(
-                    screenX,
-                    screenY,
-                    coreRadius,
-                    16);
+            shapeRenderer.circle(screenX, screenY, coreRadius, 16);
         }
     }
 
@@ -322,13 +318,7 @@ public final class WorldMapRenderer {
         shapeRenderer.end();
     }
 
-    /**
-     * Включает экранное отсечение содержимого карты с учётом HDPI-коэффициента libGDX.
-     *
-     * <p>{@link WorldMapLayout} использует координаты {@code ScreenViewport}; при стандартном
-     * {@code unitsPerPixel=1} они совпадают с логическими экранными пикселями. {@link HdpiUtils}
-     * преобразует их в координаты back buffer на мониторах с масштабированием интерфейса.</p>
-     */
+    /** Включает экранное отсечение содержимого карты с учётом HDPI-коэффициента libGDX. */
     private void beginMapClip(WorldMapLayout layout) {
         int left = (int) Math.floor(layout.getMapX());
         int bottom = (int) Math.floor(layout.getMapY());
@@ -338,13 +328,7 @@ public final class WorldMapRenderer {
         HdpiUtils.glScissor(left, bottom, Math.max(1, right - left), Math.max(1, top - bottom));
     }
 
-    /**
-     * Выводит имена станций и выбранного корабля либо астероида внутри карты.
-     *
-     * <p>Подписи всех кораблей намеренно не показываются одновременно: при стыковке несколько
-     * флотов могут занимать одну позицию и превращать текст в нечитаемое пятно. Имя конкретного
-     * корабля появляется после выбора и дублируется в правой карточке.</p>
-     */
+    /** Выводит имена станций и выбранного корабля либо астероида внутри карты. */
     private void drawLabels(Matrix4 projectionMatrix, WorldMapLayout layout, Entity selected) {
         float oldRed = font.getColor().r;
         float oldGreen = font.getColor().g;
@@ -508,44 +492,37 @@ public final class WorldMapRenderer {
         }
     }
 
-    /**
-     * Возвращает актуальную навигационную цель торгового или добывающего корабля.
-     *
-     * <p>Цель добычи имеет приоритет над legacy-торговым ИИ: на пути к астероиду и во время
-     * добычи нос направлен к источнику, а при возвращении и разгрузке — к базе.</p>
-     */
+    /** Возвращает актуальную runtime-цель торгового или добывающего корабля. */
     private Entity navigationTarget(Entity fleet) {
         MiningComponent mining = MINING.get(fleet);
+        EntityId targetId;
         if (mining != null) {
-            return miningNavigationTarget(mining);
+            targetId = miningNavigationTarget(mining);
+        } else {
+            TradeAIComponent ai = TRADE_AI.get(fleet);
+            targetId = ai == null ? null : ai.targetStationId;
         }
-        TradeAIComponent ai = TRADE_AI.get(fleet);
-        return ai == null ? null : ai.targetStation;
+        return findEntity(targetId);
     }
 
     /**
-     * Возвращает цель текущего участка добывающего цикла без обращения к OpenGL.
+     * Возвращает persistent ID цели текущего участка добывающего цикла без обращения к OpenGL.
      *
      * @param mining состояние добывающего оборудования либо {@code null}
-     * @return астероид, база или {@code null}, если корабль сейчас не летит
+     * @return ID астероида, базы или {@code null}, если корабль сейчас не летит
      */
-    static Entity miningNavigationTarget(MiningComponent mining) {
+    static EntityId miningNavigationTarget(MiningComponent mining) {
         if (mining == null || mining.state == null) {
             return null;
         }
         return switch (mining.state) {
-            case TRAVEL_TO_ASTEROID, MINING -> mining.targetAsteroid;
-            case RETURNING_TO_BASE, UNLOADING -> mining.homeBase;
+            case TRAVEL_TO_ASTEROID, MINING -> mining.targetAsteroidId;
+            case RETURNING_TO_BASE, UNLOADING -> mining.homeBaseId;
             case SEARCHING, PAUSED -> null;
         };
     }
 
-    /**
-     * Проверяет, принадлежит ли текущая линия автономному добывающему циклу.
-     *
-     * @param mining состояние добывающего оборудования либо {@code null}
-     * @return {@code true} для этапа с астероидом или базой назначения
-     */
+    /** Проверяет, принадлежит ли текущая линия автономному добывающему циклу. */
     static boolean isActiveMiningRoute(MiningComponent mining) {
         if (mining == null || mining.state == null) {
             return false;
@@ -556,15 +533,24 @@ public final class WorldMapRenderer {
         };
     }
 
-    /**
-     * Вычисляет экранный радиус ресурсного ядра астероида.
-     *
-     * @param asteroid компонент конечного источника либо {@code null}
-     * @return ноль для пустого источника или радиус от {@code 2} до {@code 6.5} пикселя
-     */
+    /** Вычисляет экранный радиус ресурсного ядра астероида. */
     static float asteroidCoreRadius(AsteroidComponent asteroid) {
         float remainingRatio = asteroid == null ? 0f : asteroid.getRemainingRatio();
         return remainingRatio <= 0f ? 0f : 2f + 4.5f * remainingRatio;
+    }
+
+    /** Разрешает persistent ID по полному набору сущностей текущего render-frame. */
+    private Entity findEntity(EntityId id) {
+        if (id == null) {
+            return null;
+        }
+        for (Entity entity : worldEntities) {
+            EntityIdComponent component = ENTITY_IDS.get(entity);
+            if (component != null && component.id.equals(id)) {
+                return entity;
+            }
+        }
+        return null;
     }
 
     /** Рисует треугольник по локальным продольным и поперечным координатам корабля. */
@@ -695,16 +681,7 @@ public final class WorldMapRenderer {
         return true;
     }
 
-    /**
-     * Возвращает неизменяемый визуальный стиль функционального типа корабля.
-     *
-     * <p>Метод не обращается к OpenGL и возвращает заранее созданные значения, поэтому его можно
-     * безопасно использовать в модульных тестах. Отсутствующий тип получает прежний универсальный
-     * треугольный маркер для совместимости с legacy-сущностями.</p>
-     *
-     * @param shipType функциональный тип корабля либо {@code null}
-     * @return ненулевой стиль маркера с конечными компонентами цвета
-     */
+    /** Возвращает неизменяемый визуальный стиль функционального типа корабля. */
     static MarkerStyle markerStyle(ShipType shipType) {
         if (shipType == null) {
             return GENERIC_FLEET_STYLE;
@@ -745,16 +722,13 @@ public final class WorldMapRenderer {
     record MarkerStyle(MarkerShape shape, float red, float green, float blue) {
     }
 
-    /**
-     * Освобождает принадлежащие экземпляру GPU-ресурсы.
-     *
-     * <p>Повторный вызов ничего не делает. Переданный в конструктор шрифт не освобождается.</p>
-     */
+    /** Освобождает принадлежащие экземпляру GPU-ресурсы. */
     public void dispose() {
         if (disposed) {
             return;
         }
         disposed = true;
+        worldEntities.clear();
         visibleEntities.clear();
         shapeRenderer.dispose();
         spriteBatch.dispose();

@@ -7,6 +7,7 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.spacesim.components.AsteroidComponent;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.MiningComponent;
@@ -20,26 +21,29 @@ import com.spacesim.controllers.TradeController;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
 import com.spacesim.model.ItemType;
+import com.spacesim.persistence.EntityId;
+import com.spacesim.persistence.EntityRegistry;
 
 import java.util.Objects;
 
 /**
  * Управляет полным автономным циклом добычи конечных астероидных ресурсов.
  *
- * <p>Корабль ищет ближайший совместимый астероид, физически переносит ресурс из конечного запаса
- * астероида в собственный трюм, возвращается к платежеспособному рынку и продаёт груз через
- * {@link TradeController}. Добыча сама не является resource source: сумма
- * {@code asteroid.remainingResource + cargo} сохраняется при каждом извлечении. Источник ресурса
- * возникает только при создании астероида.</p>
+ * <p>Persistent-состояние {@link MiningComponent} хранит цели только как устойчивые
+ * {@link EntityId}. Перед движением, добычей и разгрузкой система разрешает их через
+ * {@link EntityRegistry}. Исчезнувший астероид или рынок поэтому безопасно инвалидирует ссылку без
+ * сохранения runtime-объекта Ashley.</p>
  *
- * <p>Authoritative деньги находятся в {@link WalletComponent}. Разгрузка выполняется только если
- * база способна оплатить хотя бы одну единицу по эффективной закупочной цене; успешная сделка
- * переводит товар и milli-credits атомарно и записывается в общий {@link EconomicLedger}.</p>
+ * <p>Корабль физически переносит ресурс из конечного запаса астероида в трюм и продаёт груз через
+ * {@link TradeController}. Добыча сама не является resource source: сумма
+ * {@code asteroid.remainingResource + cargo} сохраняется. Authoritative деньги находятся только в
+ * {@link WalletComponent}; база должна иметь реальную ликвидность для покупки груза.</p>
  */
 public final class MiningSystem extends IteratingSystem {
     private static final double DISTANCE_EPSILON = 0.0001d;
 
     private final TradeController tradeController;
+    private final EntityRegistry registry;
     private ImmutableArray<Entity> asteroids;
     private ImmutableArray<Entity> marketBases;
 
@@ -52,26 +56,41 @@ public final class MiningSystem extends IteratingSystem {
     private final ComponentMapper<ReputationComponent> reputationMapper = ComponentMapper.getFor(ReputationComponent.class);
     private final ComponentMapper<TradeAIComponent> tradeAIMapper = ComponentMapper.getFor(TradeAIComponent.class);
     private final ComponentMapper<WalletComponent> walletMapper = ComponentMapper.getFor(WalletComponent.class);
+    private final ComponentMapper<EntityIdComponent> idMapper = ComponentMapper.getFor(EntityIdComponent.class);
 
-    /** Создаёт систему с собственным экономическим журналом. */
+    /** Создаёт систему с собственными экономическим журналом и registry. */
     public MiningSystem() {
-        this(new EconomicLedger());
+        this(new EconomicLedger(), new EntityRegistry());
     }
 
     /**
-     * Создаёт систему, записывающую продажи в общий журнал игровой сессии.
+     * Создаёт систему с общим ledger и собственным registry.
      *
      * @param ledger общий экономический журнал
      * @throws NullPointerException если журнал не задан
      */
     public MiningSystem(EconomicLedger ledger) {
+        this(ledger, new EntityRegistry());
+    }
+
+    /**
+     * Создаёт систему с общими ledger и persistent-ID registry игровой сессии.
+     *
+     * @param ledger общий экономический журнал
+     * @param registry runtime-индекс устойчивых EntityId
+     * @throws NullPointerException если зависимость не задана
+     */
+    public MiningSystem(EconomicLedger ledger, EntityRegistry registry) {
         super(Family.all(
+                EntityIdComponent.class,
                 ShipComponent.class,
                 MiningComponent.class,
                 InventoryComponent.class,
                 TransformComponent.class,
                 WalletComponent.class).get());
-        tradeController = new TradeController(Objects.requireNonNull(ledger, "EconomicLedger не задан"));
+        tradeController = new TradeController(
+                Objects.requireNonNull(ledger, "EconomicLedger не задан"));
+        this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
     }
 
     /** @return ledger, в который система записывает успешные продажи */
@@ -80,28 +99,27 @@ public final class MiningSystem extends IteratingSystem {
     }
 
     /**
-     * Подключает живые представления природных источников и платежеспособных рыночных сущностей.
+     * Подключает registry и живые представления идентифицированных источников и рынков.
      *
      * @param engine движок Ashley, к которому добавлена система
      */
     @Override
     public void addedToEngine(Engine engine) {
         super.addedToEngine(engine);
+        registry.track(engine);
         asteroids = engine.getEntitiesFor(Family.all(
+                EntityIdComponent.class,
                 AsteroidComponent.class,
                 TransformComponent.class).get());
         marketBases = engine.getEntitiesFor(Family.all(
+                EntityIdComponent.class,
                 MarketComponent.class,
                 InventoryComponent.class,
                 TransformComponent.class,
                 WalletComponent.class).get());
     }
 
-    /**
-     * Обновляет добывающие корабли только для конечного неотрицательного игрового времени.
-     *
-     * @param deltaTime прошедшее игровое время в секундах
-     */
+    /** Обновляет добывающие корабли только для конечного неотрицательного игрового времени. */
     @Override
     public void update(float deltaTime) {
         if (!Float.isFinite(deltaTime) || deltaTime < 0f) {
@@ -110,12 +128,7 @@ public final class MiningSystem extends IteratingSystem {
         super.update(deltaTime);
     }
 
-    /**
-     * Выполняет текущий этап автономного цикла одного корабля.
-     *
-     * @param entity добывающий корабль с обязательными компонентами системы
-     * @param deltaTime проверенное неотрицательное игровое время
-     */
+    /** Выполняет текущий этап автономного цикла одного корабля. */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         ShipComponent ship = shipMapper.get(entity);
@@ -135,7 +148,7 @@ public final class MiningSystem extends IteratingSystem {
         }
         if (mining.state == null || mining.state == MiningComponent.State.PAUSED) {
             mining.state = MiningComponent.State.SEARCHING;
-            mining.targetAsteroid = null;
+            mining.targetAsteroidId = null;
             mining.extractionRemainder = 0d;
         }
 
@@ -175,7 +188,7 @@ public final class MiningSystem extends IteratingSystem {
             }
             return;
         }
-        mining.targetAsteroid = target;
+        mining.targetAsteroidId = idOf(target);
         mining.extractionRemainder = 0d;
         mining.state = MiningComponent.State.TRAVEL_TO_ASTEROID;
     }
@@ -190,13 +203,14 @@ public final class MiningSystem extends IteratingSystem {
             stop(transform);
             return;
         }
-        if (!isUsableAsteroid(mining.targetAsteroid, mining.resourceItem)) {
+        Entity target = registry.find(mining.targetAsteroidId);
+        if (!isUsableAsteroid(target, mining.resourceItem)) {
             loseTarget(mining, inventory);
             stop(transform);
             return;
         }
 
-        TransformComponent targetTransform = transformMapper.get(mining.targetAsteroid);
+        TransformComponent targetTransform = transformMapper.get(target);
         if (moveWithinRange(
                 transform,
                 targetTransform,
@@ -207,16 +221,14 @@ public final class MiningSystem extends IteratingSystem {
         }
     }
 
-    /**
-     * Переносит целые единицы из конечного запаса астероида в трюм, не меняя суммарное количество.
-     */
+    /** Переносит целые единицы из конечного запаса астероида в трюм. */
     private void mineAsteroid(
             Entity miner,
             MiningComponent mining,
             InventoryComponent inventory,
             TransformComponent transform,
             float deltaTime) {
-        Entity target = mining.targetAsteroid;
+        Entity target = registry.find(mining.targetAsteroidId);
         if (!isUsableAsteroid(target, mining.resourceItem)) {
             loseTarget(mining, inventory);
             stop(transform);
@@ -325,35 +337,37 @@ public final class MiningSystem extends IteratingSystem {
             finishDeliveryCycle(mining);
             return;
         }
+
         ReputationComponent reputation = reputationMapper.get(miner);
-        if (!isUsableBase(mining.homeBase, miner, mining.resourceItem, reputation)
+        Entity base = registry.find(mining.homeBaseId);
+        if (!isUsableBase(base, miner, mining.resourceItem, reputation)
                 || !isWithinRange(
                         transform,
-                        transformMapper.get(mining.homeBase),
+                        transformMapper.get(base),
                         mining.dockingRange)) {
-            mining.homeBase = null;
+            mining.homeBaseId = null;
             mining.state = MiningComponent.State.RETURNING_TO_BASE;
             return;
         }
 
-        InventoryComponent baseInventory = inventoryMapper.get(mining.homeBase);
+        InventoryComponent baseInventory = inventoryMapper.get(base);
         float salePrice = tradeController.getEffectiveBuyPrice(
-                mining.homeBase,
+                base,
                 mining.resourceItem,
                 reputation);
         int amount = Math.min(cargo, baseInventory.getFreeCapacity());
         amount = Math.min(amount, maximumBasePurchaseAmount(
-                mining.homeBase,
+                base,
                 miner,
                 salePrice,
                 amount));
         if (amount <= 0 || !tradeController.sellToStation(
-                mining.homeBase,
+                base,
                 miner,
                 mining.resourceItem,
                 amount,
                 reputation)) {
-            mining.homeBase = null;
+            mining.homeBaseId = null;
             mining.state = MiningComponent.State.RETURNING_TO_BASE;
             return;
         }
@@ -362,17 +376,18 @@ public final class MiningSystem extends IteratingSystem {
         if (inventory.stock[mining.resourceItem] <= 0) {
             finishDeliveryCycle(mining);
         } else {
-            mining.homeBase = null;
+            mining.homeBaseId = null;
             mining.state = MiningComponent.State.RETURNING_TO_BASE;
         }
     }
 
     private Entity resolveBase(Entity miner, MiningComponent mining, TransformComponent transform) {
         ReputationComponent reputation = reputationMapper.get(miner);
-        if (isUsableBase(mining.homeBase, miner, mining.resourceItem, reputation)) {
-            return mining.homeBase;
+        Entity savedBase = registry.find(mining.homeBaseId);
+        if (isUsableBase(savedBase, miner, mining.resourceItem, reputation)) {
+            return savedBase;
         }
-        mining.homeBase = null;
+        mining.homeBaseId = null;
 
         Entity closest = null;
         double closestDistance = Double.POSITIVE_INFINITY;
@@ -386,7 +401,7 @@ public final class MiningSystem extends IteratingSystem {
                 closest = candidate;
             }
         }
-        mining.homeBase = closest;
+        mining.homeBaseId = closest == null ? null : idOf(closest);
         return closest;
     }
 
@@ -404,6 +419,14 @@ public final class MiningSystem extends IteratingSystem {
             }
         }
         return closest;
+    }
+
+    private EntityId idOf(Entity entity) {
+        EntityIdComponent component = idMapper.get(entity);
+        if (component == null) {
+            throw new IllegalStateException("Экономическая Entity не имеет EntityIdComponent");
+        }
+        return component.id;
     }
 
     private boolean isValidConfiguration(
@@ -436,6 +459,7 @@ public final class MiningSystem extends IteratingSystem {
         if (entity == null
                 || asteroids == null
                 || !asteroids.contains(entity, true)
+                || !idMapper.has(entity)
                 || !asteroidMapper.has(entity)
                 || !transformMapper.has(entity)) {
             return false;
@@ -447,7 +471,6 @@ public final class MiningSystem extends IteratingSystem {
                 && isValidPosition(transformMapper.get(entity));
     }
 
-    /** Проверяет рынок разгрузки, кошелёк, цену, склад, положение и реальную ликвидность. */
     private boolean isUsableBase(
             Entity entity,
             Entity miner,
@@ -457,6 +480,7 @@ public final class MiningSystem extends IteratingSystem {
                 || entity == miner
                 || marketBases == null
                 || !marketBases.contains(entity, true)
+                || !idMapper.has(entity)
                 || !marketMapper.has(entity)
                 || !inventoryMapper.has(entity)
                 || !walletMapper.has(entity)
@@ -603,13 +627,13 @@ public final class MiningSystem extends IteratingSystem {
     }
 
     private void beginReturn(MiningComponent mining) {
-        mining.targetAsteroid = null;
+        mining.targetAsteroidId = null;
         mining.extractionRemainder = 0d;
         mining.state = MiningComponent.State.RETURNING_TO_BASE;
     }
 
     private void loseTarget(MiningComponent mining, InventoryComponent inventory) {
-        mining.targetAsteroid = null;
+        mining.targetAsteroidId = null;
         mining.extractionRemainder = 0d;
         mining.state = inventory.stock[mining.resourceItem] > 0
                 ? MiningComponent.State.RETURNING_TO_BASE
@@ -617,14 +641,14 @@ public final class MiningSystem extends IteratingSystem {
     }
 
     private void removeDepletedTarget(MiningComponent mining, Entity target) {
-        mining.targetAsteroid = null;
+        mining.targetAsteroidId = null;
         if (getEngine() != null && target != null) {
             getEngine().removeEntity(target);
         }
     }
 
     private void finishDeliveryCycle(MiningComponent mining) {
-        mining.targetAsteroid = null;
+        mining.targetAsteroidId = null;
         mining.extractionRemainder = 0d;
         mining.state = MiningComponent.State.SEARCHING;
     }

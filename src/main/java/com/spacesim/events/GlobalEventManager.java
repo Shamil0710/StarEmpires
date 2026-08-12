@@ -1,5 +1,6 @@
 package com.spacesim.events;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import com.spacesim.constants.Constants;
 
@@ -14,22 +15,181 @@ import java.util.random.RandomGenerator;
 /**
  * Управляет жизненным циклом глобальных экономических событий и связанными с ними новостями.
  *
- * <p>Менеджер рассчитан на последовательное использование из игрового цикла. Все добавления и
- * удаления событий проходят через него и изменяют ревизию, по которой зависимые системы могут
- * определить необходимость пересчёта. Время менеджера является игровым временем симуляции, а не
- * wall-clock временем компьютера.</p>
- *
- * <p>Класс изменяем и не является потокобезопасным. Возвращаемое методом {@link #getActiveEvents()}
- * представление также нельзя обходить одновременно с обновлением менеджера из другого потока.
- * Очередь новостей и генератор случайных чисел принадлежат менеджеру и обслуживаются тем же
- * последовательным потоком.</p>
+ * <p>Время менеджера является игровым временем симуляции, а не wall-clock. Весь mutable state,
+ * кроме состояния самого RNG-потока, сериализуется через {@link State}. RNG сохраняется владельцем
+ * игровой сессии отдельно как {@code StatefulRandom.state}; восстановительный конструктор не
+ * выполняет дополнительного случайного вызова.</p>
  */
 public class GlobalEventManager {
     private static final double DEFAULT_SPAWN_RATE_PER_SECOND = -60d * Math.log1p(-0.001d);
     private static final float DEFAULT_EVENT_DURATION_SECONDS = 30f;
     private static final double EVENT_TIME_EPSILON_SECONDS = 1e-9d;
-    /** Верхняя граница материализованных автособытий за один вызов {@link #update(float)}. */
     private static final int MAX_AUTOMATIC_EVENTS_PER_UPDATE = 1_024;
+
+    /**
+     * Сериализуемое состояние одного активного экономического события.
+     *
+     * @param name название события
+     * @param targetItemId товар
+     * @param priceMultiplier множитель цены
+     * @param consumptionMultiplier множитель потребления
+     * @param remainingDurationSeconds оставшееся время
+     * @param x координата X
+     * @param y координата Y
+     * @param radius радиус действия
+     */
+    public record EventState(
+            String name,
+            int targetItemId,
+            float priceMultiplier,
+            float consumptionMultiplier,
+            float remainingDurationSeconds,
+            float x,
+            float y,
+            float radius) {
+        /**
+         * Проверяет состояние через те же инварианты, что и runtime-событие.
+         *
+         * @param name название события
+         * @param targetItemId товар
+         * @param priceMultiplier множитель цены
+         * @param consumptionMultiplier множитель потребления
+         * @param remainingDurationSeconds оставшееся время
+         * @param x координата X
+         * @param y координата Y
+         * @param radius радиус действия
+         */
+        public EventState {
+            new EconomyEvent(
+                    name,
+                    targetItemId,
+                    priceMultiplier,
+                    consumptionMultiplier,
+                    remainingDurationSeconds,
+                    new Vector2(x, y),
+                    radius);
+        }
+
+        EconomyEvent toEvent() {
+            return new EconomyEvent(
+                    name,
+                    targetItemId,
+                    priceMultiplier,
+                    consumptionMultiplier,
+                    remainingDurationSeconds,
+                    new Vector2(x, y),
+                    radius);
+        }
+    }
+
+    /**
+     * Сериализуемое состояние ожидающей показа новости.
+     *
+     * @param headline заголовок либо {@code null}
+     * @param content текст либо {@code null}
+     * @param hasColor был ли задан цвет
+     * @param red красный канал
+     * @param green зелёный канал
+     * @param blue синий канал
+     * @param alpha прозрачность
+     * @param timestamp игровой timestamp в миллисекундах
+     */
+    public record NewsState(
+            String headline,
+            String content,
+            boolean hasColor,
+            float red,
+            float green,
+            float blue,
+            float alpha,
+            long timestamp) {
+        /**
+         * Проверяет сериализуемые данные новости.
+         *
+         * @param headline заголовок либо {@code null}
+         * @param content текст либо {@code null}
+         * @param hasColor был ли задан цвет
+         * @param red красный канал
+         * @param green зелёный канал
+         * @param blue синий канал
+         * @param alpha прозрачность
+         * @param timestamp игровой timestamp в миллисекундах
+         */
+        public NewsState {
+            if (timestamp < 0L) {
+                throw new IllegalArgumentException("Timestamp новости не может быть отрицательным");
+            }
+            if (hasColor && (!Float.isFinite(red)
+                    || !Float.isFinite(green)
+                    || !Float.isFinite(blue)
+                    || !Float.isFinite(alpha))) {
+                throw new IllegalArgumentException("Цвет новости должен быть конечным");
+            }
+        }
+
+        static NewsState fromArticle(NewsArticle article) {
+            Color color = article.color;
+            return new NewsState(
+                    article.headline,
+                    article.content,
+                    color != null,
+                    color == null ? 0f : color.r,
+                    color == null ? 0f : color.g,
+                    color == null ? 0f : color.b,
+                    color == null ? 0f : color.a,
+                    article.timestamp);
+        }
+
+        NewsArticle toArticle() {
+            Color color = hasColor ? new Color(red, green, blue, alpha) : null;
+            return new NewsArticle(headline, content, color, timestamp);
+        }
+    }
+
+    /**
+     * Полный mutable state менеджера событий, кроме состояния RNG.
+     *
+     * @param spawnRatePerSecond средняя частота автоматических событий
+     * @param eventRevision ревизия набора событий
+     * @param secondsUntilNextSpawn время до следующего автоматического события
+     * @param simulationTimeSeconds текущее game time
+     * @param activeEvents активные события
+     * @param pendingNews очередь ещё не потреблённых новостей
+     */
+    public record State(
+            double spawnRatePerSecond,
+            long eventRevision,
+            double secondsUntilNextSpawn,
+            double simulationTimeSeconds,
+            List<EventState> activeEvents,
+            List<NewsState> pendingNews) {
+        /**
+         * Нормализует коллекции и проверяет численные инварианты.
+         *
+         * @param spawnRatePerSecond средняя частота автоматических событий
+         * @param eventRevision ревизия набора событий
+         * @param secondsUntilNextSpawn время до следующего автоматического события
+         * @param simulationTimeSeconds текущее game time
+         * @param activeEvents активные события
+         * @param pendingNews очередь новостей
+         */
+        public State {
+            if (!Double.isFinite(spawnRatePerSecond) || spawnRatePerSecond < 0d) {
+                throw new IllegalArgumentException("Частота событий состояния некорректна");
+            }
+            if (eventRevision < 0L || !Double.isFinite(simulationTimeSeconds) || simulationTimeSeconds < 0d) {
+                throw new IllegalArgumentException("Время или ревизия событий состояния некорректны");
+            }
+            boolean validDelay = spawnRatePerSecond == 0d
+                    ? secondsUntilNextSpawn == Double.POSITIVE_INFINITY
+                    : Double.isFinite(secondsUntilNextSpawn) && secondsUntilNextSpawn >= 0d;
+            if (!validDelay) {
+                throw new IllegalArgumentException("Таймер следующего события состояния некорректен");
+            }
+            activeEvents = List.copyOf(Objects.requireNonNull(activeEvents, "Список событий не задан"));
+            pendingNews = List.copyOf(Objects.requireNonNull(pendingNews, "Список новостей не задан"));
+        }
+    }
 
     private final List<EconomyEvent> activeEvents = new ArrayList<>();
     private final List<EconomyEvent> activeEventsView = Collections.unmodifiableList(activeEvents);
@@ -50,8 +210,6 @@ public class GlobalEventManager {
      * Создаёт менеджер со стандартной средней частотой и переданным источником случайности.
      *
      * @param random источник случайных чисел игровой сессии
-     * @throws NullPointerException если источник не задан
-     * @throws IllegalStateException если источник нарушает контракт {@link RandomGenerator}
      */
     public GlobalEventManager(RandomGenerator random) {
         this(random, DEFAULT_SPAWN_RATE_PER_SECOND);
@@ -60,25 +218,17 @@ public class GlobalEventManager {
     /**
      * Создаёт менеджер с заданной средней частотой автоматических событий.
      *
-     * <p>Значение {@code 0} удобно для сценариев с полностью управляемыми событиями, в том числе
-     * для детерминированных симуляций и тестов.</p>
-     *
      * @param spawnRatePerSecond среднее число автоматически создаваемых событий в секунду
-     * @throws IllegalArgumentException если частота отрицательна или не является конечным числом
      */
     public GlobalEventManager(double spawnRatePerSecond) {
         this(new Random(), spawnRatePerSecond);
     }
 
     /**
-     * Создаёт менеджер с заданным источником случайности и средней частотой событий.
+     * Создаёт новый менеджер с заданным RNG и средней частотой событий.
      *
      * @param random источник случайных чисел
      * @param spawnRatePerSecond среднее число автоматически создаваемых событий в секунду
-     * @throws NullPointerException если источник случайных чисел не задан
-     * @throws IllegalArgumentException если частота отрицательна или не является конечным числом
-     * @throws IllegalStateException если источник случайных чисел нарушает контракт и возвращает
-     *         значение вне диапазона {@code [0, 1)}
      */
     public GlobalEventManager(RandomGenerator random, double spawnRatePerSecond) {
         this.random = Objects.requireNonNull(random, "Источник случайных чисел не задан");
@@ -90,17 +240,63 @@ public class GlobalEventManager {
     }
 
     /**
+     * Восстанавливает менеджер из сохранённого состояния без дополнительного RNG-вызова.
+     *
+     * @param random RNG-поток уже восстановленный в точное сохранённое состояние
+     * @param state сериализуемое состояние менеджера
+     * @throws NullPointerException если зависимость не задана
+     */
+    public GlobalEventManager(RandomGenerator random, State state) {
+        this.random = Objects.requireNonNull(random, "Источник случайных чисел не задан");
+        State checked = Objects.requireNonNull(state, "Состояние событий не задано");
+        this.spawnRatePerSecond = checked.spawnRatePerSecond();
+        this.eventRevision = checked.eventRevision();
+        this.secondsUntilNextSpawn = checked.secondsUntilNextSpawn();
+        this.simulationTimeSeconds = checked.simulationTimeSeconds();
+        for (EventState event : checked.activeEvents()) {
+            activeEvents.add(event.toEvent());
+        }
+        for (NewsState news : checked.pendingNews()) {
+            pendingNews.add(news.toArticle());
+        }
+    }
+
+    /**
+     * Возвращает полный snapshot менеджера без изменения очереди новостей или RNG.
+     *
+     * @return immutable состояние, пригодное для сериализации
+     */
+    public State snapshotState() {
+        List<EventState> events = new ArrayList<>(activeEvents.size());
+        for (EconomyEvent event : activeEvents) {
+            Vector2 location = event.getLocation();
+            events.add(new EventState(
+                    event.getName(),
+                    event.getTargetItemId(),
+                    event.getPriceMultiplier(),
+                    event.getConsumptionMultiplier(),
+                    event.getRemainingDurationSeconds(),
+                    location.x,
+                    location.y,
+                    event.getRadius()));
+        }
+        List<NewsState> news = new ArrayList<>(pendingNews.size());
+        for (NewsArticle article : pendingNews) {
+            news.add(NewsState.fromArticle(article));
+        }
+        return new State(
+                spawnRatePerSecond,
+                eventRevision,
+                secondsUntilNextSpawn,
+                simulationTimeSeconds,
+                events,
+                news);
+    }
+
+    /**
      * Продвигает игровое время активных событий и создаёт события, запланированные на интервал.
      *
-     * <p>Входной {@code float} канонизируется через его десятичное представление перед накоплением
-     * игрового времени. Моменты автоматического появления задаются экспоненциально распределёнными
-     * интервалами. Сравнение точных границ использует наносекундный epsilon исключительно для
-     * компенсации арифметики {@code double}; расписание и RNG-последовательность не меняются.</p>
-     *
      * @param deltaSeconds прошедшее игровое время в секундах
-     * @throws IllegalArgumentException если время отрицательно, бесконечно или равно {@code NaN}
-     * @throws IllegalStateException если пользовательский источник случайных чисел возвращает
-     *         значение вне диапазона {@code [0, 1)} при планировании следующего события
      */
     public void update(float deltaSeconds) {
         if (!Float.isFinite(deltaSeconds) || deltaSeconds < 0f) {
@@ -140,8 +336,6 @@ public class GlobalEventManager {
      * Активирует событие и помещает соответствующую статью с текущим game timestamp в очередь.
      *
      * @param event новое событие
-     * @throws NullPointerException если событие не задано
-     * @throws IllegalArgumentException если событие завершено или этот экземпляр уже активен
      */
     public void activateEvent(EconomyEvent event) {
         EconomyEvent checkedEvent = Objects.requireNonNull(event, "Событие не задано");
@@ -172,11 +366,7 @@ public class GlobalEventManager {
         return true;
     }
 
-    /**
-     * Возвращает доступное только для чтения представление активных событий.
-     *
-     * @return неизменяемое живое представление списка активных событий
-     */
+    /** @return неизменяемое живое представление списка активных событий */
     public List<EconomyEvent> getActiveEvents() {
         return activeEventsView;
     }
@@ -194,7 +384,7 @@ public class GlobalEventManager {
     /**
      * Извлекает все накопленные новости и очищает внутреннюю очередь.
      *
-     * @return новый изменяемый список накопленных новостей в порядке их постановки в очередь
+     * @return новый изменяемый список накопленных новостей
      */
     public List<NewsArticle> consumePendingNews() {
         List<NewsArticle> news = new ArrayList<>(pendingNews);
