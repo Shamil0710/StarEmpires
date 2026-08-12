@@ -38,6 +38,7 @@ public final class AsteroidSpawnSystem extends EntitySystem {
     private boolean initialized;
     private double secondsSinceRefill;
     private long spawnSequence;
+    private long spawnedAsteroidCount;
 
     /** Создаёт систему с генератором, инициализированным seed из конфигурации. */
     public AsteroidSpawnSystem(AsteroidSpawnConfig config) {
@@ -107,6 +108,11 @@ public final class AsteroidSpawnSystem extends EntitySystem {
         spawnUntil(config.getTargetCount());
     }
 
+    /** Общее число когда-либо созданных этой системой астероидов, включая уже истощённые. */
+    public long getSpawnedAsteroidCount() {
+        return spawnedAsteroidCount;
+    }
+
     /** Создаёт новые источники до заданного общего количества либо пока не закончатся свободные точки. */
     private void spawnUntil(int desiredCount) {
         int activeCount = countUsableAsteroids();
@@ -161,6 +167,9 @@ public final class AsteroidSpawnSystem extends EntitySystem {
         TransformComponent transform = new TransformComponent();
         transform.position.set(point.x(), point.y());
         spawnSequence++;
+        if (spawnedAsteroidCount < Long.MAX_VALUE) {
+            spawnedAsteroidCount++;
+        }
 
         return new Entity()
                 .add(new IdentityComponent(

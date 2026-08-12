@@ -85,6 +85,11 @@ public final class AsteroidSpawnConfig {
         return targetCount;
     }
 
+    /** Совместимое доменное имя максимального числа одновременно активных астероидов. */
+    public int maxActiveAsteroids() {
+        return targetCount;
+    }
+
     public float getRefillIntervalSeconds() {
         return refillIntervalSeconds;
     }
