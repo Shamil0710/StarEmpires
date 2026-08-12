@@ -13,30 +13,46 @@ import java.util.Optional;
  * <p>Planner не читает Ashley ECS и не меняет состояние мира. Для нового груза он применяет
  * ограничения ликвидности, вместимости, спроса, cargo policy и репутационной цены. Pairing
  * supplier-consumer выполняет общий directory один раз за market snapshot; конкретный fleet
- * оценивает bounded {@link TradeOpportunity} shortlist. Уже имеющийся груз продаётся через
- * отдельный pure sale-route path без supplier pairing.</p>
+ * оценивает bounded {@link TradeOpportunity} shortlist. Внешние fuel/tariff/risk penalties
+ * подключаются через {@link TradeRouteCostModel} и участвуют в net scoring.</p>
  */
 public final class TradeRoutePlanner {
     /** Политика сравнения допустимых маршрутов. */
     public enum ScoringMode {
-        /** Legacy-поведение: максимальная абсолютная валовая прибыль/выручка. */
+        /** Legacy-форма: максимальная абсолютная net прибыль/выручка. */
         GROSS_PROFIT,
-        /** Целевая Stage-5 политика: максимальная прибыль/выручка на секунду движения. */
+        /** Целевая Stage-5 политика: максимальная net прибыль/выручка на секунду движения. */
         PROFIT_PER_SECOND
     }
 
     private final ContentCatalog contentCatalog;
     private final ScoringMode scoringMode;
+    private final TradeRouteCostModel costModel;
 
     /**
-     * Создаёт planner с явной политикой scoring.
+     * Создаёт planner с нулевыми внешними route costs.
      *
      * @param contentCatalog каталог товаров текущей session
      * @param scoringMode способ сравнения маршрутов
      */
     public TradeRoutePlanner(ContentCatalog contentCatalog, ScoringMode scoringMode) {
+        this(contentCatalog, scoringMode, TradeRouteCostModel.none());
+    }
+
+    /**
+     * Создаёт planner с явно заданной моделью логистических расходов.
+     *
+     * @param contentCatalog каталог товаров текущей session
+     * @param scoringMode способ сравнения маршрутов
+     * @param costModel policy дополнительных fuel/tariff/risk costs
+     */
+    public TradeRoutePlanner(
+            ContentCatalog contentCatalog,
+            ScoringMode scoringMode,
+            TradeRouteCostModel costModel) {
         this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
         this.scoringMode = Objects.requireNonNull(scoringMode, "ScoringMode не задан");
+        this.costModel = Objects.requireNonNull(costModel, "TradeRouteCostModel не задан");
     }
 
     /**
@@ -85,8 +101,25 @@ public final class TradeRoutePlanner {
                 if (purchaseCost <= 0L || saleRevenue <= purchaseCost) {
                     continue;
                 }
+                long grossProfit = saleRevenue - purchaseCost;
                 float distance = routeDistance(fleet, supplier, opportunity.stationDistance());
-                double travelSeconds = travelSeconds(distance, fleet.movementSpeed());
+                double seconds = travelSeconds(distance, fleet.movementSpeed());
+                long routeCost = estimateRouteCost(
+                        fleet,
+                        new TradeRouteCostModel.Context(
+                                supplier.id(),
+                                consumer.id(),
+                                supplier.factionId(),
+                                consumer.factionId(),
+                                itemId,
+                                amount,
+                                purchaseCost,
+                                saleRevenue,
+                                distance,
+                                seconds));
+                if (routeCost >= grossProfit) {
+                    continue;
+                }
                 TradeRoute candidate = new TradeRoute(
                         supplier.id(),
                         consumer.id(),
@@ -94,9 +127,11 @@ public final class TradeRoutePlanner {
                         amount,
                         purchaseCost,
                         saleRevenue,
-                        saleRevenue - purchaseCost,
+                        grossProfit,
+                        routeCost,
+                        grossProfit - routeCost,
                         distance,
-                        travelSeconds);
+                        seconds);
                 if (isBetter(candidate, best)) {
                     best = candidate;
                 }
@@ -108,8 +143,8 @@ public final class TradeRoutePlanner {
     /**
      * Ищет лучшую точку реализации уже находящегося на борту груза.
      *
-     * <p>Закупочная цена является sunk cost. В legacy режиме сравнивается абсолютная выручка, в
-     * Stage-5 режиме — выручка на секунду движения до consumer.</p>
+     * <p>Закупочная цена является sunk cost. Route costs всё равно вычитаются из ожидаемой выручки,
+     * поэтому дальняя дорогая продажа может уступить ближней после fuel/risk/tariff policy.</p>
      *
      * @param fleet immutable профиль флота с текущим cargo snapshot
      * @param directory общий snapshot рынков текущего tick
@@ -148,13 +183,32 @@ public final class TradeRoutePlanner {
                     continue;
                 }
                 float distance = directDistance(fleet, consumer);
+                double seconds = travelSeconds(distance, fleet.movementSpeed());
+                long routeCost = estimateRouteCost(
+                        fleet,
+                        new TradeRouteCostModel.Context(
+                                null,
+                                consumer.id(),
+                                -1,
+                                consumer.factionId(),
+                                itemId,
+                                amount,
+                                0L,
+                                revenue,
+                                distance,
+                                seconds));
+                if (routeCost >= revenue) {
+                    continue;
+                }
                 TradeSaleRoute candidate = new TradeSaleRoute(
                         consumer.id(),
                         itemId,
                         amount,
                         revenue,
+                        routeCost,
+                        revenue - routeCost,
                         distance,
-                        travelSeconds(distance, fleet.movementSpeed()));
+                        seconds);
                 if (isBetter(candidate, best)) {
                     best = candidate;
                 }
@@ -193,9 +247,7 @@ public final class TradeRoutePlanner {
                         consumer.walletBalanceMilliCredits(), salePrice, transferable));
         transferable = Math.min(transferable,
                 safeMaximumAffordable(
-                        Long.MAX_VALUE - fleet.walletBalanceMilliCredits(),
-                        salePrice,
-                        transferable));
+                        Long.MAX_VALUE - fleet.walletBalanceMilliCredits(), salePrice, transferable));
         return Math.max(0, transferable);
     }
 
@@ -204,15 +256,18 @@ public final class TradeRoutePlanner {
             return true;
         }
         int primary = scoringMode == ScoringMode.GROSS_PROFIT
-                ? Long.compare(candidate.grossProfitMilliCredits(), current.grossProfitMilliCredits())
-                : Double.compare(candidate.grossProfitPerSecond(), current.grossProfitPerSecond());
+                ? Long.compare(candidate.netProfitMilliCredits(), current.netProfitMilliCredits())
+                : Double.compare(candidate.netProfitPerSecond(), current.netProfitPerSecond());
         if (primary != 0) {
             return primary > 0;
         }
-
-        int profitTie = Long.compare(candidate.grossProfitMilliCredits(), current.grossProfitMilliCredits());
-        if (profitTie != 0) {
-            return profitTie > 0;
+        int netTie = Long.compare(candidate.netProfitMilliCredits(), current.netProfitMilliCredits());
+        if (netTie != 0) {
+            return netTie > 0;
+        }
+        int grossTie = Long.compare(candidate.grossProfitMilliCredits(), current.grossProfitMilliCredits());
+        if (grossTie != 0) {
+            return grossTie > 0;
         }
         int timeTie = Double.compare(candidate.travelSeconds(), current.travelSeconds());
         if (timeTie != 0) {
@@ -234,15 +289,19 @@ public final class TradeRoutePlanner {
             return true;
         }
         int primary = scoringMode == ScoringMode.GROSS_PROFIT
-                ? Long.compare(candidate.saleRevenueMilliCredits(), current.saleRevenueMilliCredits())
-                : Double.compare(candidate.revenuePerSecond(), current.revenuePerSecond());
+                ? Long.compare(candidate.netRevenueMilliCredits(), current.netRevenueMilliCredits())
+                : Double.compare(candidate.netRevenuePerSecond(), current.netRevenuePerSecond());
         if (primary != 0) {
             return primary > 0;
         }
-        int revenueTie = Long.compare(
+        int netTie = Long.compare(candidate.netRevenueMilliCredits(), current.netRevenueMilliCredits());
+        if (netTie != 0) {
+            return netTie > 0;
+        }
+        int grossTie = Long.compare(
                 candidate.saleRevenueMilliCredits(), current.saleRevenueMilliCredits());
-        if (revenueTie != 0) {
-            return revenueTie > 0;
+        if (grossTie != 0) {
+            return grossTie > 0;
         }
         int timeTie = Double.compare(candidate.travelSeconds(), current.travelSeconds());
         if (timeTie != 0) {
@@ -253,6 +312,14 @@ public final class TradeRoutePlanner {
             return itemTie < 0;
         }
         return candidate.sellStationId().compareTo(current.sellStationId()) < 0;
+    }
+
+    private long estimateRouteCost(FleetTradeProfile fleet, TradeRouteCostModel.Context context) {
+        long cost = costModel.estimateCostMilliCredits(fleet, context);
+        if (cost < 0L) {
+            throw new IllegalArgumentException("TradeRouteCostModel вернул отрицательную стоимость");
+        }
+        return cost;
     }
 
     private float effectiveSellPrice(
