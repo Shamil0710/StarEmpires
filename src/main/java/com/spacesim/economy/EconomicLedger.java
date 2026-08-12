@@ -3,21 +3,70 @@ package com.spacesim.economy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Последовательный журнал экономических движений игровой сессии.
  *
  * <p>Ledger не меняет кошельки или склады сам: authoritative systems сначала успешно выполняют
- * операцию, затем фиксируют её здесь. Обычная торговля записывается как {@link EconomicTransaction.Type#TRADE},
- * а создание/уничтожение денег и ресурсов обязано использовать отдельные source/sink типы.</p>
+ * операцию, затем фиксируют её здесь. Журнал и следующий sequence входят в {@link State}, поэтому
+ * диагностика после save/load остаётся одной непрерывной последовательностью.</p>
  */
 public final class EconomicLedger {
+    /**
+     * Сериализуемый snapshot журнала.
+     *
+     * @param nextSequence sequence, который будет выдан следующей записи
+     * @param entries накопленные записи в исходном порядке
+     */
+    public record State(long nextSequence, List<EconomicTransaction> entries) {
+        /**
+         * Проверяет монотонность и копирует список.
+         *
+         * @param nextSequence sequence следующей записи
+         * @param entries накопленные записи
+         */
+        public State {
+            if (nextSequence <= 0L) {
+                throw new IllegalArgumentException("Следующий sequence ledger должен быть положительным");
+            }
+            entries = List.copyOf(Objects.requireNonNull(entries, "Записи ledger не заданы"));
+            long expected = 1L;
+            for (EconomicTransaction entry : entries) {
+                if (entry.sequence() != expected) {
+                    throw new IllegalArgumentException("Ledger должен содержать непрерывную sequence");
+                }
+                expected++;
+            }
+            if (nextSequence != expected) {
+                throw new IllegalArgumentException("Следующий sequence не продолжает ledger");
+            }
+        }
+    }
+
     private final List<EconomicTransaction> entries = new ArrayList<>();
     private final List<EconomicTransaction> entriesView = Collections.unmodifiableList(entries);
     private long nextSequence = 1L;
 
     /** Создаёт пустой журнал. */
     public EconomicLedger() {
+    }
+
+    /**
+     * Восстанавливает журнал и его sequence из сохранённого состояния.
+     *
+     * @param state сохранённый ledger
+     * @throws NullPointerException если state не задан
+     */
+    public EconomicLedger(State state) {
+        State checked = Objects.requireNonNull(state, "Состояние EconomicLedger не задано");
+        entries.addAll(checked.entries());
+        nextSequence = checked.nextSequence();
+    }
+
+    /** @return immutable снимок записей и следующего sequence */
+    public State snapshotState() {
+        return new State(nextSequence, entries);
     }
 
     /**
@@ -159,10 +208,6 @@ public final class EconomicLedger {
     /**
      * Фиксирует производственное преобразование как диагностическое событие.
      *
-     * <p>Конкретные входы и выходы хранятся в production-системе; запись здесь означает факт
-     * transform и предназначена для дальнейшей observability. На Этапе 2 достаточно отличать его от
-     * создания или уничтожения ресурса без причины.</p>
-     *
      * @param actor непустое имя производственной сущности
      * @param reason непустое имя/описание рецепта
      * @return созданная запись
@@ -190,7 +235,7 @@ public final class EconomicLedger {
         return entries.size();
     }
 
-    /** Удаляет все записи, не меняя authoritative economic state. */
+    /** Удаляет все записи, не меняя authoritative economic state или sequence. */
     public void clear() {
         entries.clear();
     }
