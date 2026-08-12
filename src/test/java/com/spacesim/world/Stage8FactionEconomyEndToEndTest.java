@@ -2,6 +2,7 @@ package com.spacesim.world;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.WalletComponent;
@@ -31,6 +32,7 @@ class Stage8FactionEconomyEndToEndTest {
                 DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
                 10,
                 8);
+        prepareConservedLiquidityAsymmetry(world, content);
         long totalMoneyBefore = totalAuthoritativeMoney(world);
 
         FactionStrategicPolicyEngine.ApplicationReport strategic =
@@ -90,7 +92,7 @@ class Stage8FactionEconomyEndToEndTest {
                 economics.add(new FactionEconomicState(
                         state.factionContentId(),
                         state.treasuryMilliCredits(),
-                        Money.fromCredits(900_000d),
+                        Money.fromCredits(200_000d),
                         Money.fromCredits(100_000d)));
             } else {
                 economics.add(state);
@@ -129,6 +131,26 @@ class Stage8FactionEconomyEndToEndTest {
                 base.systems(),
                 economics,
                 strategies);
+    }
+
+    private static void prepareConservedLiquidityAsymmetry(
+            WorldSimulation world,
+            ContentCatalog content) {
+        int factionId = content.findFaction(TRADE_LEAGUE).runtimeId();
+        List<WalletComponent> wallets = new ArrayList<>();
+        for (Entity entity : world.findSession(DemoGalaxyFactory.ACTIVE_SYSTEM_ID).orElseThrow()
+                .getEngine().getEntities()) {
+            FactionComponent faction = entity.getComponent(FactionComponent.class);
+            WalletComponent wallet = entity.getComponent(WalletComponent.class);
+            MarketComponent market = entity.getComponent(MarketComponent.class);
+            if (faction != null && faction.factionId == factionId && wallet != null && market != null) {
+                wallets.add(wallet);
+            }
+        }
+        if (wallets.size() < 2
+                || !wallets.get(0).transferTo(wallets.get(1), Money.fromCredits(100_000d))) {
+            throw new AssertionError("Не удалось подготовить conserved liquidity fixture");
+        }
     }
 
     private static long totalAuthoritativeMoney(WorldSimulation world) {
