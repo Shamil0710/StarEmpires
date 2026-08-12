@@ -44,11 +44,63 @@ class TradeRoutePlannerTest {
         assertEquals(id(supplier), gross.buyStationId());
         assertEquals(id(farConsumer), gross.sellStationId());
         assertEquals(Money.fromCredits(150d), gross.grossProfitMilliCredits());
+        assertEquals(gross.grossProfitMilliCredits(), gross.netProfitMilliCredits());
 
         assertEquals(id(supplier), perSecond.buyStationId());
         assertEquals(id(nearConsumer), perSecond.sellStationId());
         assertEquals(Money.fromCredits(100d), perSecond.grossProfitMilliCredits());
-        assertTrue(perSecond.grossProfitPerSecond() > gross.grossProfitPerSecond());
+        assertEquals(perSecond.grossProfitMilliCredits(), perSecond.netProfitMilliCredits());
+        assertTrue(perSecond.netProfitPerSecond() > gross.netProfitPerSecond());
+    }
+
+    @Test
+    void routeCostModelМожетИзменитьЛучшийМаршрутБезИзмененияFsm() {
+        Entity supplier = station(0f, 100, 100, 1f, 10f, 100_000d);
+        Entity nearConsumer = station(100f, 0, 100, 20f, 30f, 100_000d);
+        Entity farConsumer = station(2_000f, 0, 100, 25f, 30f, 100_000d);
+        MarketDirectory directory = directory(supplier, nearConsumer, farConsumer);
+        FleetTradeProfile fleet = fleetProfile(0f, 100f, 1_000d, 10);
+        TradeRouteCostModel costs = (profile, context) -> context.travelDistance() > 500f
+                ? Money.fromCredits(120d)
+                : Money.fromCredits(20d);
+
+        TradeRoute route = new TradeRoutePlanner(
+                catalog,
+                TradeRoutePlanner.ScoringMode.GROSS_PROFIT,
+                costs)
+                .findBestNewCargoRoute(fleet, directory)
+                .orElseThrow();
+
+        assertEquals(id(nearConsumer), route.sellStationId());
+        assertEquals(Money.fromCredits(100d), route.grossProfitMilliCredits());
+        assertEquals(Money.fromCredits(20d), route.estimatedRouteCostMilliCredits());
+        assertEquals(Money.fromCredits(80d), route.netProfitMilliCredits());
+    }
+
+    @Test
+    void existingCargoИспользуетRevenuePerSecondАНеТолькоМаксимальнуюВыручку() {
+        Entity nearConsumer = station(100f, 0, 100, 20f, 30f, 100_000d);
+        Entity farConsumer = station(2_000f, 0, 100, 25f, 30f, 100_000d);
+        MarketDirectory directory = directory(nearConsumer, farConsumer);
+        FleetTradeProfile loadedFleet = fleetProfileWithFoodCargo(0f, 100f, 1_000d, 10);
+
+        TradeSaleRoute gross = new TradeRoutePlanner(
+                catalog, TradeRoutePlanner.ScoringMode.GROSS_PROFIT)
+                .findBestExistingCargoSale(loadedFleet, directory)
+                .orElseThrow();
+        TradeSaleRoute perSecond = new TradeRoutePlanner(
+                catalog, TradeRoutePlanner.ScoringMode.PROFIT_PER_SECOND)
+                .findBestExistingCargoSale(loadedFleet, directory)
+                .orElseThrow();
+
+        assertEquals(id(farConsumer), gross.sellStationId());
+        assertEquals(Money.fromCredits(250d), gross.saleRevenueMilliCredits());
+        assertEquals(gross.saleRevenueMilliCredits(), gross.netRevenueMilliCredits());
+
+        assertEquals(id(nearConsumer), perSecond.sellStationId());
+        assertEquals(Money.fromCredits(200d), perSecond.saleRevenueMilliCredits());
+        assertEquals(perSecond.saleRevenueMilliCredits(), perSecond.netRevenueMilliCredits());
+        assertTrue(perSecond.netRevenuePerSecond() > gross.netRevenuePerSecond());
     }
 
     @Test
@@ -128,6 +180,28 @@ class TradeRoutePlannerTest {
                 false,
                 null,
                 new int[Constants.MAX_ITEMS],
+                new float[Constants.MAX_FACTIONS]);
+    }
+
+    private FleetTradeProfile fleetProfileWithFoodCargo(
+            float x,
+            float speed,
+            double credits,
+            int foodCargo) {
+        int[] stock = new int[Constants.MAX_ITEMS];
+        stock[Constants.ITEM_FOOD] = foodCargo;
+        return new FleetTradeProfile(
+                x,
+                0f,
+                speed,
+                Money.fromCredits(credits),
+                foodCargo,
+                foodCargo,
+                foodCargo,
+                Constants.ITEM_FOOD,
+                false,
+                null,
+                stock,
                 new float[Constants.MAX_FACTIONS]);
     }
 
