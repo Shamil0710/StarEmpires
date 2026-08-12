@@ -16,10 +16,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Общий read-only снимок доступных рынков для поиска торговых маршрутов.
@@ -42,12 +44,14 @@ public final class MarketDirectory {
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<WalletComponent> wm = ComponentMapper.getFor(WalletComponent.class);
     private final ComponentMapper<FactionComponent> fm = ComponentMapper.getFor(FactionComponent.class);
+    private final Set<EntityId> seenLiveIds = new HashSet<>();
 
     private List<StationMarket> stations = List.of();
     private Map<EntityId, StationMarket> byId = Map.of();
     private List<List<StationMarket>> suppliersByItem = emptyIndex();
     private List<List<StationMarket>> consumersByItem = emptyIndex();
     private List<List<TradeOpportunity>> opportunitiesByItem = emptyOpportunityIndex();
+    private long revision;
 
     /**
      * Создаёт пустой directory для указанного каталога.
@@ -67,24 +71,27 @@ public final class MarketDirectory {
      * оставшаяся часть — по optimistic margin/distance. Это сохраняет ценовые и логистические
      * альтернативы, но ограничивает число кандидатов, просматриваемых каждым fleet planner.</p>
      *
+     * <p>Перед созданием новых immutable snapshots live ECS-компоненты точно сравниваются с последним
+     * snapshot. Если ни одна station не изменилась, массивы не копируются, индексы переиспользуются,
+     * а {@link #revision()} не меняется. При любом отличии выполняется обычная полная перестройка.</p>
+     *
      * @param entities кандидаты рынков
      * @throws NullPointerException если iterable не задан
      * @throws IllegalStateException если обнаружены два рынка с одинаковым EntityId
      */
     public void rebuild(Iterable<Entity> entities) {
         Objects.requireNonNull(entities, "Market entities не заданы");
+        if (matchesPreviousLiveState(entities)) {
+            return;
+        }
+
         List<StationMarket> stationBuilder = new ArrayList<>();
         Map<EntityId, StationMarket> idBuilder = new LinkedHashMap<>();
         List<List<StationMarket>> supplierBuilder = mutableIndex();
         List<List<StationMarket>> consumerBuilder = mutableIndex();
 
         for (Entity entity : entities) {
-            if (entity == null
-                    || !idm.has(entity)
-                    || !tm.has(entity)
-                    || !mm.has(entity)
-                    || !im.has(entity)
-                    || !wm.has(entity)) {
+            if (!isMarketEntity(entity)) {
                 continue;
             }
             EntityId id = idm.get(entity).id;
@@ -114,6 +121,7 @@ public final class MarketDirectory {
         }
 
         stationBuilder.sort(Comparator.comparing(StationMarket::id));
+        DistanceTable distanceTable = new DistanceTable(stationBuilder);
         List<List<TradeOpportunity>> opportunityBuilder = mutableOpportunityIndex();
         for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
             int itemId = item.runtimeId();
@@ -129,14 +137,15 @@ public final class MarketDirectory {
 
             List<TradeOpportunity> opportunities = opportunityBuilder.get(itemId);
             for (StationMarket supplier : suppliers) {
-                for (StationMarket consumer : selectConsumers(supplier, consumers, itemId)) {
+                for (StationMarket consumer : selectConsumers(
+                        supplier, consumers, itemId, distanceTable)) {
                     opportunities.add(new TradeOpportunity(
                             supplier.id(),
                             consumer.id(),
                             itemId,
                             supplier.sellPrice(itemId),
                             consumer.buyPrice(itemId),
-                            distance(supplier, consumer)));
+                            distanceTable.distance(supplier, consumer)));
                 }
             }
             opportunities.sort(
@@ -149,11 +158,21 @@ public final class MarketDirectory {
         suppliersByItem = immutableIndex(supplierBuilder);
         consumersByItem = immutableIndex(consumerBuilder);
         opportunitiesByItem = immutableOpportunityIndex(opportunityBuilder);
+        revision++;
     }
 
     /** @return все market snapshots в deterministic EntityId-порядке */
     public List<StationMarket> stations() {
         return stations;
+    }
+
+    /**
+     * Возвращает revision market snapshot; значение меняется только при точном изменении station state.
+     *
+     * @return monotonic revision текущего directory snapshot
+     */
+    public long revision() {
+        return revision;
     }
 
     /**
@@ -196,45 +215,105 @@ public final class MarketDirectory {
         return validItemId(itemId) ? opportunitiesByItem.get(itemId) : List.of();
     }
 
+    private boolean matchesPreviousLiveState(Iterable<Entity> entities) {
+        if (stations.isEmpty()) {
+            return false;
+        }
+        seenLiveIds.clear();
+        int liveMarketCount = 0;
+        boolean matches = true;
+        for (Entity entity : entities) {
+            if (!isMarketEntity(entity)) {
+                continue;
+            }
+            EntityId id = idm.get(entity).id;
+            if (id == null) {
+                throw new IllegalStateException("Market entity не имеет persistent EntityId");
+            }
+            if (!seenLiveIds.add(id)) {
+                throw new IllegalStateException("Дублирующий market EntityId: " + id);
+            }
+            liveMarketCount++;
+            StationMarket previous = byId.get(id);
+            if (previous == null || !matchesLiveState(previous, entity)) {
+                matches = false;
+            }
+        }
+        return matches && liveMarketCount == stations.size();
+    }
+
+    private boolean matchesLiveState(StationMarket previous, Entity entity) {
+        TransformComponent transform = tm.get(entity);
+        InventoryComponent inventory = im.get(entity);
+        MarketComponent market = mm.get(entity);
+        WalletComponent wallet = wm.get(entity);
+        int factionId = fm.has(entity) ? fm.get(entity).factionId : -1;
+        return previous.matchesLiveState(transform, factionId, wallet, inventory, market);
+    }
+
+    private boolean isMarketEntity(Entity entity) {
+        return entity != null
+                && idm.has(entity)
+                && tm.has(entity)
+                && mm.has(entity)
+                && im.has(entity)
+                && wm.has(entity);
+    }
+
     private List<StationMarket> selectConsumers(
             StationMarket supplier,
             List<StationMarket> consumers,
-            int itemId) {
+            int itemId,
+            DistanceTable distanceTable) {
         LinkedHashMap<EntityId, StationMarket> selected = new LinkedHashMap<>();
+        StationMarket[] efficiencyCandidates = new StationMarket[MAX_CONSUMERS_PER_SUPPLIER];
+        double[] efficiencyScores = new double[MAX_CONSUMERS_PER_SUPPLIER];
+        int efficiencyCount = 0;
+
         for (StationMarket consumer : consumers) {
-            if (selected.size() >= PRICE_CANDIDATE_SLOTS) {
-                break;
+            if (!isPotentiallyProfitable(supplier, consumer, itemId)) {
+                continue;
             }
-            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
+            if (selected.size() < PRICE_CANDIDATE_SLOTS) {
                 selected.put(consumer.id(), consumer);
+            }
+
+            double score = optimisticEfficiency(
+                    supplier,
+                    consumer,
+                    itemId,
+                    distanceTable.distance(supplier, consumer));
+            int insertionIndex = efficiencyCount;
+            for (int index = 0; index < efficiencyCount; index++) {
+                int scoreCompare = Double.compare(score, efficiencyScores[index]);
+                if (scoreCompare > 0
+                        || (scoreCompare == 0
+                        && consumer.id().compareTo(efficiencyCandidates[index].id()) < 0)) {
+                    insertionIndex = index;
+                    break;
+                }
+            }
+            if (insertionIndex >= MAX_CONSUMERS_PER_SUPPLIER) {
+                continue;
+            }
+
+            int last = Math.min(efficiencyCount, MAX_CONSUMERS_PER_SUPPLIER - 1);
+            for (int index = last; index > insertionIndex; index--) {
+                efficiencyCandidates[index] = efficiencyCandidates[index - 1];
+                efficiencyScores[index] = efficiencyScores[index - 1];
+            }
+            efficiencyCandidates[insertionIndex] = consumer;
+            efficiencyScores[insertionIndex] = score;
+            if (efficiencyCount < MAX_CONSUMERS_PER_SUPPLIER) {
+                efficiencyCount++;
             }
         }
 
-        List<StationMarket> byEfficiency = new ArrayList<>();
-        for (StationMarket consumer : consumers) {
-            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
-                byEfficiency.add(consumer);
-            }
-        }
-        byEfficiency.sort((left, right) -> {
-            int scoreCompare = Double.compare(
-                    optimisticEfficiency(supplier, right, itemId),
-                    optimisticEfficiency(supplier, left, itemId));
-            return scoreCompare != 0 ? scoreCompare : left.id().compareTo(right.id());
-        });
-        for (StationMarket consumer : byEfficiency) {
-            if (selected.size() >= MAX_CONSUMERS_PER_SUPPLIER) {
-                break;
-            }
+        for (int index = 0;
+                index < efficiencyCount && selected.size() < MAX_CONSUMERS_PER_SUPPLIER;
+                index++) {
+            StationMarket consumer = efficiencyCandidates[index];
             selected.putIfAbsent(consumer.id(), consumer);
-        }
-        for (StationMarket consumer : consumers) {
-            if (selected.size() >= MAX_CONSUMERS_PER_SUPPLIER) {
-                break;
-            }
-            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
-                selected.putIfAbsent(consumer.id(), consumer);
-            }
         }
         return List.copyOf(selected.values());
     }
@@ -256,13 +335,14 @@ public final class MarketDirectory {
     private static double optimisticEfficiency(
             StationMarket supplier,
             StationMarket consumer,
-            int itemId) {
+            int itemId,
+            float stationDistance) {
         double minimumPurchase = supplier.sellPrice(itemId)
                 * (1d - Constants.MAX_REPUTATION_PRICE_BONUS);
         double maximumSale = consumer.buyPrice(itemId)
                 * (1d + Constants.MAX_REPUTATION_PRICE_BONUS);
         double margin = Math.max(0d, maximumSale - minimumPurchase);
-        return margin / Math.max(1d, distance(supplier, consumer));
+        return margin / Math.max(1d, stationDistance);
     }
 
     private StationMarket snapshot(Entity entity) {
@@ -350,6 +430,38 @@ public final class MarketDirectory {
             result.add(List.copyOf(values));
         }
         return List.copyOf(result);
+    }
+
+    private static final class DistanceTable {
+        private final Map<EntityId, Integer> indexById;
+        private final float[][] values;
+
+        private DistanceTable(List<StationMarket> stationMarkets) {
+            indexById = new LinkedHashMap<>(stationMarkets.size());
+            values = new float[stationMarkets.size()][stationMarkets.size()];
+            for (int index = 0; index < stationMarkets.size(); index++) {
+                indexById.put(stationMarkets.get(index).id(), index);
+            }
+            for (int firstIndex = 0; firstIndex < stationMarkets.size(); firstIndex++) {
+                StationMarket first = stationMarkets.get(firstIndex);
+                for (int secondIndex = firstIndex + 1;
+                        secondIndex < stationMarkets.size();
+                        secondIndex++) {
+                    float value = MarketDirectory.distance(first, stationMarkets.get(secondIndex));
+                    values[firstIndex][secondIndex] = value;
+                    values[secondIndex][firstIndex] = value;
+                }
+            }
+        }
+
+        private float distance(StationMarket first, StationMarket second) {
+            Integer firstIndex = indexById.get(first.id());
+            Integer secondIndex = indexById.get(second.id());
+            if (firstIndex == null || secondIndex == null) {
+                return MarketDirectory.distance(first, second);
+            }
+            return values[firstIndex][secondIndex];
+        }
     }
 
     /** Immutable снимок одной торговой станции. */
@@ -474,6 +586,28 @@ public final class MarketDirectory {
             return validItemId(itemId)
                     && tradable[itemId]
                     && targetStock[itemId] > 0;
+        }
+
+        private boolean matchesLiveState(
+                TransformComponent transform,
+                int liveFactionId,
+                WalletComponent wallet,
+                InventoryComponent inventory,
+                MarketComponent market) {
+            return transform != null
+                    && wallet != null
+                    && inventory != null
+                    && market != null
+                    && Float.floatToIntBits(x) == Float.floatToIntBits(transform.position.x)
+                    && Float.floatToIntBits(y) == Float.floatToIntBits(transform.position.y)
+                    && factionId == liveFactionId
+                    && walletBalanceMilliCredits == wallet.getBalanceMilliCredits()
+                    && inventoryCapacity == inventory.capacity
+                    && Arrays.equals(stock, inventory.stock)
+                    && Arrays.equals(targetStock, market.targetStock)
+                    && Arrays.equals(sellPrices, market.sellPrices)
+                    && Arrays.equals(buyPrices, market.buyPrices)
+                    && Arrays.equals(tradable, market.tradableItems);
         }
     }
 }

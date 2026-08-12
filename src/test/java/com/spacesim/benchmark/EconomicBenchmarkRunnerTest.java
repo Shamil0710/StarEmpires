@@ -1,5 +1,11 @@
 package com.spacesim.benchmark;
 
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
+import com.spacesim.components.MiningComponent;
+import com.spacesim.constants.Constants;
+import com.spacesim.simulation.SimulationSession;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,6 +63,33 @@ class EconomicBenchmarkRunnerTest {
     }
 
     @Test
+    void benchmarkКоличественноОбнаруживаетРазрушеннуюOreSupplyChain() {
+        long seed = BenchmarkScenario.scale100Hours().rootSeed();
+        BenchmarkScenario scenario = new BenchmarkScenario(
+                "supply-chain-failure-ci",
+                1,
+                seed,
+                3_000L,
+                300L);
+
+        BenchmarkReport normal = new EconomicBenchmarkRunner(BenchmarkWorldFactory::createScale100x500)
+                .run(scenario);
+        BenchmarkReport broken = new EconomicBenchmarkRunner(EconomicBenchmarkRunnerTest::createBrokenOreWorld)
+                .run(scenario);
+
+        assertTrue(normal.deterministic().observability().totalMinedUnits() > 0L);
+        assertEquals(0L, broken.deterministic().observability().totalMinedUnits());
+        assertTrue(broken.deterministic().unmetDemandUnitObservations()
+                > normal.deterministic().unmetDemandUnitObservations());
+        assertTrue(broken.deterministic().tradeTransactions()
+                < normal.deterministic().tradeTransactions());
+        assertTrue(normal.deterministic().moneyConserved());
+        assertTrue(broken.deterministic().moneyConserved());
+        assertTrue(normal.deterministic().observability().resourceAccountingConserved());
+        assertTrue(broken.deterministic().observability().resourceAccountingConserved());
+    }
+
+    @Test
     void scenarioОтклоняетНекорректнуюДлительностьИSampling() {
         assertThrows(IllegalArgumentException.class,
                 () -> new BenchmarkScenario("bad", 1, 1L, 0L, 1L));
@@ -64,5 +97,25 @@ class EconomicBenchmarkRunnerTest {
                 () -> new BenchmarkScenario("bad", 1, 1L, 1L, 0L));
         assertThrows(IllegalArgumentException.class,
                 () -> new BenchmarkScenario(" ", 1, 1L, 1L, 1L));
+    }
+
+    private static SimulationSession createBrokenOreWorld(long rootSeed) {
+        SimulationSession session = BenchmarkWorldFactory.createScale100x500(rootSeed);
+        for (Entity entity : session.getEngine().getEntities()) {
+            MiningComponent mining = entity.getComponent(MiningComponent.class);
+            if (mining != null) {
+                mining.active = false;
+            }
+            InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
+            if (inventory == null) {
+                continue;
+            }
+            inventory.stock[Constants.ITEM_ORE] = 0;
+            MarketComponent market = entity.getComponent(MarketComponent.class);
+            if (market != null) {
+                market.isDirty = true;
+            }
+        }
+        return session;
     }
 }

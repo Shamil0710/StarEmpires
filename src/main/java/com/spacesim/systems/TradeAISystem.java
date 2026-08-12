@@ -30,6 +30,8 @@ import com.spacesim.trade.TradeRoutePlanner;
 import com.spacesim.trade.TradeSaleRoute;
 import com.spacesim.util.SpatialHashGrid;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -47,6 +49,10 @@ import java.util.Objects;
  * <p>Authoritative деньги хранятся в {@link WalletComponent}, сделки выполняет
  * {@link TradeController} и записывает в общий {@link EconomicLedger}. По умолчанию новые грузы
  * сравниваются по gross profit/second, а уже купленный cargo — по revenue/second.</p>
+ *
+ * <p>Отрицательный результат pure planner кэшируется только для точной пары
+ * {@code MarketDirectory.revision + FleetTradeProfile}. Cache является transient runtime detail и
+ * не входит в persistent state: при изменении любого market/fleet input planner выполняется снова.</p>
  */
 public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
@@ -57,8 +63,10 @@ public class TradeAISystem extends IteratingSystem {
     private final ContentCatalog contentCatalog;
     private final MarketDirectory marketDirectory;
     private final TradeRoutePlanner routePlanner;
+    private final Map<EntityId, FailedRouteSearch> failedRouteSearches = new HashMap<>();
     private ImmutableArray<Entity> marketStations;
 
+    private final ComponentMapper<EntityIdComponent> idm = ComponentMapper.getFor(EntityIdComponent.class);
     private final ComponentMapper<TradeAIComponent> am = ComponentMapper.getFor(TradeAIComponent.class);
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
     private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
@@ -216,9 +224,33 @@ public class TradeAISystem extends IteratingSystem {
         }
 
         FleetTradeProfile profile = createFleetTradeProfile(fleet, ai, position);
-        boolean routeFound = im.get(fleet).getTotalStock() > 0
-                ? findSellRoute(ai, profile)
-                : findTradeRoute(ai, profile);
+        EntityId fleetId = idm.get(fleet).id;
+        long marketRevision = marketDirectory.revision();
+        FailedRouteSearch previousFailure = fleetId == null
+                ? null
+                : failedRouteSearches.get(fleetId);
+
+        boolean routeFound;
+        if (previousFailure != null
+                && previousFailure.marketRevision == marketRevision
+                && previousFailure.profile.samePlanningState(profile)) {
+            ai.resetRoute();
+            routeFound = false;
+        } else {
+            routeFound = im.get(fleet).getTotalStock() > 0
+                    ? findSellRoute(ai, profile)
+                    : findTradeRoute(ai, profile);
+            if (fleetId != null) {
+                if (routeFound) {
+                    failedRouteSearches.remove(fleetId);
+                } else {
+                    failedRouteSearches.put(
+                            fleetId,
+                            new FailedRouteSearch(marketRevision, profile));
+                }
+            }
+        }
+
         if (!routeFound) {
             ai.routeSearchCooldown = ROUTE_SEARCH_RETRY_SECONDS;
         }
@@ -498,5 +530,8 @@ public class TradeAISystem extends IteratingSystem {
         ai.resetRoute();
         ai.state = TradeAIComponent.State.IDLE;
         ai.routeSearchCooldown = 0f;
+    }
+
+    private record FailedRouteSearch(long marketRevision, FleetTradeProfile profile) {
     }
 }

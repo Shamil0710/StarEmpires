@@ -158,4 +158,30 @@ public final class FleetTradeProfile {
         return !hasShipComponent
                 || (shipType != null && shipType.canPurchase(item.category(), item.mineable()));
     }
+
+    /**
+     * Сравнивает все входы pure route planner без использования hash/fuzzy equality.
+     *
+     * <p>Метод предназначен для transient memoization только отрицательного результата planner.
+     * Если он возвращает {@code true} и revision рынка не изменился, повторный вызов planner получил
+     * бы побитово те же входные данные и обязан вернуть тот же результат.</p>
+     *
+     * @param other другой immutable профиль
+     * @return {@code true}, если все planner-relevant поля и массивы совпадают точно
+     */
+    public boolean samePlanningState(FleetTradeProfile other) {
+        return other != null
+                && Float.floatToIntBits(x) == Float.floatToIntBits(other.x)
+                && Float.floatToIntBits(y) == Float.floatToIntBits(other.y)
+                && Float.floatToIntBits(movementSpeed) == Float.floatToIntBits(other.movementSpeed)
+                && walletBalanceMilliCredits == other.walletBalanceMilliCredits
+                && inventoryCapacity == other.inventoryCapacity
+                && totalStock == other.totalStock
+                && cargoSpace == other.cargoSpace
+                && specializedItem == other.specializedItem
+                && hasShipComponent == other.hasShipComponent
+                && shipType == other.shipType
+                && Arrays.equals(stock, other.stock)
+                && Arrays.equals(reputation, other.reputation);
+    }
 }

@@ -2,6 +2,8 @@ package com.spacesim.economy;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Random;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -29,6 +31,27 @@ class MoneyTest {
     }
 
     @Test
+    void optimizedMaximumAffordableСовпадаетСЭталоннымБинарнымПоиском() {
+        Random random = new Random(0x6B_2026L);
+        for (int iteration = 0; iteration < 20_000; iteration++) {
+            float price = 0.001f + random.nextFloat() * 100_000f;
+            int maximumAmount = random.nextInt(100_001);
+            long balance = random.nextLong(0L, 10_000_000_000_001L);
+
+            assertEquals(
+                    referenceMaximumAffordable(balance, price, maximumAmount),
+                    Money.maximumAffordable(balance, price, maximumAmount),
+                    () -> "balance=" + balance + ", price=" + price + ", max=" + maximumAmount);
+        }
+
+        assertEquals(
+                referenceMaximumAffordable(Long.MAX_VALUE, Float.MAX_VALUE, Integer.MAX_VALUE),
+                Money.maximumAffordable(Long.MAX_VALUE, Float.MAX_VALUE, Integer.MAX_VALUE));
+        assertEquals(Integer.MAX_VALUE,
+                Money.maximumAffordable(Long.MAX_VALUE, 0.0005f, Integer.MAX_VALUE));
+    }
+
+    @Test
     void отклоняетНекорректныеДенежныеЗначения() {
         assertThrows(IllegalArgumentException.class, () -> Money.fromCredits(-1d));
         assertThrows(IllegalArgumentException.class, () -> Money.fromCredits(Double.NaN));
@@ -39,5 +62,33 @@ class MoneyTest {
         assertThrows(IllegalArgumentException.class, () -> Money.maximumAffordable(-1L, 1f, 1));
         assertThrows(IllegalArgumentException.class, () -> Money.maximumAffordable(1L, 0f, 1));
         assertThrows(IllegalArgumentException.class, () -> Money.maximumAffordable(1L, 1f, -1));
+    }
+
+    private static int referenceMaximumAffordable(long balance, float price, int maximumAmount) {
+        if (balance == 0L || maximumAmount == 0) {
+            return 0;
+        }
+        int low = 0;
+        int high = maximumAmount;
+        while (low < high) {
+            int middle = low + (high - low) / 2 + 1;
+            if (referenceAffordable(balance, price, middle)) {
+                low = middle;
+            } else {
+                high = middle - 1;
+            }
+        }
+        return low;
+    }
+
+    private static boolean referenceAffordable(long balance, float price, int amount) {
+        if (amount == 0) {
+            return true;
+        }
+        try {
+            return Money.tradeValue(price, amount) <= balance;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
     }
 }

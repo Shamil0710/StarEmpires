@@ -169,6 +169,13 @@ public final class TradeRoutePlanner {
                     continue;
                 }
                 int amount = Math.min(cargo, consumer.freeCapacity());
+                long minimumRevenue = safeTradeValue(salePrice, 1);
+                if (amount <= 0
+                        || minimumRevenue <= 0L
+                        || consumer.walletBalanceMilliCredits() < minimumRevenue
+                        || Long.MAX_VALUE - fleet.walletBalanceMilliCredits() < minimumRevenue) {
+                    continue;
+                }
                 amount = Math.min(amount,
                         safeMaximumAffordable(
                                 consumer.walletBalanceMilliCredits(), salePrice, amount));
@@ -234,6 +241,20 @@ public final class TradeRoutePlanner {
             return 0;
         }
 
+        long minimumPurchaseCost = safeTradeValue(purchasePrice, 1);
+        long minimumSaleRevenue = safeTradeValue(salePrice, 1);
+        if (minimumPurchaseCost <= 0L
+                || minimumSaleRevenue <= 0L
+                || consumer.walletBalanceMilliCredits() < minimumSaleRevenue
+                || fleet.walletBalanceMilliCredits() < minimumPurchaseCost
+                || Long.MAX_VALUE - supplier.walletBalanceMilliCredits() < minimumPurchaseCost
+                || Long.MAX_VALUE - fleet.walletBalanceMilliCredits() < minimumSaleRevenue) {
+            return 0;
+        }
+
+        transferable = Math.min(transferable,
+                safeMaximumAffordable(
+                        consumer.walletBalanceMilliCredits(), salePrice, transferable));
         transferable = Math.min(transferable,
                 safeMaximumAffordable(
                         fleet.walletBalanceMilliCredits(), purchasePrice, transferable));
@@ -242,9 +263,6 @@ public final class TradeRoutePlanner {
                         Long.MAX_VALUE - supplier.walletBalanceMilliCredits(),
                         purchasePrice,
                         transferable));
-        transferable = Math.min(transferable,
-                safeMaximumAffordable(
-                        consumer.walletBalanceMilliCredits(), salePrice, transferable));
         transferable = Math.min(transferable,
                 safeMaximumAffordable(
                         Long.MAX_VALUE - fleet.walletBalanceMilliCredits(), salePrice, transferable));

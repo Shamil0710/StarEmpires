@@ -81,9 +81,11 @@ public final class Money {
     /**
      * Находит наибольшее количество товара до заданного лимита, которое можно оплатить балансом.
      *
-     * <p>Используется бинарный поиск по той же полной формуле округления, что и
-     * {@link #tradeValue(float, int)}, поэтому планировщик и фактическая транзакция не расходятся на
-     * дробных ценах.</p>
+     * <p>Используется та же полная формула округления, что и {@link #tradeValue(float, int)}.
+     * Сначала проверяется верхняя граница целиком. Для ограниченного балансом случая вычисляется
+     * аналитическая оценка границы округления и проверяется точной формулой сделки. Если double-
+     * оценка попала рядом с IEEE-754 краевым случаем, метод безопасно возвращается к эталонному
+     * бинарному поиску. Поэтому оптимизация не меняет денежную семантику.</p>
      *
      * @param balanceMilliCredits доступный неотрицательный баланс
      * @param unitPriceCredits конечная строго положительная цена единицы товара
@@ -101,9 +103,51 @@ public final class Money {
         if (balanceMilliCredits == 0L || maximumAmount == 0) {
             return 0;
         }
+        if (isAffordable(balanceMilliCredits, unitPriceCredits, maximumAmount)) {
+            return maximumAmount;
+        }
 
+        int estimated = estimateAffordableAmount(balanceMilliCredits, unitPriceCredits, maximumAmount);
+        if (estimated >= 0
+                && isAffordable(balanceMilliCredits, unitPriceCredits, estimated)
+                && (estimated == maximumAmount
+                || !isAffordable(balanceMilliCredits, unitPriceCredits, estimated + 1))) {
+            return estimated;
+        }
+        if (estimated > 0
+                && isAffordable(balanceMilliCredits, unitPriceCredits, estimated - 1)
+                && !isAffordable(balanceMilliCredits, unitPriceCredits, estimated)) {
+            return estimated - 1;
+        }
+        if (estimated + 1 < maximumAmount
+                && isAffordable(balanceMilliCredits, unitPriceCredits, estimated + 1)
+                && !isAffordable(balanceMilliCredits, unitPriceCredits, estimated + 2)) {
+            return estimated + 1;
+        }
+        return binaryMaximumAffordable(balanceMilliCredits, unitPriceCredits, maximumAmount - 1);
+    }
+
+    private static int estimateAffordableAmount(
+            long balanceMilliCredits,
+            float unitPriceCredits,
+            int maximumAmount) {
+        double unitMilliCredits = (double) unitPriceCredits * MILLI_CREDITS_PER_CREDIT;
+        double exclusiveBoundary = ((double) balanceMilliCredits + 0.5d) / unitMilliCredits;
+        if (!Double.isFinite(exclusiveBoundary) || exclusiveBoundary >= maximumAmount) {
+            return maximumAmount - 1;
+        }
+        if (exclusiveBoundary <= 1d) {
+            return 0;
+        }
+        double estimate = Math.ceil(exclusiveBoundary) - 1d;
+        return (int) Math.max(0d, Math.min(maximumAmount - 1d, estimate));
+    }
+
+    private static int binaryMaximumAffordable(
+            long balanceMilliCredits,
+            float unitPriceCredits,
+            int high) {
         int low = 0;
-        int high = maximumAmount;
         while (low < high) {
             int middle = low + (high - low + 1) / 2;
             if (isAffordable(balanceMilliCredits, unitPriceCredits, middle)) {
@@ -116,6 +160,9 @@ public final class Money {
     }
 
     private static boolean isAffordable(long balanceMilliCredits, float unitPriceCredits, int amount) {
+        if (amount <= 0) {
+            return amount == 0;
+        }
         try {
             return tradeValue(unitPriceCredits, amount) <= balanceMilliCredits;
         } catch (IllegalArgumentException exception) {

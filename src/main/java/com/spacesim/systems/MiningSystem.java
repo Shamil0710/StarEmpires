@@ -392,7 +392,7 @@ public final class MiningSystem extends IteratingSystem {
         Entity closest = null;
         double closestDistance = Double.POSITIVE_INFINITY;
         for (Entity candidate : marketBases) {
-            if (!isUsableBase(candidate, miner, mining.resourceItem, reputation)) {
+            if (!isUsableBaseCandidate(candidate, miner, mining.resourceItem, reputation)) {
                 continue;
             }
             double distance = distanceSquared(transform, transformMapper.get(candidate));
@@ -409,7 +409,7 @@ public final class MiningSystem extends IteratingSystem {
         Entity closest = null;
         double closestDistance = Double.POSITIVE_INFINITY;
         for (Entity candidate : asteroids) {
-            if (!isUsableAsteroid(candidate, resourceItem)) {
+            if (!isUsableAsteroidCandidate(candidate, resourceItem)) {
                 continue;
             }
             double distance = distanceSquared(transform, transformMapper.get(candidate));
@@ -456,9 +456,14 @@ public final class MiningSystem extends IteratingSystem {
     }
 
     private boolean isUsableAsteroid(Entity entity, int resourceItem) {
+        return entity != null
+                && asteroids != null
+                && asteroids.contains(entity, true)
+                && isUsableAsteroidCandidate(entity, resourceItem);
+    }
+
+    private boolean isUsableAsteroidCandidate(Entity entity, int resourceItem) {
         if (entity == null
-                || asteroids == null
-                || !asteroids.contains(entity, true)
                 || !idMapper.has(entity)
                 || !asteroidMapper.has(entity)
                 || !transformMapper.has(entity)) {
@@ -476,10 +481,19 @@ public final class MiningSystem extends IteratingSystem {
             Entity miner,
             int resourceItem,
             ReputationComponent reputation) {
+        return entity != null
+                && marketBases != null
+                && marketBases.contains(entity, true)
+                && isUsableBaseCandidate(entity, miner, resourceItem, reputation);
+    }
+
+    private boolean isUsableBaseCandidate(
+            Entity entity,
+            Entity miner,
+            int resourceItem,
+            ReputationComponent reputation) {
         if (entity == null
                 || entity == miner
-                || marketBases == null
-                || !marketBases.contains(entity, true)
                 || !idMapper.has(entity)
                 || !marketMapper.has(entity)
                 || !inventoryMapper.has(entity)
@@ -494,8 +508,7 @@ public final class MiningSystem extends IteratingSystem {
                 || resourceItem < 0
                 || resourceItem >= Constants.MAX_ITEMS
                 || !market.isTradable(resourceItem)
-                || inventory.getFreeCapacity() <= 0
-                || !isValidInventory(inventory)
+                || !hasValidFreeCapacity(inventory)
                 || !isValidPosition(transformMapper.get(entity))) {
             return false;
         }
@@ -543,12 +556,38 @@ public final class MiningSystem extends IteratingSystem {
         if (inventory == null || inventory.capacity < 0) {
             return false;
         }
+        long total = 0L;
+        boolean saturated = false;
         for (int stock : inventory.stock) {
             if (stock < 0) {
                 return false;
             }
+            if (!saturated) {
+                total += stock;
+                if (total >= Integer.MAX_VALUE) {
+                    total = Integer.MAX_VALUE;
+                    saturated = true;
+                }
+            }
         }
-        return inventory.getTotalStock() <= inventory.capacity;
+        return total <= inventory.capacity;
+    }
+
+    private boolean hasValidFreeCapacity(InventoryComponent inventory) {
+        if (inventory == null || inventory.capacity <= 0) {
+            return false;
+        }
+        long total = 0L;
+        for (int stock : inventory.stock) {
+            if (stock < 0) {
+                return false;
+            }
+            total += stock;
+            if (total >= inventory.capacity) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean isValidPosition(TransformComponent transform) {
