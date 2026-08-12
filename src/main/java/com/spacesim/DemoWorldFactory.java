@@ -1,65 +1,30 @@
 package com.spacesim;
 
 import com.badlogic.ashley.core.Entity;
-import com.spacesim.components.CombatComponent;
 import com.spacesim.components.EntityIdComponent;
-import com.spacesim.components.FactionComponent;
-import com.spacesim.components.IdentityComponent;
-import com.spacesim.components.InventoryComponent;
-import com.spacesim.components.MarketComponent;
 import com.spacesim.components.MiningComponent;
-import com.spacesim.components.PriceHistoryComponent;
-import com.spacesim.components.ProductionComponent;
 import com.spacesim.components.ReputationComponent;
-import com.spacesim.components.ShipComponent;
-import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
-import com.spacesim.components.WalletComponent;
-import com.spacesim.constants.Constants;
+import com.spacesim.content.ArchetypeEntityFactory;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
-import com.spacesim.economy.Money;
-import com.spacesim.model.Recipe;
-import com.spacesim.model.ShipType;
 import com.spacesim.persistence.EntityIdAllocator;
 
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Создаёт детерминированный демонстрационный мир с полной производственной экономикой.
+ * Создаёт детерминированный демонстрационный мир из versioned content archetypes.
  *
- * <p>Сценарий содержит четыре одновременно работающих стационарных производства и
- * автономную добычу руды из периодически появляющихся астероидов:</p>
- * <pre>
- * первичный ресурс: энергия
- * астероидная руда -&gt; шахтёрская база
- * энергия -&gt; продовольствие
- * руда + энергия -&gt; сталь
- * сталь + энергия -&gt; вооружение
- * </pre>
- * <p>Шестая станция является конечным потребителем энергии, продовольствия, стали и вооружения.
- * Все станции и экономические корабли получают конечные {@link WalletComponent} с начальным
- * капиталом. Authoritative деньги существуют только в этих кошельках.</p>
+ * <p>Класс содержит только сценарные решения конкретной карты: имена экземпляров, координаты,
+ * специализацию транспорта и стартовые отношения. Физические параметры кораблей, станции,
+ * рынки, капитал, производственные рецепты и faction runtime IDs принадлежат
+ * {@link ContentCatalog} и материализуются через {@link ArchetypeEntityFactory}.</p>
  *
- * <p>Производственные рецепты разрешаются через {@link ContentCatalog} по устойчивым строковым
- * content ID. Это позволяет менять производственные коэффициенты в data-файле без изменения
- * simulation-кода, сохраняя текущие плотные runtime ID товарных массивов.</p>
- *
- * <p>Все bootstrap-сущности получают устойчивые {@link EntityIdComponent} в стабильном порядке
- * результата. Перегрузка с внешним {@link EntityIdAllocator} позволяет продолжить ту же ID-
- * последовательность для динамических объектов текущей игровой сессии. Persistent-связи между
- * bootstrap-сущностями назначаются только после выдачи ID и никогда не сохраняют Ashley
- * {@code Entity} внутри компонентов состояния.</p>
- *
- * <p>Фабрика не обращается к libGDX/OpenGL и не регистрирует системы Ashley. Каждый вызов
- * {@link #createEntities()} возвращает новый независимый граф сущностей и компонентов.</p>
+ * <p>Bootstrap-сущности получают устойчивые {@link EntityIdComponent} в стабильном порядке.
+ * Каждый вызов возвращает независимый граф ECS-компонентов и не требует OpenGL.</p>
  */
 public final class DemoWorldFactory {
-    private static final int STATION_CAPACITY = 2_500;
-    private static final double STATION_STARTING_CREDITS = 250_000d;
-    private static final double FLEET_STARTING_CREDITS = 12_000d;
-    private static final double MINER_STARTING_CREDITS = 1_000d;
     private static final ContentCatalog DEFAULT_CONTENT = ContentCatalogLoader.loadDefault();
 
     private DemoWorldFactory() {
@@ -67,100 +32,84 @@ public final class DemoWorldFactory {
     }
 
     /**
-     * Создаёт полный набор станций и кораблей с новой ID-последовательностью от {@code entity:1}.
+     * Создаёт полный demo-world с новой ID-последовательностью от единицы.
      *
-     * @return неизменяемый список из шести новых станций и семи новых кораблей
+     * @return шесть станций и семь кораблей
      */
     public static List<Entity> createEntities() {
         return createEntities(new EntityIdAllocator(), DEFAULT_CONTENT);
     }
 
     /**
-     * Создаёт полный набор станций и кораблей, используя общую ID-последовательность сессии.
+     * Создаёт demo-world на встроенном production catalog и общем ID allocator.
      *
-     * @param idAllocator общий детерминированный аллокатор persistent ID
-     * @return неизменяемый список из шести новых станций и семи новых кораблей
-     * @throws NullPointerException если аллокатор не задан
+     * @param idAllocator общий allocator persistent EntityId
+     * @return шесть станций и семь кораблей
      */
     public static List<Entity> createEntities(EntityIdAllocator idAllocator) {
         return createEntities(idAllocator, DEFAULT_CONTENT);
     }
 
     /**
-     * Создаёт демонстрационный мир с явно заданным валидированным content catalog.
+     * Создаёт demo-world на явно заданном полном catalog.
      *
-     * <p>Порядок результата стабилен: сначала шесть станций от первичных источников к конечному
-     * потребителю, затем пять специализированных транспортов, добывающий и боевой корабли. ID
-     * выдаются в этом же порядке после полной сборки графа, затем добытчик получает persistent ID
-     * предпочтительной базы разгрузки.</p>
-     *
-     * @param idAllocator общий детерминированный аллокатор persistent ID
-     * @param contentCatalog versioned каталог, определяющий производственные рецепты
-     * @return неизменяемый список из шести новых станций и семи новых кораблей
-     * @throws NullPointerException если аллокатор или каталог не заданы
-     * @throws IllegalArgumentException если обязательный recipe content ID отсутствует в каталоге
+     * @param idAllocator общий allocator persistent EntityId
+     * @param contentCatalog catalog с используемыми station/ship/faction/item archetypes
+     * @return шесть станций и семь кораблей
+     * @throws NullPointerException если зависимость не задана
+     * @throws IllegalArgumentException если обязательный archetype/content ID отсутствует
      */
     public static List<Entity> createEntities(
             EntityIdAllocator idAllocator,
             ContentCatalog contentCatalog) {
-        Objects.requireNonNull(idAllocator, "EntityIdAllocator не задан");
-        Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
+        EntityIdAllocator ids = Objects.requireNonNull(idAllocator, "EntityIdAllocator не задан");
+        ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
 
-        Entity mine = createStation(
-                "Шахтёрская база Ковчег", 420f, 880f, Constants.FACTION_MINERS);
-        configureMarket(mine, Constants.ITEM_ORE, 400, 300, 0f);
+        Entity mine = ArchetypeEntityFactory.createStation(
+                content, "station.mining_base", "Шахтёрская база Ковчег", 420f, 880f);
+        Entity powerPlant = ArchetypeEntityFactory.createStation(
+                content, "station.power_plant", "Энергоузел Корона", 470f, 430f);
+        Entity farm = ArchetypeEntityFactory.createStation(
+                content, "station.agrodome", "Агрокупол Аврора", 850f, 280f);
+        Entity foundry = ArchetypeEntityFactory.createStation(
+                content, "station.foundry", "Кузница Гелиос", 900f, 900f);
+        Entity arsenal = ArchetypeEntityFactory.createStation(
+                content, "station.arsenal", "Арсенал Титан", 1350f, 730f);
+        Entity colony = ArchetypeEntityFactory.createStation(
+                content, "station.colony", "Колония Фронтир", 1600f, 330f);
 
-        Entity powerPlant = createStation(
-                "Энергоузел Корона", 470f, 430f, Constants.FACTION_NEUTRAL);
-        configureMarket(powerPlant, Constants.ITEM_ENERGY, 400, 300, 0f);
-        addProduction(powerPlant, contentCatalog.createRuntimeRecipe("recipe.energy_generation"));
+        Entity oreTransport = trader(
+                content, "ship.ore_hauler", "Материаловоз Атлас", 660f, 820f,
+                "item.ore", "faction.miners");
+        Entity energyTransport = trader(
+                content, "ship.energy_tanker", "Танкер Луч", 650f, 500f,
+                "item.energy", "faction.neutral");
+        Entity foodTransport = trader(
+                content, "ship.food_container", "Контейнеровоз Аврора", 1050f, 350f,
+                "item.food", "faction.trade_league");
+        Entity steelTransport = trader(
+                content, "ship.steel_hauler", "Материаловоз Вулкан", 1100f, 800f,
+                "item.steel", "faction.miners");
+        Entity weaponsTransport = trader(
+                content, "ship.weapons_container", "Контейнеровоз Щит", 1450f, 500f,
+                "item.weapons", "faction.trade_league");
 
-        Entity farm = createStation(
-                "Агрокупол Аврора", 850f, 280f, Constants.FACTION_TRADE_LEAGUE);
-        configureMarket(farm, Constants.ITEM_ENERGY, 80, 120, 0f);
-        configureMarket(farm, Constants.ITEM_FOOD, 320, 240, 0f);
-        addProduction(farm, contentCatalog.createRuntimeRecipe("recipe.food_growing"));
-
-        Entity foundry = createStation(
-                "Кузница Гелиос", 900f, 900f, Constants.FACTION_MINERS);
-        configureMarket(foundry, Constants.ITEM_ORE, 200, 300, 0f);
-        configureMarket(foundry, Constants.ITEM_ENERGY, 80, 120, 0f);
-        configureMarket(foundry, Constants.ITEM_STEEL, 240, 180, 0f);
-        addProduction(foundry, contentCatalog.createRuntimeRecipe("recipe.steel_smelting"));
-
-        Entity arsenal = createStation(
-                "Арсенал Титан", 1350f, 730f, Constants.FACTION_TRADE_LEAGUE);
-        configureMarket(arsenal, Constants.ITEM_ENERGY, 80, 120, 0f);
-        configureMarket(arsenal, Constants.ITEM_STEEL, 80, 120, 0f);
-        configureMarket(arsenal, Constants.ITEM_WEAPONS, 120, 90, 0f);
-        addProduction(arsenal, contentCatalog.createRuntimeRecipe("recipe.weapons_assembly"));
-
-        Entity colony = createStation(
-                "Колония Фронтир", 1600f, 330f, Constants.FACTION_NEUTRAL);
-        configureMarket(colony, Constants.ITEM_ENERGY, 80, 120, 1f);
-        configureMarket(colony, Constants.ITEM_FOOD, 200, 300, 1f);
-        configureMarket(colony, Constants.ITEM_STEEL, 80, 120, 1f / 6f);
-        configureMarket(colony, Constants.ITEM_WEAPONS, 80, 120, 1f / 6f);
-
-        Entity oreTransport = createTradingShip(
-                "Материаловоз Атлас", 660f, 820f, 150f, 140,
-                Constants.ITEM_ORE, ShipType.MATERIAL_CARRIER, Constants.FACTION_MINERS);
-        Entity energyTransport = createTradingShip(
-                "Танкер Луч", 650f, 500f, 165f, 160,
-                Constants.ITEM_ENERGY, ShipType.GAS_LIQUID_CARRIER, Constants.FACTION_NEUTRAL);
-        Entity foodTransport = createTradingShip(
-                "Контейнеровоз Аврора", 1050f, 350f, 175f, 100,
-                Constants.ITEM_FOOD, ShipType.FINISHED_GOODS_CARRIER,
-                Constants.FACTION_TRADE_LEAGUE);
-        Entity steelTransport = createTradingShip(
-                "Материаловоз Вулкан", 1100f, 800f, 185f, 140,
-                Constants.ITEM_STEEL, ShipType.MATERIAL_CARRIER, Constants.FACTION_MINERS);
-        Entity weaponsTransport = createTradingShip(
-                "Контейнеровоз Щит", 1450f, 500f, 200f, 80,
-                Constants.ITEM_WEAPONS, ShipType.FINISHED_GOODS_CARRIER,
-                Constants.FACTION_TRADE_LEAGUE);
-        Entity miningShip = createMiningShip("Добытчик Старатель", 450f, 930f);
-        Entity combatShip = createCombatShip("Фрегат Страж", 1500f, 1050f);
+        Entity miningShip = ArchetypeEntityFactory.createMiner(
+                content,
+                "ship.basic_miner",
+                "Добытчик Старатель",
+                450f,
+                930f,
+                "item.ore",
+                "faction.miners");
+        Entity combatShip = ArchetypeEntityFactory.createCombatShip(
+                content,
+                "ship.guard_frigate",
+                "Фрегат Страж",
+                1500f,
+                1050f,
+                "faction.trade_league");
+        combatShip.getComponent(TransformComponent.class).velocity.set(1f, 0.35f);
 
         List<Entity> entities = List.of(
                 mine,
@@ -177,138 +126,35 @@ public final class DemoWorldFactory {
                 miningShip,
                 combatShip);
         for (Entity entity : entities) {
-            entity.add(new EntityIdComponent(idAllocator.allocate()));
+            entity.add(new EntityIdComponent(ids.allocate()));
         }
         miningShip.getComponent(MiningComponent.class).homeBaseId =
                 mine.getComponent(EntityIdComponent.class).id;
         return entities;
     }
 
-    /** Создаёт базовую станцию с пустым рынком, историей цен, складом и конечным капиталом. */
-    private static Entity createStation(String name, float x, float y, int factionId) {
-        TransformComponent transform = new TransformComponent();
-        transform.position.set(x, y);
-
-        InventoryComponent inventory = new InventoryComponent();
-        inventory.capacity = STATION_CAPACITY;
-
-        return new Entity()
-                .add(new IdentityComponent(name, IdentityComponent.Kind.STATION))
-                .add(transform)
-                .add(inventory)
-                .add(new WalletComponent(Money.fromCredits(STATION_STARTING_CREDITS)))
-                .add(new MarketComponent())
-                .add(new FactionComponent(factionId))
-                .add(new PriceHistoryComponent());
-    }
-
-    /** Настраивает запас и рыночные параметры одного товара станции. */
-    private static void configureMarket(
-            Entity station,
-            int itemId,
-            int initialStock,
-            int targetStock,
-            float consumptionPerSecond) {
-        station.getComponent(InventoryComponent.class).stock[itemId] = initialStock;
-        station.getComponent(MarketComponent.class)
-                .configureTradableItem(itemId, targetStock, consumptionPerSecond);
-    }
-
-    /** Добавляет станции единственный активный производственный рецепт. */
-    private static void addProduction(Entity station, Recipe recipe) {
-        ProductionComponent production = new ProductionComponent();
-        production.recipes.add(recipe);
-        station.add(production);
-    }
-
-    /** Создаёт пустой специализированный транспорт с совместимым отсеком, кошельком и репутацией. */
-    private static Entity createTradingShip(
+    private static Entity trader(
+            ContentCatalog content,
+            String archetypeId,
             String name,
             float x,
             float y,
-            float movementSpeed,
-            int cargoSpace,
-            int specializedItem,
-            ShipType shipType,
-            int factionId) {
-        TransformComponent transform = new TransformComponent();
-        transform.position.set(x, y);
-
-        InventoryComponent inventory = new InventoryComponent();
-        inventory.capacity = cargoSpace;
-
-        TradeAIComponent tradeAI = new TradeAIComponent();
-        tradeAI.cargoSpace = cargoSpace;
-        tradeAI.movementSpeed = movementSpeed;
-        tradeAI.specializedItem = specializedItem;
-
-        ShipComponent ship = new ShipComponent(shipType);
-        if (!ship.canPurchaseItem(specializedItem)) {
-            throw new IllegalArgumentException(
-                    "Тип корабля не совместим со специализацией: " + name);
-        }
-
+            String itemId,
+            String factionId) {
+        Entity entity = ArchetypeEntityFactory.createTrader(
+                content, archetypeId, name, x, y, itemId, factionId);
         ReputationComponent reputation = new ReputationComponent();
-        reputation.addReputation(Constants.FACTION_TRADE_LEAGUE, 25f);
-        reputation.addReputation(Constants.FACTION_MINERS, 10f);
-
-        return new Entity()
-                .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
-                .add(transform)
-                .add(inventory)
-                .add(new WalletComponent(Money.fromCredits(FLEET_STARTING_CREDITS)))
-                .add(ship)
-                .add(tradeAI)
-                .add(reputation)
-                .add(new FactionComponent(factionId));
+        reputation.addReputation(requireFactionRuntimeId(content, "faction.trade_league"), 25f);
+        reputation.addReputation(requireFactionRuntimeId(content, "faction.miners"), 10f);
+        entity.add(reputation);
+        return entity;
     }
 
-    /** Создаёт автономный добывающий корабль с кошельком; ID базы назначается после bootstrap-ID. */
-    private static Entity createMiningShip(String name, float x, float y) {
-        TransformComponent transform = new TransformComponent();
-        transform.position.set(x, y);
-
-        InventoryComponent inventory = new InventoryComponent();
-        inventory.capacity = 80;
-
-        MiningComponent mining = new MiningComponent(Constants.ITEM_ORE, 2f);
-        mining.movementSpeed = 150f;
-        mining.extractionRange = 18f;
-        mining.dockingRange = 12f;
-
-        return new Entity()
-                .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
-                .add(transform)
-                .add(inventory)
-                .add(new WalletComponent(Money.fromCredits(MINER_STARTING_CREDITS)))
-                .add(new ShipComponent(ShipType.MINING_SHIP))
-                .add(mining)
-                .add(new FactionComponent(Constants.FACTION_MINERS));
-    }
-
-    /** Создаёт боевой корабль с отдельными характеристиками и без участия в торговле. */
-    private static Entity createCombatShip(String name, float x, float y) {
-        TransformComponent transform = new TransformComponent();
-        transform.position.set(x, y);
-        transform.velocity.set(1f, 0.35f);
-
-        InventoryComponent inventory = new InventoryComponent();
-        inventory.capacity = 0;
-
-        CombatComponent combat = new CombatComponent(
-                320f,
-                320f,
-                180f,
-                180f,
-                42f,
-                150f);
-
-        return new Entity()
-                .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
-                .add(transform)
-                .add(inventory)
-                .add(new ShipComponent(ShipType.COMBAT_SHIP))
-                .add(combat)
-                .add(new FactionComponent(Constants.FACTION_TRADE_LEAGUE));
+    private static int requireFactionRuntimeId(ContentCatalog content, String factionId) {
+        ContentCatalog.FactionDefinition faction = content.findFaction(factionId);
+        if (faction == null) {
+            throw new IllegalArgumentException("Demo-world требует faction: " + factionId);
+        }
+        return faction.runtimeId();
     }
 }
