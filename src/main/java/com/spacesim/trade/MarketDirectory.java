@@ -16,10 +16,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Общий read-only снимок доступных рынков для поиска торговых маршрутов.
@@ -42,6 +44,7 @@ public final class MarketDirectory {
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<WalletComponent> wm = ComponentMapper.getFor(WalletComponent.class);
     private final ComponentMapper<FactionComponent> fm = ComponentMapper.getFor(FactionComponent.class);
+    private final Set<EntityId> seenLiveIds = new HashSet<>();
 
     private List<StationMarket> stations = List.of();
     private Map<EntityId, StationMarket> byId = Map.of();
@@ -68,9 +71,9 @@ public final class MarketDirectory {
      * оставшаяся часть — по optimistic margin/distance. Это сохраняет ценовые и логистические
      * альтернативы, но ограничивает число кандидатов, просматриваемых каждым fleet planner.</p>
      *
-     * <p>Если новый отсортированный набор station snapshots побитово эквивалентен предыдущему,
-     * ранее построенные индексы и opportunities переиспользуются, а {@link #revision()} не меняется.
-     * Это не меняет вход pure planner и исключает повторную работу на неизменном рынке.</p>
+     * <p>Перед созданием новых immutable snapshots live ECS-компоненты точно сравниваются с последним
+     * snapshot. Если ни одна station не изменилась, массивы не копируются, индексы переиспользуются,
+     * а {@link #revision()} не меняется. При любом отличии выполняется обычная полная перестройка.</p>
      *
      * @param entities кандидаты рынков
      * @throws NullPointerException если iterable не задан
@@ -78,18 +81,17 @@ public final class MarketDirectory {
      */
     public void rebuild(Iterable<Entity> entities) {
         Objects.requireNonNull(entities, "Market entities не заданы");
+        if (matchesPreviousLiveState(entities)) {
+            return;
+        }
+
         List<StationMarket> stationBuilder = new ArrayList<>();
         Map<EntityId, StationMarket> idBuilder = new LinkedHashMap<>();
         List<List<StationMarket>> supplierBuilder = mutableIndex();
         List<List<StationMarket>> consumerBuilder = mutableIndex();
 
         for (Entity entity : entities) {
-            if (entity == null
-                    || !idm.has(entity)
-                    || !tm.has(entity)
-                    || !mm.has(entity)
-                    || !im.has(entity)
-                    || !wm.has(entity)) {
+            if (!isMarketEntity(entity)) {
                 continue;
             }
             EntityId id = idm.get(entity).id;
@@ -119,10 +121,6 @@ public final class MarketDirectory {
         }
 
         stationBuilder.sort(Comparator.comparing(StationMarket::id));
-        if (sameStationState(stationBuilder, stations)) {
-            return;
-        }
-
         DistanceTable distanceTable = new DistanceTable(stationBuilder);
         List<List<TradeOpportunity>> opportunityBuilder = mutableOpportunityIndex();
         for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
@@ -215,6 +213,51 @@ public final class MarketDirectory {
      */
     public List<TradeOpportunity> opportunities(int itemId) {
         return validItemId(itemId) ? opportunitiesByItem.get(itemId) : List.of();
+    }
+
+    private boolean matchesPreviousLiveState(Iterable<Entity> entities) {
+        if (stations.isEmpty()) {
+            return false;
+        }
+        seenLiveIds.clear();
+        int liveMarketCount = 0;
+        boolean matches = true;
+        for (Entity entity : entities) {
+            if (!isMarketEntity(entity)) {
+                continue;
+            }
+            EntityId id = idm.get(entity).id;
+            if (id == null) {
+                throw new IllegalStateException("Market entity не имеет persistent EntityId");
+            }
+            if (!seenLiveIds.add(id)) {
+                throw new IllegalStateException("Дублирующий market EntityId: " + id);
+            }
+            liveMarketCount++;
+            StationMarket previous = byId.get(id);
+            if (previous == null || !matchesLiveState(previous, entity)) {
+                matches = false;
+            }
+        }
+        return matches && liveMarketCount == stations.size();
+    }
+
+    private boolean matchesLiveState(StationMarket previous, Entity entity) {
+        TransformComponent transform = tm.get(entity);
+        InventoryComponent inventory = im.get(entity);
+        MarketComponent market = mm.get(entity);
+        WalletComponent wallet = wm.get(entity);
+        int factionId = fm.has(entity) ? fm.get(entity).factionId : -1;
+        return previous.matchesLiveState(transform, factionId, wallet, inventory, market);
+    }
+
+    private boolean isMarketEntity(Entity entity) {
+        return entity != null
+                && idm.has(entity)
+                && tm.has(entity)
+                && mm.has(entity)
+                && im.has(entity)
+                && wm.has(entity);
     }
 
     private List<StationMarket> selectConsumers(
@@ -322,20 +365,6 @@ public final class MarketDirectory {
                 market.sellPrices,
                 market.buyPrices,
                 market.tradableItems);
-    }
-
-    private static boolean sameStationState(
-            List<StationMarket> candidate,
-            List<StationMarket> previous) {
-        if (candidate.size() != previous.size()) {
-            return false;
-        }
-        for (int index = 0; index < candidate.size(); index++) {
-            if (!candidate.get(index).sameState(previous.get(index))) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static float distance(StationMarket first, StationMarket second) {
@@ -559,20 +588,26 @@ public final class MarketDirectory {
                     && targetStock[itemId] > 0;
         }
 
-        private boolean sameState(StationMarket other) {
-            return other != null
-                    && id.equals(other.id)
-                    && Float.floatToIntBits(x) == Float.floatToIntBits(other.x)
-                    && Float.floatToIntBits(y) == Float.floatToIntBits(other.y)
-                    && factionId == other.factionId
-                    && walletBalanceMilliCredits == other.walletBalanceMilliCredits
-                    && inventoryCapacity == other.inventoryCapacity
-                    && totalStock == other.totalStock
-                    && Arrays.equals(stock, other.stock)
-                    && Arrays.equals(targetStock, other.targetStock)
-                    && Arrays.equals(sellPrices, other.sellPrices)
-                    && Arrays.equals(buyPrices, other.buyPrices)
-                    && Arrays.equals(tradable, other.tradable);
+        private boolean matchesLiveState(
+                TransformComponent transform,
+                int liveFactionId,
+                WalletComponent wallet,
+                InventoryComponent inventory,
+                MarketComponent market) {
+            return transform != null
+                    && wallet != null
+                    && inventory != null
+                    && market != null
+                    && Float.floatToIntBits(x) == Float.floatToIntBits(transform.position.x)
+                    && Float.floatToIntBits(y) == Float.floatToIntBits(transform.position.y)
+                    && factionId == liveFactionId
+                    && walletBalanceMilliCredits == wallet.getBalanceMilliCredits()
+                    && inventoryCapacity == inventory.capacity
+                    && Arrays.equals(stock, inventory.stock)
+                    && Arrays.equals(targetStock, market.targetStock)
+                    && Arrays.equals(sellPrices, market.sellPrices)
+                    && Arrays.equals(buyPrices, market.buyPrices)
+                    && Arrays.equals(tradable, market.tradableItems);
         }
     }
 }
