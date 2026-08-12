@@ -25,11 +25,16 @@ import java.util.Objects;
  * Общий read-only снимок доступных рынков для поиска торговых маршрутов.
  *
  * <p>Directory перестраивается один раз из ECS-состояния, после чего ship planners работают только
- * с immutable {@link StationMarket}. По каждому active item дополнительно поддерживаются списки
- * поставщиков и покупателей, поэтому route discovery больше не обязан самостоятельно сканировать
- * Ashley entities и проверять наличие компонентов.</p>
+ * с immutable {@link StationMarket}. По каждому active item поддерживаются списки поставщиков,
+ * покупателей и bounded shortlist {@link TradeOpportunity}. Квадратичная supplier-consumer работа
+ * выполняется один раз на общий market snapshot, а не повторяется каждым торговым кораблём.</p>
  */
 public final class MarketDirectory {
+    /** Максимальное число consumer-кандидатов одного supplier по одному товару. */
+    public static final int MAX_CONSUMERS_PER_SUPPLIER = 8;
+
+    private static final int PRICE_CANDIDATE_SLOTS = MAX_CONSUMERS_PER_SUPPLIER / 2;
+
     private final ContentCatalog contentCatalog;
     private final ComponentMapper<EntityIdComponent> idm = ComponentMapper.getFor(EntityIdComponent.class);
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
@@ -42,6 +47,7 @@ public final class MarketDirectory {
     private Map<EntityId, StationMarket> byId = Map.of();
     private List<List<StationMarket>> suppliersByItem = emptyIndex();
     private List<List<StationMarket>> consumersByItem = emptyIndex();
+    private List<List<TradeOpportunity>> opportunitiesByItem = emptyOpportunityIndex();
 
     /**
      * Создаёт пустой directory для указанного каталога.
@@ -56,7 +62,10 @@ public final class MarketDirectory {
      * Перестраивает immutable snapshot из текущих ECS entities.
      *
      * <p>Сущности без полного market-набора компонентов игнорируются. Дублирующий persistent ID
-     * считается повреждением runtime state и отклоняется.</p>
+     * считается повреждением runtime state и отклоняется. Для каждого supplier сохраняется максимум
+     * {@link #MAX_CONSUMERS_PER_SUPPLIER} consumers: половина выбирается по высокой raw buy price,
+     * оставшаяся часть — по optimistic margin/distance. Это сохраняет ценовые и логистические
+     * альтернативы, но ограничивает число кандидатов, просматриваемых каждым fleet planner.</p>
      *
      * @param entities кандидаты рынков
      * @throws NullPointerException если iterable не задан
@@ -105,21 +114,41 @@ public final class MarketDirectory {
         }
 
         stationBuilder.sort(Comparator.comparing(StationMarket::id));
+        List<List<TradeOpportunity>> opportunityBuilder = mutableOpportunityIndex();
         for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
             int itemId = item.runtimeId();
-            supplierBuilder.get(itemId).sort(
+            List<StationMarket> suppliers = supplierBuilder.get(itemId);
+            List<StationMarket> consumers = consumerBuilder.get(itemId);
+            suppliers.sort(
                     Comparator.comparingDouble((StationMarket station) -> station.sellPrice(itemId))
                             .thenComparing(StationMarket::id));
-            consumerBuilder.get(itemId).sort(
+            consumers.sort(
                     Comparator.comparingDouble((StationMarket station) -> station.buyPrice(itemId))
                             .reversed()
                             .thenComparing(StationMarket::id));
+
+            List<TradeOpportunity> opportunities = opportunityBuilder.get(itemId);
+            for (StationMarket supplier : suppliers) {
+                for (StationMarket consumer : selectConsumers(supplier, consumers, itemId)) {
+                    opportunities.add(new TradeOpportunity(
+                            supplier.id(),
+                            consumer.id(),
+                            itemId,
+                            supplier.sellPrice(itemId),
+                            consumer.buyPrice(itemId),
+                            distance(supplier, consumer)));
+                }
+            }
+            opportunities.sort(
+                    Comparator.comparing(TradeOpportunity::buyStationId)
+                            .thenComparing(TradeOpportunity::sellStationId));
         }
 
         stations = List.copyOf(stationBuilder);
         byId = Collections.unmodifiableMap(new LinkedHashMap<>(idBuilder));
         suppliersByItem = immutableIndex(supplierBuilder);
         consumersByItem = immutableIndex(consumerBuilder);
+        opportunitiesByItem = immutableOpportunityIndex(opportunityBuilder);
     }
 
     /** @return все market snapshots в deterministic EntityId-порядке */
@@ -157,6 +186,85 @@ public final class MarketDirectory {
         return validItemId(itemId) ? consumersByItem.get(itemId) : List.of();
     }
 
+    /**
+     * Возвращает bounded supplier-consumer shortlist товара.
+     *
+     * @param itemId runtime item ID
+     * @return immutable opportunities или пустой список
+     */
+    public List<TradeOpportunity> opportunities(int itemId) {
+        return validItemId(itemId) ? opportunitiesByItem.get(itemId) : List.of();
+    }
+
+    private List<StationMarket> selectConsumers(
+            StationMarket supplier,
+            List<StationMarket> consumers,
+            int itemId) {
+        LinkedHashMap<EntityId, StationMarket> selected = new LinkedHashMap<>();
+        for (StationMarket consumer : consumers) {
+            if (selected.size() >= PRICE_CANDIDATE_SLOTS) {
+                break;
+            }
+            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
+                selected.put(consumer.id(), consumer);
+            }
+        }
+
+        List<StationMarket> byEfficiency = new ArrayList<>();
+        for (StationMarket consumer : consumers) {
+            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
+                byEfficiency.add(consumer);
+            }
+        }
+        byEfficiency.sort((left, right) -> {
+            int scoreCompare = Double.compare(
+                    optimisticEfficiency(supplier, right, itemId),
+                    optimisticEfficiency(supplier, left, itemId));
+            return scoreCompare != 0 ? scoreCompare : left.id().compareTo(right.id());
+        });
+        for (StationMarket consumer : byEfficiency) {
+            if (selected.size() >= MAX_CONSUMERS_PER_SUPPLIER) {
+                break;
+            }
+            selected.putIfAbsent(consumer.id(), consumer);
+        }
+        for (StationMarket consumer : consumers) {
+            if (selected.size() >= MAX_CONSUMERS_PER_SUPPLIER) {
+                break;
+            }
+            if (isPotentiallyProfitable(supplier, consumer, itemId)) {
+                selected.putIfAbsent(consumer.id(), consumer);
+            }
+        }
+        return List.copyOf(selected.values());
+    }
+
+    private static boolean isPotentiallyProfitable(
+            StationMarket supplier,
+            StationMarket consumer,
+            int itemId) {
+        if (supplier.id().equals(consumer.id())) {
+            return false;
+        }
+        double minimumPurchase = supplier.sellPrice(itemId)
+                * (1d - Constants.MAX_REPUTATION_PRICE_BONUS);
+        double maximumSale = consumer.buyPrice(itemId)
+                * (1d + Constants.MAX_REPUTATION_PRICE_BONUS);
+        return maximumSale > minimumPurchase;
+    }
+
+    private static double optimisticEfficiency(
+            StationMarket supplier,
+            StationMarket consumer,
+            int itemId) {
+        double minimumPurchase = supplier.sellPrice(itemId)
+                * (1d - Constants.MAX_REPUTATION_PRICE_BONUS);
+        double maximumSale = consumer.buyPrice(itemId)
+                * (1d + Constants.MAX_REPUTATION_PRICE_BONUS);
+        double margin = Math.max(0d, maximumSale - minimumPurchase);
+        return margin / Math.max(1d, distance(supplier, consumer));
+    }
+
     private StationMarket snapshot(Entity entity) {
         EntityId id = idm.get(entity).id;
         TransformComponent transform = tm.get(entity);
@@ -177,6 +285,14 @@ public final class MarketDirectory {
                 market.sellPrices,
                 market.buyPrices,
                 market.tradableItems);
+    }
+
+    private static float distance(StationMarket first, StationMarket second) {
+        double value = Math.hypot(second.x() - first.x(), second.y() - first.y());
+        if (!Double.isFinite(value) || value > Float.MAX_VALUE) {
+            return Float.MAX_VALUE;
+        }
+        return (float) value;
     }
 
     private static boolean isPositiveFinite(float value) {
@@ -211,9 +327,32 @@ public final class MarketDirectory {
         return List.copyOf(result);
     }
 
-    /**
-     * Immutable снимок одной торговой станции.
-     */
+    private static List<List<TradeOpportunity>> mutableOpportunityIndex() {
+        List<List<TradeOpportunity>> index = new ArrayList<>(Constants.MAX_ITEMS);
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            index.add(new ArrayList<>());
+        }
+        return index;
+    }
+
+    private static List<List<TradeOpportunity>> emptyOpportunityIndex() {
+        List<List<TradeOpportunity>> index = new ArrayList<>(Constants.MAX_ITEMS);
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            index.add(List.of());
+        }
+        return List.copyOf(index);
+    }
+
+    private static List<List<TradeOpportunity>> immutableOpportunityIndex(
+            List<List<TradeOpportunity>> source) {
+        List<List<TradeOpportunity>> result = new ArrayList<>(source.size());
+        for (List<TradeOpportunity> values : source) {
+            result.add(List.copyOf(values));
+        }
+        return List.copyOf(result);
+    }
+
+    /** Immutable снимок одной торговой станции. */
     public static final class StationMarket {
         private final EntityId id;
         private final float x;
