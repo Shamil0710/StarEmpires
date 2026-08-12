@@ -508,8 +508,7 @@ public final class MiningSystem extends IteratingSystem {
                 || resourceItem < 0
                 || resourceItem >= Constants.MAX_ITEMS
                 || !market.isTradable(resourceItem)
-                || inventory.getFreeCapacity() <= 0
-                || !isValidInventory(inventory)
+                || !hasValidFreeCapacity(inventory)
                 || !isValidPosition(transformMapper.get(entity))) {
             return false;
         }
@@ -557,12 +556,38 @@ public final class MiningSystem extends IteratingSystem {
         if (inventory == null || inventory.capacity < 0) {
             return false;
         }
+        long total = 0L;
+        boolean saturated = false;
         for (int stock : inventory.stock) {
             if (stock < 0) {
                 return false;
             }
+            if (!saturated) {
+                total += stock;
+                if (total >= Integer.MAX_VALUE) {
+                    total = Integer.MAX_VALUE;
+                    saturated = true;
+                }
+            }
         }
-        return inventory.getTotalStock() <= inventory.capacity;
+        return total <= inventory.capacity;
+    }
+
+    private boolean hasValidFreeCapacity(InventoryComponent inventory) {
+        if (inventory == null || inventory.capacity <= 0) {
+            return false;
+        }
+        long total = 0L;
+        for (int stock : inventory.stock) {
+            if (stock < 0) {
+                return false;
+            }
+            total += stock;
+            if (total >= inventory.capacity) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean isValidPosition(TransformComponent transform) {
