@@ -63,6 +63,46 @@ class SimulationClockTest {
     }
 
     @Test
+    void snapshotRestoreСохраняетДажеНеполныйTickPauseИТimeScale() {
+        SimulationClock original = new SimulationClock(0.1f);
+        original.setTimeScale(1.5d);
+        original.addFrameTime(0.15f);
+        assertEquals(2, drain(original));
+        original.addFrameTime(0.025f);
+        original.setPaused(true);
+
+        SimulationClock.State saved = original.snapshotState();
+        SimulationClock restored = new SimulationClock(saved);
+
+        assertEquals(saved, restored.snapshotState());
+        assertEquals(original.getInterpolationAlpha(), restored.getInterpolationAlpha(), 0d);
+        assertTrue(restored.isPaused());
+        assertEquals(1.5d, restored.getTimeScale(), 0d);
+
+        original.setPaused(false);
+        restored.setPaused(false);
+        original.addFrameTime(0.1f);
+        restored.addFrameTime(0.1f);
+        assertEquals(drain(original), drain(restored));
+        assertEquals(original.snapshotState(), restored.snapshotState());
+    }
+
+    @Test
+    void stateОтклоняетПовреждённыеClockДанные() {
+        assertThrows(NullPointerException.class, () -> new SimulationClock((SimulationClock.State) null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SimulationClock.State(0.1f, -1L, 0d, 1d, false, 0L));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SimulationClock.State(0.1f, 100_000_000L, 0d, 1d, false, 0L));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SimulationClock.State(0.1f, 0L, 1d, 1d, false, 0L));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SimulationClock.State(0.1f, 0L, 0d, -1d, false, 0L));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SimulationClock.State(0.1f, 0L, 0d, 1d, false, -1L));
+    }
+
+    @Test
     void отклоняетНекорректныеПараметрыИПустоеИзвлечение() {
         assertThrows(IllegalArgumentException.class, () -> new SimulationClock(0f));
         assertThrows(IllegalArgumentException.class, () -> new SimulationClock(Float.NaN));
