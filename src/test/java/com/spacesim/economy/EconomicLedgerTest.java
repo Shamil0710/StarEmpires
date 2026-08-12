@@ -2,6 +2,8 @@ package com.spacesim.economy;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -31,6 +33,45 @@ class EconomicLedgerTest {
         assertEquals(0, ledger.size());
         EconomicTransaction afterClear = ledger.recordMoneySource("Station", 1L, "restart-observation");
         assertEquals(7L, afterClear.sequence());
+    }
+
+    @Test
+    void snapshotRestoreПродолжаетSequenceИПослеДиагностическогоClear() {
+        EconomicLedger original = new EconomicLedger();
+        original.recordTrade("A", "B", 0, 1L, 1_000L);
+        original.recordResourceTransform("Factory", "recipe");
+        EconomicLedger restored = new EconomicLedger(original.snapshotState());
+
+        assertEquals(original.snapshotState(), restored.snapshotState());
+        assertEquals(3L, restored.recordMoneySink("Taxpayer", 1L, "tax").sequence());
+
+        restored.clear();
+        EconomicLedger.State cleared = restored.snapshotState();
+        assertEquals(4L, cleared.nextSequence());
+        assertEquals(List.of(), cleared.entries());
+
+        EconomicLedger afterClearRestore = new EconomicLedger(cleared);
+        assertEquals(4L,
+                afterClearRestore.recordMoneySource("Treasury", 1L, "grant").sequence());
+    }
+
+    @Test
+    void ledgerStateОтклоняетРазрывыSequenceНоРазрешаетУсечённыйХвост() {
+        EconomicTransaction five = new EconomicTransaction(
+                5L, EconomicTransaction.Type.MONEY_SOURCE,
+                "", "A", -1, 0L, 1L, "source");
+        EconomicTransaction six = new EconomicTransaction(
+                6L, EconomicTransaction.Type.MONEY_SINK,
+                "A", "", -1, 0L, 1L, "sink");
+
+        EconomicLedger.State tail = new EconomicLedger.State(7L, List.of(five, six));
+        assertEquals(7L, new EconomicLedger(tail).snapshotState().nextSequence());
+        assertThrows(IllegalArgumentException.class,
+                () -> new EconomicLedger.State(8L, List.of(five, six)));
+        assertThrows(IllegalArgumentException.class,
+                () -> new EconomicLedger.State(7L, List.of(five,
+                        new EconomicTransaction(7L, EconomicTransaction.Type.MONEY_SINK,
+                                "A", "", -1, 0L, 1L, "sink"))));
     }
 
     @Test
