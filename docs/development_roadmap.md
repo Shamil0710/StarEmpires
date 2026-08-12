@@ -10,7 +10,7 @@
 
 Критерии milestone:
 
-- [ ] проект стабильно собирается из чистого clone одной командой;
+- [x] проект стабильно собирается из чистого clone одной командой;
 - [ ] CI зелёный и блокирует сломанные изменения;
 - [ ] симуляция использует фиксированный игровой tick и поддерживает pause/time scale;
 - [ ] одинаковый seed даёт воспроизводимую экономическую симуляцию;
@@ -26,25 +26,35 @@
 
 ## Этап 0 — Repository health и зелёная сборка
 
-**Статус:** IN PROGRESS
+**Статус:** VERIFIED — READY TO MERGE
 
 ### Задачи
 
-- [ ] восстановить отсутствующие `AsteroidComponent`, `AsteroidSpawnConfig`, `AsteroidSpawnSystem`;
-- [ ] устранить все compile errors;
-- [ ] запустить полный `clean verify` в GitHub Actions;
-- [ ] добиться прохождения всех тестов;
-- [ ] добиться прохождения JaCoCo thresholds;
-- [ ] обновить `actions/setup-java` с v4 на v5;
-- [ ] убедиться, что README соответствует фактическому HEAD;
-- [ ] выполнить desktop smoke-check по существующему checklist;
-- [ ] открыть PR `fix/economy-stability -> main`;
+- [x] восстановить отсутствующие `AsteroidComponent`, `AsteroidSpawnPoint`, `AsteroidSpawnConfig`, `AsteroidSpawnSystem`;
+- [x] устранить все compile errors;
+- [x] запустить полный `clean verify` в GitHub Actions;
+- [x] добиться прохождения всех тестов — 140/140 на проверенном HEAD;
+- [x] добиться прохождения JaCoCo thresholds;
+- [x] обновить `actions/setup-java` с v4 на v5;
+- [x] убедиться, что README соответствует фактическому HEAD;
+- [ ] выполнить desktop smoke-check по существующему checklist — **MANUAL / NON-BLOCKING FOR CORE DoD**;
+- [x] открыть PR `fix/economy-stability -> main` — PR #1;
 - [ ] merge только после зелёного CI;
 - [ ] после merge использовать `main` как стабильную базу, feature/fix-ветки — для разработки.
 
+### Результат автоматической проверки
+
+- `./mvnw --batch-mode --no-transfer-progress clean verify` — SUCCESS;
+- 140 тестов, 0 failures, 0 errors, 0 skipped;
+- Javadoc с `failOnWarnings=true` — SUCCESS;
+- JaCoCo line/branch gates — SUCCESS;
+- runnable `star-empires-*-all.jar` и отчёты успешно публикуются как GitHub Actions artifacts.
+
 ### Definition of Done
 
-Свежий clone репозитория на JDK 17 выполняет `./mvnw clean verify`, создаёт runnable `-all.jar`, все автоматические проверки зелёные.
+Свежий clone репозитория на JDK 17 выполняет `./mvnw clean verify`, создаёт runnable `-all.jar`, все автоматические проверки зелёные. **Выполнено.**
+
+> Desktop smoke-test требует реального графического/OpenGL-сеанса и остаётся ручным release-checklist. Он не подменяется headless-тестами и не считается автоматически пройденным.
 
 ---
 
@@ -256,4 +266,4 @@ Supply chain может самостоятельно перестраивать�
 
 ## Текущий следующий шаг
 
-**Этап 0:** восстановить отсутствующий asteroid subsystem, получить зелёный `clean verify`, затем подготовить безопасный merge стабилизационной ветки в `main`.
+**Переход Этап 0 → Этап 1:** получить зелёный CI на этом status-коммите, merge PR #1 в `main`, затем создать отдельную ветку Этапа 1 и начать `SimulationClock`.
