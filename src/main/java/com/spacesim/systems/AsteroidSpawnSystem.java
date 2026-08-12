@@ -27,16 +27,46 @@ import java.util.random.RandomGenerator;
  * Поддерживает ограниченный набор конечных астероидных источников в разрешённых точках пояса.
  *
  * <p>Каждый созданный астероид объявляется в {@link EconomicLedger} как явный
- * {@code RESOURCE_SOURCE}: именно появление конечного природного резервуара вводит новый товар в
- * физический ресурсный пул. Последующая добыча лишь переносит этот ресурс из астероида в трюм и
- * отдельным source не считается.</p>
- *
- * <p>Каждому динамическому астероиду при создании выдаётся устойчивый
- * {@link EntityIdComponent}. Runtime-сборка передаёт системе общий {@link EntityIdAllocator},
- * продолжая ID-последовательность после bootstrap-сущностей.</p>
+ * {@code RESOURCE_SOURCE}. Внутренний refill timer и sequence являются частью сохраняемого
+ * {@link State}; состояние RNG-потока и {@link EntityIdAllocator} сохраняются владельцем игровой
+ * сессии отдельно.</p>
  */
 public final class AsteroidSpawnSystem extends EntitySystem {
     private static final double REFILL_TIME_EPSILON_SECONDS = 1e-6d;
+
+    /**
+     * Полный mutable state spawner, не включая внешние RNG и ID allocator.
+     *
+     * @param initialized выполнено ли первоначальное заполнение
+     * @param secondsSinceRefill накопленное время после последнего refill boundary
+     * @param spawnSequence номер последнего созданного астероида
+     * @param spawnedAsteroidCount общее число когда-либо созданных астероидов
+     */
+    public record State(
+            boolean initialized,
+            double secondsSinceRefill,
+            long spawnSequence,
+            long spawnedAsteroidCount) {
+        /**
+         * Проверяет численные инварианты сохраняемого состояния.
+         *
+         * @param initialized выполнено ли первоначальное заполнение
+         * @param secondsSinceRefill накопленное время refill
+         * @param spawnSequence номер последнего астероида
+         * @param spawnedAsteroidCount общее число созданных астероидов
+         */
+        public State {
+            if (!Double.isFinite(secondsSinceRefill) || secondsSinceRefill < 0d) {
+                throw new IllegalArgumentException("Refill timer состояния должен быть неотрицательным");
+            }
+            if (spawnSequence < 0L || spawnedAsteroidCount < 0L) {
+                throw new IllegalArgumentException("Счётчики asteroid spawner не могут быть отрицательными");
+            }
+            if (spawnedAsteroidCount < spawnSequence) {
+                throw new IllegalArgumentException("Общий счётчик не может быть меньше spawn sequence");
+            }
+        }
+    }
 
     private final AsteroidSpawnConfig config;
     private final RandomGenerator random;
@@ -75,13 +105,9 @@ public final class AsteroidSpawnSystem extends EntitySystem {
     /**
      * Создаёт систему с внешним RNG, общим экономическим журналом и собственной ID-последовательностью.
      *
-     * <p>Эта перегрузка сохранена для изолированных тестов. Runtime игровой сессии должен использовать
-     * четырёхаргументный конструктор с общим аллокатором.</p>
-     *
      * @param config валидная конфигурация астероидного пояса
      * @param random источник случайности подсистемы
      * @param ledger общий экономический журнал
-     * @throws NullPointerException если обязательная зависимость не задана
      */
     public AsteroidSpawnSystem(
             AsteroidSpawnConfig config,
@@ -97,17 +123,43 @@ public final class AsteroidSpawnSystem extends EntitySystem {
      * @param random источник случайности подсистемы
      * @param ledger общий экономический журнал
      * @param idAllocator общий детерминированный аллокатор ID
-     * @throws NullPointerException если обязательная зависимость не задана
      */
     public AsteroidSpawnSystem(
             AsteroidSpawnConfig config,
             RandomGenerator random,
             EconomicLedger ledger,
             EntityIdAllocator idAllocator) {
+        this(config, random, ledger, idAllocator, new State(false, 0d, 0L, 0L));
+    }
+
+    /**
+     * Восстанавливает spawner без дополнительного RNG-вызова или создания сущностей в конструкторе.
+     *
+     * @param config конфигурация астероидного пояса
+     * @param random RNG-поток в сохранённом состоянии
+     * @param ledger общий экономический журнал
+     * @param idAllocator восстановленный общий ID allocator
+     * @param state сохранённый mutable state системы
+     */
+    public AsteroidSpawnSystem(
+            AsteroidSpawnConfig config,
+            RandomGenerator random,
+            EconomicLedger ledger,
+            EntityIdAllocator idAllocator,
+            State state) {
         this.config = requireConfig(config);
         this.random = Objects.requireNonNull(random, "Источник случайности не должен быть null");
         this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");
         this.idAllocator = Objects.requireNonNull(idAllocator, "EntityIdAllocator не задан");
+        State checked = Objects.requireNonNull(state, "Состояние asteroid spawner не задано");
+        if (checked.secondsSinceRefill() >= config.getRefillIntervalSeconds()
+                + REFILL_TIME_EPSILON_SECONDS) {
+            throw new IllegalArgumentException("Сохранённый refill timer превышает interval");
+        }
+        initialized = checked.initialized();
+        secondsSinceRefill = checked.secondsSinceRefill();
+        spawnSequence = checked.spawnSequence();
+        spawnedAsteroidCount = checked.spawnedAsteroidCount();
     }
 
     private static AsteroidSpawnConfig requireConfig(AsteroidSpawnConfig config) {
@@ -117,6 +169,11 @@ public final class AsteroidSpawnSystem extends EntitySystem {
     /** @return ledger, в который записываются resource-source операции появления астероидов */
     public EconomicLedger getLedger() {
         return ledger;
+    }
+
+    /** @return immutable снимок внутренних таймеров и счётчиков */
+    public State snapshotState() {
+        return new State(initialized, secondsSinceRefill, spawnSequence, spawnedAsteroidCount);
     }
 
     @Override
@@ -221,6 +278,9 @@ public final class AsteroidSpawnSystem extends EntitySystem {
     }
 
     private Entity createAsteroid(AsteroidSpawnPoint point) {
+        if (spawnSequence == Long.MAX_VALUE) {
+            throw new IllegalStateException("Диапазон sequence asteroid spawner исчерпан");
+        }
         long resource = randomResourceAmount();
         TransformComponent transform = new TransformComponent();
         transform.position.set(point.x(), point.y());
