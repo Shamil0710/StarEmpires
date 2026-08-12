@@ -19,8 +19,8 @@
 - [x] save/load сохраняет экономическое состояние и ссылки между сущностями через устойчивые ID;
 - [x] товары, рецепты, корабли, станции и фракционные параметры загружаются из data-driven каталога;
 - [x] торговый AI оценивает прибыль с учётом времени маршрута и имеет extension seam для дополнительных route costs;
-- [ ] существует headless benchmark минимум на 100 станций, 500 экономических агентов и 100 игровых часов;
-- [ ] benchmark собирает ключевые экономические метрики и выявляет разрушение supply chain.
+- [x] существует headless benchmark минимум на 100 станций, 500 экономических агентов и 100 игровых часов;
+- [x] benchmark собирает ключевые экономические метрики и выявляет разрушение supply chain.
 
 ---
 
@@ -195,7 +195,7 @@ Post-merge `main` CI: SUCCESS.
 
 ## Этап 6 — Headless economic benchmark и observability
 
-**Статус:** ACTIVE — Stage 6A MERGED VIA PR #7; Stage 6B performance remediation
+**Статус:** COMPLETE — Stage 6A MERGED VIA PR #7; Stage 6B MERGED VIA PR #8
 
 ### Цель
 
@@ -208,9 +208,9 @@ Post-merge `main` CI: SUCCESS.
 - [x] создан deterministic world на 100 станций / 500 экономических агентов через production archetype + persistence/bootstrap path;
 - [x] определён отдельный `scale100h` профиль на 3 600 000 fixed ticks = 100 игровых часов;
 - [x] собираются wall-clock duration, simulated-time/real-time ratio и ticks/second;
-- [x] собирается JVM heap baseline до/после run; точный allocation profiling оставлен Stage 6B;
+- [x] собирается JVM heap baseline до/после run;
 - [x] собираются stockout observations и unmet demand;
-- [x] собираются price mean/variance;
+- [x] собирается price mean/variance;
 - [x] собираются trade transaction count, traded units и monetary turnover;
 - [x] собираются production cycles/output, mining mined/delivered и resource sink/source volumes;
 - [x] собираются wealth distribution, percentiles и Gini;
@@ -228,29 +228,49 @@ Pull-request CI exact head: SUCCESS.
 Merge commit: `835260b8f2a780fab8f477adfa3271819f067c38`.
 Post-merge `main` CI: SUCCESS.
 
-### Stage 6B — незакрытый scalability gate
+### Stage 6B — scalability gate
 
-- [ ] профилировать 100/500 world и определить долю времени `TradeAISystem`/`MarketDirectory`, mining/asteroid processing, ledger retention и прочих систем;
-- [ ] проверить рост entity count/asteroid count и ledger size на 1k -> 10k -> 100k ticks;
-- [ ] убрать подтверждённые superlinear/hot-path bottlenecks без изменения экономических инвариантов и deterministic semantics;
-- [ ] при необходимости разделить authoritative ledger history и benchmark aggregation/streaming так, чтобы 100h run не требовал бесконечного diagnostic retention;
-- [ ] добавить точный allocation/profile baseline после выбора инструмента, не привязывая simulation core к profiler library;
-- [ ] завершить полный `100 stations / 500 agents / 100 simulated hours` run;
-- [ ] сохранить machine-readable baseline report и отдельно зафиксировать stockouts/unmet demand/price/trade/production/wealth/route metrics;
-- [ ] только после первого полного baseline определить performance/regression thresholds;
-- [ ] проверить, что benchmark способен количественно обнаруживать искусственно нарушенный supply chain.
+- [x] профилирован 100/500 world; основные CPU/allocation hotspots локализованы в route planning, market snapshots и mining validation;
+- [x] проверен рост entity count/asteroid count и ledger size на 1k -> 10k -> 100k ticks;
+- [x] устранены подтверждённые hot-path bottlenecks без изменения экономических инвариантов и deterministic semantics;
+- [x] ledger retention проверен отдельно: в текущем 100/500 сценарии ledger стабилизируется на 27 339 entries, поэтому отдельный streaming ledger для Stage 6 не требуется;
+- [x] JFR использован как внешний allocation/CPU profiler без зависимости simulation core от profiler library;
+- [x] завершён полный `100 stations / 500 agents / 100 simulated hours` run: 3 600 000 / 3 600 000 ticks;
+- [x] сохранён machine-readable baseline report `docs/benchmarks/scale100h-stage6b-baseline.json`;
+- [x] performance/regression thresholds определены после первого полного baseline и описаны в `docs/stage6b_scalability.md`;
+- [x] CI quantitatively обнаруживает искусственно нарушенный ore supply chain: unmet demand растёт, trade activity падает, mining=0 при сохранённых инвариантах;
+- [x] exact failed-route cache защищён regression-тестами инвалидизации по market revision и fleet planning state;
+- [x] `MarketDirectory` переиспользует неизменный snapshot только при точном совпадении live state;
+- [x] финальный regression suite Stage 6B: 246 tests, 0 failures, 0 errors, 0 skipped; Javadoc и JaCoCo gates зелёные.
 
-Диагностический probe exact CI artifact `9b356cd`: 1000 ticks на 100/500 завершились с сохранёнными money/resource invariants и 7013 ledger entries; 10 000 ticks и полный 100h профиль не завершились в 120-секундном интерактивном diagnostic window. Это **не baseline**, а доказательство необходимости Stage 6B profiling/remediation.
+Verified final PR head: `b14f56d5ad59dcb96b2bb01329d8639fd35b900f`.
+Push CI exact head: SUCCESS.
+Pull-request CI exact head: SUCCESS.
+Merge commit: `10fd1d9164c289641e2558cfa5d0abb956b5b6eb`.
+Post-merge `main` CI: SUCCESS.
+
+Первый полный `scale100h` baseline создан exact CI production artifact `135cf8393a500afb84194d8c1ef923beb53287aa`:
+
+- throughput: `6662.2300866007 ticks/s`;
+- wall-clock: `540.359602296 s`;
+- money conserved: `true`;
+- resource accounting conserved: `true`, per-item delta `[0, 0, 0, 0, 0]`;
+- non-negative inventories: `true`;
+- entities: `606`, stations: `100`, economic agents: `500`;
+- ledger entries: `27 339`;
+- heap delta: `35 936 296 bytes`.
+
+Подробная evidence/threshold policy: `docs/stage6b_scalability.md`.
 
 ### Definition of Done
 
-Экономический core автоматически стресс-тестируется без UI; benchmark минимум 100 stations / 500 agents / 100 simulated hours воспроизводим; отчёт показывает производительность, дефициты, цены, торговлю, производство, wealth и route-planner metrics; экономические инварианты остаются доказанными. **Пока не выполнено: блокер — полный 100h scalability gate.**
+Экономический core автоматически стресс-тестируется без UI; benchmark минимум 100 stations / 500 agents / 100 simulated hours воспроизводим; отчёт показывает производительность, дефициты, цены, торговлю, производство, wealth и route-planner metrics; экономические инварианты остаются доказанными. **Выполнено.**
 
 ---
 
 ## Этап 7 — Иерархия мира и уровни симуляции
 
-**Статус:** PLANNED
+**Статус:** ACTIVE
 
 ### Задачи
 
@@ -338,4 +358,4 @@ Supply chain может самостоятельно перестраивать�
 
 ## Текущий следующий шаг
 
-**Этап 6B — profiling и scalability remediation headless benchmark.** Начать с воспроизводимых scale probes 1k -> 10k -> 100k ticks на 100/500 world и измерить рост wall-clock, entity/asteroid count и ledger size. Затем профилировать hot paths, устранять только подтверждённые bottlenecks, повторять probes после каждого изменения и не переходить к Stage 7, пока полный `scale100h` не завершится с сохранёнными money/resource invariants и зафиксированным machine-readable baseline.
+**Этап 7 — иерархия мира и уровни симуляции.** Начать с минимальной persistent модели `Galaxy -> Sector -> StarSystem`, устойчивых ID и jump connections, затем определить границу между local full-rate simulation и strategic reduced-rate updates для удалённых систем. Не дублировать экономический core: новые уровни мира должны оркестрировать уже существующую deterministic `SimulationSession`, а не создавать вторую экономическую реализацию.
