@@ -28,6 +28,8 @@ import java.util.random.RandomGenerator;
  * Выбор свободной точки и величины запаса воспроизводимы для одинаковой конфигурации и seed.</p>
  */
 public final class AsteroidSpawnSystem extends EntitySystem {
+    private static final double REFILL_TIME_EPSILON_SECONDS = 1e-6d;
+
     private final AsteroidSpawnConfig config;
     private final RandomGenerator random;
     private final ComponentMapper<AsteroidComponent> asteroidMapper =
@@ -100,11 +102,17 @@ public final class AsteroidSpawnSystem extends EntitySystem {
 
         secondsSinceRefill += deltaTime;
         double interval = config.getRefillIntervalSeconds();
-        if (secondsSinceRefill < interval) {
+        double completedIntervals = Math.floor(
+                (secondsSinceRefill + REFILL_TIME_EPSILON_SECONDS) / interval);
+        if (completedIntervals < 1d) {
             return;
         }
 
-        secondsSinceRefill %= interval;
+        secondsSinceRefill -= completedIntervals * interval;
+        if (secondsSinceRefill < 0d
+                && secondsSinceRefill > -REFILL_TIME_EPSILON_SECONDS) {
+            secondsSinceRefill = 0d;
+        }
         spawnUntil(config.getTargetCount());
     }
 
