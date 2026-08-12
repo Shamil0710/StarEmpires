@@ -1,7 +1,9 @@
 package com.spacesim.persistence;
 
+import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.EntityListener;
+import com.badlogic.ashley.core.Family;
 import com.spacesim.components.EntityIdComponent;
 
 import java.util.HashMap;
@@ -15,13 +17,39 @@ import java.util.Objects;
  * созданы заново как другие экземпляры {@code Entity}; достаточно зарегистрировать их с теми же
  * ID, после чего сохранённые связи разрешаются через этот индекс.</p>
  *
- * <p>Класс реализует Ashley {@link EntityListener}. Если listener подключён к family сущностей с
- * {@link EntityIdComponent}, будущие добавления и удаления автоматически поддерживают индекс в
- * актуальном состоянии. Один ID не может принадлежать двум разным runtime-сущностям; повторная
- * регистрация той же сущности с тем же ID идемпотентна.</p>
+ * <p>{@link #track(Engine)} привязывает registry ровно к одному Ashley Engine, индексирует уже
+ * существующие сущности с {@link EntityIdComponent} и подписывается на их дальнейшее добавление и
+ * удаление. Повторный вызов для того же Engine идемпотентен. Один ID не может принадлежать двум
+ * разным runtime-сущностям.</p>
  */
 public final class EntityRegistry implements EntityListener {
+    private static final Family IDENTIFIED_ENTITIES = Family.all(EntityIdComponent.class).get();
+
     private final Map<EntityId, Entity> entitiesById = new HashMap<>();
+    private Engine trackedEngine;
+
+    /**
+     * Привязывает registry к Ashley Engine и индексирует уже существующие идентифицированные сущности.
+     *
+     * @param engine отслеживаемый runtime Engine
+     * @throws NullPointerException если Engine не задан
+     * @throws IllegalStateException если registry уже привязан к другому Engine
+     */
+    public void track(Engine engine) {
+        Objects.requireNonNull(engine, "Ashley Engine не задан");
+        if (trackedEngine == engine) {
+            return;
+        }
+        if (trackedEngine != null) {
+            throw new IllegalStateException("EntityRegistry уже отслеживает другой Engine");
+        }
+
+        for (Entity entity : engine.getEntitiesFor(IDENTIFIED_ENTITIES)) {
+            register(entity);
+        }
+        engine.addEntityListener(IDENTIFIED_ENTITIES, this);
+        trackedEngine = engine;
+    }
 
     /**
      * Регистрирует сущность по её обязательному {@link EntityIdComponent}.
@@ -126,7 +154,7 @@ public final class EntityRegistry implements EntityListener {
         return entitiesById.size();
     }
 
-    /** Удаляет все runtime-сопоставления, не изменяя сами сущности. */
+    /** Удаляет все runtime-сопоставления, не меняя привязку lifecycle listener к Engine. */
     public void clear() {
         entitiesById.clear();
     }
