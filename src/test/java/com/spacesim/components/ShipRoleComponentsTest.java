@@ -41,7 +41,6 @@ class ShipRoleComponentsTest {
         assertEquals(0d, mining.extractionRemainder, 0d);
         assertEquals(0L, mining.totalMined);
         assertEquals(0L, mining.totalDelivered);
-        assertEquals(0f, mining.credits, 0f);
         assertEquals(85f, mining.movementSpeed, 0f);
         assertEquals(14f, mining.extractionRange, 0f);
         assertEquals(10f, mining.dockingRange, 0f);

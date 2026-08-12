@@ -5,10 +5,15 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.Money;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReputationTradeControllerTest {
     private final TradeController tradeController = new TradeController();
@@ -18,36 +23,38 @@ class ReputationTradeControllerTest {
         Entity station = createStation(Constants.FACTION_TRADE_LEAGUE);
         station.getComponent(InventoryComponent.class).stock[Constants.ITEM_FOOD] = 20;
         station.getComponent(MarketComponent.class).sellPrices[Constants.ITEM_FOOD] = 100f;
-
-        InventoryComponent buyerInventory = new InventoryComponent();
+        Entity buyer = participant(100d);
         ReputationComponent reputation = new ReputationComponent();
         reputation.addReputation(Constants.FACTION_TRADE_LEAGUE, 100f);
-        TradeController.CreditAccount credits = new TradeController.CreditAccount(100f);
 
-        boolean result = tradeController.buyFromStation(station, buyerInventory, Constants.ITEM_FOOD, 1, credits, reputation);
+        boolean result = tradeController.buyFromStation(
+                station, buyer, Constants.ITEM_FOOD, 1, reputation);
 
         assertTrue(result);
-        assertEquals(1, buyerInventory.stock[Constants.ITEM_FOOD]);
-        assertEquals(15f, credits.credits, 0.001f);
-        assertEquals(Constants.MAX_REPUTATION, reputation.getReputation(Constants.FACTION_TRADE_LEAGUE));
+        assertEquals(1, buyer.getComponent(InventoryComponent.class).stock[Constants.ITEM_FOOD]);
+        assertEquals(Money.fromCredits(15d),
+                buyer.getComponent(WalletComponent.class).getBalanceMilliCredits());
+        assertEquals(Constants.MAX_REPUTATION,
+                reputation.getReputation(Constants.FACTION_TRADE_LEAGUE));
     }
 
     @Test
     void положительнаяРепутацияДаётБонусПриПродаже() {
         Entity station = createStation(Constants.FACTION_MINERS);
         station.getComponent(MarketComponent.class).buyPrices[Constants.ITEM_STEEL] = 100f;
-
-        InventoryComponent sellerInventory = new InventoryComponent();
-        sellerInventory.stock[Constants.ITEM_STEEL] = 1;
+        Entity seller = participant(0d);
+        seller.getComponent(InventoryComponent.class).stock[Constants.ITEM_STEEL] = 1;
         ReputationComponent reputation = new ReputationComponent();
         reputation.addReputation(Constants.FACTION_MINERS, 100f);
-        TradeController.CreditAccount credits = new TradeController.CreditAccount(0f);
 
-        boolean result = tradeController.sellToStation(station, sellerInventory, Constants.ITEM_STEEL, 1, credits, reputation);
+        boolean result = tradeController.sellToStation(
+                station, seller, Constants.ITEM_STEEL, 1, reputation);
 
         assertTrue(result);
-        assertEquals(115f, credits.credits, 0.001f);
-        assertEquals(Constants.MAX_REPUTATION, reputation.getReputation(Constants.FACTION_MINERS));
+        assertEquals(Money.fromCredits(115d),
+                seller.getComponent(WalletComponent.class).getBalanceMilliCredits());
+        assertEquals(Constants.MAX_REPUTATION,
+                reputation.getReputation(Constants.FACTION_MINERS));
     }
 
     @Test
@@ -58,7 +65,8 @@ class ReputationTradeControllerTest {
                 () -> assertThrows(IllegalArgumentException.class,
                         () -> reputation.addReputation(Constants.FACTION_MINERS, Float.NaN)),
                 () -> assertThrows(IllegalArgumentException.class,
-                        () -> reputation.addReputation(Constants.FACTION_MINERS, Float.POSITIVE_INFINITY)),
+                        () -> reputation.addReputation(
+                                Constants.FACTION_MINERS, Float.POSITIVE_INFINITY)),
                 () -> assertEquals(0f, reputation.getReputation(Constants.FACTION_MINERS))
         );
     }
@@ -71,6 +79,13 @@ class ReputationTradeControllerTest {
         market.configureTradableItem(Constants.ITEM_STEEL, 100, 0f);
         station.add(market);
         station.add(new FactionComponent(factionId));
+        station.add(new WalletComponent(Money.fromCredits(1_000d)));
         return station;
+    }
+
+    private Entity participant(double credits) {
+        return new Entity()
+                .add(new InventoryComponent())
+                .add(new WalletComponent(Money.fromCredits(credits)));
     }
 }

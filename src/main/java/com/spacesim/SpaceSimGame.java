@@ -16,6 +16,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.kotcrab.vis.ui.VisUI;
 import com.spacesim.components.*;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.events.NewsArticle;
 import com.spacesim.model.AsteroidSpawnConfig;
@@ -35,13 +36,10 @@ import com.spacesim.util.SpatialHashGrid;
 /**
  * Главный объект приложения Star Empires и точка сборки демонстрационной сцены.
  *
- * <p>Класс управляет жизненным циклом libGDX, но модель больше не получает render delta напрямую.
- * {@link SimulationLoop} преобразует реальное время кадров в fixed simulation ticks; пауза и time
- * scale воздействуют только на игровое время, тогда как Scene2D и частота обновления UI продолжают
- * использовать реальное время кадра.</p>
- *
- * <p>Экземпляр создаётся desktop-запускателем. Все графические ресурсы,
- * созданные в {@link #create()}, освобождаются в {@link #dispose()}.</p>
+ * <p>Модель получает только fixed simulation ticks через {@link SimulationLoop}. Все экономические
+ * системы одной игровой сессии используют единый {@link EconomicLedger}: обычная торговля
+ * фиксируется как transfer, а создание/уничтожение/преобразование ресурсов имеет явный тип записи.
+ * UI и Scene2D продолжают использовать render delta и не влияют на authoritative состояние.</p>
  */
 public class SpaceSimGame extends ApplicationAdapter {
     private static final float SIMULATION_FIXED_STEP_SECONDS = 0.1f;
@@ -53,6 +51,7 @@ public class SpaceSimGame extends ApplicationAdapter {
 
     private Engine engine;
     private GlobalEventManager eventManager;
+    private EconomicLedger economicLedger;
     private SpatialHashGrid grid;
     private SimulationClock simulationClock;
     private SimulationLoop simulationLoop;
@@ -69,21 +68,16 @@ public class SpaceSimGame extends ApplicationAdapter {
     private Entity selectedEntity;
     private float economyUiUpdateAccumulator;
 
-    /**
-     * Создаёт неинициализированный объект приложения.
-     *
-     * <p>Ресурсы libGDX здесь не создаются: графический контекст становится
-     * доступен только при последующем вызове {@link #create()}.</p>
-     */
+    /** Создаёт неинициализированный объект приложения; графические ресурсы создаются в create(). */
     public SpaceSimGame() {
     }
 
     /**
-     * Создаёт экономическую модель, fixed-step pipeline, пользовательский интерфейс и начальный мир.
+     * Создаёт экономическую модель, общий ledger, fixed-step pipeline, UI и начальный мир.
      *
      * <p>Порядок Ashley-систем значим: рынок → потребление → производство → появление астероидов →
-     * добыча → торговый ИИ → запись истории. Глобальные события обновляются
-     * {@link SimulationLoop} перед Ashley-движком на каждом fixed tick.</p>
+     * добыча → торговый ИИ → запись истории. Глобальные события обновляются перед Ashley-движком
+     * внутри {@link SimulationLoop}.</p>
      */
     @Override
     public void create() {
@@ -91,6 +85,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         engine = new Engine();
         simulationRandom = new SimulationRandom(SIMULATION_ROOT_SEED);
         eventManager = new GlobalEventManager(simulationRandom.createStream("economy-events"));
+        economicLedger = new EconomicLedger();
         grid = new SpatialHashGrid(200);
         simulationClock = new SimulationClock(SIMULATION_FIXED_STEP_SECONDS);
 
@@ -111,13 +106,14 @@ public class SpaceSimGame extends ApplicationAdapter {
         Gdx.input.setInputProcessor(stage);
 
         engine.addSystem(new MarketSystem(eventManager));
-        engine.addSystem(new ConsumptionSystem(eventManager));
-        engine.addSystem(new ProductionSystem());
+        engine.addSystem(new ConsumptionSystem(eventManager, economicLedger));
+        engine.addSystem(new ProductionSystem(economicLedger));
         engine.addSystem(new AsteroidSpawnSystem(
                 AsteroidSpawnConfig.demoWorld(),
-                simulationRandom.createStream("asteroid-spawn")));
-        engine.addSystem(new MiningSystem());
-        engine.addSystem(new TradeAISystem(grid));
+                simulationRandom.createStream("asteroid-spawn"),
+                economicLedger));
+        engine.addSystem(new MiningSystem(economicLedger));
+        engine.addSystem(new TradeAISystem(grid, economicLedger));
         engine.addSystem(new PriceRecorderSystem());
 
         for (Entity entity : DemoWorldFactory.createEntities()) {
@@ -131,19 +127,26 @@ public class SpaceSimGame extends ApplicationAdapter {
     }
 
     /**
+     * @return общий экономический журнал текущей игровой сессии
+     * @throws IllegalStateException если приложение ещё не инициализировано
+     */
+    public EconomicLedger getEconomicLedger() {
+        if (economicLedger == null) {
+            throw new IllegalStateException("Экономическая симуляция ещё не инициализирована");
+        }
+        return economicLedger;
+    }
+
+    /**
      * Включает или снимает паузу игрового времени.
      *
      * @param paused новое состояние паузы
-     * @throws IllegalStateException если приложение ещё не инициализировано
      */
     public void setSimulationPaused(boolean paused) {
         requireSimulationClock().setPaused(paused);
     }
 
-    /**
-     * @return текущее состояние паузы игрового времени
-     * @throws IllegalStateException если приложение ещё не инициализировано
-     */
+    /** @return текущее состояние паузы игрового времени */
     public boolean isSimulationPaused() {
         return requireSimulationClock().isPaused();
     }
@@ -152,25 +155,17 @@ public class SpaceSimGame extends ApplicationAdapter {
      * Задаёт скорость игрового времени независимо от скорости UI/рендера.
      *
      * @param timeScale конечный неотрицательный множитель
-     * @throws IllegalStateException если приложение ещё не инициализировано
-     * @throws IllegalArgumentException если множитель некорректен
      */
     public void setSimulationTimeScale(double timeScale) {
         requireSimulationClock().setTimeScale(timeScale);
     }
 
-    /**
-     * @return текущий множитель игрового времени
-     * @throws IllegalStateException если приложение ещё не инициализировано
-     */
+    /** @return текущий множитель игрового времени */
     public double getSimulationTimeScale() {
         return requireSimulationClock().getTimeScale();
     }
 
-    /**
-     * @return игровое время полностью исполненных fixed ticks в секундах
-     * @throws IllegalStateException если приложение ещё не инициализировано
-     */
+    /** @return игровое время полностью исполненных fixed ticks в секундах */
     public double getSimulationTimeSeconds() {
         return requireSimulationClock().getSimulationTimeSeconds();
     }
@@ -182,17 +177,6 @@ public class SpaceSimGame extends ApplicationAdapter {
         return simulationClock;
     }
 
-    /**
-     * Создаёт прозрачный нижний слой выбора, масштабирования и перемещения карты.
-     *
-     * <p>Панели добавляются на сцену после этого слоя и поэтому получают ввод первыми. Щелчок
-     * по свободному месту карты снимает текущий выбор и позволяет перетащить обзор. Средняя или
-     * правая кнопка перемещает карту независимо от выбора, а колесо масштабирует её вокруг
-     * курсора. Все изменения вида проходят через {@link WorldMapLayout}, поэтому отрисовка и
-     * hit-test используют одно преобразование.</p>
-     *
-     * @return настроенный Scene2D-актор без собственного визуального представления
-     */
     private Actor createMapInteractionLayer() {
         Actor interactionLayer = new Actor();
         interactionLayer.addListener(new InputListener() {
@@ -201,24 +185,14 @@ public class SpaceSimGame extends ApplicationAdapter {
             private float previousY;
 
             @Override
-            public void enter(
-                    InputEvent event,
-                    float x,
-                    float y,
-                    int pointer,
-                    Actor fromActor) {
+            public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
                 if (pointer == -1 && event.getStage() != null) {
                     event.getStage().setScrollFocus(event.getListenerActor());
                 }
             }
 
             @Override
-            public void exit(
-                    InputEvent event,
-                    float x,
-                    float y,
-                    int pointer,
-                    Actor toActor) {
+            public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
                 if (pointer == -1
                         && event.getStage() != null
                         && event.getStage().getScrollFocus() == event.getListenerActor()) {
@@ -259,24 +233,14 @@ public class SpaceSimGame extends ApplicationAdapter {
             }
 
             @Override
-            public void touchUp(
-                    InputEvent event,
-                    float x,
-                    float y,
-                    int pointer,
-                    int button) {
+            public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
                 if (pointer == dragPointer) {
                     dragPointer = -1;
                 }
             }
 
             @Override
-            public boolean scrolled(
-                    InputEvent event,
-                    float x,
-                    float y,
-                    float amountX,
-                    float amountY) {
+            public boolean scrolled(InputEvent event, float x, float y, float amountX, float amountY) {
                 if (mapLayout == null || !mapLayout.containsMapPoint(x, y)) {
                     return false;
                 }
@@ -284,7 +248,6 @@ public class SpaceSimGame extends ApplicationAdapter {
                 return true;
             }
 
-            /** Запоминает указатель и начальную точку панорамирования. */
             private void beginDrag(int pointer, float x, float y) {
                 dragPointer = pointer;
                 previousX = x;
@@ -294,13 +257,6 @@ public class SpaceSimGame extends ApplicationAdapter {
         return interactionLayer;
     }
 
-    /**
-     * Пересчитывает вписанную карту и область обработки ввода по текущему размеру сцены.
-     *
-     * <p>Справа всегда резервируется место под карточку объекта. Для необычно маленького
-     * viewport сохраняется минимальная корректная геометрия, чтобы сворачивание и восстановление
-     * окна не передавали нулевые размеры в преобразование координат.</p>
-     */
     private void updateMapLayout() {
         float stageWidth = Math.max(64f, stage.getWidth());
         float stageHeight = Math.max(64f, stage.getHeight());
@@ -317,7 +273,6 @@ public class SpaceSimGame extends ApplicationAdapter {
         mapInteractionLayer.setBounds(0f, 0f, availableWidth, stageHeight);
     }
 
-    /** Рисует график первого торгуемого товара выбранной станции в нижней части карты. */
     private void renderSelectedPriceGraph() {
         if (selectedEntity == null || mapLayout == null || mapLayout.getMapWidth() < 600f) {
             return;
@@ -347,7 +302,6 @@ public class SpaceSimGame extends ApplicationAdapter {
         }
     }
 
-    /** Снимает выбор, если динамический объект уже удалён из Ashley-движка. */
     private void clearInactiveSelection() {
         if (selectedEntity == null || engine == null) {
             return;
@@ -361,12 +315,7 @@ public class SpaceSimGame extends ApplicationAdapter {
         entityDetailsUI.select(null);
     }
 
-    /**
-     * Выполняет один render frame и доступные fixed simulation ticks.
-     *
-     * <p>Экономика продвигается через {@link SimulationLoop}; UI и Scene2D используют render delta,
-     * поэтому остаются отзывчивыми при паузе и изменении скорости игрового времени.</p>
-     */
+    /** Выполняет один render frame и доступные fixed simulation ticks. */
     @Override
     public void render() {
         float renderDelta = Gdx.graphics.getDeltaTime();
@@ -394,15 +343,6 @@ public class SpaceSimGame extends ApplicationAdapter {
         stage.draw();
     }
 
-    /**
-     * Подгоняет виртуальную сцену под новый размер окна.
-     *
-     * <p>Нулевые размеры, которые возможны при сворачивании окна, игнорируются,
-     * чтобы не передавать некорректную геометрию во viewport.</p>
-     *
-     * @param width новая ширина окна в пикселях
-     * @param height новая высота окна в пикселях
-     */
     @Override
     public void resize(int width, int height) {
         if (width <= 0 || height <= 0 || stage == null) {
@@ -412,12 +352,6 @@ public class SpaceSimGame extends ApplicationAdapter {
         updateMapLayout();
     }
 
-    /**
-     * Освобождает Scene2D, отрисовщик графика и глобальный скин VisUI.
-     *
-     * <p>Перед освобождением сцена снимается с обработчика ввода, если она всё
-     * ещё установлена. Повторный вызов безопасен для локальных ресурсов.</p>
-     */
     @Override
     public void dispose() {
         if (Gdx.input != null && Gdx.input.getInputProcessor() == stage) {

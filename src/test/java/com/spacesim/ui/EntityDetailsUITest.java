@@ -13,7 +13,9 @@ import com.spacesim.components.ReputationComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.Money;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
 import org.junit.jupiter.api.Test;
@@ -24,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityDetailsUITest {
     @Test
-    void описываетСтанциюСРынкомПроизводствомИПолнымИнвентарём() {
+    void описываетСтанциюСРынкомПроизводствомКошелькомИПолнымИнвентарём() {
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = 700;
         inventory.stock[Constants.ITEM_ORE] = 125;
@@ -49,6 +51,7 @@ class EntityDetailsUITest {
                 .add(new FactionComponent(Constants.FACTION_MINERS))
                 .add(transform)
                 .add(inventory)
+                .add(new WalletComponent(Money.fromCredits(10_000.25d)))
                 .add(market)
                 .add(production);
 
@@ -58,6 +61,7 @@ class EntityDetailsUITest {
         assertTrue(details.body().contains("Тип: Станция"));
         assertTrue(details.body().contains("Позиция: x=120.3, y=-30.0"));
         assertTrue(details.body().contains("Фракция: Шахтёры"));
+        assertTrue(details.body().contains("Кредиты: 10000.3 кр."));
         assertTrue(details.body().contains("Руда [Материалы]: 125 ед."));
         assertTrue(details.body().contains("Энергия [Газы и жидкости]: 40 ед."));
         assertFalse(details.body().contains("Продовольствие:"));
@@ -85,12 +89,11 @@ class EntityDetailsUITest {
         tradeAI.state = TradeAIComponent.State.TRAVEL_TO_SELL;
         tradeAI.movementSpeed = 75f;
         tradeAI.specializedItem = Constants.ITEM_FOOD;
-        tradeAI.credits = 2450.75f;
         tradeAI.cargoSpace = 60;
         tradeAI.targetStation = target;
         tradeAI.targetItem = Constants.ITEM_FOOD;
         tradeAI.targetAmount = 24;
-        tradeAI.expectedProfit = 315.4f;
+        tradeAI.expectedProfitMilliCredits = Money.fromCredits(315.4d);
         tradeAI.routeSearchCooldown = 2.25f;
 
         ReputationComponent reputation = new ReputationComponent();
@@ -100,6 +103,7 @@ class EntityDetailsUITest {
         Entity fleet = new Entity()
                 .add(new IdentityComponent("Караван Альфа", IdentityComponent.Kind.FLEET))
                 .add(inventory)
+                .add(new WalletComponent(Money.fromCredits(2450.75d)))
                 .add(new ShipComponent(ShipType.FINISHED_GOODS_CARRIER))
                 .add(tradeAI)
                 .add(reputation);
@@ -141,7 +145,6 @@ class EntityDetailsUITest {
         mining.extractionRemainder = 0.75d;
         mining.totalMined = 18L;
         mining.totalDelivered = 11L;
-        mining.credits = 96.5f;
         mining.targetAsteroid = new Entity().add(
                 new IdentityComponent("Астероид W-1", IdentityComponent.Kind.ASTEROID));
         mining.homeBase = new Entity().add(
@@ -151,6 +154,7 @@ class EntityDetailsUITest {
                 .add(new IdentityComponent("Старатель", IdentityComponent.Kind.FLEET))
                 .add(new ShipComponent(ShipType.MINING_SHIP))
                 .add(inventory)
+                .add(new WalletComponent(Money.fromCredits(96.5d)))
                 .add(mining);
 
         EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(miner);

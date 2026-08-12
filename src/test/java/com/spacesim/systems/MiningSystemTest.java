@@ -11,394 +11,361 @@ import com.spacesim.components.MiningComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.EconomicLedger;
+import com.spacesim.economy.Money;
 import com.spacesim.model.ShipType;
 import org.junit.jupiter.api.Test;
-
-import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MiningSystemTest {
-    private static final double EPSILON = 0.000001d;
-
     @Test
-    void выбираетБлижайшийАстероидИЛетитДоРадиусаДобычи() {
-        MiningFixture fixture = fixture(20, 2f, 10f, 5f);
-        Entity far = asteroid("FAR", 100f, 0f, 20L);
-        Entity near = asteroid("NEAR", 30f, 0f, 20L);
-        fixture.engine.addEntity(far);
-        fixture.engine.addEntity(near);
+    void извлечениеПереноситРесурсИзАстероидаВТрюмБезСозданияТовара() {
+        EconomicLedger ledger = new EconomicLedger();
+        Engine engine = engine(ledger);
+        Entity miner = miner("Miner", 0f, 10, 2f, 100d);
+        Entity asteroid = asteroid("A-1", 0f, 10L);
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
 
-        fixture.engine.update(0f);
-        assertEquals(MiningComponent.State.TRAVEL_TO_ASTEROID, fixture.mining.state);
-        assertSame(near, fixture.mining.targetAsteroid);
+        long resourceBefore = resourcePool(miner, asteroid);
+        engine.update(0f); // search
+        engine.update(0f); // arrive
+        engine.update(1f); // mine two units
 
-        fixture.engine.update(1f);
-        assertEquals(10f, fixture.transform.position.x, 0.0001f);
-        assertEquals(10f, fixture.transform.velocity.x, 0.0001f);
-        assertEquals(MiningComponent.State.TRAVEL_TO_ASTEROID, fixture.mining.state);
-
-        fixture.engine.update(2f);
-        assertEquals(25f, fixture.transform.position.x, 0.0001f);
-        assertEquals(0f, fixture.transform.velocity.len2(), 0f);
-        assertEquals(MiningComponent.State.MINING, fixture.mining.state);
-        assertEquals(0, fixture.inventory.getTotalStock());
+        assertEquals(resourceBefore, resourcePool(miner, asteroid));
+        assertEquals(8L, asteroid.getComponent(AsteroidComponent.class).remainingResource);
+        assertEquals(2, inventory(miner).stock[Constants.ITEM_ORE]);
+        assertEquals(2L, mining(miner).totalMined);
+        assertEquals(0, ledger.size());
     }
 
     @Test
-    void конечныйЗапасИстощаетсяУдаляетсяИДоставляетсяНаРынок() {
-        MiningFixture fixture = fixture(20, 2f, 50f, 0f);
-        Entity source = asteroid("ONE", 0f, 0f, 3L);
-        Entity base = market("Рудный терминал", 0f, 0f, 100, 5f);
-        fixture.engine.addEntity(source);
-        fixture.engine.addEntity(base);
-        advanceToMining(fixture.engine);
+    void полныйЦиклДобычиИПродажиСохраняетДеньгиИЗаписываетTrade() {
+        EconomicLedger ledger = new EconomicLedger();
+        Engine engine = engine(ledger);
+        Entity base = base("Base", 0f, 10f, 1_000d, 0, 100);
+        Entity miner = miner("Miner", 0f, 2, 2f, 100d);
+        Entity asteroid = asteroid("A-1", 0f, 10L);
+        mining(miner).homeBase = base;
+        engine.addEntity(base);
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
 
-        fixture.engine.update(0.25f);
-        assertEquals(0, fixture.inventory.stock[Constants.ITEM_ORE]);
-        assertEquals(0.5d, fixture.mining.extractionRemainder, EPSILON);
+        long moneyBefore = wallet(base).getBalanceMilliCredits() + wallet(miner).getBalanceMilliCredits();
 
-        fixture.engine.update(1.25f);
-        assertEquals(3, fixture.inventory.stock[Constants.ITEM_ORE]);
-        assertEquals(3L, fixture.mining.totalMined);
-        assertEquals(0d, fixture.mining.extractionRemainder, 0d);
-        assertEquals(MiningComponent.State.RETURNING_TO_BASE, fixture.mining.state);
-        assertNull(fixture.mining.targetAsteroid);
-        assertEquals(0, fixture.engine.getEntitiesFor(
-                Family.all(AsteroidComponent.class).get()).size());
+        engine.update(0f); // search
+        engine.update(0f); // arrive asteroid
+        engine.update(1f); // cargo full -> returning
+        assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
+        engine.update(0f); // arrive base
+        assertEquals(MiningComponent.State.UNLOADING, mining(miner).state);
+        engine.update(0f); // sell
 
-        fixture.engine.update(0f);
-        assertEquals(MiningComponent.State.UNLOADING, fixture.mining.state);
-        MarketComponent market = base.getComponent(MarketComponent.class);
-        market.isDirty = false;
-        fixture.engine.update(0f);
-
-        assertEquals(MiningComponent.State.SEARCHING, fixture.mining.state);
-        assertEquals(0, fixture.inventory.stock[Constants.ITEM_ORE]);
-        assertEquals(3, base.getComponent(InventoryComponent.class).stock[Constants.ITEM_ORE]);
-        assertEquals(15f, fixture.mining.credits, 0.0001f);
-        assertEquals(3L, fixture.mining.totalDelivered);
-        assertTrue(market.isDirty);
+        assertEquals(0, inventory(miner).stock[Constants.ITEM_ORE]);
+        assertEquals(2, inventory(base).stock[Constants.ITEM_ORE]);
+        assertEquals(Money.fromCredits(120d), wallet(miner).getBalanceMilliCredits());
+        assertEquals(Money.fromCredits(980d), wallet(base).getBalanceMilliCredits());
+        assertEquals(moneyBefore,
+                wallet(base).getBalanceMilliCredits() + wallet(miner).getBalanceMilliCredits());
+        assertEquals(2L, mining(miner).totalDelivered);
+        assertEquals(MiningComponent.State.SEARCHING, mining(miner).state);
+        assertEquals(1, ledger.size());
     }
 
     @Test
-    void полныйТрюмПрерываетДобычуНоНеУдаляетБогатыйИсточник() {
-        MiningFixture fixture = fixture(2, 10f, 10f, 0f);
-        Entity source = asteroid("RICH", 0f, 0f, 100L);
-        Entity base = market("База", 40f, 0f, 100, 2f);
-        fixture.engine.addEntity(source);
-        fixture.engine.addEntity(base);
-        advanceToMining(fixture.engine);
+    void истощённыйАстероидУдаляетсяИзДвижкаПослеФизическогоПереноса() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Miner", 0f, 10, 5f, 100d);
+        Entity asteroid = asteroid("A-1", 0f, 1L);
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
 
-        fixture.engine.update(1f);
-        assertEquals(2, fixture.inventory.stock[Constants.ITEM_ORE]);
-        assertEquals(98L, source.getComponent(AsteroidComponent.class).remainingResource);
-        assertEquals(MiningComponent.State.RETURNING_TO_BASE, fixture.mining.state);
+        engine.update(0f);
+        engine.update(0f);
+        engine.update(1f);
 
-        fixture.engine.update(2f);
-        assertEquals(20f, fixture.transform.position.x, 0.0001f);
-        fixture.engine.update(2f);
-        assertEquals(40f, fixture.transform.position.x, 0.0001f);
-        assertEquals(MiningComponent.State.UNLOADING, fixture.mining.state);
-        fixture.engine.update(0f);
-
-        assertEquals(0, fixture.inventory.getTotalStock());
-        assertEquals(2, base.getComponent(InventoryComponent.class).stock[Constants.ITEM_ORE]);
-        assertEquals(4f, fixture.mining.credits, 0.0001f);
-        assertEquals(2L, fixture.mining.totalDelivered);
-        assertEquals(MiningComponent.State.SEARCHING, fixture.mining.state);
+        assertEquals(1, inventory(miner).stock[Constants.ITEM_ORE]);
+        assertEquals(1L, mining(miner).totalMined);
+        assertFalse(engine.getEntitiesFor(Family.all(AsteroidComponent.class).get()).contains(asteroid, true));
+        assertNull(mining(miner).targetAsteroid);
+        assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
     }
 
     @Test
-    void безНазначеннойБазыВыбираетБлижайшийПригодныйРынок() {
-        MiningFixture fixture = fixture(10, 1f, 100f, 0f);
-        fixture.inventory.stock[Constants.ITEM_ORE] = 5;
-        fixture.mining.state = MiningComponent.State.RETURNING_TO_BASE;
-        Entity invalidNear = market("Нет цены", 2f, 0f, 100, 0f);
-        Entity validFar = market("Покупатель", 8f, 0f, 100, 3f);
-        fixture.engine.addEntity(invalidNear);
-        fixture.engine.addEntity(validFar);
+    void базаБезДенегНеВыбираетсяДляВозврата() {
+        Engine engine = engine(new EconomicLedger());
+        Entity poorBase = base("Poor", 0f, 10f, 5d, 0, 100);
+        Entity miner = miner("Miner", 0f, 10, 1f, 100d);
+        inventory(miner).stock[Constants.ITEM_ORE] = 1;
+        mining(miner).state = MiningComponent.State.RETURNING_TO_BASE;
+        mining(miner).homeBase = poorBase;
+        engine.addEntity(poorBase);
+        engine.addEntity(miner);
 
-        fixture.engine.update(0.1f);
-        assertSame(validFar, fixture.mining.homeBase);
-        assertEquals(MiningComponent.State.UNLOADING, fixture.mining.state);
-        fixture.engine.update(0f);
+        engine.update(0f);
 
-        assertEquals(0, fixture.inventory.getTotalStock());
-        assertEquals(5, validFar.getComponent(InventoryComponent.class)
-                .stock[Constants.ITEM_ORE]);
-        assertEquals(0, invalidNear.getComponent(InventoryComponent.class)
-                .stock[Constants.ITEM_ORE]);
-        assertEquals(15f, fixture.mining.credits, 0.0001f);
+        assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
+        assertNull(mining(miner).homeBase);
+        assertEquals(1, inventory(miner).stock[Constants.ITEM_ORE]);
     }
 
     @Test
-    void частичнаяРазгрузкаПродолжаетсяНаДругомРынке() {
-        MiningFixture fixture = fixture(10, 1f, 100f, 0f);
-        fixture.inventory.stock[Constants.ITEM_ORE] = 5;
-        fixture.mining.state = MiningComponent.State.RETURNING_TO_BASE;
-        Entity smallBase = market("Малый склад", 0f, 0f, 2, 2f);
-        Entity largeBase = market("Большой склад", 5f, 0f, 20, 4f);
-        fixture.engine.addEntity(smallBase);
-        fixture.engine.addEntity(largeBase);
+    void приНеплатёжеспособнойПредпочтительнойБазеВыбираетДругую() {
+        Engine engine = engine(new EconomicLedger());
+        Entity poor = base("Poor", 1f, 10f, 1d, 0, 100);
+        Entity good = base("Good", 5f, 10f, 100d, 0, 100);
+        Entity miner = miner("Miner", 0f, 10, 1f, 0d);
+        inventory(miner).stock[Constants.ITEM_ORE] = 1;
+        mining(miner).state = MiningComponent.State.RETURNING_TO_BASE;
+        mining(miner).homeBase = poor;
+        engine.addEntity(poor);
+        engine.addEntity(good);
+        engine.addEntity(miner);
 
-        fixture.engine.update(0f);
-        fixture.engine.update(0f);
-        assertEquals(2, smallBase.getComponent(InventoryComponent.class)
-                .stock[Constants.ITEM_ORE]);
-        assertEquals(3, fixture.inventory.stock[Constants.ITEM_ORE]);
-        assertEquals(MiningComponent.State.RETURNING_TO_BASE, fixture.mining.state);
+        engine.update(0f);
 
-        fixture.engine.update(0.1f);
-        assertSame(largeBase, fixture.mining.homeBase);
-        assertEquals(MiningComponent.State.UNLOADING, fixture.mining.state);
-        fixture.engine.update(0f);
-
-        assertEquals(0, fixture.inventory.getTotalStock());
-        assertEquals(3, largeBase.getComponent(InventoryComponent.class)
-                .stock[Constants.ITEM_ORE]);
-        assertEquals(16f, fixture.mining.credits, 0.0001f);
-        assertEquals(5L, fixture.mining.totalDelivered);
+        assertSame(good, mining(miner).homeBase);
+        assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
     }
 
     @Test
-    void исчезновениеЦелиВПолётеБезопасноПерезапускаетАвтомат() {
-        MiningFixture fixture = fixture(10, 1f, 10f, 0f);
-        Entity source = asteroid("TEMP", 100f, 0f, 10L);
-        fixture.engine.addEntity(source);
-        fixture.engine.update(0f);
-        fixture.engine.removeEntity(source);
+    void базаСОграниченнойЛиквидностьюПокупаетТолькоОплачиваемуюЧасть() {
+        EconomicLedger ledger = new EconomicLedger();
+        Engine engine = engine(ledger);
+        Entity base = base("Base", 0f, 10f, 15d, 0, 100);
+        Entity miner = miner("Miner", 0f, 10, 1f, 0d);
+        inventory(miner).stock[Constants.ITEM_ORE] = 3;
+        mining(miner).state = MiningComponent.State.UNLOADING;
+        mining(miner).homeBase = base;
+        engine.addEntity(base);
+        engine.addEntity(miner);
 
-        fixture.engine.update(1f);
-        assertEquals(MiningComponent.State.SEARCHING, fixture.mining.state);
-        assertNull(fixture.mining.targetAsteroid);
-        assertEquals(0f, fixture.transform.position.x, 0f);
+        engine.update(0f);
 
-        fixture.inventory.stock[Constants.ITEM_ORE] = 1;
-        fixture.mining.targetAsteroid = source;
-        fixture.mining.state = MiningComponent.State.TRAVEL_TO_ASTEROID;
-        fixture.engine.update(0f);
-        assertEquals(MiningComponent.State.RETURNING_TO_BASE, fixture.mining.state);
+        assertEquals(2, inventory(miner).stock[Constants.ITEM_ORE]);
+        assertEquals(1, inventory(base).stock[Constants.ITEM_ORE]);
+        assertEquals(Money.fromCredits(10d), wallet(miner).getBalanceMilliCredits());
+        assertEquals(Money.fromCredits(5d), wallet(base).getBalanceMilliCredits());
+        assertEquals(1L, mining(miner).totalDelivered);
+        assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
+        assertNull(mining(miner).homeBase);
+        assertEquals(1, ledger.size());
     }
 
     @Test
-    void безАстероидаРесурсБольшеНеПоявляетсяИзПустоты() {
-        MiningFixture fixture = fixture(100, 10f, 100f, 10f);
+    void заполненнаяБазаНеВыбирается() {
+        Engine engine = engine(new EconomicLedger());
+        Entity full = base("Full", 0f, 10f, 1_000d, 100, 100);
+        Entity miner = miner("Miner", 0f, 10, 1f, 100d);
+        inventory(miner).stock[Constants.ITEM_ORE] = 1;
+        mining(miner).state = MiningComponent.State.RETURNING_TO_BASE;
+        mining(miner).homeBase = full;
+        engine.addEntity(full);
+        engine.addEntity(miner);
 
-        fixture.engine.update(1000f);
+        engine.update(0f);
 
-        assertEquals(0, fixture.inventory.getTotalStock());
-        assertEquals(0L, fixture.mining.totalMined);
-        assertEquals(MiningComponent.State.SEARCHING, fixture.mining.state);
+        assertNull(mining(miner).homeBase);
+        assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
     }
 
     @Test
-    void несколькоКораблейНеМогутИзвлечьБольшеОбщегоОстатка() {
-        Engine engine = new Engine();
-        engine.addSystem(new MiningSystem());
-        MiningFixture first = addMiner(engine, 10, 10f, 10f, 0f);
-        MiningFixture second = addMiner(engine, 10, 10f, 10f, 0f);
-        Entity source = asteroid("SHARED", 0f, 0f, 3L);
-        engine.addEntity(source);
-        advanceToMining(engine);
+    void поискВыбираетБлижайшийСовместимыйАстероид() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Miner", 0f, 10, 1f, 100d);
+        Entity far = asteroid("Far", 100f, 10L);
+        Entity near = asteroid("Near", 10f, 10L);
+        engine.addEntity(miner);
+        engine.addEntity(far);
+        engine.addEntity(near);
+
+        engine.update(0f);
+
+        assertSame(near, mining(miner).targetAsteroid);
+        assertEquals(MiningComponent.State.TRAVEL_TO_ASTEROID, mining(miner).state);
+    }
+
+    @Test
+    void нулеваяСкоростьНеТелепортируетКорабль() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Miner", 0f, 10, 1f, 100d);
+        Entity asteroid = asteroid("A", 100f, 10L);
+        mining(miner).movementSpeed = 0f;
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
+        engine.update(0f);
+        engine.update(5f);
+
+        assertEquals(0f, transform(miner).position.x, 0f);
+        assertEquals(MiningComponent.State.TRAVEL_TO_ASTEROID, mining(miner).state);
+    }
+
+    @Test
+    void выключенноеОборудованиеПереходитВPausedИНеМеняетРесурсы() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Miner", 0f, 10, 2f, 100d);
+        Entity asteroid = asteroid("A", 0f, 10L);
+        mining(miner).active = false;
+        transform(miner).velocity.set(5f, 5f);
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
 
         engine.update(1f);
 
-        assertEquals(3,
-                first.inventory.stock[Constants.ITEM_ORE]
-                        + second.inventory.stock[Constants.ITEM_ORE]);
-        assertEquals(3L, first.mining.totalMined + second.mining.totalMined);
-        assertEquals(0, engine.getEntitiesFor(Family.all(AsteroidComponent.class).get()).size());
+        assertEquals(MiningComponent.State.PAUSED, mining(miner).state);
+        assertEquals(0, inventory(miner).stock[Constants.ITEM_ORE]);
+        assertEquals(10L, asteroid.getComponent(AsteroidComponent.class).remainingResource);
+        assertEquals(0f, transform(miner).velocity.len2(), 0f);
     }
 
     @Test
-    void огромныйШагОграниченТрюмомИНеПереполняетЧисла() {
-        MiningFixture fixture = fixture(Integer.MAX_VALUE, Float.MAX_VALUE, 0f, 0f);
-        fixture.inventory.stock[Constants.ITEM_ORE] = Integer.MAX_VALUE - 1;
-        Entity source = asteroid("HUGE", 0f, 0f, Long.MAX_VALUE);
-        fixture.engine.addEntity(source);
-        advanceToMining(fixture.engine);
+    void повреждённаяКонфигурацияБезДобываемогоРесурсаБезопасноОстанавливается() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Miner", 0f, 10, 1f, 100d);
+        mining(miner).resourceItem = Constants.ITEM_FOOD;
+        transform(miner).velocity.set(10f, 0f);
+        engine.addEntity(miner);
 
-        assertTimeoutPreemptively(
-                Duration.ofSeconds(1),
-                () -> fixture.engine.update(Float.MAX_VALUE));
+        engine.update(1f);
 
-        assertEquals(Integer.MAX_VALUE, fixture.inventory.stock[Constants.ITEM_ORE]);
-        assertEquals(1L, fixture.mining.totalMined);
-        assertEquals(Long.MAX_VALUE - 1L,
-                source.getComponent(AsteroidComponent.class).remainingResource);
-        assertEquals(0d, fixture.mining.extractionRemainder, 0d);
+        assertEquals(0f, transform(miner).velocity.len2(), 0f);
+        assertEquals(0, inventory(miner).getTotalStock());
     }
 
     @Test
-    void повреждённыйДробныйОстатокНормализуетсяАСтатистикаНасыщается() {
-        double[] invalidRemainders = {
-                -1d, 1d, Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY
-        };
-        for (double invalidRemainder : invalidRemainders) {
-            MiningFixture fixture = fixture(10, 1f, 0f, 0f);
-            fixture.engine.addEntity(asteroid("R-" + invalidRemainder, 0f, 0f, 10L));
-            advanceToMining(fixture.engine);
-            fixture.mining.extractionRemainder = invalidRemainder;
-            fixture.engine.update(0.5f);
-            assertEquals(0.5d, fixture.mining.extractionRemainder, EPSILON);
-            assertEquals(0, fixture.inventory.getTotalStock());
-        }
+    void торговыйАвтоматСПолетомВременноБлокируетДобычу() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Hybrid", 0f, 10, 1f, 100d);
+        TradeAIComponent trade = new TradeAIComponent();
+        trade.state = TradeAIComponent.State.TRAVEL_TO_BUY;
+        miner.add(trade);
+        transform(miner).velocity.set(1f, 0f);
+        Entity asteroid = asteroid("A", 0f, 10L);
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
 
-        MiningFixture saturated = fixture(20, 10f, 0f, 0f);
-        saturated.engine.addEntity(asteroid("SAT", 0f, 0f, 20L));
-        advanceToMining(saturated.engine);
-        saturated.mining.totalMined = Long.MAX_VALUE - 5L;
-        saturated.engine.update(1f);
-        assertEquals(Long.MAX_VALUE, saturated.mining.totalMined);
+        engine.update(1f);
+
+        assertEquals(MiningComponent.State.SEARCHING, mining(miner).state);
+        assertEquals(0, inventory(miner).stock[Constants.ITEM_ORE]);
+        assertEquals(0f, transform(miner).velocity.len2(), 0f);
     }
 
     @Test
-    void выключениеПовреждённаяКонфигурацияИТорговыйПолётБлокируютЦикл() {
-        MiningFixture paused = fixture(10, 2f, 10f, 0f);
-        paused.engine.addEntity(asteroid("P", 10f, 0f, 10L));
-        paused.mining.active = false;
-        paused.engine.update(1f);
-        assertEquals(MiningComponent.State.PAUSED, paused.mining.state);
-        assertEquals(0f, paused.transform.position.x, 0f);
-        paused.mining.active = true;
-        paused.engine.update(0f);
-        assertEquals(MiningComponent.State.TRAVEL_TO_ASTEROID, paused.mining.state);
+    void отрицательныйИНеконечныйDeltaИгнорируются() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Miner", 0f, 10, 1f, 100d);
+        Entity asteroid = asteroid("A", 0f, 10L);
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
 
-        MiningFixture wrongType = fixture(10, 2f, 10f, 0f);
-        wrongType.ship.type = ShipType.COMBAT_SHIP;
-        wrongType.engine.addEntity(asteroid("C", 10f, 0f, 10L));
-        wrongType.engine.update(1f);
-        assertEquals(0f, wrongType.transform.position.x, 0f);
+        engine.update(-1f);
+        engine.update(Float.NaN);
 
-        MiningFixture invalidRate = fixture(10, 2f, 10f, 0f);
-        invalidRate.mining.extractionPerSecond = Float.NaN;
-        invalidRate.engine.addEntity(asteroid("N", 10f, 0f, 10L));
-        invalidRate.engine.update(1f);
-        assertEquals(0f, invalidRate.transform.position.x, 0f);
-
-        MiningFixture trading = fixture(10, 2f, 10f, 0f);
-        TradeAIComponent tradeAI = new TradeAIComponent();
-        tradeAI.state = TradeAIComponent.State.TRAVEL_TO_BUY;
-        trading.entity.add(tradeAI);
-        trading.engine.addEntity(asteroid("T", 10f, 0f, 10L));
-        trading.engine.update(1f);
-        assertEquals(MiningComponent.State.SEARCHING, trading.mining.state);
-        assertEquals(0f, trading.transform.position.x, 0f);
+        assertEquals(MiningComponent.State.SEARCHING, mining(miner).state);
+        assertNull(mining(miner).targetAsteroid);
     }
 
     @Test
-    void некорректноеВремяПолностьюИгнорируется() {
-        MiningFixture fixture = fixture(10, 2f, 10f, 0f);
-        fixture.engine.addEntity(asteroid("D", 10f, 0f, 10L));
-
-        fixture.engine.update(-1f);
-        fixture.engine.update(Float.NaN);
-        fixture.engine.update(Float.NEGATIVE_INFINITY);
-        fixture.engine.update(Float.POSITIVE_INFINITY);
-
-        assertEquals(MiningComponent.State.SEARCHING, fixture.mining.state);
-        assertNull(fixture.mining.targetAsteroid);
-        assertEquals(0f, fixture.transform.position.x, 0f);
+    void дробнаяПроизводительностьНакопляетОстатокДоЦелойЕдиницы() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Miner", 0f, 10, 0.5f, 100d);
+        Entity asteroid = asteroid("A", 0f, 10L);
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
+        engine.update(0f);
+        engine.update(0f);
+        engine.update(1f);
+        assertEquals(0, inventory(miner).stock[Constants.ITEM_ORE]);
+        assertEquals(0.5d, mining(miner).extractionRemainder, 1e-12);
+        engine.update(1f);
+        assertEquals(1, inventory(miner).stock[Constants.ITEM_ORE]);
+        assertEquals(0d, mining(miner).extractionRemainder, 1e-12);
     }
 
-    @Test
-    void рынокБезПоложительнойЦеныНеПолучаетБесплатныйРесурс() {
-        MiningFixture fixture = fixture(10, 1f, 10f, 0f);
-        fixture.inventory.stock[Constants.ITEM_ORE] = 4;
-        fixture.mining.state = MiningComponent.State.RETURNING_TO_BASE;
-        Entity base = market("Некорректный рынок", 0f, 0f, 100, Float.NaN);
-        fixture.engine.addEntity(base);
-
-        fixture.engine.update(0f);
-        fixture.engine.update(0f);
-
-        assertEquals(4, fixture.inventory.stock[Constants.ITEM_ORE]);
-        assertEquals(0, base.getComponent(InventoryComponent.class)
-                .stock[Constants.ITEM_ORE]);
-        assertEquals(0f, fixture.mining.credits, 0f);
-        assertEquals(MiningComponent.State.RETURNING_TO_BASE, fixture.mining.state);
-        assertFalse(base.getComponent(MarketComponent.class).isDirty);
-    }
-
-    private MiningFixture fixture(
-            int capacity,
-            float extractionPerSecond,
-            float movementSpeed,
-            float extractionRange) {
+    private Engine engine(EconomicLedger ledger) {
         Engine engine = new Engine();
-        engine.addSystem(new MiningSystem());
-        return addMiner(engine, capacity, extractionPerSecond, movementSpeed, extractionRange);
+        engine.addSystem(new MiningSystem(ledger));
+        return engine;
     }
 
-    private MiningFixture addMiner(
-            Engine engine,
-            int capacity,
-            float extractionPerSecond,
-            float movementSpeed,
-            float extractionRange) {
-        ShipComponent ship = new ShipComponent(ShipType.MINING_SHIP);
-        MiningComponent mining = new MiningComponent(Constants.ITEM_ORE, extractionPerSecond);
-        mining.movementSpeed = movementSpeed;
-        mining.extractionRange = extractionRange;
-        mining.dockingRange = 0f;
+    private Entity miner(String name, float x, int capacity, float extractionRate, double credits) {
+        TransformComponent transform = new TransformComponent();
+        transform.position.set(x, 0f);
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = capacity;
-        TransformComponent transform = new TransformComponent();
-
-        Entity entity = new Entity()
-                .add(new IdentityComponent("Добытчик", IdentityComponent.Kind.FLEET))
-                .add(ship)
-                .add(mining)
-                .add(inventory)
-                .add(transform);
-        engine.addEntity(entity);
-        return new MiningFixture(engine, entity, ship, mining, inventory, transform);
-    }
-
-    private Entity asteroid(String pointId, float x, float y, long resource) {
-        TransformComponent transform = new TransformComponent();
-        transform.position.set(x, y);
+        MiningComponent mining = new MiningComponent(Constants.ITEM_ORE, extractionRate);
+        mining.movementSpeed = 100f;
+        mining.extractionRange = 1f;
+        mining.dockingRange = 1f;
         return new Entity()
-                .add(new IdentityComponent("Астероид " + pointId, IdentityComponent.Kind.ASTEROID))
+                .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
-                .add(new AsteroidComponent(pointId, Constants.ITEM_ORE, resource));
+                .add(inventory)
+                .add(new WalletComponent(Money.fromCredits(credits)))
+                .add(new ShipComponent(ShipType.MINING_SHIP))
+                .add(mining);
     }
 
-    private Entity market(String name, float x, float y, int capacity, float buyPrice) {
+    private Entity asteroid(String name, float x, long resource) {
         TransformComponent transform = new TransformComponent();
-        transform.position.set(x, y);
+        transform.position.set(x, 0f);
+        return new Entity()
+                .add(new IdentityComponent(name, IdentityComponent.Kind.ASTEROID))
+                .add(transform)
+                .add(new AsteroidComponent(name, Constants.ITEM_ORE, resource));
+    }
+
+    private Entity base(
+            String name,
+            float x,
+            float buyPrice,
+            double credits,
+            int oreStock,
+            int capacity) {
+        TransformComponent transform = new TransformComponent();
+        transform.position.set(x, 0f);
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = capacity;
+        inventory.stock[Constants.ITEM_ORE] = oreStock;
         MarketComponent market = new MarketComponent();
         market.configureTradableItem(Constants.ITEM_ORE, Math.max(1, capacity), 0f);
         market.buyPrices[Constants.ITEM_ORE] = buyPrice;
-        market.sellPrices[Constants.ITEM_ORE] = Math.max(1f, buyPrice + 1f);
+        market.sellPrices[Constants.ITEM_ORE] = buyPrice * 1.1f;
         market.isDirty = false;
         return new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.STATION))
                 .add(transform)
                 .add(inventory)
-                .add(market);
+                .add(market)
+                .add(new WalletComponent(Money.fromCredits(credits)));
     }
 
-    private void advanceToMining(Engine engine) {
-        engine.update(0f);
-        engine.update(0f);
+    private MiningComponent mining(Entity entity) {
+        return entity.getComponent(MiningComponent.class);
     }
 
-    private record MiningFixture(
-            Engine engine,
-            Entity entity,
-            ShipComponent ship,
-            MiningComponent mining,
-            InventoryComponent inventory,
-            TransformComponent transform) {
+    private InventoryComponent inventory(Entity entity) {
+        return entity.getComponent(InventoryComponent.class);
+    }
+
+    private WalletComponent wallet(Entity entity) {
+        return entity.getComponent(WalletComponent.class);
+    }
+
+    private TransformComponent transform(Entity entity) {
+        return entity.getComponent(TransformComponent.class);
+    }
+
+    private long resourcePool(Entity miner, Entity asteroid) {
+        return inventory(miner).stock[Constants.ITEM_ORE]
+                + asteroid.getComponent(AsteroidComponent.class).remainingResource;
     }
 }

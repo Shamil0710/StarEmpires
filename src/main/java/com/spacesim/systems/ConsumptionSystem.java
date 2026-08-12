@@ -1,60 +1,68 @@
 package com.spacesim.systems;
 
+import com.badlogic.ashley.core.ComponentMapper;
+import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
-import com.badlogic.ashley.core.*;
-import com.spacesim.components.*;
+import com.spacesim.components.IdentityComponent;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
+import com.spacesim.components.TransformComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.EconomyEvent;
 import com.spacesim.events.GlobalEventManager;
+
+import java.util.Objects;
 
 /**
  * Уменьшает запасы товаров в соответствии с базовой скоростью потребления рынка.
  *
- * <p>Система обрабатывает сущности, у которых одновременно присутствуют инвентарь, рынок и
- * положение в мире. Для каждого товара величина потребления вычисляется как произведение базовой
- * скорости, прошедшего времени и множителей всех действующих в этой точке экономических событий.
- * Множители нескольких событий перемножаются.</p>
- *
- * <p>Поскольку запасы представлены целыми единицами, дробная часть результата сохраняется в
- * {@link MarketComponent#consumptionRemainder}. Как только накопленное значение достигает целой
- * единицы, из инвентаря списывается доступное количество, а неиспользованный временной остаток
- * переносится на следующий кадр. Фактическое изменение запаса устанавливает
- * {@link MarketComponent#isDirty}, чтобы {@link MarketSystem} пересчитал цены.</p>
- *
- * <p>Неконечное или неположительное время кадра игнорируется. Для отсутствующего запаса либо
- * некорректной базовой скорости накопленный остаток соответствующего товара сбрасывается.</p>
+ * <p>Фактически списанные единицы являются явным {@code RESOURCE_SINK} и записываются в
+ * {@link EconomicLedger}. Дробная часть потребления сохраняется в
+ * {@link MarketComponent#consumptionRemainder}, поэтому частота вызовов не меняет итоговую скорость.</p>
  */
 public class ConsumptionSystem extends IteratingSystem {
-    /** Менеджер событий, задающих пространственные множители потребления. */
     private final GlobalEventManager eventManager;
+    private final EconomicLedger ledger;
 
-    /** Быстрый доступ к инвентарю обрабатываемой сущности. */
-    private ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
-    /** Быстрый доступ к параметрам рынка и накопленным дробным остаткам. */
-    private ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
-    /** Быстрый доступ к мировой позиции, необходимой для проверки областей событий. */
-    private ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
+    private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
+    private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
+    private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
+    private final ComponentMapper<IdentityComponent> identityMapper = ComponentMapper.getFor(IdentityComponent.class);
 
     /**
-     * Создаёт систему потребления.
+     * Создаёт систему с собственным диагностическим ledger.
      *
-     * @param eventManager менеджер, предоставляющий актуальный список экономических событий;
-     *                     во время работы системы не должен быть {@code null}
+     * @param eventManager менеджер экономических событий
      */
     public ConsumptionSystem(GlobalEventManager eventManager) {
+        this(eventManager, new EconomicLedger());
+    }
+
+    /**
+     * Создаёт систему, записывающую потребление в общий журнал игровой сессии.
+     *
+     * @param eventManager менеджер экономических событий
+     * @param ledger общий экономический журнал
+     * @throws NullPointerException если зависимость не задана
+     */
+    public ConsumptionSystem(GlobalEventManager eventManager, EconomicLedger ledger) {
         super(Family.all(InventoryComponent.class, MarketComponent.class, TransformComponent.class).get());
-        this.eventManager = eventManager;
+        this.eventManager = Objects.requireNonNull(eventManager, "GlobalEventManager не задан");
+        this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");
+    }
+
+    /** @return ledger, в который записываются фактические resource sink операции */
+    public EconomicLedger getLedger() {
+        return ledger;
     }
 
     /**
      * Применяет накопившееся потребление к одной подходящей сущности.
      *
-     * <p>Метод вызывается Ashley только для сущностей семейства системы. Списание ограничивается
-     * текущим запасом, поэтому значение в инвентаре не становится отрицательным.</p>
-     *
-     * @param entity сущность с компонентами {@link InventoryComponent}, {@link MarketComponent}
-     *               и {@link TransformComponent}
-     * @param deltaTime прошедшее с предыдущего обновления время в секундах
+     * @param entity сущность рынка
+     * @param deltaTime прошедшее игровое время в секундах
      */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
@@ -66,56 +74,54 @@ public class ConsumptionSystem extends IteratingSystem {
         MarketComponent market = mm.get(entity);
         TransformComponent transform = tm.get(entity);
 
-        for (int i = 0; i < Constants.MAX_ITEMS; i++) {
-            if (inv.stock[i] <= 0) {
-                market.consumptionRemainder[i] = 0d;
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            if (inv.stock[itemId] <= 0) {
+                market.consumptionRemainder[itemId] = 0d;
                 continue;
             }
 
-            float baseConsumption = market.baseConsumption[i];
+            float baseConsumption = market.baseConsumption[itemId];
             if (!Float.isFinite(baseConsumption) || baseConsumption <= 0f) {
-                market.consumptionRemainder[i] = 0d;
+                market.consumptionRemainder[itemId] = 0d;
                 continue;
             }
 
-            float multiplier = getConsumptionMultiplier(i, transform);
+            float multiplier = getConsumptionMultiplier(itemId, transform);
             if (!Float.isFinite(multiplier) || multiplier <= 0f) {
                 continue;
             }
 
-            double accumulatedConsumption = market.consumptionRemainder[i]
+            double accumulatedConsumption = market.consumptionRemainder[itemId]
                     + (double) baseConsumption * multiplier * deltaTime;
             if (!Double.isFinite(accumulatedConsumption)) {
-                market.consumptionRemainder[i] = 0d;
+                market.consumptionRemainder[itemId] = 0d;
                 continue;
             }
 
             double wholeConsumption = Math.floor(accumulatedConsumption);
             if (wholeConsumption < 1d) {
-                market.consumptionRemainder[i] = accumulatedConsumption;
+                market.consumptionRemainder[itemId] = accumulatedConsumption;
                 continue;
             }
 
             int unitsToConsume = wholeConsumption >= Integer.MAX_VALUE
                     ? Integer.MAX_VALUE
                     : (int) wholeConsumption;
-            int consumedUnits = Math.min(inv.stock[i], unitsToConsume);
-            inv.stock[i] -= consumedUnits;
-            market.consumptionRemainder[i] = accumulatedConsumption - wholeConsumption;
+            int consumedUnits = Math.min(inv.stock[itemId], unitsToConsume);
+            inv.stock[itemId] -= consumedUnits;
+            market.consumptionRemainder[itemId] = accumulatedConsumption - wholeConsumption;
 
             if (consumedUnits > 0) {
                 market.isDirty = true;
+                ledger.recordResourceSink(
+                        entityName(entity),
+                        itemId,
+                        consumedUnits,
+                        "market-consumption");
             }
         }
     }
 
-    /**
-     * Вычисляет совокупный множитель потребления для товара в позиции сущности.
-     *
-     * @param itemId идентификатор товара
-     * @param transform положение потребляющей сущности
-     * @return произведение множителей всех влияющих событий или {@code 1.0f}, если таких событий нет
-     */
     private float getConsumptionMultiplier(int itemId, TransformComponent transform) {
         float multiplier = 1.0f;
         for (EconomyEvent event : eventManager.getActiveEvents()) {
@@ -124,5 +130,12 @@ public class ConsumptionSystem extends IteratingSystem {
             }
         }
         return multiplier;
+    }
+
+    private String entityName(Entity entity) {
+        IdentityComponent identity = identityMapper.get(entity);
+        return identity == null || identity.name == null || identity.name.isBlank()
+                ? "UNIDENTIFIED"
+                : identity.name;
     }
 }

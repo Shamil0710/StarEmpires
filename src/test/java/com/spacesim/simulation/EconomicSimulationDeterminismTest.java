@@ -9,7 +9,9 @@ import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.EconomyEvent;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.model.AsteroidSpawnConfig;
@@ -58,6 +60,7 @@ class EconomicSimulationDeterminismTest {
         GlobalEventManager events = new GlobalEventManager(random.createStream("economy-events"), 0.5d);
         Engine engine = new Engine();
         SpatialHashGrid grid = new SpatialHashGrid(Constants.CELL_SIZE);
+        EconomicLedger ledger = new EconomicLedger();
 
         engine.addSystem(new MarketSystem(events));
         engine.addSystem(new ConsumptionSystem(events));
@@ -65,8 +68,8 @@ class EconomicSimulationDeterminismTest {
         engine.addSystem(new AsteroidSpawnSystem(
                 AsteroidSpawnConfig.demoWorld(),
                 random.createStream("asteroid-spawn")));
-        engine.addSystem(new MiningSystem());
-        engine.addSystem(new TradeAISystem(grid));
+        engine.addSystem(new MiningSystem(ledger));
+        engine.addSystem(new TradeAISystem(grid, ledger));
         engine.addSystem(new PriceRecorderSystem());
 
         for (Entity entity : DemoWorldFactory.createEntities()) {
@@ -75,14 +78,15 @@ class EconomicSimulationDeterminismTest {
 
         SimulationClock clock = new SimulationClock(FIXED_STEP);
         SimulationLoop loop = new SimulationLoop(clock, events, engine);
-        return new Fixture(engine, events, clock, loop);
+        return new Fixture(engine, events, clock, loop, ledger);
     }
 
     private String snapshot(Fixture fixture) {
         StringBuilder snapshot = new StringBuilder();
         snapshot.append("tick=").append(fixture.clock.getTick())
                 .append(";eventTime=").append(Double.doubleToLongBits(fixture.events.getSimulationTimeSeconds()))
-                .append(";eventRevision=").append(fixture.events.getEventRevision()).append('\n');
+                .append(";eventRevision=").append(fixture.events.getEventRevision())
+                .append(";ledgerSize=").append(fixture.ledger.size()).append('\n');
 
         for (EconomyEvent event : fixture.events.getActiveEvents()) {
             snapshot.append("event=")
@@ -115,6 +119,11 @@ class EconomicSimulationDeterminismTest {
                 snapshot.append(";stock=").append(Arrays.toString(inventory.stock));
             }
 
+            WalletComponent wallet = entity.getComponent(WalletComponent.class);
+            if (wallet != null) {
+                snapshot.append(";wallet=").append(wallet.getBalanceMilliCredits());
+            }
+
             MarketComponent market = entity.getComponent(MarketComponent.class);
             if (market != null) {
                 snapshot.append(";sell=").append(floatBits(market.sellPrices))
@@ -128,8 +137,7 @@ class EconomicSimulationDeterminismTest {
                         .append(',').append(trade.targetItem)
                         .append(',').append(trade.targetAmount)
                         .append(',').append(trade.specializedItem)
-                        .append(',').append(Float.floatToIntBits(trade.credits))
-                        .append(',').append(Float.floatToIntBits(trade.expectedProfit))
+                        .append(',').append(trade.expectedProfitMilliCredits)
                         .append(',').append(identityName(trade.buyStation))
                         .append(',').append(identityName(trade.sellStation))
                         .append(',').append(identityName(trade.targetStation));
@@ -169,6 +177,7 @@ class EconomicSimulationDeterminismTest {
             Engine engine,
             GlobalEventManager events,
             SimulationClock clock,
-            SimulationLoop loop) {
+            SimulationLoop loop,
+            EconomicLedger ledger) {
     }
 }

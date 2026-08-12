@@ -19,7 +19,9 @@ import com.spacesim.components.ReputationComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.Money;
 import com.spacesim.model.ItemType;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
@@ -29,18 +31,12 @@ import java.util.Objects;
 import java.util.StringJoiner;
 
 /**
- * Прокручиваемая правая карточка выбранной станции или торгового корабля.
+ * Прокручиваемая правая карточка выбранной станции или корабля.
  *
- * <p>Карточка показывает понятное имя, тип и координаты сущности, а затем
- * добавляет разделы только для фактически установленных ECS-компонентов. Такой
- * подход позволяет безопасно выбирать ещё не полностью сконструированную
- * сущность. Текст можно актуализировать методом {@link #refresh()} после
- * очередного шага симуляции, не меняя сам выбор.</p>
- *
- * <p>Внешняя таблица занимает сцену и закрепляет непрозрачную панель VisUI у
- * правого края. {@link #RECOMMENDED_WIDTH} можно использовать при расчёте
- * доступной области интерактивной карты, чтобы объекты не оказывались под
- * карточкой. Класс не владеет переданным {@link Skin} и не освобождает его.</p>
+ * <p>Карточка показывает понятное имя, тип и координаты сущности, а затем добавляет разделы только
+ * для фактически установленных ECS-компонентов. Денежный баланс читается исключительно из
+ * {@link WalletComponent}, поэтому интерфейс использует тот же authoritative state, что и торговые
+ * системы.</p>
  */
 public class EntityDetailsUI extends Table {
     /** Рекомендуемая ширина карточки и резервируемой под неё области, в пикселях интерфейса. */
@@ -57,10 +53,6 @@ public class EntityDetailsUI extends Table {
 
     /**
      * Создаёт пустую карточку и закрепляет её у правого края сцены.
-     *
-     * <p>Переданный скин должен быть загруженным скином VisUI: из него берутся
-     * подписи, полоса прокрутки и непрозрачный фон {@code window}. До первого
-     * выбора карточка содержит краткую инструкцию пользователю.</p>
      *
      * @param skin загруженный скин VisUI; не {@code null}
      * @throws NullPointerException если {@code skin == null}
@@ -102,10 +94,9 @@ public class EntityDetailsUI extends Table {
     }
 
     /**
-     * Выбирает сущность, немедленно перестраивает карточку и возвращает
-     * прокрутку к её началу.
+     * Выбирает сущность, немедленно перестраивает карточку и возвращает прокрутку к её началу.
      *
-     * @param entity выбранная станция или корабль; {@code null} снимает выбор
+     * @param entity выбранная сущность; {@code null} снимает выбор
      */
     public void select(Entity entity) {
         selectedEntity = entity;
@@ -113,12 +104,7 @@ public class EntityDetailsUI extends Table {
         scrollPane.setScrollY(0f);
     }
 
-    /**
-     * Обновляет текст из текущего состояния ранее выбранной сущности.
-     *
-     * <p>Положение прокрутки сохраняется, поэтому метод можно вызывать
-     * периодически во время движения корабля и изменения рынка.</p>
-     */
+    /** Обновляет текст из текущего состояния ранее выбранной сущности. */
     public void refresh() {
         DetailsText details = describe(selectedEntity);
         titleLabel.setText(details.title());
@@ -151,6 +137,7 @@ public class EntityDetailsUI extends Table {
         TransformComponent transform = entity.getComponent(TransformComponent.class);
         FactionComponent faction = entity.getComponent(FactionComponent.class);
         ReputationComponent reputation = entity.getComponent(ReputationComponent.class);
+        WalletComponent wallet = entity.getComponent(WalletComponent.class);
 
         String type = resolveType(identity, market, ship, tradeAI);
         String title = identity == null ? "Безымянный объект" : identity.name;
@@ -160,6 +147,7 @@ public class EntityDetailsUI extends Table {
         body.append("Фракция: ")
                 .append(faction == null ? "не указана" : faction.getFactionName())
                 .append('\n');
+        appendWallet(body, wallet);
 
         if (ship != null) {
             appendShipProfile(body, ship);
@@ -201,6 +189,16 @@ public class EntityDetailsUI extends Table {
         }
         text.append("x=").append(formatNumber(transform.position.x))
                 .append(", y=").append(formatNumber(transform.position.y))
+                .append('\n');
+    }
+
+    /** Добавляет authoritative баланс, если объект является экономическим участником. */
+    private static void appendWallet(StringBuilder text, WalletComponent wallet) {
+        if (wallet == null) {
+            return;
+        }
+        text.append("Кредиты: ")
+                .append(formatMoney(wallet.getBalanceMilliCredits()))
                 .append('\n');
     }
 
@@ -343,8 +341,7 @@ public class EntityDetailsUI extends Table {
                 .append("  Дробный остаток: ").append(formatNumber(mining.extractionRemainder))
                 .append(" ед.\n")
                 .append("  Всего добыто: ").append(mining.totalMined).append(" ед.\n")
-                .append("  Доставлено: ").append(mining.totalDelivered).append(" ед.\n")
-                .append("  Кредиты: ").append(formatMoney(mining.credits)).append('\n');
+                .append("  Доставлено: ").append(mining.totalDelivered).append(" ед.\n");
     }
 
     /** Добавляет текущее состояние корпуса, щитов и вооружения боевого корабля. */
@@ -367,13 +364,13 @@ public class EntityDetailsUI extends Table {
                 .append("  Состояние: ").append(localizeState(tradeAI.state)).append('\n')
                 .append("  Скорость: ").append(formatNumber(tradeAI.movementSpeed)).append(" ед./с\n")
                 .append("  Специализация: ").append(specializationName(tradeAI.specializedItem)).append('\n')
-                .append("  Кредиты: ").append(formatMoney(tradeAI.credits)).append('\n')
                 .append("  Груз: ").append(inventory == null ? NO_VALUE : inventory.getTotalStock())
                 .append(" / ").append(tradeAI.cargoSpace).append(" ед.\n")
                 .append("  Цель: ").append(targetName(tradeAI.targetStation)).append('\n')
                 .append("  Товар: ").append(targetItemName(tradeAI.targetItem)).append('\n')
                 .append("  Количество: ").append(tradeAI.targetAmount).append(" ед.\n")
-                .append("  Ожидаемая прибыль: ").append(formatMoney(tradeAI.expectedProfit)).append('\n')
+                .append("  Ожидаемая прибыль: ")
+                .append(formatMoney(tradeAI.expectedProfitMilliCredits)).append('\n')
                 .append("  Новый поиск через: ").append(formatNumber(tradeAI.routeSearchCooldown)).append(" с\n");
     }
 
@@ -479,9 +476,17 @@ public class EntityDetailsUI extends Table {
         return String.format(Locale.ROOT, "%.1f", normalized);
     }
 
-    /** Форматирует денежную сумму в кредитах. */
+    /** Форматирует вычисляемую рыночную цену в кредитах. */
     private static String formatMoney(float value) {
         return formatNumber(value) + (Float.isFinite(value) ? " кр." : "");
+    }
+
+    /** Форматирует authoritative milli-credits как пользовательские кредиты. */
+    private static String formatMoney(long milliCredits) {
+        if (milliCredits < 0L) {
+            return NO_VALUE;
+        }
+        return formatNumber(Money.toCredits(milliCredits)) + " кр.";
     }
 
     /**

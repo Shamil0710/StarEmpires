@@ -13,7 +13,9 @@ import com.spacesim.components.ReputationComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.Money;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
 
@@ -32,21 +34,17 @@ import java.util.List;
  * сталь + энергия -&gt; вооружение
  * </pre>
  * <p>Шестая станция является конечным потребителем энергии, продовольствия, стали и вооружения.
- * Производительность звеньев и базовое потребление подобраны так, чтобы их номинальные темпы были
- * сбалансированы. Для каждого из пяти товаров создаётся отдельный специализированный совместимый
- * транспорт: это не позволяет всем пустым кораблям одновременно переключиться на самый дорогой
- * товар. Дополнительный добывающий корабль ищет конечные астероидные источники, доставляет руду
- * на шахтёрскую базу и продаёт её рынку, а боевой корабль демонстрирует отдельный профиль корпуса
- * без участия в торговле.</p>
+ * Все станции и экономические корабли получают конечные {@link WalletComponent} с начальным
+ * капиталом. Authoritative деньги существуют только в этих кошельках.</p>
  *
  * <p>Фабрика не обращается к libGDX/OpenGL и не регистрирует системы Ashley. Каждый вызов
- * {@link #createEntities()} возвращает новый независимый граф сущностей и компонентов, который
- * можно безопасно добавлять в отдельный {@link com.badlogic.ashley.core.Engine} или проверять в
- * unit-тесте.</p>
+ * {@link #createEntities()} возвращает новый независимый граф сущностей и компонентов.</p>
  */
 public final class DemoWorldFactory {
     private static final int STATION_CAPACITY = 2_500;
-    private static final float FLEET_STARTING_CREDITS = 12_000f;
+    private static final double STATION_STARTING_CREDITS = 250_000d;
+    private static final double FLEET_STARTING_CREDITS = 12_000d;
+    private static final double MINER_STARTING_CREDITS = 1_000d;
 
     private DemoWorldFactory() {
         throw new AssertionError("Фабрика демонстрационного мира не создаёт экземпляров");
@@ -56,9 +54,7 @@ public final class DemoWorldFactory {
      * Создаёт полный набор станций и кораблей демонстрационной сцены.
      *
      * <p>Порядок результата стабилен: сначала шесть станций от первичных источников к конечному
-     * потребителю, затем пять специализированных транспортов в порядке идентификаторов товаров,
-     * добывающий и боевой корабли. Список неизменяем, однако сами сущности и их ECS-компоненты
-     * предназначены для изменения игровыми системами.</p>
+     * потребителю, затем пять специализированных транспортов, добывающий и боевой корабли.</p>
      *
      * @return неизменяемый список из шести новых станций и семи новых кораблей
      */
@@ -144,7 +140,7 @@ public final class DemoWorldFactory {
                 combatShip);
     }
 
-    /** Создаёт базовую станцию с пустым рынком, историей цен и складом. */
+    /** Создаёт базовую станцию с пустым рынком, историей цен, складом и конечным капиталом. */
     private static Entity createStation(String name, float x, float y, int factionId) {
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
@@ -156,6 +152,7 @@ public final class DemoWorldFactory {
                 .add(new IdentityComponent(name, IdentityComponent.Kind.STATION))
                 .add(transform)
                 .add(inventory)
+                .add(new WalletComponent(Money.fromCredits(STATION_STARTING_CREDITS)))
                 .add(new MarketComponent())
                 .add(new FactionComponent(factionId))
                 .add(new PriceHistoryComponent());
@@ -180,7 +177,7 @@ public final class DemoWorldFactory {
         station.add(production);
     }
 
-    /** Создаёт пустой специализированный транспорт с совместимым отсеком и репутацией. */
+    /** Создаёт пустой специализированный транспорт с совместимым отсеком, кошельком и репутацией. */
     private static Entity createTradingShip(
             String name,
             float x,
@@ -198,7 +195,6 @@ public final class DemoWorldFactory {
 
         TradeAIComponent tradeAI = new TradeAIComponent();
         tradeAI.cargoSpace = cargoSpace;
-        tradeAI.credits = FLEET_STARTING_CREDITS;
         tradeAI.movementSpeed = movementSpeed;
         tradeAI.specializedItem = specializedItem;
 
@@ -216,13 +212,14 @@ public final class DemoWorldFactory {
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
                 .add(inventory)
+                .add(new WalletComponent(Money.fromCredits(FLEET_STARTING_CREDITS)))
                 .add(ship)
                 .add(tradeAI)
                 .add(reputation)
                 .add(new FactionComponent(factionId));
     }
 
-    /** Создаёт автономный добывающий корабль с предпочтительным рынком разгрузки. */
+    /** Создаёт автономный добывающий корабль с предпочтительным рынком разгрузки и кошельком. */
     private static Entity createMiningShip(String name, float x, float y, Entity homeBase) {
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
@@ -240,12 +237,13 @@ public final class DemoWorldFactory {
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
                 .add(inventory)
+                .add(new WalletComponent(Money.fromCredits(MINER_STARTING_CREDITS)))
                 .add(new ShipComponent(ShipType.MINING_SHIP))
                 .add(mining)
                 .add(new FactionComponent(Constants.FACTION_MINERS));
     }
 
-    /** Создаёт боевой корабль с отдельными характеристиками и без торгового автомата. */
+    /** Создаёт боевой корабль с отдельными характеристиками и без участия в торговле. */
     private static Entity createCombatShip(String name, float x, float y) {
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
