@@ -27,6 +27,7 @@ import java.util.random.RandomGenerator;
 public class GlobalEventManager {
     private static final double DEFAULT_SPAWN_RATE_PER_SECOND = -60d * Math.log1p(-0.001d);
     private static final float DEFAULT_EVENT_DURATION_SECONDS = 30f;
+    private static final double EVENT_TIME_EPSILON_SECONDS = 1e-9d;
     /** Верхняя граница материализованных автособытий за один вызов {@link #update(float)}. */
     private static final int MAX_AUTOMATIC_EVENTS_PER_UPDATE = 1_024;
 
@@ -40,9 +41,7 @@ public class GlobalEventManager {
     private double secondsUntilNextSpawn;
     private double simulationTimeSeconds;
 
-    /**
-     * Создаёт менеджер со стандартной средней частотой автоматических событий и независимым RNG.
-     */
+    /** Создаёт менеджер со стандартной средней частотой автоматических событий и независимым RNG. */
     public GlobalEventManager() {
         this(new Random(), DEFAULT_SPAWN_RATE_PER_SECOND);
     }
@@ -74,9 +73,6 @@ public class GlobalEventManager {
     /**
      * Создаёт менеджер с заданным источником случайности и средней частотой событий.
      *
-     * <p>Значение {@code spawnRatePerSecond == 0} полностью отключает автоматическое создание
-     * событий, но не мешает ручной активации и завершению уже активных событий.</p>
-     *
      * @param random источник случайных чисел
      * @param spawnRatePerSecond среднее число автоматически создаваемых событий в секунду
      * @throws NullPointerException если источник случайных чисел не задан
@@ -98,8 +94,8 @@ public class GlobalEventManager {
      *
      * <p>Входной {@code float} канонизируется через его десятичное представление перед накоплением
      * игрового времени. Моменты автоматического появления задаются экспоненциально распределёнными
-     * интервалами, поэтому с одинаковым RNG их расписание не зависит от частоты render frames.
-     * За один вызов материализуется не более 1024 автоматических событий.</p>
+     * интервалами. Сравнение точных границ использует наносекундный epsilon исключительно для
+     * компенсации арифметики {@code double}; расписание и RNG-последовательность не меняются.</p>
      *
      * @param deltaSeconds прошедшее игровое время в секундах
      * @throws IllegalArgumentException если время отрицательно, бесконечно или равно {@code NaN}
@@ -114,22 +110,25 @@ public class GlobalEventManager {
         double remainingSeconds = canonicalSeconds(deltaSeconds);
         int spawnedEvents = 0;
         while (remainingSeconds > 0d) {
-            if (secondsUntilNextSpawn > remainingSeconds) {
+            if (secondsUntilNextSpawn > remainingSeconds + EVENT_TIME_EPSILON_SECONDS) {
                 advanceSimulationTime(remainingSeconds);
                 secondsUntilNextSpawn -= remainingSeconds;
                 return;
             }
 
-            double stepUntilSpawn = secondsUntilNextSpawn;
+            double stepUntilSpawn = Math.min(secondsUntilNextSpawn, remainingSeconds);
             advanceSimulationTime(stepUntilSpawn);
             remainingSeconds -= stepUntilSpawn;
+            if (remainingSeconds < EVENT_TIME_EPSILON_SECONDS) {
+                remainingSeconds = 0d;
+            }
 
             activateEvent(createDefaultEvent());
             spawnedEvents++;
             secondsUntilNextSpawn = sampleNextSpawnDelay();
 
             if (spawnedEvents >= MAX_AUTOMATIC_EVENTS_PER_UPDATE
-                    && secondsUntilNextSpawn <= remainingSeconds) {
+                    && secondsUntilNextSpawn <= remainingSeconds + EVENT_TIME_EPSILON_SECONDS) {
                 advanceSimulationTime(remainingSeconds);
                 secondsUntilNextSpawn = sampleNextSpawnDelay();
                 return;
@@ -176,29 +175,18 @@ public class GlobalEventManager {
     /**
      * Возвращает доступное только для чтения представление активных событий.
      *
-     * <p>Представление является «живым»: последующие изменения менеджера отражаются в ранее
-     * полученном списке. Добавлять и удалять элементы через него нельзя.</p>
-     *
-     * @return неизменяемое представление списка активных событий
+     * @return неизменяемое живое представление списка активных событий
      */
     public List<EconomyEvent> getActiveEvents() {
         return activeEventsView;
     }
 
-    /**
-     * Возвращает ревизию набора активных событий.
-     *
-     * @return текущая ревизия набора событий
-     */
+    /** @return текущая ревизия набора событий */
     public long getEventRevision() {
         return eventRevision;
     }
 
-    /**
-     * Возвращает текущее игровое время менеджера.
-     *
-     * @return неотрицательное число секунд от начала симуляции
-     */
+    /** @return неотрицательное игровое время в секундах от начала симуляции */
     public double getSimulationTimeSeconds() {
         return simulationTimeSeconds;
     }
