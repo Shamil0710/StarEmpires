@@ -42,6 +42,34 @@ Properties:
 
 The exact infrastructure head `03df8af7f2ba3fda191af0c8e804408ea5d44094` passed CI.
 
+## 8.5C — Presentation asset geometry contract
+
+The presentation package now defines an explicit asset contract instead of deriving gameplay-relevant placement from transparent PNG pixels.
+
+`ShipSpriteSpec` stores:
+
+- stable presentation-only `assetId`;
+- base texture resource path;
+- optional emissive texture resource path;
+- intended world width / height;
+- normalized pivot;
+- explicit collision/selection footprint hint;
+- ordered visual hardpoints.
+
+`VisualHardpoint` stores normalized sprite-space coordinates, a presentation role (`ENGINE`, `WEAPON`, `UTILITY`) and a visual direction. Hardpoint coordinates and visual direction are not authoritative thrust or weapon physics.
+
+Important rules:
+
+- texture paths and asset IDs do not become save/entity identity;
+- collision size is explicit and is not inferred from alpha bounds;
+- hardpoint IDs must be unique within a ship sprite specification;
+- hardpoint metadata is defensive/immutable after construction;
+- emissive art is optional and can be added without changing simulation state.
+
+The asset-contract exact head `dc472857a2d84b5729db29d533f5f41ea4c79132` passed CI.
+
+A real project ship sprite is still required before Stage 8.5C is considered complete. The current graphics spike deliberately uses procedural fixture textures so technology validation is not confused with final art acceptance.
+
 ## 8.5E/F — Desktop graphics spike
 
 The validation scene is separate from the normal game and does **not** create `SimulationSession` or authoritative world state.
@@ -90,6 +118,26 @@ The desktop HUD reports:
 
 Frame-time statistics use a rolling 240-frame window.
 
+### Automated build and software-GL smoke evidence
+
+The graphics-spike exact head `f078714ddcb9b1eafe82703fbe095628f8794142` passed the full Java 17 CI pipeline and produced the packaged desktop JAR.
+
+That exact CI artifact was additionally launched under Linux Xvfb with `LIBGL_ALWAYS_SOFTWARE=1` at a `1920x1080` virtual screen. The application rendered for several seconds without a shader compilation, framebuffer, SpriteBatch or LWJGL runtime exception. A captured frame visibly contained the representative ships, asteroids, engine trails, additive glow, beam and metrics HUD.
+
+One captured software-renderer frame reported approximately:
+
+```text
+FPS: 52
+Average frame time: 20.20 ms
+P95 frame time: 29.03 ms
+Max frame time: 82.09 ms
+Draw calls: 16
+Max sprites/batch: 2051
+Heap in use: 6.3 MiB
+```
+
+These numbers are **smoke evidence only**. They were produced by a virtual/software graphics environment and MUST NOT be used to accept or reject libGDX performance. The purpose of this run is runtime API/visual-path validation, not a reference-machine benchmark.
+
 ## Required manual evidence
 
 A Stage-8.5 decision run must record the actual developer machine instead of treating hardware as implicit.
@@ -126,7 +174,7 @@ A representative 60 FPS frame budget is approximately `16.67 ms`; therefore aver
 
 ## Still required before Stage 8.5 closes
 
-- integrate at least one real project ship sprite through a documented asset/pivot/scale contract;
+- integrate at least one real project ship sprite through the documented asset/pivot/scale contract;
 - validate engine animation/emissive placement against that real sprite;
 - execute and record the representative desktop run on the reference developer machine;
 - inspect visual quality at tactical and wider zoom levels;
