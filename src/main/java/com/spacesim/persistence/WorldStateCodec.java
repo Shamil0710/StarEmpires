@@ -2,6 +2,7 @@ package com.spacesim.persistence;
 
 import com.spacesim.world.AsteroidFieldId;
 import com.spacesim.world.AsteroidFieldNode;
+import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.GalaxyId;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.JumpConnection;
@@ -30,12 +31,12 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Детерминированный бинарный codec Stage-7 {@link WorldState}.
+ * Детерминированный бинарный codec {@link WorldState}.
  *
- * <p>World codec не сериализует экономические компоненты повторно. Каждый system payload кодируется
- * существующим {@link GameStateCodec}, поэтому local save schema, migration и invariant checks
- * остаются единым источником истины. World-layer добавляет canonical Galaxy topology, strategic
- * planet/asteroid-field landmarks и отображение StarSystem ID -> local GameState.</p>
+ * <p>World codec не сериализует экономические ECS-компоненты повторно. Каждый system payload
+ * кодируется существующим {@link GameStateCodec}; поверх него хранятся canonical Galaxy topology и
+ * strategic faction economy. Schema v2 добавляет faction-state в хвост Stage-7 schema v1, поэтому
+ * decoder может нейтрально мигрировать существующие world saves без создания treasury денег.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757; // STGW — Star Empires Galaxy World.
@@ -48,6 +49,7 @@ public final class WorldStateCodec {
     private static final int MAX_PLANETS = 1_000_000;
     private static final int MAX_ASTEROID_FIELDS = 1_000_000;
     private static final int MAX_CONNECTIONS = 500_000;
+    private static final int MAX_FACTIONS = 10_000;
 
     private WorldStateCodec() {
         throw new AssertionError("WorldStateCodec не создаёт экземпляров");
@@ -84,6 +86,7 @@ public final class WorldStateCodec {
                     output.writeInt(payload.length);
                     output.write(payload);
                 }
+                writeFactions(output, checked.factions());
             }
             byte[] bytes = buffer.toByteArray();
             if (bytes.length > MAX_SAVE_BYTES) {
@@ -96,10 +99,10 @@ public final class WorldStateCodec {
     }
 
     /**
-     * Декодирует и полностью валидирует world snapshot.
+     * Декодирует, мигрирует и полностью валидирует world snapshot.
      *
      * @param bytes бинарный world save
-     * @return новый immutable WorldState
+     * @return новый immutable WorldState текущей schema
      * @throws NullPointerException если bytes не заданы
      * @throws IllegalArgumentException если формат повреждён, неизвестен или превышает лимиты
      */
@@ -117,7 +120,8 @@ public final class WorldStateCodec {
                 throw new IllegalArgumentException("Неподдерживаемая версия world-файла: " + fileVersion);
             }
             int schemaVersion = input.readInt();
-            if (schemaVersion != WorldState.CURRENT_VERSION) {
+            if (schemaVersion != WorldState.CURRENT_VERSION
+                    && schemaVersion != WorldState.LEGACY_STAGE7_VERSION) {
                 throw new IllegalArgumentException("Неподдерживаемая WorldState schema: " + schemaVersion);
             }
             GalaxyTopology topology = readTopology(input);
@@ -135,10 +139,21 @@ public final class WorldStateCodec {
                 }
                 systemStates.add(new StarSystemSimulationState(systemId, GameStateCodec.decode(payload)));
             }
+
+            final WorldState state;
+            if (schemaVersion == WorldState.LEGACY_STAGE7_VERSION) {
+                state = WorldState.fromLegacyStage7(topology, List.copyOf(systemStates));
+            } else {
+                state = new WorldState(
+                        WorldState.CURRENT_VERSION,
+                        topology,
+                        List.copyOf(systemStates),
+                        readFactions(input));
+            }
             if (input.read() != -1) {
                 throw new IllegalArgumentException("После WorldState обнаружен лишний бинарный хвост");
             }
-            return new WorldState(schemaVersion, topology, List.copyOf(systemStates));
+            return state;
         } catch (EOFException exception) {
             throw new IllegalArgumentException("WorldState оборван", exception);
         } catch (IOException exception) {
@@ -199,6 +214,32 @@ public final class WorldStateCodec {
             throw new IllegalArgumentException("Размер WorldState находится вне допустимого диапазона");
         }
         return decode(Files.readAllBytes(source));
+    }
+
+    private static void writeFactions(
+            DataOutputStream output,
+            List<FactionEconomicState> factions) throws IOException {
+        writeCount(output, factions.size(), MAX_FACTIONS, "factions");
+        for (FactionEconomicState faction : factions) {
+            FactionEconomicState value = Objects.requireNonNull(faction, "FactionEconomicState не задан");
+            writeString(output, value.factionContentId());
+            output.writeLong(value.treasuryMilliCredits());
+            output.writeLong(value.stationLiquidityReserveMilliCredits());
+            output.writeLong(value.maxLiquiditySupportPerDecisionMilliCredits());
+        }
+    }
+
+    private static List<FactionEconomicState> readFactions(DataInputStream input) throws IOException {
+        int count = readCount(input, MAX_FACTIONS, "factions");
+        List<FactionEconomicState> factions = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            factions.add(new FactionEconomicState(
+                    readString(input),
+                    input.readLong(),
+                    input.readLong(),
+                    input.readLong()));
+        }
+        return List.copyOf(factions);
     }
 
     private static void writeTopology(DataOutputStream output, GalaxyTopology topology) throws IOException {

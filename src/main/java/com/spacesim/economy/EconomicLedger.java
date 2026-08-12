@@ -115,6 +115,38 @@ public final class EconomicLedger {
     }
 
     /**
+     * Фиксирует обычный денежный transfer между существующими экономическими участниками.
+     *
+     * <p>Метод вызывается только после успешного authoritative изменения обоих балансов и не
+     * обозначает денежный source/sink. Он нужен world-level policy, налогам и другим переводам,
+     * которые не сопровождаются движением товара.</p>
+     *
+     * @param source непустое диагностическое имя плательщика
+     * @param destination непустое диагностическое имя получателя
+     * @param amountMilliCredits строго положительная сумма transfer
+     * @param reason непустая причина перевода
+     * @return созданная запись
+     */
+    public EconomicTransaction recordMoneyTransfer(
+            String source,
+            String destination,
+            long amountMilliCredits,
+            String reason) {
+        requireName(source, "Источник transfer");
+        requireName(destination, "Получатель transfer");
+        requirePositive(amountMilliCredits, "Сумма денежного transfer");
+        return append(new EconomicTransaction(
+                nextSequenceValue(),
+                EconomicTransaction.Type.MONEY_TRANSFER,
+                source,
+                destination,
+                -1,
+                0L,
+                amountMilliCredits,
+                requireReason(reason)));
+    }
+
+    /**
      * Фиксирует явное создание денег.
      *
      * @param destination непустое имя получателя

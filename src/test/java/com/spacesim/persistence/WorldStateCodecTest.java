@@ -1,6 +1,7 @@
 package com.spacesim.persistence;
 
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.GalaxyId;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.JumpConnection;
@@ -50,6 +51,43 @@ class WorldStateCodecTest {
     }
 
     @Test
+    void factionEconomicStateСохраняетсяВCanonicalContentIdПорядке() {
+        WorldState base = twoSystemWorld(false);
+        WorldState state = new WorldState(
+                WorldState.CURRENT_VERSION,
+                base.topology(),
+                base.systems(),
+                List.of(
+                        new FactionEconomicState("faction.miners", 750_000_000L, 300_000_000L, 100_000_000L),
+                        new FactionEconomicState("faction.neutral", 500_000_000L, 300_000_000L, 100_000_000L)));
+
+        WorldState decoded = WorldStateCodec.decode(WorldStateCodec.encode(state));
+
+        assertEquals(state, decoded);
+        assertEquals(
+                List.of("faction.miners", "faction.neutral"),
+                decoded.factions().stream().map(FactionEconomicState::factionContentId).toList());
+    }
+
+    @Test
+    void stage7SchemaV1МигрируетБезСозданияFactionTreasury() {
+        WorldState currentWithoutFactions = twoSystemWorld(false);
+        byte[] currentBytes = WorldStateCodec.encode(currentWithoutFactions);
+
+        // Schema v2 добавляет в хвост Stage-7 layout только faction-count. При пустом faction-state
+        // это ровно четыре нулевых байта. Удаляем хвост и ставим прежнюю logical schema v1.
+        byte[] legacyBytes = Arrays.copyOf(currentBytes, currentBytes.length - Integer.BYTES);
+        ByteBuffer.wrap(legacyBytes).putInt(8, WorldState.LEGACY_STAGE7_VERSION);
+
+        WorldState migrated = WorldStateCodec.decode(legacyBytes);
+
+        assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
+        assertEquals(currentWithoutFactions.topology(), migrated.topology());
+        assertEquals(currentWithoutFactions.systems(), migrated.systems());
+        assertEquals(List.of(), migrated.factions());
+    }
+
+    @Test
     void canonicalOrderingДелаетРазныйВходнойПорядокОднимWorldSave() {
         WorldState canonical = twoSystemWorld(false);
         WorldState reversed = twoSystemWorld(true);
@@ -72,7 +110,8 @@ class WorldStateCodecTest {
                         new StarSystemSimulationState(
                                 ALPHA_ID,
                                 SimulationSession.createDemo(303L).snapshot()),
-                        first.systems().get(1)));
+                        first.systems().get(1)),
+                first.factions());
 
         WorldStateCodec.write(save, first);
         assertTrue(Files.isRegularFile(save));
@@ -107,6 +146,19 @@ class WorldStateCodecTest {
     }
 
     @Test
+    void duplicateFactionContentIdОтклоняется() {
+        WorldState base = twoSystemWorld(false);
+        FactionEconomicState faction = new FactionEconomicState(
+                "faction.miners", 1L, 2L, 3L);
+
+        assertThrows(IllegalArgumentException.class, () -> new WorldState(
+                WorldState.CURRENT_VERSION,
+                base.topology(),
+                base.systems(),
+                List.of(faction, faction)));
+    }
+
+    @Test
     void existingGameStateОборачиваетсяВDefaultWorldБезИзмененияEconomicSnapshot() {
         GameState state = SimulationSession.createDemo(0x7A6EL).snapshot();
 
@@ -116,6 +168,7 @@ class WorldStateCodecTest {
         assertEquals(1, world.systems().size());
         assertEquals(WorldTopologyDefaults.DEFAULT_SYSTEM_ID, world.systems().get(0).systemId());
         assertEquals(state, world.systems().get(0).simulationState());
+        assertEquals(List.of(), world.factions());
         assertEquals(state, WorldStateCodec.decode(WorldStateCodec.encode(world))
                 .systems().get(0).simulationState());
     }
