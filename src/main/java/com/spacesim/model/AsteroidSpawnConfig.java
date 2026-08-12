@@ -24,6 +24,21 @@ public final class AsteroidSpawnConfig {
     private final long maxResource;
     private final long seed;
 
+    /**
+     * Создаёт и проверяет конфигурацию ресурсного пояса.
+     *
+     * @param resourceItem идентификатор добываемого товара
+     * @param spawnPoints непустой список уникально именованных разрешённых точек появления
+     * @param initialCount число источников, создаваемых при первой обработке системы
+     * @param targetCount максимальное число одновременно поддерживаемых активных источников
+     * @param refillIntervalSeconds положительный период проверки пополнения в игровых секундах
+     * @param minResource минимальный положительный запас одного источника
+     * @param maxResource максимальный запас одного источника, не меньше минимального
+     * @param seed seed генератора, определяющего выбор точек и размер запасов
+     * @throws IllegalArgumentException если товар не добываемый, список точек некорректен, счётчики
+     *                                  противоречат друг другу, интервал неположителен или диапазон
+     *                                  ресурса недопустим
+     */
     public AsteroidSpawnConfig(
             int resourceItem,
             List<AsteroidSpawnPoint> spawnPoints,
@@ -69,46 +84,60 @@ public final class AsteroidSpawnConfig {
         this.seed = seed;
     }
 
+    /** @return идентификатор товара, содержащегося в создаваемых источниках */
     public int getResourceItem() {
         return resourceItem;
     }
 
+    /** @return неизменяемый список разрешённых точек появления */
     public List<AsteroidSpawnPoint> getSpawnPoints() {
         return spawnPoints;
     }
 
+    /** @return число астероидов, создаваемых при первом обновлении */
     public int getInitialCount() {
         return initialCount;
     }
 
+    /** @return целевое максимальное число одновременно активных астероидов */
     public int getTargetCount() {
         return targetCount;
     }
 
-    /** Совместимое доменное имя максимального числа одновременно активных астероидов. */
+    /**
+     * Совместимое доменное имя максимального числа одновременно активных астероидов.
+     *
+     * @return то же значение, что и {@link #getTargetCount()}
+     */
     public int maxActiveAsteroids() {
         return targetCount;
     }
 
+    /** @return период проверки пополнения в игровых секундах */
     public float getRefillIntervalSeconds() {
         return refillIntervalSeconds;
     }
 
+    /** @return минимальный запас ресурса одного нового астероида */
     public long getMinResource() {
         return minResource;
     }
 
+    /** @return максимальный запас ресурса одного нового астероида */
     public long getMaxResource() {
         return maxResource;
     }
 
+    /** @return seed воспроизводимого генератора появления */
     public long getSeed() {
         return seed;
     }
 
     /**
-     * Конфигурация демонстрационного мира: четыре исходных источника, пополнение до шести раз в
-     * двадцать секунд, по 36–84 единицы руды на источник.
+     * Создаёт конфигурацию демонстрационного мира: четыре исходных источника, пополнение до шести
+     * раз в двадцать секунд, по 36–84 единицы руды на источник.
+     *
+     * @return новая валидная конфигурация демонстрационного астероидного пояса
      */
     public static AsteroidSpawnConfig demoWorld() {
         return new AsteroidSpawnConfig(
