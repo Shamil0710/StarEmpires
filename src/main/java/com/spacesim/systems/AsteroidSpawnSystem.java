@@ -25,7 +25,7 @@ import java.util.random.RandomGenerator;
  * <p>При первом обновлении система создаёт {@link AsteroidSpawnConfig#getInitialCount()} источников.
  * Затем через каждый интервал пополнения восстанавливает число активных источников до
  * {@link AsteroidSpawnConfig#getTargetCount()}, не создавая два астероида в одной точке.
- * Выбор свободной точки и величины запаса воспроизводимы для одинаковой конфигурации и seed.</p>
+ * Выбор свободной точки и величины запаса воспроизводимы для одинаковой конфигурации и RNG.</p>
  */
 public final class AsteroidSpawnSystem extends EntitySystem {
     private static final double REFILL_TIME_EPSILON_SECONDS = 1e-6d;
@@ -52,8 +52,14 @@ public final class AsteroidSpawnSystem extends EntitySystem {
         this(config, new Random(requireConfig(config).getSeed()));
     }
 
-    /** Конструктор с внедряемым генератором для детерминированных тестов. */
-    AsteroidSpawnSystem(AsteroidSpawnConfig config, RandomGenerator random) {
+    /**
+     * Создаёт систему с внешним RNG-потоком игровой сессии.
+     *
+     * @param config валидная конфигурация астероидного пояса
+     * @param random источник случайности, выделенный подсистеме астероидов
+     * @throws NullPointerException если конфигурация или источник случайности не заданы
+     */
+    public AsteroidSpawnSystem(AsteroidSpawnConfig config, RandomGenerator random) {
         this.config = requireConfig(config);
         if (random == null) {
             throw new NullPointerException("Источник случайности не должен быть null");
