@@ -24,6 +24,7 @@ import java.util.List;
  * @param mining состояние добычи либо {@code null}
  * @param combat боевое состояние либо {@code null}
  * @param asteroid природный ресурс либо {@code null}
+ * @param archetype stable content archetype либо {@code null} для legacy/dynamic сущности
  */
 public record EntityState(
         EntityId id,
@@ -40,7 +41,8 @@ public record EntityState(
         TradeAiState tradeAi,
         MiningState mining,
         CombatState combat,
-        AsteroidState asteroid) {
+        AsteroidState asteroid,
+        ArchetypeState archetype) {
 
     /**
      * @param name отображаемое имя
@@ -215,5 +217,9 @@ public record EntityState(
             int resourceItem,
             long initialResource,
             long remainingResource) {
+    }
+
+    /** @param contentId stable station/ship archetype content ID */
+    public record ArchetypeState(String contentId) {
     }
 }
