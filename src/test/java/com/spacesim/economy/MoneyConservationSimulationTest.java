@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MoneyConservationSimulationTest {
     @Test
     void demoWorldНеСоздаётИНЕУничтожаетДеньгиОбычнойЭкономическойАктивностью() {
-        SimulationRandom random = new SimulationRandom(0xCA5H_2026L);
+        SimulationRandom random = new SimulationRandom(0xCA5E_2026L);
         GlobalEventManager events = new GlobalEventManager(random.createStream("economy-events"), 0d);
         EconomicLedger ledger = new EconomicLedger();
         Engine engine = new Engine();
