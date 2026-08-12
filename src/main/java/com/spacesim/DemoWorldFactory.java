@@ -35,8 +35,7 @@ import java.util.List;
  * </pre>
  * <p>Шестая станция является конечным потребителем энергии, продовольствия, стали и вооружения.
  * Все станции и экономические корабли получают конечные {@link WalletComponent} с начальным
- * капиталом. Это позволяет Stage 2 переводить торговлю на физический transfer денег без скрытого
- * создания ликвидности в каждой сделке.</p>
+ * капиталом. Authoritative деньги существуют только в этих кошельках.</p>
  *
  * <p>Фабрика не обращается к libGDX/OpenGL и не регистрирует системы Ashley. Каждый вызов
  * {@link #createEntities()} возвращает новый независимый граф сущностей и компонентов.</p>
@@ -44,7 +43,6 @@ import java.util.List;
 public final class DemoWorldFactory {
     private static final int STATION_CAPACITY = 2_500;
     private static final double STATION_STARTING_CREDITS = 250_000d;
-    private static final float LEGACY_FLEET_STARTING_CREDITS = 12_000f;
     private static final double FLEET_STARTING_CREDITS = 12_000d;
     private static final double MINER_STARTING_CREDITS = 1_000d;
 
@@ -197,7 +195,6 @@ public final class DemoWorldFactory {
 
         TradeAIComponent tradeAI = new TradeAIComponent();
         tradeAI.cargoSpace = cargoSpace;
-        tradeAI.credits = LEGACY_FLEET_STARTING_CREDITS;
         tradeAI.movementSpeed = movementSpeed;
         tradeAI.specializedItem = specializedItem;
 
