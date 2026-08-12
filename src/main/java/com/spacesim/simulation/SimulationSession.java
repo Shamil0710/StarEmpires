@@ -10,6 +10,7 @@ import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.model.AsteroidSpawnConfig;
+import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityIdAllocator;
 import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.persistence.EntityState;
@@ -17,6 +18,7 @@ import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.persistence.GameState;
 import com.spacesim.systems.AsteroidSpawnSystem;
 import com.spacesim.systems.ConsumptionSystem;
+import com.spacesim.systems.ConstructionSystem;
 import com.spacesim.systems.MarketSystem;
 import com.spacesim.systems.MiningSystem;
 import com.spacesim.systems.PriceRecorderSystem;
@@ -34,12 +36,12 @@ import java.util.Objects;
  *
  * <p>Класс не создаёт OpenGL/Scene2D-ресурсов и потому подходит для save/load, continuation-тестов и
  * benchmark runner. Один {@link ContentCatalog} принадлежит всей сессии и передаётся фабрике мира,
- * рынкам и торговому AI, поэтому data metadata не расходится между системами.</p>
+ * рынкам, торговому AI и construction lifecycle.</p>
  *
  * <p>Stage 7 использует этот класс как локальный economic core одной StarSystem. Обычный
  * {@link #advanceFrame(float)} сохраняет точный fixed-rate pipeline, а
- * {@link #advanceStrategicSteps(int)} даёт world-orchestrator намеренно reduced-rate способ
- * продвинуть удалённую систему без создания второй экономической реализации.</p>
+ * {@link #advanceStrategicSteps(int)} даёт world-orchestrator reduced-rate способ продвинуть
+ * удалённую систему без создания второй экономической реализации.</p>
  */
 public final class SimulationSession {
     /** Fixed tick демонстрационной экономики. */
@@ -147,8 +149,6 @@ public final class SimulationSession {
      *
      * @param state сохранённое состояние текущей поддерживаемой версии
      * @return новая независимая сессия
-     * @throws NullPointerException если state не задан
-     * @throws IllegalArgumentException если версия или обязательное состояние некорректны
      */
     public static SimulationSession restore(GameState state) {
         return restore(state, ContentCatalogLoader.loadDefault());
@@ -157,11 +157,8 @@ public final class SimulationSession {
     /**
      * Восстанавливает runtime-сессию на явно заданном content catalog.
      *
-     * <p>Content compatibility проверяется внешней persistence-границей; этот метод восстанавливает
-     * уже валидированный authoritative GameState без изменения persistent schema.</p>
-     *
      * @param state сохранённое состояние текущей поддерживаемой версии
-     * @param contentCatalog каталог, который будет использовать продолженная simulation session
+     * @param contentCatalog каталог продолженной simulation session
      * @return новая независимая сессия
      * @throws NullPointerException если state или каталог не заданы
      * @throws IllegalArgumentException если версия или обязательное состояние некорректны
@@ -170,8 +167,7 @@ public final class SimulationSession {
         GameState checked = Objects.requireNonNull(state, "GameState не задан");
         ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
         if (checked.schemaVersion() != GameState.CURRENT_VERSION) {
-            throw new IllegalArgumentException(
-                    "Неподдерживаемая версия GameState: " + checked.schemaVersion());
+            throw new IllegalArgumentException("Неподдерживаемая версия GameState: " + checked.schemaVersion());
         }
         if (checked.nextEntityIdValue() <= 0L) {
             throw new IllegalArgumentException("Следующий EntityId сохранения должен быть положительным");
@@ -236,6 +232,7 @@ public final class SimulationSession {
         engine.addSystem(new TradeAISystem(
                 new SpatialHashGrid(Constants.CELL_SIZE), ledger, registry, contentCatalog));
         engine.addSystem(recorder);
+        engine.addSystem(new ConstructionSystem(contentCatalog, ledger));
     }
 
     /**
@@ -251,14 +248,8 @@ public final class SimulationSession {
     /**
      * Выполняет один reduced-rate update, представляющий несколько authoritative fixed ticks.
      *
-     * <p>Clock продвигается на указанное число эквивалентных ticks, после чего events и весь Ashley
-     * Engine вызываются ровно по одному разу с суммарным delta. Это намеренная Stage-7 аппроксимация
-     * для удалённых систем; local/player system должна продолжать использовать
-     * {@link #advanceFrame(float)}.</p>
-     *
      * @param equivalentFixedTicks число fixed ticks, агрегируемых в один strategic update
-     * @return суммарный simulation delta, переданный events и Engine
-     * @throws IllegalArgumentException если число ticks неположительно
+     * @return суммарный simulation delta
      */
     public float advanceStrategicSteps(int equivalentFixedTicks) {
         float strategicDelta = clock.advanceStrategicSteps(equivalentFixedTicks);
@@ -268,10 +259,43 @@ public final class SimulationSession {
     }
 
     /**
-     * Собирает полный value-based snapshot текущей сессии.
+     * Добавляет новую runtime-сущность через общий persistent ID allocator этой session.
      *
-     * @return immutable состояние текущей persistent schema
+     * <p>Метод не создаёт деньги/товары и не выполняет semantic factory logic. Он является
+     * lifecycle boundary для Stage-9 construction/investment и будущего dynamic asset creation.</p>
+     *
+     * @param entity новая Entity без {@link EntityIdComponent}
+     * @return выделенный persistent ID
+     * @throws NullPointerException если entity не задана
+     * @throws IllegalArgumentException если entity уже имеет persistent ID
      */
+    public EntityId addEntityWithAllocatedId(Entity entity) {
+        Entity checked = Objects.requireNonNull(entity, "Добавляемая Entity не задана");
+        if (checked.getComponent(EntityIdComponent.class) != null) {
+            throw new IllegalArgumentException("Dynamic Entity уже имеет EntityIdComponent");
+        }
+        EntityId id = entityIdAllocator.allocate();
+        checked.add(new EntityIdComponent(id));
+        engine.addEntity(checked);
+        return id;
+    }
+
+    /**
+     * Удаляет текущую runtime-сущность по persistent ID.
+     *
+     * @param id persistent ID либо {@code null}
+     * @return true, если сущность существовала и была удалена из Engine
+     */
+    public boolean removeEntity(EntityId id) {
+        Entity entity = entityRegistry.find(id);
+        if (entity == null) {
+            return false;
+        }
+        engine.removeEntity(entity);
+        return true;
+    }
+
+    /** @return полный value-based snapshot текущей сессии */
     public GameState snapshot() {
         List<Entity> entities = new ArrayList<>();
         for (Entity entity : engine.getEntities()) {
