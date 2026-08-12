@@ -8,6 +8,12 @@ package com.spacesim.model;
  * @param y мировая координата Y
  */
 public record AsteroidSpawnPoint(String id, float x, float y) {
+    /**
+     * Проверяет и нормализует параметры точки появления.
+     *
+     * @throws IllegalArgumentException если идентификатор пуст либо одна из координат не является
+     *                                  конечным числом
+     */
     public AsteroidSpawnPoint {
         if (id == null || id.strip().isEmpty()) {
             throw new IllegalArgumentException("Идентификатор точки спавна не должен быть пустым");
