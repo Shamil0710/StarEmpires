@@ -110,37 +110,72 @@ public final class ContentCatalog {
         return fingerprint;
     }
 
-    /** @param contentId persistent item ID; @return описание либо {@code null} */
+    /**
+     * Ищет товар по persistent content ID.
+     *
+     * @param contentId persistent item ID
+     * @return описание товара либо {@code null}
+     */
     public ItemDefinition findItem(String contentId) {
         return itemsById.get(contentId);
     }
 
-    /** @param runtimeId плотный item ID; @return описание либо {@code null} */
+    /**
+     * Ищет товар по плотному runtime ID.
+     *
+     * @param runtimeId плотный item ID
+     * @return описание товара либо {@code null}
+     */
     public ItemDefinition findItem(int runtimeId) {
         return itemsByRuntimeId.get(runtimeId);
     }
 
-    /** @param contentId persistent recipe ID; @return описание либо {@code null} */
+    /**
+     * Ищет рецепт по persistent content ID.
+     *
+     * @param contentId persistent recipe ID
+     * @return описание рецепта либо {@code null}
+     */
     public RecipeDefinition findRecipe(String contentId) {
         return recipesById.get(contentId);
     }
 
-    /** @param contentId persistent faction ID; @return описание либо {@code null} */
+    /**
+     * Ищет фракцию по persistent content ID.
+     *
+     * @param contentId persistent faction ID
+     * @return описание фракции либо {@code null}
+     */
     public FactionDefinition findFaction(String contentId) {
         return factionsById.get(contentId);
     }
 
-    /** @param runtimeId runtime faction ID; @return описание либо {@code null} */
+    /**
+     * Ищет фракцию по runtime ID.
+     *
+     * @param runtimeId runtime faction ID
+     * @return описание фракции либо {@code null}
+     */
     public FactionDefinition findFaction(int runtimeId) {
         return factionsByRuntimeId.get(runtimeId);
     }
 
-    /** @param contentId persistent ship archetype ID; @return описание либо {@code null} */
+    /**
+     * Ищет корабельный archetype по persistent content ID.
+     *
+     * @param contentId persistent ship archetype ID
+     * @return описание archetype либо {@code null}
+     */
     public ShipArchetypeDefinition findShipArchetype(String contentId) {
         return shipsById.get(contentId);
     }
 
-    /** @param contentId persistent station archetype ID; @return описание либо {@code null} */
+    /**
+     * Ищет станционный archetype по persistent content ID.
+     *
+     * @param contentId persistent station archetype ID
+     * @return описание archetype либо {@code null}
+     */
     public StationArchetypeDefinition findStationArchetype(String contentId) {
         return stationsById.get(contentId);
     }
