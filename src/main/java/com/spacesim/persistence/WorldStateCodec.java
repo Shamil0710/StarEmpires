@@ -3,7 +3,10 @@ package com.spacesim.persistence;
 import com.spacesim.world.AsteroidFieldId;
 import com.spacesim.world.AsteroidFieldNode;
 import com.spacesim.world.FactionEconomicState;
+import com.spacesim.world.FactionProductionPolicyState;
 import com.spacesim.world.FactionRelationState;
+import com.spacesim.world.FactionStockPolicyState;
+import com.spacesim.world.FactionStrategicGoalState;
 import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.GalaxyId;
 import com.spacesim.world.GalaxyTopology;
@@ -35,13 +38,13 @@ import java.util.Objects;
 /**
  * Детерминированный бинарный codec {@link WorldState}.
  *
- * <p>World codec переиспользует {@link GameStateCodec} для local simulation payload. Schema v2
- * добавила faction treasury в хвост Stage-7 schema v1; schema v3 добавляет следующим хвостом
- * diplomacy/territory policies. Decoder принимает обе legacy world schemas и мигрирует их
- * нейтрально, не создавая treasury, relations или territory из отсутствующих данных.</p>
+ * <p>Local economic payload кодируется существующим {@link GameStateCodec}. World schema v1
+ * содержит topology + local sessions, v2 добавляет treasury, а текущая v3 — strategic faction
+ * state: diplomacy, territory, stock/production policies и military/expansion goals. Legacy v1/v2
+ * мигрируются нейтрально без создания отсутствующих денег или strategic policies.</p>
  */
 public final class WorldStateCodec {
-    private static final int MAGIC = 0x53544757; // STGW — Star Empires Galaxy World.
+    private static final int MAGIC = 0x53544757;
     private static final int FILE_FORMAT_VERSION = 1;
     private static final int MAX_SAVE_BYTES = 256 * 1024 * 1024;
     private static final int MAX_GAMESTATE_PAYLOAD_BYTES = 32 * 1024 * 1024;
@@ -52,24 +55,25 @@ public final class WorldStateCodec {
     private static final int MAX_ASTEROID_FIELDS = 1_000_000;
     private static final int MAX_CONNECTIONS = 500_000;
     private static final int MAX_FACTIONS = 10_000;
+    private static final int MAX_POLICIES_PER_FACTION = 100_000;
+    private static final int MAX_GOALS_PER_FACTION = 100_000;
 
     private WorldStateCodec() {
         throw new AssertionError("WorldStateCodec не создаёт экземпляров");
     }
 
     /**
-     * Кодирует полный world snapshot в deterministic binary representation.
+     * Кодирует полный world snapshot.
      *
      * @param state валидный WorldState текущей schema
-     * @return новый массив байтов
+     * @return новый deterministic byte array
      * @throws NullPointerException если state не задан
-     * @throws IllegalArgumentException если версия неизвестна или общий размер превышает лимит
+     * @throws IllegalArgumentException если schema или размер недопустимы
      */
     public static byte[] encode(WorldState state) {
         WorldState checked = Objects.requireNonNull(state, "WorldState не задан");
         if (checked.schemaVersion() != WorldState.CURRENT_VERSION) {
-            throw new IllegalArgumentException(
-                    "Нельзя записать WorldState schema: " + checked.schemaVersion());
+            throw new IllegalArgumentException("Нельзя записать WorldState schema: " + checked.schemaVersion());
         }
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -78,16 +82,7 @@ public final class WorldStateCodec {
                 output.writeInt(FILE_FORMAT_VERSION);
                 output.writeInt(checked.schemaVersion());
                 writeTopology(output, checked.topology());
-                writeCount(output, checked.systems().size(), MAX_SYSTEMS, "systemStates");
-                for (StarSystemSimulationState systemState : checked.systems()) {
-                    output.writeLong(systemState.systemId().value());
-                    byte[] payload = GameStateCodec.encode(systemState.simulationState());
-                    if (payload.length <= 0 || payload.length > MAX_GAMESTATE_PAYLOAD_BYTES) {
-                        throw new IllegalArgumentException("GameState payload системы превышает допустимый размер");
-                    }
-                    output.writeInt(payload.length);
-                    output.write(payload);
-                }
+                writeSystems(output, checked.systems());
                 writeFactions(output, checked.factions());
                 writeFactionStrategies(output, checked.factionStrategies());
             }
@@ -102,12 +97,12 @@ public final class WorldStateCodec {
     }
 
     /**
-     * Декодирует, мигрирует и полностью валидирует world snapshot.
+     * Декодирует и мигрирует world snapshot.
      *
      * @param bytes бинарный world save
-     * @return новый immutable WorldState текущей schema
+     * @return immutable WorldState текущей schema
      * @throws NullPointerException если bytes не заданы
-     * @throws IllegalArgumentException если формат повреждён, неизвестен или превышает лимиты
+     * @throws IllegalArgumentException если save повреждён или schema неизвестна
      */
     public static WorldState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "Байты WorldState не заданы");
@@ -129,39 +124,20 @@ public final class WorldStateCodec {
                 throw new IllegalArgumentException("Неподдерживаемая WorldState schema: " + schemaVersion);
             }
             GalaxyTopology topology = readTopology(input);
-            int systemCount = readCount(input, MAX_SYSTEMS, "systemStates");
-            List<StarSystemSimulationState> systemStates = new ArrayList<>(systemCount);
-            for (int index = 0; index < systemCount; index++) {
-                StarSystemId systemId = new StarSystemId(input.readLong());
-                int payloadLength = input.readInt();
-                if (payloadLength <= 0 || payloadLength > MAX_GAMESTATE_PAYLOAD_BYTES) {
-                    throw new IllegalArgumentException("Некорректная длина GameState payload системы");
-                }
-                byte[] payload = input.readNBytes(payloadLength);
-                if (payload.length != payloadLength) {
-                    throw new EOFException("GameState payload системы оборван");
-                }
-                systemStates.add(new StarSystemSimulationState(systemId, GameStateCodec.decode(payload)));
-            }
-
-            final WorldState state;
+            List<StarSystemSimulationState> systems = readSystems(input);
+            WorldState state;
             if (schemaVersion == WorldState.LEGACY_STAGE7_VERSION) {
-                state = WorldState.fromLegacyStage7(topology, List.copyOf(systemStates));
+                state = WorldState.fromLegacyStage7(topology, systems);
             } else {
                 List<FactionEconomicState> factions = readFactions(input);
-                if (schemaVersion == WorldState.LEGACY_FACTION_TREASURY_VERSION) {
-                    state = WorldState.fromLegacyFactionTreasury(
-                            topology,
-                            List.copyOf(systemStates),
-                            factions);
-                } else {
-                    state = new WorldState(
-                            WorldState.CURRENT_VERSION,
-                            topology,
-                            List.copyOf(systemStates),
-                            factions,
-                            readFactionStrategies(input));
-                }
+                state = schemaVersion == WorldState.LEGACY_FACTION_TREASURY_VERSION
+                        ? WorldState.fromLegacyFactionTreasury(topology, systems, factions)
+                        : new WorldState(
+                                WorldState.CURRENT_VERSION,
+                                topology,
+                                systems,
+                                factions,
+                                readFactionStrategies(input));
             }
             if (input.read() != -1) {
                 throw new IllegalArgumentException("После WorldState обнаружен лишний бинарный хвост");
@@ -180,12 +156,12 @@ public final class WorldStateCodec {
     }
 
     /**
-     * Атомарно записывает world snapshot рядом с целевым файлом.
+     * Атомарно записывает world snapshot.
      *
      * @param path целевой файл
      * @param state сохраняемый WorldState
-     * @throws NullPointerException если path или state не заданы
-     * @throws IOException если файл нельзя записать или заменить
+     * @throws NullPointerException если path/state не заданы
+     * @throws IOException если файл нельзя записать
      */
     public static void write(Path path, WorldState state) throws IOException {
         Path target = Objects.requireNonNull(path, "Путь WorldState не задан").toAbsolutePath();
@@ -215,10 +191,10 @@ public final class WorldStateCodec {
      * Читает ограниченный world save с диска.
      *
      * @param path существующий файл
-     * @return decoded immutable WorldState
+     * @return decoded WorldState
      * @throws NullPointerException если path не задан
      * @throws IOException если файл нельзя прочитать
-     * @throws IllegalArgumentException если размер или бинарный формат некорректны
+     * @throws IllegalArgumentException если размер/формат некорректны
      */
     public static WorldState read(Path path) throws IOException {
         Path source = Objects.requireNonNull(path, "Путь WorldState не задан").toAbsolutePath();
@@ -229,16 +205,46 @@ public final class WorldStateCodec {
         return decode(Files.readAllBytes(source));
     }
 
-    private static void writeFactions(
-            DataOutputStream output,
-            List<FactionEconomicState> factions) throws IOException {
+    private static void writeSystems(DataOutputStream output, List<StarSystemSimulationState> systems)
+            throws IOException {
+        writeCount(output, systems.size(), MAX_SYSTEMS, "systemStates");
+        for (StarSystemSimulationState systemState : systems) {
+            output.writeLong(systemState.systemId().value());
+            byte[] payload = GameStateCodec.encode(systemState.simulationState());
+            if (payload.length <= 0 || payload.length > MAX_GAMESTATE_PAYLOAD_BYTES) {
+                throw new IllegalArgumentException("GameState payload системы превышает допустимый размер");
+            }
+            output.writeInt(payload.length);
+            output.write(payload);
+        }
+    }
+
+    private static List<StarSystemSimulationState> readSystems(DataInputStream input) throws IOException {
+        int count = readCount(input, MAX_SYSTEMS, "systemStates");
+        List<StarSystemSimulationState> systems = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            StarSystemId systemId = new StarSystemId(input.readLong());
+            int payloadLength = input.readInt();
+            if (payloadLength <= 0 || payloadLength > MAX_GAMESTATE_PAYLOAD_BYTES) {
+                throw new IllegalArgumentException("Некорректная длина GameState payload системы");
+            }
+            byte[] payload = input.readNBytes(payloadLength);
+            if (payload.length != payloadLength) {
+                throw new EOFException("GameState payload системы оборван");
+            }
+            systems.add(new StarSystemSimulationState(systemId, GameStateCodec.decode(payload)));
+        }
+        return List.copyOf(systems);
+    }
+
+    private static void writeFactions(DataOutputStream output, List<FactionEconomicState> factions)
+            throws IOException {
         writeCount(output, factions.size(), MAX_FACTIONS, "factions");
         for (FactionEconomicState faction : factions) {
-            FactionEconomicState value = Objects.requireNonNull(faction, "FactionEconomicState не задан");
-            writeString(output, value.factionContentId());
-            output.writeLong(value.treasuryMilliCredits());
-            output.writeLong(value.stationLiquidityReserveMilliCredits());
-            output.writeLong(value.maxLiquiditySupportPerDecisionMilliCredits());
+            writeString(output, faction.factionContentId());
+            output.writeLong(faction.treasuryMilliCredits());
+            output.writeLong(faction.stationLiquidityReserveMilliCredits());
+            output.writeLong(faction.maxLiquiditySupportPerDecisionMilliCredits());
         }
     }
 
@@ -247,10 +253,7 @@ public final class WorldStateCodec {
         List<FactionEconomicState> factions = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             factions.add(new FactionEconomicState(
-                    readString(input),
-                    input.readLong(),
-                    input.readLong(),
-                    input.readLong()));
+                    readString(input), input.readLong(), input.readLong(), input.readLong()));
         }
         return List.copyOf(factions);
     }
@@ -259,8 +262,7 @@ public final class WorldStateCodec {
             DataOutputStream output,
             List<FactionStrategicState> strategies) throws IOException {
         writeCount(output, strategies.size(), MAX_FACTIONS, "factionStrategies");
-        for (FactionStrategicState strategy : strategies) {
-            FactionStrategicState value = Objects.requireNonNull(strategy, "FactionStrategicState не задан");
+        for (FactionStrategicState value : strategies) {
             writeString(output, value.factionContentId());
             output.writeInt(value.minimumMarketAccessRelation());
             writeCount(output, value.relations().size(), MAX_FACTIONS, "factionRelations");
@@ -271,6 +273,26 @@ public final class WorldStateCodec {
             writeCount(output, value.controlledSystems().size(), MAX_SYSTEMS, "controlledSystems");
             for (StarSystemId systemId : value.controlledSystems()) {
                 output.writeLong(systemId.value());
+            }
+            writeCount(output, value.stockPolicies().size(), MAX_POLICIES_PER_FACTION, "stockPolicies");
+            for (FactionStockPolicyState policy : value.stockPolicies()) {
+                writeString(output, policy.itemContentId());
+                output.writeInt(policy.targetStockFloor());
+            }
+            writeCount(output, value.productionPolicies().size(), MAX_POLICIES_PER_FACTION, "productionPolicies");
+            for (FactionProductionPolicyState policy : value.productionPolicies()) {
+                writeString(output, policy.stationArchetypeContentId());
+                writeString(output, policy.recipeContentId());
+            }
+            writeCount(output, value.strategicGoals().size(), MAX_GOALS_PER_FACTION, "strategicGoals");
+            for (FactionStrategicGoalState goal : value.strategicGoals()) {
+                writeString(output, goal.goalId());
+                writeString(output, goal.type().name());
+                writeCount(output, goal.demandFloors().size(), MAX_POLICIES_PER_FACTION, "goalDemandFloors");
+                for (FactionStockPolicyState demand : goal.demandFloors()) {
+                    writeString(output, demand.itemContentId());
+                    output.writeInt(demand.targetStockFloor());
+                }
             }
         }
     }
@@ -291,11 +313,41 @@ public final class WorldStateCodec {
             for (int systemIndex = 0; systemIndex < systemCount; systemIndex++) {
                 controlledSystems.add(new StarSystemId(input.readLong()));
             }
+            int stockCount = readCount(input, MAX_POLICIES_PER_FACTION, "stockPolicies");
+            List<FactionStockPolicyState> stockPolicies = new ArrayList<>(stockCount);
+            for (int policyIndex = 0; policyIndex < stockCount; policyIndex++) {
+                stockPolicies.add(new FactionStockPolicyState(readString(input), input.readInt()));
+            }
+            int productionCount = readCount(input, MAX_POLICIES_PER_FACTION, "productionPolicies");
+            List<FactionProductionPolicyState> productionPolicies = new ArrayList<>(productionCount);
+            for (int policyIndex = 0; policyIndex < productionCount; policyIndex++) {
+                productionPolicies.add(new FactionProductionPolicyState(readString(input), readString(input)));
+            }
+            int goalCount = readCount(input, MAX_GOALS_PER_FACTION, "strategicGoals");
+            List<FactionStrategicGoalState> goals = new ArrayList<>(goalCount);
+            for (int goalIndex = 0; goalIndex < goalCount; goalIndex++) {
+                String goalId = readString(input);
+                FactionStrategicGoalState.GoalType type;
+                try {
+                    type = FactionStrategicGoalState.GoalType.valueOf(readString(input));
+                } catch (IllegalArgumentException exception) {
+                    throw new IllegalArgumentException("Неизвестный strategic goal type", exception);
+                }
+                int demandCount = readCount(input, MAX_POLICIES_PER_FACTION, "goalDemandFloors");
+                List<FactionStockPolicyState> demands = new ArrayList<>(demandCount);
+                for (int demandIndex = 0; demandIndex < demandCount; demandIndex++) {
+                    demands.add(new FactionStockPolicyState(readString(input), input.readInt()));
+                }
+                goals.add(new FactionStrategicGoalState(goalId, type, List.copyOf(demands)));
+            }
             strategies.add(new FactionStrategicState(
                     factionId,
                     threshold,
                     List.copyOf(relations),
-                    List.copyOf(controlledSystems)));
+                    List.copyOf(controlledSystems),
+                    List.copyOf(stockPolicies),
+                    List.copyOf(productionPolicies),
+                    List.copyOf(goals)));
         }
         return List.copyOf(strategies);
     }
@@ -322,7 +374,6 @@ public final class WorldStateCodec {
                 writeString(output, system.name());
                 output.writeDouble(system.x());
                 output.writeDouble(system.y());
-
                 int planetCount = system.planets().size();
                 if (planetCount > MAX_PLANETS - totalPlanets) {
                     throw new IllegalArgumentException("Topology содержит слишком много PlanetNode");
@@ -334,7 +385,6 @@ public final class WorldStateCodec {
                     writeString(output, planet.name());
                     output.writeDouble(planet.orbitRadius());
                 }
-
                 int fieldCount = system.asteroidFields().size();
                 if (fieldCount > MAX_ASTEROID_FIELDS - totalFields) {
                     throw new IllegalArgumentException("Topology содержит слишком много AsteroidFieldNode");
@@ -379,7 +429,6 @@ public final class WorldStateCodec {
                 String systemName = readString(input);
                 double x = input.readDouble();
                 double y = input.readDouble();
-
                 int planetCount = readCount(input, MAX_PLANETS, "planets");
                 if (planetCount > MAX_PLANETS - totalPlanets) {
                     throw new IllegalArgumentException("Topology содержит слишком много PlanetNode");
@@ -388,11 +437,8 @@ public final class WorldStateCodec {
                 List<PlanetNode> planets = new ArrayList<>(planetCount);
                 for (int planetIndex = 0; planetIndex < planetCount; planetIndex++) {
                     planets.add(new PlanetNode(
-                            new PlanetId(input.readLong()),
-                            readString(input),
-                            input.readDouble()));
+                            new PlanetId(input.readLong()), readString(input), input.readDouble()));
                 }
-
                 int fieldCount = readCount(input, MAX_ASTEROID_FIELDS, "asteroidFields");
                 if (fieldCount > MAX_ASTEROID_FIELDS - totalFields) {
                     throw new IllegalArgumentException("Topology содержит слишком много AsteroidFieldNode");
@@ -408,12 +454,7 @@ public final class WorldStateCodec {
                             input.readDouble()));
                 }
                 systems.add(new StarSystemNode(
-                        systemId,
-                        systemName,
-                        x,
-                        y,
-                        List.copyOf(planets),
-                        List.copyOf(fields)));
+                        systemId, systemName, x, y, List.copyOf(planets), List.copyOf(fields)));
             }
             sectors.add(new SectorNode(sectorId, sectorName, List.copyOf(systems)));
         }
@@ -421,15 +462,13 @@ public final class WorldStateCodec {
         List<JumpConnection> connections = new ArrayList<>(connectionCount);
         for (int index = 0; index < connectionCount; index++) {
             connections.add(new JumpConnection(
-                    new StarSystemId(input.readLong()),
-                    new StarSystemId(input.readLong())));
+                    new StarSystemId(input.readLong()), new StarSystemId(input.readLong())));
         }
         return new GalaxyTopology(galaxyId, galaxyName, List.copyOf(sectors), List.copyOf(connections));
     }
 
     private static void writeString(DataOutputStream output, String value) throws IOException {
-        byte[] bytes = Objects.requireNonNull(value, "Persistent string не задан")
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = Objects.requireNonNull(value, "Persistent string не задан").getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_STRING_BYTES) {
             throw new IllegalArgumentException("Persistent string превышает допустимый размер");
         }
