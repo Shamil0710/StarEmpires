@@ -4,6 +4,7 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Version;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -15,8 +16,13 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
 import com.spacesim.presentation.PresentationLayer;
 import com.spacesim.presentation.PresentationPipeline;
+import com.spacesim.presentation.asset.ProjectShipSprites;
+import com.spacesim.presentation.asset.ShipSpriteSpec;
+import com.spacesim.presentation.asset.VisualHardpoint;
+import com.spacesim.presentation.asset.VisualHardpointType;
 import java.util.Locale;
 
 /**
@@ -25,7 +31,9 @@ import java.util.Locale;
  * <p>The scene is deliberately presentation-only and does not create a {@code SimulationSession}.
  * It exercises the production desktop backend with batched sprites, a fixed representative object
  * load, additive emissive/particle work, an off-screen framebuffer, a post-process shader and an
- * on-screen metrics HUD. Procedural textures are validation fixtures, not production art.</p>
+ * on-screen metrics HUD. When the project heavy-corvette texture is present in resources, ship zero
+ * becomes the real authored sprite and its declared hardpoints drive engine and weapon effects.
+ * Procedural textures remain a deterministic fallback and mass-load fixture.</p>
  */
 public final class GraphicsValidationApp extends ApplicationAdapter {
     private static final int FRAME_WINDOW_SIZE = 240;
@@ -34,6 +42,7 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
     private static final float SHIP_BASE_HEIGHT = 30f;
     private static final float ASTEROID_BASE_SIZE = 24f;
     private static final float PARTICLE_SIZE = 9f;
+    private static final int HERO_SHIP_INDEX = 0;
 
     private static final String POST_VERTEX_SHADER =
             "attribute vec4 a_position;\n"
@@ -67,6 +76,8 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
     private final GraphicsValidationProfile profile = GraphicsValidationProfile.representative();
     private final FrameTimeWindow frameTimes = new FrameTimeWindow(FRAME_WINDOW_SIZE);
     private final PresentationPipeline<Float> pipeline = new PresentationPipeline<>();
+    private final ShipSpriteSpec heavyCorvetteSpec = ProjectShipSprites.whiteHeavyCorvette01();
+    private final Vector2 transformedHardpoint = new Vector2();
 
     private OrthographicCamera camera;
     private SpriteBatch batch;
@@ -75,16 +86,20 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
     private Texture asteroidTexture;
     private Texture glowTexture;
     private Texture whiteTexture;
+    private Texture heavyCorvetteTexture;
+    private Texture heavyCorvetteEmissiveTexture;
     private TextureRegion shipRegion;
     private TextureRegion asteroidRegion;
     private TextureRegion glowRegion;
+    private TextureRegion heavyCorvetteRegion;
+    private TextureRegion heavyCorvetteEmissiveRegion;
     private FrameBuffer sceneBuffer;
     private TextureRegion sceneRegion;
     private ShaderProgram postShader;
     private float elapsedSeconds;
     private int frameDrawCalls;
 
-    /** Creates GPU fixtures, post-processing resources and ordered presentation passes. */
+    /** Creates GPU fixtures, optional authored ship resources and ordered presentation passes. */
     @Override
     public void create() {
         camera = new OrthographicCamera();
@@ -99,6 +114,7 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
         shipRegion = new TextureRegion(shipTexture);
         asteroidRegion = new TextureRegion(asteroidTexture);
         glowRegion = new TextureRegion(glowTexture);
+        loadHeavyCorvetteAssets();
 
         postShader = new ShaderProgram(POST_VERTEX_SHADER, POST_FRAGMENT_SHADER);
         if (!postShader.isCompiled()) {
@@ -147,6 +163,12 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
         if (postShader != null) {
             postShader.dispose();
         }
+        if (heavyCorvetteTexture != null) {
+            heavyCorvetteTexture.dispose();
+        }
+        if (heavyCorvetteEmissiveTexture != null) {
+            heavyCorvetteEmissiveTexture.dispose();
+        }
         if (shipTexture != null) {
             shipTexture.dispose();
         }
@@ -164,6 +186,27 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
         }
         if (batch != null) {
             batch.dispose();
+        }
+    }
+
+    private void loadHeavyCorvetteAssets() {
+        FileHandle baseHandle = Gdx.files.internal(heavyCorvetteSpec.baseTexturePath());
+        if (baseHandle.exists()) {
+            heavyCorvetteTexture = new Texture(baseHandle);
+            heavyCorvetteTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+            heavyCorvetteRegion = new TextureRegion(heavyCorvetteTexture);
+        }
+
+        String emissivePath = heavyCorvetteSpec.emissiveTexturePath();
+        if (emissivePath != null) {
+            FileHandle emissiveHandle = Gdx.files.internal(emissivePath);
+            if (emissiveHandle.exists()) {
+                heavyCorvetteEmissiveTexture = new Texture(emissiveHandle);
+                heavyCorvetteEmissiveTexture.setFilter(
+                        Texture.TextureFilter.Linear,
+                        Texture.TextureFilter.Linear);
+                heavyCorvetteEmissiveRegion = new TextureRegion(heavyCorvetteEmissiveTexture);
+            }
         }
     }
 
@@ -213,6 +256,12 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
 
         for (int index = 0; index < profile.shipCount(); index++) {
             ShipPose pose = shipPose(index);
+            if (index == HERO_SHIP_INDEX && hasHeavyCorvette()) {
+                drawHeavyCorvetteBase(pose);
+                drawDamageMark(pose, heavyCorvetteSpec.worldWidth(), heavyCorvetteSpec.worldHeight());
+                continue;
+            }
+
             float classScale = 0.76f + (index % 5) * 0.12f;
             float width = SHIP_BASE_WIDTH * classScale;
             float height = SHIP_BASE_HEIGHT * classScale;
@@ -241,6 +290,23 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
         frameDrawCalls += batch.renderCalls;
     }
 
+    private void drawHeavyCorvetteBase(ShipPose pose) {
+        float width = heavyCorvetteSpec.worldWidth();
+        float height = heavyCorvetteSpec.worldHeight();
+        batch.setColor(Color.WHITE);
+        batch.draw(
+                heavyCorvetteRegion,
+                pose.x - width * heavyCorvetteSpec.pivotX(),
+                pose.y - height * heavyCorvetteSpec.pivotY(),
+                width * heavyCorvetteSpec.pivotX(),
+                height * heavyCorvetteSpec.pivotY(),
+                width,
+                height,
+                1f,
+                1f,
+                pose.rotationDegrees);
+    }
+
     private void drawEffects(float deltaSeconds) {
         batch.setProjectionMatrix(camera.combined);
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
@@ -248,13 +314,18 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
 
         for (int index = 0; index < profile.shipCount(); index++) {
             ShipPose pose = shipPose(index);
-            float radians = pose.rotationDegrees * MathUtils.degreesToRadians;
-            float glowX = pose.x - MathUtils.cos(radians) * 31f;
-            float glowY = pose.y - MathUtils.sin(radians) * 31f;
-            float pulse = 0.82f + MathUtils.sin(elapsedSeconds * 8f + index * 0.37f) * 0.18f;
-            float size = 34f * pulse;
-            batch.setColor(0.20f, 0.55f, 1f, 0.58f);
-            batch.draw(glowRegion, glowX - size * 0.5f, glowY - size * 0.5f, size, size);
+            if (index == HERO_SHIP_INDEX && hasHeavyCorvette()) {
+                drawHeavyCorvetteEmissive(pose);
+                drawHeavyCorvetteEngineGlows(pose);
+            } else {
+                float radians = pose.rotationDegrees * MathUtils.degreesToRadians;
+                float glowX = pose.x - MathUtils.cos(radians) * 31f;
+                float glowY = pose.y - MathUtils.sin(radians) * 31f;
+                float pulse = 0.82f + MathUtils.sin(elapsedSeconds * 8f + index * 0.37f) * 0.18f;
+                float size = 34f * pulse;
+                batch.setColor(0.20f, 0.55f, 1f, 0.58f);
+                batch.draw(glowRegion, glowX - size * 0.5f, glowY - size * 0.5f, size, size);
+            }
         }
 
         int particlesPerShip = Math.max(1, profile.particleCount() / profile.shipCount());
@@ -262,20 +333,30 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
             int shipIndex = index % profile.shipCount();
             int localIndex = index / profile.shipCount();
             ShipPose pose = shipPose(shipIndex);
-            float radians = pose.rotationDegrees * MathUtils.degreesToRadians;
             float phase = (localIndex + elapsedSeconds * 26f + hash01(index, 607)) % particlesPerShip;
-            float distance = 20f + phase * 2.5f;
-            float side = (hash01(index, 701) - 0.5f) * (6f + phase * 0.35f);
-            float x = pose.x - MathUtils.cos(radians) * distance - MathUtils.sin(radians) * side;
-            float y = pose.y - MathUtils.sin(radians) * distance + MathUtils.cos(radians) * side;
-            float alpha = Math.max(0.05f, 1f - phase / particlesPerShip);
-            float size = PARTICLE_SIZE * (0.55f + alpha);
-            batch.setColor(0.10f + alpha * 0.22f, 0.38f + alpha * 0.32f, 1f, alpha * 0.44f);
-            batch.draw(glowRegion, x - size * 0.5f, y - size * 0.5f, size, size);
+
+            if (shipIndex == HERO_SHIP_INDEX && hasHeavyCorvette()) {
+                drawHeavyCorvetteParticle(index, phase, particlesPerShip, pose);
+            } else {
+                float radians = pose.rotationDegrees * MathUtils.degreesToRadians;
+                float distance = 20f + phase * 2.5f;
+                float side = (hash01(index, 701) - 0.5f) * (6f + phase * 0.35f);
+                float x = pose.x - MathUtils.cos(radians) * distance - MathUtils.sin(radians) * side;
+                float y = pose.y - MathUtils.sin(radians) * distance + MathUtils.cos(radians) * side;
+                float alpha = Math.max(0.05f, 1f - phase / particlesPerShip);
+                float size = PARTICLE_SIZE * (0.55f + alpha);
+                batch.setColor(0.10f + alpha * 0.22f, 0.38f + alpha * 0.32f, 1f, alpha * 0.44f);
+                batch.draw(glowRegion, x - size * 0.5f, y - size * 0.5f, size, size);
+            }
         }
 
-        ShipPose shieldPose = shipPose(0);
-        float shieldPulse = 88f + MathUtils.sin(elapsedSeconds * 4f) * 12f;
+        ShipPose shieldPose = shipPose(HERO_SHIP_INDEX);
+        float shieldPulse = hasHeavyCorvette()
+                ? Math.max(heavyCorvetteSpec.worldWidth(), heavyCorvetteSpec.worldHeight()) * 1.18f
+                : 88f + MathUtils.sin(elapsedSeconds * 4f) * 12f;
+        if (hasHeavyCorvette()) {
+            shieldPulse += MathUtils.sin(elapsedSeconds * 4f) * 10f;
+        }
         batch.setColor(0.18f, 0.62f, 1f, 0.18f);
         batch.draw(
                 glowRegion,
@@ -288,6 +369,67 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
         batch.end();
         frameDrawCalls += batch.renderCalls;
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+    }
+
+    private void drawHeavyCorvetteEmissive(ShipPose pose) {
+        if (heavyCorvetteEmissiveRegion == null) {
+            return;
+        }
+        float width = heavyCorvetteSpec.worldWidth();
+        float height = heavyCorvetteSpec.worldHeight();
+        float pulse = 0.82f + MathUtils.sin(elapsedSeconds * 5.5f) * 0.12f;
+        batch.setColor(1f, 0.86f, 0.58f, pulse);
+        batch.draw(
+                heavyCorvetteEmissiveRegion,
+                pose.x - width * heavyCorvetteSpec.pivotX(),
+                pose.y - height * heavyCorvetteSpec.pivotY(),
+                width * heavyCorvetteSpec.pivotX(),
+                height * heavyCorvetteSpec.pivotY(),
+                width,
+                height,
+                1f,
+                1f,
+                pose.rotationDegrees);
+    }
+
+    private void drawHeavyCorvetteEngineGlows(ShipPose pose) {
+        float pulse = 0.82f + MathUtils.sin(elapsedSeconds * 8f) * 0.18f;
+        for (VisualHardpoint hardpoint : heavyCorvetteSpec.hardpoints()) {
+            if (hardpoint.type() != VisualHardpointType.ENGINE) {
+                continue;
+            }
+            transformHardpoint(pose, hardpoint, transformedHardpoint);
+            float size = 30f * pulse;
+            batch.setColor(0.16f, 0.52f, 1f, 0.72f);
+            batch.draw(
+                    glowRegion,
+                    transformedHardpoint.x - size * 0.5f,
+                    transformedHardpoint.y - size * 0.5f,
+                    size,
+                    size);
+        }
+    }
+
+    private void drawHeavyCorvetteParticle(
+            int particleIndex,
+            float phase,
+            int particlesPerShip,
+            ShipPose pose) {
+        VisualHardpoint engine = engineHardpoint(particleIndex);
+        transformHardpoint(pose, engine, transformedHardpoint);
+        float direction = (pose.rotationDegrees + engine.directionDegrees()) * MathUtils.degreesToRadians;
+        float distance = 5f + phase * 2.25f;
+        float side = (hash01(particleIndex, 701) - 0.5f) * (5f + phase * 0.25f);
+        float x = transformedHardpoint.x
+                + MathUtils.cos(direction) * distance
+                - MathUtils.sin(direction) * side;
+        float y = transformedHardpoint.y
+                + MathUtils.sin(direction) * distance
+                + MathUtils.cos(direction) * side;
+        float alpha = Math.max(0.05f, 1f - phase / particlesPerShip);
+        float size = PARTICLE_SIZE * (0.55f + alpha);
+        batch.setColor(0.08f + alpha * 0.20f, 0.34f + alpha * 0.34f, 1f, alpha * 0.52f);
+        batch.draw(glowRegion, x - size * 0.5f, y - size * 0.5f, size, size);
     }
 
     private void compositeScene(float deltaSeconds) {
@@ -339,12 +481,18 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
                 frameDrawCalls,
                 batch.maxSpritesInBatch,
                 usedMegabytes);
+        String line5 = hasHeavyCorvette()
+                ? "hero asset REAL HEAVY CORVETTE | hardpoint VFX ON | emissive "
+                        + (heavyCorvetteEmissiveRegion == null ? "MISSING/OPTIONAL" : "ON")
+                : "hero asset PROCEDURAL FALLBACK | add white_heavy_corvette_01_base.png to resources";
 
         font.setColor(0.82f, 0.91f, 1f, 1f);
         font.draw(batch, line1, 22f, camera.viewportHeight - 22f);
         font.draw(batch, line2, 22f, camera.viewportHeight - 44f);
         font.draw(batch, line3, 22f, camera.viewportHeight - 66f);
         font.draw(batch, line4, 22f, camera.viewportHeight - 88f);
+        font.setColor(hasHeavyCorvette() ? 0.58f : 1f, hasHeavyCorvette() ? 1f : 0.72f, 0.62f, 1f);
+        font.draw(batch, line5, 22f, camera.viewportHeight - 110f);
         font.setColor(Color.WHITE);
         batch.end();
         frameDrawCalls += batch.renderCalls;
@@ -362,17 +510,31 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
     }
 
     private void drawValidationBeam() {
-        ShipPose source = shipPose(2);
         ShipPose target = shipPose(3);
-        float dx = target.x - source.x;
-        float dy = target.y - source.y;
+        float sourceX;
+        float sourceY;
+
+        if (hasHeavyCorvette()) {
+            ShipPose source = shipPose(HERO_SHIP_INDEX);
+            VisualHardpoint muzzle = hardpoint("weapon_nose_primary");
+            transformHardpoint(source, muzzle, transformedHardpoint);
+            sourceX = transformedHardpoint.x;
+            sourceY = transformedHardpoint.y;
+        } else {
+            ShipPose source = shipPose(2);
+            sourceX = source.x;
+            sourceY = source.y;
+        }
+
+        float dx = target.x - sourceX;
+        float dy = target.y - sourceY;
         float length = (float) Math.sqrt(dx * dx + dy * dy);
         float angle = MathUtils.atan2Deg(dy, dx);
         batch.setColor(0.35f, 0.92f, 1f, 0.72f);
         batch.draw(
                 whiteTexture,
-                source.x,
-                source.y - 1.5f,
+                sourceX,
+                sourceY - 1.5f,
                 0f,
                 1.5f,
                 length,
@@ -386,6 +548,47 @@ public final class GraphicsValidationApp extends ApplicationAdapter {
                 1,
                 false,
                 false);
+    }
+
+    private VisualHardpoint engineHardpoint(int particleIndex) {
+        int targetOrdinal = Math.floorMod(particleIndex, 3);
+        int currentOrdinal = 0;
+        for (VisualHardpoint hardpoint : heavyCorvetteSpec.hardpoints()) {
+            if (hardpoint.type() != VisualHardpointType.ENGINE) {
+                continue;
+            }
+            if (currentOrdinal == targetOrdinal) {
+                return hardpoint;
+            }
+            currentOrdinal++;
+        }
+        throw new IllegalStateException("Heavy corvette must define three engine hardpoints");
+    }
+
+    private VisualHardpoint hardpoint(String id) {
+        for (VisualHardpoint hardpoint : heavyCorvetteSpec.hardpoints()) {
+            if (id.equals(hardpoint.id())) {
+                return hardpoint;
+            }
+        }
+        throw new IllegalStateException("Missing heavy-corvette hardpoint: " + id);
+    }
+
+    private Vector2 transformHardpoint(ShipPose pose, VisualHardpoint hardpoint, Vector2 output) {
+        float width = heavyCorvetteSpec.worldWidth();
+        float height = heavyCorvetteSpec.worldHeight();
+        float localX = (hardpoint.normalizedX() - heavyCorvetteSpec.pivotX()) * width;
+        float localY = (hardpoint.normalizedY() - heavyCorvetteSpec.pivotY()) * height;
+        float radians = pose.rotationDegrees * MathUtils.degreesToRadians;
+        float cos = MathUtils.cos(radians);
+        float sin = MathUtils.sin(radians);
+        return output.set(
+                pose.x + localX * cos - localY * sin,
+                pose.y + localX * sin + localY * cos);
+    }
+
+    private boolean hasHeavyCorvette() {
+        return heavyCorvetteRegion != null;
     }
 
     private ShipPose shipPose(int index) {
