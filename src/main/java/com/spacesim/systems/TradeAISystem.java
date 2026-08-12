@@ -58,7 +58,6 @@ public class TradeAISystem extends IteratingSystem {
     private final MarketDirectory marketDirectory;
     private final TradeRoutePlanner routePlanner;
     private ImmutableArray<Entity> marketStations;
-    private ImmutableArray<Entity> tradeFleets;
 
     private final ComponentMapper<TradeAIComponent> am = ComponentMapper.getFor(TradeAIComponent.class);
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
@@ -157,7 +156,7 @@ public class TradeAISystem extends IteratingSystem {
     }
 
     /**
-     * Подключает registry к Engine и получает живые представления рынков и торговых флотов.
+     * Подключает registry к Engine и получает живое представление идентифицированных рынков.
      *
      * @param engine Ashley-движок
      */
@@ -171,20 +170,10 @@ public class TradeAISystem extends IteratingSystem {
                 MarketComponent.class,
                 InventoryComponent.class,
                 WalletComponent.class).get());
-        tradeFleets = engine.getEntitiesFor(Family.all(
-                EntityIdComponent.class,
-                TradeAIComponent.class,
-                TransformComponent.class,
-                InventoryComponent.class,
-                WalletComponent.class).get());
     }
 
     /**
-     * Перестраивает общий market snapshot только если в текущем tick реально потребуется route
-     * planning, затем исполняет торговые автоматы.
-     *
-     * <p>Когда planning нужен, snapshot по-прежнему создаётся до BUYING/SELLING mutations этого
-     * update, поэтому IDLE fleets видят тот же pre-trade market state, что и до оптимизации.</p>
+     * Перестраивает общий market snapshot и исполняет торговые автоматы.
      *
      * @param deltaTime прошедшее игровое время в секундах
      */
@@ -193,26 +182,8 @@ public class TradeAISystem extends IteratingSystem {
         if (!Float.isFinite(deltaTime) || deltaTime < 0f) {
             return;
         }
-        if (requiresRoutePlanning(deltaTime)) {
-            marketDirectory.rebuild(marketStations);
-        }
+        marketDirectory.rebuild(marketStations);
         super.update(deltaTime);
-    }
-
-    private boolean requiresRoutePlanning(float deltaTime) {
-        if (tradeFleets == null) {
-            return false;
-        }
-        for (Entity fleet : tradeFleets) {
-            TradeAIComponent ai = am.get(fleet);
-            if (ai == null || ai.state != TradeAIComponent.State.IDLE) {
-                continue;
-            }
-            if (!(ai.routeSearchCooldown > deltaTime)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** Исполняет текущее состояние одного торгового флота. */
