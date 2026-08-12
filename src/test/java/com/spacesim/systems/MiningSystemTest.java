@@ -4,6 +4,7 @@ import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.spacesim.components.AsteroidComponent;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
@@ -16,15 +17,17 @@ import com.spacesim.constants.Constants;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
 import com.spacesim.model.ShipType;
+import com.spacesim.persistence.EntityId;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MiningSystemTest {
+    private long nextEntityId = 1L;
+
     @Test
     void извлечениеПереноситРесурсИзАстероидаВТрюмБезСозданияТовара() {
         EconomicLedger ledger = new EconomicLedger();
@@ -35,9 +38,9 @@ class MiningSystemTest {
         engine.addEntity(asteroid);
 
         long resourceBefore = resourcePool(miner, asteroid);
-        engine.update(0f); // search
-        engine.update(0f); // arrive
-        engine.update(1f); // mine two units
+        engine.update(0f);
+        engine.update(0f);
+        engine.update(1f);
 
         assertEquals(resourceBefore, resourcePool(miner, asteroid));
         assertEquals(8L, asteroid.getComponent(AsteroidComponent.class).remainingResource);
@@ -53,20 +56,20 @@ class MiningSystemTest {
         Entity base = base("Base", 0f, 10f, 1_000d, 0, 100);
         Entity miner = miner("Miner", 0f, 2, 2f, 100d);
         Entity asteroid = asteroid("A-1", 0f, 10L);
-        mining(miner).homeBase = base;
+        mining(miner).homeBaseId = id(base);
         engine.addEntity(base);
         engine.addEntity(miner);
         engine.addEntity(asteroid);
 
         long moneyBefore = wallet(base).getBalanceMilliCredits() + wallet(miner).getBalanceMilliCredits();
 
-        engine.update(0f); // search
-        engine.update(0f); // arrive asteroid
-        engine.update(1f); // cargo full -> returning
+        engine.update(0f);
+        engine.update(0f);
+        engine.update(1f);
         assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
-        engine.update(0f); // arrive base
+        engine.update(0f);
         assertEquals(MiningComponent.State.UNLOADING, mining(miner).state);
-        engine.update(0f); // sell
+        engine.update(0f);
 
         assertEquals(0, inventory(miner).stock[Constants.ITEM_ORE]);
         assertEquals(2, inventory(base).stock[Constants.ITEM_ORE]);
@@ -94,7 +97,7 @@ class MiningSystemTest {
         assertEquals(1, inventory(miner).stock[Constants.ITEM_ORE]);
         assertEquals(1L, mining(miner).totalMined);
         assertFalse(engine.getEntitiesFor(Family.all(AsteroidComponent.class).get()).contains(asteroid, true));
-        assertNull(mining(miner).targetAsteroid);
+        assertNull(mining(miner).targetAsteroidId);
         assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
     }
 
@@ -105,14 +108,14 @@ class MiningSystemTest {
         Entity miner = miner("Miner", 0f, 10, 1f, 100d);
         inventory(miner).stock[Constants.ITEM_ORE] = 1;
         mining(miner).state = MiningComponent.State.RETURNING_TO_BASE;
-        mining(miner).homeBase = poorBase;
+        mining(miner).homeBaseId = id(poorBase);
         engine.addEntity(poorBase);
         engine.addEntity(miner);
 
         engine.update(0f);
 
         assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
-        assertNull(mining(miner).homeBase);
+        assertNull(mining(miner).homeBaseId);
         assertEquals(1, inventory(miner).stock[Constants.ITEM_ORE]);
     }
 
@@ -124,14 +127,14 @@ class MiningSystemTest {
         Entity miner = miner("Miner", 0f, 10, 1f, 0d);
         inventory(miner).stock[Constants.ITEM_ORE] = 1;
         mining(miner).state = MiningComponent.State.RETURNING_TO_BASE;
-        mining(miner).homeBase = poor;
+        mining(miner).homeBaseId = id(poor);
         engine.addEntity(poor);
         engine.addEntity(good);
         engine.addEntity(miner);
 
         engine.update(0f);
 
-        assertSame(good, mining(miner).homeBase);
+        assertEquals(id(good), mining(miner).homeBaseId);
         assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
     }
 
@@ -143,7 +146,7 @@ class MiningSystemTest {
         Entity miner = miner("Miner", 0f, 10, 1f, 0d);
         inventory(miner).stock[Constants.ITEM_ORE] = 3;
         mining(miner).state = MiningComponent.State.UNLOADING;
-        mining(miner).homeBase = base;
+        mining(miner).homeBaseId = id(base);
         engine.addEntity(base);
         engine.addEntity(miner);
 
@@ -155,7 +158,7 @@ class MiningSystemTest {
         assertEquals(Money.fromCredits(5d), wallet(base).getBalanceMilliCredits());
         assertEquals(1L, mining(miner).totalDelivered);
         assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
-        assertNull(mining(miner).homeBase);
+        assertNull(mining(miner).homeBaseId);
         assertEquals(1, ledger.size());
     }
 
@@ -166,13 +169,13 @@ class MiningSystemTest {
         Entity miner = miner("Miner", 0f, 10, 1f, 100d);
         inventory(miner).stock[Constants.ITEM_ORE] = 1;
         mining(miner).state = MiningComponent.State.RETURNING_TO_BASE;
-        mining(miner).homeBase = full;
+        mining(miner).homeBaseId = id(full);
         engine.addEntity(full);
         engine.addEntity(miner);
 
         engine.update(0f);
 
-        assertNull(mining(miner).homeBase);
+        assertNull(mining(miner).homeBaseId);
         assertEquals(MiningComponent.State.RETURNING_TO_BASE, mining(miner).state);
     }
 
@@ -188,7 +191,7 @@ class MiningSystemTest {
 
         engine.update(0f);
 
-        assertSame(near, mining(miner).targetAsteroid);
+        assertEquals(id(near), mining(miner).targetAsteroidId);
         assertEquals(MiningComponent.State.TRAVEL_TO_ASTEROID, mining(miner).state);
     }
 
@@ -259,6 +262,21 @@ class MiningSystemTest {
     }
 
     @Test
+    void объектБезPersistentIdНеУчаствуетВДобывающейСимуляции() {
+        Engine engine = engine(new EconomicLedger());
+        Entity miner = miner("Miner", 0f, 10, 1f, 100d);
+        miner.remove(EntityIdComponent.class);
+        Entity asteroid = asteroid("A", 0f, 10L);
+        engine.addEntity(miner);
+        engine.addEntity(asteroid);
+
+        engine.update(1f);
+
+        assertEquals(MiningComponent.State.SEARCHING, mining(miner).state);
+        assertNull(mining(miner).targetAsteroidId);
+    }
+
+    @Test
     void отрицательныйИНеконечныйDeltaИгнорируются() {
         Engine engine = engine(new EconomicLedger());
         Entity miner = miner("Miner", 0f, 10, 1f, 100d);
@@ -270,7 +288,7 @@ class MiningSystemTest {
         engine.update(Float.NaN);
 
         assertEquals(MiningComponent.State.SEARCHING, mining(miner).state);
-        assertNull(mining(miner).targetAsteroid);
+        assertNull(mining(miner).targetAsteroidId);
     }
 
     @Test
@@ -305,22 +323,22 @@ class MiningSystemTest {
         mining.movementSpeed = 100f;
         mining.extractionRange = 1f;
         mining.dockingRange = 1f;
-        return new Entity()
+        return identified(new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
                 .add(inventory)
                 .add(new WalletComponent(Money.fromCredits(credits)))
                 .add(new ShipComponent(ShipType.MINING_SHIP))
-                .add(mining);
+                .add(mining));
     }
 
     private Entity asteroid(String name, float x, long resource) {
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, 0f);
-        return new Entity()
+        return identified(new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.ASTEROID))
                 .add(transform)
-                .add(new AsteroidComponent(name, Constants.ITEM_ORE, resource));
+                .add(new AsteroidComponent(name, Constants.ITEM_ORE, resource)));
     }
 
     private Entity base(
@@ -340,12 +358,20 @@ class MiningSystemTest {
         market.buyPrices[Constants.ITEM_ORE] = buyPrice;
         market.sellPrices[Constants.ITEM_ORE] = buyPrice * 1.1f;
         market.isDirty = false;
-        return new Entity()
+        return identified(new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.STATION))
                 .add(transform)
                 .add(inventory)
                 .add(market)
-                .add(new WalletComponent(Money.fromCredits(credits)));
+                .add(new WalletComponent(Money.fromCredits(credits))));
+    }
+
+    private Entity identified(Entity entity) {
+        return entity.add(new EntityIdComponent(new EntityId(nextEntityId++)));
+    }
+
+    private EntityId id(Entity entity) {
+        return entity.getComponent(EntityIdComponent.class).id;
     }
 
     private MiningComponent mining(Entity entity) {
