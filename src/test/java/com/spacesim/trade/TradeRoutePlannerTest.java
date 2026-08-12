@@ -13,6 +13,7 @@ import com.spacesim.economy.Money;
 import com.spacesim.persistence.EntityId;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -85,6 +86,27 @@ class TradeRoutePlannerTest {
 
         assertEquals(7, snapshot.stock(Constants.ITEM_FOOD));
         assertEquals(10f, snapshot.sellPrice(Constants.ITEM_FOOD), 0f);
+    }
+
+    @Test
+    void opportunityShortlistЛинейноОграниченЧисломSuppliers() {
+        List<Entity> markets = new ArrayList<>();
+        for (int index = 0; index < 40; index++) {
+            markets.add(station(index * 10f, 100, 100, 1f, 10f + index * 0.01f, 100_000d));
+        }
+        for (int index = 0; index < 40; index++) {
+            markets.add(station(1_000f + index * 10f, 0, 100, 20f + index * 0.01f, 30f, 100_000d));
+        }
+
+        MarketDirectory directory = new MarketDirectory(catalog);
+        directory.rebuild(markets);
+        int suppliers = directory.suppliers(Constants.ITEM_FOOD).size();
+        int opportunities = directory.opportunities(Constants.ITEM_FOOD).size();
+
+        assertEquals(40, suppliers);
+        assertTrue(opportunities > 0);
+        assertTrue(opportunities <= suppliers * MarketDirectory.MAX_CONSUMERS_PER_SUPPLIER);
+        assertTrue(opportunities < suppliers * directory.consumers(Constants.ITEM_FOOD).size());
     }
 
     private MarketDirectory directory(Entity... stations) {
