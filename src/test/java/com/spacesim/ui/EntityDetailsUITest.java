@@ -3,6 +3,7 @@ package com.spacesim.ui;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.CombatComponent;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
@@ -18,6 +19,8 @@ import com.spacesim.constants.Constants;
 import com.spacesim.economy.Money;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
+import com.spacesim.persistence.EntityId;
+import com.spacesim.persistence.EntityRegistry;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -77,9 +80,13 @@ class EntityDetailsUITest {
     }
 
     @Test
-    void описываетДвижущийсяФлотЕгоМаршрутГрузИДипломатию() {
+    void описываетДвижущийсяФлотИРазрешаетPersistentЦельЧерезRegistry() {
+        EntityId targetId = new EntityId(10L);
         Entity target = new Entity()
+                .add(new EntityIdComponent(targetId))
                 .add(new IdentityComponent("Аграрный узел", IdentityComponent.Kind.STATION));
+        EntityRegistry registry = new EntityRegistry();
+        registry.register(target);
 
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = 80;
@@ -90,7 +97,7 @@ class EntityDetailsUITest {
         tradeAI.movementSpeed = 75f;
         tradeAI.specializedItem = Constants.ITEM_FOOD;
         tradeAI.cargoSpace = 60;
-        tradeAI.targetStation = target;
+        tradeAI.targetStationId = targetId;
         tradeAI.targetItem = Constants.ITEM_FOOD;
         tradeAI.targetAmount = 24;
         tradeAI.expectedProfitMilliCredits = Money.fromCredits(315.4d);
@@ -108,7 +115,7 @@ class EntityDetailsUITest {
                 .add(tradeAI)
                 .add(reputation);
 
-        EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(fleet);
+        EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(fleet, registry);
 
         assertEquals("Караван Альфа", details.title());
         assertTrue(details.body().contains("Тип: Перевозчик готовых товаров"));
@@ -132,10 +139,22 @@ class EntityDetailsUITest {
     }
 
     @Test
-    void описываетДобывающийКорабльБезТорговогоИи() {
+    void описываетДобывающийКорабльИРазрешаетPersistentЦелиЧерезRegistry() {
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = 40;
         inventory.stock[Constants.ITEM_ORE] = 7;
+
+        EntityId asteroidId = new EntityId(21L);
+        EntityId baseId = new EntityId(22L);
+        Entity asteroidTarget = new Entity()
+                .add(new EntityIdComponent(asteroidId))
+                .add(new IdentityComponent("Астероид W-1", IdentityComponent.Kind.ASTEROID));
+        Entity homeBase = new Entity()
+                .add(new EntityIdComponent(baseId))
+                .add(new IdentityComponent("База Ковчег", IdentityComponent.Kind.STATION));
+        EntityRegistry registry = new EntityRegistry();
+        registry.register(asteroidTarget);
+        registry.register(homeBase);
 
         MiningComponent mining = new MiningComponent(Constants.ITEM_ORE, 1.25f);
         mining.active = false;
@@ -145,10 +164,8 @@ class EntityDetailsUITest {
         mining.extractionRemainder = 0.75d;
         mining.totalMined = 18L;
         mining.totalDelivered = 11L;
-        mining.targetAsteroid = new Entity().add(
-                new IdentityComponent("Астероид W-1", IdentityComponent.Kind.ASTEROID));
-        mining.homeBase = new Entity().add(
-                new IdentityComponent("База Ковчег", IdentityComponent.Kind.STATION));
+        mining.targetAsteroidId = asteroidId;
+        mining.homeBaseId = baseId;
 
         Entity miner = new Entity()
                 .add(new IdentityComponent("Старатель", IdentityComponent.Kind.FLEET))
@@ -157,7 +174,7 @@ class EntityDetailsUITest {
                 .add(new WalletComponent(Money.fromCredits(96.5d)))
                 .add(mining);
 
-        EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(miner);
+        EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(miner, registry);
 
         assertEquals("Старатель", details.title());
         assertTrue(details.body().contains("Тип: Добывающий корабль"));
@@ -176,6 +193,17 @@ class EntityDetailsUITest {
         assertTrue(details.body().contains("Доставлено: 11 ед."));
         assertTrue(details.body().contains("Кредиты: 96.5 кр."));
         assertFalse(details.body().contains("Ожидаемая прибыль:"));
+    }
+
+    @Test
+    void недоступнаяPersistentЦельПоказываетStableIdВместоRuntimeСсылки() {
+        TradeAIComponent tradeAI = new TradeAIComponent();
+        tradeAI.targetStationId = new EntityId(99L);
+        Entity fleet = new Entity().add(tradeAI);
+
+        EntityDetailsUI.DetailsText details = EntityDetailsUI.describe(fleet, new EntityRegistry());
+
+        assertTrue(details.body().contains("Цель: entity:99 (недоступна)"));
     }
 
     @Test
