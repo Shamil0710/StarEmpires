@@ -23,6 +23,10 @@ import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityRegistry;
+import com.spacesim.trade.FleetTradeProfile;
+import com.spacesim.trade.MarketDirectory;
+import com.spacesim.trade.TradeRoute;
+import com.spacesim.trade.TradeRoutePlanner;
 import com.spacesim.util.SpatialHashGrid;
 
 import java.util.List;
@@ -36,14 +40,14 @@ import java.util.Objects;
  * {@link EntityRegistry}; удалённая или не зарегистрированная станция делает маршрут невалидным без
  * висячей Ashley-ссылки.</p>
  *
- * <p>Набор доступных товаров и их cargo metadata берутся из {@link ContentCatalog}. Поэтому выбор
- * торгового маршрута не зависит от Java enum {@code ItemType}; плотный runtime ID остаётся только
- * индексом hot-path массивов.</p>
+ * <p>Поиск нового груза делегирован pure {@link TradeRoutePlanner}, который работает поверх общего
+ * immutable {@link MarketDirectory}. Система только строит {@link FleetTradeProfile} конкретного
+ * корабля и копирует найденный value-route в существующее persistent состояние FSM. Продажа уже
+ * имеющегося груза пока использует legacy spatial path и будет вынесена отдельным Stage-5 срезом.</p>
  *
- * <p>Authoritative деньги хранятся только в {@link WalletComponent}. При выборе маршрута система
- * проверяет ликвидность обеих сторон. Фактические сделки выполняет {@link TradeController}, поэтому
- * товар и деньги переходят атомарно и записываются в общий {@link EconomicLedger}. Критерий
- * маршрута пока остаётся максимальной валовой прибылью; profit/time относится к Stage 5.</p>
+ * <p>Authoritative деньги хранятся только в {@link WalletComponent}. Фактические сделки выполняет
+ * {@link TradeController}, поэтому товар и деньги переходят атомарно и записываются в общий
+ * {@link EconomicLedger}. Scoring новых маршрутов задаётся явно и не влияет на execution layer.</p>
  */
 public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
@@ -55,6 +59,8 @@ public class TradeAISystem extends IteratingSystem {
     private final TradeController tradeController;
     private final EntityRegistry registry;
     private final ContentCatalog contentCatalog;
+    private final MarketDirectory marketDirectory;
+    private final TradeRoutePlanner routePlanner;
     private ImmutableArray<Entity> marketStations;
 
     private final ComponentMapper<TradeAIComponent> am = ComponentMapper.getFor(TradeAIComponent.class);
@@ -100,7 +106,7 @@ public class TradeAISystem extends IteratingSystem {
     }
 
     /**
-     * Создаёт торговую AI-систему с явно заданным versioned content catalog.
+     * Создаёт торговую AI-систему с явно заданным catalog и legacy gross-profit scoring.
      *
      * @param grid пространственный индекс рыночных станций
      * @param ledger общий экономический журнал
@@ -113,6 +119,25 @@ public class TradeAISystem extends IteratingSystem {
             EconomicLedger ledger,
             EntityRegistry registry,
             ContentCatalog contentCatalog) {
+        this(grid, ledger, registry, contentCatalog, TradeRoutePlanner.ScoringMode.GROSS_PROFIT);
+    }
+
+    /**
+     * Создаёт торговую AI-систему с явно заданной политикой route scoring.
+     *
+     * @param grid пространственный индекс рыночных станций
+     * @param ledger общий экономический журнал
+     * @param registry runtime-индекс устойчивых EntityId
+     * @param contentCatalog каталог товаров текущей simulation session
+     * @param scoringMode политика сравнения новых торговых маршрутов
+     * @throws NullPointerException если зависимость не задана
+     */
+    public TradeAISystem(
+            SpatialHashGrid grid,
+            EconomicLedger ledger,
+            EntityRegistry registry,
+            ContentCatalog contentCatalog,
+            TradeRoutePlanner.ScoringMode scoringMode) {
         super(Family.all(
                 EntityIdComponent.class,
                 TradeAIComponent.class,
@@ -124,6 +149,10 @@ public class TradeAISystem extends IteratingSystem {
                 Objects.requireNonNull(ledger, "EconomicLedger не задан"));
         this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
         this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
+        this.marketDirectory = new MarketDirectory(this.contentCatalog);
+        this.routePlanner = new TradeRoutePlanner(
+                this.contentCatalog,
+                Objects.requireNonNull(scoringMode, "ScoringMode не задан"));
     }
 
     /** @return ledger, в который система записывает успешные сделки */
@@ -149,7 +178,7 @@ public class TradeAISystem extends IteratingSystem {
     }
 
     /**
-     * Перестраивает пространственный индекс и обновляет торговые автоматы.
+     * Перестраивает общие market indexes и обновляет торговые автоматы.
      *
      * @param deltaTime прошедшее игровое время в секундах
      */
@@ -159,6 +188,7 @@ public class TradeAISystem extends IteratingSystem {
             return;
         }
         rebuildSpatialIndex();
+        marketDirectory.rebuild(marketStations);
         super.update(deltaTime);
     }
 
@@ -208,70 +238,50 @@ public class TradeAISystem extends IteratingSystem {
 
     private boolean findTradeRoute(Entity fleet, TradeAIComponent ai, TransformComponent position) {
         ai.resetRoute();
-        List<Entity> nearby = grid.getNearby(position.position, ROUTE_SEARCH_RADIUS_CELLS);
-        ReputationComponent reputation = rm.get(fleet);
-        long bestProfit = 0L;
-
-        for (Entity buyStation : nearby) {
-            if (!isActiveMarketStation(fleet, buyStation)) {
-                continue;
-            }
-            MarketComponent buyMarket = mm.get(buyStation);
-
-            for (Entity sellStation : nearby) {
-                if (sellStation == buyStation || !isActiveMarketStation(fleet, sellStation)) {
-                    continue;
-                }
-                MarketComponent sellMarket = mm.get(sellStation);
-
-                for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
-                    int itemId = item.runtimeId();
-                    if (!acceptsNewRouteItem(fleet, ai, item)
-                            || !buyMarket.isTradable(itemId)
-                            || !sellMarket.isTradable(itemId)) {
-                        continue;
-                    }
-
-                    float purchasePrice = tradeController.getEffectiveSellPrice(
-                            buyStation, itemId, reputation);
-                    float salePrice = tradeController.getEffectiveBuyPrice(
-                            sellStation, itemId, reputation);
-                    if (!isPositiveFinitePrice(purchasePrice)
-                            || !isPositiveFinitePrice(salePrice)
-                            || salePrice <= purchasePrice) {
-                        continue;
-                    }
-
-                    int amount = calculateTradeAmount(
-                            fleet, ai, buyStation, sellStation, itemId, purchasePrice, salePrice);
-                    if (amount <= 0) {
-                        continue;
-                    }
-                    long purchaseCost = safeTradeValue(purchasePrice, amount);
-                    long saleRevenue = safeTradeValue(salePrice, amount);
-                    if (purchaseCost <= 0L || saleRevenue <= purchaseCost) {
-                        continue;
-                    }
-                    long profit = saleRevenue - purchaseCost;
-                    if (profit > bestProfit) {
-                        bestProfit = profit;
-                        ai.buyStationId = idOf(buyStation);
-                        ai.sellStationId = idOf(sellStation);
-                        ai.targetStationId = ai.buyStationId;
-                        ai.targetItem = itemId;
-                        ai.targetAmount = amount;
-                        ai.expectedProfitMilliCredits = profit;
-                    }
-                }
-            }
-        }
-
-        if (bestProfit <= 0L) {
+        TradeRoute route = routePlanner.findBestNewCargoRoute(
+                createFleetTradeProfile(fleet, ai, position), marketDirectory).orElse(null);
+        if (route == null) {
             return false;
         }
+
+        ai.buyStationId = route.buyStationId();
+        ai.sellStationId = route.sellStationId();
+        ai.targetStationId = route.buyStationId();
+        ai.targetItem = route.itemId();
+        ai.targetAmount = route.amount();
+        ai.expectedProfitMilliCredits = route.grossProfitMilliCredits();
         ai.routeSearchCooldown = 0f;
         ai.state = TradeAIComponent.State.TRAVEL_TO_BUY;
         return true;
+    }
+
+    private FleetTradeProfile createFleetTradeProfile(
+            Entity fleet,
+            TradeAIComponent ai,
+            TransformComponent position) {
+        InventoryComponent inventory = im.get(fleet);
+        WalletComponent wallet = wm.get(fleet);
+        ReputationComponent reputationComponent = rm.get(fleet);
+        float[] reputation = new float[Constants.MAX_FACTIONS];
+        if (reputationComponent != null) {
+            for (int factionId = 0; factionId < Constants.MAX_FACTIONS; factionId++) {
+                reputation[factionId] = reputationComponent.getReputation(factionId);
+            }
+        }
+        ShipComponent ship = sm.get(fleet);
+        return new FleetTradeProfile(
+                position.position.x,
+                position.position.y,
+                ai.movementSpeed,
+                wallet.getBalanceMilliCredits(),
+                inventory.capacity,
+                inventory.getTotalStock(),
+                ai.cargoSpace,
+                ai.specializedItem,
+                ship != null,
+                ship == null ? null : ship.type,
+                inventory.stock,
+                reputation);
     }
 
     private boolean findSellRoute(Entity fleet, TradeAIComponent ai, TransformComponent position) {
@@ -514,14 +524,6 @@ public class TradeAISystem extends IteratingSystem {
             throw new IllegalStateException("Экономическая Entity не имеет EntityIdComponent");
         }
         return component.id;
-    }
-
-    private boolean acceptsNewRouteItem(
-            Entity fleet,
-            TradeAIComponent ai,
-            ContentCatalog.ItemDefinition item) {
-        return (ai.specializedItem == -1 || ai.specializedItem == item.runtimeId())
-                && canShipPurchaseItem(fleet, item);
     }
 
     private boolean canShipPurchaseItem(Entity fleet, ContentCatalog.ItemDefinition item) {
