@@ -14,8 +14,8 @@
 - [ ] CI зелёный и блокирует сломанные изменения — CI зелёный; обязательная branch protection для `main` пока не настроена доступным connector API;
 - [x] симуляция использует фиксированный игровой tick и поддерживает pause/time scale;
 - [x] одинаковый seed даёт воспроизводимую экономическую симуляцию;
-- [ ] товары сохраняются физически: source / transform / sink всегда явны;
-- [ ] деньги передаются между экономическими агентами, а не создаются/исчезают внутри обычной сделки;
+- [x] товары сохраняются физически: source / transform / sink всегда явны;
+- [x] деньги передаются между экономическими агентами, а не создаются/исчезают внутри обычной сделки;
 - [ ] save/load сохраняет экономическое состояние и ссылки между сущностями через устойчивые ID;
 - [ ] товары, рецепты, корабли, станции и фракционные параметры загружаются из data-driven каталога;
 - [ ] торговый AI оценивает прибыль с учётом времени/стоимости маршрута;
@@ -58,7 +58,7 @@
 
 ## Этап 1 — SimulationClock и детерминированное игровое время
 
-**Статус:** VERIFIED — READY TO MERGE
+**Статус:** COMPLETE — MERGED TO `main` VIA PR #2
 
 ### Задачи
 
@@ -81,7 +81,8 @@
 - `EconomicSimulationDeterminismTest` сравнивает экономическое состояние после 300 ticks при `30 × 1s` и `300 × 0.1s` render patterns;
 - сравниваются позиции, склады, рыночные цены, торговые состояния, маршруты, астероиды и активные события;
 - полный `clean verify` на HEAD Этапа 1 — SUCCESS;
-- 156 тестов на интеграционном наборе, Javadoc и JaCoCo gates — SUCCESS.
+- 156 тестов на интеграционном наборе, Javadoc и JaCoCo gates — SUCCESS;
+- merge commit в `main`: `3340d762548e0643c496bdc400b6be51e0df7f64`.
 
 ### Definition of Done
 
@@ -91,21 +92,42 @@
 
 ## Этап 2 — Деньги и экономические инварианты
 
-**Статус:** PLANNED
+**Статус:** VERIFIED — READY FOR PR
 
 ### Задачи
 
-- [ ] заменить денежные `float` на целочисленную фиксированную денежную единицу (`long`);
-- [ ] создать `WalletComponent`;
-- [ ] сделать торговую транзакцию двусторонней: товар и деньги физически переходят между участниками;
-- [ ] создать `Transaction` / `EconomicLedger` для диагностики;
-- [ ] определить явные money sources/sinks отдельно от transfer;
-- [ ] добавить resource-conservation и money-conservation тесты;
-- [ ] добавить тесты атомарности сделки.
+- [x] заменить денежные `float` на целочисленную фиксированную денежную единицу (`long`);
+- [x] создать `WalletComponent`;
+- [x] сделать торговую транзакцию двусторонней: товар и деньги физически переходят между участниками;
+- [x] создать `EconomicTransaction` / `EconomicLedger` для диагностики;
+- [x] определить явные money sources/sinks отдельно от transfer;
+- [x] классифицировать resource source / sink / transform отдельно от физических transfer;
+- [x] подключить один общий session ledger к runtime экономическим системам;
+- [x] удалить legacy `CreditAccount`, `PlayerProfile` и authoritative `float credits` из торгового API;
+- [x] добавить resource-conservation и money-conservation тесты;
+- [x] добавить тесты атомарности сделки;
+- [x] добавить regression-test сохранения общей денежной массы demo-world;
+- [x] подтвердить детерминированность последовательности `EconomicTransaction` при разных render patterns;
+- [x] зафиксировать контракт в `docs/economic_invariants.md`.
+
+### Результат проверки
+
+- authoritative денежный баланс хранится только в `WalletComponent` как `long` milli-credits;
+- обычная торговля является двусторонним transfer и не использует money source/sink;
+- станция имеет конечную ликвидность и не может купить груз без достаточного баланса;
+- добыча переносит ресурс `asteroid.remainingResource -> cargo` без скрытого создания товара;
+- asteroid spawn записывается как `RESOURCE_SOURCE`, потребление как `RESOURCE_SINK`, производство как `RESOURCE_TRANSFORM`;
+- bootstrap-запасы и стартовый капитал считаются baseline initial state, а не runtime source-операциями;
+- `MoneyConservationSimulationTest` проверяет неизменность суммы всех кошельков demo-world после 600 fixed ticks;
+- `EconomicLedgerDeterminismTest` подтверждает одинаковую последовательность ledger-операций при разных render patterns;
+- полный `./mvnw --batch-mode --no-transfer-progress clean verify` на code HEAD `f68816e3a4348bc3a80ae4d0bf8064f512e77c84` — SUCCESS;
+- **167 тестов, 0 failures, 0 errors, 0 skipped**;
+- Javadoc с `failOnWarnings=true` и JaCoCo line/branch gates — SUCCESS;
+- runnable `star-empires-*-all.jar`, JaCoCo, Javadoc и test reports опубликованы GitHub Actions artifacts.
 
 ### Definition of Done
 
-Обычная торговля не создаёт и не уничтожает деньги или товар. Любое создание/уничтожение ресурса имеет явный тип экономического события.
+Обычная торговля не создаёт и не уничтожает деньги или товар. Любое создание/уничтожение ресурса имеет явный тип экономического события. **Выполнено на code HEAD; ожидается повторный зелёный CI точного status/docs HEAD перед PR.**
 
 ---
 
@@ -276,4 +298,4 @@ Supply chain может самостоятельно перестраивать�
 
 ## Текущий следующий шаг
 
-**Переход Этап 1 → Этап 2:** получить зелёный CI на status/docs HEAD, открыть PR `feat/simulation-clock -> main`, merge только после зелёной проверки, затем создать отдельную ветку Этапа 2 для денег и экономических инвариантов.
+**Переход Этап 2 → Этап 3:** получить зелёный CI на текущем status/docs HEAD `feat/economic-invariants`, открыть PR в `main`, merge только после зелёных push + pull_request проверок точного HEAD. После merge создать отдельную ветку Этапа 3 и начать с устойчивого `EntityId` и runtime registry, не смешивая save/load с data-driven контентом Этапа 4.
