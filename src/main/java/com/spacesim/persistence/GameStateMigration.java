@@ -9,9 +9,11 @@ import java.util.Objects;
 /**
  * Pure value-layer migrations старых {@link GameState} к текущей persistent schema.
  *
- * <p>Stage 3 schema v1 имела ровно пять item slots. Stage 4 превращает массивы в фиксированную
- * capacity, внутри которой data catalog может определять переменное число плотных runtime ID.
- * Миграция сохраняет первые пять значений побитово и дополняет новые slots нейтральными значениями.</p>
+ * <p>Stage 3 schema v1 имела ровно пять item slots и не содержала stable content archetype ID.
+ * Stage 4 превращает массивы в фиксированную capacity, внутри которой data catalog может определять
+ * переменное число плотных runtime ID. Миграция сохраняет первые пять значений побитово, дополняет
+ * новые slots нейтральными значениями и оставляет archetype {@code null}: прежний runtime-state
+ * продолжает работать без попытки угадать тип по имени сущности.</p>
  */
 public final class GameStateMigration {
     /** Число товарных slots в Stage 3 schema v1. */
@@ -121,7 +123,8 @@ public final class GameStateMigration {
                 entity.tradeAi(),
                 entity.mining(),
                 entity.combat(),
-                entity.asteroid());
+                entity.asteroid(),
+                null);
     }
 
     private static List<Integer> padIntegers(List<Integer> values, String label) {
