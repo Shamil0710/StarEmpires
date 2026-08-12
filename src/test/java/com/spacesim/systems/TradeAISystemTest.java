@@ -103,6 +103,50 @@ class TradeAISystemTest {
     }
 
     @Test
+    void failedRouteCacheИнвалидируетсяПриИзмененииРынка() {
+        Engine engine = engine(new EconomicLedger());
+        Entity source = station("Source", 0f, 100, 100, 9f, 10f, 100_000d);
+        Entity destination = station("Poor", 100f, 0, 100, 20f, 22f, 5d);
+        Entity fleet = fleet("Trader", 0f, 1_000d, 10);
+        engine.addEntity(source);
+        engine.addEntity(destination);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+        assertEquals(TradeAIComponent.State.IDLE, ai(fleet).state);
+        assertEquals(1f, ai(fleet).routeSearchCooldown, 0f);
+
+        assertTrue(wallet(destination).creditFromSource(Money.fromCredits(1_000d)));
+        engine.update(1f);
+
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_BUY, ai(fleet).state);
+        assertEquals(id(source), ai(fleet).buyStationId);
+        assertEquals(id(destination), ai(fleet).sellStationId);
+    }
+
+    @Test
+    void failedRouteCacheИнвалидируетсяПриИзмененииПрофиляФлота() {
+        Engine engine = engine(new EconomicLedger());
+        Entity source = station("Source", 0f, 100, 100, 9f, 10f, 100_000d);
+        Entity destination = station("Destination", 100f, 0, 100, 20f, 22f, 100_000d);
+        Entity fleet = fleet("PoorTrader", 0f, 5d, 10);
+        engine.addEntity(source);
+        engine.addEntity(destination);
+        engine.addEntity(fleet);
+
+        engine.update(0f);
+        assertEquals(TradeAIComponent.State.IDLE, ai(fleet).state);
+        assertEquals(1f, ai(fleet).routeSearchCooldown, 0f);
+
+        assertTrue(wallet(fleet).creditFromSource(Money.fromCredits(100d)));
+        engine.update(1f);
+
+        assertEquals(TradeAIComponent.State.TRAVEL_TO_BUY, ai(fleet).state);
+        assertEquals(id(source), ai(fleet).buyStationId);
+        assertEquals(id(destination), ai(fleet).sellStationId);
+    }
+
+    @Test
     void учитываетЛимитКошелькаПродавцаИПокупателяПриРазмереПартии() {
         Engine engine = engine(new EconomicLedger());
         Entity source = station("Source", 0f, 100, 100, 9f, 10f, 100_000d);
