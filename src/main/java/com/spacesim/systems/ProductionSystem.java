@@ -1,56 +1,66 @@
 package com.spacesim.systems;
 
+import com.badlogic.ashley.core.ComponentMapper;
+import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
-import com.badlogic.ashley.core.*;
-import com.spacesim.components.*;
+import com.spacesim.components.IdentityComponent;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
+import com.spacesim.components.ProductionComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.economy.EconomicLedger;
 import com.spacesim.model.Recipe;
+
+import java.util.Objects;
 
 /**
  * Выполняет производство товаров по активным рецептам сущностей.
  *
  * <p>Система накапливает время в {@link ProductionComponent#progressSeconds}. Число полностью
- * завершённых циклов определяется делением суммы сохранённого прогресса и времени кадра на
- * длительность рецепта. Благодаря этому большой кадр обрабатывается пакетно, без цикла по каждой
- * произведённой единице.</p>
+ * завершённых циклов определяется делением суммы сохранённого прогресса и времени tick на
+ * длительность рецепта. Благодаря этому большой интервал обрабатывается пакетно, без цикла по
+ * каждой произведённой единице.</p>
  *
- * <p>Размер пакета дополнительно ограничивается доступными входными товарами, вместимостью
- * инвентаря и диапазоном {@code int} для каждого запаса. При вычислении используется чистое
- * изменение товара за цикл ({@code output - input}), поэтому корректно поддерживаются рецепты,
- * одновременно потребляющие и производящие один товар. После фактического изменения инвентаря
- * связанный {@link MarketComponent} помечается как {@link MarketComponent#isDirty dirty}.</p>
- *
- * <p>Если активного рецепта нет либо даже один следующий цикл невозможен, накопленный прогресс
- * сбрасывается. Некорректное или неположительное время кадра игнорируется. Когда пакет исчерпал
- * ресурсы, неиспользованное время также не переносится; в остальных случаях сохраняется остаток от
- * деления на длительность рецепта.</p>
+ * <p>Размер пакета ограничивается доступными входными товарами, вместимостью инвентаря и диапазоном
+ * {@code int}. Фактически применённый пакет является явным {@code RESOURCE_TRANSFORM} и фиксируется
+ * в {@link EconomicLedger}; производство не маскируется под независимые resource source/sink.</p>
  */
 public class ProductionSystem extends IteratingSystem {
-    /** Маркер отсутствия ресурсного ограничения для рецепта с нулевыми чистыми изменениями. */
     private static final long UNLIMITED_CYCLES = Long.MAX_VALUE;
 
-    /** Быстрый доступ к запасам производственной сущности. */
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
-    /** Быстрый доступ к рецептам и накопленному производственному прогрессу. */
     private final ComponentMapper<ProductionComponent> pm = ComponentMapper.getFor(ProductionComponent.class);
-    /** Доступ к необязательному рынку, который требуется пометить после изменения запасов. */
     private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
+    private final ComponentMapper<IdentityComponent> identityMapper = ComponentMapper.getFor(IdentityComponent.class);
+    private final EconomicLedger ledger;
+
+    /** Создаёт систему с собственным диагностическим ledger. */
+    public ProductionSystem() {
+        this(new EconomicLedger());
+    }
 
     /**
-     * Создаёт систему для сущностей с инвентарём и производственным компонентом.
+     * Создаёт систему, записывающую фактические производственные преобразования в общий журнал.
+     *
+     * @param ledger общий экономический журнал игровой сессии
+     * @throws NullPointerException если журнал не задан
      */
-    public ProductionSystem() {
+    public ProductionSystem(EconomicLedger ledger) {
         super(Family.all(InventoryComponent.class, ProductionComponent.class).get());
+        this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");
+    }
+
+    /** @return ledger, в который записываются производственные transform-операции */
+    public EconomicLedger getLedger() {
+        return ledger;
     }
 
     /**
      * Продвигает активный рецепт одной производственной сущности.
      *
-     * <p>Метод сначала проверяет возможность одного цикла, затем вычисляет число завершённых по
-     * времени циклов и применяет максимально допустимую их часть одной пакетной операцией.</p>
-     *
-     * @param entity сущность с {@link InventoryComponent} и {@link ProductionComponent}
-     * @param deltaTime прошедшее с предыдущего обновления время в секундах
+     * @param entity сущность с инвентарём и производственным компонентом
+     * @param deltaTime прошедшее игровое время в секундах
      */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
@@ -66,7 +76,6 @@ public class ProductionSystem extends IteratingSystem {
             production.progressSeconds = 0f;
             return;
         }
-
         if (!canProduce(inventory, recipe)) {
             production.progressSeconds = 0f;
             return;
@@ -82,12 +91,15 @@ public class ProductionSystem extends IteratingSystem {
         long maximumCycles = getMaximumProducibleCycles(inventory, recipe);
         boolean resourcesExhausted = false;
         boolean inventoryChanged = maximumCycles != UNLIMITED_CYCLES;
+        long cyclesApplied = 0L;
 
         if (inventoryChanged) {
-            long cyclesToApply = completedCycles >= maximumCycles
+            cyclesApplied = completedCycles >= maximumCycles
                     ? maximumCycles
                     : (long) completedCycles;
-            applyRecipe(inventory, recipe, cyclesToApply);
+            if (cyclesApplied > 0L) {
+                applyRecipe(inventory, recipe, cyclesApplied);
+            }
             resourcesExhausted = !canProduce(inventory, recipe);
         }
 
@@ -95,24 +107,16 @@ public class ProductionSystem extends IteratingSystem {
                 ? 0f
                 : (float) (elapsedSeconds % recipe.durationSeconds);
 
-        if (inventoryChanged && mm.has(entity)) {
-            mm.get(entity).isDirty = true;
+        if (cyclesApplied > 0L) {
+            if (mm.has(entity)) {
+                mm.get(entity).isDirty = true;
+            }
+            ledger.recordResourceTransform(
+                    entityName(entity),
+                    recipe.name + " x" + cyclesApplied);
         }
     }
 
-    /**
-     * Вычисляет максимальное число циклов, которое можно безопасно применить одним пакетом.
-     *
-     * <p>Для товара с отрицательным чистым изменением границей служит момент исчерпания входного
-     * запаса, для положительного — переполнение {@code int}. Если суммарный объём увеличивается,
-     * добавляется ограничение общей вместимости. Значение {@link #UNLIMITED_CYCLES} означает, что
-     * рецепт не меняет ни один запас и потому не имеет ресурсной границы.</p>
-     *
-     * @param inventory исходный инвентарь
-     * @param recipe применяемый рецепт
-     * @return максимальное неотрицательное число безопасных циклов либо
-     *         {@link #UNLIMITED_CYCLES}
-     */
     private long getMaximumProducibleCycles(InventoryComponent inventory, Recipe recipe) {
         long maximumCycles = UNLIMITED_CYCLES;
         long totalStock = 0L;
@@ -140,20 +144,9 @@ public class ProductionSystem extends IteratingSystem {
             long cyclesUntilCapacity = ((long) inventory.capacity - totalStock) / totalDeltaPerCycle;
             maximumCycles = Math.min(maximumCycles, cyclesUntilCapacity);
         }
-
         return maximumCycles;
     }
 
-    /**
-     * Проверяет возможность выполнить ровно один цикл рецепта.
-     *
-     * <p>Проверка отклоняет отрицательные или недостаточные запасы, переполнение отдельного товара
-     * и превышение общей вместимости после одновременного применения всех входов и выходов.</p>
-     *
-     * @param inventory проверяемый инвентарь
-     * @param recipe проверяемый рецепт
-     * @return {@code true}, если один цикл можно применить без нарушения ограничений
-     */
     private boolean canProduce(InventoryComponent inventory, Recipe recipe) {
         long resultingTotalStock = 0L;
 
@@ -172,21 +165,9 @@ public class ProductionSystem extends IteratingSystem {
             }
             resultingTotalStock += resultingItemStock;
         }
-
         return resultingTotalStock <= inventory.capacity;
     }
 
-    /**
-     * Применяет чистые изменения рецепта сразу для заданного числа циклов.
-     *
-     * <p>Метод полагается на предварительный расчёт
-     * {@link #getMaximumProducibleCycles(InventoryComponent, Recipe)} и сам повторно не проверяет
-     * вместимость или переполнение.</p>
-     *
-     * @param inventory изменяемый инвентарь
-     * @param recipe применяемый рецепт
-     * @param cycles число циклов, гарантированно допустимое предварительной проверкой
-     */
     private void applyRecipe(InventoryComponent inventory, Recipe recipe, long cycles) {
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
             long itemDeltaPerCycle = (long) recipe.getOutputAmount(itemId)
@@ -196,16 +177,17 @@ public class ProductionSystem extends IteratingSystem {
         }
     }
 
-    /**
-     * Нормализует ранее сохранённый прогресс перед накоплением времени.
-     *
-     * @param progressSeconds сохранённый прогресс в секундах
-     * @return исходное неотрицательное конечное значение либо {@code 0}, если значение некорректно
-     */
     private double normalizedProgress(float progressSeconds) {
         if (!Float.isFinite(progressSeconds) || progressSeconds < 0f) {
             return 0d;
         }
         return progressSeconds;
+    }
+
+    private String entityName(Entity entity) {
+        IdentityComponent identity = identityMapper.get(entity);
+        return identity == null || identity.name == null || identity.name.isBlank()
+                ? "UNIDENTIFIED"
+                : identity.name;
     }
 }
