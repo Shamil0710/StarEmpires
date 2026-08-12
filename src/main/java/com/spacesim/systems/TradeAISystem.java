@@ -51,12 +51,6 @@ import java.util.Objects;
 public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
     private static final float ROUTE_SEARCH_RETRY_SECONDS = 1f;
-    private static final Family TRADE_FLEET_FAMILY = Family.all(
-            EntityIdComponent.class,
-            TradeAIComponent.class,
-            TransformComponent.class,
-            InventoryComponent.class,
-            WalletComponent.class).get();
 
     private final TradeController tradeController;
     private final EntityRegistry registry;
@@ -140,7 +134,12 @@ public class TradeAISystem extends IteratingSystem {
             EntityRegistry registry,
             ContentCatalog contentCatalog,
             TradeRoutePlanner.ScoringMode scoringMode) {
-        super(TRADE_FLEET_FAMILY);
+        super(Family.all(
+                EntityIdComponent.class,
+                TradeAIComponent.class,
+                TransformComponent.class,
+                InventoryComponent.class,
+                WalletComponent.class).get());
         Objects.requireNonNull(grid, "SpatialHashGrid не задан");
         this.tradeController = new TradeController(
                 Objects.requireNonNull(ledger, "EconomicLedger не задан"));
@@ -172,16 +171,20 @@ public class TradeAISystem extends IteratingSystem {
                 MarketComponent.class,
                 InventoryComponent.class,
                 WalletComponent.class).get());
-        tradeFleets = engine.getEntitiesFor(TRADE_FLEET_FAMILY);
+        tradeFleets = engine.getEntitiesFor(Family.all(
+                EntityIdComponent.class,
+                TradeAIComponent.class,
+                TransformComponent.class,
+                InventoryComponent.class,
+                WalletComponent.class).get());
     }
 
     /**
-     * Перестраивает общий market snapshot только когда в этом tick реально потребуется route search,
-     * затем исполняет торговые автоматы.
+     * Перестраивает общий market snapshot только если в текущем tick реально потребуется route
+     * planning, затем исполняет торговые автоматы.
      *
-     * <p>Snapshot по-прежнему строится до любых BUYING/SELLING mutations текущего system update,
-     * поэтому все IDLE planners видят тот же pre-trade market state, что и до оптимизации. Во время
-     * travel-only ticks directory вообще не читается и его дорогая перестройка пропускается.</p>
+     * <p>Когда planning нужен, snapshot по-прежнему создаётся до BUYING/SELLING mutations этого
+     * update, поэтому IDLE fleets видят тот же pre-trade market state, что и до оптимизации.</p>
      *
      * @param deltaTime прошедшее игровое время в секундах
      */
@@ -200,8 +203,8 @@ public class TradeAISystem extends IteratingSystem {
         if (tradeFleets == null) {
             return false;
         }
-        for (int index = 0; index < tradeFleets.size(); index++) {
-            TradeAIComponent ai = am.get(tradeFleets.get(index));
+        for (Entity fleet : tradeFleets) {
+            TradeAIComponent ai = am.get(fleet);
             if (ai == null || ai.state != TradeAIComponent.State.IDLE) {
                 continue;
             }
@@ -414,32 +417,21 @@ public class TradeAISystem extends IteratingSystem {
             return;
         }
 
-        int amount = Math.min(ai.targetAmount,
-                calculateTradeAmount(
-                        fleet,
-                        ai,
-                        buyStation,
-                        sellStation,
-                        ai.targetItem,
-                        purchasePrice,
-                        salePrice));
-        if (amount <= 0) {
-            abandonRoute(ai);
-            return;
-        }
-
-        int purchased = tradeController.buyFromStation(
+        int amount = Math.min(ai.targetAmount, calculateTradeAmount(
                 fleet,
+                ai,
                 buyStation,
+                sellStation,
                 ai.targetItem,
-                amount,
-                reputation);
-        if (purchased <= 0) {
+                purchasePrice,
+                salePrice));
+        if (amount <= 0 || !tradeController.buyFromStation(
+                buyStation, fleet, ai.targetItem, amount, reputation)) {
             abandonRoute(ai);
             return;
         }
 
-        ai.targetAmount = purchased;
+        ai.targetAmount = amount;
         ai.targetStationId = ai.sellStationId;
         ai.state = TradeAIComponent.State.TRAVEL_TO_SELL;
     }
@@ -453,12 +445,10 @@ public class TradeAISystem extends IteratingSystem {
             return;
         }
 
-        int availableCargo = im.get(fleet).stock[ai.targetItem];
-        if (availableCargo <= 0) {
-            abandonRoute(ai);
-            return;
-        }
-
+        InventoryComponent fleetInventory = im.get(fleet);
+        InventoryComponent stationInventory = im.get(sellStation);
+        WalletComponent stationWallet = wm.get(sellStation);
+        WalletComponent fleetWallet = wm.get(fleet);
         ReputationComponent reputation = rm.get(fleet);
         float salePrice = tradeController.getEffectiveBuyPrice(
                 sellStation, ai.targetItem, reputation);
@@ -467,37 +457,19 @@ public class TradeAISystem extends IteratingSystem {
             return;
         }
 
-        int amount = Math.min(availableCargo, ai.targetAmount);
-        amount = Math.min(amount, im.get(sellStation).getFreeCapacity());
+        int amount = Math.min(ai.targetAmount,
+                Math.min(fleetInventory.stock[ai.targetItem], stationInventory.getFreeCapacity()));
+        amount = Math.min(amount,
+                safeMaximumAffordable(stationWallet.getBalanceMilliCredits(), salePrice, amount));
         amount = Math.min(amount,
                 safeMaximumAffordable(
-                        wm.get(sellStation).getBalanceMilliCredits(), salePrice, amount));
-        amount = Math.min(amount,
-                safeMaximumAffordable(
-                        Long.MAX_VALUE - wm.get(fleet).getBalanceMilliCredits(), salePrice, amount));
-        if (amount <= 0) {
+                        Long.MAX_VALUE - fleetWallet.getBalanceMilliCredits(), salePrice, amount));
+        if (amount <= 0 || !tradeController.sellToStation(
+                sellStation, fleet, ai.targetItem, amount, reputation)) {
             abandonRoute(ai);
             return;
         }
-
-        int sold = tradeController.sellToStation(
-                fleet,
-                sellStation,
-                ai.targetItem,
-                amount,
-                reputation);
-        if (sold <= 0) {
-            abandonRoute(ai);
-            return;
-        }
-
-        abandonRoute(ai);
-    }
-
-    private void abandonRoute(TradeAIComponent ai) {
-        ai.resetRoute();
-        ai.state = TradeAIComponent.State.IDLE;
-        ai.routeSearchCooldown = ROUTE_SEARCH_RETRY_SECONDS;
+        finishRoute(ai);
     }
 
     private Entity resolveActiveMarketStation(EntityId id) {
@@ -506,12 +478,15 @@ public class TradeAISystem extends IteratingSystem {
     }
 
     private boolean isActiveMarketStation(Entity entity) {
-        return entity != null
-                && entity.flags != 0
-                && tm.has(entity)
-                && mm.has(entity)
-                && im.has(entity)
-                && wm.has(entity);
+        if (entity == null || marketStations == null) {
+            return false;
+        }
+        for (Entity station : marketStations) {
+            if (station == entity) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean canShipPurchaseItem(Entity fleet, ContentCatalog.ItemDefinition item) {
@@ -519,21 +494,38 @@ public class TradeAISystem extends IteratingSystem {
             return false;
         }
         ShipComponent ship = sm.get(fleet);
-        if (ship == null || ship.type == null) {
-            return true;
-        }
-        return ship.type.canCarry(item);
+        return ship == null
+                || (ship.type != null && ship.type.canPurchase(item.category(), item.mineable()));
     }
 
-    private static int safeMaximumAffordable(long balance, float price, int maximumAmount) {
+    private boolean isValidItem(int itemId) {
+        return contentCatalog.findItem(itemId) != null;
+    }
+
+    private boolean isPositiveFinitePrice(float price) {
+        return Float.isFinite(price) && price > 0f;
+    }
+
+    private int safeMaximumAffordable(long balance, float price, int maxAmount) {
+        if (balance < 0L || maxAmount <= 0 || !isPositiveFinitePrice(price)) {
+            return 0;
+        }
         try {
-            return Money.maximumAffordable(balance, price, maximumAmount);
+            return Money.maximumAffordable(balance, price, maxAmount);
         } catch (IllegalArgumentException exception) {
             return 0;
         }
     }
 
-    private static boolean isPositiveFinitePrice(float price) {
-        return Float.isFinite(price) && price > 0f;
+    private void abandonRoute(TradeAIComponent ai) {
+        ai.resetRoute();
+        ai.state = TradeAIComponent.State.IDLE;
+        ai.routeSearchCooldown = ROUTE_SEARCH_RETRY_SECONDS;
+    }
+
+    private void finishRoute(TradeAIComponent ai) {
+        ai.resetRoute();
+        ai.state = TradeAIComponent.State.IDLE;
+        ai.routeSearchCooldown = 0f;
     }
 }
