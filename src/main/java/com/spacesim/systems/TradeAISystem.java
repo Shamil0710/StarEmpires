@@ -51,6 +51,12 @@ import java.util.Objects;
 public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
     private static final float ROUTE_SEARCH_RETRY_SECONDS = 1f;
+    private static final Family TRADE_FLEET_FAMILY = Family.all(
+            EntityIdComponent.class,
+            TradeAIComponent.class,
+            TransformComponent.class,
+            InventoryComponent.class,
+            WalletComponent.class).get();
 
     private final TradeController tradeController;
     private final EntityRegistry registry;
@@ -58,6 +64,7 @@ public class TradeAISystem extends IteratingSystem {
     private final MarketDirectory marketDirectory;
     private final TradeRoutePlanner routePlanner;
     private ImmutableArray<Entity> marketStations;
+    private ImmutableArray<Entity> tradeFleets;
 
     private final ComponentMapper<TradeAIComponent> am = ComponentMapper.getFor(TradeAIComponent.class);
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
@@ -133,12 +140,7 @@ public class TradeAISystem extends IteratingSystem {
             EntityRegistry registry,
             ContentCatalog contentCatalog,
             TradeRoutePlanner.ScoringMode scoringMode) {
-        super(Family.all(
-                EntityIdComponent.class,
-                TradeAIComponent.class,
-                TransformComponent.class,
-                InventoryComponent.class,
-                WalletComponent.class).get());
+        super(TRADE_FLEET_FAMILY);
         Objects.requireNonNull(grid, "SpatialHashGrid не задан");
         this.tradeController = new TradeController(
                 Objects.requireNonNull(ledger, "EconomicLedger не задан"));
@@ -156,7 +158,7 @@ public class TradeAISystem extends IteratingSystem {
     }
 
     /**
-     * Подключает registry к Engine и получает живое представление идентифицированных рынков.
+     * Подключает registry к Engine и получает живые представления рынков и торговых флотов.
      *
      * @param engine Ashley-движок
      */
@@ -170,10 +172,16 @@ public class TradeAISystem extends IteratingSystem {
                 MarketComponent.class,
                 InventoryComponent.class,
                 WalletComponent.class).get());
+        tradeFleets = engine.getEntitiesFor(TRADE_FLEET_FAMILY);
     }
 
     /**
-     * Перестраивает общий market snapshot и исполняет торговые автоматы.
+     * Перестраивает общий market snapshot только когда в этом tick реально потребуется route search,
+     * затем исполняет торговые автоматы.
+     *
+     * <p>Snapshot по-прежнему строится до любых BUYING/SELLING mutations текущего system update,
+     * поэтому все IDLE planners видят тот же pre-trade market state, что и до оптимизации. Во время
+     * travel-only ticks directory вообще не читается и его дорогая перестройка пропускается.</p>
      *
      * @param deltaTime прошедшее игровое время в секундах
      */
@@ -182,8 +190,26 @@ public class TradeAISystem extends IteratingSystem {
         if (!Float.isFinite(deltaTime) || deltaTime < 0f) {
             return;
         }
-        marketDirectory.rebuild(marketStations);
+        if (requiresRoutePlanning(deltaTime)) {
+            marketDirectory.rebuild(marketStations);
+        }
         super.update(deltaTime);
+    }
+
+    private boolean requiresRoutePlanning(float deltaTime) {
+        if (tradeFleets == null) {
+            return false;
+        }
+        for (int index = 0; index < tradeFleets.size(); index++) {
+            TradeAIComponent ai = am.get(tradeFleets.get(index));
+            if (ai == null || ai.state != TradeAIComponent.State.IDLE) {
+                continue;
+            }
+            if (!(ai.routeSearchCooldown > deltaTime)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Исполняет текущее состояние одного торгового флота. */
@@ -388,21 +414,32 @@ public class TradeAISystem extends IteratingSystem {
             return;
         }
 
-        int amount = Math.min(ai.targetAmount, calculateTradeAmount(
-                fleet,
-                ai,
-                buyStation,
-                sellStation,
-                ai.targetItem,
-                purchasePrice,
-                salePrice));
-        if (amount <= 0 || !tradeController.buyFromStation(
-                buyStation, fleet, ai.targetItem, amount, reputation)) {
+        int amount = Math.min(ai.targetAmount,
+                calculateTradeAmount(
+                        fleet,
+                        ai,
+                        buyStation,
+                        sellStation,
+                        ai.targetItem,
+                        purchasePrice,
+                        salePrice));
+        if (amount <= 0) {
             abandonRoute(ai);
             return;
         }
 
-        ai.targetAmount = amount;
+        int purchased = tradeController.buyFromStation(
+                fleet,
+                buyStation,
+                ai.targetItem,
+                amount,
+                reputation);
+        if (purchased <= 0) {
+            abandonRoute(ai);
+            return;
+        }
+
+        ai.targetAmount = purchased;
         ai.targetStationId = ai.sellStationId;
         ai.state = TradeAIComponent.State.TRAVEL_TO_SELL;
     }
@@ -416,10 +453,12 @@ public class TradeAISystem extends IteratingSystem {
             return;
         }
 
-        InventoryComponent fleetInventory = im.get(fleet);
-        InventoryComponent stationInventory = im.get(sellStation);
-        WalletComponent stationWallet = wm.get(sellStation);
-        WalletComponent fleetWallet = wm.get(fleet);
+        int availableCargo = im.get(fleet).stock[ai.targetItem];
+        if (availableCargo <= 0) {
+            abandonRoute(ai);
+            return;
+        }
+
         ReputationComponent reputation = rm.get(fleet);
         float salePrice = tradeController.getEffectiveBuyPrice(
                 sellStation, ai.targetItem, reputation);
@@ -428,64 +467,31 @@ public class TradeAISystem extends IteratingSystem {
             return;
         }
 
-        int amount = Math.min(ai.targetAmount,
-                Math.min(fleetInventory.stock[ai.targetItem], stationInventory.getFreeCapacity()));
-        amount = Math.min(amount,
-                safeMaximumAffordable(stationWallet.getBalanceMilliCredits(), salePrice, amount));
+        int amount = Math.min(availableCargo, ai.targetAmount);
+        amount = Math.min(amount, im.get(sellStation).getFreeCapacity());
         amount = Math.min(amount,
                 safeMaximumAffordable(
-                        Long.MAX_VALUE - fleetWallet.getBalanceMilliCredits(), salePrice, amount));
-        if (amount <= 0 || !tradeController.sellToStation(
-                sellStation, fleet, ai.targetItem, amount, reputation)) {
+                        wm.get(sellStation).getBalanceMilliCredits(), salePrice, amount));
+        amount = Math.min(amount,
+                safeMaximumAffordable(
+                        Long.MAX_VALUE - wm.get(fleet).getBalanceMilliCredits(), salePrice, amount));
+        if (amount <= 0) {
             abandonRoute(ai);
             return;
         }
-        finishRoute(ai);
-    }
 
-    private Entity resolveActiveMarketStation(EntityId id) {
-        Entity entity = registry.find(id);
-        return isActiveMarketStation(entity) ? entity : null;
-    }
-
-    private boolean isActiveMarketStation(Entity entity) {
-        if (entity == null || marketStations == null) {
-            return false;
+        int sold = tradeController.sellToStation(
+                fleet,
+                sellStation,
+                ai.targetItem,
+                amount,
+                reputation);
+        if (sold <= 0) {
+            abandonRoute(ai);
+            return;
         }
-        for (Entity station : marketStations) {
-            if (station == entity) {
-                return true;
-            }
-        }
-        return false;
-    }
 
-    private boolean canShipPurchaseItem(Entity fleet, ContentCatalog.ItemDefinition item) {
-        if (item == null) {
-            return false;
-        }
-        ShipComponent ship = sm.get(fleet);
-        return ship == null
-                || (ship.type != null && ship.type.canPurchase(item.category(), item.mineable()));
-    }
-
-    private boolean isValidItem(int itemId) {
-        return contentCatalog.findItem(itemId) != null;
-    }
-
-    private boolean isPositiveFinitePrice(float price) {
-        return Float.isFinite(price) && price > 0f;
-    }
-
-    private int safeMaximumAffordable(long balance, float price, int maxAmount) {
-        if (balance < 0L || maxAmount <= 0 || !isPositiveFinitePrice(price)) {
-            return 0;
-        }
-        try {
-            return Money.maximumAffordable(balance, price, maxAmount);
-        } catch (IllegalArgumentException exception) {
-            return 0;
-        }
+        abandonRoute(ai);
     }
 
     private void abandonRoute(TradeAIComponent ai) {
@@ -494,9 +500,40 @@ public class TradeAISystem extends IteratingSystem {
         ai.routeSearchCooldown = ROUTE_SEARCH_RETRY_SECONDS;
     }
 
-    private void finishRoute(TradeAIComponent ai) {
-        ai.resetRoute();
-        ai.state = TradeAIComponent.State.IDLE;
-        ai.routeSearchCooldown = 0f;
+    private Entity resolveActiveMarketStation(EntityId id) {
+        Entity entity = registry.find(id);
+        return isActiveMarketStation(entity) ? entity : null;
+    }
+
+    private boolean isActiveMarketStation(Entity entity) {
+        return entity != null
+                && entity.flags != 0
+                && tm.has(entity)
+                && mm.has(entity)
+                && im.has(entity)
+                && wm.has(entity);
+    }
+
+    private boolean canShipPurchaseItem(Entity fleet, ContentCatalog.ItemDefinition item) {
+        if (item == null) {
+            return false;
+        }
+        ShipComponent ship = sm.get(fleet);
+        if (ship == null || ship.type == null) {
+            return true;
+        }
+        return ship.type.canCarry(item);
+    }
+
+    private static int safeMaximumAffordable(long balance, float price, int maximumAmount) {
+        try {
+            return Money.maximumAffordable(balance, price, maximumAmount);
+        } catch (IllegalArgumentException exception) {
+            return 0;
+        }
+    }
+
+    private static boolean isPositiveFinitePrice(float price) {
+        return Float.isFinite(price) && price > 0f;
     }
 }
