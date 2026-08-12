@@ -48,6 +48,7 @@ public final class MarketDirectory {
     private List<List<StationMarket>> suppliersByItem = emptyIndex();
     private List<List<StationMarket>> consumersByItem = emptyIndex();
     private List<List<TradeOpportunity>> opportunitiesByItem = emptyOpportunityIndex();
+    private long revision;
 
     /**
      * Создаёт пустой directory для указанного каталога.
@@ -66,6 +67,10 @@ public final class MarketDirectory {
      * {@link #MAX_CONSUMERS_PER_SUPPLIER} consumers: половина выбирается по высокой raw buy price,
      * оставшаяся часть — по optimistic margin/distance. Это сохраняет ценовые и логистические
      * альтернативы, но ограничивает число кандидатов, просматриваемых каждым fleet planner.</p>
+     *
+     * <p>Если новый отсортированный набор station snapshots побитово эквивалентен предыдущему,
+     * ранее построенные индексы и opportunities переиспользуются, а {@link #revision()} не меняется.
+     * Это не меняет вход pure planner и исключает повторную работу на неизменном рынке.</p>
      *
      * @param entities кандидаты рынков
      * @throws NullPointerException если iterable не задан
@@ -114,6 +119,10 @@ public final class MarketDirectory {
         }
 
         stationBuilder.sort(Comparator.comparing(StationMarket::id));
+        if (sameStationState(stationBuilder, stations)) {
+            return;
+        }
+
         DistanceTable distanceTable = new DistanceTable(stationBuilder);
         List<List<TradeOpportunity>> opportunityBuilder = mutableOpportunityIndex();
         for (ContentCatalog.ItemDefinition item : contentCatalog.getItems()) {
@@ -151,11 +160,21 @@ public final class MarketDirectory {
         suppliersByItem = immutableIndex(supplierBuilder);
         consumersByItem = immutableIndex(consumerBuilder);
         opportunitiesByItem = immutableOpportunityIndex(opportunityBuilder);
+        revision++;
     }
 
     /** @return все market snapshots в deterministic EntityId-порядке */
     public List<StationMarket> stations() {
         return stations;
+    }
+
+    /**
+     * Возвращает revision market snapshot; значение меняется только при точном изменении station state.
+     *
+     * @return monotonic revision текущего directory snapshot
+     */
+    public long revision() {
+        return revision;
     }
 
     /**
@@ -303,6 +322,20 @@ public final class MarketDirectory {
                 market.sellPrices,
                 market.buyPrices,
                 market.tradableItems);
+    }
+
+    private static boolean sameStationState(
+            List<StationMarket> candidate,
+            List<StationMarket> previous) {
+        if (candidate.size() != previous.size()) {
+            return false;
+        }
+        for (int index = 0; index < candidate.size(); index++) {
+            if (!candidate.get(index).sameState(previous.get(index))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static float distance(StationMarket first, StationMarket second) {
@@ -524,6 +557,22 @@ public final class MarketDirectory {
             return validItemId(itemId)
                     && tradable[itemId]
                     && targetStock[itemId] > 0;
+        }
+
+        private boolean sameState(StationMarket other) {
+            return other != null
+                    && id.equals(other.id)
+                    && Float.floatToIntBits(x) == Float.floatToIntBits(other.x)
+                    && Float.floatToIntBits(y) == Float.floatToIntBits(other.y)
+                    && factionId == other.factionId
+                    && walletBalanceMilliCredits == other.walletBalanceMilliCredits
+                    && inventoryCapacity == other.inventoryCapacity
+                    && totalStock == other.totalStock
+                    && Arrays.equals(stock, other.stock)
+                    && Arrays.equals(targetStock, other.targetStock)
+                    && Arrays.equals(sellPrices, other.sellPrices)
+                    && Arrays.equals(buyPrices, other.buyPrices)
+                    && Arrays.equals(tradable, other.tradable);
         }
     }
 }
