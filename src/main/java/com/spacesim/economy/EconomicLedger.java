@@ -23,6 +23,11 @@ public final class EconomicLedger {
         /**
          * Проверяет монотонность и копирует список.
          *
+         * <p>После диагностического {@link EconomicLedger#clear()} список может быть пустым либо
+         * начинаться не с sequence {@code 1}; {@code nextSequence} при этом намеренно не
+         * сбрасывается. Поэтому snapshot требует только непрерывность сохранённого хвоста и точное
+         * продолжение его последней записи.</p>
+         *
          * @param nextSequence sequence следующей записи
          * @param entries накопленные записи
          */
@@ -31,15 +36,23 @@ public final class EconomicLedger {
                 throw new IllegalArgumentException("Следующий sequence ledger должен быть положительным");
             }
             entries = List.copyOf(Objects.requireNonNull(entries, "Записи ledger не заданы"));
-            long expected = 1L;
-            for (EconomicTransaction entry : entries) {
-                if (entry.sequence() != expected) {
-                    throw new IllegalArgumentException("Ledger должен содержать непрерывную sequence");
+            if (!entries.isEmpty()) {
+                long expected = entries.get(0).sequence();
+                if (expected <= 0L) {
+                    throw new IllegalArgumentException("Sequence ledger должен быть положительным");
                 }
-                expected++;
-            }
-            if (nextSequence != expected) {
-                throw new IllegalArgumentException("Следующий sequence не продолжает ledger");
+                for (EconomicTransaction entry : entries) {
+                    if (entry.sequence() != expected) {
+                        throw new IllegalArgumentException("Ledger должен содержать непрерывную sequence");
+                    }
+                    if (expected == Long.MAX_VALUE) {
+                        throw new IllegalArgumentException("Последняя sequence ledger не оставляет следующего значения");
+                    }
+                    expected++;
+                }
+                if (nextSequence != expected) {
+                    throw new IllegalArgumentException("Следующий sequence не продолжает ledger");
+                }
             }
         }
     }
