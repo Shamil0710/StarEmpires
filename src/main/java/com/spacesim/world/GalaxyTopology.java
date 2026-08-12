@@ -1,0 +1,194 @@
+package com.spacesim.world;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Immutable persistent topology галактики с deterministic lookup и jump indexes.
+ *
+ * <p>Topology хранит только стратегическую структуру мира. Экономические ECS-сущности и локальный
+ * simulation state намеренно не входят в этот класс: Stage 7 использует topology как слой
+ * оркестрации уже существующего deterministic economic core.</p>
+ */
+public final class GalaxyTopology {
+    private final GalaxyId id;
+    private final String name;
+    private final List<SectorNode> sectors;
+    private final List<StarSystemNode> systems;
+    private final List<JumpConnection> connections;
+    private final Map<SectorId, SectorNode> sectorsById;
+    private final Map<StarSystemId, StarSystemNode> systemsById;
+    private final Map<StarSystemId, SectorNode> sectorsBySystemId;
+    private final Map<StarSystemId, List<StarSystemId>> neighborsBySystemId;
+
+    /**
+     * Создаёт и полностью валидирует topology.
+     *
+     * @param id устойчивый ID галактики
+     * @param name отображаемое имя
+     * @param sectors сектора в произвольном входном порядке
+     * @param connections jump connections в произвольном входном порядке
+     * @throws NullPointerException если обязательное значение не задано
+     * @throws IllegalArgumentException при пустом имени, дублирующихся ID/connection или ссылке jump
+     *         на отсутствующую систему
+     */
+    public GalaxyTopology(
+            GalaxyId id,
+            String name,
+            List<SectorNode> sectors,
+            List<JumpConnection> connections) {
+        this.id = Objects.requireNonNull(id, "GalaxyId не задан");
+        this.name = normalizedName(name);
+        Objects.requireNonNull(sectors, "Список секторов не задан");
+        Objects.requireNonNull(connections, "Список jump connections не задан");
+
+        List<SectorNode> sortedSectors = new ArrayList<>(sectors.size());
+        Map<SectorId, SectorNode> sectorIndex = new HashMap<>();
+        Map<StarSystemId, StarSystemNode> systemIndex = new HashMap<>();
+        Map<StarSystemId, SectorNode> systemSectorIndex = new HashMap<>();
+        List<StarSystemNode> flattenedSystems = new ArrayList<>();
+
+        for (SectorNode sector : sectors) {
+            SectorNode value = Objects.requireNonNull(sector, "Сектор topology не задан");
+            if (sectorIndex.putIfAbsent(value.id(), value) != null) {
+                throw new IllegalArgumentException("Дублирующий SectorId: " + value.id());
+            }
+            sortedSectors.add(value);
+            for (StarSystemNode system : value.systems()) {
+                if (systemIndex.putIfAbsent(system.id(), system) != null) {
+                    throw new IllegalArgumentException(
+                            "Дублирующий StarSystemId между секторами: " + system.id());
+                }
+                systemSectorIndex.put(system.id(), value);
+                flattenedSystems.add(system);
+            }
+        }
+        sortedSectors.sort(Comparator.comparing(SectorNode::id));
+        flattenedSystems.sort(Comparator.comparing(StarSystemNode::id));
+
+        List<JumpConnection> sortedConnections = new ArrayList<>(connections.size());
+        Set<JumpConnection> uniqueConnections = new HashSet<>();
+        Map<StarSystemId, TreeSet<StarSystemId>> mutableNeighbors = new HashMap<>();
+        for (StarSystemNode system : flattenedSystems) {
+            mutableNeighbors.put(system.id(), new TreeSet<>());
+        }
+        for (JumpConnection connection : connections) {
+            JumpConnection value = Objects.requireNonNull(connection, "Jump connection не задан");
+            requireKnownSystem(systemIndex, value.first());
+            requireKnownSystem(systemIndex, value.second());
+            if (!uniqueConnections.add(value)) {
+                throw new IllegalArgumentException("Дублирующий jump connection: " + value);
+            }
+            sortedConnections.add(value);
+            mutableNeighbors.get(value.first()).add(value.second());
+            mutableNeighbors.get(value.second()).add(value.first());
+        }
+        sortedConnections.sort(Comparator.naturalOrder());
+
+        Map<StarSystemId, List<StarSystemId>> neighborIndex = new HashMap<>();
+        for (Map.Entry<StarSystemId, TreeSet<StarSystemId>> entry : mutableNeighbors.entrySet()) {
+            neighborIndex.put(entry.getKey(), List.copyOf(entry.getValue()));
+        }
+
+        this.sectors = List.copyOf(sortedSectors);
+        this.systems = List.copyOf(flattenedSystems);
+        this.connections = List.copyOf(sortedConnections);
+        this.sectorsById = Map.copyOf(sectorIndex);
+        this.systemsById = Map.copyOf(systemIndex);
+        this.sectorsBySystemId = Map.copyOf(systemSectorIndex);
+        this.neighborsBySystemId = Map.copyOf(neighborIndex);
+    }
+
+    /** @return устойчивый ID галактики */
+    public GalaxyId id() {
+        return id;
+    }
+
+    /** @return нормализованное отображаемое имя */
+    public String name() {
+        return name;
+    }
+
+    /** @return сектора в deterministic SectorId-порядке */
+    public List<SectorNode> sectors() {
+        return sectors;
+    }
+
+    /** @return все системы галактики в deterministic StarSystemId-порядке */
+    public List<StarSystemNode> systems() {
+        return systems;
+    }
+
+    /** @return канонические jump connections в deterministic порядке */
+    public List<JumpConnection> connections() {
+        return connections;
+    }
+
+    /**
+     * Ищет сектор по ID.
+     *
+     * @param sectorId устойчивый ID сектора
+     * @return найденный сектор либо empty
+     */
+    public Optional<SectorNode> findSector(SectorId sectorId) {
+        return Optional.ofNullable(sectorId == null ? null : sectorsById.get(sectorId));
+    }
+
+    /**
+     * Ищет систему по ID.
+     *
+     * @param systemId устойчивый ID системы
+     * @return найденная система либо empty
+     */
+    public Optional<StarSystemNode> findSystem(StarSystemId systemId) {
+        return Optional.ofNullable(systemId == null ? null : systemsById.get(systemId));
+    }
+
+    /**
+     * Ищет родительский сектор системы.
+     *
+     * @param systemId устойчивый ID системы
+     * @return сектор либо empty для неизвестной системы
+     */
+    public Optional<SectorNode> sectorOf(StarSystemId systemId) {
+        return Optional.ofNullable(systemId == null ? null : sectorsBySystemId.get(systemId));
+    }
+
+    /**
+     * Возвращает соседние по jump connections системы в deterministic ID-порядке.
+     *
+     * @param systemId устойчивый ID системы
+     * @return immutable список соседей или пустой список для неизвестной системы
+     */
+    public List<StarSystemId> neighbors(StarSystemId systemId) {
+        if (systemId == null) {
+            return List.of();
+        }
+        return neighborsBySystemId.getOrDefault(systemId, List.of());
+    }
+
+    private static String normalizedName(String name) {
+        String value = Objects.requireNonNull(name, "Имя галактики не задано").trim();
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("Имя галактики не может быть пустым");
+        }
+        return value;
+    }
+
+    private static void requireKnownSystem(
+            Map<StarSystemId, StarSystemNode> systemIndex,
+            StarSystemId systemId) {
+        if (!systemIndex.containsKey(systemId)) {
+            throw new IllegalArgumentException(
+                    "Jump connection ссылается на неизвестную систему: " + systemId);
+        }
+    }
+}
