@@ -2,7 +2,12 @@ package com.spacesim.controllers;
 
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
-import com.spacesim.components.*;
+import com.spacesim.components.FactionComponent;
+import com.spacesim.components.IdentityComponent;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
+import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
@@ -12,22 +17,23 @@ import java.util.Objects;
 /**
  * Выполняет синхронные атомарные операции покупки и продажи.
  *
- * <p>Основной API Этапа 2 работает с двумя Ashley-сущностями, имеющими
+ * <p>Единственный денежный API работает с двумя Ashley-сущностями, имеющими
  * {@link InventoryComponent} и {@link WalletComponent}. Обычная сделка физически переносит товар в
  * одну сторону и целочисленные milli-credits в другую; успешная операция фиксируется в
  * {@link EconomicLedger}. До мутации проверяются склады, вместимость, оба кошелька, рынок, цена и
  * переполнение, поэтому отказ не меняет состояние.</p>
  *
- * <p>Legacy API с {@link CreditAccount} и {@link PlayerProfile} временно сохранён для поэтапной
- * миграции существующих тестов и систем. Он не является частью нового денежного инварианта и будет
- * удалён после перевода TradeAI/Mining.</p>
+ * <p>Контроллер не создаёт и не уничтожает деньги. Покупка переводит сумму от покупателя станции,
+ * продажа — от станции продавцу. Любая эмиссия или изъятие должны происходить только через явно
+ * классифицированные source/sink-операции экономического слоя.</p>
  */
 public class TradeController {
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
     private final ComponentMapper<FactionComponent> fm = ComponentMapper.getFor(FactionComponent.class);
     private final ComponentMapper<WalletComponent> wm = ComponentMapper.getFor(WalletComponent.class);
-    private final ComponentMapper<IdentityComponent> identityMapper = ComponentMapper.getFor(IdentityComponent.class);
+    private final ComponentMapper<IdentityComponent> identityMapper =
+            ComponentMapper.getFor(IdentityComponent.class);
     private final EconomicLedger ledger;
 
     /** Создаёт контроллер с собственным диагностическим ledger. */
@@ -45,7 +51,11 @@ public class TradeController {
         this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");
     }
 
-    /** @return ledger, используемый этим контроллером */
+    /**
+     * Возвращает журнал, используемый этим контроллером.
+     *
+     * @return ненулевой ledger
+     */
     public EconomicLedger getLedger() {
         return ledger;
     }
@@ -171,201 +181,6 @@ public class TradeController {
     }
 
     /**
-     * Упрощённый legacy-профиль игрока для старого сценария покупки.
-     */
-    public static class PlayerProfile {
-        /** Текущий legacy-баланс кредитов. */
-        public float credits;
-        /** Количество товаров в legacy-грузе игрока. */
-        public int[] cargo = new int[20];
-
-        /** Создаёт профиль с нулевым балансом и пустым грузом. */
-        public PlayerProfile() {
-        }
-    }
-
-    /**
-     * Legacy-покупка без станционного кошелька. Сохраняется только до завершения миграции Stage 2.
-     *
-     * @param station станция с компонентами рынка и склада
-     * @param itemId идентификатор покупаемого товара
-     * @param amount положительное количество единиц товара
-     * @param player изменяемый legacy-профиль покупателя
-     * @return {@code true}, если старый сценарий покупки выполнен
-     */
-    public boolean buy(Entity station, int itemId, int amount, PlayerProfile player) {
-        if (station == null
-                || player == null
-                || player.cargo == null
-                || !isValidBalance(player.credits)
-                || amount <= 0
-                || itemId < 0
-                || itemId >= Constants.MAX_ITEMS
-                || itemId >= player.cargo.length
-                || !im.has(station)
-                || !mm.has(station)) {
-            return false;
-        }
-
-        InventoryComponent inv = im.get(station);
-        MarketComponent market = mm.get(station);
-        if (!isValidInventory(inv)
-                || !isValidMarket(market)
-                || !market.isTradable(itemId)
-                || player.cargo == inv.stock
-                || player.cargo[itemId] < 0) {
-            return false;
-        }
-
-        float unitPrice = market.sellPrices[itemId];
-        float cost = calculateTotalPrice(unitPrice, amount);
-        float resultingBalance = player.credits - cost;
-        if (isValidPrice(unitPrice)
-                && isValidPrice(cost)
-                && isValidBalance(resultingBalance)
-                && resultingBalance < player.credits
-                && inv.stock[itemId] >= amount
-                && player.credits >= cost
-                && player.cargo[itemId] <= Integer.MAX_VALUE - amount) {
-            inv.stock[itemId] -= amount;
-            player.credits = resultingBalance;
-            player.cargo[itemId] += amount;
-            market.isDirty = true;
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Legacy-покупка без учёта репутации.
-     *
-     * @param station станция-продавец
-     * @param buyerInventory склад покупателя
-     * @param itemId идентификатор товара
-     * @param amount количество
-     * @param buyerCredits legacy-счёт
-     * @return {@code true} при успехе
-     */
-    public boolean buyFromStation(
-            Entity station,
-            InventoryComponent buyerInventory,
-            int itemId,
-            int amount,
-            CreditAccount buyerCredits) {
-        return buyFromStation(station, buyerInventory, itemId, amount, buyerCredits, null);
-    }
-
-    /**
-     * Legacy-покупка с репутацией. Не сохраняет деньги станции и будет удалена после миграции систем.
-     *
-     * @param station станция-продавец
-     * @param buyerInventory склад покупателя
-     * @param itemId идентификатор товара
-     * @param amount количество
-     * @param buyerCredits legacy-счёт
-     * @param buyerReputation репутация или {@code null}
-     * @return {@code true} при успехе
-     */
-    public boolean buyFromStation(
-            Entity station,
-            InventoryComponent buyerInventory,
-            int itemId,
-            int amount,
-            CreditAccount buyerCredits,
-            ReputationComponent buyerReputation) {
-        if (!isValidTradeRequest(station, buyerInventory, itemId, amount)
-                || buyerCredits == null
-                || !isValidBalance(buyerCredits.credits)) {
-            return false;
-        }
-
-        InventoryComponent stationInventory = im.get(station);
-        float unitPrice = getEffectiveSellPrice(station, itemId, buyerReputation);
-        float cost = calculateTotalPrice(unitPrice, amount);
-        float resultingBalance = buyerCredits.credits - cost;
-        if (!isValidPrice(unitPrice)
-                || !isValidPrice(cost)
-                || !isValidBalance(resultingBalance)
-                || resultingBalance >= buyerCredits.credits
-                || stationInventory.stock[itemId] < amount
-                || buyerCredits.credits < cost
-                || getFreeCapacity(buyerInventory) < amount) {
-            return false;
-        }
-
-        stationInventory.stock[itemId] -= amount;
-        buyerInventory.stock[itemId] += amount;
-        buyerCredits.credits = resultingBalance;
-        mm.get(station).isDirty = true;
-        increaseReputation(station, buyerReputation);
-        return true;
-    }
-
-    /**
-     * Legacy-продажа без учёта репутации.
-     *
-     * @param station станция-покупатель
-     * @param sellerInventory склад продавца
-     * @param itemId идентификатор товара
-     * @param amount количество
-     * @param sellerCredits legacy-счёт
-     * @return {@code true} при успехе
-     */
-    public boolean sellToStation(
-            Entity station,
-            InventoryComponent sellerInventory,
-            int itemId,
-            int amount,
-            CreditAccount sellerCredits) {
-        return sellToStation(station, sellerInventory, itemId, amount, sellerCredits, null);
-    }
-
-    /**
-     * Legacy-продажа с репутацией. Создаёт деньги участнику и будет удалена после миграции систем.
-     *
-     * @param station станция-покупатель
-     * @param sellerInventory склад продавца
-     * @param itemId идентификатор товара
-     * @param amount количество
-     * @param sellerCredits legacy-счёт
-     * @param sellerReputation репутация или {@code null}
-     * @return {@code true} при успехе
-     */
-    public boolean sellToStation(
-            Entity station,
-            InventoryComponent sellerInventory,
-            int itemId,
-            int amount,
-            CreditAccount sellerCredits,
-            ReputationComponent sellerReputation) {
-        if (!isValidTradeRequest(station, sellerInventory, itemId, amount)
-                || sellerCredits == null
-                || !isValidBalance(sellerCredits.credits)) {
-            return false;
-        }
-
-        InventoryComponent stationInventory = im.get(station);
-        float unitPrice = getEffectiveBuyPrice(station, itemId, sellerReputation);
-        float revenue = calculateTotalPrice(unitPrice, amount);
-        float resultingBalance = sellerCredits.credits + revenue;
-        if (!isValidPrice(unitPrice)
-                || !isValidPrice(revenue)
-                || !isValidBalance(resultingBalance)
-                || resultingBalance <= sellerCredits.credits
-                || sellerInventory.stock[itemId] < amount
-                || getFreeCapacity(stationInventory) < amount) {
-            return false;
-        }
-
-        sellerInventory.stock[itemId] -= amount;
-        stationInventory.stock[itemId] += amount;
-        sellerCredits.credits = resultingBalance;
-        mm.get(station).isDirty = true;
-        increaseReputation(station, sellerReputation);
-        return true;
-    }
-
-    /**
      * Рассчитывает эффективную цену продажи станции с учётом положительной репутации.
      *
      * @param station станция
@@ -455,21 +270,6 @@ public class TradeController {
                 && mm.get(station).isTradable(itemId);
     }
 
-    private boolean isValidTradeRequest(Entity station, InventoryComponent participantInventory, int itemId, int amount) {
-        return station != null
-                && participantInventory != null
-                && im.has(station)
-                && mm.has(station)
-                && itemId >= 0
-                && itemId < Constants.MAX_ITEMS
-                && amount > 0
-                && im.get(station) != participantInventory
-                && isValidInventory(im.get(station))
-                && isValidInventory(participantInventory)
-                && isValidMarket(mm.get(station))
-                && mm.get(station).isTradable(itemId);
-    }
-
     private boolean isValidPriceRequest(Entity station, int itemId) {
         return station != null
                 && itemId >= 0
@@ -505,22 +305,6 @@ public class TradeController {
                 && market.tradableItems.length >= Constants.MAX_ITEMS;
     }
 
-    private boolean isValidBalance(float balance) {
-        return Float.isFinite(balance) && balance >= 0f;
-    }
-
-    private boolean isValidPrice(float price) {
-        return Float.isFinite(price) && price > 0f;
-    }
-
-    private float calculateTotalPrice(float unitPrice, int amount) {
-        double total = (double) unitPrice * amount;
-        if (!Double.isFinite(total) || total <= 0d || total > Float.MAX_VALUE) {
-            return Float.NaN;
-        }
-        return (float) total;
-    }
-
     private long safeTradeValue(float unitPrice, int amount) {
         try {
             return Money.tradeValue(unitPrice, amount);
@@ -537,26 +321,5 @@ public class TradeController {
             }
         }
         return "UNIDENTIFIED";
-    }
-
-    /**
-     * Минимальный legacy-счёт участника торговли.
-     */
-    public static class CreditAccount {
-        /** Текущий legacy-баланс кредитов. */
-        public float credits;
-
-        /**
-         * Создаёт legacy-счёт.
-         *
-         * @param credits конечный неотрицательный баланс
-         * @throws IllegalArgumentException если баланс некорректен
-         */
-        public CreditAccount(float credits) {
-            if (!Float.isFinite(credits) || credits < 0f) {
-                throw new IllegalArgumentException("Баланс должен быть конечным и неотрицательным");
-            }
-            this.credits = credits;
-        }
     }
 }
