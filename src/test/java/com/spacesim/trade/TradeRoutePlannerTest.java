@@ -18,6 +18,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TradeRoutePlannerTest {
@@ -138,6 +139,28 @@ class TradeRoutePlannerTest {
 
         assertEquals(7, snapshot.stock(Constants.ITEM_FOOD));
         assertEquals(10f, snapshot.sellPrice(Constants.ITEM_FOOD), 0f);
+    }
+
+    @Test
+    void directoryRevisionМеняетсяТолькоПриИзмененииLiveMarketState() {
+        Entity supplier = station(0f, 7, 100, 1f, 10f, 100_000d);
+        Entity consumer = station(100f, 0, 100, 20f, 30f, 100_000d);
+        List<Entity> markets = List.of(supplier, consumer);
+        MarketDirectory directory = new MarketDirectory(catalog);
+        directory.rebuild(markets);
+        long firstRevision = directory.revision();
+        MarketDirectory.StationMarket firstSnapshot = directory.find(id(supplier));
+
+        directory.rebuild(markets);
+
+        assertEquals(firstRevision, directory.revision());
+        assertSame(firstSnapshot, directory.find(id(supplier)));
+
+        supplier.getComponent(InventoryComponent.class).stock[Constants.ITEM_FOOD] = 6;
+        directory.rebuild(markets);
+
+        assertEquals(firstRevision + 1L, directory.revision());
+        assertEquals(6, directory.find(id(supplier)).stock(Constants.ITEM_FOOD));
     }
 
     @Test
