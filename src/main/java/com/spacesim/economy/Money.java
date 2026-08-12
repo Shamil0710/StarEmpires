@@ -81,9 +81,10 @@ public final class Money {
     /**
      * Находит наибольшее количество товара до заданного лимита, которое можно оплатить балансом.
      *
-     * <p>Используется бинарный поиск по той же полной формуле округления, что и
-     * {@link #tradeValue(float, int)}, поэтому планировщик и фактическая транзакция не расходятся на
-     * дробных ценах.</p>
+     * <p>Используется та же полная формула округления, что и {@link #tradeValue(float, int)}.
+     * Сначала проверяется верхняя граница целиком; бинарный поиск выполняется только когда баланс
+     * действительно ограничивает количество. Поэтому planner не повторяет несколько одинаковых
+     * расчётов для большинства полностью обеспеченных кандидатов.</p>
      *
      * @param balanceMilliCredits доступный неотрицательный баланс
      * @param unitPriceCredits конечная строго положительная цена единицы товара
@@ -101,9 +102,12 @@ public final class Money {
         if (balanceMilliCredits == 0L || maximumAmount == 0) {
             return 0;
         }
+        if (isAffordable(balanceMilliCredits, unitPriceCredits, maximumAmount)) {
+            return maximumAmount;
+        }
 
         int low = 0;
-        int high = maximumAmount;
+        int high = maximumAmount - 1;
         while (low < high) {
             int middle = low + (high - low + 1) / 2;
             if (isAffordable(balanceMilliCredits, unitPriceCredits, middle)) {
