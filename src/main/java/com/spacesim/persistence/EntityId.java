@@ -14,6 +14,7 @@ public record EntityId(long value) implements Comparable<EntityId> {
     /**
      * Проверяет допустимость persistent ID.
      *
+     * @param value положительное числовое значение идентификатора
      * @throws IllegalArgumentException если значение не положительно
      */
     public EntityId {
