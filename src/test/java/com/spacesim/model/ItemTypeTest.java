@@ -13,11 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ItemTypeTest {
     @Test
-    void каталогПолностьюСовместимСИсторическимиМассивами() {
+    void legacyКаталогЗанимаетНачальныеSlotsНеТребуяЗаполнитьВсюCapacity() {
         ItemType[] items = ItemType.values();
         boolean[] seenIds = new boolean[Constants.MAX_ITEMS];
 
-        assertEquals(Constants.MAX_ITEMS, items.length);
+        assertTrue(items.length < Constants.MAX_ITEMS);
         for (ItemType item : items) {
             int id = item.getId();
             assertTrue(id >= 0 && id < Constants.MAX_ITEMS, item.name());
@@ -33,18 +33,26 @@ class ItemTypeTest {
             assertTrue(item.getBasePrice() > 0f);
         }
 
-        for (boolean seenId : seenIds) {
-            assertTrue(seenId);
+        for (int itemId = 0; itemId < items.length; itemId++) {
+            assertTrue(seenIds[itemId]);
+        }
+        for (int itemId = items.length; itemId < Constants.MAX_ITEMS; itemId++) {
+            assertFalse(seenIds[itemId]);
+            assertNull(Constants.ITEM_NAMES[itemId]);
+            assertEquals(0f, Constants.BASE_PRICES[itemId], 0f);
+            assertNull(Constants.getItemType(itemId));
         }
     }
 
     @Test
-    void lookupБезопасноОтклоняетЛюбойИдентификаторВнеКаталога() {
+    void lookupБезопасноОтклоняетИдентификаторыВнеLegacyКаталога() {
         assertNull(ItemType.fromId(-1));
         assertNull(ItemType.fromId(Integer.MIN_VALUE));
+        assertNull(ItemType.fromId(ItemType.values().length));
         assertNull(ItemType.fromId(Constants.MAX_ITEMS));
         assertNull(ItemType.fromId(Integer.MAX_VALUE));
         assertNull(Constants.getItemType(-1));
+        assertNull(Constants.getItemType(ItemType.values().length));
         assertNull(Constants.getItemType(Constants.MAX_ITEMS));
     }
 
