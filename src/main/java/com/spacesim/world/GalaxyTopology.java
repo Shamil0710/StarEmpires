@@ -12,11 +12,11 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Immutable persistent topology галактики с deterministic lookup и jump indexes.
+ * Immutable persistent topology галактики с deterministic lookup и jump/system indexes.
  *
- * <p>Topology хранит только стратегическую структуру мира. Экономические ECS-сущности и локальный
- * simulation state намеренно не входят в этот класс: Stage 7 использует topology как слой
- * оркестрации уже существующего deterministic economic core.</p>
+ * <p>Topology хранит только strategic structure. Экономические ECS-сущности остаются внутри
+ * локальных SimulationSession. Планеты и asteroid fields индексируются глобально по stable ID и
+ * могут быть разрешены обратно в родительскую StarSystem без обхода всей Galaxy.</p>
  */
 public final class GalaxyTopology {
     private final GalaxyId id;
@@ -28,6 +28,10 @@ public final class GalaxyTopology {
     private final Map<StarSystemId, StarSystemNode> systemsById;
     private final Map<StarSystemId, SectorNode> sectorsBySystemId;
     private final Map<StarSystemId, List<StarSystemId>> neighborsBySystemId;
+    private final Map<PlanetId, PlanetNode> planetsById;
+    private final Map<PlanetId, StarSystemNode> systemsByPlanetId;
+    private final Map<AsteroidFieldId, AsteroidFieldNode> asteroidFieldsById;
+    private final Map<AsteroidFieldId, StarSystemNode> systemsByAsteroidFieldId;
 
     /**
      * Создаёт и полностью валидирует topology.
@@ -54,6 +58,10 @@ public final class GalaxyTopology {
         Map<SectorId, SectorNode> sectorIndex = new HashMap<>();
         Map<StarSystemId, StarSystemNode> systemIndex = new HashMap<>();
         Map<StarSystemId, SectorNode> systemSectorIndex = new HashMap<>();
+        Map<PlanetId, PlanetNode> planetIndex = new HashMap<>();
+        Map<PlanetId, StarSystemNode> planetSystemIndex = new HashMap<>();
+        Map<AsteroidFieldId, AsteroidFieldNode> fieldIndex = new HashMap<>();
+        Map<AsteroidFieldId, StarSystemNode> fieldSystemIndex = new HashMap<>();
         List<StarSystemNode> flattenedSystems = new ArrayList<>();
 
         for (SectorNode sector : sectors) {
@@ -69,6 +77,20 @@ public final class GalaxyTopology {
                 }
                 systemSectorIndex.put(system.id(), value);
                 flattenedSystems.add(system);
+                for (PlanetNode planet : system.planets()) {
+                    if (planetIndex.putIfAbsent(planet.id(), planet) != null) {
+                        throw new IllegalArgumentException(
+                                "Дублирующий PlanetId между системами: " + planet.id());
+                    }
+                    planetSystemIndex.put(planet.id(), system);
+                }
+                for (AsteroidFieldNode field : system.asteroidFields()) {
+                    if (fieldIndex.putIfAbsent(field.id(), field) != null) {
+                        throw new IllegalArgumentException(
+                                "Дублирующий AsteroidFieldId между системами: " + field.id());
+                    }
+                    fieldSystemIndex.put(field.id(), system);
+                }
             }
         }
         sortedSectors.sort(Comparator.comparing(SectorNode::id));
@@ -105,6 +127,10 @@ public final class GalaxyTopology {
         this.systemsById = Map.copyOf(systemIndex);
         this.sectorsBySystemId = Map.copyOf(systemSectorIndex);
         this.neighborsBySystemId = Map.copyOf(neighborIndex);
+        this.planetsById = Map.copyOf(planetIndex);
+        this.systemsByPlanetId = Map.copyOf(planetSystemIndex);
+        this.asteroidFieldsById = Map.copyOf(fieldIndex);
+        this.systemsByAsteroidFieldId = Map.copyOf(fieldSystemIndex);
     }
 
     /** @return устойчивый ID галактики */
@@ -176,11 +202,45 @@ public final class GalaxyTopology {
     }
 
     /**
-     * Сравнивает topology как persistent value, игнорируя производные runtime indexes.
+     * Ищет стратегическую планету по глобальному stable ID.
      *
-     * @param other сравниваемый объект
-     * @return {@code true}, если canonical topology-данные совпадают
+     * @param planetId ID планеты
+     * @return планета либо empty
      */
+    public Optional<PlanetNode> findPlanet(PlanetId planetId) {
+        return Optional.ofNullable(planetId == null ? null : planetsById.get(planetId));
+    }
+
+    /**
+     * Разрешает родительскую систему планеты.
+     *
+     * @param planetId ID планеты
+     * @return StarSystem либо empty
+     */
+    public Optional<StarSystemNode> systemOf(PlanetId planetId) {
+        return Optional.ofNullable(planetId == null ? null : systemsByPlanetId.get(planetId));
+    }
+
+    /**
+     * Ищет strategic asteroid field по глобальному stable ID.
+     *
+     * @param fieldId ID поля
+     * @return asteroid field либо empty
+     */
+    public Optional<AsteroidFieldNode> findAsteroidField(AsteroidFieldId fieldId) {
+        return Optional.ofNullable(fieldId == null ? null : asteroidFieldsById.get(fieldId));
+    }
+
+    /**
+     * Разрешает родительскую систему asteroid field.
+     *
+     * @param fieldId ID поля
+     * @return StarSystem либо empty
+     */
+    public Optional<StarSystemNode> systemOf(AsteroidFieldId fieldId) {
+        return Optional.ofNullable(fieldId == null ? null : systemsByAsteroidFieldId.get(fieldId));
+    }
+
     @Override
     public boolean equals(Object other) {
         if (this == other) {
@@ -195,13 +255,11 @@ public final class GalaxyTopology {
                 && connections.equals(topology.connections);
     }
 
-    /** @return hash persistent topology-данных */
     @Override
     public int hashCode() {
         return Objects.hash(id, name, sectors, connections);
     }
 
-    /** @return компактное представление persistent topology */
     @Override
     public String toString() {
         return "GalaxyTopology[id=" + id

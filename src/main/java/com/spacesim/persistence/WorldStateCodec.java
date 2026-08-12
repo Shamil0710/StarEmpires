@@ -1,8 +1,12 @@
 package com.spacesim.persistence;
 
+import com.spacesim.world.AsteroidFieldId;
+import com.spacesim.world.AsteroidFieldNode;
 import com.spacesim.world.GalaxyId;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.JumpConnection;
+import com.spacesim.world.PlanetId;
+import com.spacesim.world.PlanetNode;
 import com.spacesim.world.SectorId;
 import com.spacesim.world.SectorNode;
 import com.spacesim.world.StarSystemId;
@@ -30,8 +34,8 @@ import java.util.Objects;
  *
  * <p>World codec не сериализует экономические компоненты повторно. Каждый system payload кодируется
  * существующим {@link GameStateCodec}, поэтому local save schema, migration и invariant checks
- * остаются единым источником истины. World-layer добавляет только canonical Galaxy topology и
- * отображение StarSystem ID -> local GameState.</p>
+ * остаются единым источником истины. World-layer добавляет canonical Galaxy topology, strategic
+ * planet/asteroid-field landmarks и отображение StarSystem ID -> local GameState.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757; // STGW — Star Empires Galaxy World.
@@ -41,6 +45,8 @@ public final class WorldStateCodec {
     private static final int MAX_STRING_BYTES = 1024 * 1024;
     private static final int MAX_SECTORS = 10_000;
     private static final int MAX_SYSTEMS = 100_000;
+    private static final int MAX_PLANETS = 1_000_000;
+    private static final int MAX_ASTEROID_FIELDS = 1_000_000;
     private static final int MAX_CONNECTIONS = 500_000;
 
     private WorldStateCodec() {
@@ -61,7 +67,6 @@ public final class WorldStateCodec {
             throw new IllegalArgumentException(
                     "Нельзя записать WorldState schema: " + checked.schemaVersion());
         }
-
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             try (DataOutputStream output = new DataOutputStream(buffer)) {
@@ -74,8 +79,7 @@ public final class WorldStateCodec {
                     output.writeLong(systemState.systemId().value());
                     byte[] payload = GameStateCodec.encode(systemState.simulationState());
                     if (payload.length <= 0 || payload.length > MAX_GAMESTATE_PAYLOAD_BYTES) {
-                        throw new IllegalArgumentException(
-                                "GameState payload системы превышает допустимый размер");
+                        throw new IllegalArgumentException("GameState payload системы превышает допустимый размер");
                     }
                     output.writeInt(payload.length);
                     output.write(payload);
@@ -87,9 +91,7 @@ public final class WorldStateCodec {
             }
             return bytes;
         } catch (IOException exception) {
-            throw new IllegalStateException(
-                    "Неожиданная ошибка памяти при кодировании WorldState",
-                    exception);
+            throw new IllegalStateException("Неожиданная ошибка памяти при кодировании WorldState", exception);
         }
     }
 
@@ -106,22 +108,18 @@ public final class WorldStateCodec {
         if (bytes.length == 0 || bytes.length > MAX_SAVE_BYTES) {
             throw new IllegalArgumentException("Размер WorldState находится вне допустимого диапазона");
         }
-
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes))) {
             if (input.readInt() != MAGIC) {
                 throw new IllegalArgumentException("Некорректный magic WorldState");
             }
             int fileVersion = input.readInt();
             if (fileVersion != FILE_FORMAT_VERSION) {
-                throw new IllegalArgumentException(
-                        "Неподдерживаемая версия world-файла: " + fileVersion);
+                throw new IllegalArgumentException("Неподдерживаемая версия world-файла: " + fileVersion);
             }
             int schemaVersion = input.readInt();
             if (schemaVersion != WorldState.CURRENT_VERSION) {
-                throw new IllegalArgumentException(
-                        "Неподдерживаемая WorldState schema: " + schemaVersion);
+                throw new IllegalArgumentException("Неподдерживаемая WorldState schema: " + schemaVersion);
             }
-
             GalaxyTopology topology = readTopology(input);
             int systemCount = readCount(input, MAX_SYSTEMS, "systemStates");
             List<StarSystemSimulationState> systemStates = new ArrayList<>(systemCount);
@@ -129,25 +127,18 @@ public final class WorldStateCodec {
                 StarSystemId systemId = new StarSystemId(input.readLong());
                 int payloadLength = input.readInt();
                 if (payloadLength <= 0 || payloadLength > MAX_GAMESTATE_PAYLOAD_BYTES) {
-                    throw new IllegalArgumentException(
-                            "Некорректная длина GameState payload системы");
+                    throw new IllegalArgumentException("Некорректная длина GameState payload системы");
                 }
                 byte[] payload = input.readNBytes(payloadLength);
                 if (payload.length != payloadLength) {
                     throw new EOFException("GameState payload системы оборван");
                 }
-                systemStates.add(new StarSystemSimulationState(
-                        systemId,
-                        GameStateCodec.decode(payload)));
+                systemStates.add(new StarSystemSimulationState(systemId, GameStateCodec.decode(payload)));
             }
             if (input.read() != -1) {
-                throw new IllegalArgumentException(
-                        "После WorldState обнаружен лишний бинарный хвост");
+                throw new IllegalArgumentException("После WorldState обнаружен лишний бинарный хвост");
             }
-            return new WorldState(
-                    schemaVersion,
-                    topology,
-                    List.copyOf(systemStates));
+            return new WorldState(schemaVersion, topology, List.copyOf(systemStates));
         } catch (EOFException exception) {
             throw new IllegalArgumentException("WorldState оборван", exception);
         } catch (IOException exception) {
@@ -156,9 +147,7 @@ public final class WorldStateCodec {
             if (exception instanceof IllegalArgumentException) {
                 throw exception;
             }
-            throw new IllegalArgumentException(
-                    "WorldState содержит повреждённые значения",
-                    exception);
+            throw new IllegalArgumentException("WorldState содержит повреждённые значения", exception);
         }
     }
 
@@ -185,11 +174,7 @@ public final class WorldStateCodec {
         try {
             Files.write(temp, bytes);
             try {
-                Files.move(
-                        temp,
-                        target,
-                        StandardCopyOption.ATOMIC_MOVE,
-                        StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException exception) {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -216,14 +201,14 @@ public final class WorldStateCodec {
         return decode(Files.readAllBytes(source));
     }
 
-    private static void writeTopology(
-            DataOutputStream output,
-            GalaxyTopology topology) throws IOException {
+    private static void writeTopology(DataOutputStream output, GalaxyTopology topology) throws IOException {
         GalaxyTopology value = Objects.requireNonNull(topology, "GalaxyTopology не задан");
         output.writeLong(value.id().value());
         writeString(output, value.name());
         writeCount(output, value.sectors().size(), MAX_SECTORS, "sectors");
         int totalSystems = 0;
+        int totalPlanets = 0;
+        int totalFields = 0;
         for (SectorNode sector : value.sectors()) {
             output.writeLong(sector.id().value());
             writeString(output, sector.name());
@@ -238,6 +223,32 @@ public final class WorldStateCodec {
                 writeString(output, system.name());
                 output.writeDouble(system.x());
                 output.writeDouble(system.y());
+
+                int planetCount = system.planets().size();
+                if (planetCount > MAX_PLANETS - totalPlanets) {
+                    throw new IllegalArgumentException("Topology содержит слишком много PlanetNode");
+                }
+                totalPlanets += planetCount;
+                writeCount(output, planetCount, MAX_PLANETS, "planets");
+                for (PlanetNode planet : system.planets()) {
+                    output.writeLong(planet.id().value());
+                    writeString(output, planet.name());
+                    output.writeDouble(planet.orbitRadius());
+                }
+
+                int fieldCount = system.asteroidFields().size();
+                if (fieldCount > MAX_ASTEROID_FIELDS - totalFields) {
+                    throw new IllegalArgumentException("Topology содержит слишком много AsteroidFieldNode");
+                }
+                totalFields += fieldCount;
+                writeCount(output, fieldCount, MAX_ASTEROID_FIELDS, "asteroidFields");
+                for (AsteroidFieldNode field : system.asteroidFields()) {
+                    output.writeLong(field.id().value());
+                    writeString(output, field.name());
+                    output.writeDouble(field.x());
+                    output.writeDouble(field.y());
+                    output.writeDouble(field.radius());
+                }
             }
         }
         writeCount(output, value.connections().size(), MAX_CONNECTIONS, "connections");
@@ -253,6 +264,8 @@ public final class WorldStateCodec {
         int sectorCount = readCount(input, MAX_SECTORS, "sectors");
         List<SectorNode> sectors = new ArrayList<>(sectorCount);
         int totalSystems = 0;
+        int totalPlanets = 0;
+        int totalFields = 0;
         for (int sectorIndex = 0; sectorIndex < sectorCount; sectorIndex++) {
             SectorId sectorId = new SectorId(input.readLong());
             String sectorName = readString(input);
@@ -263,11 +276,45 @@ public final class WorldStateCodec {
             totalSystems += systemCount;
             List<StarSystemNode> systems = new ArrayList<>(systemCount);
             for (int systemIndex = 0; systemIndex < systemCount; systemIndex++) {
+                StarSystemId systemId = new StarSystemId(input.readLong());
+                String systemName = readString(input);
+                double x = input.readDouble();
+                double y = input.readDouble();
+
+                int planetCount = readCount(input, MAX_PLANETS, "planets");
+                if (planetCount > MAX_PLANETS - totalPlanets) {
+                    throw new IllegalArgumentException("Topology содержит слишком много PlanetNode");
+                }
+                totalPlanets += planetCount;
+                List<PlanetNode> planets = new ArrayList<>(planetCount);
+                for (int planetIndex = 0; planetIndex < planetCount; planetIndex++) {
+                    planets.add(new PlanetNode(
+                            new PlanetId(input.readLong()),
+                            readString(input),
+                            input.readDouble()));
+                }
+
+                int fieldCount = readCount(input, MAX_ASTEROID_FIELDS, "asteroidFields");
+                if (fieldCount > MAX_ASTEROID_FIELDS - totalFields) {
+                    throw new IllegalArgumentException("Topology содержит слишком много AsteroidFieldNode");
+                }
+                totalFields += fieldCount;
+                List<AsteroidFieldNode> fields = new ArrayList<>(fieldCount);
+                for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
+                    fields.add(new AsteroidFieldNode(
+                            new AsteroidFieldId(input.readLong()),
+                            readString(input),
+                            input.readDouble(),
+                            input.readDouble(),
+                            input.readDouble()));
+                }
                 systems.add(new StarSystemNode(
-                        new StarSystemId(input.readLong()),
-                        readString(input),
-                        input.readDouble(),
-                        input.readDouble()));
+                        systemId,
+                        systemName,
+                        x,
+                        y,
+                        List.copyOf(planets),
+                        List.copyOf(fields)));
             }
             sectors.add(new SectorNode(sectorId, sectorName, List.copyOf(systems)));
         }
@@ -278,11 +325,7 @@ public final class WorldStateCodec {
                     new StarSystemId(input.readLong()),
                     new StarSystemId(input.readLong())));
         }
-        return new GalaxyTopology(
-                galaxyId,
-                galaxyName,
-                List.copyOf(sectors),
-                List.copyOf(connections));
+        return new GalaxyTopology(galaxyId, galaxyName, List.copyOf(sectors), List.copyOf(connections));
     }
 
     private static void writeString(DataOutputStream output, String value) throws IOException {
@@ -307,26 +350,17 @@ public final class WorldStateCodec {
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
-    private static void writeCount(
-            DataOutputStream output,
-            int count,
-            int maximum,
-            String label) throws IOException {
+    private static void writeCount(DataOutputStream output, int count, int maximum, String label) throws IOException {
         if (count < 0 || count > maximum) {
-            throw new IllegalArgumentException(
-                    "Некорректный размер " + label + ": " + count);
+            throw new IllegalArgumentException("Некорректный размер " + label + ": " + count);
         }
         output.writeInt(count);
     }
 
-    private static int readCount(
-            DataInputStream input,
-            int maximum,
-            String label) throws IOException {
+    private static int readCount(DataInputStream input, int maximum, String label) throws IOException {
         int count = input.readInt();
         if (count < 0 || count > maximum) {
-            throw new IllegalArgumentException(
-                    "Некорректный размер " + label + ": " + count);
+            throw new IllegalArgumentException("Некорректный размер " + label + ": " + count);
         }
         return count;
     }

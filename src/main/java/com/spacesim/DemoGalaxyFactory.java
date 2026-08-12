@@ -3,9 +3,13 @@ package com.spacesim;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.world.AsteroidFieldId;
+import com.spacesim.world.AsteroidFieldNode;
 import com.spacesim.world.GalaxyId;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.JumpConnection;
+import com.spacesim.world.PlanetId;
+import com.spacesim.world.PlanetNode;
 import com.spacesim.world.SectorId;
 import com.spacesim.world.SectorNode;
 import com.spacesim.world.StarSystemId;
@@ -21,8 +25,9 @@ import java.util.Objects;
  * Детерминированный production bootstrap минимального Stage-7 multi-system мира.
  *
  * <p>Каждая звёздная система получает обычную {@link SimulationSession}; никакой отдельной
- * стратегической экономики фабрика не создаёт. Различаются только deterministic root seeds
- * локальных sessions, а {@link WorldSimulation} решает, какая из них исполняется full-rate.</p>
+ * стратегической экономики фабрика не создаёт. Strategic topology дополнительно содержит
+ * persistent planet/asteroid-field landmarks, а stations/fleets/asteroids живут внутри local
+ * SimulationSession каждой системы.</p>
  */
 public final class DemoGalaxyFactory {
     /** Система, которую desktop показывает и симулирует на полном local rate. */
@@ -57,7 +62,7 @@ public final class DemoGalaxyFactory {
      *
      * @param rootSeed общий seed bootstrap
      * @param contentCatalog единый catalog всех локальных simulation sessions
-     * @return WorldState с тремя системами и двумя jump connections
+     * @return WorldState с тремя системами, strategic landmarks и двумя jump connections
      */
     public static WorldState createState(long rootSeed, ContentCatalog contentCatalog) {
         ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
@@ -65,9 +70,32 @@ public final class DemoGalaxyFactory {
         SimulationSession inner = SimulationSession.createDemo(derivedSeed(rootSeed, 2L), content);
         SimulationSession frontier = SimulationSession.createDemo(derivedSeed(rootSeed, 3L), content);
 
-        StarSystemNode anchor = new StarSystemNode(ACTIVE_SYSTEM_ID, "Anchor", 0d, 0d);
-        StarSystemNode corona = new StarSystemNode(INNER_SYSTEM_ID, "Corona", 18d, 7d);
-        StarSystemNode frontierNode = new StarSystemNode(FRONTIER_SYSTEM_ID, "Frontier", 43d, -11d);
+        StarSystemNode anchor = new StarSystemNode(
+                ACTIVE_SYSTEM_ID,
+                "Anchor",
+                0d,
+                0d,
+                List.of(
+                        new PlanetNode(new PlanetId(1L), "Anchor Prime", 1.0d),
+                        new PlanetNode(new PlanetId(2L), "Vesper", 2.6d)),
+                List.of(new AsteroidFieldNode(
+                        new AsteroidFieldId(1L), "Anchor Belt", 0.8d, -0.4d, 1.4d)));
+        StarSystemNode corona = new StarSystemNode(
+                INNER_SYSTEM_ID,
+                "Corona",
+                18d,
+                7d,
+                List.of(new PlanetNode(new PlanetId(3L), "Corona II", 1.8d)),
+                List.of(new AsteroidFieldNode(
+                        new AsteroidFieldId(2L), "Corona Trojans", -1.2d, 0.7d, 0.9d)));
+        StarSystemNode frontierNode = new StarSystemNode(
+                FRONTIER_SYSTEM_ID,
+                "Frontier",
+                43d,
+                -11d,
+                List.of(new PlanetNode(new PlanetId(4L), "Prospect", 1.3d)),
+                List.of(new AsteroidFieldNode(
+                        new AsteroidFieldId(3L), "Frontier Field", 1.6d, 1.1d, 2.1d)));
         SectorNode core = new SectorNode(
                 new SectorId(1L),
                 "Core Sector",
