@@ -42,7 +42,12 @@ public final class AsteroidSpawnSystem extends EntitySystem {
     private long spawnSequence;
     private long spawnedAsteroidCount;
 
-    /** Создаёт систему с генератором, инициализированным seed из конфигурации. */
+    /**
+     * Создаёт систему с генератором, инициализированным seed из конфигурации.
+     *
+     * @param config валидная конфигурация астероидного пояса
+     * @throws NullPointerException если конфигурация не задана
+     */
     public AsteroidSpawnSystem(AsteroidSpawnConfig config) {
         this(config, new Random(requireConfig(config).getSeed()));
     }
@@ -84,6 +89,8 @@ public final class AsteroidSpawnSystem extends EntitySystem {
      * Продвигает расписание появления источников.
      * Неконечное или отрицательное время игнорируется; нулевой шаг всё равно выполняет первичное
      * заселение, что позволяет детерминированно построить стартовый мир до первого реального кадра.
+     *
+     * @param deltaTime прошедшее игровое время в секундах
      */
     @Override
     public void update(float deltaTime) {
@@ -116,7 +123,11 @@ public final class AsteroidSpawnSystem extends EntitySystem {
         spawnUntil(config.getTargetCount());
     }
 
-    /** Общее число когда-либо созданных этой системой астероидов, включая уже истощённые. */
+    /**
+     * Возвращает общее число астероидов, когда-либо созданных этой системой, включая истощённые.
+     *
+     * @return неотрицательный насыщаемый счётчик созданных сущностей
+     */
     public long getSpawnedAsteroidCount() {
         return spawnedAsteroidCount;
     }
