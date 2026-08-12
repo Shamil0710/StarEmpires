@@ -9,12 +9,14 @@ import com.badlogic.ashley.utils.ImmutableArray;
 import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.economy.EconomicLedger;
 import com.spacesim.model.AsteroidSpawnConfig;
 import com.spacesim.model.AsteroidSpawnPoint;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.random.RandomGenerator;
@@ -22,16 +24,17 @@ import java.util.random.RandomGenerator;
 /**
  * Поддерживает ограниченный набор конечных астероидных источников в разрешённых точках пояса.
  *
- * <p>При первом обновлении система создаёт {@link AsteroidSpawnConfig#getInitialCount()} источников.
- * Затем через каждый интервал пополнения восстанавливает число активных источников до
- * {@link AsteroidSpawnConfig#getTargetCount()}, не создавая два астероида в одной точке.
- * Выбор свободной точки и величины запаса воспроизводимы для одинаковой конфигурации и RNG.</p>
+ * <p>Каждый созданный астероид объявляется в {@link EconomicLedger} как явный
+ * {@code RESOURCE_SOURCE}: именно появление конечного природного резервуара вводит новый товар в
+ * физический ресурсный пул. Последующая добыча лишь переносит этот ресурс из астероида в трюм и
+ * отдельным source не считается.</p>
  */
 public final class AsteroidSpawnSystem extends EntitySystem {
     private static final double REFILL_TIME_EPSILON_SECONDS = 1e-6d;
 
     private final AsteroidSpawnConfig config;
     private final RandomGenerator random;
+    private final EconomicLedger ledger;
     private final ComponentMapper<AsteroidComponent> asteroidMapper =
             ComponentMapper.getFor(AsteroidComponent.class);
 
@@ -43,43 +46,53 @@ public final class AsteroidSpawnSystem extends EntitySystem {
     private long spawnedAsteroidCount;
 
     /**
-     * Создаёт систему с генератором, инициализированным seed из конфигурации.
+     * Создаёт систему с RNG по seed конфигурации и собственным диагностическим ledger.
      *
      * @param config валидная конфигурация астероидного пояса
-     * @throws NullPointerException если конфигурация не задана
      */
     public AsteroidSpawnSystem(AsteroidSpawnConfig config) {
-        this(config, new Random(requireConfig(config).getSeed()));
+        this(config, new Random(requireConfig(config).getSeed()), new EconomicLedger());
     }
 
     /**
-     * Создаёт систему с внешним RNG-потоком игровой сессии.
+     * Создаёт систему с внешним RNG и собственным диагностическим ledger.
      *
      * @param config валидная конфигурация астероидного пояса
-     * @param random источник случайности, выделенный подсистеме астероидов
-     * @throws NullPointerException если конфигурация или источник случайности не заданы
+     * @param random источник случайности подсистемы
      */
     public AsteroidSpawnSystem(AsteroidSpawnConfig config, RandomGenerator random) {
+        this(config, random, new EconomicLedger());
+    }
+
+    /**
+     * Создаёт систему с внешним RNG и общим экономическим журналом игровой сессии.
+     *
+     * @param config валидная конфигурация астероидного пояса
+     * @param random источник случайности подсистемы
+     * @param ledger общий экономический журнал
+     * @throws NullPointerException если обязательная зависимость не задана
+     */
+    public AsteroidSpawnSystem(
+            AsteroidSpawnConfig config,
+            RandomGenerator random,
+            EconomicLedger ledger) {
         this.config = requireConfig(config);
-        if (random == null) {
-            throw new NullPointerException("Источник случайности не должен быть null");
-        }
-        this.random = random;
+        this.random = Objects.requireNonNull(random, "Источник случайности не должен быть null");
+        this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");
     }
 
     private static AsteroidSpawnConfig requireConfig(AsteroidSpawnConfig config) {
-        if (config == null) {
-            throw new NullPointerException("Конфигурация астероидного пояса не должна быть null");
-        }
-        return config;
+        return Objects.requireNonNull(config, "Конфигурация астероидного пояса не должна быть null");
+    }
+
+    /** @return ledger, в который записываются resource-source операции появления астероидов */
+    public EconomicLedger getLedger() {
+        return ledger;
     }
 
     @Override
     public void addedToEngine(Engine engine) {
-        if (engine == null) {
-            throw new NullPointerException("Ashley Engine не должен быть null");
-        }
-        this.engine = engine;
+        this.engine = Objects.requireNonNull(engine, "Ashley Engine не должен быть null");
         asteroids = engine.getEntitiesFor(Family.all(
                 AsteroidComponent.class,
                 TransformComponent.class).get());
@@ -93,8 +106,6 @@ public final class AsteroidSpawnSystem extends EntitySystem {
 
     /**
      * Продвигает расписание появления источников.
-     * Неконечное или отрицательное время игнорируется; нулевой шаг всё равно выполняет первичное
-     * заселение, что позволяет детерминированно построить стартовый мир до первого реального кадра.
      *
      * @param deltaTime прошедшее игровое время в секундах
      */
@@ -108,7 +119,6 @@ public final class AsteroidSpawnSystem extends EntitySystem {
             spawnUntil(config.getInitialCount());
             initialized = true;
         }
-
         if (deltaTime <= 0f) {
             return;
         }
@@ -129,16 +139,11 @@ public final class AsteroidSpawnSystem extends EntitySystem {
         spawnUntil(config.getTargetCount());
     }
 
-    /**
-     * Возвращает общее число астероидов, когда-либо созданных этой системой, включая истощённые.
-     *
-     * @return неотрицательный насыщаемый счётчик созданных сущностей
-     */
+    /** @return общее число когда-либо созданных этой системой астероидов */
     public long getSpawnedAsteroidCount() {
         return spawnedAsteroidCount;
     }
 
-    /** Создаёт новые источники до заданного общего количества либо пока не закончатся свободные точки. */
     private void spawnUntil(int desiredCount) {
         int activeCount = countUsableAsteroids();
         if (activeCount >= desiredCount) {
@@ -170,7 +175,6 @@ public final class AsteroidSpawnSystem extends EntitySystem {
         }
     }
 
-    /** Считает только непустые источники текущей ресурсной конфигурации. */
     private int countUsableAsteroids() {
         if (asteroids == null) {
             return 0;
@@ -196,12 +200,17 @@ public final class AsteroidSpawnSystem extends EntitySystem {
             spawnedAsteroidCount++;
         }
 
-        return new Entity()
-                .add(new IdentityComponent(
-                        "Астероид " + point.id() + "-" + spawnSequence,
-                        IdentityComponent.Kind.ASTEROID))
+        String asteroidName = "Астероид " + point.id() + "-" + spawnSequence;
+        Entity entity = new Entity()
+                .add(new IdentityComponent(asteroidName, IdentityComponent.Kind.ASTEROID))
                 .add(transform)
                 .add(new AsteroidComponent(point.id(), config.getResourceItem(), resource));
+        ledger.recordResourceSource(
+                asteroidName,
+                config.getResourceItem(),
+                resource,
+                "asteroid-spawn");
+        return entity;
     }
 
     private long randomResourceAmount() {
