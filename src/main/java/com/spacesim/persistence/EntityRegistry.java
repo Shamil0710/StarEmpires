@@ -1,6 +1,7 @@
 package com.spacesim.persistence;
 
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.EntityListener;
 import com.spacesim.components.EntityIdComponent;
 
 import java.util.HashMap;
@@ -14,10 +15,12 @@ import java.util.Objects;
  * созданы заново как другие экземпляры {@code Entity}; достаточно зарегистрировать их с теми же
  * ID, после чего сохранённые связи разрешаются через этот индекс.</p>
  *
- * <p>Один ID не может принадлежать двум разным runtime-сущностям. Повторная регистрация той же
- * сущности с тем же ID идемпотентна.</p>
+ * <p>Класс реализует Ashley {@link EntityListener}. Если listener подключён к family сущностей с
+ * {@link EntityIdComponent}, будущие добавления и удаления автоматически поддерживают индекс в
+ * актуальном состоянии. Один ID не может принадлежать двум разным runtime-сущностям; повторная
+ * регистрация той же сущности с тем же ID идемпотентна.</p>
  */
-public final class EntityRegistry {
+public final class EntityRegistry implements EntityListener {
     private final Map<EntityId, Entity> entitiesById = new HashMap<>();
 
     /**
@@ -55,6 +58,26 @@ public final class EntityRegistry {
         }
         EntityIdComponent component = entity.getComponent(EntityIdComponent.class);
         return component != null && entitiesById.remove(component.id, entity);
+    }
+
+    /**
+     * Автоматически регистрирует сущность, добавленную в отслеживаемую Ashley family.
+     *
+     * @param entity добавленная сущность с ID-компонентом
+     */
+    @Override
+    public void entityAdded(Entity entity) {
+        register(entity);
+    }
+
+    /**
+     * Автоматически удаляет сущность, покинувшую отслеживаемую Ashley family или Engine.
+     *
+     * @param entity удалённая сущность
+     */
+    @Override
+    public void entityRemoved(Entity entity) {
+        unregister(entity);
     }
 
     /**
