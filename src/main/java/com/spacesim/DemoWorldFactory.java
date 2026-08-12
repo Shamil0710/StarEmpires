@@ -2,6 +2,7 @@ package com.spacesim;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.CombatComponent;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
@@ -18,8 +19,10 @@ import com.spacesim.constants.Constants;
 import com.spacesim.economy.Money;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
+import com.spacesim.persistence.EntityIdAllocator;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Создаёт детерминированный демонстрационный мир с полной производственной экономикой.
@@ -37,6 +40,10 @@ import java.util.List;
  * Все станции и экономические корабли получают конечные {@link WalletComponent} с начальным
  * капиталом. Authoritative деньги существуют только в этих кошельках.</p>
  *
+ * <p>Все bootstrap-сущности получают устойчивые {@link EntityIdComponent} в стабильном порядке
+ * результата. Перегрузка с внешним {@link EntityIdAllocator} позволяет продолжить ту же ID-
+ * последовательность для динамических объектов текущей игровой сессии.</p>
+ *
  * <p>Фабрика не обращается к libGDX/OpenGL и не регистрирует системы Ashley. Каждый вызов
  * {@link #createEntities()} возвращает новый независимый граф сущностей и компонентов.</p>
  */
@@ -51,14 +58,29 @@ public final class DemoWorldFactory {
     }
 
     /**
-     * Создаёт полный набор станций и кораблей демонстрационной сцены.
-     *
-     * <p>Порядок результата стабилен: сначала шесть станций от первичных источников к конечному
-     * потребителю, затем пять специализированных транспортов, добывающий и боевой корабли.</p>
+     * Создаёт полный набор станций и кораблей с новой ID-последовательностью от {@code entity:1}.
      *
      * @return неизменяемый список из шести новых станций и семи новых кораблей
      */
     public static List<Entity> createEntities() {
+        return createEntities(new EntityIdAllocator());
+    }
+
+    /**
+     * Создаёт полный набор станций и кораблей, используя общую ID-последовательность сессии.
+     *
+     * <p>Порядок результата стабилен: сначала шесть станций от первичных источников к конечному
+     * потребителю, затем пять специализированных транспортов, добывающий и боевой корабли. ID
+     * выдаются в этом же порядке только после полной сборки графа, поэтому внутренние runtime-ссылки
+     * вроде базы добытчика не влияют на идентичность.</p>
+     *
+     * @param idAllocator общий детерминированный аллокатор persistent ID
+     * @return неизменяемый список из шести новых станций и семи новых кораблей
+     * @throws NullPointerException если аллокатор не задан
+     */
+    public static List<Entity> createEntities(EntityIdAllocator idAllocator) {
+        Objects.requireNonNull(idAllocator, "EntityIdAllocator не задан");
+
         Entity mine = createStation(
                 "Шахтёрская база Ковчег", 420f, 880f, Constants.FACTION_MINERS);
         configureMarket(mine, Constants.ITEM_ORE, 400, 300, 0f);
@@ -124,7 +146,7 @@ public final class DemoWorldFactory {
         Entity miningShip = createMiningShip("Добытчик Старатель", 450f, 930f, mine);
         Entity combatShip = createCombatShip("Фрегат Страж", 1500f, 1050f);
 
-        return List.of(
+        List<Entity> entities = List.of(
                 mine,
                 powerPlant,
                 farm,
@@ -138,6 +160,10 @@ public final class DemoWorldFactory {
                 weaponsTransport,
                 miningShip,
                 combatShip);
+        for (Entity entity : entities) {
+            entity.add(new EntityIdComponent(idAllocator.allocate()));
+        }
+        return entities;
     }
 
     /** Создаёт базовую станцию с пустым рынком, историей цен, складом и конечным капиталом. */
