@@ -1,30 +1,99 @@
 # Star Empires — Development Roadmap
 
-> Статусный документ разработки. Этапы выполняются последовательно: следующий этап начинается только после выполнения Definition of Done предыдущего.
+> Главный статусный и плановый документ разработки.
 >
-> Последнее обновление: 2026-08-12.
+> Этот файл является единственным источником истины для последовательности этапов, Definition of Done, активного milestone и правил перехода между этапами.
+>
+> Последнее обновление: 2026-08-13.
 
-## Цель ближайшего milestone: Economic Sandbox v0.1
+## 1. Цель проекта
 
-Надёжный, воспроизводимый экономический sandbox, который можно прогонять без UI сотни игровых часов и использовать как фундамент для галактики, фракций, строительства и боевой системы.
+**Star Empires** — космическая sandbox-RPG/strategy с живой экономикой и миром, который продолжает существовать независимо от игрока.
 
-Критерии milestone:
+Целевая петля развития игрока:
 
-- [x] проект стабильно собирается из чистого clone одной командой;
-- [ ] CI зелёный и блокирует сломанные изменения — CI зелёный; обязательная branch protection для `main` пока не настроена доступным connector API;
-- [x] симуляция использует фиксированный игровой tick и поддерживает pause/time scale;
-- [x] одинаковый seed даёт воспроизводимую экономическую симуляцию;
-- [x] товары сохраняются физически: source / transform / sink всегда явны;
-- [x] деньги передаются между экономическими агентами, а не создаются/исчезают внутри обычной сделки;
-- [x] save/load сохраняет экономическое состояние и ссылки между сущностями через устойчивые ID;
-- [x] товары, рецепты, корабли, станции и фракционные параметры загружаются из data-driven каталога;
-- [x] торговый AI оценивает прибыль с учётом времени маршрута и имеет extension seam для дополнительных route costs;
-- [x] существует headless benchmark минимум на 100 станций, 500 экономических агентов и 100 игровых часов;
-- [x] benchmark собирает ключевые экономические метрики и выявляет разрушение supply chain.
+```text
+пилот одного корабля
+        ↓
+торговец / шахтёр / наёмник
+        ↓
+владелец нескольких кораблей
+        ↓
+компания и автономные флоты
+        ↓
+собственные станции
+        ↓
+собственная фракция
+        ↓
+территория, дипломатия и войны
+        ↓
+региональная / галактическая держава
+```
+
+Ключевой принцип проекта: **игрок и AI по возможности используют одни и те же физические правила мира**. Игрок не получает отдельной «игровой экономики», а действует внутри той же системы ресурсов, рынков, логистики, строительства, боя и фракционной политики, что и остальные акторы.
 
 ---
 
-## Этап 0 — Repository health и зелёная сборка
+## 2. Зафиксированный технологический стек
+
+Текущий production stack проекта:
+
+- Java 17;
+- libGDX / LWJGL3;
+- Ashley ECS для локальных runtime entities;
+- Maven Wrapper;
+- JUnit;
+- JaCoCo;
+- GitHub Actions;
+- data-driven JSON content catalog;
+- deterministic fixed-tick simulation;
+- versioned binary persistence.
+
+**Технологическое решение на текущем roadmap считается зафиксированным.**
+
+Миграция на другой движок или основной язык не является плановой задачей и может рассматриваться только как отдельное архитектурное решение с оценкой стоимости миграции и потери уже реализованной инфраструктуры.
+
+---
+
+## 3. Общая карта milestones
+
+| Milestone | Цель | Основные этапы | Статус |
+| --- | --- | --- | --- |
+| **v0.1 Economic Sandbox** | доказать корректность и масштабируемость экономического core | Stage 0–6 | COMPLETE |
+| **v0.2 Living Galactic Economy** | получить несколько живых систем, реальные фракции, строительство, межсистемную логистику и автономное расширение | Stage 7–11 | ACTIVE |
+| **v0.3 Playable Space Sandbox** | превратить симуляцию в игру: игрок, путешествия, торговля, добыча и базовый бой | Stage 12–14 | PLANNED |
+| **v0.4 Fleet & Empire Sandbox** | дать игроку собственные флоты, станции, фракцию и стратегическую войну | Stage 15–18 | PLANNED |
+| **v0.5 RPG & Living World** | исследования, NPC, миссии, события и персональная прогрессия | Stage 19–20 | PLANNED |
+| **v0.6 Content & Balance Alpha** | расширить контент и доказать длительную устойчивость полной игры | Stage 21 | PLANNED |
+| **v0.7 Polish / Release Candidate** | UX, onboarding, performance, save compatibility, release quality | Stage 22 | PLANNED |
+
+Параллельно основному roadmap развивается **Visual / UX Track**, описанный ниже. Он не должен нарушать последовательность core-этапов и не должен подменять функциональные Definition of Done.
+
+---
+
+# MILESTONE v0.1 — ECONOMIC SANDBOX
+
+**Статус:** COMPLETE, кроме организационного branch-protection пункта.
+
+Цель milestone: надёжный, воспроизводимый экономический sandbox, который можно прогонять без UI сотни игровых часов и использовать как фундамент для галактики, фракций, строительства и боя.
+
+Критерии:
+
+- [x] проект стабильно собирается из чистого clone одной командой;
+- [ ] обязательная branch protection для `main` — CI зелёный, но branch protection не настроена доступным connector API;
+- [x] fixed simulation tick и pause/time scale;
+- [x] deterministic seed;
+- [x] физическое сохранение товаров;
+- [x] двусторонняя передача денег без скрытой эмиссии в обычной торговле;
+- [x] save/load с устойчивыми ID;
+- [x] data-driven товары, рецепты, корабли, станции и фракции;
+- [x] route planning по экономической отдаче на единицу времени;
+- [x] benchmark 100 stations / 500 economic agents / 100 simulated hours;
+- [x] quantitative observability и supply-chain failure detection.
+
+---
+
+## Stage 0 — Repository health и зелёная сборка
 
 **Статус:** COMPLETE — MERGED TO `main` VIA PR #1
 
@@ -37,37 +106,33 @@
 - [x] feature/fix-ветки используются как рабочий контур, `main` — стабильная база;
 - [ ] desktop OpenGL smoke-check остаётся ручным release-checklist и не блокирует core DoD.
 
-Merge commit: `483dad87b03eb2a1eb355be6c29e503dc7d872e5`.
-
 ### Definition of Done
 
 Свежий clone выполняет `./mvnw clean verify`, создаёт runnable `-all.jar`, автоматические проверки зелёные. **Выполнено.**
 
 ---
 
-## Этап 1 — SimulationClock и детерминированное игровое время
+## Stage 1 — SimulationClock и детерминированное игровое время
 
 **Статус:** COMPLETE — MERGED TO `main` VIA PR #2
 
 ### Основные результаты
 
 - [x] `SimulationClock` с fixed step `0.1s`;
-- [x] render delta отделён от simulation delta через `SimulationLoop`;
+- [x] render delta отделён от simulation delta;
 - [x] pause/time scale не меняют размер simulation tick;
 - [x] события и новости работают на game time;
 - [x] deterministic `SimulationRandom` с именованными RNG streams;
 - [x] определён явный порядок simulation systems;
-- [x] тесты подтверждают эквивалентность разных render-frame patterns при одинаковом числе fixed ticks.
-
-Merge commit: `3340d762548e0643c496bdc400b6be51e0df7f64`.
+- [x] одинаковое число fixed ticks даёт одинаковый результат независимо от FPS.
 
 ### Definition of Done
 
-Одинаковый initial state + seed + количество simulation ticks приводит к одинаковому экономическому состоянию независимо от FPS/рендеринга. **Выполнено.**
+Одинаковый initial state + seed + количество simulation ticks приводит к одинаковому экономическому состоянию независимо от render-frame pattern. **Выполнено.**
 
 ---
 
-## Этап 2 — Деньги и экономические инварианты
+## Stage 2 — Деньги и экономические инварианты
 
 **Статус:** COMPLETE — MERGED TO `main` VIA PR #3
 
@@ -75,313 +140,1467 @@ Merge commit: `3340d762548e0643c496bdc400b6be51e0df7f64`.
 
 - [x] authoritative деньги переведены на `long` milli-credits;
 - [x] добавлен `WalletComponent`;
-- [x] обычная торговля двусторонняя и атомарная: товар и деньги физически переходят между агентами;
+- [x] торговля двусторонняя и атомарная;
 - [x] станции имеют конечную ликвидность;
-- [x] введены `EconomicTransaction` и общий `EconomicLedger`;
-- [x] resource source / sink / transform отделены от физических transfer;
-- [x] добыча, производство, потребление и asteroid spawn отражаются в ledger;
-- [x] удалены legacy authoritative `float credits` APIs;
-- [x] добавлены money/resource conservation, atomicity и ledger-determinism regression tests;
-- [x] контракт задокументирован в `docs/economic_invariants.md`.
-
-Verified PR head: `8dcacbf88220990c5b7a61cd4b56ece06121478b`.
-Merge commit: `41aaf96c101edf5a216ba23fd30f592df0eb8d51`.
+- [x] введены `EconomicTransaction` и `EconomicLedger`;
+- [x] resource source / sink / transform отделены от transfer;
+- [x] добыча, производство, потребление и spawn отражаются в ledger;
+- [x] legacy authoritative `float credits` APIs удалены;
+- [x] regression tests покрывают conservation, atomicity и ledger determinism.
 
 ### Definition of Done
 
-Обычная торговля не создаёт и не уничтожает деньги или товар. Любое создание/уничтожение ресурса имеет явный экономический тип. **Выполнено.**
+Обычная торговля не создаёт и не уничтожает деньги или товар. Любое создание или уничтожение ресурса имеет явный economic transaction type. **Выполнено.**
 
 ---
 
-## Этап 3 — EntityId и сохранения
+## Stage 3 — EntityId и сохранения
 
 **Статус:** COMPLETE — MERGED TO `main` VIA PR #4
 
 ### Основные результаты
 
-- [x] введён устойчивый `EntityId`;
-- [x] введён общий runtime `EntityRegistry`;
-- [x] persistent-ссылки TradeAI/Mining переведены с прямых Ashley `Entity` на `EntityId`;
-- [x] реализован versioned `GameState`;
-- [x] реализован детерминированный ограниченный бинарный `GameStateCodec`;
-- [x] сохранение использует безопасную замену файла;
-- [x] сохраняются clock, RNG streams, события, asteroid spawner, price recorder и economic ledger;
-- [x] `SimulationSession` поддерживает snapshot/restore/save/load без OpenGL;
-- [x] `SpaceSimGame` использует тот же authoritative simulation pipeline;
-- [x] round-trip и file continuation tests подтверждают `simulate(A) -> save/load -> simulate(B)`.
-
-Verified PR head: `9899aae8016e2d1154de46a1ddaf840893c8e09e`.
-Merge commit: `10559976dacced9d07392df9125f504a851d9b76`.
+- [x] устойчивый `EntityId`;
+- [x] общий runtime `EntityRegistry`;
+- [x] persistent references переведены на ID;
+- [x] versioned `GameState`;
+- [x] bounded deterministic `GameStateCodec`;
+- [x] safe file replacement;
+- [x] сохранение clock, RNG streams, events, asteroid spawner, price recorder и ledger;
+- [x] `SimulationSession` snapshot/restore/save/load без OpenGL;
+- [x] continuation tests.
 
 ### Definition of Done
 
-`simulate(A) -> save -> load -> simulate(B)` эквивалентно `simulate(A+B)` в пределах определённых инвариантов. **Выполнено.**
+`simulate(A) -> save/load -> simulate(B)` эквивалентно `simulate(A+B)` в пределах определённых инвариантов. **Выполнено.**
 
 ---
 
-## Этап 4 — Data-driven контент
+## Stage 4 — Data-driven контент
 
 **Статус:** COMPLETE — MERGED TO `main` VIA PR #5
 
 ### Основные результаты
 
-- [x] создан versioned validated JSON `ContentCatalog`;
+- [x] versioned validated JSON `ContentCatalog`;
 - [x] товары, рецепты, фракции, ship archetypes и station archetypes описываются данными;
 - [x] stable string content IDs отделены от dense runtime IDs;
-- [x] hot simulation path сохраняет плотные массивы;
-- [x] `MAX_ITEMS` стал runtime capacity `64`, а не числом enum-товаров;
-- [x] `MarketSystem` и `TradeAISystem` получают item metadata из `ContentCatalog`;
-- [x] `ShipType` оставлен как runtime role/cargo policy, конкретные модели вынесены в archetypes;
-- [x] generic `ArchetypeEntityFactory` создаёт stations/traders/miners/combat ships из данных;
-- [x] `DemoWorldFactory` хранит scenario placement, а не экономические tuning constants;
-- [x] stable archetype ID сохраняется через `ArchetypeComponent` и `EntityState` schema v2;
-- [x] Stage-3 save v1 мигрирует 5 item slots в текущую capacity без потери legacy значений;
-- [x] semantic SHA-256 fingerprint каталога реализован;
-- [x] content-bound `STEC` save envelope отклоняет несовместимый catalog до restore;
-- [x] raw `STEM` Stage-3 saves остаются поддержаны;
-- [x] data-only item test доказывает работу товара без Java `ItemType` constant;
-- [x] validation fail-fast проверяет ссылки station -> faction/recipe/item и role-specific ship parameters;
-- [x] authoring/versioning contract описан в `docs/content_catalog.md`;
-- [x] implementation evidence описан в `docs/stage4_verification.md`.
-
-Verified final PR head: `b9ddcd3171ced36ee12945408805e84763a9362d`.
-Push CI exact head: SUCCESS.
-Pull-request CI exact head: SUCCESS.
-Merge commit: `aed0e711146dfd2b326974bec6d1823f43f062ed`.
-Post-merge `main` CI: SUCCESS.
+- [x] runtime item capacity не привязана к enum count;
+- [x] market/trade получают metadata из каталога;
+- [x] generic `ArchetypeEntityFactory`;
+- [x] content fingerprint;
+- [x] content-bound save envelope;
+- [x] миграция legacy saves;
+- [x] fail-fast validation ссылок и role-specific parameters.
 
 ### Definition of Done
 
-Новый товар/рецепт/тип станции или конкретный ship/station archetype можно добавить изменением данных без изменения simulation-кода. **Выполнено.**
+Новый товар, рецепт, ship/station archetype можно добавить через данные без изменения simulation-кода. **Выполнено.**
 
 ---
 
-## Этап 5 — Логистика и Trade Route Planner
+## Stage 5 — Логистика и Trade Route Planner
 
 **Статус:** COMPLETE — MERGED TO `main` VIA PR #6
 
 ### Основные результаты
 
-- [x] route discovery отделён от исполнения FSM корабля;
-- [x] создан `MarketDirectory` с immutable defensive snapshots рынков;
-- [x] созданы value objects `FleetTradeProfile`, `TradeOpportunity`, `TradeRoute`, `TradeSaleRoute` без Ashley `Entity` references;
-- [x] создан pure `TradeRoutePlanner`;
-- [x] production default оценивает новые грузы по net profit per travel second вместо gross profit;
-- [x] уже купленный cargo оценивается по net sale revenue per travel second;
-- [x] учитываются purchase amount, cargo capacity, specialization, cargo policy, спрос, stock, капитал и рыночная ликвидность;
-- [x] score учитывает `fleet -> supplier -> consumer` distance/time;
-- [x] создан `TradeRouteCostModel` как extension seam для fuel/risk/tariffs без введения вымышленных balancing costs на этом этапе;
-- [x] supplier-consumer pairing выполняется один раз на общий market snapshot вместо глобального `stations² × goods` перебора каждым агентом;
-- [x] shortlist ограничен максимум 8 consumers на supplier/item и сохраняет ценовые и margin/distance кандидаты;
-- [x] stale-route/replan policy определена и реализована: execution повторно валидирует stations/prices/capacity/liquidity, invalid route сбрасывается с cooldown без partial transfer;
-- [x] deterministic tie-breaks не используют RNG;
-- [x] Stage 2 money/resource invariants остаются зелёными;
-- [x] Stage 3 save/load continuation остаётся зелёным, persistent route schema не менялась;
-- [x] performance-oriented regression с 40 suppliers + 40 consumers доказывает bounded candidate count;
-- [x] архитектурный и экономический контракт описан в `docs/trade_route_planning.md`.
-
-Verified final PR head: `ac80376130f7680b0b59e0fab59c63719a75795d`.
-Push CI exact head: SUCCESS.
-Pull-request CI exact head: SUCCESS.
-Exact-head suite: **235 tests, 0 failures, 0 errors, 0 skipped**; Javadoc SUCCESS; JaCoCo thresholds SUCCESS.
-Merge commit: `fd7c0ece140487aa13a661225c8c9034e9333537`.
-Post-merge `main` CI: SUCCESS.
+- [x] route discovery отделён от ship FSM;
+- [x] `MarketDirectory`;
+- [x] immutable/value-object trade planning state;
+- [x] pure `TradeRoutePlanner`;
+- [x] scoring по net profit / travel time;
+- [x] учитываются stock, спрос, capacity, specialization, liquidity;
+- [x] `TradeRouteCostModel` оставляет seam для fuel/risk/tariffs;
+- [x] bounded candidate shortlist;
+- [x] stale-route/replan policy;
+- [x] deterministic tie-breaks;
+- [x] performance regression.
 
 ### Definition of Done
 
-Торговый AI предпочитает лучший маршрут по экономической отдаче на единицу времени, route discovery находится вне ship FSM, а каждый агент больше не выполняет глобальный квадратичный перебор всех пар станций и товаров. **Выполнено.**
+Trade AI выбирает экономически лучший локальный маршрут без глобального квадратичного перебора каждым агентом. **Выполнено.**
 
 ---
 
-## Этап 6 — Headless economic benchmark и observability
+## Stage 6 — Headless benchmark и observability
 
 **Статус:** COMPLETE — Stage 6A MERGED VIA PR #7; Stage 6B MERGED VIA PR #8
 
-### Цель
+### Основные результаты
 
-Получить воспроизводимый количественный контур, который показывает не только корректность инвариантов, но и устойчивость экономики и стоимость симуляции на масштабе до перехода к multi-system миру.
-
-### Stage 6A — выполненная инфраструктура
-
-- [x] создан headless simulation/benchmark runner без OpenGL на authoritative `SimulationSession`;
-- [x] определены versioned benchmark scenarios и deterministic seeds;
-- [x] создан deterministic world на 100 станций / 500 экономических агентов через production archetype + persistence/bootstrap path;
-- [x] определён отдельный `scale100h` профиль на 3 600 000 fixed ticks = 100 игровых часов;
-- [x] собираются wall-clock duration, simulated-time/real-time ratio и ticks/second;
-- [x] собирается JVM heap baseline до/после run;
-- [x] собираются stockout observations и unmet demand;
-- [x] собирается price mean/variance;
-- [x] собираются trade transaction count, traded units и monetary turnover;
-- [x] собираются production cycles/output, mining mined/delivered и resource sink/source volumes;
-- [x] собираются wealth distribution, percentiles и Gini;
-- [x] собираются route profitability observations и shared `MarketDirectory` opportunity counts;
-- [x] benchmark явно проверяет money conservation;
-- [x] benchmark выполняет item-by-item resource accounting через inventories + asteroids + source/sink + recipe transform deltas;
-- [x] добавлен machine-readable JSON report с отделением deterministic и machine-dependent metrics;
-- [x] demo smoke benchmark deterministic и входит в CI;
-- [x] scale CI smoke проверяет ровно 100 stations, 450 traders и 50 miners = 500 economic agents;
-- [x] полный regression suite после Stage 6A: 241 tests, Javadoc и JaCoCo gates зелёные.
-
-Verified final PR head: `9b356cd9941ee7785724e66f51608687c7fa98a7`.
-Push CI exact head: SUCCESS.
-Pull-request CI exact head: SUCCESS.
-Merge commit: `835260b8f2a780fab8f477adfa3271819f067c38`.
-Post-merge `main` CI: SUCCESS.
-
-### Stage 6B — scalability gate
-
-- [x] профилирован 100/500 world; основные CPU/allocation hotspots локализованы в route planning, market snapshots и mining validation;
-- [x] проверен рост entity count/asteroid count и ledger size на 1k -> 10k -> 100k ticks;
-- [x] устранены подтверждённые hot-path bottlenecks без изменения экономических инвариантов и deterministic semantics;
-- [x] ledger retention проверен отдельно: в текущем 100/500 сценарии ledger стабилизируется на 27 339 entries, поэтому отдельный streaming ledger для Stage 6 не требуется;
-- [x] JFR использован как внешний allocation/CPU profiler без зависимости simulation core от profiler library;
-- [x] завершён полный `100 stations / 500 agents / 100 simulated hours` run: 3 600 000 / 3 600 000 ticks;
-- [x] сохранён machine-readable baseline report `docs/benchmarks/scale100h-stage6b-baseline.json`;
-- [x] performance/regression thresholds определены после первого полного baseline и описаны в `docs/stage6b_scalability.md`;
-- [x] CI quantitatively обнаруживает искусственно нарушенный ore supply chain: unmet demand растёт, trade activity падает, mining=0 при сохранённых инвариантах;
-- [x] exact failed-route cache защищён regression-тестами инвалидизации по market revision и fleet planning state;
-- [x] `MarketDirectory` переиспользует неизменный snapshot только при точном совпадении live state;
-- [x] финальный regression suite Stage 6B: 246 tests, 0 failures, 0 errors, 0 skipped; Javadoc и JaCoCo gates зелёные.
-
-Verified final PR head: `b14f56d5ad59dcb96b2bb01329d8639fd35b900f`.
-Push CI exact head: SUCCESS.
-Pull-request CI exact head: SUCCESS.
-Merge commit: `10fd1d9164c289641e2558cfa5d0abb956b5b6eb`.
-Post-merge `main` CI: SUCCESS.
-
-Первый полный `scale100h` baseline создан exact CI production artifact `135cf8393a500afb84194d8c1ef923beb53287aa`:
-
-- throughput: `6662.2300866007 ticks/s`;
-- wall-clock: `540.359602296 s`;
-- money conserved: `true`;
-- resource accounting conserved: `true`, per-item delta `[0, 0, 0, 0, 0]`;
-- non-negative inventories: `true`;
-- entities: `606`, stations: `100`, economic agents: `500`;
-- ledger entries: `27 339`;
-- heap delta: `35 936 296 bytes`.
-
-Подробная evidence/threshold policy: `docs/stage6b_scalability.md`.
+- [x] headless benchmark runner;
+- [x] deterministic scenarios;
+- [x] world 100 stations / 500 agents;
+- [x] full `scale100h`: 3 600 000 fixed ticks;
+- [x] performance/heap metrics;
+- [x] stockouts/unmet demand;
+- [x] price/trade/production/mining/resource metrics;
+- [x] wealth distribution / Gini;
+- [x] route profitability;
+- [x] money/resource accounting checks;
+- [x] machine-readable JSON reports;
+- [x] profiling and confirmed hot-path optimizations;
+- [x] regression thresholds;
+- [x] broken supply-chain detection.
 
 ### Definition of Done
 
-Экономический core автоматически стресс-тестируется без UI; benchmark минимум 100 stations / 500 agents / 100 simulated hours воспроизводим; отчёт показывает производительность, дефициты, цены, торговлю, производство, wealth и route-planner metrics; экономические инварианты остаются доказанными. **Выполнено.**
+Экономический core автоматически стресс-тестируется без UI и количественно показывает корректность, производительность и деградацию supply chain. **Выполнено.**
 
 ---
 
-## Этап 7 — Иерархия мира и уровни симуляции
+# MILESTONE v0.2 — LIVING GALACTIC ECONOMY
+
+**Статус:** ACTIVE
+
+Цель: перейти от стабильной локальной экономики к **самоизменяющейся галактической экономике**, где системы связаны физическими перевозками, станции могут строиться и исчезать, а фракции способны самостоятельно реагировать на дефицит и расширяться.
+
+---
+
+## Stage 7 — Иерархия мира и уровни симуляции
 
 **Статус:** COMPLETE — MERGED TO `main` VIA PR #9
 
 ### Основные результаты
 
-- [x] реализована immutable persistent hierarchy `Galaxy -> Sector -> StarSystem` с typed stable IDs;
-- [x] добавлены strategic planets и asteroid fields со stable IDs; stations, fleets и individual asteroids остаются локальными ECS entities соответствующей `SimulationSession`;
-- [x] реализованы canonical jump connections и deterministic neighbor/system/landmark indexes;
-- [x] создан `WorldState`: каждая StarSystem topology имеет ровно один authoritative local `GameState`;
-- [x] создан bounded deterministic `WorldStateCodec`, который переиспользует существующий `GameStateCodec`, не меняя Stage 3–6 economic save schema;
-- [x] создан content-bound `WorldPersistence` с сохранением active system и scheduler config;
-- [x] legacy `STEC` и raw `STEM` single-session saves автоматически загружаются как default single-system world;
-- [x] active StarSystem продолжает использовать точный fixed-rate `SimulationSession` с шагом `0.1s`;
-- [x] remote StarSystems используют тот же economic core через coarse strategic updates без второй экономической реализации;
-- [x] default strategic cadence агрегирует 10 fixed ticks в один remote object-level `Engine.update()`;
-- [x] установлен bounded remote update budget и deterministic largest-lag-first scheduler со stable `StarSystemId` tie-break;
-- [x] scheduler не имеет hidden mutable cursor: exact continuation выводится из persistent clocks и system IDs;
-- [x] production `DemoGalaxyFactory` создаёт 2 sectors / 3 экономически живые systems / 4 planets / 3 asteroid fields / 2 jump connections;
-- [x] desktop `SpaceSimGame` переведён на `WorldSimulation` и больше не собирает дублирующий economic pipeline;
-- [x] world save/load continuation, scheduler budget, reduced-rate remote economy, legacy saves и topology indexes защищены regression-тестами;
-- [x] implementation/verification contract описан в `docs/stage7_world_simulation.md`.
-
-Verified final PR head: `688460e984613450816528e4a4ade1762a916655`.
-Push CI exact head: SUCCESS.
-Pull-request CI exact head: SUCCESS.
-Implementation-head suite: **274 tests, 0 failures, 0 errors, 0 skipped**; Javadoc SUCCESS; JaCoCo thresholds SUCCESS.
-Merge commit: `5190c23cc9c62352730b7773c2423c143c5eb482`.
-Post-merge `main` CI: SUCCESS.
+- [x] hierarchy `Galaxy -> Sector -> StarSystem` с typed stable IDs;
+- [x] strategic planets и asteroid fields;
+- [x] canonical jump connections;
+- [x] deterministic topology indexes;
+- [x] `WorldState`, `WorldStateCodec`, `WorldPersistence`;
+- [x] legacy single-system save migration;
+- [x] active system на полном fixed rate;
+- [x] remote systems на coarse strategic updates;
+- [x] bounded deterministic scheduler;
+- [x] 2 sectors / 3 systems production demo;
+- [x] единый economic core для desktop/headless/world layers.
 
 ### Definition of Done
 
-Мир содержит несколько систем, удалённые системы продолжают экономически жить без симуляции каждого объекта на полном local tick. **Выполнено.**
+Несколько систем экономически живут одновременно, удалённые системы не требуют full local object-level tick. **Выполнено.**
 
 ---
 
-## Этап 8 — Фракции как экономические акторы
+## Stage 8 — Фракции как экономические акторы
 
 **Статус:** COMPLETE — MERGED TO `main` VIA PR #10
 
-### Задачи
+### Основные результаты
 
-- [x] treasury и бюджет;
-- [x] отношения и территория;
-- [x] production/stock policies;
-- [x] military и expansion demand;
-- [x] ограничения доступа к рынкам;
-- [x] налоги/тарифы/субсидии;
-- [x] стратегические цели, создающие экономический спрос.
-
-Verified final PR head: `63494d0a4ceabbf276cefde24e56aef15fc09e74`.
-Push CI exact head: SUCCESS.
-Pull-request CI exact head: SUCCESS.
-Functional suite: **289 tests, 0 failures, 0 errors, 0 skipped**; Javadoc SUCCESS; JaCoCo thresholds SUCCESS.
-Merge commit: `c5921e6af7a1dba8c08e89d45ca9f1e2b944ac8e`.
-Post-merge `main` CI: SUCCESS.
-Detailed evidence: `docs/stage8_verification.md`.
+- [x] faction treasury и budget policy;
+- [x] subsidies;
+- [x] diplomacy/relations;
+- [x] territory ownership;
+- [x] market access restrictions;
+- [x] stock/production policy;
+- [x] military/expansion strategic demand;
+- [x] taxes/tariffs;
+- [x] world persistence для strategic state;
+- [x] end-to-end money-conservation verification.
 
 ### Definition of Done
 
-Фракционные решения физически изменяют спрос, производство, логистику и финансовые потоки мира. **Выполнено.**
+Фракционные решения физически изменяют спрос, производство, логистику и финансовые потоки обычной экономики. **Выполнено.**
 
 ---
 
-## Этап 9 — Строительство и воспроизводство экономики
+## Stage 9 — Dynamic Economy: строительство, lifecycle и воспроизводство экономики
 
 **Статус:** ACTIVE
 
-### Задачи
+### Цель
 
-- [ ] строительство требует реальных ресурсов и перевозок;
-- [ ] станции появляются и исчезают как часть симуляции;
-- [ ] AI реагирует на supply-chain bottlenecks;
-- [ ] уничтожение объекта создаёт реальный дефицит;
-- [ ] экономика умеет инвестировать в новые производственные мощности.
+Сделать экономику способной менять собственную производственную структуру: строить новые станции, удалять уничтоженные объекты, обнаруживать производственные bottlenecks и восстанавливать supply chain без scripted respawn.
+
+### Архитектурный принцип
+
+Строительство не является `spawnStation()` после таймера.
+
+Construction project должен быть **физическим экономическим потребителем**, который:
+
+1. имеет owner и persistent ID;
+2. требует data-driven набор материалов;
+3. имеет funding;
+4. создаёт реальный market demand;
+5. получает материалы через существующую логистику;
+6. завершает объект только после фактического material fulfillment;
+7. не создаёт товары или деньги из ничего.
+
+### Stage 9A — Entity lifecycle infrastructure
+
+#### Задачи
+
+- [ ] определить authoritative lifecycle persistent local entities: create/register/disable/destroy/unregister;
+- [ ] обеспечить deterministic allocation `EntityId` для созданных runtime объектов;
+- [ ] добавить безопасный removal path для stations и ships;
+- [ ] удаление станции инвалидирует route planner state и cached opportunities;
+- [ ] dangling persistent references не переживают destroy;
+- [ ] `EntityRegistry`, `MarketDirectory`, spatial indexes и simulation systems согласованно видят removal;
+- [ ] save/load корректно сохраняет мир после create/destroy;
+- [ ] active и remote systems поддерживают изменяемый entity count;
+- [ ] destruction/removal не нарушает money/resource accounting.
+
+#### Acceptance tests
+
+- создать станцию -> сохранить -> загрузить -> продолжить;
+- удалить станцию с активными trade routes -> simulation продолжает работу без stale access;
+- удалить и восстановить несколько объектов при одинаковом seed -> deterministic state;
+- уничтоженный объект отсутствует после world save/load.
+
+### Stage 9B — Persistent Construction Project
+
+`ConstructionProject` должен хранить как минимум:
+
+- stable project ID;
+- owner faction;
+- target `StationArchetypeId`;
+- target `StarSystemId`;
+- location;
+- required materials;
+- delivered materials;
+- project wallet / funding state;
+- construction progress;
+- state machine;
+- timestamps/ticks создания и завершения.
+
+Рекомендуемые состояния:
+
+```text
+PLANNED
+  ↓
+FUNDED
+  ↓
+AWAITING_MATERIALS
+  ↓
+BUILDING
+  ↓
+COMPLETED
+```
+
+Допустимы terminal states `CANCELLED` / `FAILED`, если они реально понадобятся.
+
+#### Задачи
+
+- [ ] construction requirements описываются data-driven;
+- [ ] проект создаётся без hardcoded simulation recipe;
+- [ ] faction treasury физически финансирует project wallet;
+- [ ] project demand виден обычному market/logistics core;
+- [ ] поставленный материал физически перемещается из cargo/inventory в project storage;
+- [ ] partial delivery сохраняется;
+- [ ] project state сохраняется через world persistence;
+- [ ] completion создаёт station через существующий archetype factory;
+- [ ] station появляется только после material + time requirements;
+- [ ] cancel/refund policy явно определена и не нарушает conservation.
+
+Для первой версии не расширять каталог ради реализма: использовать существующие ресурсы, например steel + energy, если этого достаточно для доказательства механики.
+
+### Stage 9C — Destruction и economic shock
+
+#### Задачи
+
+- [ ] production-safe API уничтожения station/ship;
+- [ ] destruction удаляет производственную мощность и market availability;
+- [ ] судьба cargo/stock при уничтожении задана явно: destroyed/salvage/transfer;
+- [ ] resource sink от уничтожения отражается в ledger;
+- [ ] destruction создаёт измеримый stockout/unmet demand;
+- [ ] route planner корректно реагирует на исчезнувший market;
+- [ ] events/news могут сообщить об экономически значимом уничтожении.
+
+### Stage 9D — Bottleneck analysis и AI investment
+
+AI должен реагировать не на магические пороги вида `if steel < X build foundry`, а на **дефицит производственной мощности**.
+
+Минимальные входы `EconomicBottleneckAnalyzer`:
+
+- persistent unmet demand;
+- stockout duration;
+- price pressure;
+- blocked production cycles;
+- input shortages;
+- utilization существующих producers;
+- transport bottlenecks;
+- региональное отсутствие production archetype.
+
+#### Задачи
+
+- [ ] deterministic bottleneck report;
+- [ ] distinction между production shortage и logistics shortage;
+- [ ] faction investment candidate selection;
+- [ ] affordability/budget check;
+- [ ] expected economic utility / strategic utility;
+- [ ] anti-thrashing cooldown/hysteresis;
+- [ ] AI создаёт construction project через тот же API, что позднее будет использовать игрок;
+- [ ] исключить бесконечное строительство из-за временного demand spike.
+
+### Stage 9E — Economic resilience benchmark
+
+Acceptance scenario:
+
+```text
+stable economy
+    ↓
+destroy critical foundry
+    ↓
+steel shortage
+    ↓
+weapons shortage / price pressure
+    ↓
+AI detects bottleneck
+    ↓
+new construction project
+    ↓
+materials delivered
+    ↓
+replacement capacity online
+    ↓
+supply chain recovers
+```
+
+Метрики:
+
+- time to detect;
+- time to investment decision;
+- time to material fulfillment;
+- time to new capacity online;
+- time to recovery;
+- peak unmet demand;
+- peak price pressure;
+- total investment;
+- money conservation;
+- resource accounting.
 
 ### Definition of Done
 
-Supply chain может самостоятельно перестраиваться после дефицита или уничтожения производственного звена.
+После уничтожения критической производственной станции supply chain действительно деградирует, AI обнаруживает bottleneck, физически финансирует и снабжает replacement construction, новая мощность появляется, а экономические показатели демонстрируют восстановление без scripted respawn.
+
+### Рекомендуемое PR-разбиение
+
+1. entity lifecycle infrastructure;
+2. persistent construction state/schema;
+3. physical project demand and delivery;
+4. station completion/spawn;
+5. destruction/removal integration;
+6. bottleneck analyzer;
+7. faction investment planner;
+8. resilience benchmark + documentation.
 
 ---
 
-## Этап 10 — Combat vertical slice
+## Stage 10 — Inter-system logistics и физическое перемещение между системами
 
 **Статус:** PLANNED
 
-Боевой слой развивается после стабилизации экономики, чтобы уничтожение, защита и захват объектов имели реальные экономические последствия.
+### Почему этот этап идёт до полноценного combat
 
-### Задачи
+Без межсистемной логистики галактика остаётся набором параллельных локальных экономик. Колонизация, снабжение войн, региональная специализация, blockade и настоящая экспансия требуют physical transit.
 
-- [ ] weapons / damage / armor / shields;
-- [ ] targeting и combat AI;
-- [ ] fleet combat;
-- [ ] salvage;
-- [ ] потери кораблей и станций интегрированы с экономикой;
-- [ ] военный спрос интегрирован с производственными цепочками.
+### Stage 10A — Fleet identity на world level
+
+- [ ] определить persistent identity fleet/ship при переходе между local `SimulationSession`;
+- [ ] разделить «entity находится в system» и «entity находится in transit»;
+- [ ] transit state входит в `WorldState`;
+- [ ] переход не дублирует корабль одновременно в двух systems;
+- [ ] сохранение в середине transit безопасно.
+
+### Stage 10B — Jump transit
+
+Минимальная FSM:
+
+```text
+IN_SYSTEM
+  ↓
+MOVING_TO_JUMP
+  ↓
+JUMP_PENDING
+  ↓
+IN_TRANSIT
+  ↓
+ARRIVING
+  ↓
+IN_SYSTEM
+```
+
+- [ ] deterministic jump duration;
+- [ ] jump connections используются как navigation edges;
+- [ ] path невозможен без topology connection;
+- [ ] transit продолжается в remote simulation;
+- [ ] save/load continuation сохраняет arrival state;
+- [ ] active system может меняться независимо от transit других флотов.
+
+### Stage 10C — Galactic route planner
+
+Расширить planning от локального:
+
+```text
+fleet -> supplier -> consumer
+```
+
+до:
+
+```text
+fleet
+ -> supplier in system A
+ -> jump path
+ -> consumer in system B/C
+```
+
+Учитывать:
+
+- in-system travel time;
+- jump travel time;
+- tariffs;
+- market access;
+- route risk seam;
+- cargo capacity;
+- expected purchase/sale amount;
+- total expected route duration.
+
+Использовать существующий `TradeRouteCostModel` как extension seam, не создавать параллельный scoring stack без необходимости.
+
+### Stage 10D — Cross-system market discovery
+
+- [ ] bounded market discovery across reachable topology;
+- [ ] route search не масштабируется как полный перебор всех markets галактики каждым fleet;
+- [ ] regional/sector indexes;
+- [ ] deterministic candidate ordering;
+- [ ] configurable search horizon;
+- [ ] stale route invalidation при изменении topology/access/market state.
+
+### Stage 10E — Inter-system economic benchmark
+
+Сценарий:
+
+- system A имеет избыток steel;
+- system B испытывает steel shortage;
+- jump connection доступен;
+- local supply недостаточен;
+- trade fleet физически переносит ресурс;
+- после закрытия connection shortage возвращается;
+- после восстановления connection trade возобновляется.
 
 ### Definition of Done
 
-Боевой результат изменяет физические активы и supply chain, а экономика и фракционный AI реагируют на последствия.
+Ресурс физически перемещается между StarSystems через fleet transit, а route planner способен выбирать прибыльный межсистемный маршрут с учётом времени пути, доступа и тарифов.
 
 ---
 
-## Правила выполнения roadmap
+## Stage 11 — Autonomous Faction Expansion
 
-1. Не расширять количество контента ради количества до стабилизации соответствующего core-этапа.
-2. Любая новая экономическая механика сопровождается тестом инварианта.
-3. Сломанный CI блокирует переход к следующему этапу.
-4. README описывает только фактически доступное поведение текущего стабильного состояния.
-5. Архитектурные решения фиксируются до массового наполнения контентом.
-6. Оптимизация проводится по benchmark/профилям, кроме очевидно не масштабируемых алгоритмов, уже выявленных архитектурой.
-7. После завершения каждого этапа этот файл обновляется: статус, выполненные пункты, важные решения и следующий активный этап.
-8. Новый stage branch создаётся только от зелёного актуального `main` после merge предыдущего этапа.
+**Статус:** PLANNED
 
-## Текущий следующий шаг
+### Цель
 
-**Этап 9 — строительство и воспроизводство экономики.** Начать с construction project как persistent physical demand: строительство станции должно резервировать и потреблять реальные ресурсы, получать supply через существующий market/logistics core и создавать новую станцию только после фактического material fulfillment. Затем подключить AI investment/bottleneck response, destruction-driven deficit и replacement production capacity.
+Превратить Stage 8 `EXPANSION` из demand modifier в реальное пространственное развитие фракций.
+
+### Stage 11A — Expansion opportunity model
+
+Фракция анализирует:
+
+- незанятые / слабо контролируемые systems;
+- доступность ресурсов;
+- distance/jump connectivity;
+- существующий trade network;
+- strategic threat;
+- expected construction cost;
+- expected demand/profit;
+- diplomacy/access constraints.
+
+### Stage 11B — Expansion plan
+
+Persistent plan содержит:
+
+- target system;
+- strategic reason;
+- anchor construction project;
+- required support fleet;
+- initial stock targets;
+- budget;
+- status.
+
+### Stage 11C — Physical expansion execution
+
+- [ ] faction создаёт construction project;
+- [ ] материалы доставляются из существующих systems;
+- [ ] новая station появляется физически;
+- [ ] market начинает участвовать в экономике;
+- [ ] при необходимости создаются/назначаются miners/traders;
+- [ ] territory ownership меняется только по определённому правилу;
+- [ ] expansion может провалиться из-за нехватки бюджета/логистики.
+
+### Stage 11D — Competition
+
+- [ ] несколько фракций могут оценить одну system;
+- [ ] deterministic conflict resolution без combat через timing/resources/access;
+- [ ] будущая военная конкуренция добавляется в Stage 18.
+
+### Definition of Done
+
+Хотя бы одна фракция способна самостоятельно выбрать экономически/стратегически интересную соседнюю систему, профинансировать строительство, доставить ресурсы и создать новый устойчивый экономический узел.
+
+---
+
+# MILESTONE v0.3 — PLAYABLE SPACE SANDBOX
+
+**Статус:** PLANNED
+
+Цель: впервые получить игру, в которую можно играть как в космическую sandbox, а не только наблюдать simulation core.
+
+---
+
+## Stage 12 — Player entity, ownership и базовое путешествие
+
+**Статус:** PLANNED
+
+### Stage 12A — Player state
+
+Добавить persistent `PlayerState`:
+
+- wallet;
+- reputation;
+- faction affiliation или independent status;
+- owned ship IDs;
+- active ship ID;
+- owned station IDs — может оставаться пустым до Stage 16;
+- discovered systems/objects;
+- optional home/start location.
+
+### Stage 12B — Ownership model
+
+- [ ] entity ownership не равен faction membership автоматически;
+- [ ] корабль может принадлежать игроку и иметь faction/legal context;
+- [ ] ownership сохраняется;
+- [ ] уничтожение owned entity корректно обновляет player state;
+- [ ] покупка/продажа ownership выполняется атомарно.
+
+### Stage 12C — Direct ship control
+
+- [ ] выбрать один production control model: direct thrust или point-and-click movement;
+- [ ] camera follow;
+- [ ] selection;
+- [ ] docking/undocking;
+- [ ] jump travel;
+- [ ] pause/time controls;
+- [ ] UI безопасно взаимодействует с fixed simulation.
+
+### Stage 12D — Player market interaction
+
+- [ ] ручная покупка;
+- [ ] ручная продажа;
+- [ ] cargo UI;
+- [ ] wallet UI;
+- [ ] market price/stock visibility;
+- [ ] market access/reputation constraints;
+- [ ] те же authoritative trade/economic rules, что и AI.
+
+### Definition of Done
+
+Игрок начинает в одном owned ship, может перелететь между минимум двумя системами, пристыковаться, вручную купить товар, перевезти его и продать, при этом сделка проходит через тот же economic core, что и AI trade.
+
+---
+
+## Stage 13 — Combat Vertical Slice
+
+**Статус:** PLANNED
+
+### Scope discipline
+
+Не строить сразу сложную оружейную мета-систему. Первый бой должен доказать:
+
+- target acquisition;
+- pursuit/positioning;
+- range;
+- damage;
+- shields;
+- hull;
+- destruction;
+- economic aftermath.
+
+### Stage 13A — Combat state
+
+Расширить текущий `CombatComponent` только необходимыми authoritative данными:
+
+- hull/max hull;
+- shields/max shields;
+- armor — только если нужен первой модели;
+- weapon slots или weapon profile;
+- target;
+- cooldown/fire state;
+- combat affiliation/hostility.
+
+### Stage 13B — Weapons
+
+Data-driven weapon archetype минимум:
+
+- damage;
+- rate/cooldown;
+- range;
+- projectile/instant-hit model;
+- damage application rule.
+
+Не вводить damage types, десятки weapons, crew systems и сложную модульность до доказательства loop.
+
+### Stage 13C — Combat AI
+
+Минимальные состояния:
+
+```text
+PATROL / IDLE
+  ↓
+ACQUIRE_TARGET
+  ↓
+APPROACH
+  ↓
+ENGAGE
+  ↓
+DISENGAGE / DESTROYED
+```
+
+### Stage 13D — Destruction and salvage
+
+- [ ] ship destruction проходит Stage-9 lifecycle;
+- [ ] inventory/cargo fate задана явно;
+- [ ] salvage создаётся физически, если выбран этот дизайн;
+- [ ] потеря ship создаёт replacement demand;
+- [ ] weapons/steel/other production reacts;
+- [ ] news/event entry для значимых потерь.
+
+### Stage 13E — Player combat
+
+- [ ] player ship выбирает цель;
+- [ ] attack command;
+- [ ] combat feedback;
+- [ ] смерть/потеря корабля имеет определённый game-over/recovery rule;
+- [ ] manual controls не обходят simulation rules.
+
+### Acceptance scenario
+
+Минимальная битва вроде `2 frigates vs 3 raiders` должна:
+
+1. завершаться воспроизводимым результатом при одинаковом seed/input;
+2. физически уничтожать ships;
+3. создавать salvage/resource sinks по правилам;
+4. менять faction asset count;
+5. создавать replacement military demand.
+
+### Definition of Done
+
+Боевой результат физически меняет активы и supply chain, а player и AI используют один authoritative damage/destruction pipeline.
+
+---
+
+## Stage 14 — First Complete Player Economic Loop
+
+**Статус:** PLANNED
+
+### Цель
+
+Получить первый «игровой час», который уже можно оценивать как fun/not fun.
+
+### Основная loop
+
+```text
+explore
+  ↓
+find opportunity
+  ↓
+trade / mine / fight
+  ↓
+earn credits
+  ↓
+upgrade or buy ship
+  ↓
+take larger opportunities
+```
+
+### Stage 14A — Player mining
+
+- [ ] player может использовать mining ship;
+- [ ] asteroid resource конечен;
+- [ ] mined resource попадает в cargo;
+- [ ] продажа проходит обычный market;
+- [ ] mining UI показывает target/progress/cargo.
+
+### Stage 14B — Ship purchase / sale
+
+- [ ] data-driven ship prices;
+- [ ] ownership transfer;
+- [ ] wallet transfer;
+- [ ] spawn/delivery rule;
+- [ ] старый ship можно продать или сохранить.
+
+### Stage 14C — Minimal ship upgrade/equipment seam
+
+Архитектура должна позволять различать как минимум:
+
+- cargo capacity;
+- movement performance;
+- combat capability;
+- mining capability.
+
+Полный equipment system не является обязательным DoD Stage 14.
+
+### Stage 14D — Playtest telemetry
+
+Собирать хотя бы:
+
+- credits/hour;
+- trade profit/hour;
+- mining profit/hour;
+- combat reward/loss;
+- travel downtime;
+- average cargo utilization;
+- player deaths/losses;
+- market opportunity frequency.
+
+### Definition of Done
+
+Игрок может начать с базового корабля, заработать на торговле/добыче/бою и приобрести следующий корабль без debug grants. Это первый внутренний playable vertical slice.
+
+---
+
+# MILESTONE v0.4 — FLEET & EMPIRE SANDBOX
+
+**Статус:** PLANNED
+
+---
+
+## Stage 15 — Player fleets и автономные orders
+
+**Статус:** PLANNED
+
+### Цель
+
+Перевести игрока из роли одного пилота в владельца компании.
+
+### Stage 15A — Fleet ownership
+
+- [ ] player-owned ship может работать без direct control;
+- [ ] fleet grouping;
+- [ ] fleet leader/member model;
+- [ ] persistent orders;
+- [ ] transfer ship between fleets;
+- [ ] destroyed member safely removed.
+
+### Stage 15B — Orders
+
+Минимальные orders:
+
+- HOLD;
+- MOVE;
+- TRADE;
+- MINE;
+- ESCORT;
+- PATROL;
+- FOLLOW.
+
+### Stage 15C — Delegated economy
+
+Player autonomous trader/miner использует существующий AI planner с owner-specific policy, а не упрощённую «passive income» формулу.
+
+### Stage 15D — Fleet management UI
+
+- owned assets list;
+- location/status;
+- current order;
+- cargo;
+- profit/loss summary;
+- change order;
+- jump route overview.
+
+### Definition of Done
+
+Игрок может владеть несколькими кораблями, лично управлять одним и одновременно заставить другие физически торговать/добывать в persistent world.
+
+---
+
+## Stage 16 — Player construction и station ownership
+
+**Статус:** PLANNED
+
+### Главный принцип
+
+Игрок использует **тот же Stage-9 Construction Project**, что и faction AI.
+
+### Stage 16A — Create project UI/API
+
+Игрок выбирает:
+
+- station archetype;
+- system;
+- permitted location;
+- project funding;
+- optional construction priority.
+
+### Stage 16B — Material logistics
+
+Игрок может:
+
+- позволить рынку закупать материалы;
+- доставить материалы вручную;
+- назначить свои traders;
+- отменить проект по тем же refund rules, что и AI.
+
+### Stage 16C — Owned station economy
+
+- station wallet;
+- market settings;
+- production recipe/policy;
+- stock targets;
+- access rules в пределах разрешённого scope;
+- revenue/cost reporting.
+
+### Stage 16D — Station management UI
+
+- inventory;
+- market;
+- production;
+- wallet;
+- construction state;
+- profit/loss;
+- incoming/outgoing logistics.
+
+### Definition of Done
+
+Игрок зарабатывает ресурсы/деньги, создаёт construction project, физически снабжает его и получает работающую owned station, которая участвует в общей экономике.
+
+---
+
+## Stage 17 — Player Faction
+
+**Статус:** PLANNED
+
+### Цель
+
+Позволить естественный переход «компания -> политический актор».
+
+### Stage 17A — Found faction
+
+Требования должны быть explicit и data-driven/configurable:
+
+- capital threshold;
+- owned assets;
+- optional station/headquarters;
+- fee/resource requirement;
+- legal/diplomatic state.
+
+### Stage 17B — Reuse Stage-8 strategic systems
+
+Player faction получает:
+
+- treasury;
+- territory;
+- relations;
+- market access policy;
+- taxes/tariffs;
+- subsidies;
+- stock/production policy;
+- military/expansion goals.
+
+Игрок управляет теми же моделями через UI, а не получает отдельные player-only systems.
+
+### Stage 17C — Faction management UI
+
+- treasury;
+- budget;
+- policies;
+- diplomacy;
+- territory;
+- construction;
+- fleets;
+- strategic demand.
+
+### Definition of Done
+
+Игрок создаёт собственную фракцию, которая существует в тех же strategic state/persistence/economic systems, что и AI factions.
+
+---
+
+## Stage 18 — Strategic warfare, territory и galactic politics
+
+**Статус:** PLANNED
+
+### Stage 18A — Hostility / war state
+
+- [ ] formal relation state;
+- [ ] war declaration/peace transition;
+- [ ] market access changes;
+- [ ] combat hostility;
+- [ ] territory implications.
+
+### Stage 18B — Strategic objectives
+
+Минимальные objectives:
+
+- defend system;
+- attack station;
+- escort supply;
+- blockade route;
+- capture/contest system.
+
+### Stage 18C — Military logistics
+
+Флот не должен быть бесплатной абстракцией.
+
+Минимальная экономическая связь:
+
+- construction/replacement ships требует production;
+- weapons/ship components создают demand;
+- repair/resupply costs добавляются, если входят в подтверждённый дизайн;
+- потеря transport routes влияет на frontline economy.
+
+### Stage 18D — Blockade
+
+Ключевой системный тест:
+
+- закрытие/опасность jump route;
+- падение throughput;
+- shortage;
+- price growth;
+- local production response;
+- strategic response.
+
+### Stage 18E — Territory transition
+
+Заранее определить authoritative rule контроля системы:
+
+- station presence;
+- military dominance;
+- control points;
+- negotiated handover;
+- или комбинация.
+
+Не менять territory просто от уничтожения одного случайного объекта.
+
+### Definition of Done
+
+Война меняет physical assets, trade routes, territory и supply chains; AI/player faction способны реагировать стратегически и экономически.
+
+---
+
+# MILESTONE v0.5 — RPG & LIVING WORLD
+
+**Статус:** PLANNED
+
+---
+
+## Stage 19 — Exploration, discovery и world generation
+
+**Статус:** PLANNED
+
+### Stage 19A — Discovery state
+
+Игрок не обязан знать всю GalaxyTopology с начала.
+
+- [ ] discovered systems;
+- [ ] discovered jump connections;
+- [ ] discovered stations;
+- [ ] discovered resource fields;
+- [ ] map intel age, если потребуется.
+
+### Stage 19B — Procedural / semi-procedural generation
+
+Определить seed-driven generation contract:
+
+- sectors;
+- systems;
+- stars/planets как strategic landmarks;
+- asteroid/resource distribution;
+- jump topology;
+- faction starting regions;
+- initial economy bootstrap.
+
+Generation должен быть deterministic по seed и content catalog.
+
+### Stage 19C — Exploration content seam
+
+Поддержать data-driven:
+
+- anomalies;
+- derelicts;
+- resource discoveries;
+- special locations;
+- one-off events.
+
+### Definition of Done
+
+Новый seed создаёт воспроизводимую multi-system galaxy, которую игрок может постепенно открывать, а discovery влияет на доступную информацию и решения.
+
+---
+
+## Stage 20 — NPC, missions, reputation и RPG progression
+
+**Статус:** PLANNED
+
+### Stage 20A — NPC identity
+
+Persistent NPC model вводится только под реальную игровую потребность:
+
+- identity;
+- faction;
+- role;
+- relation/reputation;
+- current assignment;
+- optional skills/personality.
+
+Не симулировать индивидуального NPC там, где достаточно агрегированной модели.
+
+### Stage 20B — Mission framework
+
+Mission строится поверх реальных world state/events.
+
+Минимальные templates:
+
+- haul;
+- deliver;
+- mine;
+- escort;
+- bounty;
+- investigate/discover;
+- defend.
+
+### Stage 20C — Dynamic contracts
+
+Контракты возникают из состояния мира:
+
+- shortage -> delivery mission;
+- fleet loss -> combat/escort demand;
+- expansion -> construction supply;
+- war -> patrol/bounty/escort;
+- discovery -> exploration.
+
+### Stage 20D — Reputation
+
+Объединить player reputation с:
+
+- market access;
+- contract availability;
+- faction diplomacy;
+- prices, если дизайн подтверждён;
+- hostility.
+
+### Stage 20E — Player progression
+
+Выбрать ограниченную production model:
+
+- skills/perks;
+- licenses;
+- ship specialization;
+- reputation gates;
+- или комбинацию.
+
+Не добавлять RPG progression, которая не меняет реальные игровые решения.
+
+### Definition of Done
+
+Игрок получает динамические задания, возникающие из живого мира, а reputation/progression открывают новые способы взаимодействия без создания параллельной scripted campaign economy.
+
+---
+
+# MILESTONE v0.6 — CONTENT & BALANCE ALPHA
+
+**Статус:** PLANNED
+
+---
+
+## Stage 21 — Content breadth, balance и long-run stability
+
+**Статус:** PLANNED
+
+### Цель
+
+Только после стабилизации core loops расширять количество контента.
+
+### Stage 21A — Economy content
+
+Постепенно расширить:
+
+- raw resources;
+- intermediates;
+- advanced components;
+- civilian goods;
+- military goods;
+- ship/station construction materials.
+
+Каждый новый tier должен иметь экономическую роль, а не существовать ради количества.
+
+### Stage 21B — Ship ecosystem
+
+Размеры и роли:
+
+- small;
+- medium;
+- large;
+- freighter;
+- tanker;
+- miner;
+- combat;
+- support/specialized.
+
+Визуальные размеры должны соответствовать игровым roles и collision/navigation constraints.
+
+### Stage 21C — Station ecosystem
+
+- extraction/support;
+- refining;
+- manufacturing;
+- trade hub;
+- shipyard;
+- military;
+- colony;
+- special strategic infrastructure.
+
+### Stage 21D — Faction differentiation
+
+Различия через:
+
+- starting economy;
+- doctrine;
+- preferred production;
+- taxation;
+- diplomacy;
+- ship/station archetypes;
+- expansion behavior.
+
+Не использовать простые скрытые resource bonuses, если различие можно выразить через реальные правила.
+
+### Stage 21E — Full-world benchmark
+
+Новые profiles должны включать:
+
+- multi-system world;
+- inter-system trade;
+- construction;
+- faction expansion;
+- combat losses;
+- player-owned assets;
+- long simulated duration.
+
+Проверять:
+
+- runaway inflation/deflation;
+- dead economies;
+- permanent shortages;
+- uncontrolled entity growth;
+- memory/ledger growth;
+- route-planner scaling;
+- faction snowball;
+- recovery from shocks.
+
+### Definition of Done
+
+Контентная версия поддерживает длительную симуляцию без системного коллапса, а несколько стратегий игрока остаются экономически жизнеспособными.
+
+---
+
+# MILESTONE v0.7 — POLISH / RELEASE CANDIDATE
+
+**Статус:** PLANNED
+
+---
+
+## Stage 22 — UX, onboarding, performance и release hardening
+
+**Статус:** PLANNED
+
+### Stage 22A — UI/UX pass
+
+- unified HUD;
+- map layers;
+- fleet management;
+- station management;
+- faction management;
+- market comparison;
+- notifications;
+- filters/search;
+- keyboard shortcuts;
+- accessibility basics.
+
+### Stage 22B — Onboarding
+
+- new game flow;
+- controls tutorial;
+- first trade;
+- first mining;
+- first combat;
+- first autonomous ship;
+- first station.
+
+### Stage 22C — Save compatibility policy
+
+До release определить:
+
+- supported migration window;
+- corrupt-save behavior;
+- backup/autosave;
+- crash-safe writes;
+- version diagnostics;
+- content fingerprint mismatch UX.
+
+### Stage 22D — Performance
+
+Профилировать реальные gameplay scenarios:
+
+- large fleet combat;
+- many remote systems;
+- galaxy route planning;
+- UI with thousands of assets;
+- save/load size/time;
+- long-running construction/war economy.
+
+### Stage 22E — Release quality gates
+
+- [ ] clean build;
+- [ ] CI;
+- [ ] full regression;
+- [ ] benchmark thresholds;
+- [ ] desktop smoke;
+- [ ] soak test;
+- [ ] save/load soak;
+- [ ] no known critical economy conservation bugs;
+- [ ] no known deterministic continuation bugs.
+
+### Definition of Done
+
+Candidate можно отдать внешнему игроку без developer instructions и получить полный игровой цикл от старта до собственного флота/станции/фракции без debug tools.
+
+---
+
+# 4. Parallel Visual / UX Track
+
+Этот трек идёт параллельно, но не заменяет core stages.
+
+## V1 — Ship sprite pipeline
+
+Можно вести параллельно Stage 9–10.
+
+- единый top-down grounded near-future visual language;
+- small / medium / large size grammar;
+- читаемые silhouette roles;
+- engine hardpoints;
+- damage/weapon hardpoints seam;
+- sprite scale contract;
+- pivot/origin convention;
+- collision footprint convention.
+
+## V2 — Engine / movement animation
+
+Параллельно Stage 10–12.
+
+- idle;
+- thrust;
+- maneuver;
+- optional reverse/lateral thrusters;
+- 4-frame minimum animation where appropriate;
+- animation должна следовать реальному movement state, а не декоративному random playback.
+
+## V3 — Station visual language
+
+Параллельно Stage 9/11/16.
+
+- construction site;
+- industrial;
+- mining;
+- trade;
+- military;
+- colony;
+- faction differentiation seam.
+
+Construction stages желательно визуализировать через ту же persistent project state.
+
+## V4 — Combat VFX
+
+Параллельно Stage 13.
+
+- muzzle/beam/projectile;
+- shields;
+- hit feedback;
+- destruction;
+- salvage/debris.
+
+## V5 — Strategic map / empire UI
+
+Параллельно Stage 15–18.
+
+- systems;
+- jump routes;
+- territory;
+- fleet orders;
+- trade flows;
+- shortages;
+- wars.
+
+### Visual Track правило
+
+Нельзя привязывать authoritative gameplay к конкретному sprite asset. Asset IDs могут быть data-driven presentation metadata поверх simulation archetype.
+
+---
+
+# 5. Cross-cutting engineering tracks
+
+Некоторые задачи должны сопровождать несколько stages, а не становиться отдельными «большими переделками».
+
+## Persistence
+
+Каждый новый persistent domain object обязан определить:
+
+- stable ID;
+- schema ownership;
+- codec;
+- migration policy;
+- continuation test;
+- bounds/validation.
+
+## Determinism
+
+Любой AI/planner должен иметь:
+
+- deterministic iteration order;
+- explicit tie-break;
+- named RNG stream только если случайность действительно нужна;
+- save/load continuation coverage.
+
+## Economic conservation
+
+Любая механика, меняющая деньги/товары:
+
+- использует transfer/source/sink/transform semantics;
+- имеет ledger representation;
+- имеет invariant/regression test;
+- не создаёт hidden passive income/resource creation.
+
+## Observability
+
+Для major systems добавлять измеримые метрики:
+
+- construction;
+- faction investment;
+- inter-system throughput;
+- fleet losses;
+- combat;
+- recovery;
+- territory;
+- player economy.
+
+## Performance
+
+Оптимизация делается:
+
+1. по benchmark/profile;
+2. либо заранее, если алгоритм очевидно не масштабируется по структуре.
+
+Не делать speculative micro-optimization без evidence.
+
+---
+
+# 6. Правила выполнения roadmap
+
+1. **`main` остаётся стабильной базой.**
+2. Новый stage/feature branch создаётся только от зелёного актуального `main`.
+3. Сломанный CI блокирует merge и переход к следующему core stage.
+4. Следующий core stage становится ACTIVE только после Definition of Done предыдущего.
+5. Крупный Stage дробится на independently reviewable PRs.
+6. Не расширять количество контента ради количества до стабилизации соответствующего механизма.
+7. Любая новая экономическая механика сопровождается invariant tests.
+8. Любой persistent state сопровождается save/load continuation tests.
+9. Любой deterministic planner/AI сопровождается deterministic tie-break tests.
+10. README описывает только реально доступное поведение стабильного `main`.
+11. Архитектурные решения фиксируются до массового наполнения контентом.
+12. Player и AI переиспользуют общие simulation APIs, если нет доказанной причины для отдельного пути.
+13. Не создавать passive income, virtual delivery, instant construction и другие обходы физической экономики без отдельного design decision.
+14. Remote simulation может иметь reduced fidelity, но не должна создавать вторую несовместимую экономическую модель.
+15. После завершения Stage обновить этот файл: статус, exact verification evidence, merge commit и следующий активный этап.
+16. Для каждого milestone должна существовать хотя бы одна end-to-end acceptance scenario.
+17. Visual/UX work может идти параллельно, но не считается выполнением simulation Definition of Done.
+18. Новая система должна сначала доказать минимальную working loop; только потом расширяется глубиной и количеством контента.
+
+---
+
+# 7. Definition of Ready для нового Stage
+
+Перед началом крупного Stage должны быть понятны:
+
+- проблема, которую он решает;
+- dependency на предыдущие stages;
+- authoritative state owner;
+- persistence impact;
+- economic invariant impact;
+- deterministic behavior;
+- minimal vertical slice;
+- acceptance test;
+- что сознательно **не входит** в scope;
+- ожидаемое PR-разбиение.
+
+Если один из этих пунктов неизвестен, сначала выполняется короткий design/audit pass, а не начинается массовая реализация.
+
+---
+
+# 8. Milestone acceptance scenarios
+
+## v0.2 Living Galactic Economy
+
+```text
+critical producer destroyed
+→ shortage
+→ faction detects bottleneck
+→ construction project
+→ materials arrive from another system
+→ new capacity online
+→ economy recovers
+→ faction later expands to neighboring system
+```
+
+## v0.3 Playable Space Sandbox
+
+```text
+player starts with one ship
+→ travels to another system
+→ trades/mines
+→ fights
+→ earns credits
+→ buys a better ship
+```
+
+## v0.4 Fleet & Empire Sandbox
+
+```text
+player owns multiple ships
+→ delegates trade/mining
+→ builds station
+→ creates faction
+→ fights over a system
+→ territory and economy change
+```
+
+## v0.5 RPG & Living World
+
+```text
+world shortage/war/discovery
+→ dynamic contract generated
+→ player accepts
+→ completes task through real simulation
+→ reputation/world state changes
+```
+
+---
+
+# 9. Текущий следующий шаг
+
+**ACTIVE: Stage 9 — Dynamic Economy: строительство, lifecycle и воспроизводство экономики.**
+
+Начинать с **Stage 9A — Entity lifecycle infrastructure**, а не с faction AI.
+
+Первый implementation sequence:
+
+1. определить безопасный create/destroy/unregister lifecycle для station/ship;
+2. доказать save/load после runtime creation/removal;
+3. ввести persistent `ConstructionProject`;
+4. сделать construction site физическим economic demand;
+5. подключить реальные доставки материалов;
+6. завершать station только после fulfillment;
+7. интегрировать destruction;
+8. добавить bottleneck analyzer;
+9. добавить faction investment planner;
+10. завершить Stage 9 economic resilience benchmark.
+
+После Stage 9 следующий core этап — **Stage 10: Inter-system logistics**, затем **Stage 11: Autonomous Faction Expansion**. Полноценный combat intentionally переносится в playable milestone после появления межсистемной экономики и player state.
