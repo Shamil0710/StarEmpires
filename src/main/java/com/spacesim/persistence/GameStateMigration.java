@@ -1,7 +1,6 @@
 package com.spacesim.persistence;
 
 import com.spacesim.constants.Constants;
-import com.spacesim.content.ContentCatalogLoader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,9 +11,7 @@ import java.util.Objects;
  *
  * <p>Stage 3 schema v1 имела ровно пять item slots. Stage 4 превращает массивы в фиксированную
  * capacity, внутри которой data catalog может определять переменное число плотных runtime ID.
- * Миграция сохраняет первые пять значений побитово и дополняет новые slots нейтральными значениями.
- * Старый контент семантически совпадает с текущим встроенным catalog, поэтому migrated snapshot
- * получает его semantic fingerprint.</p>
+ * Миграция сохраняет первые пять значений побитово и дополняет новые slots нейтральными значениями.</p>
  */
 public final class GameStateMigration {
     /** Число товарных slots в Stage 3 schema v1. */
@@ -48,7 +45,6 @@ public final class GameStateMigration {
         }
         return new GameState(
                 GameState.CURRENT_VERSION,
-                ContentCatalogLoader.loadDefault().getFingerprint(),
                 state.rootSeed(),
                 state.clock(),
                 state.nextEntityIdValue(),
