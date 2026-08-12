@@ -1,0 +1,234 @@
+package com.spacesim.economy;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Последовательный журнал экономических движений игровой сессии.
+ *
+ * <p>Ledger не меняет кошельки или склады сам: authoritative systems сначала успешно выполняют
+ * операцию, затем фиксируют её здесь. Обычная торговля записывается как {@link EconomicTransaction.Type#TRADE},
+ * а создание/уничтожение денег и ресурсов обязано использовать отдельные source/sink типы.</p>
+ */
+public final class EconomicLedger {
+    private final List<EconomicTransaction> entries = new ArrayList<>();
+    private final List<EconomicTransaction> entriesView = Collections.unmodifiableList(entries);
+    private long nextSequence = 1L;
+
+    /** Создаёт пустой журнал. */
+    public EconomicLedger() {
+    }
+
+    /**
+     * Фиксирует успешно завершённую торговую операцию.
+     *
+     * @param buyer непустое диагностическое имя покупателя
+     * @param seller непустое диагностическое имя продавца
+     * @param itemId неотрицательный идентификатор товара
+     * @param itemAmount строго положительное количество товара
+     * @param moneyMilliCredits строго положительная сумма transfer в milli-credits
+     * @return созданная запись
+     */
+    public EconomicTransaction recordTrade(
+            String buyer,
+            String seller,
+            int itemId,
+            long itemAmount,
+            long moneyMilliCredits) {
+        requireName(buyer, "Покупатель");
+        requireName(seller, "Продавец");
+        if (itemId < 0 || itemAmount <= 0L || moneyMilliCredits <= 0L) {
+            throw new IllegalArgumentException("Торговая запись должна содержать положительный товар и сумму");
+        }
+        return append(new EconomicTransaction(
+                nextSequenceValue(),
+                EconomicTransaction.Type.TRADE,
+                buyer,
+                seller,
+                itemId,
+                itemAmount,
+                moneyMilliCredits,
+                "trade"));
+    }
+
+    /**
+     * Фиксирует явное создание денег.
+     *
+     * @param destination непустое имя получателя
+     * @param amountMilliCredits строго положительная созданная сумма
+     * @param reason непустая причина source-операции
+     * @return созданная запись
+     */
+    public EconomicTransaction recordMoneySource(
+            String destination,
+            long amountMilliCredits,
+            String reason) {
+        requireName(destination, "Получатель");
+        requirePositive(amountMilliCredits, "Сумма денежного source");
+        return append(new EconomicTransaction(
+                nextSequenceValue(),
+                EconomicTransaction.Type.MONEY_SOURCE,
+                "",
+                destination,
+                -1,
+                0L,
+                amountMilliCredits,
+                requireReason(reason)));
+    }
+
+    /**
+     * Фиксирует явное уничтожение денег.
+     *
+     * @param source непустое имя источника
+     * @param amountMilliCredits строго положительная уничтоженная сумма
+     * @param reason непустая причина sink-операции
+     * @return созданная запись
+     */
+    public EconomicTransaction recordMoneySink(
+            String source,
+            long amountMilliCredits,
+            String reason) {
+        requireName(source, "Источник");
+        requirePositive(amountMilliCredits, "Сумма денежного sink");
+        return append(new EconomicTransaction(
+                nextSequenceValue(),
+                EconomicTransaction.Type.MONEY_SINK,
+                source,
+                "",
+                -1,
+                0L,
+                amountMilliCredits,
+                requireReason(reason)));
+    }
+
+    /**
+     * Фиксирует появление физического ресурса из внешнего для товарного пула источника.
+     *
+     * @param destination непустое имя получателя
+     * @param itemId неотрицательный идентификатор товара
+     * @param itemAmount строго положительное количество появившегося товара
+     * @param reason непустая причина появления ресурса
+     * @return созданная запись
+     */
+    public EconomicTransaction recordResourceSource(
+            String destination,
+            int itemId,
+            long itemAmount,
+            String reason) {
+        requireName(destination, "Получатель ресурса");
+        requireItem(itemId, itemAmount);
+        return append(new EconomicTransaction(
+                nextSequenceValue(),
+                EconomicTransaction.Type.RESOURCE_SOURCE,
+                "",
+                destination,
+                itemId,
+                itemAmount,
+                0L,
+                requireReason(reason)));
+    }
+
+    /**
+     * Фиксирует исчезновение физического ресурса из товарного пула.
+     *
+     * @param source непустое имя источника
+     * @param itemId неотрицательный идентификатор товара
+     * @param itemAmount строго положительное количество исчезнувшего товара
+     * @param reason непустая причина потребления
+     * @return созданная запись
+     */
+    public EconomicTransaction recordResourceSink(
+            String source,
+            int itemId,
+            long itemAmount,
+            String reason) {
+        requireName(source, "Источник ресурса");
+        requireItem(itemId, itemAmount);
+        return append(new EconomicTransaction(
+                nextSequenceValue(),
+                EconomicTransaction.Type.RESOURCE_SINK,
+                source,
+                "",
+                itemId,
+                itemAmount,
+                0L,
+                requireReason(reason)));
+    }
+
+    /**
+     * Фиксирует производственное преобразование как диагностическое событие.
+     *
+     * <p>Конкретные входы и выходы хранятся в production-системе; запись здесь означает факт
+     * transform и предназначена для дальнейшей observability. На Этапе 2 достаточно отличать его от
+     * создания или уничтожения ресурса без причины.</p>
+     *
+     * @param actor непустое имя производственной сущности
+     * @param reason непустое имя/описание рецепта
+     * @return созданная запись
+     */
+    public EconomicTransaction recordResourceTransform(String actor, String reason) {
+        requireName(actor, "Производственная сущность");
+        return append(new EconomicTransaction(
+                nextSequenceValue(),
+                EconomicTransaction.Type.RESOURCE_TRANSFORM,
+                actor,
+                actor,
+                -1,
+                0L,
+                0L,
+                requireReason(reason)));
+    }
+
+    /** @return живое неизменяемое представление всех записей в порядке sequence */
+    public List<EconomicTransaction> getEntries() {
+        return entriesView;
+    }
+
+    /** @return число зафиксированных экономических операций */
+    public int size() {
+        return entries.size();
+    }
+
+    /** Удаляет все записи, не меняя authoritative economic state. */
+    public void clear() {
+        entries.clear();
+    }
+
+    private EconomicTransaction append(EconomicTransaction transaction) {
+        entries.add(transaction);
+        return transaction;
+    }
+
+    private long nextSequenceValue() {
+        if (nextSequence == Long.MAX_VALUE) {
+            throw new IllegalStateException("Диапазон sequence экономического журнала исчерпан");
+        }
+        return nextSequence++;
+    }
+
+    private void requireName(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " должен иметь непустое имя");
+        }
+    }
+
+    private String requireReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Экономическая операция должна иметь причину");
+        }
+        return reason.strip();
+    }
+
+    private void requirePositive(long value, String label) {
+        if (value <= 0L) {
+            throw new IllegalArgumentException(label + " должна быть положительной");
+        }
+    }
+
+    private void requireItem(int itemId, long itemAmount) {
+        if (itemId < 0 || itemAmount <= 0L) {
+            throw new IllegalArgumentException("Ресурсная операция должна содержать допустимый товар и количество");
+        }
+    }
+}
