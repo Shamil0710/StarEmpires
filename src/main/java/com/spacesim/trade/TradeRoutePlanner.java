@@ -12,8 +12,8 @@ import java.util.Optional;
  *
  * <p>Planner не читает Ashley ECS и не меняет состояние мира. Он применяет те же ограничения
  * ликвидности, вместимости, спроса, cargo policy и репутационной цены, которые используются при
- * фактической сделке. Scoring policy вынесена отдельно: Stage 5 сначала может доказать legacy
- * gross-profit equivalence, а затем намеренно перейти на profit/time.</p>
+ * фактической сделке. Supplier-consumer pairing выполняет общий directory один раз за market
+ * snapshot; конкретный fleet оценивает только bounded {@link TradeOpportunity} shortlist.</p>
  */
 public final class TradeRoutePlanner {
     /** Политика сравнения допустимых маршрутов. */
@@ -60,44 +60,44 @@ public final class TradeRoutePlanner {
                 continue;
             }
             int itemId = item.runtimeId();
-            for (MarketDirectory.StationMarket supplier : directory.suppliers(itemId)) {
-                float purchasePrice = effectiveSellPrice(supplier, itemId, fleet);
-                if (!isPositiveFinite(purchasePrice)) {
+            for (TradeOpportunity opportunity : directory.opportunities(itemId)) {
+                MarketDirectory.StationMarket supplier = directory.find(opportunity.buyStationId());
+                MarketDirectory.StationMarket consumer = directory.find(opportunity.sellStationId());
+                if (supplier == null || consumer == null) {
                     continue;
                 }
-                for (MarketDirectory.StationMarket consumer : directory.consumers(itemId)) {
-                    if (consumer.id().equals(supplier.id())) {
-                        continue;
-                    }
-                    float salePrice = effectiveBuyPrice(consumer, itemId, fleet);
-                    if (!isPositiveFinite(salePrice) || salePrice <= purchasePrice) {
-                        continue;
-                    }
-                    int amount = calculateAmount(
-                            fleet, supplier, consumer, itemId, purchasePrice, salePrice);
-                    if (amount <= 0) {
-                        continue;
-                    }
-                    long purchaseCost = safeTradeValue(purchasePrice, amount);
-                    long saleRevenue = safeTradeValue(salePrice, amount);
-                    if (purchaseCost <= 0L || saleRevenue <= purchaseCost) {
-                        continue;
-                    }
-                    float distance = routeDistance(fleet, supplier, consumer);
-                    double travelSeconds = travelSeconds(distance, fleet.movementSpeed());
-                    TradeRoute candidate = new TradeRoute(
-                            supplier.id(),
-                            consumer.id(),
-                            itemId,
-                            amount,
-                            purchaseCost,
-                            saleRevenue,
-                            saleRevenue - purchaseCost,
-                            distance,
-                            travelSeconds);
-                    if (isBetter(candidate, best)) {
-                        best = candidate;
-                    }
+
+                float purchasePrice = effectiveSellPrice(supplier, itemId, fleet);
+                float salePrice = effectiveBuyPrice(consumer, itemId, fleet);
+                if (!isPositiveFinite(purchasePrice)
+                        || !isPositiveFinite(salePrice)
+                        || salePrice <= purchasePrice) {
+                    continue;
+                }
+                int amount = calculateAmount(
+                        fleet, supplier, consumer, itemId, purchasePrice, salePrice);
+                if (amount <= 0) {
+                    continue;
+                }
+                long purchaseCost = safeTradeValue(purchasePrice, amount);
+                long saleRevenue = safeTradeValue(salePrice, amount);
+                if (purchaseCost <= 0L || saleRevenue <= purchaseCost) {
+                    continue;
+                }
+                float distance = routeDistance(fleet, supplier, opportunity.stationDistance());
+                double travelSeconds = travelSeconds(distance, fleet.movementSpeed());
+                TradeRoute candidate = new TradeRoute(
+                        supplier.id(),
+                        consumer.id(),
+                        itemId,
+                        amount,
+                        purchaseCost,
+                        saleRevenue,
+                        saleRevenue - purchaseCost,
+                        distance,
+                        travelSeconds);
+                if (isBetter(candidate, best)) {
+                    best = candidate;
                 }
             }
         }
@@ -199,10 +199,9 @@ public final class TradeRoutePlanner {
     private static float routeDistance(
             FleetTradeProfile fleet,
             MarketDirectory.StationMarket supplier,
-            MarketDirectory.StationMarket consumer) {
+            float stationDistance) {
         double toSupplier = Math.hypot(supplier.x() - fleet.x(), supplier.y() - fleet.y());
-        double toConsumer = Math.hypot(consumer.x() - supplier.x(), consumer.y() - supplier.y());
-        double total = toSupplier + toConsumer;
+        double total = toSupplier + stationDistance;
         if (!Double.isFinite(total) || total > Float.MAX_VALUE) {
             return Float.MAX_VALUE;
         }
