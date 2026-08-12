@@ -25,6 +25,8 @@ import com.spacesim.economy.Money;
 import com.spacesim.model.ItemType;
 import com.spacesim.model.Recipe;
 import com.spacesim.model.ShipType;
+import com.spacesim.persistence.EntityId;
+import com.spacesim.persistence.EntityRegistry;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -35,8 +37,8 @@ import java.util.StringJoiner;
  *
  * <p>Карточка показывает понятное имя, тип и координаты сущности, а затем добавляет разделы только
  * для фактически установленных ECS-компонентов. Денежный баланс читается исключительно из
- * {@link WalletComponent}, поэтому интерфейс использует тот же authoritative state, что и торговые
- * системы.</p>
+ * {@link WalletComponent}. Persistent-ссылки маршрутов представлены {@link EntityId} и при наличии
+ * registry разрешаются в текущие runtime-имена только на уровне отображения.</p>
  */
 public class EntityDetailsUI extends Table {
     /** Рекомендуемая ширина карточки и резервируемой под неё области, в пикселях интерфейса. */
@@ -49,16 +51,29 @@ public class EntityDetailsUI extends Table {
     private final Label titleLabel;
     private final Label contentLabel;
     private final ScrollPane scrollPane;
+    private final EntityRegistry entityRegistry;
     private Entity selectedEntity;
 
     /**
-     * Создаёт пустую карточку и закрепляет её у правого края сцены.
+     * Создаёт карточку без runtime-разрешения persistent ID; подходит для изолированного UI.
      *
      * @param skin загруженный скин VisUI; не {@code null}
      * @throws NullPointerException если {@code skin == null}
      */
     public EntityDetailsUI(Skin skin) {
+        this(skin, null);
+    }
+
+    /**
+     * Создаёт карточку с runtime-разрешением persistent ID через registry текущей сессии.
+     *
+     * @param skin загруженный скин VisUI; не {@code null}
+     * @param entityRegistry registry текущей сессии либо {@code null}
+     * @throws NullPointerException если {@code skin == null}
+     */
+    public EntityDetailsUI(Skin skin, EntityRegistry entityRegistry) {
         Skin checkedSkin = Objects.requireNonNull(skin, "Skin must not be null");
+        this.entityRegistry = entityRegistry;
 
         titleLabel = new Label("", checkedSkin);
         titleLabel.setWrap(true);
@@ -106,18 +121,29 @@ public class EntityDetailsUI extends Table {
 
     /** Обновляет текст из текущего состояния ранее выбранной сущности. */
     public void refresh() {
-        DetailsText details = describe(selectedEntity);
+        DetailsText details = describe(selectedEntity, entityRegistry);
         titleLabel.setText(details.title());
         contentLabel.setText(details.body());
     }
 
     /**
-     * Формирует независимую от OpenGL текстовую модель карточки.
+     * Формирует независимую от OpenGL текстовую модель без runtime-разрешения persistent ID.
      *
      * @param entity описываемая ECS-сущность либо {@code null}
      * @return ненулевые заголовок и содержимое карточки
      */
     static DetailsText describe(Entity entity) {
+        return describe(entity, null);
+    }
+
+    /**
+     * Формирует текстовую модель и при возможности разрешает persistent ID в runtime-имена.
+     *
+     * @param entity описываемая ECS-сущность либо {@code null}
+     * @param registry registry текущей сессии либо {@code null}
+     * @return ненулевые заголовок и содержимое карточки
+     */
+    static DetailsText describe(Entity entity, EntityRegistry registry) {
         if (entity == null) {
             return new DetailsText(
                     "Объект не выбран",
@@ -165,13 +191,13 @@ public class EntityDetailsUI extends Table {
             appendProduction(body, production);
         }
         if (mining != null) {
-            appendMining(body, mining);
+            appendMining(body, mining, registry);
         }
         if (combat != null) {
             appendCombat(body, combat);
         }
         if (tradeAI != null) {
-            appendShip(body, tradeAI, inventory);
+            appendShip(body, tradeAI, inventory, registry);
         }
         if (reputation != null) {
             appendReputation(body, reputation);
@@ -323,7 +349,10 @@ public class EntityDetailsUI extends Table {
     }
 
     /** Добавляет состояние автономного цикла и статистику добывающего оборудования. */
-    private static void appendMining(StringBuilder text, MiningComponent mining) {
+    private static void appendMining(
+            StringBuilder text,
+            MiningComponent mining,
+            EntityRegistry registry) {
         text.append("\nДобыча\n")
                 .append("  Состояние: ").append(mining.active ? "активна" : "остановлена").append('\n')
                 .append("  Этап: ")
@@ -336,8 +365,10 @@ public class EntityDetailsUI extends Table {
                 .append(" ед./с\n")
                 .append("  Радиус добычи: ").append(formatNumber(mining.extractionRange))
                 .append(" ед.\n")
-                .append("  Целевой астероид: ").append(targetName(mining.targetAsteroid)).append('\n')
-                .append("  База разгрузки: ").append(targetName(mining.homeBase)).append('\n')
+                .append("  Целевой астероид: ")
+                .append(targetName(mining.targetAsteroidId, registry)).append('\n')
+                .append("  База разгрузки: ")
+                .append(targetName(mining.homeBaseId, registry)).append('\n')
                 .append("  Дробный остаток: ").append(formatNumber(mining.extractionRemainder))
                 .append(" ед.\n")
                 .append("  Всего добыто: ").append(mining.totalMined).append(" ед.\n")
@@ -358,15 +389,18 @@ public class EntityDetailsUI extends Table {
     }
 
     /** Добавляет оперативные характеристики торгового корабля и его маршрута. */
-    private static void appendShip(StringBuilder text, TradeAIComponent tradeAI,
-                                   InventoryComponent inventory) {
+    private static void appendShip(
+            StringBuilder text,
+            TradeAIComponent tradeAI,
+            InventoryComponent inventory,
+            EntityRegistry registry) {
         text.append("\nКорабль\n")
                 .append("  Состояние: ").append(localizeState(tradeAI.state)).append('\n')
                 .append("  Скорость: ").append(formatNumber(tradeAI.movementSpeed)).append(" ед./с\n")
                 .append("  Специализация: ").append(specializationName(tradeAI.specializedItem)).append('\n')
                 .append("  Груз: ").append(inventory == null ? NO_VALUE : inventory.getTotalStock())
                 .append(" / ").append(tradeAI.cargoSpace).append(" ед.\n")
-                .append("  Цель: ").append(targetName(tradeAI.targetStation)).append('\n')
+                .append("  Цель: ").append(targetName(tradeAI.targetStationId, registry)).append('\n')
                 .append("  Товар: ").append(targetItemName(tradeAI.targetItem)).append('\n')
                 .append("  Количество: ").append(tradeAI.targetAmount).append(" ед.\n")
                 .append("  Ожидаемая прибыль: ")
@@ -404,13 +438,20 @@ public class EntityDetailsUI extends Table {
         return market == null ? "Космический объект" : "Станция";
     }
 
-    /** Возвращает имя станции назначения без рекурсивного построения её карточки. */
-    private static String targetName(Entity target) {
-        if (target == null) {
+    /** Возвращает runtime-имя persistent-цели либо её стабильный ID, если объект уже отсутствует. */
+    private static String targetName(EntityId targetId, EntityRegistry registry) {
+        if (targetId == null) {
             return "не выбрана";
         }
+        if (registry == null) {
+            return targetId.toString();
+        }
+        Entity target = registry.find(targetId);
+        if (target == null) {
+            return targetId + " (недоступна)";
+        }
         IdentityComponent identity = target.getComponent(IdentityComponent.class);
-        return identity == null ? "безымянная станция" : identity.name;
+        return identity == null ? targetId.toString() : identity.name;
     }
 
     /** Локализует состояние конечного автомата торгового корабля. */
