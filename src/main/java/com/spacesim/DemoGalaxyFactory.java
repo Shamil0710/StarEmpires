@@ -7,6 +7,8 @@ import com.spacesim.simulation.SimulationSession;
 import com.spacesim.world.AsteroidFieldId;
 import com.spacesim.world.AsteroidFieldNode;
 import com.spacesim.world.FactionEconomicState;
+import com.spacesim.world.FactionRelationState;
+import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.GalaxyId;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.JumpConnection;
@@ -27,9 +29,9 @@ import java.util.Objects;
  * Детерминированный production bootstrap минимального multi-system мира.
  *
  * <p>Каждая звёздная система получает обычную {@link SimulationSession}. Strategic topology
- * содержит persistent landmarks, а Stage-8 bootstrap дополнительно задаёт реальные faction
- * treasuries и первый liquidity-support budget. Это scenario initial state, а не денежный source во
- * время симуляции: суммы существуют с начала authoritative world snapshot.</p>
+ * содержит persistent landmarks, faction treasuries, relations и territory. Текущий demo policy
+ * сохраняет рынки открытыми: отношения выше market-access threshold, поэтому введение Stage-8
+ * diplomacy не меняет прежний economic baseline до отдельного изменения policy.</p>
  */
 public final class DemoGalaxyFactory {
     /** Система, которую desktop показывает и симулирует на полном local rate. */
@@ -64,7 +66,7 @@ public final class DemoGalaxyFactory {
      *
      * @param rootSeed общий seed bootstrap
      * @param contentCatalog единый catalog всех локальных simulation sessions
-     * @return WorldState с тремя системами, strategic landmarks и faction treasuries
+     * @return WorldState с тремя системами, strategic landmarks и faction state
      */
     public static WorldState createState(long rootSeed, ContentCatalog contentCatalog) {
         ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
@@ -124,7 +126,29 @@ public final class DemoGalaxyFactory {
                 List.of(
                         factionState("faction.neutral", 500_000d),
                         factionState("faction.trade_league", 1_000_000d),
-                        factionState("faction.miners", 750_000d)));
+                        factionState("faction.miners", 750_000d)),
+                List.of(
+                        new FactionStrategicState(
+                                "faction.neutral",
+                                -25,
+                                List.of(
+                                        new FactionRelationState("faction.miners", 10),
+                                        new FactionRelationState("faction.trade_league", 10)),
+                                List.of(FRONTIER_SYSTEM_ID)),
+                        new FactionStrategicState(
+                                "faction.trade_league",
+                                -25,
+                                List.of(
+                                        new FactionRelationState("faction.miners", 5),
+                                        new FactionRelationState("faction.neutral", 20)),
+                                List.of(ACTIVE_SYSTEM_ID)),
+                        new FactionStrategicState(
+                                "faction.miners",
+                                -25,
+                                List.of(
+                                        new FactionRelationState("faction.neutral", 10),
+                                        new FactionRelationState("faction.trade_league", 5)),
+                                List.of(INNER_SYSTEM_ID))));
     }
 
     private static FactionEconomicState factionState(String contentId, double treasuryCredits) {

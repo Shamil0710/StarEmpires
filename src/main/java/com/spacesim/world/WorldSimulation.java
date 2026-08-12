@@ -23,9 +23,9 @@ import java.util.Optional;
  *
  * <p>Active/local StarSystem исполняется через точный fixed-rate
  * {@link SimulationSession#advanceFrame(float)}. Удалённые системы догоняют active game time
- * coarse-пакетами через {@link SimulationSession#advanceStrategicSteps(int)}. Stage 8 добавляет
- * world-level faction treasury, но не создаёт отдельный финансовый контур: policy переводит деньги
- * атомарно в существующие station wallets и фиксирует обычный money transfer в локальном ledger.</p>
+ * coarse-пакетами через {@link SimulationSession#advanceStrategicSteps(int)}. Faction treasury
+ * использует реальные transfers, а persistent diplomacy/territory материализуется в transient
+ * station market-access rules каждой local session.</p>
  */
 public final class WorldSimulation {
     /** По умолчанию remote Engine обновляется раз на десять эквивалентных local ticks. */
@@ -39,6 +39,9 @@ public final class WorldSimulation {
     private final ContentCatalog contentCatalog;
     private final List<String> factionOrder;
     private final Map<String, FactionEconomicAccount> factionAccountsById;
+    private final List<FactionStrategicState> factionStrategies;
+    private final Map<String, FactionStrategicState> factionStrategiesById;
+    private final Map<StarSystemId, String> territoryOwnerBySystem;
     private final StarSystemId activeSystemId;
     private final int strategicStepTicks;
     private final int remoteUpdateBudgetPerFrame;
@@ -53,6 +56,9 @@ public final class WorldSimulation {
             ContentCatalog contentCatalog,
             List<String> factionOrder,
             Map<String, FactionEconomicAccount> factionAccountsById,
+            List<FactionStrategicState> factionStrategies,
+            Map<String, FactionStrategicState> factionStrategiesById,
+            Map<StarSystemId, String> territoryOwnerBySystem,
             StarSystemId activeSystemId,
             int strategicStepTicks,
             int remoteUpdateBudgetPerFrame) {
@@ -62,6 +68,9 @@ public final class WorldSimulation {
         this.contentCatalog = contentCatalog;
         this.factionOrder = List.copyOf(factionOrder);
         this.factionAccountsById = Map.copyOf(factionAccountsById);
+        this.factionStrategies = List.copyOf(factionStrategies);
+        this.factionStrategiesById = Map.copyOf(factionStrategiesById);
+        this.territoryOwnerBySystem = Map.copyOf(territoryOwnerBySystem);
         this.activeSystemId = activeSystemId;
         this.strategicStepTicks = strategicStepTicks;
         this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;
@@ -118,12 +127,52 @@ public final class WorldSimulation {
             throw new IllegalArgumentException("Active StarSystem отсутствует в topology: " + activeId);
         }
 
+        Map<String, ContentCatalog.FactionDefinition> contentFactions = new HashMap<>();
+        for (ContentCatalog.FactionDefinition faction : content.getFactions()) {
+            contentFactions.put(faction.id(), faction);
+        }
+
+        Map<String, FactionEconomicAccount> factionAccounts = new HashMap<>();
+        List<String> factionIds = new ArrayList<>(checked.factions().size());
+        for (FactionEconomicState factionState : checked.factions()) {
+            if (!contentFactions.containsKey(factionState.factionContentId())) {
+                throw new IllegalArgumentException(
+                        "WorldState содержит неизвестную content faction: "
+                                + factionState.factionContentId());
+            }
+            FactionEconomicAccount account = new FactionEconomicAccount(factionState);
+            factionAccounts.put(account.factionContentId(), account);
+            factionIds.add(account.factionContentId());
+        }
+
+        Map<String, FactionStrategicState> strategiesById = new HashMap<>();
+        Map<StarSystemId, String> territoryOwners = new HashMap<>();
+        for (FactionStrategicState strategy : checked.factionStrategies()) {
+            if (!contentFactions.containsKey(strategy.factionContentId())) {
+                throw new IllegalArgumentException(
+                        "Strategic state содержит неизвестную content faction: "
+                                + strategy.factionContentId());
+            }
+            for (FactionRelationState relation : strategy.relations()) {
+                if (!contentFactions.containsKey(relation.targetFactionContentId())) {
+                    throw new IllegalArgumentException(
+                            "Faction relation содержит неизвестную target faction: "
+                                    + relation.targetFactionContentId());
+                }
+            }
+            strategiesById.put(strategy.factionContentId(), strategy);
+            for (StarSystemId controlled : strategy.controlledSystems()) {
+                territoryOwners.put(controlled, strategy.factionContentId());
+            }
+        }
+
         Map<StarSystemId, SimulationSession> sessions = new HashMap<>();
         List<StarSystemId> order = new ArrayList<>(checked.systems().size());
         for (StarSystemSimulationState systemState : checked.systems()) {
             SimulationSession session = SimulationSession.restore(
                     systemState.simulationState(),
                     content);
+            FactionPolicyRuntime.install(session, content, checked.factionStrategies());
             sessions.put(systemState.systemId(), session);
             order.add(systemState.systemId());
         }
@@ -146,19 +195,6 @@ public final class WorldSimulation {
             }
         }
 
-        Map<String, FactionEconomicAccount> factionAccounts = new HashMap<>();
-        List<String> factionIds = new ArrayList<>(checked.factions().size());
-        for (FactionEconomicState factionState : checked.factions()) {
-            if (content.findFaction(factionState.factionContentId()) == null) {
-                throw new IllegalArgumentException(
-                        "WorldState содержит неизвестную content faction: "
-                                + factionState.factionContentId());
-            }
-            FactionEconomicAccount account = new FactionEconomicAccount(factionState);
-            factionAccounts.put(account.factionContentId(), account);
-            factionIds.add(account.factionContentId());
-        }
-
         return new WorldSimulation(
                 checked.topology(),
                 order,
@@ -166,6 +202,9 @@ public final class WorldSimulation {
                 content,
                 factionIds,
                 factionAccounts,
+                checked.factionStrategies(),
+                strategiesById,
+                territoryOwners,
                 activeId,
                 strategicStepTicks,
                 remoteUpdateBudgetPerFrame);
@@ -202,16 +241,12 @@ public final class WorldSimulation {
     /**
      * Выполняет одно deterministic решение поддержки ликвидности для указанной faction.
      *
-     * <p>Решение рассматривает только market stations с совпадающим runtime faction ID. Системы
-     * идут в canonical {@link StarSystemId}-порядке, станции внутри системы — по persistent
-     * EntityId. Из treasury расходуется не больше policy budget. Каждая станция пополняется только
-     * до liquidity reserve; transfer выполняется {@link WalletComponent#transferTo(WalletComponent,
-     * long)} и затем фиксируется как MONEY_TRANSFER в ledger соответствующей local session.</p>
+     * <p>Системы идут в canonical {@link StarSystemId}-порядке, станции внутри системы — по
+     * persistent EntityId. Treasury расходуется не больше policy budget, а каждый transfer
+     * фиксируется как MONEY_TRANSFER в ledger соответствующей local session.</p>
      *
      * @param factionContentId stable faction content ID
      * @return отчёт о физически выполненных денежных переводах
-     * @throws NullPointerException если ID не задан
-     * @throws IllegalArgumentException если faction не имеет persistent economic state
      */
     public LiquiditySupportReport applyLiquiditySupport(String factionContentId) {
         String factionId = Objects.requireNonNull(factionContentId, "Faction content ID не задан").strip();
@@ -283,9 +318,33 @@ public final class WorldSimulation {
     }
 
     /**
+     * Возвращает persistent diplomacy/territory policy faction.
+     *
+     * @param factionContentId stable content ID
+     * @return strategic state либо empty для legacy/unconfigured faction
+     */
+    public Optional<FactionStrategicState> findFactionStrategicState(String factionContentId) {
+        return Optional.ofNullable(
+                factionContentId == null ? null : factionStrategiesById.get(factionContentId));
+    }
+
+    /**
+     * Возвращает strategic владельца StarSystem.
+     *
+     * @param systemId stable system ID
+     * @return faction content ID либо empty для neutral/unclaimed system
+     */
+    public Optional<String> controllingFaction(StarSystemId systemId) {
+        if (systemId != null && topology.findSystem(systemId).isEmpty()) {
+            throw new IllegalArgumentException("Неизвестная StarSystem: " + systemId);
+        }
+        return Optional.ofNullable(systemId == null ? null : territoryOwnerBySystem.get(systemId));
+    }
+
+    /**
      * Возвращает текущий immutable world snapshot.
      *
-     * @return WorldState всех систем и faction treasuries в canonical порядке
+     * @return WorldState всех систем, faction treasuries и strategic policies
      */
     public WorldState snapshot() {
         List<StarSystemSimulationState> systemStates = new ArrayList<>(systemOrder.size());
@@ -302,7 +361,8 @@ public final class WorldSimulation {
                 WorldState.CURRENT_VERSION,
                 topology,
                 List.copyOf(systemStates),
-                List.copyOf(factionStates));
+                List.copyOf(factionStates),
+                factionStrategies);
     }
 
     /**
@@ -355,7 +415,6 @@ public final class WorldSimulation {
      *
      * @param systemId существующая StarSystem
      * @return неотрицательный lag в fixed ticks; для active равен нулю
-     * @throws IllegalArgumentException если система неизвестна или неожиданно опережает active
      */
     public long getLagTicks(StarSystemId systemId) {
         SimulationSession session = sessionsById.get(

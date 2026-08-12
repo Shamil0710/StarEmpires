@@ -3,6 +3,8 @@ package com.spacesim.persistence;
 import com.spacesim.world.AsteroidFieldId;
 import com.spacesim.world.AsteroidFieldNode;
 import com.spacesim.world.FactionEconomicState;
+import com.spacesim.world.FactionRelationState;
+import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.GalaxyId;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.JumpConnection;
@@ -33,10 +35,10 @@ import java.util.Objects;
 /**
  * Детерминированный бинарный codec {@link WorldState}.
  *
- * <p>World codec не сериализует экономические ECS-компоненты повторно. Каждый system payload
- * кодируется существующим {@link GameStateCodec}; поверх него хранятся canonical Galaxy topology и
- * strategic faction economy. Schema v2 добавляет faction-state в хвост Stage-7 schema v1, поэтому
- * decoder может нейтрально мигрировать существующие world saves без создания treasury денег.</p>
+ * <p>World codec переиспользует {@link GameStateCodec} для local simulation payload. Schema v2
+ * добавила faction treasury в хвост Stage-7 schema v1; schema v3 добавляет следующим хвостом
+ * diplomacy/territory policies. Decoder принимает обе legacy world schemas и мигрирует их
+ * нейтрально, не создавая treasury, relations или territory из отсутствующих данных.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757; // STGW — Star Empires Galaxy World.
@@ -87,6 +89,7 @@ public final class WorldStateCodec {
                     output.write(payload);
                 }
                 writeFactions(output, checked.factions());
+                writeFactionStrategies(output, checked.factionStrategies());
             }
             byte[] bytes = buffer.toByteArray();
             if (bytes.length > MAX_SAVE_BYTES) {
@@ -121,6 +124,7 @@ public final class WorldStateCodec {
             }
             int schemaVersion = input.readInt();
             if (schemaVersion != WorldState.CURRENT_VERSION
+                    && schemaVersion != WorldState.LEGACY_FACTION_TREASURY_VERSION
                     && schemaVersion != WorldState.LEGACY_STAGE7_VERSION) {
                 throw new IllegalArgumentException("Неподдерживаемая WorldState schema: " + schemaVersion);
             }
@@ -144,11 +148,20 @@ public final class WorldStateCodec {
             if (schemaVersion == WorldState.LEGACY_STAGE7_VERSION) {
                 state = WorldState.fromLegacyStage7(topology, List.copyOf(systemStates));
             } else {
-                state = new WorldState(
-                        WorldState.CURRENT_VERSION,
-                        topology,
-                        List.copyOf(systemStates),
-                        readFactions(input));
+                List<FactionEconomicState> factions = readFactions(input);
+                if (schemaVersion == WorldState.LEGACY_FACTION_TREASURY_VERSION) {
+                    state = WorldState.fromLegacyFactionTreasury(
+                            topology,
+                            List.copyOf(systemStates),
+                            factions);
+                } else {
+                    state = new WorldState(
+                            WorldState.CURRENT_VERSION,
+                            topology,
+                            List.copyOf(systemStates),
+                            factions,
+                            readFactionStrategies(input));
+                }
             }
             if (input.read() != -1) {
                 throw new IllegalArgumentException("После WorldState обнаружен лишний бинарный хвост");
@@ -240,6 +253,51 @@ public final class WorldStateCodec {
                     input.readLong()));
         }
         return List.copyOf(factions);
+    }
+
+    private static void writeFactionStrategies(
+            DataOutputStream output,
+            List<FactionStrategicState> strategies) throws IOException {
+        writeCount(output, strategies.size(), MAX_FACTIONS, "factionStrategies");
+        for (FactionStrategicState strategy : strategies) {
+            FactionStrategicState value = Objects.requireNonNull(strategy, "FactionStrategicState не задан");
+            writeString(output, value.factionContentId());
+            output.writeInt(value.minimumMarketAccessRelation());
+            writeCount(output, value.relations().size(), MAX_FACTIONS, "factionRelations");
+            for (FactionRelationState relation : value.relations()) {
+                writeString(output, relation.targetFactionContentId());
+                output.writeInt(relation.relation());
+            }
+            writeCount(output, value.controlledSystems().size(), MAX_SYSTEMS, "controlledSystems");
+            for (StarSystemId systemId : value.controlledSystems()) {
+                output.writeLong(systemId.value());
+            }
+        }
+    }
+
+    private static List<FactionStrategicState> readFactionStrategies(DataInputStream input) throws IOException {
+        int count = readCount(input, MAX_FACTIONS, "factionStrategies");
+        List<FactionStrategicState> strategies = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            String factionId = readString(input);
+            int threshold = input.readInt();
+            int relationCount = readCount(input, MAX_FACTIONS, "factionRelations");
+            List<FactionRelationState> relations = new ArrayList<>(relationCount);
+            for (int relationIndex = 0; relationIndex < relationCount; relationIndex++) {
+                relations.add(new FactionRelationState(readString(input), input.readInt()));
+            }
+            int systemCount = readCount(input, MAX_SYSTEMS, "controlledSystems");
+            List<StarSystemId> controlledSystems = new ArrayList<>(systemCount);
+            for (int systemIndex = 0; systemIndex < systemCount; systemIndex++) {
+                controlledSystems.add(new StarSystemId(input.readLong()));
+            }
+            strategies.add(new FactionStrategicState(
+                    factionId,
+                    threshold,
+                    List.copyOf(relations),
+                    List.copyOf(controlledSystems)));
+        }
+        return List.copyOf(strategies);
     }
 
     private static void writeTopology(DataOutputStream output, GalaxyTopology topology) throws IOException {
