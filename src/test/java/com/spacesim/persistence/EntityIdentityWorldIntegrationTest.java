@@ -2,7 +2,6 @@ package com.spacesim.persistence;
 
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
-import com.badlogic.ashley.core.Family;
 import com.spacesim.DemoWorldFactory;
 import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.EntityIdComponent;
@@ -28,7 +27,7 @@ class EntityIdentityWorldIntegrationTest {
         EntityIdAllocator allocator = new EntityIdAllocator();
         EntityRegistry registry = new EntityRegistry();
         Engine engine = new Engine();
-        engine.addEntityListener(Family.all(EntityIdComponent.class).get(), registry);
+        registry.track(engine);
 
         List<Entity> bootstrap = DemoWorldFactory.createEntities(allocator);
         for (Entity entity : bootstrap) {
@@ -77,6 +76,21 @@ class EntityIdentityWorldIntegrationTest {
 
         assertFalse(registry.contains(removedId));
         assertEquals(12 + asteroids.size(), registry.size());
+    }
+
+    @Test
+    void trackИндексируетСуществующиеСущностиИОтклоняетДругойEngine() {
+        Engine engine = new Engine();
+        Entity existing = new Entity().add(new EntityIdComponent(new EntityId(77L)));
+        engine.addEntity(existing);
+        EntityRegistry registry = new EntityRegistry();
+
+        registry.track(engine);
+        registry.track(engine);
+
+        assertEquals(existing, registry.require(new EntityId(77L)));
+        assertThrows(IllegalStateException.class, () -> registry.track(new Engine()));
+        assertThrows(NullPointerException.class, () -> registry.track(null));
     }
 
     @Test
