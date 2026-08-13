@@ -49,7 +49,7 @@ class DestructionEconomicShockTest {
         afterDirectory.rebuild(session.getEngine().getEntities());
         assertEquals(null, afterDirectory.find(targetId));
         assertTrue(session.getEventManager().snapshotState().pendingNews().stream()
-                .anyMatch(article -> article.content != null && article.content.contains("Уничтожен объект")));
+                .anyMatch(article -> article.content() != null && article.content().contains("Уничтожен объект")));
 
         WorldSimulation restored = WorldSimulation.restore(world.snapshot(), DemoGalaxyFactory.ACTIVE_SYSTEM_ID);
         assertFalse(restored.findSession(foundry.systemId()).orElseThrow().getEntityRegistry().contains(targetId));
