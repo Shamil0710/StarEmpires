@@ -80,7 +80,7 @@ class ConstructionProjectIntegrationTest {
         assertFalse(session.getEntityRegistry().contains(planned.constructionSiteEntityId()));
 
         Entity station = session.getEntityRegistry().require(completed.completedStationEntityId());
-        assertEquals(TARGET, station.getComponent(ArchetypeComponent.class).archetypeId);
+        assertEquals(TARGET, station.getComponent(ArchetypeComponent.class).contentId);
         assertEquals(0, station.getComponent(InventoryComponent.class).getTotalStock());
         assertEquals(0L, station.getComponent(WalletComponent.class).getBalanceMilliCredits());
         assertEquals(treasuryBefore,
