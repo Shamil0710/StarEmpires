@@ -28,15 +28,12 @@ class GalacticPathPlannerTest {
                         new JumpConnection(A, D),
                         new JumpConnection(D, B)));
         GalacticPathPlanner planner = new GalacticPathPlanner(topology, JumpTransitTiming.DEFAULT, 0.1f);
-
         GalacticPath path = planner.findPath(A, B).orElseThrow();
 
         assertEquals(List.of(A, C, B), path.systems());
         assertEquals(2, path.jumpCount());
-        assertEquals(
-                planner.directEdgeTicks(A, C) + planner.directEdgeTicks(C, B),
-                path.totalJumpTicks());
-        assertEquals(path.totalJumpTicks() * 0.1d, path.totalJumpSeconds(), 1e-9);
+        assertEquals(planner.directEdgeTicks(A, C) + planner.directEdgeTicks(C, B), path.totalJumpTicks());
+        assertEquals(path.totalJumpTicks() * (double) 0.1f, path.totalJumpSeconds(), 0d);
         assertEquals(100d, path.strategicDistance(), 1e-9);
     }
 
@@ -61,9 +58,7 @@ class GalacticPathPlannerTest {
     @Test
     void supportsZeroHopAndDisconnectedCases() {
         GalaxyTopology topology = topology(
-                List.of(
-                        new StarSystemNode(A, "A", 0d, 0d),
-                        new StarSystemNode(B, "B", 10d, 0d)),
+                List.of(new StarSystemNode(A, "A", 0d, 0d), new StarSystemNode(B, "B", 10d, 0d)),
                 List.of());
         GalacticPathPlanner planner = new GalacticPathPlanner(topology, JumpTransitTiming.DEFAULT, 0.1f);
 
@@ -77,22 +72,18 @@ class GalacticPathPlannerTest {
     @Test
     void directEdgeDurationUsesStage10BStructuralBarriers() {
         GalaxyTopology topology = topology(
-                List.of(
-                        new StarSystemNode(A, "A", 0d, 0d),
-                        new StarSystemNode(B, "B", 20d, 0d)),
+                List.of(new StarSystemNode(A, "A", 0d, 0d), new StarSystemNode(B, "B", 20d, 0d)),
                 List.of(new JumpConnection(A, B)));
         JumpTransitTiming timing = new JumpTransitTiming(2L, 3L, 4L, 20d);
         GalacticPathPlanner planner = new GalacticPathPlanner(topology, timing, 0.1f);
 
         long transitOnly = timing.transitTicks(topology, A, B, 0.1f);
-        assertEquals(transitOnly + 2L + 3L + 4L, planner.directEdgeTicks(A, B));
+        assertEquals(transitOnly + 9L, planner.directEdgeTicks(A, B));
     }
 
     @Test
     void rejectsUnknownSystems() {
-        GalaxyTopology topology = topology(
-                List.of(new StarSystemNode(A, "A", 0d, 0d)),
-                List.of());
+        GalaxyTopology topology = topology(List.of(new StarSystemNode(A, "A", 0d, 0d)), List.of());
         GalacticPathPlanner planner = new GalacticPathPlanner(topology, JumpTransitTiming.DEFAULT, 0.1f);
 
         assertThrows(IllegalArgumentException.class, () -> planner.findPath(A, B));
