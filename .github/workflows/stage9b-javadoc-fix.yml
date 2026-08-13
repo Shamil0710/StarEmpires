@@ -1,0 +1,75 @@
+name: Stage 9B Javadoc fix
+
+on:
+  push:
+    branches: [agent/stage9b-construction-project]
+    paths: ['.github/workflows/stage9b-javadoc-fix.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: agent/stage9b-construction-project
+          fetch-depth: 0
+      - name: Fix strict public API Javadoc
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{path}: expected exactly one fragment, found {text.count(old)}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              'src/main/java/com/spacesim/world/ConstructionProjectId.java',
+              '''    /** Validates the persistent ID. */\n    public ConstructionProjectId {''',
+              '''    /**\n     * Validates the persistent ID.\n     *\n     * @param value strictly positive persistent value\n     */\n    public ConstructionProjectId {''')
+
+          replace_once(
+              'src/main/java/com/spacesim/world/ConstructionMaterialState.java',
+              '''    /** Validates and normalizes material state. */\n    public ConstructionMaterialState {''',
+              '''    /**\n     * Validates and normalizes material state.\n     *\n     * @param itemContentId stable content item ID\n     * @param requiredAmount strictly positive required amount\n     * @param deliveredAmount delivered amount in range {@code [0, requiredAmount]}\n     */\n    public ConstructionMaterialState {''')
+
+          replace_once(
+              'src/main/java/com/spacesim/world/ConstructionProjectState.java',
+              '''    /** Validates project invariants and canonical material ordering. */\n    public ConstructionProjectState {''',
+              '''    /**\n     * Validates project invariants and canonical material ordering.\n     *\n     * @param id stable world-level project ID\n     * @param ownerFactionContentId owner faction content ID\n     * @param stationArchetypeContentId target station archetype content ID\n     * @param systemId target StarSystem\n     * @param x target world X coordinate\n     * @param y target world Y coordinate\n     * @param constructionSiteEntityId local site ID or null only for terminal states\n     * @param materials material requirements\n     * @param minimumFundingMilliCredits minimum project liquidity\n     * @param projectWalletMilliCredits current project wallet balance\n     * @param buildDurationTicks required build duration in target-system ticks\n     * @param status persistent state-machine state\n     * @param createdTick creation tick\n     * @param stateChangedTick latest transition tick\n     * @param buildStartedTick BUILDING start or -1\n     * @param completedTick terminal tick or -1\n     * @param completedStationEntityId final station ID only for COMPLETED\n     */\n    public ConstructionProjectState {''')
+
+          p = Path('src/main/java/com/spacesim/content/ContentCatalog.java')
+          text = p.read_text(encoding='utf-8')
+          old = '''    /**\n     * @param id стабильный persistent archetype ID\n     * @param displayName отображаемое имя типа\n     * @param inventoryCapacity вместимость склада\n     * @param startingCredits начальный капитал станции\n     * @param factionId persistent faction ID владельца\n     * @param recipeId persistent recipe ID либо {@code null}\n     * @param markets рыночные правила по товарам\n     */\n    /**\n     * Data-driven physical construction requirements of a station archetype.'''
+          new = '''    /**\n     * Data-driven physical construction requirements of a station archetype.'''
+          if text.count(old) != 1:
+              raise SystemExit('ContentCatalog detached station Javadoc fragment missing')
+          text = text.replace(old, new, 1)
+          text = text.replace(
+              '''        /** Validates immutable construction requirements. */\n        public ConstructionDefinition {''',
+              '''        /**\n         * Validates immutable construction requirements.\n         *\n         * @param fundingCredits minimum project liquidity funded from faction treasury\n         * @param buildSeconds build duration after all materials have arrived\n         * @param materials required positive item amounts by persistent item ID\n         */\n        public ConstructionDefinition {''',
+              1)
+          station_decl = '''    public record StationArchetypeDefinition(\n            String id, String displayName, int inventoryCapacity, double startingCredits,\n            String factionId, String recipeId, List<MarketDefinition> markets,\n            ConstructionDefinition construction) {'''
+          station_doc = '''    /**\n     * Data-driven station archetype used by bootstrap and constructed-station materialization.\n     *\n     * @param id stable persistent archetype ID\n     * @param displayName display name\n     * @param inventoryCapacity warehouse capacity\n     * @param startingCredits bootstrap-only starting credits\n     * @param factionId bootstrap owner faction ID\n     * @param recipeId persistent production recipe ID or {@code null}\n     * @param markets market rules\n     * @param construction optional physical construction requirements\n     */\n''' + station_decl
+          if text.count(station_decl) != 1:
+              raise SystemExit('StationArchetypeDefinition declaration missing')
+          text = text.replace(station_decl, station_doc, 1)
+          p.write_text(text, encoding='utf-8')
+
+          for debug_name in ['docs/stage9b_ci_debug_3.txt', 'docs/stage9b_ci_debug_final.txt']:
+              debug = Path(debug_name)
+              if debug.exists():
+                  debug.unlink()
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/stage9b-javadoc-fix.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add -A
+          git commit -m "docs: satisfy Stage 9B strict public Javadoc"
+          git push origin HEAD:agent/stage9b-construction-project
