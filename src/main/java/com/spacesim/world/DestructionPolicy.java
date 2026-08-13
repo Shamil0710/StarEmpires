@@ -16,7 +16,13 @@ public record DestructionPolicy(
         MoneyDestructionFate moneyFate,
         EntityId resourceRecipientEntityId) {
 
-    /** Validates cross-field policy requirements. */
+    /**
+     * Validates cross-field policy requirements.
+     *
+     * @param resourceFate fate of all inventory stock
+     * @param moneyFate fate of wallet balance
+     * @param resourceRecipientEntityId required only for {@link ResourceDestructionFate#TRANSFER_TO_ENTITY}
+     */
     public DestructionPolicy {
         Objects.requireNonNull(resourceFate, "Resource destruction fate не задан");
         Objects.requireNonNull(moneyFate, "Money destruction fate не задан");
