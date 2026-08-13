@@ -562,7 +562,7 @@ Stage 8.5 завершён, когда:
 
 **Статус:** COMPLETE — Stage 9E acceptance passed
 
-Текущий implementation focus: **Stage 10A — Fleet identity на world level**.
+Текущий implementation focus: **Stage 10C — Galactic route planner**.
 
 ### Цель
 
@@ -762,13 +762,17 @@ supply chain recovers
 
 ### Stage 10A — Fleet identity на world level
 
-- [ ] определить persistent identity fleet/ship при переходе между local `SimulationSession`;
-- [ ] разделить «entity находится в system» и «entity находится in transit»;
-- [ ] transit state входит в `WorldState`;
-- [ ] переход не дублирует корабль одновременно в двух systems;
-- [ ] сохранение в середине transit безопасно.
+**Статус:** COMPLETE — PR #19
+
+- [x] определить persistent identity fleet/ship при переходе между local `SimulationSession`;
+- [x] разделить «entity находится в system» и «entity находится in transit»;
+- [x] transit state входит в `WorldState`;
+- [x] переход не дублирует корабль одновременно в двух systems;
+- [x] сохранение в середине transit безопасно.
 
 ### Stage 10B — Jump transit
+
+**Статус:** COMPLETE candidate — `docs/stage10b_jump_transit.md`
 
 Минимальная FSM:
 
@@ -786,14 +790,16 @@ ARRIVING
 IN_SYSTEM
 ```
 
-- [ ] deterministic jump duration;
-- [ ] jump connections используются как navigation edges;
-- [ ] path невозможен без topology connection;
-- [ ] transit продолжается в remote simulation;
-- [ ] save/load continuation сохраняет arrival state;
-- [ ] active system может меняться независимо от transit других флотов.
+- [x] deterministic jump duration;
+- [x] jump connections используются как navigation edges;
+- [x] path невозможен без topology connection;
+- [x] transit продолжается в remote simulation;
+- [x] save/load continuation сохраняет arrival state;
+- [x] active system может меняться независимо от transit других флотов.
 
 ### Stage 10C — Galactic route planner
+
+**Статус:** ACTIVE
 
 Расширить planning от локального:
 
