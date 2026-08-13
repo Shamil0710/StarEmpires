@@ -262,6 +262,16 @@ public final class ContentCatalog {
                     .append(station.displayName()).append('|').append(station.inventoryCapacity()).append('|')
                     .append(Double.doubleToLongBits(station.startingCredits())).append('|')
                     .append(station.factionId()).append('|').append(station.recipeId()).append('|');
+            ConstructionDefinition construction = station.construction();
+            if (construction == null) {
+                canonical.append("construction=none|");
+            } else {
+                canonical.append("construction=")
+                        .append(Double.doubleToLongBits(construction.fundingCredits())).append(',')
+                        .append(Float.floatToIntBits(construction.buildSeconds())).append(',');
+                appendAmounts(canonical, construction.materials());
+                canonical.append('|');
+            }
             List<MarketDefinition> markets = new ArrayList<>(station.markets());
             markets.sort(Comparator.comparing(MarketDefinition::itemId));
             for (MarketDefinition market : markets) {
@@ -437,9 +447,38 @@ public final class ContentCatalog {
      * @param recipeId persistent recipe ID либо {@code null}
      * @param markets рыночные правила по товарам
      */
+    /**
+     * Data-driven physical construction requirements of a station archetype.
+     *
+     * @param fundingCredits minimum project liquidity funded from faction treasury
+     * @param buildSeconds build duration after all materials have arrived
+     * @param materials required positive item amounts by persistent item ID
+     */
+    public record ConstructionDefinition(
+            double fundingCredits, float buildSeconds, Map<String, Integer> materials) {
+        /** Validates immutable construction requirements. */
+        public ConstructionDefinition {
+            if (!Double.isFinite(fundingCredits) || fundingCredits <= 0d
+                    || !Float.isFinite(buildSeconds) || buildSeconds <= 0f) {
+                throw new IllegalArgumentException("Construction funding/build duration должны быть положительными");
+            }
+            materials = immutableOrderedCopy(Objects.requireNonNull(materials, "Construction materials не заданы"));
+            if (materials.isEmpty()) {
+                throw new IllegalArgumentException("ConstructionDefinition требует materials");
+            }
+            for (Map.Entry<String, Integer> entry : materials.entrySet()) {
+                Objects.requireNonNull(entry.getKey(), "Construction item ID не задан");
+                if (entry.getValue() == null || entry.getValue() <= 0) {
+                    throw new IllegalArgumentException("Construction material amount должен быть положительным");
+                }
+            }
+        }
+    }
+
     public record StationArchetypeDefinition(
             String id, String displayName, int inventoryCapacity, double startingCredits,
-            String factionId, String recipeId, List<MarketDefinition> markets) {
+            String factionId, String recipeId, List<MarketDefinition> markets,
+            ConstructionDefinition construction) {
         /**
          * @param id стабильный persistent archetype ID
          * @param displayName отображаемое имя типа
@@ -448,6 +487,7 @@ public final class ContentCatalog {
          * @param factionId persistent faction ID владельца
          * @param recipeId persistent recipe ID либо {@code null}
          * @param markets рыночные правила по товарам
+         * @param construction optional data-driven construction requirements; null means archetype is not constructible
          */
         public StationArchetypeDefinition {
             Objects.requireNonNull(id, "Station archetype ID не задан");

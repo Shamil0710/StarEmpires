@@ -1,38 +1,414 @@
 {
   "schemaVersion": 1,
   "items": [
-    {"id":"item.ore","runtimeId":0,"codeName":"Ore","displayName":"Руда","category":"MATERIAL","basePrice":10.0,"mineable":true},
-    {"id":"item.energy","runtimeId":1,"codeName":"Energy","displayName":"Энергия","category":"GAS_LIQUID","basePrice":5.0,"mineable":false},
-    {"id":"item.food","runtimeId":2,"codeName":"Food","displayName":"Продовольствие","category":"FINISHED_GOODS","basePrice":20.0,"mineable":false},
-    {"id":"item.steel","runtimeId":3,"codeName":"Steel","displayName":"Сталь","category":"MATERIAL","basePrice":50.0,"mineable":false},
-    {"id":"item.weapons","runtimeId":4,"codeName":"Weapons","displayName":"Вооружение","category":"FINISHED_GOODS","basePrice":150.0,"mineable":false}
+    {
+      "id": "item.ore",
+      "runtimeId": 0,
+      "codeName": "Ore",
+      "displayName": "Руда",
+      "category": "MATERIAL",
+      "basePrice": 10.0,
+      "mineable": true
+    },
+    {
+      "id": "item.energy",
+      "runtimeId": 1,
+      "codeName": "Energy",
+      "displayName": "Энергия",
+      "category": "GAS_LIQUID",
+      "basePrice": 5.0,
+      "mineable": false
+    },
+    {
+      "id": "item.food",
+      "runtimeId": 2,
+      "codeName": "Food",
+      "displayName": "Продовольствие",
+      "category": "FINISHED_GOODS",
+      "basePrice": 20.0,
+      "mineable": false
+    },
+    {
+      "id": "item.steel",
+      "runtimeId": 3,
+      "codeName": "Steel",
+      "displayName": "Сталь",
+      "category": "MATERIAL",
+      "basePrice": 50.0,
+      "mineable": false
+    },
+    {
+      "id": "item.weapons",
+      "runtimeId": 4,
+      "codeName": "Weapons",
+      "displayName": "Вооружение",
+      "category": "FINISHED_GOODS",
+      "basePrice": 150.0,
+      "mineable": false
+    }
   ],
   "recipes": [
-    {"id":"recipe.energy_generation","displayName":"Генерация энергии","durationSeconds":4.0,"inputs":{},"outputs":{"item.energy":7}},
-    {"id":"recipe.food_growing","displayName":"Выращивание продовольствия","durationSeconds":6.0,"inputs":{"item.energy":2},"outputs":{"item.food":6}},
-    {"id":"recipe.steel_smelting","displayName":"Выплавка стали","durationSeconds":4.0,"inputs":{"item.ore":2,"item.energy":1},"outputs":{"item.steel":2}},
-    {"id":"recipe.weapons_assembly","displayName":"Сборка вооружения","durationSeconds":6.0,"inputs":{"item.steel":2,"item.energy":1},"outputs":{"item.weapons":1}}
+    {
+      "id": "recipe.energy_generation",
+      "displayName": "Генерация энергии",
+      "durationSeconds": 4.0,
+      "inputs": {},
+      "outputs": {
+        "item.energy": 7
+      }
+    },
+    {
+      "id": "recipe.food_growing",
+      "displayName": "Выращивание продовольствия",
+      "durationSeconds": 6.0,
+      "inputs": {
+        "item.energy": 2
+      },
+      "outputs": {
+        "item.food": 6
+      }
+    },
+    {
+      "id": "recipe.steel_smelting",
+      "displayName": "Выплавка стали",
+      "durationSeconds": 4.0,
+      "inputs": {
+        "item.ore": 2,
+        "item.energy": 1
+      },
+      "outputs": {
+        "item.steel": 2
+      }
+    },
+    {
+      "id": "recipe.weapons_assembly",
+      "displayName": "Сборка вооружения",
+      "durationSeconds": 6.0,
+      "inputs": {
+        "item.steel": 2,
+        "item.energy": 1
+      },
+      "outputs": {
+        "item.weapons": 1
+      }
+    }
   ],
   "factions": [
-    {"id":"faction.neutral","runtimeId":0,"displayName":"Нейтралы"},
-    {"id":"faction.trade_league","runtimeId":1,"displayName":"Торговая лига"},
-    {"id":"faction.miners","runtimeId":2,"displayName":"Шахтёры"}
+    {
+      "id": "faction.neutral",
+      "runtimeId": 0,
+      "displayName": "Нейтралы"
+    },
+    {
+      "id": "faction.trade_league",
+      "runtimeId": 1,
+      "displayName": "Торговая лига"
+    },
+    {
+      "id": "faction.miners",
+      "runtimeId": 2,
+      "displayName": "Шахтёры"
+    }
   ],
   "shipArchetypes": [
-    {"id":"ship.ore_hauler","displayName":"Рудный материаловоз","role":"MATERIAL_CARRIER","cargoCapacity":140,"movementSpeed":150.0,"startingCredits":12000.0,"extractionPerSecond":0.0,"extractionRange":0.0,"dockingRange":0.0,"hull":0.0,"shields":0.0,"damagePerSecond":0.0,"weaponRange":0.0},
-    {"id":"ship.energy_tanker","displayName":"Энергетический танкер","role":"GAS_LIQUID_CARRIER","cargoCapacity":160,"movementSpeed":165.0,"startingCredits":12000.0,"extractionPerSecond":0.0,"extractionRange":0.0,"dockingRange":0.0,"hull":0.0,"shields":0.0,"damagePerSecond":0.0,"weaponRange":0.0},
-    {"id":"ship.food_container","displayName":"Продовольственный контейнеровоз","role":"FINISHED_GOODS_CARRIER","cargoCapacity":100,"movementSpeed":175.0,"startingCredits":12000.0,"extractionPerSecond":0.0,"extractionRange":0.0,"dockingRange":0.0,"hull":0.0,"shields":0.0,"damagePerSecond":0.0,"weaponRange":0.0},
-    {"id":"ship.steel_hauler","displayName":"Стальной материаловоз","role":"MATERIAL_CARRIER","cargoCapacity":140,"movementSpeed":185.0,"startingCredits":12000.0,"extractionPerSecond":0.0,"extractionRange":0.0,"dockingRange":0.0,"hull":0.0,"shields":0.0,"damagePerSecond":0.0,"weaponRange":0.0},
-    {"id":"ship.weapons_container","displayName":"Оружейный контейнеровоз","role":"FINISHED_GOODS_CARRIER","cargoCapacity":80,"movementSpeed":200.0,"startingCredits":12000.0,"extractionPerSecond":0.0,"extractionRange":0.0,"dockingRange":0.0,"hull":0.0,"shields":0.0,"damagePerSecond":0.0,"weaponRange":0.0},
-    {"id":"ship.basic_miner","displayName":"Базовый добытчик","role":"MINING_SHIP","cargoCapacity":80,"movementSpeed":150.0,"startingCredits":1000.0,"extractionPerSecond":2.0,"extractionRange":18.0,"dockingRange":12.0,"hull":0.0,"shields":0.0,"damagePerSecond":0.0,"weaponRange":0.0},
-    {"id":"ship.guard_frigate","displayName":"Сторожевой фрегат","role":"COMBAT_SHIP","cargoCapacity":0,"movementSpeed":0.0,"startingCredits":0.0,"extractionPerSecond":0.0,"extractionRange":0.0,"dockingRange":0.0,"hull":320.0,"shields":180.0,"damagePerSecond":42.0,"weaponRange":150.0}
+    {
+      "id": "ship.ore_hauler",
+      "displayName": "Рудный материаловоз",
+      "role": "MATERIAL_CARRIER",
+      "cargoCapacity": 140,
+      "movementSpeed": 150.0,
+      "startingCredits": 12000.0,
+      "extractionPerSecond": 0.0,
+      "extractionRange": 0.0,
+      "dockingRange": 0.0,
+      "hull": 0.0,
+      "shields": 0.0,
+      "damagePerSecond": 0.0,
+      "weaponRange": 0.0
+    },
+    {
+      "id": "ship.energy_tanker",
+      "displayName": "Энергетический танкер",
+      "role": "GAS_LIQUID_CARRIER",
+      "cargoCapacity": 160,
+      "movementSpeed": 165.0,
+      "startingCredits": 12000.0,
+      "extractionPerSecond": 0.0,
+      "extractionRange": 0.0,
+      "dockingRange": 0.0,
+      "hull": 0.0,
+      "shields": 0.0,
+      "damagePerSecond": 0.0,
+      "weaponRange": 0.0
+    },
+    {
+      "id": "ship.food_container",
+      "displayName": "Продовольственный контейнеровоз",
+      "role": "FINISHED_GOODS_CARRIER",
+      "cargoCapacity": 100,
+      "movementSpeed": 175.0,
+      "startingCredits": 12000.0,
+      "extractionPerSecond": 0.0,
+      "extractionRange": 0.0,
+      "dockingRange": 0.0,
+      "hull": 0.0,
+      "shields": 0.0,
+      "damagePerSecond": 0.0,
+      "weaponRange": 0.0
+    },
+    {
+      "id": "ship.steel_hauler",
+      "displayName": "Стальной материаловоз",
+      "role": "MATERIAL_CARRIER",
+      "cargoCapacity": 140,
+      "movementSpeed": 185.0,
+      "startingCredits": 12000.0,
+      "extractionPerSecond": 0.0,
+      "extractionRange": 0.0,
+      "dockingRange": 0.0,
+      "hull": 0.0,
+      "shields": 0.0,
+      "damagePerSecond": 0.0,
+      "weaponRange": 0.0
+    },
+    {
+      "id": "ship.weapons_container",
+      "displayName": "Оружейный контейнеровоз",
+      "role": "FINISHED_GOODS_CARRIER",
+      "cargoCapacity": 80,
+      "movementSpeed": 200.0,
+      "startingCredits": 12000.0,
+      "extractionPerSecond": 0.0,
+      "extractionRange": 0.0,
+      "dockingRange": 0.0,
+      "hull": 0.0,
+      "shields": 0.0,
+      "damagePerSecond": 0.0,
+      "weaponRange": 0.0
+    },
+    {
+      "id": "ship.basic_miner",
+      "displayName": "Базовый добытчик",
+      "role": "MINING_SHIP",
+      "cargoCapacity": 80,
+      "movementSpeed": 150.0,
+      "startingCredits": 1000.0,
+      "extractionPerSecond": 2.0,
+      "extractionRange": 18.0,
+      "dockingRange": 12.0,
+      "hull": 0.0,
+      "shields": 0.0,
+      "damagePerSecond": 0.0,
+      "weaponRange": 0.0
+    },
+    {
+      "id": "ship.guard_frigate",
+      "displayName": "Сторожевой фрегат",
+      "role": "COMBAT_SHIP",
+      "cargoCapacity": 0,
+      "movementSpeed": 0.0,
+      "startingCredits": 0.0,
+      "extractionPerSecond": 0.0,
+      "extractionRange": 0.0,
+      "dockingRange": 0.0,
+      "hull": 320.0,
+      "shields": 180.0,
+      "damagePerSecond": 42.0,
+      "weaponRange": 150.0
+    }
   ],
   "stationArchetypes": [
-    {"id":"station.mining_base","displayName":"Шахтёрская база","inventoryCapacity":2500,"startingCredits":250000.0,"factionId":"faction.miners","recipeId":null,"markets":[{"itemId":"item.ore","initialStock":400,"targetStock":300,"consumptionPerSecond":0.0}]},
-    {"id":"station.power_plant","displayName":"Энергоузел","inventoryCapacity":2500,"startingCredits":250000.0,"factionId":"faction.neutral","recipeId":"recipe.energy_generation","markets":[{"itemId":"item.energy","initialStock":400,"targetStock":300,"consumptionPerSecond":0.0}]},
-    {"id":"station.agrodome","displayName":"Агрокупол","inventoryCapacity":2500,"startingCredits":250000.0,"factionId":"faction.trade_league","recipeId":"recipe.food_growing","markets":[{"itemId":"item.energy","initialStock":80,"targetStock":120,"consumptionPerSecond":0.0},{"itemId":"item.food","initialStock":320,"targetStock":240,"consumptionPerSecond":0.0}]},
-    {"id":"station.foundry","displayName":"Промышленная кузница","inventoryCapacity":2500,"startingCredits":250000.0,"factionId":"faction.miners","recipeId":"recipe.steel_smelting","markets":[{"itemId":"item.ore","initialStock":200,"targetStock":300,"consumptionPerSecond":0.0},{"itemId":"item.energy","initialStock":80,"targetStock":120,"consumptionPerSecond":0.0},{"itemId":"item.steel","initialStock":240,"targetStock":180,"consumptionPerSecond":0.0}]},
-    {"id":"station.arsenal","displayName":"Арсенал","inventoryCapacity":2500,"startingCredits":250000.0,"factionId":"faction.trade_league","recipeId":"recipe.weapons_assembly","markets":[{"itemId":"item.energy","initialStock":80,"targetStock":120,"consumptionPerSecond":0.0},{"itemId":"item.steel","initialStock":80,"targetStock":120,"consumptionPerSecond":0.0},{"itemId":"item.weapons","initialStock":120,"targetStock":90,"consumptionPerSecond":0.0}]},
-    {"id":"station.colony","displayName":"Колониальный хаб","inventoryCapacity":2500,"startingCredits":250000.0,"factionId":"faction.neutral","recipeId":null,"markets":[{"itemId":"item.energy","initialStock":80,"targetStock":120,"consumptionPerSecond":1.0},{"itemId":"item.food","initialStock":200,"targetStock":300,"consumptionPerSecond":1.0},{"itemId":"item.steel","initialStock":80,"targetStock":120,"consumptionPerSecond":0.16666667},{"itemId":"item.weapons","initialStock":80,"targetStock":120,"consumptionPerSecond":0.16666667}]}
+    {
+      "id": "station.mining_base",
+      "displayName": "Шахтёрская база",
+      "inventoryCapacity": 2500,
+      "startingCredits": 250000.0,
+      "factionId": "faction.miners",
+      "recipeId": null,
+      "markets": [
+        {
+          "itemId": "item.ore",
+          "initialStock": 400,
+          "targetStock": 300,
+          "consumptionPerSecond": 0.0
+        }
+      ],
+      "construction": {
+        "fundingCredits": 25000.0,
+        "buildSeconds": 25.0,
+        "materials": {
+          "item.steel": 120,
+          "item.energy": 60
+        }
+      }
+    },
+    {
+      "id": "station.power_plant",
+      "displayName": "Энергоузел",
+      "inventoryCapacity": 2500,
+      "startingCredits": 250000.0,
+      "factionId": "faction.neutral",
+      "recipeId": "recipe.energy_generation",
+      "markets": [
+        {
+          "itemId": "item.energy",
+          "initialStock": 400,
+          "targetStock": 300,
+          "consumptionPerSecond": 0.0
+        }
+      ],
+      "construction": {
+        "fundingCredits": 25000.0,
+        "buildSeconds": 25.0,
+        "materials": {
+          "item.steel": 100,
+          "item.energy": 80
+        }
+      }
+    },
+    {
+      "id": "station.agrodome",
+      "displayName": "Агрокупол",
+      "inventoryCapacity": 2500,
+      "startingCredits": 250000.0,
+      "factionId": "faction.trade_league",
+      "recipeId": "recipe.food_growing",
+      "markets": [
+        {
+          "itemId": "item.energy",
+          "initialStock": 80,
+          "targetStock": 120,
+          "consumptionPerSecond": 0.0
+        },
+        {
+          "itemId": "item.food",
+          "initialStock": 320,
+          "targetStock": 240,
+          "consumptionPerSecond": 0.0
+        }
+      ],
+      "construction": {
+        "fundingCredits": 30000.0,
+        "buildSeconds": 30.0,
+        "materials": {
+          "item.steel": 120,
+          "item.energy": 100
+        }
+      }
+    },
+    {
+      "id": "station.foundry",
+      "displayName": "Промышленная кузница",
+      "inventoryCapacity": 2500,
+      "startingCredits": 250000.0,
+      "factionId": "faction.miners",
+      "recipeId": "recipe.steel_smelting",
+      "markets": [
+        {
+          "itemId": "item.ore",
+          "initialStock": 200,
+          "targetStock": 300,
+          "consumptionPerSecond": 0.0
+        },
+        {
+          "itemId": "item.energy",
+          "initialStock": 80,
+          "targetStock": 120,
+          "consumptionPerSecond": 0.0
+        },
+        {
+          "itemId": "item.steel",
+          "initialStock": 240,
+          "targetStock": 180,
+          "consumptionPerSecond": 0.0
+        }
+      ],
+      "construction": {
+        "fundingCredits": 40000.0,
+        "buildSeconds": 35.0,
+        "materials": {
+          "item.steel": 180,
+          "item.energy": 120
+        }
+      }
+    },
+    {
+      "id": "station.arsenal",
+      "displayName": "Арсенал",
+      "inventoryCapacity": 2500,
+      "startingCredits": 250000.0,
+      "factionId": "faction.trade_league",
+      "recipeId": "recipe.weapons_assembly",
+      "markets": [
+        {
+          "itemId": "item.energy",
+          "initialStock": 80,
+          "targetStock": 120,
+          "consumptionPerSecond": 0.0
+        },
+        {
+          "itemId": "item.steel",
+          "initialStock": 80,
+          "targetStock": 120,
+          "consumptionPerSecond": 0.0
+        },
+        {
+          "itemId": "item.weapons",
+          "initialStock": 120,
+          "targetStock": 90,
+          "consumptionPerSecond": 0.0
+        }
+      ],
+      "construction": {
+        "fundingCredits": 50000.0,
+        "buildSeconds": 40.0,
+        "materials": {
+          "item.steel": 220,
+          "item.energy": 160
+        }
+      }
+    },
+    {
+      "id": "station.colony",
+      "displayName": "Колониальный хаб",
+      "inventoryCapacity": 2500,
+      "startingCredits": 250000.0,
+      "factionId": "faction.neutral",
+      "recipeId": null,
+      "markets": [
+        {
+          "itemId": "item.energy",
+          "initialStock": 80,
+          "targetStock": 120,
+          "consumptionPerSecond": 1.0
+        },
+        {
+          "itemId": "item.food",
+          "initialStock": 200,
+          "targetStock": 300,
+          "consumptionPerSecond": 1.0
+        },
+        {
+          "itemId": "item.steel",
+          "initialStock": 80,
+          "targetStock": 120,
+          "consumptionPerSecond": 0.16666667
+        },
+        {
+          "itemId": "item.weapons",
+          "initialStock": 80,
+          "targetStock": 120,
+          "consumptionPerSecond": 0.16666667
+        }
+      ],
+      "construction": {
+        "fundingCredits": 75000.0,
+        "buildSeconds": 50.0,
+        "materials": {
+          "item.steel": 300,
+          "item.energy": 200
+        }
+      }
+    }
   ]
 }
