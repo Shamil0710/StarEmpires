@@ -2,6 +2,7 @@ package com.spacesim.benchmark;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
@@ -48,10 +49,13 @@ final class Stage9ESetup {
     }
 
     static void applyShock(WorldSimulation world, Entity foundry, EntityId reserveId) {
-        var inner = world.findSession(DemoGalaxyFactory.INNER_SYSTEM_ID).orElseThrow();
+        EntityIdComponent foundryId = foundry.getComponent(EntityIdComponent.class);
+        if (foundryId == null || foundryId.id == null) {
+            throw new IllegalStateException("Stage 9E foundry не имеет persistent EntityId");
+        }
         world.destroyEntity(
                 DemoGalaxyFactory.INNER_SYSTEM_ID,
-                inner.getEntityRegistry().idOf(foundry),
+                foundryId.id,
                 new DestructionPolicy(
                         ResourceDestructionFate.TRANSFER_TO_ENTITY,
                         MoneyDestructionFate.SINK,
