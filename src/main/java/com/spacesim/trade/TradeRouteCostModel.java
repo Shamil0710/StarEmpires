@@ -103,7 +103,22 @@ public interface TradeRouteCostModel {
                     0);
         }
 
-        /** Validates local or galactic cost context. */
+        /**
+         * @param buyStationId supplier ID or {@code null} for existing cargo
+         * @param sellStationId consumer ID
+         * @param buyFactionId supplier runtime faction ID or {@code -1}
+         * @param sellFactionId consumer runtime faction ID or {@code -1}
+         * @param itemId runtime item ID
+         * @param amount cargo amount
+         * @param purchaseCostMilliCredits purchase cost
+         * @param saleRevenueMilliCredits sale revenue
+         * @param travelDistance explicit local distance estimate
+         * @param travelSeconds full expected movement duration
+         * @param buySystemId supplier system for galactic route or {@code null}
+         * @param sellSystemId consumer system for galactic route or {@code null}
+         * @param jumpPath galactic path or {@code null}
+         * @param routeRiskBasisPoints expected route risk in basis points
+         */
         public Context {
             Objects.requireNonNull(sellStationId, "sellStationId не задан");
             if (itemId < 0 || amount <= 0

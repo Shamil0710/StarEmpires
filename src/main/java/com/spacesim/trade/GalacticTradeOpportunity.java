@@ -25,7 +25,15 @@ public record GalacticTradeOpportunity(
         double localTravelSeconds,
         int routeRiskBasisPoints) {
 
-    /** Validates one immutable galactic candidate. */
+    /**
+     * @param supplier supplier market in the fleet's current system
+     * @param consumer remote consumer market
+     * @param itemId runtime item ID
+     * @param jumpPath deterministic supplier-to-consumer jump path
+     * @param localTravelDistance explicit in-system travel distance estimate
+     * @param localTravelSeconds explicit in-system travel time estimate
+     * @param routeRiskBasisPoints expected route risk in basis points
+     */
     public GalacticTradeOpportunity {
         Objects.requireNonNull(supplier, "Galactic supplier не задан");
         Objects.requireNonNull(consumer, "Galactic consumer не задан");

@@ -45,7 +45,24 @@ public record GalacticTradeRoute(
         int routeRiskBasisPoints,
         GalacticPath jumpPath) {
 
-    /** Validates the immutable galactic route result. */
+    /**
+     * @param buySystemId supplier StarSystem
+     * @param buyStationId supplier local EntityId
+     * @param sellSystemId consumer StarSystem
+     * @param sellStationId consumer local EntityId
+     * @param itemId runtime item ID
+     * @param amount planned cargo amount
+     * @param purchaseCostMilliCredits expected purchase cost
+     * @param saleRevenueMilliCredits expected sale revenue
+     * @param grossProfitMilliCredits revenue minus purchase cost
+     * @param routeCostMilliCredits external route cost
+     * @param netProfitMilliCredits gross profit minus route cost
+     * @param localTravelDistance explicit in-system distance estimate
+     * @param strategicJumpDistance topology distance of jump path
+     * @param expectedDurationSeconds local plus jump time
+     * @param routeRiskBasisPoints route risk in basis points
+     * @param jumpPath deterministic supplier-to-consumer path
+     */
     public GalacticTradeRoute {
         Objects.requireNonNull(buySystemId, "buySystemId не задан");
         Objects.requireNonNull(buyStationId, "buyStationId не задан");
