@@ -20,21 +20,16 @@ final class FactionEconomicPressureTracker {
         }
     }
 
-    void observe(
-            List<FactionStrategicState> strategies,
-            EconomicBottleneckReport report,
-            long tick) {
+    void observe(List<FactionStrategicState> strategies, EconomicBottleneckReport report, long tick) {
         Objects.requireNonNull(strategies, "Faction strategies не заданы");
         Objects.requireNonNull(report, "Bottleneck report не задан");
         if (tick < 0L) {
             throw new IllegalArgumentException("Pressure observation tick не может быть отрицательным");
         }
-
         Map<StarSystemId, List<EconomicBottleneck>> bySystem = new HashMap<>();
         for (EconomicBottleneck bottleneck : report.bottlenecks()) {
             bySystem.computeIfAbsent(bottleneck.systemId(), ignored -> new ArrayList<>()).add(bottleneck);
         }
-
         Set<Key> observed = new HashSet<>();
         for (FactionStrategicState strategy : strategies) {
             for (StarSystemId systemId : strategy.controlledSystems()) {
@@ -45,7 +40,6 @@ final class FactionEconomicPressureTracker {
                 }
             }
         }
-
         for (Map.Entry<Key, FactionEconomicPressureState> entry : new ArrayList<>(states.entrySet())) {
             Key key = entry.getKey();
             FactionEconomicPressureState previous = entry.getValue();
@@ -82,37 +76,33 @@ final class FactionEconomicPressureTracker {
     }
 
     private static FactionEconomicPressureState positiveObservation(
-            FactionEconomicPressureState previous,
-            String factionId,
-            EconomicBottleneck bottleneck,
-            long tick) {
+            FactionEconomicPressureState previous, String factionId, EconomicBottleneck bottleneck, long tick) {
+        if (previous != null
+                && previous.consecutiveObservations() > 0
+                && previous.bottleneckType() == bottleneck.type()
+                && tick == previous.lastObservedTick()) {
+            return previous;
+        }
         boolean continuation = previous != null
                 && previous.consecutiveObservations() > 0
                 && previous.bottleneckType() == bottleneck.type()
-                && tick >= previous.lastObservedTick();
+                && tick > previous.lastObservedTick();
         long firstTick = continuation ? previous.firstObservedTick() : tick;
         int consecutive = continuation && previous.consecutiveObservations() < Integer.MAX_VALUE
-                ? previous.consecutiveObservations() + 1
-                : 1;
+                ? previous.consecutiveObservations() + 1 : 1;
         long peak = continuation
                 ? Math.max(previous.peakUnmetDemandUnits(), bottleneck.unmetDemandUnits())
                 : bottleneck.unmetDemandUnits();
         long cooldown = previous == null ? 0L : previous.cooldownUntilTick();
         return new FactionEconomicPressureState(
-                factionId,
-                bottleneck.systemId(),
-                bottleneck.itemContentId(),
-                bottleneck.type(),
-                firstTick,
-                tick,
-                consecutive,
-                peak,
-                bottleneck.unmetDemandUnits(),
-                cooldown);
+                factionId, bottleneck.systemId(), bottleneck.itemContentId(), bottleneck.type(),
+                firstTick, tick, consecutive, peak, bottleneck.unmetDemandUnits(), cooldown);
     }
 
-    private static FactionEconomicPressureState clearObservation(
-            FactionEconomicPressureState previous, long tick) {
+    private static FactionEconomicPressureState clearObservation(FactionEconomicPressureState previous, long tick) {
+        if (tick == previous.lastObservedTick() && previous.consecutiveObservations() == 0) {
+            return previous;
+        }
         return new FactionEconomicPressureState(
                 previous.factionContentId(), previous.systemId(), previous.itemContentId(), previous.bottleneckType(),
                 tick, tick, 0, 0L, 0L, previous.cooldownUntilTick());
