@@ -1,0 +1,454 @@
+exit_code=1
+--- last 600 lines ---
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< com.spacesim:economy-core >----------------------
+[INFO] Building economy-core 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.5.0:clean (default-clean) @ economy-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-coverage-agent) @ economy-core ---
+[INFO] argLine set to -javaagent:/home/runner/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/home/runner/work/StarEmpires/StarEmpires/target/jacoco.exec,excludes=com/spacesim/SpaceSimGame*:com/spacesim/desktop/**:com/spacesim/ui/WorldMapRenderer*
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ economy-core ---
+[INFO] Copying 8 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ economy-core ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 146 source files with javac [debug release 17] to target/classes
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ economy-core ---
+[INFO] skip non existing resourceDirectory /home/runner/work/StarEmpires/StarEmpires/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ economy-core ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 80 source files with javac [debug release 17] to target/test-classes
+[INFO] 
+[INFO] --- surefire:3.5.4:test (default-test) @ economy-core ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.spacesim.systems.PriceRecorderSystemTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.221 s -- in com.spacesim.systems.PriceRecorderSystemTest
+[INFO] Running com.spacesim.systems.MarketSystemTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.163 s -- in com.spacesim.systems.MarketSystemTest
+[INFO] Running com.spacesim.systems.TradeAISystemTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.239 s -- in com.spacesim.systems.TradeAISystemTest
+[INFO] Running com.spacesim.systems.TradeAISystemStaleRouteTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in com.spacesim.systems.TradeAISystemStaleRouteTest
+[INFO] Running com.spacesim.systems.ConsumptionSystemTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.057 s -- in com.spacesim.systems.ConsumptionSystemTest
+[INFO] Running com.spacesim.systems.TradeAISystemProfitTimeTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in com.spacesim.systems.TradeAISystemProfitTimeTest
+[INFO] Running com.spacesim.systems.AsteroidSpawnSystemTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.043 s -- in com.spacesim.systems.AsteroidSpawnSystemTest
+[INFO] Running com.spacesim.systems.MiningSystemTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.057 s -- in com.spacesim.systems.MiningSystemTest
+[INFO] Running com.spacesim.systems.ProductionSystemTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.071 s -- in com.spacesim.systems.ProductionSystemTest
+[INFO] Running com.spacesim.persistence.SimulationPersistenceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.589 s -- in com.spacesim.persistence.SimulationPersistenceTest
+[INFO] Running com.spacesim.persistence.GameStateMigrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.spacesim.persistence.GameStateMigrationTest
+[INFO] Running com.spacesim.persistence.EntityStateMapperTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.030 s -- in com.spacesim.persistence.EntityStateMapperTest
+[INFO] Running com.spacesim.persistence.WorldStateCodecTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.313 s -- in com.spacesim.persistence.WorldStateCodecTest
+[INFO] Running com.spacesim.persistence.GameStateCodecTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.716 s -- in com.spacesim.persistence.GameStateCodecTest
+[INFO] Running com.spacesim.persistence.WorldPersistenceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.446 s -- in com.spacesim.persistence.WorldPersistenceTest
+[INFO] Running com.spacesim.persistence.PersistentComponentReferenceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in com.spacesim.persistence.PersistentComponentReferenceTest
+[INFO] Running com.spacesim.persistence.EntityIdentityInfrastructureTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in com.spacesim.persistence.EntityIdentityInfrastructureTest
+[INFO] Running com.spacesim.persistence.EntityIdentityWorldIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in com.spacesim.persistence.EntityIdentityWorldIntegrationTest
+[INFO] Running com.spacesim.util.SpatialHashGridTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.spacesim.util.SpatialHashGridTest
+[INFO] Running com.spacesim.economy.EconomicLedgerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in com.spacesim.economy.EconomicLedgerTest
+[INFO] Running com.spacesim.economy.MoneyConservationSimulationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.048 s -- in com.spacesim.economy.MoneyConservationSimulationTest
+[INFO] Running com.spacesim.economy.EconomicInvariantsIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in com.spacesim.economy.EconomicInvariantsIntegrationTest
+[INFO] Running com.spacesim.economy.EconomicLedgerDeterminismTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.049 s -- in com.spacesim.economy.EconomicLedgerDeterminismTest
+[INFO] Running com.spacesim.economy.MoneyTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.057 s -- in com.spacesim.economy.MoneyTest
+[INFO] Running com.spacesim.ui.EntityPickerTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.spacesim.ui.EntityPickerTest
+[INFO] Running com.spacesim.ui.NewsUITest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.spacesim.ui.NewsUITest
+[INFO] Running com.spacesim.ui.WorldMapLayoutTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in com.spacesim.ui.WorldMapLayoutTest
+[INFO] Running com.spacesim.ui.EconomyStatusUITest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.077 s -- in com.spacesim.ui.EconomyStatusUITest
+[INFO] Running com.spacesim.ui.EntityDetailsUITest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.079 s -- in com.spacesim.ui.EntityDetailsUITest
+[INFO] Running com.spacesim.ui.WorldMapRendererTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in com.spacesim.ui.WorldMapRendererTest
+[INFO] Running com.spacesim.ui.PriceGraphRendererTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in com.spacesim.ui.PriceGraphRendererTest
+[INFO] Running com.spacesim.DemoWorldDataDrivenContentTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.spacesim.DemoWorldDataDrivenContentTest
+[INFO] Running com.spacesim.DemoWorldFactoryTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in com.spacesim.DemoWorldFactoryTest
+[INFO] Running com.spacesim.simulation.SimulationClockStrategicTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.spacesim.simulation.SimulationClockStrategicTest
+[INFO] Running com.spacesim.simulation.EntityLifecycleServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.053 s -- in com.spacesim.simulation.EntityLifecycleServiceTest
+[INFO] Running com.spacesim.simulation.SimulationRandomTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.spacesim.simulation.SimulationRandomTest
+[INFO] Running com.spacesim.simulation.SimulationLoopTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in com.spacesim.simulation.SimulationLoopTest
+[INFO] Running com.spacesim.simulation.SimulationClockTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in com.spacesim.simulation.SimulationClockTest
+[INFO] Running com.spacesim.simulation.EconomicSimulationDeterminismTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.054 s -- in com.spacesim.simulation.EconomicSimulationDeterminismTest
+[INFO] Running com.spacesim.simulation.SimulationSessionPersistenceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.294 s -- in com.spacesim.simulation.SimulationSessionPersistenceTest
+[INFO] Running com.spacesim.model.ShipTypeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.spacesim.model.ShipTypeTest
+[INFO] Running com.spacesim.model.ItemTypeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.spacesim.model.ItemTypeTest
+[INFO] Running com.spacesim.trade.TradeRoutePlannerTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.030 s -- in com.spacesim.trade.TradeRoutePlannerTest
+[INFO] Running com.spacesim.world.WorldSimulationLifecycleTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.spacesim.world.WorldSimulationLifecycleTest
+[INFO] Running com.spacesim.world.ConstructionProjectSystemIntegrationTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.108 s -- in com.spacesim.world.ConstructionProjectSystemIntegrationTest
+[INFO] Running com.spacesim.world.StrategicLandmarkTopologyTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in com.spacesim.world.StrategicLandmarkTopologyTest
+[INFO] Running com.spacesim.world.WorldSimulationTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.728 s -- in com.spacesim.world.WorldSimulationTest
+[INFO] Running com.spacesim.world.WorldSimulationFactionStrategyTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in com.spacesim.world.WorldSimulationFactionStrategyTest
+[INFO] Running com.spacesim.world.WorldSimulationFactionFiscalTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in com.spacesim.world.WorldSimulationFactionFiscalTest
+[INFO] Running com.spacesim.world.WorldSimulationFactionEconomyTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.040 s -- in com.spacesim.world.WorldSimulationFactionEconomyTest
+[INFO] Running com.spacesim.world.ConstructionProjectIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.079 s -- in com.spacesim.world.ConstructionProjectIntegrationTest
+[INFO] Running com.spacesim.world.Stage8FactionEconomyEndToEndTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in com.spacesim.world.Stage8FactionEconomyEndToEndTest
+[INFO] Running com.spacesim.world.FactionStrategicPolicyEngineTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in com.spacesim.world.FactionStrategicPolicyEngineTest
+[INFO] Running com.spacesim.world.GalaxyTopologyTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in com.spacesim.world.GalaxyTopologyTest
+[INFO] Running com.spacesim.benchmark.BenchmarkWorldFactoryTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.252 s -- in com.spacesim.benchmark.BenchmarkWorldFactoryTest
+[INFO] Running com.spacesim.benchmark.EconomicBenchmarkRunnerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.478 s -- in com.spacesim.benchmark.EconomicBenchmarkRunnerTest
+[INFO] Running com.spacesim.presentation.validation.FrameTimeWindowTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.spacesim.presentation.validation.FrameTimeWindowTest
+[INFO] Running com.spacesim.presentation.validation.GraphicsValidationProfileTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in com.spacesim.presentation.validation.GraphicsValidationProfileTest
+[INFO] Running com.spacesim.presentation.asset.ProjectShipSpritesTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.spacesim.presentation.asset.ProjectShipSpritesTest
+[INFO] Running com.spacesim.presentation.asset.SpriteOrientationTransformTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.spacesim.presentation.asset.SpriteOrientationTransformTest
+[INFO] Running com.spacesim.presentation.asset.ShipSpriteSpecTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.spacesim.presentation.asset.ShipSpriteSpecTest
+[INFO] Running com.spacesim.presentation.PresentationPipelineTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.spacesim.presentation.PresentationPipelineTest
+[INFO] Running com.spacesim.DemoGalaxyFactoryTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.spacesim.DemoGalaxyFactoryTest
+[INFO] Running com.spacesim.components.ShipRoleComponentsTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.spacesim.components.ShipRoleComponentsTest
+[INFO] Running com.spacesim.components.WalletComponentTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in com.spacesim.components.WalletComponentTest
+[INFO] Running com.spacesim.components.IdentityComponentTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.spacesim.components.IdentityComponentTest
+[INFO] Running com.spacesim.components.AsteroidComponentTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.spacesim.components.AsteroidComponentTest
+[INFO] Running com.spacesim.content.DataOnlyItemIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.spacesim.content.DataOnlyItemIntegrationTest
+[INFO] Running com.spacesim.content.ContentCatalogLoaderTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in com.spacesim.content.ContentCatalogLoaderTest
+[INFO] Running com.spacesim.content.ArchetypeEntityFactoryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.spacesim.content.ArchetypeEntityFactoryTest
+[INFO] Running com.spacesim.content.ContentArchetypeValidationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.spacesim.content.ContentArchetypeValidationTest
+[INFO] Running com.spacesim.content.ContentFingerprintTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in com.spacesim.content.ContentFingerprintTest
+[INFO] Running com.spacesim.controllers.WalletTradeControllerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.spacesim.controllers.WalletTradeControllerTest
+[INFO] Running com.spacesim.controllers.ReputationTradeControllerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.spacesim.controllers.ReputationTradeControllerTest
+[INFO] Running com.spacesim.controllers.TradeControllerTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.spacesim.controllers.TradeControllerTest
+[INFO] Running com.spacesim.controllers.FactionMarketAccessIntegrationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.spacesim.controllers.FactionMarketAccessIntegrationTest
+[INFO] Running com.spacesim.events.GlobalEventManagerTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.044 s -- in com.spacesim.events.GlobalEventManagerTest
+[INFO] Running com.spacesim.events.NewsGameTimeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.spacesim.events.NewsGameTimeTest
+[INFO] Running com.spacesim.events.GlobalEventManagerPersistenceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.spacesim.events.GlobalEventManagerPersistenceTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 325, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jar:3.5.0:jar (default-jar) @ economy-core ---
+[INFO] Building jar: /home/runner/work/StarEmpires/StarEmpires/target/star-empires-1.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- shade:3.6.0:shade (default) @ economy-core ---
+[INFO] Including com.badlogicgames.gdx:gdx:jar:1.14.2 in the shaded jar.
+[INFO] Including com.badlogicgames.gdx:gdx-jnigen-loader:jar:2.5.2 in the shaded jar.
+[INFO] Including com.badlogicgames.gdx:gdx-backend-lwjgl3:jar:1.14.2 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl:jar:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl:jar:natives-linux:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl:jar:natives-linux-arm32:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl:jar:natives-linux-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl:jar:natives-macos:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl:jar:natives-macos-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl:jar:natives-windows:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl:jar:natives-windows-x86:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-glfw:jar:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-glfw:jar:natives-linux:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-glfw:jar:natives-linux-arm32:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-glfw:jar:natives-linux-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-glfw:jar:natives-macos:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-glfw:jar:natives-macos-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-glfw:jar:natives-windows:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-glfw:jar:natives-windows-x86:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-jemalloc:jar:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-jemalloc:jar:natives-linux:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-jemalloc:jar:natives-linux-arm32:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-jemalloc:jar:natives-linux-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-jemalloc:jar:natives-macos:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-jemalloc:jar:natives-macos-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-jemalloc:jar:natives-windows:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-jemalloc:jar:natives-windows-x86:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-openal:jar:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-openal:jar:natives-linux:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-openal:jar:natives-linux-arm32:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-openal:jar:natives-linux-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-openal:jar:natives-macos:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-openal:jar:natives-macos-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-openal:jar:natives-windows:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-openal:jar:natives-windows-x86:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-opengl:jar:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-opengl:jar:natives-linux:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-opengl:jar:natives-linux-arm32:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-opengl:jar:natives-linux-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-opengl:jar:natives-macos:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-opengl:jar:natives-macos-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-opengl:jar:natives-windows:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-opengl:jar:natives-windows-x86:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-stb:jar:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-stb:jar:natives-linux:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-stb:jar:natives-linux-arm32:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-stb:jar:natives-linux-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-stb:jar:natives-macos:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-stb:jar:natives-macos-arm64:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-stb:jar:natives-windows:3.3.3 in the shaded jar.
+[INFO] Including org.lwjgl:lwjgl-stb:jar:natives-windows-x86:3.3.3 in the shaded jar.
+[INFO] Including com.badlogicgames.jlayer:jlayer:jar:1.0.1-gdx in the shaded jar.
+[INFO] Including org.jcraft:jorbis:jar:0.0.17 in the shaded jar.
+[INFO] Including com.badlogicgames.gdx:gdx-platform:jar:natives-desktop:1.14.2 in the shaded jar.
+[INFO] Including com.badlogicgames.ashley:ashley:jar:1.7.4 in the shaded jar.
+[INFO] Including com.kotcrab.vis:vis-ui:jar:1.5.9 in the shaded jar.
+[WARNING] lwjgl-stb-3.3.3-natives-linux.jar, lwjgl-stb-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/x64/org/lwjgl/stb/liblwjgl_stb.so.sha1
+[WARNING] lwjgl-jemalloc-3.3.3-natives-linux-arm32.jar, lwjgl-jemalloc-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm32/org/lwjgl/jemalloc/libjemalloc.so.sha1
+[WARNING] lwjgl-openal-3.3.3-natives-linux-arm64.jar, lwjgl-openal-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm64/org/lwjgl/openal/libopenal.so.sha1
+[WARNING] lwjgl-glfw-3.3.3-natives-linux.jar, lwjgl-glfw-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/x64/org/lwjgl/glfw/libglfw.so.sha1
+[WARNING] lwjgl-stb-3.3.3-natives-macos.jar, lwjgl-stb-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/x64/org/lwjgl/stb/liblwjgl_stb.dylib.sha1
+[WARNING] lwjgl-openal-3.3.3-natives-macos.jar, lwjgl-openal-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/x64/org/lwjgl/openal/libopenal.dylib.sha1
+[WARNING] lwjgl-opengl-3.3.3-natives-windows-x86.jar, lwjgl-opengl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x86/org/lwjgl/opengl/lwjgl_opengl.dll.sha1
+[WARNING] lwjgl-openal-3.3.3-natives-macos-arm64.jar, lwjgl-openal-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/arm64/org/lwjgl/openal/libopenal.dylib.sha1
+[WARNING] lwjgl-jemalloc-3.3.3-natives-linux-arm64.jar, lwjgl-jemalloc-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm64/org/lwjgl/jemalloc/libjemalloc.so.sha1
+[WARNING] lwjgl-3.3.3-natives-linux-arm32.jar, lwjgl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm32/org/lwjgl/liblwjgl.so.sha1
+[WARNING] lwjgl-glfw-3.3.3-natives-windows.jar, lwjgl-glfw-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x64/org/lwjgl/glfw/glfw.dll.sha1
+[WARNING] lwjgl-opengl-3.3.3-natives-macos.jar, lwjgl-opengl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/x64/org/lwjgl/opengl/liblwjgl_opengl.dylib.sha1
+[WARNING] lwjgl-jemalloc-3.3.3-natives-macos.jar, lwjgl-jemalloc-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/x64/org/lwjgl/jemalloc/libjemalloc.dylib.sha1
+[WARNING] lwjgl-stb-3.3.3-natives-macos-arm64.jar, lwjgl-stb-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/arm64/org/lwjgl/stb/liblwjgl_stb.dylib.sha1
+[WARNING] lwjgl-openal-3.3.3-natives-linux-arm32.jar, lwjgl-openal-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm32/org/lwjgl/openal/libopenal.so.sha1
+[WARNING] lwjgl-glfw-3.3.3-natives-linux-arm64.jar, lwjgl-glfw-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm64/org/lwjgl/glfw/libglfw.so.sha1
+[WARNING] lwjgl-glfw-3.3.3-natives-windows-x86.jar, lwjgl-glfw-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x86/org/lwjgl/glfw/glfw.dll.sha1
+[WARNING] lwjgl-openal-3.3.3-natives-linux.jar, lwjgl-openal-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/x64/org/lwjgl/openal/libopenal.so.sha1
+[WARNING] lwjgl-opengl-3.3.3-natives-linux-arm32.jar, lwjgl-opengl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm32/org/lwjgl/opengl/liblwjgl_opengl.so.sha1
+[WARNING] lwjgl-3.3.3-natives-windows-x86.jar, lwjgl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x86/org/lwjgl/lwjgl.dll.sha1
+[WARNING] lwjgl-jemalloc-3.3.3-natives-macos-arm64.jar, lwjgl-jemalloc-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/arm64/org/lwjgl/jemalloc/libjemalloc.dylib.sha1
+[WARNING] lwjgl-opengl-3.3.3-natives-linux-arm64.jar, lwjgl-opengl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm64/org/lwjgl/opengl/liblwjgl_opengl.so.sha1
+[WARNING] lwjgl-jemalloc-3.3.3-natives-windows.jar, lwjgl-jemalloc-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x64/org/lwjgl/jemalloc/jemalloc.dll.sha1
+[WARNING] lwjgl-stb-3.3.3-natives-linux-arm64.jar, lwjgl-stb-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm64/org/lwjgl/stb/liblwjgl_stb.so.sha1
+[WARNING] ashley-1.7.4.jar, gdx-1.14.2.jar, gdx-backend-lwjgl3-1.14.2.jar, gdx-jnigen-loader-2.5.2.jar, gdx-platform-1.14.2-natives-desktop.jar, jlayer-1.0.1-gdx.jar, jorbis-0.0.17.jar, lwjgl-3.3.3-natives-linux-arm32.jar, lwjgl-3.3.3-natives-linux-arm64.jar, lwjgl-3.3.3-natives-linux.jar, lwjgl-3.3.3-natives-macos-arm64.jar, lwjgl-3.3.3-natives-macos.jar, lwjgl-3.3.3-natives-windows-x86.jar, lwjgl-3.3.3-natives-windows.jar, lwjgl-3.3.3.jar, lwjgl-glfw-3.3.3-natives-linux-arm32.jar, lwjgl-glfw-3.3.3-natives-linux-arm64.jar, lwjgl-glfw-3.3.3-natives-linux.jar, lwjgl-glfw-3.3.3-natives-macos-arm64.jar, lwjgl-glfw-3.3.3-natives-macos.jar, lwjgl-glfw-3.3.3-natives-windows-x86.jar, lwjgl-glfw-3.3.3-natives-windows.jar, lwjgl-glfw-3.3.3.jar, lwjgl-jemalloc-3.3.3-natives-linux-arm32.jar, lwjgl-jemalloc-3.3.3-natives-linux-arm64.jar, lwjgl-jemalloc-3.3.3-natives-linux.jar, lwjgl-jemalloc-3.3.3-natives-macos-arm64.jar, lwjgl-jemalloc-3.3.3-natives-macos.jar, lwjgl-jemalloc-3.3.3-natives-windows-x86.jar, lwjgl-jemalloc-3.3.3-natives-windows.jar, lwjgl-jemalloc-3.3.3.jar, lwjgl-openal-3.3.3-natives-linux-arm32.jar, lwjgl-openal-3.3.3-natives-linux-arm64.jar, lwjgl-openal-3.3.3-natives-linux.jar, lwjgl-openal-3.3.3-natives-macos-arm64.jar, lwjgl-openal-3.3.3-natives-macos.jar, lwjgl-openal-3.3.3-natives-windows-x86.jar, lwjgl-openal-3.3.3-natives-windows.jar, lwjgl-openal-3.3.3.jar, lwjgl-opengl-3.3.3-natives-linux-arm32.jar, lwjgl-opengl-3.3.3-natives-linux-arm64.jar, lwjgl-opengl-3.3.3-natives-linux.jar, lwjgl-opengl-3.3.3-natives-macos-arm64.jar, lwjgl-opengl-3.3.3-natives-macos.jar, lwjgl-opengl-3.3.3-natives-windows-x86.jar, lwjgl-opengl-3.3.3-natives-windows.jar, lwjgl-opengl-3.3.3.jar, lwjgl-stb-3.3.3-natives-linux-arm32.jar, lwjgl-stb-3.3.3-natives-linux-arm64.jar, lwjgl-stb-3.3.3-natives-linux.jar, lwjgl-stb-3.3.3-natives-macos-arm64.jar, lwjgl-stb-3.3.3-natives-macos.jar, lwjgl-stb-3.3.3-natives-windows-x86.jar, lwjgl-stb-3.3.3-natives-windows.jar, lwjgl-stb-3.3.3.jar, star-empires-1.0-SNAPSHOT.jar, vis-ui-1.5.9.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/MANIFEST.MF
+[WARNING] lwjgl-3.3.3-natives-macos-arm64.jar, lwjgl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/arm64/org/lwjgl/liblwjgl.dylib.sha1
+[WARNING] lwjgl-opengl-3.3.3-natives-linux.jar, lwjgl-opengl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/x64/org/lwjgl/opengl/liblwjgl_opengl.so.sha1
+[WARNING] lwjgl-jemalloc-3.3.3-natives-linux.jar, lwjgl-jemalloc-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/x64/org/lwjgl/jemalloc/libjemalloc.so.sha1
+[WARNING] lwjgl-jemalloc-3.3.3-natives-windows-x86.jar, lwjgl-jemalloc-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x86/org/lwjgl/jemalloc/jemalloc.dll.sha1
+[WARNING] lwjgl-stb-3.3.3-natives-linux-arm32.jar, lwjgl-stb-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm32/org/lwjgl/stb/liblwjgl_stb.so.sha1
+[WARNING] lwjgl-stb-3.3.3-natives-windows.jar, lwjgl-stb-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x64/org/lwjgl/stb/lwjgl_stb.dll.sha1
+[WARNING] lwjgl-3.3.3-natives-linux-arm64.jar, lwjgl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm64/org/lwjgl/liblwjgl.so.sha1
+[WARNING] lwjgl-3.3.3-natives-linux.jar, lwjgl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/x64/org/lwjgl/liblwjgl.so.sha1
+[WARNING] lwjgl-glfw-3.3.3-natives-macos.jar, lwjgl-glfw-3.3.3.jar define 2 overlapping resources: 
+[WARNING]   - META-INF/macos/x64/org/lwjgl/glfw/libglfw.dylib.sha1
+[WARNING]   - META-INF/macos/x64/org/lwjgl/glfw/libglfw_async.dylib.sha1
+[WARNING] lwjgl-stb-3.3.3-natives-windows-x86.jar, lwjgl-stb-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x86/org/lwjgl/stb/lwjgl_stb.dll.sha1
+[WARNING] lwjgl-3.3.3-natives-macos.jar, lwjgl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/x64/org/lwjgl/liblwjgl.dylib.sha1
+[WARNING] lwjgl-glfw-3.3.3-natives-linux-arm32.jar, lwjgl-glfw-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/linux/arm32/org/lwjgl/glfw/libglfw.so.sha1
+[WARNING] lwjgl-3.3.3-natives-windows.jar, lwjgl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x64/org/lwjgl/lwjgl.dll.sha1
+[WARNING] lwjgl-openal-3.3.3-natives-windows.jar, lwjgl-openal-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x64/org/lwjgl/openal/OpenAL.dll.sha1
+[WARNING] lwjgl-openal-3.3.3-natives-windows-x86.jar, lwjgl-openal-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x86/org/lwjgl/openal/OpenAL.dll.sha1
+[WARNING] lwjgl-opengl-3.3.3-natives-macos-arm64.jar, lwjgl-opengl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/macos/arm64/org/lwjgl/opengl/liblwjgl_opengl.dylib.sha1
+[WARNING] lwjgl-glfw-3.3.3-natives-macos-arm64.jar, lwjgl-glfw-3.3.3.jar define 2 overlapping resources: 
+[WARNING]   - META-INF/macos/arm64/org/lwjgl/glfw/libglfw.dylib.sha1
+[WARNING]   - META-INF/macos/arm64/org/lwjgl/glfw/libglfw_async.dylib.sha1
+[WARNING] lwjgl-opengl-3.3.3-natives-windows.jar, lwjgl-opengl-3.3.3.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/windows/x64/org/lwjgl/opengl/lwjgl_opengl.dll.sha1
+[WARNING] maven-shade-plugin has detected that some files are
+[WARNING] present in two or more JARs. When this happens, only one
+[WARNING] single version of the file is copied to the uber jar.
+[WARNING] Usually this is not harmful and you can skip these warnings,
+[WARNING] otherwise try to manually exclude artifacts based on
+[WARNING] mvn dependency:tree -Ddetail=true and the above output.
+[WARNING] See https://maven.apache.org/plugins/maven-shade-plugin/
+[INFO] Attaching shaded artifact.
+[INFO] 
+[INFO] >>> javadoc:3.12.0:javadoc (verify-javadoc) > generate-sources @ economy-core >>>
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-coverage-agent) @ economy-core ---
+[INFO] argLine set to -javaagent:/home/runner/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/home/runner/work/StarEmpires/StarEmpires/target/jacoco.exec,excludes=com/spacesim/SpaceSimGame*:com/spacesim/desktop/**:com/spacesim/ui/WorldMapRenderer*
+[INFO] 
+[INFO] <<< javadoc:3.12.0:javadoc (verify-javadoc) < generate-sources @ economy-core <<<
+[INFO] 
+[INFO] 
+[INFO] --- javadoc:3.12.0:javadoc (verify-javadoc) @ economy-core ---
+[WARNING] Javadoc Warnings
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionMaterialState.java:17: warning: no @param for itemContentId
+[WARNING] public ConstructionMaterialState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionMaterialState.java:17: warning: no @param for requiredAmount
+[WARNING] public ConstructionMaterialState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionMaterialState.java:17: warning: no @param for deliveredAmount
+[WARNING] public ConstructionMaterialState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectId.java:13: warning: no @param for value
+[WARNING] public ConstructionProjectId {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for id
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for ownerFactionContentId
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for stationArchetypeContentId
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for systemId
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for x
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for y
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for constructionSiteEntityId
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for materials
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for minimumFundingMilliCredits
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for projectWalletMilliCredits
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for buildDurationTicks
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for status
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for createdTick
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for stateChangedTick
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for buildStartedTick
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for completedTick
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/world/ConstructionProjectState.java:59: warning: no @param for completedStationEntityId
+[WARNING] public ConstructionProjectState {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/content/ContentCatalog.java:478: warning: no comment
+[WARNING] public record StationArchetypeDefinition(
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/content/ContentCatalog.java:460: warning: no @param for fundingCredits
+[WARNING] public ConstructionDefinition {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/content/ContentCatalog.java:460: warning: no @param for buildSeconds
+[WARNING] public ConstructionDefinition {
+[WARNING] ^
+[WARNING] /home/runner/work/StarEmpires/StarEmpires/src/main/java/com/spacesim/content/ContentCatalog.java:460: warning: no @param for materials
+[WARNING] public ConstructionDefinition {
+[WARNING] ^
+[WARNING] 25 warnings
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  44.602 s
+[INFO] Finished at: 2026-08-13T10:26:00Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-javadoc-plugin:3.12.0:javadoc (verify-javadoc) on project economy-core: An error has occurred in Javadoc report generation: Project contains Javadoc Warnings -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
