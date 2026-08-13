@@ -439,15 +439,6 @@ public final class ContentCatalog {
     }
 
     /**
-     * @param id стабильный persistent archetype ID
-     * @param displayName отображаемое имя типа
-     * @param inventoryCapacity вместимость склада
-     * @param startingCredits начальный капитал станции
-     * @param factionId persistent faction ID владельца
-     * @param recipeId persistent recipe ID либо {@code null}
-     * @param markets рыночные правила по товарам
-     */
-    /**
      * Data-driven physical construction requirements of a station archetype.
      *
      * @param fundingCredits minimum project liquidity funded from faction treasury
@@ -456,7 +447,13 @@ public final class ContentCatalog {
      */
     public record ConstructionDefinition(
             double fundingCredits, float buildSeconds, Map<String, Integer> materials) {
-        /** Validates immutable construction requirements. */
+        /**
+         * Validates immutable construction requirements.
+         *
+         * @param fundingCredits minimum project liquidity funded from faction treasury
+         * @param buildSeconds build duration after all materials have arrived
+         * @param materials required positive item amounts by persistent item ID
+         */
         public ConstructionDefinition {
             if (!Double.isFinite(fundingCredits) || fundingCredits <= 0d
                     || !Float.isFinite(buildSeconds) || buildSeconds <= 0f) {
@@ -475,6 +472,18 @@ public final class ContentCatalog {
         }
     }
 
+    /**
+     * Data-driven station archetype used by bootstrap and constructed-station materialization.
+     *
+     * @param id stable persistent archetype ID
+     * @param displayName display name
+     * @param inventoryCapacity warehouse capacity
+     * @param startingCredits bootstrap-only starting credits
+     * @param factionId bootstrap owner faction ID
+     * @param recipeId persistent production recipe ID or {@code null}
+     * @param markets market rules
+     * @param construction optional physical construction requirements
+     */
     public record StationArchetypeDefinition(
             String id, String displayName, int inventoryCapacity, double startingCredits,
             String factionId, String recipeId, List<MarketDefinition> markets,

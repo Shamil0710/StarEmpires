@@ -55,7 +55,27 @@ public record ConstructionProjectState(
         long completedTick,
         EntityId completedStationEntityId) implements Comparable<ConstructionProjectState> {
 
-    /** Validates project invariants and canonical material ordering. */
+    /**
+     * Validates project invariants and canonical material ordering.
+     *
+     * @param id stable world-level project ID
+     * @param ownerFactionContentId owner faction content ID
+     * @param stationArchetypeContentId target station archetype content ID
+     * @param systemId target StarSystem
+     * @param x target world X coordinate
+     * @param y target world Y coordinate
+     * @param constructionSiteEntityId local site ID or null only for terminal states
+     * @param materials material requirements
+     * @param minimumFundingMilliCredits minimum project liquidity
+     * @param projectWalletMilliCredits current project wallet balance
+     * @param buildDurationTicks required build duration in target-system ticks
+     * @param status persistent state-machine state
+     * @param createdTick creation tick
+     * @param stateChangedTick latest transition tick
+     * @param buildStartedTick BUILDING start or -1
+     * @param completedTick terminal tick or -1
+     * @param completedStationEntityId final station ID only for COMPLETED
+     */
     public ConstructionProjectState {
         Objects.requireNonNull(id, "Construction project ID не задан");
         ownerFactionContentId = requireId(ownerFactionContentId, "Owner faction");

@@ -9,7 +9,11 @@ package com.spacesim.world;
  * @param value strictly positive persistent value
  */
 public record ConstructionProjectId(long value) implements Comparable<ConstructionProjectId> {
-    /** Validates the persistent ID. */
+    /**
+     * Validates the persistent ID.
+     *
+     * @param value strictly positive persistent value
+     */
     public ConstructionProjectId {
         if (value <= 0L) {
             throw new IllegalArgumentException("ConstructionProjectId должен быть положительным");

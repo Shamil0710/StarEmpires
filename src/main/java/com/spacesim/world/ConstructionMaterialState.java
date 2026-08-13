@@ -13,7 +13,13 @@ public record ConstructionMaterialState(
         String itemContentId,
         int requiredAmount,
         int deliveredAmount) implements Comparable<ConstructionMaterialState> {
-    /** Validates and normalizes material state. */
+    /**
+     * Validates and normalizes material state.
+     *
+     * @param itemContentId stable content item ID
+     * @param requiredAmount strictly positive required amount
+     * @param deliveredAmount delivered amount in range {@code [0, requiredAmount]}
+     */
     public ConstructionMaterialState {
         itemContentId = Objects.requireNonNull(itemContentId, "Construction item ID не задан").strip();
         if (itemContentId.isEmpty()) {
