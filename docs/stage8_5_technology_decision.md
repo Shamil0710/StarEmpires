@@ -76,13 +76,13 @@ The performance result is therefore not close to the technology rejection bounda
 
 ## Reference developer machine
 
-Captured by `run-graphics-validation.cmd`:
+Captured by the validation launcher used for the accepted run:
 
 ```text
 OS: Microsoft Windows 11 Pro 10.0.26100 build 26100
 CPU identifier: AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
-CPU physical cores: not captured by the current script
-CPU logical processors: not captured by the current script
+CPU physical cores: not captured in the accepted profile
+CPU logical processors: not captured in the accepted profile
 RAM: 31.92 GiB
 GPU: NVIDIA GeForce RTX 4070
 GPU driver: 32.0.15.9579
@@ -94,7 +94,7 @@ Important distinction:
 - project compatibility baseline remains **Java 17** and is verified by GitHub Actions;
 - the final real-GPU Windows run happened with the locally selected **JDK 24.0.2** executable.
 
-The missing CPU core-count fields are a diagnostics limitation, not a Stage-8.5 blocker. They should be repaired before future formal rendering benchmarks are standardized.
+The missing CPU core-count fields are not a Stage-8.5 blocker. The current branch hardware collector now uses PowerShell/CIM and records CPU name, physical cores and logical processors for subsequent benchmark captures.
 
 ## Constraints discovered
 
@@ -155,3 +155,15 @@ The next active core stage is:
 **Stage 9A — Entity lifecycle infrastructure**, followed by the rest of Stage 9 Dynamic Economy.
 
 Future visual work continues in parallel and does not block Stage 9 unless it reveals a new measured regression against an explicit quality/performance gate.
+
+## Repository synchronization
+
+The main development roadmap now marks:
+
+- Stage 8.5 as `COMPLETE — TECHNOLOGY DECISION KEEP_LIBGDX`;
+- Stage 9 as `ACTIVE — STAGE 8.5 GATE PASSED`;
+- Stage 9A as the current implementation focus;
+- `BloomMode = OFF / LIGHT / FULL` as planned production work in **Stage 13 / V4 Combat VFX**;
+- persistent graphics-quality selection and final per-mode performance thresholds in **Stage 22**.
+
+The Stage-8.5 validation record is also synchronized to this accepted decision, so no document continues to treat the technology decision as pending.
