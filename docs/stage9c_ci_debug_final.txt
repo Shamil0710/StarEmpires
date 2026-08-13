@@ -1,0 +1,50 @@
+exit_code=1
+--- tail ---
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< com.spacesim:economy-core >----------------------
+[INFO] Building economy-core 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.5.0:clean (default-clean) @ economy-core ---
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (prepare-coverage-agent) @ economy-core ---
+[INFO] argLine set to -javaagent:/home/runner/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/home/runner/work/StarEmpires/StarEmpires/target/jacoco.exec,excludes=com/spacesim/SpaceSimGame*:com/spacesim/desktop/**:com/spacesim/ui/WorldMapRenderer*
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ economy-core ---
+[INFO] Copying 8 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ economy-core ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 151 source files with javac [debug release 17] to target/classes
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ economy-core ---
+[INFO] skip non existing resourceDirectory /home/runner/work/StarEmpires/StarEmpires/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ economy-core ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 82 source files with javac [debug release 17] to target/test-classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /home/runner/work/StarEmpires/StarEmpires/src/test/java/com/spacesim/world/DestructionEconomicShockTest.java:[52,45] content has private access in com.spacesim.events.GlobalEventManager.NewsState
+[ERROR] /home/runner/work/StarEmpires/StarEmpires/src/test/java/com/spacesim/world/DestructionEconomicShockTest.java:[52,72] content has private access in com.spacesim.events.GlobalEventManager.NewsState
+[INFO] 2 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  14.545 s
+[INFO] Finished at: 2026-08-13T10:59:04Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.15.0:testCompile (default-testCompile) on project economy-core: Compilation failure: Compilation failure: 
+[ERROR] /home/runner/work/StarEmpires/StarEmpires/src/test/java/com/spacesim/world/DestructionEconomicShockTest.java:[52,45] content has private access in com.spacesim.events.GlobalEventManager.NewsState
+[ERROR] /home/runner/work/StarEmpires/StarEmpires/src/test/java/com/spacesim/world/DestructionEconomicShockTest.java:[52,72] content has private access in com.spacesim.events.GlobalEventManager.NewsState
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
