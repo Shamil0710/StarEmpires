@@ -10,6 +10,7 @@ import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.events.GlobalEventManager;
 import com.spacesim.model.AsteroidSpawnConfig;
+import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityIdAllocator;
 import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.persistence.EntityState;
@@ -54,6 +55,7 @@ public final class SimulationSession {
     private final EconomicLedger ledger;
     private final EntityIdAllocator entityIdAllocator;
     private final EntityRegistry entityRegistry;
+    private final EntityLifecycleService entityLifecycleService;
     private final AsteroidSpawnSystem asteroidSpawnSystem;
     private final PriceRecorderSystem priceRecorderSystem;
     private final SimulationClock clock;
@@ -83,6 +85,8 @@ public final class SimulationSession {
         this.ledger = ledger;
         this.entityIdAllocator = entityIdAllocator;
         this.entityRegistry = entityRegistry;
+        this.entityLifecycleService = new EntityLifecycleService(
+                engine, entityIdAllocator, entityRegistry);
         this.asteroidSpawnSystem = asteroidSpawnSystem;
         this.priceRecorderSystem = priceRecorderSystem;
         this.clock = clock;
@@ -300,6 +304,26 @@ public final class SimulationSession {
                 priceRecorderSystem.snapshotState(),
                 ledger.snapshotState(),
                 List.copyOf(states));
+    }
+
+    /**
+     * Создаёт новую экономически пустую persistent Entity через authoritative lifecycle boundary.
+     *
+     * @param entity detached runtime Entity без EntityIdComponent
+     * @return детерминированно выделенный persistent ID
+     */
+    public EntityId createEntity(Entity entity) {
+        return entityLifecycleService.create(entity);
+    }
+
+    /**
+     * Структурно удаляет экономически пустую Entity и немедленно инвалидирует persistent refs.
+     *
+     * @param id persistent ID либо {@code null}
+     * @return {@code true}, если live Entity была удалена
+     */
+    public boolean removeEntity(EntityId id) {
+        return entityLifecycleService.remove(id);
     }
 
     /** @return Ashley Engine текущей headless-сессии для read-only тестовой диагностики */
