@@ -32,7 +32,8 @@ class TradeRouteAccessPlanningTest {
         Entity allowedLowerPrice = station(20f, 0, 100, 30f, 32f, 100_000d,
                 accessForFaction(1, true));
         MarketDirectory directory = directory(supplier, deniedHighPrice, allowedLowerPrice);
-        TradeRoutePlanner planner = new TradeRoutePlanner(catalog);
+        TradeRoutePlanner planner = new TradeRoutePlanner(
+                catalog, TradeRoutePlanner.ScoringMode.PROFIT_PER_SECOND);
 
         TradeRoute route = planner.findBestNewCargoRoute(fleet(1), directory).orElseThrow();
 
@@ -49,7 +50,8 @@ class TradeRouteAccessPlanningTest {
         Entity supplier = station(0f, 100, 100, 8f, 10f, 100_000d, supplierAccess);
         Entity consumer = station(10f, 0, 100, 30f, 32f, 100_000d, consumerAccess);
         MarketDirectory directory = directory(supplier, consumer);
-        TradeRoutePlanner planner = new TradeRoutePlanner(catalog);
+        TradeRoutePlanner planner = new TradeRoutePlanner(
+                catalog, TradeRoutePlanner.ScoringMode.PROFIT_PER_SECOND);
         long deniedRevision = directory.revision();
 
         assertTrue(planner.findBestNewCargoRoute(fleet(-1), directory).isEmpty());
