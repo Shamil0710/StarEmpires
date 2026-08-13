@@ -115,9 +115,10 @@ final class FactionInvestmentPlanner {
             long utility = utilityScore(pressure.lastUnmetDemandUnits(), output, funding);
             candidates.add(new Candidate(station, funding, utility, station.factionId().equals(factionId)));
         }
+        Comparator<Candidate> utilityOrder = Comparator.comparingLong(Candidate::expectedUtilityScore).reversed();
         candidates.sort(Comparator
                 .comparing(Candidate::nativeFaction).reversed()
-                .thenComparingLong(Candidate::expectedUtilityScore).reversed()
+                .thenComparing(utilityOrder)
                 .thenComparing(candidate -> candidate.station().id()));
         return candidates.stream().findFirst();
     }
