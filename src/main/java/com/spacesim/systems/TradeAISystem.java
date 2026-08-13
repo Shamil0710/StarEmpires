@@ -8,8 +8,10 @@ import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.math.Vector2;
 import com.spacesim.components.EntityIdComponent;
+import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.ProcurementPolicyComponent;
 import com.spacesim.components.ReputationComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
@@ -30,7 +32,9 @@ import com.spacesim.trade.TradeRoutePlanner;
 import com.spacesim.trade.TradeSaleRoute;
 import com.spacesim.util.SpatialHashGrid;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -71,6 +75,9 @@ public class TradeAISystem extends IteratingSystem {
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
     private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
+    private final ComponentMapper<FactionComponent> fm = ComponentMapper.getFor(FactionComponent.class);
+    private final ComponentMapper<ProcurementPolicyComponent> ppm =
+            ComponentMapper.getFor(ProcurementPolicyComponent.class);
     private final ComponentMapper<ReputationComponent> rm = ComponentMapper.getFor(ReputationComponent.class);
     private final ComponentMapper<ShipComponent> sm = ComponentMapper.getFor(ShipComponent.class);
     private final ComponentMapper<WalletComponent> wm = ComponentMapper.getFor(WalletComponent.class);
@@ -257,7 +264,7 @@ public class TradeAISystem extends IteratingSystem {
             routeFound = false;
         } else {
             routeFound = im.get(fleet).getTotalStock() > 0
-                    ? findSellRoute(ai, profile)
+                    ? findFactionProcurementSale(fleet, ai, profile) || findSellRoute(ai, profile)
                     : findTradeRoute(ai, profile);
             if (fleetId != null) {
                 if (routeFound) {
@@ -293,9 +300,38 @@ public class TradeAISystem extends IteratingSystem {
         return true;
     }
 
+    private boolean findFactionProcurementSale(
+            Entity fleet, TradeAIComponent ai, FleetTradeProfile profile) {
+        FactionComponent fleetFaction = fm.get(fleet);
+        if (fleetFaction == null || marketStations == null) {
+            return false;
+        }
+        List<Entity> procurementMarkets = new ArrayList<>();
+        for (Entity station : marketStations) {
+            FactionComponent stationFaction = fm.get(station);
+            if (ppm.has(station)
+                    && stationFaction != null
+                    && stationFaction.factionId == fleetFaction.factionId) {
+                procurementMarkets.add(station);
+            }
+        }
+        if (procurementMarkets.isEmpty()) {
+            return false;
+        }
+        MarketDirectory procurementDirectory = new MarketDirectory(contentCatalog);
+        procurementDirectory.rebuild(procurementMarkets);
+        ai.resetRoute();
+        return applySaleRoute(
+                ai, routePlanner.findBestExistingCargoSale(profile, procurementDirectory).orElse(null));
+    }
+
     private boolean findSellRoute(TradeAIComponent ai, FleetTradeProfile profile) {
         ai.resetRoute();
-        TradeSaleRoute route = routePlanner.findBestExistingCargoSale(profile, marketDirectory).orElse(null);
+        return applySaleRoute(
+                ai, routePlanner.findBestExistingCargoSale(profile, marketDirectory).orElse(null));
+    }
+
+    private boolean applySaleRoute(TradeAIComponent ai, TradeSaleRoute route) {
         if (route == null) {
             return false;
         }
