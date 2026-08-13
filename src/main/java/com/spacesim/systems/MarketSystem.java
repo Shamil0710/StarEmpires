@@ -108,11 +108,12 @@ public class MarketSystem extends EntitySystem {
 
                 float ratio = (float) market.targetStock[itemId] / Math.max(1, inventory.stock[itemId]);
                 float priceMultiplier = getPriceMultiplier(itemId, position);
-                market.sellPrices[itemId] = item.basePrice()
+                float dynamicSellPrice = item.basePrice()
                         * (float) Math.pow(ratio, 1.2)
                         * priceMultiplier;
+                market.sellPrices[itemId] = procurement == null ? dynamicSellPrice : 0f;
                 market.buyPrices[itemId] = procurement == null
-                        ? market.sellPrices[itemId] * 0.9f
+                        ? dynamicSellPrice * 0.9f
                         : item.basePrice() * procurement.buyPriceMultiplier();
             }
             market.isDirty = false;
