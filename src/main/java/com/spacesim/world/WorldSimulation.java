@@ -215,6 +215,13 @@ public final class WorldSimulation {
             }
         }
 
+        for (FleetJumpState jump : checked.fleetJumps()) {
+            if (jump.phaseStartedTick() > activeTick || jump.phaseEndsTick() <= activeTick) {
+                throw new IllegalArgumentException(
+                        "Active jump phase does not cover authoritative world tick: " + jump.fleetId());
+            }
+        }
+
         return new WorldSimulation(
                 checked.topology(),
                 order,
@@ -244,7 +251,7 @@ public final class WorldSimulation {
      */
     public AdvanceReport advanceFrame(float realDeltaSeconds) {
         SimulationSession active = sessionsById.get(activeSystemId);
-        int localTicks = active.advanceFrame(realDeltaSeconds);
+        int localTicks = active.advanceFrame(realDeltaSeconds, this::advanceJumpTransitionsAtTick);
         totalLocalFixedTicksExecuted = safeAdd(totalLocalFixedTicksExecuted, localTicks);
 
         int strategicUpdates = 0;
@@ -259,7 +266,6 @@ public final class WorldSimulation {
             totalStrategicUpdatesExecuted = safeAdd(totalStrategicUpdatesExecuted, 1L);
         }
         constructionProjectService.advance();
-        fleetJumpService.advance(activeTick);
         return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));
     }
 
@@ -815,6 +821,24 @@ public final class WorldSimulation {
             throw new IllegalArgumentException("StarSystem clock опережает active clock: " + systemId);
         }
         return activeTick - remoteTick;
+    }
+
+    private void advanceJumpTransitionsAtTick(long worldTick) {
+        for (FleetJumpState jump : fleetJumpService.snapshots()) {
+            if (jump.phaseEndsTick() > worldTick) {
+                continue;
+            }
+            switch (jump.phase()) {
+                case JUMP_PENDING ->
+                        synchronizeSystemToTick(jump.originSystemId(), jump.phaseEndsTick());
+                case IN_TRANSIT ->
+                        synchronizeSystemToTick(jump.destinationSystemId(), jump.phaseEndsTick());
+                case MOVING_TO_JUMP, ARRIVING -> {
+                    // No cross-session physical handoff occurs at these boundaries.
+                }
+            }
+        }
+        fleetJumpService.advance(worldTick);
     }
 
     private SimulationSession requireLifecycleSession(StarSystemId systemId) {
