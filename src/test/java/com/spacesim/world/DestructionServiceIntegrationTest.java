@@ -53,7 +53,7 @@ class DestructionServiceIntegrationTest {
 
         List<com.spacesim.events.NewsArticle> news = session.getEventManager().consumePendingNews();
         assertEquals(1, news.size());
-        assertTrue(news.get(0).title().contains("Уничтожен"));
+        assertTrue(news.get(0).headline.contains("Уничтожен"));
     }
 
     @Test
