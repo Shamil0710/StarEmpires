@@ -1,13 +1,24 @@
 package com.spacesim.benchmark;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.DemoGalaxyFactory;
 import com.spacesim.components.ArchetypeComponent;
+import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.economy.EconomicTransaction;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.world.ConstructionMaterialState;
+import com.spacesim.world.ConstructionProjectState;
+import com.spacesim.world.FactionEconomicPressureState;
+import com.spacesim.world.WorldSimulation;
+
+import java.util.List;
 
 final class Stage9EMetrics {
+    private static final String MINERS = "faction.miners";
     private static final String FOUNDRY = "station.foundry";
+    private static final String STEEL = "item.steel";
 
     private Stage9EMetrics() {
         throw new AssertionError("Utility class");
@@ -70,5 +81,60 @@ final class Stage9EMetrics {
             }
         }
         throw new IllegalStateException("Stage 9E requires initial Corona foundry");
+    }
+
+    static FactionEconomicPressureState findSteelPressure(WorldSimulation world) {
+        for (FactionEconomicPressureState pressure : world.getFactionEconomicPressureStates()) {
+            if (MINERS.equals(pressure.factionContentId())
+                    && DemoGalaxyFactory.INNER_SYSTEM_ID.equals(pressure.systemId())
+                    && STEEL.equals(pressure.itemContentId())) {
+                return pressure;
+            }
+        }
+        return null;
+    }
+
+    static ConstructionProjectState findReplacementProject(WorldSimulation world) {
+        for (ConstructionProjectState project : world.getConstructionProjects()) {
+            if (MINERS.equals(project.ownerFactionContentId())
+                    && DemoGalaxyFactory.INNER_SYSTEM_ID.equals(project.systemId())
+                    && FOUNDRY.equals(project.stationArchetypeContentId())) {
+                return project;
+            }
+        }
+        return null;
+    }
+
+    static int delivered(ConstructionProjectState project, String itemContentId) {
+        for (ConstructionMaterialState material : project.materials()) {
+            if (itemContentId.equals(material.itemContentId())) {
+                return material.deliveredAmount();
+            }
+        }
+        return 0;
+    }
+
+    static String completedStationName(SimulationSession session, ConstructionProjectState project) {
+        if (project.completedStationEntityId() == null) {
+            return null;
+        }
+        Entity station = session.getEntityRegistry().find(project.completedStationEntityId());
+        IdentityComponent identity = station == null ? null : station.getComponent(IdentityComponent.class);
+        return identity == null ? null : identity.name;
+    }
+
+    static boolean hasResourceTransformFrom(SimulationSession session, int startIndex, String source) {
+        if (source == null || source.isBlank()) {
+            return false;
+        }
+        List<EconomicTransaction> entries = session.getLedger().getEntries();
+        for (int index = Math.max(0, startIndex); index < entries.size(); index++) {
+            EconomicTransaction entry = entries.get(index);
+            if (entry.type() == EconomicTransaction.Type.RESOURCE_TRANSFORM
+                    && source.equals(entry.source())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
