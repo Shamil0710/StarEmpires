@@ -2,7 +2,6 @@ package com.spacesim.trade;
 
 import com.spacesim.constants.Constants;
 import com.spacesim.content.ContentCatalog;
-import com.spacesim.persistence.EntityId;
 import com.spacesim.world.GalacticPath;
 import com.spacesim.world.GalacticPathPlanner;
 import com.spacesim.world.SectorId;
@@ -248,7 +247,12 @@ public final class GalacticMarketDiscovery {
      * @param opportunities bounded deterministic candidates
      */
     public record Result(long marketRevision, List<GalacticTradeOpportunity> opportunities) {
-        /** Defensive immutable-copy constructor. */
+        /**
+         * Creates an immutable defensive copy of one discovery result.
+         *
+         * @param marketRevision world market index revision at discovery time
+         * @param opportunities bounded deterministic candidates
+         */
         public Result {
             if (marketRevision < 0L) {
                 throw new IllegalArgumentException("Market revision не может быть отрицательным");
