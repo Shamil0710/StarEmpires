@@ -1,6 +1,6 @@
 # Stage 10B — Jump Transit
 
-Status: COMPLETE — PR #20 pending merge. Implementation and acceptance gates are complete.
+Status: COMPLETE — PR #20 merged. Implementation and acceptance gates are complete.
 
 ## Purpose
 
