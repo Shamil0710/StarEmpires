@@ -11,11 +11,37 @@ public final class ProjectShipSprites {
     public static final String WHITE_HEAVY_CORVETTE_01_BASE =
             "assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_base.png";
 
-    /** Optional emissive mask expected beside the base texture. */
+    /** Emissive mask expected beside the base texture. */
     public static final String WHITE_HEAVY_CORVETTE_01_EMISSIVE =
             "assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_emissive.png";
 
+    /** Damage overlay expected beside the base texture. */
+    public static final String WHITE_HEAVY_CORVETTE_01_DAMAGE =
+            "assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_damage.png";
+
+    /** Ship-specific idle exhaust texture expected beside the base texture. */
+    public static final String WHITE_HEAVY_CORVETTE_01_ENGINE_IDLE =
+            "assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_engine_idle.png";
+
+    /** Ship-specific full-thrust exhaust texture expected beside the base texture. */
+    public static final String WHITE_HEAVY_CORVETTE_01_ENGINE_THRUST =
+            "assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_engine_thrust.png";
+
     private ProjectShipSprites() {
+    }
+
+    /**
+     * Returns the complete production-like resource pack for the first heavy corvette.
+     *
+     * @return immutable visual asset-pack contract
+     */
+    public static ShipVisualAssetSet whiteHeavyCorvette01Assets() {
+        return new ShipVisualAssetSet(
+                WHITE_HEAVY_CORVETTE_01_BASE,
+                WHITE_HEAVY_CORVETTE_01_EMISSIVE,
+                WHITE_HEAVY_CORVETTE_01_DAMAGE,
+                WHITE_HEAVY_CORVETTE_01_ENGINE_IDLE,
+                WHITE_HEAVY_CORVETTE_01_ENGINE_THRUST);
     }
 
     /**
