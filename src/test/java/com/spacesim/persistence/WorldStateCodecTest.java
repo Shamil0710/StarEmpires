@@ -1,6 +1,8 @@
 package com.spacesim.persistence;
 
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.world.EconomicBottleneckType;
+import com.spacesim.world.FactionEconomicPressureState;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionRelationState;
 import com.spacesim.world.FactionStrategicState;
@@ -84,15 +86,37 @@ class WorldStateCodecTest {
     }
 
     @Test
+    void pressureLayerСохраняетсяВCanonicalПорядке() {
+        WorldState base = strategicWorld();
+        FactionEconomicPressureState beta = new FactionEconomicPressureState(
+                "faction.miners", BETA_ID, "item.weapons",
+                EconomicBottleneckType.LOGISTICS_SHORTAGE,
+                100L, 200L, 3, 90L, 70L, 500L);
+        FactionEconomicPressureState alpha = new FactionEconomicPressureState(
+                "faction.miners", ALPHA_ID, "item.steel",
+                EconomicBottleneckType.PRODUCTION_CAPACITY_SHORTAGE,
+                100L, 200L, 4, 120L, 80L, 600L);
+        WorldState state = new WorldState(
+                WorldState.CURRENT_VERSION,
+                base.topology(), base.systems(), base.factions(), base.factionStrategies(),
+                base.nextConstructionProjectIdValue(), base.constructionProjects(),
+                List.of(beta, alpha));
+
+        WorldState decoded = WorldStateCodec.decode(WorldStateCodec.encode(state));
+
+        assertEquals(List.of(alpha, beta), decoded.factionEconomicPressures());
+        assertEquals(state, decoded);
+    }
+
+    @Test
     void stage7SchemaV1МигрируетБезСозданияFactionState() {
         WorldState current = twoSystemWorld(false);
         byte[] currentBytes = WorldStateCodec.encode(current);
 
-        // Current v4 adds factions + strategies + construction allocator watermark + project count.
-        // Exact v1 layout ends before all four of those layers.
+        // Current v5 adds factions + strategies + construction watermark + project count + pressure count.
         byte[] legacyBytes = Arrays.copyOf(
                 currentBytes,
-                currentBytes.length - 3 * Integer.BYTES - Long.BYTES);
+                currentBytes.length - 4 * Integer.BYTES - Long.BYTES);
         ByteBuffer.wrap(legacyBytes).putInt(8, WorldState.LEGACY_STAGE7_VERSION);
 
         WorldState migrated = WorldStateCodec.decode(legacyBytes);
@@ -102,6 +126,7 @@ class WorldStateCodecTest {
         assertEquals(current.systems(), migrated.systems());
         assertEquals(List.of(), migrated.factions());
         assertEquals(List.of(), migrated.factionStrategies());
+        assertEquals(List.of(), migrated.factionEconomicPressures());
     }
 
     @Test
@@ -115,11 +140,10 @@ class WorldStateCodecTest {
                 List.of());
         byte[] currentBytes = WorldStateCodec.encode(treasuryOnly);
 
-        // Current v4 appends empty strategic-state count, construction allocator watermark
-        // and empty project count after the exact v2 layout.
+        // Current v5 appends strategic count, construction watermark, project count and pressure count.
         byte[] v2Bytes = Arrays.copyOf(
                 currentBytes,
-                currentBytes.length - 2 * Integer.BYTES - Long.BYTES);
+                currentBytes.length - 3 * Integer.BYTES - Long.BYTES);
         ByteBuffer.wrap(v2Bytes).putInt(8, WorldState.LEGACY_FACTION_TREASURY_VERSION);
 
         WorldState migrated = WorldStateCodec.decode(v2Bytes);
@@ -127,6 +151,7 @@ class WorldStateCodecTest {
         assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
         assertEquals(treasuryOnly.factions(), migrated.factions());
         assertEquals(List.of(), migrated.factionStrategies());
+        assertEquals(List.of(), migrated.factionEconomicPressures());
     }
 
     @Test
@@ -134,10 +159,10 @@ class WorldStateCodecTest {
         WorldState current = strategicWorld();
         byte[] currentBytes = WorldStateCodec.encode(current);
 
-        // v4 adds only construction allocator watermark + project count after the exact v3 layout.
+        // v5 adds construction allocator watermark + project count + pressure count after exact v3 layout.
         byte[] v3Bytes = Arrays.copyOf(
                 currentBytes,
-                currentBytes.length - Long.BYTES - Integer.BYTES);
+                currentBytes.length - Long.BYTES - 2 * Integer.BYTES);
         ByteBuffer.wrap(v3Bytes).putInt(8, WorldState.LEGACY_STAGE8_VERSION);
 
         WorldState migrated = WorldStateCodec.decode(v3Bytes);
@@ -149,6 +174,27 @@ class WorldStateCodecTest {
         assertEquals(current.factionStrategies(), migrated.factionStrategies());
         assertEquals(1L, migrated.nextConstructionProjectIdValue());
         assertEquals(List.of(), migrated.constructionProjects());
+        assertEquals(List.of(), migrated.factionEconomicPressures());
+    }
+
+    @Test
+    void stage9SchemaV4МигрируетConstructionБезВыдуманногоPressure() {
+        WorldState current = strategicWorld();
+        byte[] currentBytes = WorldStateCodec.encode(current);
+
+        byte[] v4Bytes = Arrays.copyOf(currentBytes, currentBytes.length - Integer.BYTES);
+        ByteBuffer.wrap(v4Bytes).putInt(8, WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION);
+
+        WorldState migrated = WorldStateCodec.decode(v4Bytes);
+
+        assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
+        assertEquals(current.topology(), migrated.topology());
+        assertEquals(current.systems(), migrated.systems());
+        assertEquals(current.factions(), migrated.factions());
+        assertEquals(current.factionStrategies(), migrated.factionStrategies());
+        assertEquals(current.nextConstructionProjectIdValue(), migrated.nextConstructionProjectIdValue());
+        assertEquals(current.constructionProjects(), migrated.constructionProjects());
+        assertEquals(List.of(), migrated.factionEconomicPressures());
     }
 
     @Test
@@ -227,6 +273,7 @@ class WorldStateCodecTest {
         assertEquals(state, world.systems().get(0).simulationState());
         assertEquals(List.of(), world.factions());
         assertEquals(List.of(), world.factionStrategies());
+        assertEquals(List.of(), world.factionEconomicPressures());
         assertEquals(state, WorldStateCodec.decode(WorldStateCodec.encode(world))
                 .systems().get(0).simulationState());
     }
