@@ -560,9 +560,9 @@ Stage 8.5 завершён, когда:
 
 ## Stage 9 — Dynamic Economy: строительство, lifecycle и воспроизводство экономики
 
-**Статус:** ACTIVE — STAGE 8.5 GATE PASSED
+**Статус:** COMPLETE — Stage 9E acceptance passed
 
-Текущий implementation focus: **Stage 9E — Economic resilience benchmark**.
+Текущий implementation focus: **Stage 10A — Fleet identity на world level**.
 
 ### Цель
 
@@ -670,7 +670,7 @@ COMPLETED
 
 ### Stage 9D — Bottleneck analysis и AI investment
 
-**Статус:** COMPLETE — PR #16 candidate; `docs/stage9d_economic_response.md`
+**Статус:** COMPLETE — PR #17; `docs/stage9d_economic_response.md`
 
 AI должен реагировать не на магические пороги вида `if steel < X build foundry`, а на **дефицит производственной мощности**.
 
@@ -698,7 +698,7 @@ AI должен реагировать не на магические порог
 
 ### Stage 9E — Economic resilience benchmark
 
-**Статус:** ACTIVE
+**Статус:** COMPLETE — PR #18 candidate; `docs/stage9e_economic_resilience.md`
 
 Acceptance scenario:
 
@@ -754,7 +754,7 @@ supply chain recovers
 
 ## Stage 10 — Inter-system logistics и физическое перемещение между системами
 
-**Статус:** PLANNED
+**Статус:** ACTIVE
 
 ### Почему этот этап идёт до полноценного combat
 
