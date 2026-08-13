@@ -8,6 +8,7 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.ProcurementPolicyComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
@@ -40,6 +41,8 @@ public class MarketSystem extends EntitySystem {
     private final ComponentMapper<MarketComponent> mm = ComponentMapper.getFor(MarketComponent.class);
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<TransformComponent> tm = ComponentMapper.getFor(TransformComponent.class);
+    private final ComponentMapper<ProcurementPolicyComponent> ppm =
+            ComponentMapper.getFor(ProcurementPolicyComponent.class);
 
     /**
      * Создаёт систему на встроенном production content catalog.
@@ -89,6 +92,7 @@ public class MarketSystem extends EntitySystem {
             MarketComponent market = mm.get(entity);
             InventoryComponent inventory = im.get(entity);
             TransformComponent position = tm.get(entity);
+            ProcurementPolicyComponent procurement = ppm.get(entity);
 
             if (!market.isDirty && !eventsChanged) {
                 continue;
@@ -107,7 +111,9 @@ public class MarketSystem extends EntitySystem {
                 market.sellPrices[itemId] = item.basePrice()
                         * (float) Math.pow(ratio, 1.2)
                         * priceMultiplier;
-                market.buyPrices[itemId] = market.sellPrices[itemId] * 0.9f;
+                market.buyPrices[itemId] = procurement == null
+                        ? market.sellPrices[itemId] * 0.9f
+                        : item.basePrice() * procurement.buyPriceMultiplier();
             }
             market.isDirty = false;
         }
