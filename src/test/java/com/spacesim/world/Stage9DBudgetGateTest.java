@@ -4,6 +4,8 @@ import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
 import com.spacesim.components.ArchetypeComponent;
 import com.spacesim.components.EntityIdComponent;
+import com.spacesim.content.ContentCatalog;
+import com.spacesim.content.ContentCatalogLoader;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -17,7 +19,8 @@ class Stage9DBudgetGateTest {
 
     @Test
     void emptyTreasuryНеСоздаётUnfundedProducerProject() {
-        WorldState base = DemoGalaxyFactory.createState(ROOT_SEED);
+        ContentCatalog content = ContentCatalogLoader.loadDefault();
+        WorldState base = DemoGalaxyFactory.createState(ROOT_SEED, content);
         List<FactionEconomicState> factions = new ArrayList<>();
         for (FactionEconomicState faction : base.factions()) {
             if (MINERS.equals(faction.factionContentId())) {
@@ -39,7 +42,9 @@ class Stage9DBudgetGateTest {
                 base.nextConstructionProjectIdValue(),
                 base.constructionProjects(),
                 base.factionEconomicPressures());
-        WorldSimulation world = WorldSimulation.restore(poorState, DemoGalaxyFactory.ACTIVE_SYSTEM_ID);
+        WorldSimulation world = WorldSimulation.restore(poorState, content, DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS,
+                WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME);
         destroyFoundry(world);
 
         for (int observation = 0; observation < 3; observation++) {
