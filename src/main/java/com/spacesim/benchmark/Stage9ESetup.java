@@ -6,6 +6,7 @@ import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
@@ -27,9 +28,7 @@ final class Stage9ESetup {
     }
 
     static EntityId createReserve(WorldSimulation world, ContentCatalog content, Entity foundry) {
-        TransformComponent source = foundry.getComponent(TransformComponent.class);
-        TransformComponent transform = new TransformComponent();
-        transform.position.set(source.position.x, source.position.y);
+        TransformComponent transform = replacementZone(world);
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = 5_000;
         TradeAIComponent trade = new TradeAIComponent();
@@ -60,5 +59,26 @@ final class Stage9ESetup {
                         ResourceDestructionFate.TRANSFER_TO_ENTITY,
                         MoneyDestructionFate.SINK,
                         reserveId));
+    }
+
+    private static TransformComponent replacementZone(WorldSimulation world) {
+        var session = world.findSession(DemoGalaxyFactory.INNER_SYSTEM_ID).orElseThrow();
+        TransformComponent result = new TransformComponent();
+        long bestId = Long.MAX_VALUE;
+        for (Entity entity : session.getEngine().getEntities()) {
+            EntityIdComponent id = entity.getComponent(EntityIdComponent.class);
+            TransformComponent position = entity.getComponent(TransformComponent.class);
+            if (id != null
+                    && position != null
+                    && entity.getComponent(MarketComponent.class) != null
+                    && id.id.value() < bestId) {
+                bestId = id.id.value();
+                result.position.set(position.position.x + 60f, position.position.y + 60f);
+            }
+        }
+        if (bestId == Long.MAX_VALUE) {
+            result.position.set(1000f, 700f);
+        }
+        return result;
     }
 }
