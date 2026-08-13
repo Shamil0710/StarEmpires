@@ -299,7 +299,7 @@ final class ConstructionProjectService {
                 market.isDirty = true;
             }
             session.getLedger().recordResourceSink(
-                    item.runtimeId(), required, refreshed.constructionSiteEntityId(),
+                    siteName(refreshed), item.runtimeId(), required,
                     "station-construction:" + refreshed.stationArchetypeContentId());
         }
 
