@@ -49,10 +49,15 @@ echo Controls inside the validation window:
 echo   1 - Representative performance scene
 echo   2 - Tactical scale/readability review
 echo   3 - Close-up heavy-corvette inspection
+echo   E - Heavy-corvette engine OFF / IDLE / THRUST
+echo   D - Toggle authored damage overlay
+echo   L - Toggle authored emissive layer
 echo   H - Toggle hardpoint markers
 echo   R - Toggle preview rotation
 echo ESC - Exit
 echo.
+echo Representative keeps 50 ships / 500 asteroids / 2000 procedural particles.
+echo Hero exhaust uses the approved authored asset; hero procedural particles are redistributed.
 echo Runtime ship-forward convention: RIGHT.
 echo The heavy-corvette source art faces LEFT and is normalized automatically.
 echo.
