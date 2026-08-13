@@ -10,6 +10,7 @@ import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.trade.TradeRoutePlanner;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -746,6 +747,25 @@ public final class WorldSimulation {
             }
         }
         return removed;
+    }
+
+    /**
+     * Creates the canonical Stage-10C galactic trade planner for this world.
+     *
+     * @param scoringMode route ranking policy
+     * @return planner configured with world content and strategic cost policy
+     */
+    public TradeRoutePlanner createGalacticTradeRoutePlanner(TradeRoutePlanner.ScoringMode scoringMode) {
+        return new TradeRoutePlanner(
+                contentCatalog,
+                Objects.requireNonNull(scoringMode, "Trade route scoring mode не задан"),
+                new WorldTradeRouteCostModel(contentCatalog, factionStrategies));
+    }
+
+    /** @return path planner whose edge timing matches Stage-10B jump execution */
+    public GalacticPathPlanner createGalacticPathPlanner() {
+        float fixedStep = sessionsById.get(activeSystemId).getClock().getFixedStepSeconds();
+        return new GalacticPathPlanner(topology, JumpTransitTiming.DEFAULT, fixedStep);
     }
 
     /** @return immutable Galaxy topology этого runtime world */
