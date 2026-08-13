@@ -26,30 +26,23 @@ final class ConstructionBidPolicy {
         if (PROCUREMENT_BUDGET_FRACTION * (1d + Constants.MAX_REPUTATION_PRICE_BONUS) > 1d) {
             throw new IllegalStateException("Procurement reserve does not cover maximum reputation markup");
         }
+        int materialLines = construction.materials().size();
+        if (materialLines <= 0) {
+            throw new IllegalArgumentException("Construction project has no physical materials: " + target.id());
+        }
 
-        double baseMaterialCost = 0d;
-        long requiredUnits = 0L;
+        double lineBudget = construction.fundingCredits() * PROCUREMENT_BUDGET_FRACTION / materialLines;
+        ProcurementPolicyComponent policy = new ProcurementPolicyComponent();
         for (Map.Entry<String, Integer> requirement : construction.materials().entrySet()) {
             ContentCatalog.ItemDefinition item = checked.findItem(requirement.getKey());
             if (item == null) {
                 throw new IllegalStateException("Unknown construction item: " + requirement.getKey());
             }
-            baseMaterialCost += item.basePrice() * requirement.getValue();
-            requiredUnits = Math.addExact(requiredUnits, requirement.getValue());
-        }
-        double procurementBudget = construction.fundingCredits() * PROCUREMENT_BUDGET_FRACTION;
-        double premiumPool = procurementBudget - baseMaterialCost;
-        if (!Double.isFinite(premiumPool) || premiumPool < 0d || requiredUnits <= 0L) {
-            throw new IllegalArgumentException("Construction funding cannot cover bounded procurement: " + target.id());
-        }
-        double premiumPerUnit = premiumPool / requiredUnits;
-
-        ProcurementPolicyComponent policy = new ProcurementPolicyComponent();
-        for (Map.Entry<String, Integer> requirement : construction.materials().entrySet()) {
-            ContentCatalog.ItemDefinition item = checked.findItem(requirement.getKey());
-            double bid = item.basePrice() + premiumPerUnit;
-            if (!Double.isFinite(bid) || bid <= 0d || bid > Float.MAX_VALUE) {
-                throw new IllegalArgumentException("Construction procurement bid is not representable: " + target.id());
+            int amount = requirement.getValue();
+            double bid = lineBudget / amount;
+            if (!Double.isFinite(bid) || bid < item.basePrice() || bid > Float.MAX_VALUE) {
+                throw new IllegalArgumentException(
+                        "Construction funding cannot cover bounded material line: " + target.id() + " -> " + item.id());
             }
             policy.configureBuyPrice(item.runtimeId(), (float) bid);
         }
