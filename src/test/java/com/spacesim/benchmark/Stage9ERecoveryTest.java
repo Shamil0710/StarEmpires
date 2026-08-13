@@ -11,6 +11,7 @@ class Stage9ERecoveryTest {
     @Test
     void physicalRecoveryScenarioCompletes() {
         Stage9ERecoveryReport report = Stage9ERecoveryRunner.run(SEED);
+        System.out.println(report);
 
         assertTrue(report.successful(), report::toString);
         assertTrue(report.detectionTick() > report.shockTick(), report::toString);
