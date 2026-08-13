@@ -23,7 +23,14 @@ public record JumpTransitTiming(
     /** Default minimal timing policy used by Stage 10B runtime. */
     public static final JumpTransitTiming DEFAULT = new JumpTransitTiming(1L, 1L, 1L, 20d);
 
-    /** Validates positive finite timing parameters. */
+    /**
+     * Validates positive finite timing parameters.
+     *
+     * @param approachTicks local preparation barrier ticks
+     * @param pendingTicks committed jump barrier ticks
+     * @param arrivalTicks local arrival barrier ticks
+     * @param strategicUnitsPerSecond inter-system strategic travel speed
+     */
     public JumpTransitTiming {
         if (approachTicks <= 0L || pendingTicks <= 0L || arrivalTicks <= 0L) {
             throw new IllegalArgumentException("Jump barrier durations должны быть положительными");
@@ -55,7 +62,8 @@ public record JumpTransitTiming(
                 Objects.requireNonNull(destination, "Jump destination не задан")).orElseThrow(
                 () -> new IllegalArgumentException("Unknown jump destination: " + destination));
         if (!checkedTopology.neighbors(from.id()).contains(to.id())) {
-            throw new IllegalArgumentException("Jump systems are not directly connected: " + from.id() + " -> " + to.id());
+            throw new IllegalArgumentException(
+                    "Jump systems are not directly connected: " + from.id() + " -> " + to.id());
         }
         if (!Float.isFinite(fixedStepSeconds) || fixedStepSeconds <= 0f) {
             throw new IllegalArgumentException("Fixed step должен быть положительным и конечным");

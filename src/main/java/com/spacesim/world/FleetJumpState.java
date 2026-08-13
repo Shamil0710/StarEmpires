@@ -28,7 +28,18 @@ public record FleetJumpState(
         long phaseEndsTick,
         float arrivalX,
         float arrivalY) implements Comparable<FleetJumpState> {
-    /** Validates persistent jump state invariants. */
+    /**
+     * Validates persistent jump state invariants.
+     *
+     * @param fleetId stable world fleet identity
+     * @param phase current jump phase
+     * @param originSystemId jump origin
+     * @param destinationSystemId direct jump destination
+     * @param phaseStartedTick authoritative world tick at which the phase began
+     * @param phaseEndsTick exclusive phase completion boundary
+     * @param arrivalX destination-local arrival X
+     * @param arrivalY destination-local arrival Y
+     */
     public FleetJumpState {
         Objects.requireNonNull(fleetId, "FleetId jump state не задан");
         Objects.requireNonNull(phase, "Jump phase не задана");
