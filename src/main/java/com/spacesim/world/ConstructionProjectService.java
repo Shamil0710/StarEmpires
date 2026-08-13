@@ -279,25 +279,43 @@ final class ConstructionProjectService {
         return idAllocator.peekNextValue();
     }
 
-    ConstructionProjectId failDestroyedSite(
-            StarSystemId systemId, EntityId entityId, long tick) {
+    ConstructionProjectState findBySite(StarSystemId systemId, EntityId entityId) {
         if (systemId == null || entityId == null) {
             return null;
         }
-        for (ConstructionProjectState state : new ArrayList<>(projects.values())) {
-            if (isTerminal(state.status())
-                    || !state.systemId().equals(systemId)
-                    || !entityId.equals(state.constructionSiteEntityId())) {
-                continue;
+        for (ConstructionProjectState state : projects.values()) {
+            if (!isTerminal(state.status())
+                    && state.systemId().equals(systemId)
+                    && entityId.equals(state.constructionSiteEntityId())) {
+                return snapshotState(state);
             }
-            ConstructionProjectState refreshed = refresh(state);
-            ConstructionProjectState failed = copy(
-                    refreshed, ConstructionProjectStatus.FAILED, tick, refreshed.buildStartedTick(), tick,
-                    null, null, refreshed.materials(), 0L);
-            projects.put(state.id(), failed);
-            return state.id();
         }
         return null;
+    }
+
+    ConstructionProjectId failDestroyedSite(ConstructionProjectState beforeDestruction, long tick) {
+        if (beforeDestruction == null) {
+            return null;
+        }
+        ConstructionProjectState current = projects.get(beforeDestruction.id());
+        if (current == null || isTerminal(current.status())
+                || !current.systemId().equals(beforeDestruction.systemId())
+                || !Objects.equals(current.constructionSiteEntityId(), beforeDestruction.constructionSiteEntityId())) {
+            throw new IllegalStateException("Construction project изменился во время destruction: "
+                    + beforeDestruction.id());
+        }
+        ConstructionProjectState failed = copy(
+                beforeDestruction,
+                ConstructionProjectStatus.FAILED,
+                tick,
+                beforeDestruction.buildStartedTick(),
+                tick,
+                null,
+                null,
+                beforeDestruction.materials(),
+                0L);
+        projects.put(beforeDestruction.id(), failed);
+        return beforeDestruction.id();
     }
 
     boolean isConstructionSite(StarSystemId systemId, EntityId entityId) {
