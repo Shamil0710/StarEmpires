@@ -95,7 +95,7 @@ final class EconomicBottleneckAnalyzer {
                 : inputBlocked >= storageBlocked
                 ? EconomicBottleneckType.LOGISTICS_SHORTAGE
                 : EconomicBottleneckType.STORAGE_CONGESTION;
-        long severity = unmet * 100_000L + stockouts * 10_000L + Math.max(0, pressureBps - BASE_PRESSURE_BPS);
+        long severity = severityScore(unmet, stockouts, pressureBps);
         return new EconomicBottleneck(systemId, item.id(), type, deficit, surplus, unmet, stockouts,
                 producers, ready, inputBlocked, storageBlocked, pressureBps, severity);
     }
@@ -124,5 +124,16 @@ final class EconomicBottleneckAnalyzer {
     private static int pressureBps(int target, int stock) {
         long value = (long) target * BASE_PRESSURE_BPS / Math.max(1, stock);
         return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(BASE_PRESSURE_BPS, value);
+    }
+
+    private static long severityScore(long unmet, int stockouts, int pressureBps) {
+        try {
+            long unmetScore = Math.multiplyExact(unmet, 100_000L);
+            long stockoutScore = Math.multiplyExact((long) stockouts, 10_000L);
+            long pressureScore = Math.max(0L, (long) pressureBps - BASE_PRESSURE_BPS);
+            return Math.addExact(Math.addExact(unmetScore, stockoutScore), pressureScore);
+        } catch (ArithmeticException exception) {
+            return Long.MAX_VALUE;
+        }
     }
 }
