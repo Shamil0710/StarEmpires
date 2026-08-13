@@ -8,6 +8,7 @@ set "EMISSIVE_REL=%ASSET_DIR%\heavy_corvette_white_01_emissive.png"
 set "DAMAGE_REL=%ASSET_DIR%\heavy_corvette_white_01_damage.png"
 set "IDLE_REL=%ASSET_DIR%\heavy_corvette_white_01_engine_idle.png"
 set "THRUST_REL=%ASSET_DIR%\heavy_corvette_white_01_engine_thrust.png"
+set "HARDWARE_PROFILE=target\stage8_5_hardware_profile.txt"
 
 pushd "%PROJECT_DIR%" >nul 2>&1
 if errorlevel 1 (
@@ -77,14 +78,17 @@ if not defined APP_JAR (
     goto :failure
 )
 
+call :collect_hardware_profile "%HARDWARE_PROFILE%"
+echo Reference hardware profile:
+echo   %HARDWARE_PROFILE%
+echo.
+
 if /I "%~1"=="--build-only" (
-    echo.
     echo Build completed: %APP_JAR%
     popd
     exit /b 0
 )
 
-echo.
 echo [2/2] Starting Stage 8.5 graphics validation...
 echo.
 "%JAVA_EXE%" -jar "%APP_JAR%" --graphics-spike
@@ -105,6 +109,21 @@ if exist "%PROJECT_DIR%%~2" (
 ) else (
     echo [MISSING] %~1 - %~2
 )
+exit /b 0
+
+:collect_hardware_profile
+set "PROFILE_FILE=%~1"
+> "%PROFILE_FILE%" echo Star Empires - Stage 8.5 Reference Hardware Profile
+>> "%PROFILE_FILE%" echo Generated=%DATE% %TIME%
+>> "%PROFILE_FILE%" echo JavaExecutable=%JAVA_EXE%
+>> "%PROFILE_FILE%" echo ProcessorIdentifier=%PROCESSOR_IDENTIFIER%
+where.exe powershell.exe >nul 2>&1
+if errorlevel 1 (
+    >> "%PROFILE_FILE%" echo PowerShellCimProfile=UNAVAILABLE
+    exit /b 0
+)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$p='%PROFILE_FILE%'; $cpu=Get-CimInstance Win32_Processor ^| Select-Object -First 1; $os=Get-CimInstance Win32_OperatingSystem; $ram=[math]::Round(($os.TotalVisibleMemorySize*1KB)/1GB,2); Add-Content -LiteralPath $p -Value ('OS=' + $os.Caption + ' ' + $os.Version + ' build ' + $os.BuildNumber); Add-Content -LiteralPath $p -Value ('CPU=' + $cpu.Name.Trim()); Add-Content -LiteralPath $p -Value ('CPUCores=' + $cpu.NumberOfCores); Add-Content -LiteralPath $p -Value ('CPULogicalProcessors=' + $cpu.NumberOfLogicalProcessors); Add-Content -LiteralPath $p -Value ('RAM_GiB=' + $ram); $gpus=Get-CimInstance Win32_VideoController; $i=0; foreach($gpu in $gpus){ $i++; Add-Content -LiteralPath $p -Value ('GPU' + $i + '=' + $gpu.Name); Add-Content -LiteralPath $p -Value ('GPU' + $i + '_Driver=' + $gpu.DriverVersion) }" >nul 2>&1
+if errorlevel 1 >> "%PROFILE_FILE%" echo PowerShellCimProfile=FAILED
 exit /b 0
 
 :failure
