@@ -40,6 +40,8 @@ public record EconomicTransaction(
         RESOURCE_SOURCE,
         /** Явное исчезновение физического ресурса, например потребление. */
         RESOURCE_SINK,
+        /** Физический transfer ресурса между persistent участниками без source/sink. */
+        RESOURCE_TRANSFER,
         /** Производственное преобразование входных товаров в выходные. */
         RESOURCE_TRANSFORM
     }
