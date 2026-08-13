@@ -37,8 +37,7 @@ final class Stage9ERecoveryRunner {
 
         SimulationSession inner = world.findSession(DemoGalaxyFactory.INNER_SYSTEM_ID).orElseThrow();
         Entity foundry = Stage9EMetrics.requireFoundry(inner);
-        Stage9EInitialStock.apply(foundry, content);
-        EntityId reserveId = Stage9ESetup.createReserve(world, content, foundry);
+        EntityId salvageId = Stage9ESetup.createReserveNetwork(world, content, foundry);
         int steelId = content.findItem(STEEL).runtimeId();
         int weaponsId = content.findItem(WEAPONS).runtimeId();
         long baselineSteel = Stage9EMetrics.unmetDemand(inner, steelId);
@@ -48,7 +47,7 @@ final class Stage9ERecoveryRunner {
         int foundriesBefore = Stage9EMetrics.countFoundries(inner);
         long shockTick = activeTick(world);
 
-        Stage9ESetup.applyShock(world, foundry, reserveId);
+        Stage9ESetup.applyShock(world, foundry, salvageId);
         int foundriesAfterShock = Stage9EMetrics.countFoundries(inner);
 
         Progress progress = new Progress(
