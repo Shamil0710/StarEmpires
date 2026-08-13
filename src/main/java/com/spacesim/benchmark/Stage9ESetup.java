@@ -14,6 +14,7 @@ import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.model.ShipType;
 import com.spacesim.persistence.EntityId;
+import com.spacesim.simulation.SimulationSession;
 import com.spacesim.world.DestructionPolicy;
 import com.spacesim.world.MoneyDestructionFate;
 import com.spacesim.world.ResourceDestructionFate;
@@ -23,7 +24,6 @@ final class Stage9ESetup {
     private static final String MINERS = "faction.miners";
     private static final String STEEL = "item.steel";
     private static final String ENERGY = "item.energy";
-    private static final float RELEASE_DELAY_SECONDS = 100f;
 
     private Stage9ESetup() {
         throw new AssertionError("Utility class");
@@ -54,6 +54,19 @@ final class Stage9ESetup {
         steel.getComponent(InventoryComponent.class).stock[content.findItem(STEEL).runtimeId()] = 500;
         energy.getComponent(InventoryComponent.class).stock[content.findItem(ENERGY).runtimeId()] = 300;
         return salvageId;
+    }
+
+    static void releaseReserves(SimulationSession session) {
+        for (Entity entity : session.getEngine().getEntities()) {
+            IdentityComponent identity = entity.getComponent(IdentityComponent.class);
+            TradeAIComponent trade = entity.getComponent(TradeAIComponent.class);
+            if (identity != null
+                    && trade != null
+                    && ("Corona Steel Reserve".equals(identity.name)
+                    || "Corona Energy Reserve".equals(identity.name))) {
+                trade.routeSearchCooldown = 0f;
+            }
+        }
     }
 
     static void applyShock(WorldSimulation world, Entity foundry, EntityId salvageId) {
@@ -100,7 +113,7 @@ final class Stage9ESetup {
         trade.specializedItem = itemId;
         trade.cargoSpace = capacity;
         trade.movementSpeed = 220f;
-        trade.routeSearchCooldown = RELEASE_DELAY_SECONDS;
+        trade.routeSearchCooldown = Float.MAX_VALUE;
         return new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
