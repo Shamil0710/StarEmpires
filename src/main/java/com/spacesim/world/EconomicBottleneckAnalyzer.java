@@ -13,14 +13,14 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-public final class EconomicBottleneckAnalyzer {
+final class EconomicBottleneckAnalyzer {
     private static final int BASE_PRESSURE_BPS = 10_000;
 
     private EconomicBottleneckAnalyzer() {
         throw new AssertionError("Utility class");
     }
 
-    public static EconomicBottleneckReport analyze(WorldSimulation world, ContentCatalog content) {
+    static EconomicBottleneckReport analyze(WorldSimulation world, ContentCatalog content) {
         Objects.requireNonNull(world, "WorldSimulation не задан");
         Objects.requireNonNull(content, "ContentCatalog не задан");
         List<EconomicBottleneck> result = new ArrayList<>();
