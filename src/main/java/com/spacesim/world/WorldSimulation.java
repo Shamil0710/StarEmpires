@@ -47,6 +47,7 @@ public final class WorldSimulation {
     private final ConstructionProjectService constructionProjectService;
     private final DestructionService destructionService;
     private final FactionEconomicPressureTracker economicPressureTracker;
+    private final FleetWorldService fleetWorldService;
     private final StarSystemId activeSystemId;
     private final int strategicStepTicks;
     private final int remoteUpdateBudgetPerFrame;
@@ -67,6 +68,8 @@ public final class WorldSimulation {
             long nextConstructionProjectIdValue,
             List<ConstructionProjectState> constructionProjects,
             List<FactionEconomicPressureState> factionEconomicPressures,
+            long nextFleetIdValue,
+            List<FleetPlacementState> fleetPlacements,
             StarSystemId activeSystemId,
             int strategicStepTicks,
             int remoteUpdateBudgetPerFrame) {
@@ -91,6 +94,8 @@ public final class WorldSimulation {
                 this.factionAccountsById,
                 this.constructionProjectService);
         this.economicPressureTracker = new FactionEconomicPressureTracker(factionEconomicPressures);
+        this.fleetWorldService = new FleetWorldService(
+                this.sessionsById, nextFleetIdValue, fleetPlacements);
         this.activeSystemId = activeSystemId;
         this.strategicStepTicks = strategicStepTicks;
         this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;
@@ -218,6 +223,8 @@ public final class WorldSimulation {
                 checked.nextConstructionProjectIdValue(),
                 checked.constructionProjects(),
                 checked.factionEconomicPressures(),
+                checked.nextFleetIdValue(),
+                checked.fleets(),
                 activeId,
                 strategicStepTicks,
                 remoteUpdateBudgetPerFrame);
@@ -461,7 +468,9 @@ public final class WorldSimulation {
                 factionStrategies,
                 constructionProjectService.nextIdValue(),
                 constructionProjectService.snapshots(),
-                economicPressureTracker.snapshots());
+                economicPressureTracker.snapshots(),
+                fleetWorldService.nextIdValue(),
+                fleetWorldService.snapshots());
     }
 
     /**
@@ -541,6 +550,59 @@ public final class WorldSimulation {
         return constructionProjectService.snapshots();
     }
 
+    /** @return immutable world-level fleet placements sorted by stable FleetId */
+    public List<FleetPlacementState> getFleetPlacements() {
+        return fleetWorldService.snapshots();
+    }
+
+    /**
+     * Ищет world-level placement fleet.
+     *
+     * @param fleetId stable world FleetId or {@code null}
+     * @return current placement or empty
+     */
+    public Optional<FleetPlacementState> findFleet(FleetId fleetId) {
+        return fleetWorldService.find(fleetId);
+    }
+
+    /**
+     * Разрешает system-local fleet entity в стабильный world FleetId.
+     *
+     * @param systemId local StarSystem or {@code null}
+     * @param entityId system-local EntityId or {@code null}
+     * @return stable FleetId or empty
+     */
+    public Optional<FleetId> findFleetByLocal(StarSystemId systemId, EntityId entityId) {
+        return fleetWorldService.findByLocal(systemId, entityId);
+    }
+
+    /**
+     * Передаёт fleet из local SimulationSession во world-owned transit state.
+     *
+     * <p>Stage 10A выполняет только identity/location handoff без travel clock. Stage 10B will
+     * schedule this boundary through the authoritative jump-transit FSM and deterministic travel
+     * duration.</p>
+     *
+     * @param fleetId stable fleet identity
+     * @param destinationSystemId destination StarSystem
+     * @return persistent transit placement containing the detached physical fleet snapshot
+     */
+    public FleetPlacementState beginFleetTransfer(FleetId fleetId, StarSystemId destinationSystemId) {
+        return fleetWorldService.beginTransfer(fleetId, destinationSystemId);
+    }
+
+    /**
+     * Материализует transit fleet в destination local SimulationSession.
+     *
+     * @param fleetId stable fleet identity
+     * @param arrivalX finite destination X coordinate
+     * @param arrivalY finite destination Y coordinate
+     * @return local placement with a freshly allocated destination EntityId
+     */
+    public FleetPlacementState completeFleetTransfer(FleetId fleetId, float arrivalX, float arrivalY) {
+        return fleetWorldService.completeTransfer(fleetId, arrivalX, arrivalY);
+    }
+
     /**
      * Ищет local simulation session системы.
      *
@@ -561,7 +623,13 @@ public final class WorldSimulation {
      */
     public DestructionResult destroyEntity(
             StarSystemId systemId, EntityId entityId, DestructionPolicy policy) {
-        return destructionService.destroy(systemId, entityId, policy);
+        Optional<FleetId> fleetId = fleetWorldService.findByLocal(systemId, entityId);
+        DestructionResult result = destructionService.destroy(systemId, entityId, policy);
+        if (fleetId.isPresent() && !fleetWorldService.unregisterLocal(systemId, entityId)) {
+            throw new IllegalStateException(
+                    "Destroyed fleet lost world mapping before unregister: " + fleetId.orElseThrow());
+        }
+        return result;
     }
 
     /**
@@ -574,8 +642,25 @@ public final class WorldSimulation {
      * @throws IllegalArgumentException если StarSystem отсутствует
      */
     public EntityId createEntity(StarSystemId systemId, Entity entity) {
-        return requireLifecycleSession(systemId).createEntity(
-                Objects.requireNonNull(entity, "Создаваемая Entity не задана"));
+        StarSystemId checkedSystemId = Objects.requireNonNull(systemId, "StarSystemId lifecycle не задан");
+        SimulationSession session = requireLifecycleSession(checkedSystemId);
+        Entity checkedEntity = Objects.requireNonNull(entity, "Создаваемая Entity не задана");
+        IdentityComponent identity = checkedEntity.getComponent(IdentityComponent.class);
+        boolean fleet = identity != null && identity.kind == IdentityComponent.Kind.FLEET;
+        EntityId id = session.createEntity(checkedEntity);
+        if (!fleet) {
+            return id;
+        }
+        try {
+            fleetWorldService.registerLocal(checkedSystemId, id);
+            return id;
+        } catch (RuntimeException exception) {
+            if (!session.removeEntity(id)) {
+                exception.addSuppressed(new IllegalStateException(
+                        "Fleet registration rollback could not remove local entity: " + id));
+            }
+            throw exception;
+        }
     }
 
     /**
@@ -588,7 +673,16 @@ public final class WorldSimulation {
      * @throws IllegalArgumentException если StarSystem отсутствует
      */
     public boolean removeEntity(StarSystemId systemId, EntityId entityId) {
-        return requireLifecycleSession(systemId).removeEntity(entityId);
+        StarSystemId checkedSystemId = Objects.requireNonNull(systemId, "StarSystemId lifecycle не задан");
+        SimulationSession session = requireLifecycleSession(checkedSystemId);
+        Optional<FleetId> fleetId = fleetWorldService.findByLocal(checkedSystemId, entityId);
+        boolean removed = session.removeEntity(entityId);
+        if (removed && fleetId.isPresent()
+                && !fleetWorldService.unregisterLocal(checkedSystemId, entityId)) {
+            throw new IllegalStateException(
+                    "Removed fleet lost world mapping before unregister: " + fleetId.orElseThrow());
+        }
+        return removed;
     }
 
     /** @return immutable Galaxy topology этого runtime world */
