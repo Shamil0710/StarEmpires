@@ -19,6 +19,8 @@ import com.spacesim.world.WorldTopologyDefaults;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -28,10 +30,13 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorldStateCodecTest {
+    private static final int MAGIC = 0x53544757;
+    private static final int FILE_VERSION = 1;
     private static final StarSystemId ALPHA_ID = new StarSystemId(1L);
     private static final StarSystemId BETA_ID = new StarSystemId(2L);
 
@@ -39,7 +44,7 @@ class WorldStateCodecTest {
     Path temporaryDirectory;
 
     @Test
-    void multiSystemWorldДаётDeterministicExactRoundTrip() {
+    void multiSystemWorldHasDeterministicExactRoundTrip() {
         WorldState state = strategicWorld();
 
         byte[] first = WorldStateCodec.encode(state);
@@ -55,7 +60,7 @@ class WorldStateCodecTest {
     }
 
     @Test
-    void factionLayersСохраняютсяВCanonicalContentIdПорядке() {
+    void factionLayersUseCanonicalContentIdOrder() {
         WorldState base = twoSystemWorld(false);
         WorldState state = new WorldState(
                 WorldState.CURRENT_VERSION,
@@ -86,7 +91,7 @@ class WorldStateCodecTest {
     }
 
     @Test
-    void pressureLayerСохраняетсяВCanonicalПорядке() {
+    void pressureLayerUsesCanonicalOrder() {
         WorldState base = strategicWorld();
         FactionEconomicPressureState beta = new FactionEconomicPressureState(
                 "faction.miners", BETA_ID, "item.weapons",
@@ -109,17 +114,9 @@ class WorldStateCodecTest {
     }
 
     @Test
-    void stage7SchemaV1МигрируетБезСозданияFactionState() {
+    void stage7SchemaV1MigratesWithoutFactionState() throws IOException {
         WorldState current = twoSystemWorld(false);
-        byte[] currentBytes = WorldStateCodec.encode(current);
-
-        // Current v5 adds factions + strategies + construction watermark + project count + pressure count.
-        byte[] legacyBytes = Arrays.copyOf(
-                currentBytes,
-                currentBytes.length - 4 * Integer.BYTES - Long.BYTES);
-        ByteBuffer.wrap(legacyBytes).putInt(8, WorldState.LEGACY_STAGE7_VERSION);
-
-        WorldState migrated = WorldStateCodec.decode(legacyBytes);
+        WorldState migrated = WorldStateCodec.decode(encodeLegacy(current, WorldState.LEGACY_STAGE7_VERSION));
 
         assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
         assertEquals(current.topology(), migrated.topology());
@@ -127,10 +124,11 @@ class WorldStateCodecTest {
         assertEquals(List.of(), migrated.factions());
         assertEquals(List.of(), migrated.factionStrategies());
         assertEquals(List.of(), migrated.factionEconomicPressures());
+        assertFalse(migrated.fleets().isEmpty());
     }
 
     @Test
-    void treasurySchemaV2МигрируетСДеньгамиНоБезВыдуманнойDiplomacy() {
+    void treasurySchemaV2MigratesWithoutInventedDiplomacy() throws IOException {
         WorldState base = twoSystemWorld(false);
         WorldState treasuryOnly = new WorldState(
                 WorldState.CURRENT_VERSION,
@@ -138,36 +136,20 @@ class WorldStateCodecTest {
                 base.systems(),
                 List.of(new FactionEconomicState("faction.miners", 123_456L, 9_000L, 1_000L)),
                 List.of());
-        byte[] currentBytes = WorldStateCodec.encode(treasuryOnly);
 
-        // Current v5 appends strategic count, construction watermark, project count and pressure count.
-        byte[] v2Bytes = Arrays.copyOf(
-                currentBytes,
-                currentBytes.length - 3 * Integer.BYTES - Long.BYTES);
-        ByteBuffer.wrap(v2Bytes).putInt(8, WorldState.LEGACY_FACTION_TREASURY_VERSION);
+        WorldState migrated = WorldStateCodec.decode(
+                encodeLegacy(treasuryOnly, WorldState.LEGACY_FACTION_TREASURY_VERSION));
 
-        WorldState migrated = WorldStateCodec.decode(v2Bytes);
-
-        assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
         assertEquals(treasuryOnly.factions(), migrated.factions());
         assertEquals(List.of(), migrated.factionStrategies());
         assertEquals(List.of(), migrated.factionEconomicPressures());
     }
 
     @Test
-    void stage8SchemaV3МигрируетСStrategicStateНоБезConstruction() {
+    void stage8SchemaV3MigratesWithoutConstruction() throws IOException {
         WorldState current = strategicWorld();
-        byte[] currentBytes = WorldStateCodec.encode(current);
+        WorldState migrated = WorldStateCodec.decode(encodeLegacy(current, WorldState.LEGACY_STAGE8_VERSION));
 
-        // v5 adds construction allocator watermark + project count + pressure count after exact v3 layout.
-        byte[] v3Bytes = Arrays.copyOf(
-                currentBytes,
-                currentBytes.length - Long.BYTES - 2 * Integer.BYTES);
-        ByteBuffer.wrap(v3Bytes).putInt(8, WorldState.LEGACY_STAGE8_VERSION);
-
-        WorldState migrated = WorldStateCodec.decode(v3Bytes);
-
-        assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
         assertEquals(current.topology(), migrated.topology());
         assertEquals(current.systems(), migrated.systems());
         assertEquals(current.factions(), migrated.factions());
@@ -178,27 +160,40 @@ class WorldStateCodecTest {
     }
 
     @Test
-    void stage9SchemaV4МигрируетConstructionБезВыдуманногоPressure() {
+    void stage9SchemaV4MigratesWithoutInventedPressure() throws IOException {
         WorldState current = strategicWorld();
-        byte[] currentBytes = WorldStateCodec.encode(current);
+        WorldState migrated = WorldStateCodec.decode(
+                encodeLegacy(current, WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION));
 
-        byte[] v4Bytes = Arrays.copyOf(currentBytes, currentBytes.length - Integer.BYTES);
-        ByteBuffer.wrap(v4Bytes).putInt(8, WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION);
-
-        WorldState migrated = WorldStateCodec.decode(v4Bytes);
-
-        assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
-        assertEquals(current.topology(), migrated.topology());
-        assertEquals(current.systems(), migrated.systems());
-        assertEquals(current.factions(), migrated.factions());
-        assertEquals(current.factionStrategies(), migrated.factionStrategies());
         assertEquals(current.nextConstructionProjectIdValue(), migrated.nextConstructionProjectIdValue());
         assertEquals(current.constructionProjects(), migrated.constructionProjects());
         assertEquals(List.of(), migrated.factionEconomicPressures());
     }
 
     @Test
-    void canonicalOrderingДелаетРазныйВходнойПорядокОднимWorldSave() {
+    void stage9SchemaV5MigratesToDeterministicFleetIds() throws IOException {
+        WorldState current = strategicWorld();
+        FactionEconomicPressureState pressure = new FactionEconomicPressureState(
+                "faction.miners", ALPHA_ID, "item.steel",
+                EconomicBottleneckType.PRODUCTION_CAPACITY_SHORTAGE,
+                10L, 20L, 3, 90L, 80L, 100L);
+        current = new WorldState(
+                WorldState.CURRENT_VERSION,
+                current.topology(), current.systems(), current.factions(), current.factionStrategies(),
+                current.nextConstructionProjectIdValue(), current.constructionProjects(), List.of(pressure));
+
+        byte[] legacy = encodeLegacy(current, WorldState.LEGACY_STAGE9_PRESSURE_VERSION);
+        WorldState first = WorldStateCodec.decode(legacy);
+        WorldState second = WorldStateCodec.decode(legacy);
+
+        assertEquals(List.of(pressure), first.factionEconomicPressures());
+        assertEquals(first.fleets(), second.fleets());
+        assertEquals(first.nextFleetIdValue(), second.nextFleetIdValue());
+        assertFalse(first.fleets().isEmpty());
+    }
+
+    @Test
+    void canonicalOrderingProducesSameSave() {
         WorldState canonical = twoSystemWorld(false);
         WorldState reversed = twoSystemWorld(true);
 
@@ -207,7 +202,7 @@ class WorldStateCodecTest {
     }
 
     @Test
-    void fileWriteReadБезопасноЗаменяетWorldSnapshot() throws IOException {
+    void fileWriteReadSafelyReplacesSnapshot() throws IOException {
         Path save = temporaryDirectory.resolve("world-1.starsave");
         WorldState first = strategicWorld();
         WorldState second = new WorldState(
@@ -222,13 +217,12 @@ class WorldStateCodecTest {
         WorldStateCodec.write(save, first);
         assertTrue(Files.isRegularFile(save));
         assertEquals(first, WorldStateCodec.read(save));
-
         WorldStateCodec.write(save, second);
         assertEquals(second, WorldStateCodec.read(save));
     }
 
     @Test
-    void worldStateТребуетРовноОдинSnapshotНаКаждуюTopologySystem() {
+    void worldStateRequiresOneSnapshotPerTopologySystem() {
         GalaxyTopology topology = topology(false);
         GameState alpha = SimulationSession.createDemo(101L).snapshot();
         GameState beta = SimulationSession.createDemo(202L).snapshot();
@@ -246,7 +240,7 @@ class WorldStateCodecTest {
     }
 
     @Test
-    void duplicateFactionИDoubleTerritoryОтклоняются() {
+    void duplicateFactionAndDoubleTerritoryAreRejected() {
         WorldState base = twoSystemWorld(false);
         FactionEconomicState economic = new FactionEconomicState("faction.miners", 1L, 2L, 3L);
         assertThrows(IllegalArgumentException.class, () -> new WorldState(
@@ -263,7 +257,7 @@ class WorldStateCodecTest {
     }
 
     @Test
-    void existingGameStateОборачиваетсяВDefaultWorldБезИзмененияEconomicSnapshot() {
+    void existingGameStateWrapsIntoDefaultWorldWithoutEconomicChange() {
         GameState state = SimulationSession.createDemo(0x7A6EL).snapshot();
 
         WorldState world = WorldState.singleSystem(state);
@@ -279,7 +273,7 @@ class WorldStateCodecTest {
     }
 
     @Test
-    void повреждённыйWorldHeaderTruncationИТrailingBytesОтклоняются() {
+    void corruptHeaderTruncationAndTrailingBytesAreRejected() {
         byte[] valid = WorldStateCodec.encode(strategicWorld());
 
         byte[] badMagic = valid.clone();
@@ -299,6 +293,31 @@ class WorldStateCodecTest {
         byte[] trailing = Arrays.copyOf(valid, valid.length + 1);
         trailing[trailing.length - 1] = 1;
         assertThrows(IllegalArgumentException.class, () -> WorldStateCodec.decode(trailing));
+    }
+
+    private static byte[] encodeLegacy(WorldState state, int schemaVersion) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try (DataOutputStream output = new DataOutputStream(buffer)) {
+            output.writeInt(MAGIC);
+            output.writeInt(FILE_VERSION);
+            output.writeInt(schemaVersion);
+            WorldTopologyBinary.write(output, state.topology());
+            WorldSystemBinary.write(output, state.systems());
+            if (schemaVersion >= WorldState.LEGACY_FACTION_TREASURY_VERSION) {
+                WorldFactionBinary.writeEconomic(output, state.factions());
+            }
+            if (schemaVersion >= WorldState.LEGACY_STAGE8_VERSION) {
+                WorldFactionBinary.writeStrategies(output, state.factionStrategies());
+            }
+            if (schemaVersion >= WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION) {
+                output.writeLong(state.nextConstructionProjectIdValue());
+                WorldConstructionBinary.write(output, state.constructionProjects());
+            }
+            if (schemaVersion >= WorldState.LEGACY_STAGE9_PRESSURE_VERSION) {
+                WorldFactionBinary.writePressures(output, state.factionEconomicPressures());
+            }
+        }
+        return buffer.toByteArray();
     }
 
     private WorldState strategicWorld() {
