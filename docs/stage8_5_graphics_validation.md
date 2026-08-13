@@ -42,7 +42,7 @@ Properties:
 
 The exact infrastructure head `03df8af7f2ba3fda191af0c8e804408ea5d44094` passed CI.
 
-## 8.5C — Presentation asset geometry contract
+## 8.5C — Presentation asset geometry and orientation contract
 
 The presentation package defines an explicit asset contract instead of deriving gameplay-relevant placement from transparent PNG pixels.
 
@@ -54,21 +54,31 @@ The presentation package defines an explicit asset contract instead of deriving 
 - intended world width / height;
 - normalized pivot;
 - explicit elliptical collision/selection footprint width / height;
-- ordered visual hardpoints.
+- authored `SourceFacing`;
+- ordered visual hardpoints in authored sprite space.
 
-A compatibility radius constructor remains available for compact/circular assets, but broad ships should use explicit footprint width/height. `collisionRadius()` is now only a conservative compatibility bound; new code should prefer the explicit dimensions.
+A compatibility radius constructor remains available for compact/circular assets. Existing constructors default source art to `SourceFacing.RIGHT`; assets authored in the opposite direction opt in explicitly.
 
-`VisualHardpoint` stores normalized sprite-space coordinates, a presentation role (`ENGINE`, `WEAPON`, `UTILITY`) and a visual direction. Hardpoint coordinates and visual direction are not authoritative thrust or weapon physics.
+### Canonical forward convention
+
+The runtime presentation convention is now explicit:
+
+```text
+RUNTIME FORWARD = RIGHT / positive local X
+```
+
+Source textures do not need to be destructively edited to match that convention. `SpriteOrientationTransform` mirrors left-authored assets horizontally around their declared pivot and applies the same transform to visual hardpoint positions and directions.
+
+This prevents the sprite, engine exhaust and weapon muzzles from disagreeing after an orientation correction.
 
 Important rules:
 
 - texture paths and asset IDs do not become save/entity identity;
 - collision size is explicit and is not inferred from alpha bounds;
 - hardpoint IDs must be unique within a ship sprite specification;
-- hardpoint metadata is defensive/immutable after construction;
+- source-facing metadata is presentation-only;
+- hardpoints remain authored-space metadata and are normalized only while rendering;
 - emissive art is optional and can be added without changing simulation state.
-
-The generic asset-contract exact head `dc472857a2d84b5729db29d533f5f41ea4c79132` passed CI.
 
 ### Selected project asset — heavy corvette
 
@@ -81,13 +91,14 @@ asset ID: ship.heavy_corvette.white_01
 rendered size: 120 x 72 world units
 pivot: 0.50, 0.50
 explicit footprint: 86.4 x 41.8 world units
-source orientation: nose left / exhaust right
+source facing: LEFT
+runtime facing at rotation 0: RIGHT
 main engines: 3
 weapon hardpoints: 5
 utility hardpoints: 1
 ```
 
-The source sprite uses normalized hardpoint coordinates with `(0,0)` at bottom-left. Engine visual directions point right (`0°`) and forward weapon visual directions point left (`180°`).
+The source sprite uses normalized hardpoint coordinates with `(0,0)` at bottom-left. In authored space the engines are on the right and the nose is on the left. At runtime the presentation transform mirrors the whole visual contract so the nose points right like the procedural validation ships, engine exhaust points left, and forward weapon directions point right.
 
 Canonical base texture path:
 
@@ -101,25 +112,21 @@ Optional emissive mask path:
 src/main/resources/assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_emissive.png
 ```
 
-The binary sprite is now stored under the canonical filename without browser-added suffixes such as `(1)`.
-
 ## 8.5D — Engine / emissive validation behavior
 
-The desktop spike loads the heavy-corvette base texture automatically.
+When the heavy-corvette texture exists:
 
-When the texture exists:
-
-- ship zero becomes the real heavy-corvette sprite;
-- its declared world size and pivot control drawing;
-- all three declared engine hardpoints receive additive engine glow;
-- particle exhaust for the hero ship originates from those hardpoints and follows their visual directions;
-- the validation beam starts at `weapon_nose_primary`;
-- an optional emissive texture is overlaid in the additive effects pass when present;
-- the HUD reports `REAL HEAVY CORVETTE` and whether the emissive asset is present.
+- the hero ship uses the real authored sprite;
+- source-left art is normalized to runtime-right without modifying the PNG;
+- all three engine hardpoints receive additive engine glow after the same orientation transform;
+- particle exhaust originates from the transformed hardpoints and uses transformed directions;
+- the validation beam starts at the transformed `weapon_nose_primary`;
+- an optional emissive texture uses the same horizontal normalization;
+- the HUD reports `source LEFT -> runtime RIGHT`.
 
 When the texture is absent, the representative load still runs with the deterministic procedural fallback and the HUD explicitly reports the missing real asset.
 
-## 8.5E/F — Desktop graphics spike
+## 8.5E/F — Desktop graphics validation
 
 The validation scene is separate from the normal game and does **not** create `SimulationSession` or authoritative world state.
 
@@ -131,38 +138,68 @@ Use the dedicated root script:
 run-graphics-validation.cmd
 ```
 
-The script:
-
-1. checks Java / Maven Wrapper availability;
-2. reports whether the heavy-corvette PNG is present at the expected path;
-3. runs `clean package` and package-phase tests;
-4. locates the shaded `star-empires-*-all.jar`;
-5. launches it with `--graphics-spike`.
+The script checks Java/Maven Wrapper, verifies the heavy-corvette asset path, builds/tests the JAR, prints the review controls, and launches `--graphics-spike`.
 
 `run-graphics-validation.cmd --build-only` may be used to build without opening the graphics window.
 
-### Representative workload
+### Interactive review modes
 
-The workload is encoded by `GraphicsValidationProfile.representative()`:
+The same runtime now supports three explicit views:
+
+```text
+1 — REPRESENTATIVE
+2 — TACTICAL
+3 — CLOSE-UP
+H — toggle hardpoint markers
+R — toggle hero rotation
+ESC — exit
+```
+
+#### 1 — Representative
+
+Keeps the performance workload used for the first real-GPU run:
 
 - ships: `50`;
 - asteroids/background objects: `500`;
 - active additive particles: `2000`;
-- total representative world/effect objects: `2550`;
-- heavy-corvette hardpoint-driven effects;
-- engine/emissive glow;
-- shield-style additive effect;
-- beam/projectile-style geometry;
-- damage-mark overlay;
-- off-screen RGBA framebuffer;
-- one full-screen shader post-process pass;
-- metrics HUD.
+- framebuffer + full-screen shader post-process;
+- authored heavy corvette as the hero ship;
+- hardpoint-driven engine/weapon effects.
 
-The spike disables VSync and the foreground FPS cap so measured frame time is not intentionally clamped to 60 FPS.
+This is the mode whose FPS/frame-time numbers should be compared against the Stage-8.5 performance target.
+
+#### 2 — Tactical
+
+Reduces background load and enlarges the hero/nearby ships so relative class scale and silhouette readability can be inspected without losing surrounding context.
+
+Current review load:
+
+- ships: `7`;
+- asteroids: `140`;
+- particles: `560`;
+- heavy-corvette preview scale: `2.2x`.
+
+#### 3 — Close-up
+
+Shows one heavy corvette at `6x` preview scale with a lighter background workload. Entering close-up automatically enables hardpoint markers.
+
+Current review load:
+
+- ships: `1`;
+- asteroids: `40`;
+- particles: `240`.
+
+Hardpoint marker legend:
+
+- engine — cyan;
+- weapon — red;
+- utility — yellow.
+
+Each marker also has a short direction indicator after runtime orientation normalization. `R` continuously rotates the hero so pivot stability, transformed engine exhaust and weapon directions can be inspected through a full turn.
 
 ### Real developer-GPU run captured on 2026-08-13
 
-A user-supplied Windows screenshot confirms that the authored heavy-corvette texture was actually loaded and rendered on a real desktop GPU. The HUD reported:
+A user-supplied Windows screenshot confirms that the authored heavy-corvette texture was actually loaded and rendered on a real desktop GPU. Before the orientation-normalization change the HUD reported:
 
 ```text
 viewport: 2560 x 1369
@@ -183,27 +220,29 @@ hardpoint VFX: ON
 emissive: MISSING / OPTIONAL
 ```
 
-These results strongly exceed the Stage-8.5 60 FPS target for this representative scene. Hardware model/driver details are still required before this run becomes a complete reference-machine record, but the runtime result already proves real authored texture upload, real GPU execution, hardpoint-driven VFX and framebuffer/post-processing coexist successfully.
+These results strongly exceed the Stage-8.5 60 FPS target for the representative scene. Hardware model/driver details are still required before this becomes a complete reference-machine record.
 
-The screenshot also shows the heavy corvette at a larger, readable class scale than the procedural ships, which is appropriate for its heavy-corvette classification. A dedicated tactical/wide-zoom review is still required before finalizing scale and art readability.
+The same screenshot also exposed an important visual-contract issue: the authored heavy corvette faced left while procedural ships faced right. That observation directly motivated the explicit `SourceFacing` and runtime-right normalization now implemented.
 
 ### Earlier software-GL smoke evidence
 
-The original graphics-spike exact head `f078714ddcb9b1eafe82703fbe095628f8794142` passed the full Java 17 CI pipeline and produced the packaged desktop JAR. That exact artifact also rendered successfully under Linux Xvfb/software OpenGL. Those software-renderer FPS numbers are smoke evidence only and are not used to accept or reject libGDX performance.
+The original graphics-spike exact head `f078714ddcb9b1eafe82703fbe095628f8794142` passed the full Java 17 CI pipeline and produced the packaged desktop JAR. That exact artifact also rendered successfully under Linux Xvfb/software OpenGL. Those software-renderer FPS numbers remain smoke evidence only and are not used to accept or reject libGDX performance.
 
 ## Remaining visual review
 
-For the real heavy corvette specifically inspect:
+Use Tactical and Close-up modes to inspect:
 
+- runtime nose direction relative to procedural ships;
 - tactical-size silhouette readability;
 - wider-zoom readability;
-- whether the sprite appears too visually noisy when downscaled;
-- three main engine glow origins;
-- exhaust direction under ship rotation;
-- nose weapon beam origin;
+- whether the sprite becomes visually noisy when downscaled;
+- three transformed main-engine glow origins;
+- exhaust direction under rotation;
+- transformed nose-weapon beam origin;
+- all five weapon hardpoints;
 - pivot/rotation stability;
 - transparent-edge behavior;
-- footprint plausibility relative to the visible hull;
+- footprint plausibility relative to visible hull;
 - emissive alignment if an optional mask is later added.
 
 ## Decision guideline
@@ -212,8 +251,9 @@ The roadmap target remains 60 FPS at 1920x1080 on the documented reference devel
 
 ## Still required before Stage 8.5 closes
 
-- complete tactical/wide-zoom visual review of the real heavy corvette;
-- verify or adjust engine and weapon hardpoint placement from close screenshots;
+- run the new Tactical and Close-up modes on the real heavy corvette;
+- verify/correct transformed engine and weapon hardpoints from close screenshots;
+- repeat Representative once after orientation normalization to ensure no regression;
 - record CPU/GPU/RAM/driver details for the reference machine;
 - decide whether to create an emissive mask and/or dedicated bloom pass;
 - write the final `KEEP_LIBGDX` or `MIGRATION_RECOMMENDED` decision with evidence;
