@@ -13,66 +13,12 @@ def replace_once(old: str, new: str, label: str) -> None:
 
 
 replace_once(
-    "        this.fleetWorldService = new FleetWorldService(\n"
-    "                this.sessionsById, nextFleetIdValue, fleetPlacements);\n"
-    "        this.fleetJumpService = new FleetJumpService(\n"
-    "                topology, this.sessionsById, this.fleetWorldService,\n"
-    "                JumpTransitTiming.DEFAULT, fleetJumpStates);\n"
-    "        this.activeSystemId = activeSystemId;\n"
-    "        this.strategicStepTicks = strategicStepTicks;\n"
-    "        this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;",
-    "        this.fleetWorldService = new FleetWorldService(\n"
-    "                this.sessionsById, nextFleetIdValue, fleetPlacements);\n"
-    "        this.activeSystemId = activeSystemId;\n"
-    "        this.strategicStepTicks = strategicStepTicks;\n"
-    "        this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;\n"
-    "        this.fleetJumpService = new FleetJumpService(\n"
-    "                topology, this.sessionsById, this.fleetWorldService,\n"
-    "                JumpTransitTiming.DEFAULT, fleetJumpStates, this::synchronizeSystemToTick);",
-    "constructor ordering",
-)
-
-replace_once(
-    "        for (StarSystemId systemId : order) {\n"
-    "            SimulationSession session = sessions.get(systemId);\n"
-    "            if (Float.floatToIntBits(session.getClock().getFixedStepSeconds()) != fixedStepBits) {\n"
-    "                throw new IllegalArgumentException(\"StarSystem sessions используют разные fixed-step durations\");\n"
-    "            }\n"
-    "            if (!systemId.equals(activeId) && session.getClock().getTick() > activeTick) {\n"
-    "                throw new IllegalArgumentException(\"Remote StarSystem не может опережать active system: \" + systemId);\n"
-    "            }\n"
-    "        }\n\n"
-    "        return new WorldSimulation(",
-    "        for (StarSystemId systemId : order) {\n"
-    "            SimulationSession session = sessions.get(systemId);\n"
-    "            if (Float.floatToIntBits(session.getClock().getFixedStepSeconds()) != fixedStepBits) {\n"
-    "                throw new IllegalArgumentException(\"StarSystem sessions используют разные fixed-step durations\");\n"
-    "            }\n"
-    "            if (!systemId.equals(activeId) && session.getClock().getTick() > activeTick) {\n"
-    "                throw new IllegalArgumentException(\"Remote StarSystem не может опережать active system: \" + systemId);\n"
-    "            }\n"
-    "        }\n"
-    "        for (FleetJumpState jump : checked.fleetJumps()) {\n"
-    "            if (jump.phaseStartedTick() > activeTick || jump.phaseEndsTick() <= activeTick) {\n"
-    "                throw new IllegalArgumentException(\n"
-    "                        \"Active jump phase не охватывает authoritative world tick: \" + jump.fleetId());\n"
-    "            }\n"
-    "        }\n\n"
-    "        return new WorldSimulation(",
-    "restore jump tick invariant",
-)
-
-replace_once(
     "        SimulationSession active = sessionsById.get(activeSystemId);\n"
     "        int localTicks = active.advanceFrame(realDeltaSeconds);\n"
-    "        totalLocalFixedTicksExecuted = safeAdd(totalLocalFixedTicksExecuted, localTicks);\n\n"
-    "        int strategicUpdates = 0;\n"
-    "        long activeTick = active.getClock().getTick();",
+    "        totalLocalFixedTicksExecuted = safeAdd(totalLocalFixedTicksExecuted, localTicks);",
     "        SimulationSession active = sessionsById.get(activeSystemId);\n"
-    "        int localTicks = active.advanceFrame(realDeltaSeconds, fleetJumpService::advance);\n"
-    "        totalLocalFixedTicksExecuted = safeAdd(totalLocalFixedTicksExecuted, localTicks);\n\n"
-    "        int strategicUpdates = 0;\n"
-    "        long activeTick = active.getClock().getTick();",
+    "        int localTicks = active.advanceFrame(realDeltaSeconds, this::advanceJumpTransitionsAtTick);\n"
+    "        totalLocalFixedTicksExecuted = safeAdd(totalLocalFixedTicksExecuted, localTicks);",
     "fixed-tick callback",
 )
 replace_once(
@@ -83,5 +29,39 @@ replace_once(
     "        return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));",
     "remove frame-end jump advance",
 )
+replace_once(
+    "        return new WorldSimulation(\n"
+    "                checked.topology(),",
+    "        for (FleetJumpState jump : checked.fleetJumps()) {\n"
+    "            if (jump.phaseStartedTick() > activeTick || jump.phaseEndsTick() <= activeTick) {\n"
+    "                throw new IllegalArgumentException(\n"
+    "                        \"Active jump phase does not cover authoritative world tick: \" + jump.fleetId());\n"
+    "            }\n"
+    "        }\n\n"
+    "        return new WorldSimulation(\n"
+    "                checked.topology(),",
+    "restore jump tick invariant",
+)
+marker = "    private SimulationSession requireLifecycleSession(StarSystemId systemId) {"
+helper = """    private void advanceJumpTransitionsAtTick(long worldTick) {
+        for (FleetJumpState jump : fleetJumpService.snapshots()) {
+            if (jump.phaseEndsTick() > worldTick) {
+                continue;
+            }
+            switch (jump.phase()) {
+                case JUMP_PENDING ->
+                        synchronizeSystemToTick(jump.originSystemId(), jump.phaseEndsTick());
+                case IN_TRANSIT ->
+                        synchronizeSystemToTick(jump.destinationSystemId(), jump.phaseEndsTick());
+                case MOVING_TO_JUMP, ARRIVING -> {
+                    // No cross-session physical handoff occurs at these boundaries.
+                }
+            }
+        }
+        fleetJumpService.advance(worldTick);
+    }
+
+"""
+replace_once(marker, helper + marker, "jump boundary helper")
 
 path.write_text(text)
