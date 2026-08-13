@@ -125,6 +125,26 @@ class EntityLifecycleServiceTest {
     }
 
     @Test
+    void одинаковаяLifecycleПоследовательностьДаётОдинаковыйSnapshot() {
+        SimulationSession first = SimulationSession.createDemo(ROOT_SEED);
+        SimulationSession second = SimulationSession.createDemo(ROOT_SEED);
+
+        for (int index = 0; index < 4; index++) {
+            EntityId firstId = first.createEntity(
+                    emptyPersistentCandidate("Deterministic " + index, index * 10f, index * 20f));
+            EntityId secondId = second.createEntity(
+                    emptyPersistentCandidate("Deterministic " + index, index * 10f, index * 20f));
+            assertEquals(firstId, secondId);
+            if ((index & 1) == 0) {
+                assertTrue(first.removeEntity(firstId));
+                assertTrue(second.removeEntity(secondId));
+            }
+        }
+
+        assertEquals(first.snapshot(), second.snapshot());
+    }
+
+    @Test
     void removeОтклоняетEntityСДеньгамиИлиТоваромНеМеняяRegistry() {
         SimulationSession session = SimulationSession.createDemo(ROOT_SEED);
         Entity station = findFirst(session, WalletComponent.class);

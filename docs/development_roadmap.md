@@ -588,13 +588,13 @@ Construction project должен быть **физическим экономи
 
 #### Задачи
 
-- [x] определить authoritative lifecycle persistent local entities: create/register/disable/destroy/unregister;
+- [x] определить authoritative lifecycle persistent local entities: create/register/structural disable-for-removal/unregister; экономическое destroy непустых assets остаётся Stage 9C;
 - [x] обеспечить deterministic allocation `EntityId` для созданных runtime объектов;
 - [x] добавить безопасный removal path для stations и ships;
 - [x] удаление станции инвалидирует route planner state и cached opportunities;
-- [x] dangling persistent references не переживают destroy;
+- [x] dangling persistent references не переживают structural removal;
 - [x] `EntityRegistry`, `MarketDirectory`, spatial indexes и simulation systems согласованно видят removal;
-- [x] save/load корректно сохраняет мир после create/destroy;
+- [x] save/load корректно сохраняет мир после runtime create/structural removal;
 - [x] active и remote systems поддерживают изменяемый entity count;
 - [x] destruction/removal не нарушает money/resource accounting.
 
@@ -603,7 +603,7 @@ Construction project должен быть **физическим экономи
 - создать станцию -> сохранить -> загрузить -> продолжить;
 - удалить станцию с активными trade routes -> simulation продолжает работу без stale access;
 - удалить и восстановить несколько объектов при одинаковом seed -> deterministic state;
-- уничтоженный объект отсутствует после world save/load.
+- structurally removed объект отсутствует после world save/load; non-empty destruction проверяется Stage 9C.
 
 ### Stage 9B — Persistent Construction Project
 
