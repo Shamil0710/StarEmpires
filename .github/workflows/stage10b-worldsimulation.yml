@@ -16,14 +16,15 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - name: Apply reviewed WorldSimulation patch
-        run: git apply scripts/stage10b_worldsimulation.patch
+      - name: Apply reviewed WorldSimulation updater
+        run: python3 scripts/stage10b_worldsimulation_patch.py
       - name: Commit result and remove temporary files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/main/java/com/spacesim/world/WorldSimulation.java
           git rm scripts/stage10b_worldsimulation.patch
+          git rm scripts/stage10b_worldsimulation_patch.py
           git rm .github/workflows/stage10b-worldsimulation.yml
           git commit -m "feat: integrate Stage 10B jump runtime"
           git push origin HEAD:${GITHUB_REF_NAME}
