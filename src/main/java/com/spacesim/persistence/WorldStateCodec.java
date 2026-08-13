@@ -6,6 +6,8 @@ import com.spacesim.world.ConstructionMaterialState;
 import com.spacesim.world.ConstructionProjectId;
 import com.spacesim.world.ConstructionProjectState;
 import com.spacesim.world.ConstructionProjectStatus;
+import com.spacesim.world.EconomicBottleneckType;
+import com.spacesim.world.FactionEconomicPressureState;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionProductionPolicyState;
 import com.spacesim.world.FactionRelationState;
@@ -43,9 +45,10 @@ import java.util.Objects;
  * Детерминированный бинарный codec {@link WorldState}.
  *
  * <p>Local economic payload кодируется существующим {@link GameStateCodec}. World schema v1
- * содержит topology + local sessions, v2 добавляет treasury, v3 — strategic faction state, а
- * текущая v4 добавляет world-level construction projects и их allocator watermark. Legacy v1-v3
- * мигрируются нейтрально без создания отсутствующих денег, policies или construction projects.</p>
+ * содержит topology + local sessions, v2 добавляет treasury, v3 — strategic faction state,
+ * v4 — world-level construction projects, а текущая v5 добавляет persistent faction economic
+ * pressure/hysteresis. Legacy v1-v4 мигрируются нейтрально без создания отсутствующих денег,
+ * policies, construction projects или pressure observations.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
@@ -63,6 +66,7 @@ public final class WorldStateCodec {
     private static final int MAX_GOALS_PER_FACTION = 100_000;
     private static final int MAX_CONSTRUCTION_PROJECTS = 100_000;
     private static final int MAX_CONSTRUCTION_MATERIALS_PER_PROJECT = 10_000;
+    private static final int MAX_ECONOMIC_PRESSURE_STATES = 1_000_000;
 
     private WorldStateCodec() {
         throw new AssertionError("WorldStateCodec не создаёт экземпляров");
@@ -93,6 +97,7 @@ public final class WorldStateCodec {
                 writeFactionStrategies(output, checked.factionStrategies());
                 output.writeLong(checked.nextConstructionProjectIdValue());
                 writeConstructionProjects(output, checked.constructionProjects());
+                writeEconomicPressureStates(output, checked.factionEconomicPressures());
             }
             byte[] bytes = buffer.toByteArray();
             if (bytes.length > MAX_SAVE_BYTES) {
@@ -127,6 +132,7 @@ public final class WorldStateCodec {
             }
             int schemaVersion = input.readInt();
             if (schemaVersion != WorldState.CURRENT_VERSION
+                    && schemaVersion != WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION
                     && schemaVersion != WorldState.LEGACY_STAGE8_VERSION
                     && schemaVersion != WorldState.LEGACY_FACTION_TREASURY_VERSION
                     && schemaVersion != WorldState.LEGACY_STAGE7_VERSION) {
@@ -147,14 +153,22 @@ public final class WorldStateCodec {
                         state = WorldState.fromLegacyStage8(topology, systems, factions, strategies);
                     } else {
                         long nextConstructionProjectIdValue = input.readLong();
-                        state = new WorldState(
-                                WorldState.CURRENT_VERSION,
-                                topology,
-                                systems,
-                                factions,
-                                strategies,
-                                nextConstructionProjectIdValue,
-                                readConstructionProjects(input));
+                        List<ConstructionProjectState> projects = readConstructionProjects(input);
+                        if (schemaVersion == WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION) {
+                            state = WorldState.fromLegacyStage9Construction(
+                                    topology, systems, factions, strategies,
+                                    nextConstructionProjectIdValue, projects);
+                        } else {
+                            state = new WorldState(
+                                    WorldState.CURRENT_VERSION,
+                                    topology,
+                                    systems,
+                                    factions,
+                                    strategies,
+                                    nextConstructionProjectIdValue,
+                                    projects,
+                                    readEconomicPressureStates(input));
+                        }
                     }
                 }
             }
@@ -347,6 +361,53 @@ public final class WorldStateCodec {
                     buildStartedTick, completedTick, stationId));
         }
         return List.copyOf(projects);
+    }
+
+    private static void writeEconomicPressureStates(
+            DataOutputStream output,
+            List<FactionEconomicPressureState> states) throws IOException {
+        writeCount(output, states.size(), MAX_ECONOMIC_PRESSURE_STATES, "economicPressureStates");
+        for (FactionEconomicPressureState state : states) {
+            writeString(output, state.factionContentId());
+            output.writeLong(state.systemId().value());
+            writeString(output, state.itemContentId());
+            writeString(output, state.bottleneckType().name());
+            output.writeLong(state.firstObservedTick());
+            output.writeLong(state.lastObservedTick());
+            output.writeInt(state.consecutiveObservations());
+            output.writeLong(state.peakUnmetDemandUnits());
+            output.writeLong(state.lastUnmetDemandUnits());
+            output.writeLong(state.cooldownUntilTick());
+        }
+    }
+
+    private static List<FactionEconomicPressureState> readEconomicPressureStates(DataInputStream input)
+            throws IOException {
+        int count = readCount(input, MAX_ECONOMIC_PRESSURE_STATES, "economicPressureStates");
+        List<FactionEconomicPressureState> states = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            String factionId = readString(input);
+            StarSystemId systemId = new StarSystemId(input.readLong());
+            String itemId = readString(input);
+            EconomicBottleneckType type;
+            try {
+                type = EconomicBottleneckType.valueOf(readString(input));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Unknown EconomicBottleneckType", exception);
+            }
+            states.add(new FactionEconomicPressureState(
+                    factionId,
+                    systemId,
+                    itemId,
+                    type,
+                    input.readLong(),
+                    input.readLong(),
+                    input.readInt(),
+                    input.readLong(),
+                    input.readLong(),
+                    input.readLong()));
+        }
+        return List.copyOf(states);
     }
 
     private static void writeOptionalEntityId(DataOutputStream output, EntityId id) throws IOException {

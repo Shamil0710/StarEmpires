@@ -562,7 +562,7 @@ Stage 8.5 завершён, когда:
 
 **Статус:** ACTIVE — STAGE 8.5 GATE PASSED
 
-Текущий implementation focus: **Stage 9C — Destruction и economic shock**.
+Текущий implementation focus: **Stage 9E — Economic resilience benchmark**.
 
 ### Цель
 
@@ -656,19 +656,21 @@ COMPLETED
 
 ### Stage 9C — Destruction и economic shock
 
-**Статус:** ACTIVE
+**Статус:** COMPLETE — PR #15; `docs/stage9c_destruction_and_economic_shock.md`
 
 #### Задачи
 
-- [ ] production-safe API уничтожения station/ship;
-- [ ] destruction удаляет производственную мощность и market availability;
-- [ ] судьба cargo/stock при уничтожении задана явно: destroyed/salvage/transfer;
-- [ ] resource sink от уничтожения отражается в ledger;
-- [ ] destruction создаёт измеримый stockout/unmet demand;
-- [ ] route planner корректно реагирует на исчезнувший market;
-- [ ] events/news могут сообщить об экономически значимом уничтожении.
+- [x] production-safe API уничтожения station/ship;
+- [x] destruction удаляет производственную мощность и market availability;
+- [x] судьба cargo/stock при уничтожении задана явно: destroyed/salvage/transfer;
+- [x] resource sink от уничтожения отражается в ledger;
+- [x] destruction создаёт измеримый stockout/unmet demand;
+- [x] route planner корректно реагирует на исчезнувший market;
+- [x] events/news могут сообщить об экономически значимом уничтожении.
 
 ### Stage 9D — Bottleneck analysis и AI investment
+
+**Статус:** COMPLETE — PR #16 candidate; `docs/stage9d_economic_response.md`
 
 AI должен реагировать не на магические пороги вида `if steel < X build foundry`, а на **дефицит производственной мощности**.
 
@@ -685,16 +687,18 @@ AI должен реагировать не на магические порог
 
 #### Задачи
 
-- [ ] deterministic bottleneck report;
-- [ ] distinction между production shortage и logistics shortage;
-- [ ] faction investment candidate selection;
-- [ ] affordability/budget check;
-- [ ] expected economic utility / strategic utility;
-- [ ] anti-thrashing cooldown/hysteresis;
-- [ ] AI создаёт construction project через тот же API, что позднее будет использовать игрок;
-- [ ] исключить бесконечное строительство из-за временного demand spike.
+- [x] deterministic bottleneck report;
+- [x] distinction между production shortage и logistics shortage;
+- [x] faction investment candidate selection;
+- [x] affordability/budget check;
+- [x] expected economic utility / strategic utility;
+- [x] anti-thrashing cooldown/hysteresis;
+- [x] AI создаёт construction project через тот же API, что позднее будет использовать игрок;
+- [x] исключить бесконечное строительство из-за временного demand spike.
 
 ### Stage 9E — Economic resilience benchmark
+
+**Статус:** ACTIVE
 
 Acceptance scenario:
 

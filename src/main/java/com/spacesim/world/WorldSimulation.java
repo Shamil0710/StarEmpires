@@ -46,6 +46,7 @@ public final class WorldSimulation {
     private final Map<StarSystemId, String> territoryOwnerBySystem;
     private final ConstructionProjectService constructionProjectService;
     private final DestructionService destructionService;
+    private final FactionEconomicPressureTracker economicPressureTracker;
     private final StarSystemId activeSystemId;
     private final int strategicStepTicks;
     private final int remoteUpdateBudgetPerFrame;
@@ -65,6 +66,7 @@ public final class WorldSimulation {
             Map<StarSystemId, String> territoryOwnerBySystem,
             long nextConstructionProjectIdValue,
             List<ConstructionProjectState> constructionProjects,
+            List<FactionEconomicPressureState> factionEconomicPressures,
             StarSystemId activeSystemId,
             int strategicStepTicks,
             int remoteUpdateBudgetPerFrame) {
@@ -88,6 +90,7 @@ public final class WorldSimulation {
                 this.sessionsById,
                 this.factionAccountsById,
                 this.constructionProjectService);
+        this.economicPressureTracker = new FactionEconomicPressureTracker(factionEconomicPressures);
         this.activeSystemId = activeSystemId;
         this.strategicStepTicks = strategicStepTicks;
         this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;
@@ -214,6 +217,7 @@ public final class WorldSimulation {
                 territoryOwners,
                 checked.nextConstructionProjectIdValue(),
                 checked.constructionProjects(),
+                checked.factionEconomicPressures(),
                 activeId,
                 strategicStepTicks,
                 remoteUpdateBudgetPerFrame);
@@ -243,6 +247,33 @@ public final class WorldSimulation {
         }
         constructionProjectService.advance();
         return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));
+    }
+
+    /**
+     * Выполняет один deterministic Stage-9D economic investment decision для всех factions.
+     *
+     * <p>Сначала измеряются physical bottlenecks и обновляется persistent hysteresis,
+     * затем каждая faction может создать не более одного обычного Stage-9B ConstructionProject.</p>
+     *
+     * @return число новых construction projects, созданных этим decision
+     */
+    public int applyEconomicInvestmentDecision() {
+        EconomicBottleneckReport report = EconomicBottleneckAnalyzer.analyze(this, contentCatalog);
+        long tick = sessionsById.get(activeSystemId).getClock().getTick();
+        economicPressureTracker.observe(factionStrategies, report, tick);
+        int createdProjects = 0;
+        for (String factionId : factionOrder) {
+            if (FactionInvestmentPlanner.evaluateFaction(this, contentCatalog, economicPressureTracker, factionId)
+                    .isPresent()) {
+                createdProjects++;
+            }
+        }
+        return createdProjects;
+    }
+
+    /** @return canonical immutable persistent Stage-9D pressure states */
+    public List<FactionEconomicPressureState> getFactionEconomicPressureStates() {
+        return economicPressureTracker.snapshots();
     }
 
     /**
@@ -429,7 +460,8 @@ public final class WorldSimulation {
                 List.copyOf(factionStates),
                 factionStrategies,
                 constructionProjectService.nextIdValue(),
-                constructionProjectService.snapshots());
+                constructionProjectService.snapshots(),
+                economicPressureTracker.snapshots());
     }
 
     /**
