@@ -1,0 +1,67 @@
+name: Stage 9B legacy test fix
+
+on:
+  push:
+    branches: [agent/stage9b-construction-project]
+    paths: ['.github/workflows/stage9b-legacy-test-fix.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: agent/stage9b-construction-project
+          fetch-depth: 0
+      - name: Update legacy/persistence tests for WorldState v4 and JSON formatting independence
+        shell: python
+        run: |
+          from pathlib import Path
+
+          for filename in [
+              'src/test/java/com/spacesim/persistence/SimulationPersistenceTest.java',
+              'src/test/java/com/spacesim/persistence/WorldPersistenceTest.java']:
+              p = Path(filename)
+              text = p.read_text(encoding='utf-8')
+              old = 'String json = defaultJson().replace("\\\"basePrice\\\":10.0", "\\\"basePrice\\\":11.0");'
+              new = 'String json = defaultJson().replaceFirst("\\\"basePrice\\\"\\\\s*:\\s*10\\\\.0", "\\\"basePrice\\\": 11.0");'
+              if old not in text:
+                  raise SystemExit(f'changedCatalog fragment missing in {filename}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('src/test/java/com/spacesim/persistence/WorldStateCodecTest.java')
+          text = p.read_text(encoding='utf-8')
+          old = '''        // Current v3 with empty faction layers appends two zero counts: factions + strategies.\n        byte[] legacyBytes = Arrays.copyOf(currentBytes, currentBytes.length - 2 * Integer.BYTES);'''
+          new = '''        // Current v4 adds factions + strategies + construction allocator watermark + project count.\n        // Exact v1 layout ends before all four of those layers.\n        byte[] legacyBytes = Arrays.copyOf(\n                currentBytes,\n                currentBytes.length - 3 * Integer.BYTES - Long.BYTES);'''
+          if old not in text:
+              raise SystemExit('v1 legacy fragment missing')
+          text = text.replace(old, new, 1)
+
+          old = '''        // v3 appends only the empty strategic-state count after the exact v2 layout.\n        byte[] v2Bytes = Arrays.copyOf(currentBytes, currentBytes.length - Integer.BYTES);'''
+          new = '''        // Current v4 appends empty strategic-state count, construction allocator watermark\n        // and empty project count after the exact v2 layout.\n        byte[] v2Bytes = Arrays.copyOf(\n                currentBytes,\n                currentBytes.length - 2 * Integer.BYTES - Long.BYTES);'''
+          if old not in text:
+              raise SystemExit('v2 legacy fragment missing')
+          text = text.replace(old, new, 1)
+
+          # Add explicit v3 migration coverage after v2 test.
+          marker = '''    @Test\n    void canonicalOrderingДелаетРазныйВходнойПорядокОднимWorldSave() {'''
+          addition = '''    @Test\n    void stage8SchemaV3МигрируетСStrategicStateНоБезConstruction() {\n        WorldState current = strategicWorld();\n        byte[] currentBytes = WorldStateCodec.encode(current);\n\n        // v4 adds only construction allocator watermark + project count after the exact v3 layout.\n        byte[] v3Bytes = Arrays.copyOf(\n                currentBytes,\n                currentBytes.length - Long.BYTES - Integer.BYTES);\n        ByteBuffer.wrap(v3Bytes).putInt(8, WorldState.LEGACY_STAGE8_VERSION);\n\n        WorldState migrated = WorldStateCodec.decode(v3Bytes);\n\n        assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());\n        assertEquals(current.topology(), migrated.topology());\n        assertEquals(current.systems(), migrated.systems());\n        assertEquals(current.factions(), migrated.factions());\n        assertEquals(current.factionStrategies(), migrated.factionStrategies());\n        assertEquals(1L, migrated.nextConstructionProjectIdValue());\n        assertEquals(List.of(), migrated.constructionProjects());\n    }\n\n'''
+          if marker not in text:
+              raise SystemExit('migration insertion marker missing')
+          text = text.replace(marker, addition + marker, 1)
+          p.write_text(text, encoding='utf-8')
+
+          debug = Path('docs/stage9b_ci_debug_2.txt')
+          if debug.exists():
+              debug.unlink()
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/stage9b-legacy-test-fix.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add -A
+          git commit -m "test: update persistence coverage for WorldState v4"
+          git push origin HEAD:agent/stage9b-construction-project
