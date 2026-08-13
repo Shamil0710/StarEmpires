@@ -164,6 +164,25 @@ public class TradeAISystem extends IteratingSystem {
     }
 
     /**
+     * Invalidates transient planner state after authoritative entity removal.
+     *
+     * <p>The removed entity ID is dropped from per-fleet negative-search cache. When the removed
+     * entity was a market, the shared immutable market snapshot is discarded immediately so no
+     * route planner invocation can observe it as a candidate.</p>
+     *
+     * @param removedId persistent ID that left the local simulation
+     * @param marketRemoved whether the removed entity participated as a market station
+     */
+    public void invalidateAfterEntityRemoval(EntityId removedId, boolean marketRemoved) {
+        if (removedId != null) {
+            failedRouteSearches.remove(removedId);
+        }
+        if (marketRemoved) {
+            marketDirectory.invalidate();
+        }
+    }
+
+    /**
      * Подключает registry к Engine и получает живое представление идентифицированных рынков.
      *
      * @param engine Ashley-движок

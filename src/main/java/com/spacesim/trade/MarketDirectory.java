@@ -63,6 +63,29 @@ public final class MarketDirectory {
     }
 
     /**
+     * Немедленно отбрасывает transient market snapshot и все derived shortlist.
+     *
+     * <p>Метод используется lifecycle boundary при удалении рынка. Следующий
+     * {@link #rebuild(Iterable)} построит snapshot только из оставшихся live ECS entities.
+     * Revision меняется сразу, поэтому negative-route caches не могут считать старый snapshot
+     * актуальным даже до следующей полной перестройки.</p>
+     *
+     * @throws IllegalStateException если revision исчерпан
+     */
+    public void invalidate() {
+        if (revision == Long.MAX_VALUE) {
+            throw new IllegalStateException("Диапазон MarketDirectory revision исчерпан");
+        }
+        stations = List.of();
+        byId = Map.of();
+        suppliersByItem = emptyIndex();
+        consumersByItem = emptyIndex();
+        opportunitiesByItem = emptyOpportunityIndex();
+        seenLiveIds.clear();
+        revision++;
+    }
+
+    /**
      * Перестраивает immutable snapshot из текущих ECS entities.
      *
      * <p>Сущности без полного market-набора компонентов игнорируются. Дублирующий persistent ID

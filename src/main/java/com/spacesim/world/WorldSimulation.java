@@ -8,6 +8,7 @@ import com.spacesim.components.MarketComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.persistence.EntityId;
 import com.spacesim.simulation.SimulationSession;
 
 import java.util.ArrayList;
@@ -421,6 +422,33 @@ public final class WorldSimulation {
         return Optional.ofNullable(systemId == null ? null : sessionsById.get(systemId));
     }
 
+    /**
+     * Создаёт persistent Entity в указанной active или remote StarSystem.
+     *
+     * @param systemId существующая StarSystem
+     * @param entity detached экономически пустая Entity без persistent ID
+     * @return новый system-local persistent EntityId
+     * @throws NullPointerException если system ID или Entity не заданы
+     * @throws IllegalArgumentException если StarSystem отсутствует
+     */
+    public EntityId createEntity(StarSystemId systemId, Entity entity) {
+        return requireLifecycleSession(systemId).createEntity(
+                Objects.requireNonNull(entity, "Создаваемая Entity не задана"));
+    }
+
+    /**
+     * Структурно удаляет экономически пустую Entity из active или remote StarSystem.
+     *
+     * @param systemId существующая StarSystem
+     * @param entityId persistent ID либо {@code null}
+     * @return {@code true}, если Entity существовала и была удалена
+     * @throws NullPointerException если system ID не задан
+     * @throws IllegalArgumentException если StarSystem отсутствует
+     */
+    public boolean removeEntity(StarSystemId systemId, EntityId entityId) {
+        return requireLifecycleSession(systemId).removeEntity(entityId);
+    }
+
     /** @return immutable Galaxy topology этого runtime world */
     public GalaxyTopology getTopology() {
         return topology;
@@ -473,6 +501,15 @@ public final class WorldSimulation {
             throw new IllegalArgumentException("StarSystem clock опережает active clock: " + systemId);
         }
         return activeTick - remoteTick;
+    }
+
+    private SimulationSession requireLifecycleSession(StarSystemId systemId) {
+        StarSystemId checked = Objects.requireNonNull(systemId, "StarSystemId lifecycle не задан");
+        SimulationSession session = sessionsById.get(checked);
+        if (session == null) {
+            throw new IllegalArgumentException("Неизвестная StarSystem: " + checked);
+        }
+        return session;
     }
 
     private FactionEconomicAccount requireFactionAccount(String factionId) {
