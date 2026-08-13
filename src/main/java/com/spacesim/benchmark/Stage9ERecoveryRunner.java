@@ -145,6 +145,7 @@ final class Stage9ERecoveryRunner {
             progress.projectId = project.id().value();
             progress.decisionTick = tick;
             progress.funding = project.minimumFundingMilliCredits();
+            Stage9ESetup.releaseReserves(inner);
         }
         progress.deliveredSteel = Stage9EMetrics.delivered(project, STEEL);
         progress.deliveredEnergy = Stage9EMetrics.delivered(project, ENERGY);
