@@ -2,17 +2,10 @@ package com.spacesim.presentation.asset;
 
 import java.util.List;
 
-/**
- * Production-facing presentation specifications for project ship art.
- *
- * <p>These definitions describe how authored textures are placed and decorated. They are not
- * gameplay archetypes: combat statistics, persistence identity and economic semantics remain in
- * their authoritative systems.</p>
- */
+/** Production-facing presentation specifications for project ship art. */
 public final class ProjectShipSprites {
     /** Presentation asset ID for the first heavy corvette visual. */
-    public static final String WHITE_HEAVY_CORVETTE_01_ID =
-            "ship.heavy_corvette.white_01";
+    public static final String WHITE_HEAVY_CORVETTE_01_ID = "ship.heavy_corvette.white_01";
 
     /** Base texture expected by the Stage-8.5 real-art validation. */
     public static final String WHITE_HEAVY_CORVETTE_01_BASE =
@@ -28,12 +21,10 @@ public final class ProjectShipSprites {
     /**
      * Returns the initial production-like heavy-corvette visual contract.
      *
-     * <p>The source art is authored nose-left / exhaust-right. Hardpoint coordinates use the
-     * package convention: normalized origin at the sprite bottom-left. Direction {@code 0} points
-     * right and {@code 180} points left. The footprint is deliberately narrower than the visible
-     * armor silhouette and engine exhaust.</p>
-     *
-     * @return immutable-by-construction heavy-corvette sprite specification
+     * <p>The source art is authored nose-left / exhaust-right, while the runtime presentation
+     * convention is forward-right. {@link SpriteOrientationTransform} therefore mirrors the sprite,
+     * hardpoint positions and visual directions as one transform. Hardpoint coordinates retain the
+     * authored-source convention with normalized origin at bottom-left.</p>
      */
     public static ShipSpriteSpec whiteHeavyCorvette01() {
         return new ShipSpriteSpec(
@@ -46,60 +37,16 @@ public final class ProjectShipSprites {
                 0.50f,
                 86.4f,
                 41.8f,
+                SourceFacing.LEFT,
                 List.of(
-                        new VisualHardpoint(
-                                "engine_main_top",
-                                VisualHardpointType.ENGINE,
-                                0.855f,
-                                0.674f,
-                                0f),
-                        new VisualHardpoint(
-                                "engine_main_mid",
-                                VisualHardpointType.ENGINE,
-                                0.866f,
-                                0.500f,
-                                0f),
-                        new VisualHardpoint(
-                                "engine_main_bottom",
-                                VisualHardpointType.ENGINE,
-                                0.855f,
-                                0.326f,
-                                0f),
-                        new VisualHardpoint(
-                                "weapon_nose_primary",
-                                VisualHardpointType.WEAPON,
-                                0.055f,
-                                0.500f,
-                                180f),
-                        new VisualHardpoint(
-                                "weapon_forward_upper",
-                                VisualHardpointType.WEAPON,
-                                0.165f,
-                                0.620f,
-                                180f),
-                        new VisualHardpoint(
-                                "weapon_forward_lower",
-                                VisualHardpointType.WEAPON,
-                                0.165f,
-                                0.380f,
-                                180f),
-                        new VisualHardpoint(
-                                "weapon_mid_upper",
-                                VisualHardpointType.WEAPON,
-                                0.440f,
-                                0.720f,
-                                180f),
-                        new VisualHardpoint(
-                                "weapon_mid_lower",
-                                VisualHardpointType.WEAPON,
-                                0.440f,
-                                0.280f,
-                                180f),
-                        new VisualHardpoint(
-                                "utility_center",
-                                VisualHardpointType.UTILITY,
-                                0.560f,
-                                0.500f,
-                                180f)));
+                        new VisualHardpoint("engine_main_top", VisualHardpointType.ENGINE, 0.855f, 0.674f, 0f),
+                        new VisualHardpoint("engine_main_mid", VisualHardpointType.ENGINE, 0.866f, 0.500f, 0f),
+                        new VisualHardpoint("engine_main_bottom", VisualHardpointType.ENGINE, 0.855f, 0.326f, 0f),
+                        new VisualHardpoint("weapon_nose_primary", VisualHardpointType.WEAPON, 0.055f, 0.500f, 180f),
+                        new VisualHardpoint("weapon_forward_upper", VisualHardpointType.WEAPON, 0.165f, 0.620f, 180f),
+                        new VisualHardpoint("weapon_forward_lower", VisualHardpointType.WEAPON, 0.165f, 0.380f, 180f),
+                        new VisualHardpoint("weapon_mid_upper", VisualHardpointType.WEAPON, 0.440f, 0.720f, 180f),
+                        new VisualHardpoint("weapon_mid_lower", VisualHardpointType.WEAPON, 0.440f, 0.280f, 180f),
+                        new VisualHardpoint("utility_center", VisualHardpointType.UTILITY, 0.560f, 0.500f, 180f)));
     }
 }
