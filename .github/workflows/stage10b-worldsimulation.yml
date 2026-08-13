@@ -1,0 +1,29 @@
+name: Stage 10B WorldSimulation
+
+on:
+  push:
+    branches:
+      - agent/stage10b-jump-transit
+    paths:
+      - .github/workflows/stage10b-worldsimulation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply reviewed WorldSimulation patch
+        run: git apply scripts/stage10b_worldsimulation.patch
+      - name: Commit result and remove temporary files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/WorldSimulation.java
+          git rm scripts/stage10b_worldsimulation.patch
+          git rm .github/workflows/stage10b-worldsimulation.yml
+          git commit -m "feat: integrate Stage 10B jump runtime"
+          git push origin HEAD:${GITHUB_REF_NAME}
