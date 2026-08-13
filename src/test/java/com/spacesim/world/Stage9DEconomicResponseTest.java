@@ -83,6 +83,50 @@ class Stage9DEconomicResponseTest {
         assertTrue(FactionInvestmentPlanner.evaluateFaction(world, content, tracker, MINERS).isEmpty());
     }
 
+    @Test
+    void worldPressureПереживаетSnapshotRestoreИПродолжаетHysteresis() {
+        ContentCatalog content = ContentCatalogLoader.loadDefault();
+        WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
+        destroyFoundry(world);
+
+        world.advanceFrame(0.1f);
+        assertEquals(0, world.applyEconomicInvestmentDecision());
+        world.advanceFrame(0.1f);
+        assertEquals(0, world.applyEconomicInvestmentDecision());
+        FactionEconomicPressureState beforeSave = findSteelPressure(world);
+        assertEquals(2, beforeSave.consecutiveObservations());
+
+        WorldSimulation restored = WorldSimulation.restore(world.snapshot(), DemoGalaxyFactory.ACTIVE_SYSTEM_ID);
+        assertEquals(world.getFactionEconomicPressureStates(), restored.getFactionEconomicPressureStates());
+        restored.advanceFrame(0.1f);
+        assertTrue(restored.applyEconomicInvestmentDecision() >= 1);
+        assertEquals(1, countActiveProducerProjects(restored, content, "item.steel"));
+        assertTrue(findSteelPressure(restored).cooldownUntilTick()
+                > restored.findSession(restored.getActiveSystemId()).orElseThrow().getClock().getTick());
+    }
+
+    @Test
+    void worldDecisionRepeatedInSameTickНеСоздаётПреждевременныйProject() {
+        ContentCatalog content = ContentCatalogLoader.loadDefault();
+        WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
+        destroyFoundry(world);
+
+        assertEquals(0, world.applyEconomicInvestmentDecision());
+        assertEquals(0, world.applyEconomicInvestmentDecision());
+        assertEquals(0, world.applyEconomicInvestmentDecision());
+        assertEquals(1, findSteelPressure(world).consecutiveObservations());
+        assertEquals(0, countActiveProducerProjects(world, content, "item.steel"));
+    }
+
+    private static FactionEconomicPressureState findSteelPressure(WorldSimulation world) {
+        return world.getFactionEconomicPressureStates().stream()
+                .filter(value -> value.factionContentId().equals(MINERS)
+                        && value.systemId().equals(DemoGalaxyFactory.INNER_SYSTEM_ID)
+                        && value.itemContentId().equals("item.steel"))
+                .findFirst()
+                .orElseThrow();
+    }
+
     private static int countActiveProducerProjects(
             WorldSimulation world, ContentCatalog content, String itemContentId) {
         int count = 0;
