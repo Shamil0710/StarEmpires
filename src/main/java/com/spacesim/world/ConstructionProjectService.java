@@ -279,6 +279,27 @@ final class ConstructionProjectService {
         return idAllocator.peekNextValue();
     }
 
+    ConstructionProjectId failDestroyedSite(
+            StarSystemId systemId, EntityId entityId, long tick) {
+        if (systemId == null || entityId == null) {
+            return null;
+        }
+        for (ConstructionProjectState state : new ArrayList<>(projects.values())) {
+            if (isTerminal(state.status())
+                    || !state.systemId().equals(systemId)
+                    || !entityId.equals(state.constructionSiteEntityId())) {
+                continue;
+            }
+            ConstructionProjectState refreshed = refresh(state);
+            ConstructionProjectState failed = copy(
+                    refreshed, ConstructionProjectStatus.FAILED, tick, refreshed.buildStartedTick(), tick,
+                    null, null, refreshed.materials(), 0L);
+            projects.put(state.id(), failed);
+            return state.id();
+        }
+        return null;
+    }
+
     boolean isConstructionSite(StarSystemId systemId, EntityId entityId) {
         if (systemId == null || entityId == null) {
             return false;
@@ -386,10 +407,6 @@ final class ConstructionProjectService {
         requireFactionAccount(state.ownerFactionContentId());
         SimulationSession session = requireSession(state.systemId());
         if (isTerminal(state.status())) {
-            if (state.status() == ConstructionProjectStatus.COMPLETED
-                    && session.getEntityRegistry().find(state.completedStationEntityId()) == null) {
-                throw new IllegalArgumentException("Restored construction project потерял completed station");
-            }
             return state;
         }
         Entity site = requireSite(state);
@@ -475,7 +492,9 @@ final class ConstructionProjectService {
     }
 
     private static boolean isTerminal(ConstructionProjectStatus status) {
-        return status == ConstructionProjectStatus.COMPLETED || status == ConstructionProjectStatus.CANCELLED;
+        return status == ConstructionProjectStatus.COMPLETED
+                || status == ConstructionProjectStatus.CANCELLED
+                || status == ConstructionProjectStatus.FAILED;
     }
 
     private static String normalizedId(String value, String label) {
