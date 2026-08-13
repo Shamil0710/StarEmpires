@@ -2,7 +2,7 @@
 
 ## Status
 
-**COMPLETE candidate.** Stage 9D adds deterministic physical bottleneck analysis, persistent faction-specific pressure hysteresis, and a planner that funds ordinary Stage-9B construction projects instead of spawning replacement capacity directly.
+**COMPLETE.** Stage 9D adds deterministic physical bottleneck analysis, persistent faction-specific pressure hysteresis, and a planner that funds ordinary Stage-9B construction projects instead of spawning replacement capacity directly.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ Selected responses use the same public construction API intended for later playe
 
 ## Verification
 
-Tests cover destroyed foundry → steel production-capacity shortage; input-starved foundry → logistics shortage; deterministic reports; v5 pressure round-trip and v4 migration; same-tick hysteresis protection; physical replacement foundry creation/funding; same-item anti-overbuilding; no redundant steel producer for logistics shortage; pressure continuation through world snapshot/restore; and zero-treasury budget gating. Normal Java 17 CI still enforces tests, JaCoCo, strict Javadoc and desktop packaging.
+Tests cover destroyed foundry → steel production-capacity shortage; input-starved foundry → logistics shortage; deterministic reports; v5 pressure round-trip and v4 migration; same-tick hysteresis protection; physical replacement foundry creation/funding; same-item anti-overbuilding; no redundant steel producer for logistics shortage; pressure continuation through world snapshot/restore; zero-treasury budget gating; and saturation of diagnostic severity ranking. Normal Java 17 CI still enforces tests, JaCoCo, strict Javadoc and desktop packaging.
 
 ## Stage 9E handoff
 
