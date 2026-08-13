@@ -114,6 +114,8 @@ public class MarketSystem extends EntitySystem {
                 market.sellPrices[itemId] = procurement == null ? dynamicSellPrice : 0f;
                 market.buyPrices[itemId] = procurement == null
                         ? dynamicSellPrice * 0.9f
+                        : inventory.stock[itemId] >= market.targetStock[itemId]
+                        ? 0f
                         : procurement.buyPrice(itemId);
             }
             market.isDirty = false;
