@@ -1,0 +1,31 @@
+{
+  "assetId": "ship.heavy_corvette.white_01",
+  "sourceFacing": "LEFT",
+  "runtimeForward": "RIGHT",
+  "fullFrameLayers": {
+    "base": "heavy_corvette_white_01_base.png",
+    "emissive": "heavy_corvette_white_01_emissive.png",
+    "damage": "heavy_corvette_white_01_damage.png",
+    "requirements": [
+      "sameCanvasSize",
+      "samePixelAlignment",
+      "transparentBackground"
+    ]
+  },
+  "engineVfx": {
+    "idle": "heavy_corvette_white_01_engine_idle.png",
+    "thrust": "heavy_corvette_white_01_engine_thrust.png",
+    "sourceAttachment": "LEFT_CENTER",
+    "sourcePlumeDirection": "RIGHT",
+    "transparentBackground": true
+  },
+  "presentation": {
+    "worldWidth": 120.0,
+    "worldHeight": 72.0,
+    "pivot": [0.5, 0.5],
+    "collisionFootprint": [86.4, 41.8],
+    "engineHardpoints": 3,
+    "weaponHardpoints": 5,
+    "utilityHardpoints": 1
+  }
+}
