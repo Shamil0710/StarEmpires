@@ -1,0 +1,70 @@
+name: Stage 9A roadmap finalizer
+
+on:
+  push:
+    branches:
+      - agent/stage9a-entity-lifecycle
+    paths:
+      - '.github/workflows/stage9a-roadmap-finalize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v5
+        with:
+          ref: agent/stage9a-entity-lifecycle
+          fetch-depth: 0
+      - name: Update roadmap
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('docs/development_roadmap.md')
+          text = path.read_text(encoding='utf-8')
+
+          text = text.replace(
+              'Текущий implementation focus: **Stage 9A — Entity lifecycle infrastructure**.',
+              'Текущий implementation focus: **Stage 9B — Persistent Construction Project**.',
+              1)
+
+          start = text.index('### Stage 9A — Entity lifecycle infrastructure')
+          end = text.index('### Stage 9B — Persistent Construction Project', start)
+          section = text[start:end]
+          if '**Статус:** COMPLETE' not in section:
+              section = section.replace(
+                  '### Stage 9A — Entity lifecycle infrastructure\n\n',
+                  '### Stage 9A — Entity lifecycle infrastructure\n\n**Статус:** COMPLETE — PR #13 candidate; `docs/stage9a_entity_lifecycle.md`\n\n',
+                  1)
+          section = section.replace('- [ ]', '- [x]')
+          text = text[:start] + section + text[end:]
+
+          text = text.replace(
+              '### Stage 9B — Persistent Construction Project\n\n',
+              '### Stage 9B — Persistent Construction Project\n\n**Статус:** ACTIVE\n\n',
+              1)
+
+          text = text.replace(
+              '**ACTIVE: Stage 9A — Entity lifecycle infrastructure.**',
+              '**ACTIVE: Stage 9B — Persistent Construction Project.**',
+              1)
+
+          old_sequence = '''Immediate implementation sequence:\n\n1. authoritative create/register/disable/destroy/unregister lifecycle для persistent local entities;\n2. deterministic allocation новых `EntityId`;\n3. safe station/ship removal с invalidation route/cache/index state;\n4. save/load continuation после runtime create/destroy;\n5. проверить отсутствие dangling persistent references и conservation regressions;\n6. после green Stage 9A перейти к persistent `ConstructionProject` (Stage 9B).'''
+          new_sequence = '''Immediate implementation sequence:\n\n1. persistent `ConstructionProject` ID/state model и state machine;\n2. data-driven material requirements для station archetype;\n3. project wallet и physical faction funding;\n4. project storage и частичные material deliveries;\n5. save/load continuation construction progress;\n6. completion через Stage-9A lifecycle без magic stock/money creation;\n7. cancellation/refund policy с conservation tests;\n8. затем Stage 9C destruction/economic shock.'''
+          if old_sequence not in text:
+              raise SystemExit('Current-next-step sequence not found')
+          text = text.replace(old_sequence, new_sequence, 1)
+
+          path.write_text(text, encoding='utf-8')
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/stage9a-roadmap-finalize.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add docs/development_roadmap.md .github/workflows/stage9a-roadmap-finalize.yml
+          git commit -m "docs: complete Stage 9A and activate Stage 9B"
+          git push origin HEAD:agent/stage9a-entity-lifecycle
