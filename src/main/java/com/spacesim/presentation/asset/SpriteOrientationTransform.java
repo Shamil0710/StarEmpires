@@ -13,7 +13,12 @@ public final class SpriteOrientationTransform {
     private SpriteOrientationTransform() {
     }
 
-    /** @return horizontal render scale required to normalize the authored texture */
+    /**
+     * Returns the horizontal render scale required to normalize the authored texture.
+     *
+     * @param spec sprite contract whose authored facing is being normalized
+     * @return positive one for right-facing source art or negative one for left-facing source art
+     */
     public static float horizontalScale(ShipSpriteSpec spec) {
         return Objects.requireNonNull(spec, "Sprite spec must not be null")
                 .sourceFacing()
@@ -37,15 +42,29 @@ public final class SpriteOrientationTransform {
                 * horizontalScale(spec);
     }
 
-    /** Converts an authored normalized Y coordinate into pivot-relative runtime local Y. */
+    /**
+     * Converts an authored normalized Y coordinate into pivot-relative runtime local Y.
+     *
+     * @param spec sprite contract
+     * @param normalizedY authored normalized Y in [0,1]
+     * @param renderScale positive additional preview/render scale
+     * @return runtime local Y relative to the pivot
+     */
     public static float localY(ShipSpriteSpec spec, float normalizedY, float renderScale) {
         validateNormalized(normalizedY, "normalized Y");
         validateScale(renderScale);
         return (normalizedY - spec.pivotY()) * spec.worldHeight() * renderScale;
     }
 
-    /** Mirrors an authored visual direction when necessary and normalizes it into [0,360). */
+    /**
+     * Mirrors an authored visual direction when necessary and normalizes it into [0,360).
+     *
+     * @param spec sprite contract whose authored facing is being normalized
+     * @param authoredDirectionDegrees direction expressed in authored sprite space
+     * @return runtime-normalized direction in degrees in [0,360)
+     */
     public static float directionDegrees(ShipSpriteSpec spec, float authoredDirectionDegrees) {
+        Objects.requireNonNull(spec, "Sprite spec must not be null");
         if (!Float.isFinite(authoredDirectionDegrees)) {
             throw new IllegalArgumentException("Direction must be finite");
         }
