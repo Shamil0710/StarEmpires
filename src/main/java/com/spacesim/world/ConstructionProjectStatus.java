@@ -13,5 +13,7 @@ public enum ConstructionProjectStatus {
     /** Target station was created and construction resources were consumed. */
     COMPLETED,
     /** Project was cancelled before any construction material was delivered. */
-    CANCELLED
+    CANCELLED,
+    /** Physical construction site was destroyed before completion. */
+    FAILED
 }
