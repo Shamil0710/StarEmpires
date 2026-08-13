@@ -1,0 +1,37 @@
+name: Stage 9C construction failure API
+
+on:
+  push:
+    branches: [agent/stage9c-destruction-shock]
+    paths: ['.github/workflows/stage9c-construction-failure-api.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: agent/stage9c-destruction-shock
+          fetch-depth: 0
+      - name: Preserve construction history when site is destroyed
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/main/java/com/spacesim/world/ConstructionProjectService.java')
+          text = p.read_text(encoding='utf-8')
+          old = '''    ConstructionProjectId failDestroyedSite(\n            StarSystemId systemId, EntityId entityId, long tick) {\n        if (systemId == null || entityId == null) {\n            return null;\n        }\n        for (ConstructionProjectState state : new ArrayList<>(projects.values())) {\n            if (isTerminal(state.status())\n                    || !state.systemId().equals(systemId)\n                    || !entityId.equals(state.constructionSiteEntityId())) {\n                continue;\n            }\n            ConstructionProjectState refreshed = refresh(state);\n            ConstructionProjectState failed = copy(\n                    refreshed, ConstructionProjectStatus.FAILED, tick, refreshed.buildStartedTick(), tick,\n                    null, null, refreshed.materials(), 0L);\n            projects.put(state.id(), failed);\n            return state.id();\n        }\n        return null;\n    }\n\n'''
+          new = '''    ConstructionProjectState findBySite(StarSystemId systemId, EntityId entityId) {\n        if (systemId == null || entityId == null) {\n            return null;\n        }\n        for (ConstructionProjectState state : projects.values()) {\n            if (!isTerminal(state.status())\n                    && state.systemId().equals(systemId)\n                    && entityId.equals(state.constructionSiteEntityId())) {\n                return snapshotState(state);\n            }\n        }\n        return null;\n    }\n\n    ConstructionProjectId failDestroyedSite(ConstructionProjectState beforeDestruction, long tick) {\n        if (beforeDestruction == null) {\n            return null;\n        }\n        ConstructionProjectState current = projects.get(beforeDestruction.id());\n        if (current == null || isTerminal(current.status())\n                || !current.systemId().equals(beforeDestruction.systemId())\n                || !Objects.equals(current.constructionSiteEntityId(), beforeDestruction.constructionSiteEntityId())) {\n            throw new IllegalStateException("Construction project изменился во время destruction: "\n                    + beforeDestruction.id());\n        }\n        ConstructionProjectState failed = copy(\n                beforeDestruction,\n                ConstructionProjectStatus.FAILED,\n                tick,\n                beforeDestruction.buildStartedTick(),\n                tick,\n                null,\n                null,\n                beforeDestruction.materials(),\n                0L);\n        projects.put(beforeDestruction.id(), failed);\n        return beforeDestruction.id();\n    }\n\n'''
+          if old not in text:
+              raise SystemExit('Old construction failure block not found')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/stage9c-construction-failure-api.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: preserve construction history on site destruction"
+          git push origin HEAD:agent/stage9c-destruction-shock
