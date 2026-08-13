@@ -799,7 +799,7 @@ IN_SYSTEM
 
 ### Stage 10C — Galactic route planner
 
-**Статус:** COMPLETE candidate — `docs/stage10c_galactic_route_planner.md`
+**Статус:** COMPLETE — PR #21; `docs/stage10c_galactic_route_planner.md`
 
 Расширить planning от локального:
 

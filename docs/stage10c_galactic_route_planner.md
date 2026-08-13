@@ -1,6 +1,6 @@
 # Stage 10C — Galactic Route Planner
 
-Status: COMPLETE candidate pending PR merge. Stage 10D is the next active implementation focus in the roadmap.
+Status: COMPLETE — PR #21 pending merge. Stage 10D is the next active implementation focus in the roadmap.
 
 ## Purpose
 
