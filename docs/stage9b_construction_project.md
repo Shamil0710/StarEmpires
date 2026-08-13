@@ -1,6 +1,6 @@
 # Stage 9B — Persistent Construction Project
 
-**Status:** COMPLETE candidate — awaiting exact-head CI
+**Status:** COMPLETE
 
 ## Core model
 
@@ -73,7 +73,7 @@ On completion:
 
 ## Verification
 
-Automated coverage now includes:
+Automated coverage includes:
 
 - project creation and stable IDs;
 - data-driven construction requirements and fingerprint sensitivity;
@@ -92,8 +92,8 @@ Automated coverage now includes:
 - finished station with no bootstrap money/stock source;
 - money/resource conservation boundaries.
 
-The final diagnostic run confirmed **all 324 tests passing**; the only remaining gate at that point was strict Javadoc on new public record constructors, which has now been corrected. This ordinary connector commit intentionally triggers the final exact-head Java 17 CI including tests, coverage, Javadoc and packaging.
+Before roadmap finalization, exact-head Java 17 CI passed all 324 tests, coverage, strict Javadoc and desktop packaging. The final branch checkpoint repeats the same gate after recording Stage 9B completion.
 
 ## Consequence
 
-After exact-head CI succeeds, Stage 9B can merge and Stage 9C — Destruction and Economic Shock — becomes active.
+Stage 9B is complete. Stage 9C — Destruction and Economic Shock — is the next active substage.
