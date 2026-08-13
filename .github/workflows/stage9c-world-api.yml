@@ -1,0 +1,45 @@
+name: Stage 9C world API integration
+
+on:
+  push:
+    branches: [agent/stage9c-destruction-shock]
+    paths: ['.github/workflows/stage9c-world-api.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: agent/stage9c-destruction-shock
+          fetch-depth: 0
+      - name: Wire DestructionService into WorldSimulation
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace(
+              '''    private final ConstructionProjectService constructionProjectService;\n    private final StarSystemId activeSystemId;''',
+              '''    private final ConstructionProjectService constructionProjectService;\n    private final DestructionService destructionService;\n    private final StarSystemId activeSystemId;''', 1)
+          text = text.replace(
+              '''        this.constructionProjectService = new ConstructionProjectService(\n                contentCatalog,\n                this.sessionsById,\n                this.factionAccountsById,\n                nextConstructionProjectIdValue,\n                constructionProjects);\n        this.activeSystemId = activeSystemId;''',
+              '''        this.constructionProjectService = new ConstructionProjectService(\n                contentCatalog,\n                this.sessionsById,\n                this.factionAccountsById,\n                nextConstructionProjectIdValue,\n                constructionProjects);\n        this.destructionService = new DestructionService(\n                contentCatalog,\n                this.sessionsById,\n                this.factionAccountsById,\n                this.constructionProjectService);\n        this.activeSystemId = activeSystemId;''', 1)
+          marker = '''    /**\n     * Создаёт persistent Entity в указанной active или remote StarSystem.'''
+          api = '''    /**\n     * Экономически разрешает destruction policy и затем структурно удаляет persistent Entity.\n     *\n     * @param systemId target StarSystem\n     * @param entityId destroyed persistent local Entity ID\n     * @param policy explicit resource/money fate\n     * @return immutable accounting/result diagnostics\n     */\n    public DestructionResult destroyEntity(\n            StarSystemId systemId, EntityId entityId, DestructionPolicy policy) {\n        return destructionService.destroy(systemId, entityId, policy);\n    }\n\n'''
+          if marker not in text:
+              raise SystemExit('WorldSimulation lifecycle API marker missing')
+          if 'public DestructionResult destroyEntity(' not in text:
+              text = text.replace(marker, api + marker, 1)
+          p.write_text(text, encoding='utf-8')
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/stage9c-world-api.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: expose authoritative destruction through WorldSimulation"
+          git push origin HEAD:agent/stage9c-destruction-shock
