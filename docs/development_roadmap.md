@@ -562,7 +562,7 @@ Stage 8.5 завершён, когда:
 
 **Статус:** COMPLETE — Stage 9E acceptance passed
 
-Текущий implementation focus: **Stage 10C — Galactic route planner**.
+Текущий implementation focus: **Stage 10D — Cross-system market discovery**.
 
 ### Цель
 
@@ -799,7 +799,7 @@ IN_SYSTEM
 
 ### Stage 10C — Galactic route planner
 
-**Статус:** ACTIVE
+**Статус:** COMPLETE candidate — `docs/stage10c_galactic_route_planner.md`
 
 Расширить planning от локального:
 
@@ -830,6 +830,8 @@ fleet
 Использовать существующий `TradeRouteCostModel` как extension seam, не создавать параллельный scoring stack без необходимости.
 
 ### Stage 10D — Cross-system market discovery
+
+**Статус:** ACTIVE
 
 - [ ] bounded market discovery across reachable topology;
 - [ ] route search не масштабируется как полный перебор всех markets галактики каждым fleet;
