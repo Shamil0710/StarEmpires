@@ -20,22 +20,30 @@ public record GalacticMarketDiscoveryPolicy(
     public static final GalacticMarketDiscoveryPolicy DEFAULT =
             new GalacticMarketDiscoveryPolicy(4, 24, 4, 128, 0);
 
-    /** Validates all bounded-discovery limits. */
+    /**
+     * Validates all bounded-discovery limits.
+     *
+     * @param maxJumpHops maximum topology hops from the fleet's current system
+     * @param maxSystems maximum reachable systems inspected, excluding the origin
+     * @param maxConsumersPerSystemPerItem maximum remote consumers inspected per item and system
+     * @param maxOpportunities maximum candidates returned to the pure route scorer
+     * @param riskPerJumpBasisPoints planning-only expected risk added per jump hop
+     */
     public GalacticMarketDiscoveryPolicy {
         if (maxJumpHops <= 0) {
-            throw new IllegalArgumentException("maxJumpHops должен быть положительным");
+            throw new IllegalArgumentException("maxJumpHops must be positive");
         }
         if (maxSystems <= 0) {
-            throw new IllegalArgumentException("maxSystems должен быть положительным");
+            throw new IllegalArgumentException("maxSystems must be positive");
         }
         if (maxConsumersPerSystemPerItem <= 0) {
-            throw new IllegalArgumentException("maxConsumersPerSystemPerItem должен быть положительным");
+            throw new IllegalArgumentException("maxConsumersPerSystemPerItem must be positive");
         }
         if (maxOpportunities <= 0) {
-            throw new IllegalArgumentException("maxOpportunities должен быть положительным");
+            throw new IllegalArgumentException("maxOpportunities must be positive");
         }
         if (riskPerJumpBasisPoints < 0 || riskPerJumpBasisPoints > 10_000) {
-            throw new IllegalArgumentException("riskPerJumpBasisPoints должен быть в диапазоне 0..10000");
+            throw new IllegalArgumentException("riskPerJumpBasisPoints must be in range 0..10000");
         }
     }
 }
