@@ -12,7 +12,12 @@ public final class FleetTransferStateMapper {
         throw new AssertionError("Utility class");
     }
 
-    /** Clears references that are valid only inside the origin SimulationSession. */
+    /**
+     * Clears references that are valid only inside the origin SimulationSession.
+     *
+     * @param state local fleet state
+     * @return session-independent fleet state
+     */
     public static EntityState sanitize(EntityState state) {
         EntityState checked = Objects.requireNonNull(state, "Fleet EntityState не задан");
         if (checked.identity() == null || !"FLEET".equals(checked.identity().kindName())) {
@@ -42,7 +47,14 @@ public final class FleetTransferStateMapper {
                 checked.asteroid(), checked.archetype());
     }
 
-    /** Restores a fleet as a detached Entity and applies destination-local coordinates. */
+    /**
+     * Restores a fleet without a local ID and applies destination coordinates.
+     *
+     * @param state session-independent fleet state
+     * @param arrivalX destination X coordinate
+     * @param arrivalY destination Y coordinate
+     * @return detached Ashley entity ready for local registration
+     */
     public static Entity restoreDetached(EntityState state, float arrivalX, float arrivalY) {
         if (!Float.isFinite(arrivalX) || !Float.isFinite(arrivalY)) {
             throw new IllegalArgumentException("Fleet coordinates должны быть конечными");
