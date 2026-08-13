@@ -1,34 +1,46 @@
 package com.spacesim.components;
 
 import com.badlogic.ashley.core.Component;
+import com.spacesim.constants.Constants;
 
 /**
- * Runtime-derived policy for a market that posts a fixed purchase bid relative to item base price.
+ * Runtime-derived fixed purchase bids for a special physical market consumer.
  *
- * <p>The component deliberately affects only the price paid by the market to incoming sellers.
- * Construction sites derive it from persistent construction requirements and project funding, so
- * the component itself does not need an independent persistence schema.</p>
+ * <p>The component affects only prices paid to incoming sellers. Construction sites derive every
+ * bid from persistent requirements and project funding, so this runtime component does not require
+ * an independent persistence schema.</p>
  */
 public final class ProcurementPolicyComponent implements Component {
-    private final float buyPriceMultiplier;
+    private final float[] buyPrices = new float[Constants.MAX_ITEMS];
 
-    /**
-     * Creates a fixed procurement bid policy.
-     *
-     * @param buyPriceMultiplier positive finite multiplier applied to the catalog item base price
-     * @throws IllegalArgumentException if the multiplier is not finite and positive
-     */
-    public ProcurementPolicyComponent(float buyPriceMultiplier) {
-        if (!Float.isFinite(buyPriceMultiplier) || buyPriceMultiplier <= 0f) {
-            throw new IllegalArgumentException("Procurement buy-price multiplier must be finite and positive");
-        }
-        this.buyPriceMultiplier = buyPriceMultiplier;
+    /** Creates an initially unconfigured fixed-bid policy. */
+    public ProcurementPolicyComponent() {
     }
 
     /**
-     * @return positive multiplier used for the market buy offer
+     * Configures the fixed bid of one runtime item.
+     *
+     * @param itemId runtime item identifier
+     * @param buyPrice positive finite purchase price per physical unit
+     * @throws IllegalArgumentException if the item or price is invalid
      */
-    public float buyPriceMultiplier() {
-        return buyPriceMultiplier;
+    public void configureBuyPrice(int itemId, float buyPrice) {
+        if (itemId < 0 || itemId >= buyPrices.length) {
+            throw new IllegalArgumentException("Procurement item id is outside runtime capacity");
+        }
+        if (!Float.isFinite(buyPrice) || buyPrice <= 0f) {
+            throw new IllegalArgumentException("Procurement buy price must be finite and positive");
+        }
+        buyPrices[itemId] = buyPrice;
+    }
+
+    /**
+     * Returns the configured fixed bid.
+     *
+     * @param itemId runtime item identifier
+     * @return positive fixed bid, or zero for an unconfigured/invalid item
+     */
+    public float buyPrice(int itemId) {
+        return itemId < 0 || itemId >= buyPrices.length ? 0f : buyPrices[itemId];
     }
 }
