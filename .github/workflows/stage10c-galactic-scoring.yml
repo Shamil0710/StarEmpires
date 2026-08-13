@@ -1,0 +1,27 @@
+name: Stage 10C galactic scoring
+
+on:
+  push:
+    branches:
+      - agent/stage10c-galactic-route-planner
+    paths:
+      - .github/workflows/stage10c-galactic-scoring.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 scripts/stage10c_galactic_scoring.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/trade/TradeRoutePlanner.java
+          git rm scripts/stage10c_galactic_scoring.py
+          git rm .github/workflows/stage10c-galactic-scoring.yml
+          git commit -m "feat: score bounded galactic trade opportunities"
+          git push origin HEAD:${GITHUB_REF_NAME}
