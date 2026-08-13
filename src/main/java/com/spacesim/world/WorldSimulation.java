@@ -48,7 +48,8 @@ public final class WorldSimulation {
     private final DestructionService destructionService;
     private final FactionEconomicPressureTracker economicPressureTracker;
     private final FleetWorldService fleetWorldService;
-    private final StarSystemId activeSystemId;
+    private final FleetJumpService fleetJumpService;
+    private StarSystemId activeSystemId;
     private final int strategicStepTicks;
     private final int remoteUpdateBudgetPerFrame;
 
@@ -70,6 +71,7 @@ public final class WorldSimulation {
             List<FactionEconomicPressureState> factionEconomicPressures,
             long nextFleetIdValue,
             List<FleetPlacementState> fleetPlacements,
+            List<FleetJumpState> fleetJumpStates,
             StarSystemId activeSystemId,
             int strategicStepTicks,
             int remoteUpdateBudgetPerFrame) {
@@ -96,6 +98,9 @@ public final class WorldSimulation {
         this.economicPressureTracker = new FactionEconomicPressureTracker(factionEconomicPressures);
         this.fleetWorldService = new FleetWorldService(
                 this.sessionsById, nextFleetIdValue, fleetPlacements);
+        this.fleetJumpService = new FleetJumpService(
+                topology, this.sessionsById, this.fleetWorldService,
+                JumpTransitTiming.DEFAULT, fleetJumpStates);
         this.activeSystemId = activeSystemId;
         this.strategicStepTicks = strategicStepTicks;
         this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;
@@ -225,6 +230,7 @@ public final class WorldSimulation {
                 checked.factionEconomicPressures(),
                 checked.nextFleetIdValue(),
                 checked.fleets(),
+                checked.fleetJumps(),
                 activeId,
                 strategicStepTicks,
                 remoteUpdateBudgetPerFrame);
@@ -253,6 +259,7 @@ public final class WorldSimulation {
             totalStrategicUpdatesExecuted = safeAdd(totalStrategicUpdatesExecuted, 1L);
         }
         constructionProjectService.advance();
+        fleetJumpService.advance(activeTick);
         return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));
     }
 
@@ -470,7 +477,8 @@ public final class WorldSimulation {
                 constructionProjectService.snapshots(),
                 economicPressureTracker.snapshots(),
                 fleetWorldService.nextIdValue(),
-                fleetWorldService.snapshots());
+                fleetWorldService.snapshots(),
+                fleetJumpService.snapshots());
     }
 
     /**
@@ -576,6 +584,51 @@ public final class WorldSimulation {
         return fleetWorldService.findByLocal(systemId, entityId);
     }
 
+    /** @return immutable active jump states sorted by stable FleetId */
+    public List<FleetJumpState> getFleetJumpStates() {
+        return fleetJumpService.snapshots();
+    }
+
+    /**
+     * Ищет active jump operation fleet.
+     *
+     * @param fleetId stable FleetId or {@code null}
+     * @return current jump phase or empty
+     */
+    public Optional<FleetJumpState> findFleetJump(FleetId fleetId) {
+        return fleetJumpService.find(fleetId);
+    }
+
+    /**
+     * Запрашивает authoritative direct jump по topology edge.
+     *
+     * <p>Если fleet находится в remote system, её local session сначала догоняется ровно до
+     * текущего world tick через тот же coarse simulation core. После этого jump FSM использует
+     * абсолютные tick boundaries и не зависит от render-frame partitioning.</p>
+     *
+     * @param fleetId stable fleet identity
+     * @param destinationSystemId directly connected destination
+     * @param arrivalX finite destination-local arrival X
+     * @param arrivalY finite destination-local arrival Y
+     * @return persistent MOVING_TO_JUMP state
+     */
+    public FleetJumpState requestFleetJump(
+            FleetId fleetId,
+            StarSystemId destinationSystemId,
+            float arrivalX,
+            float arrivalY) {
+        FleetPlacementState placement = fleetWorldService.find(
+                Objects.requireNonNull(fleetId, "FleetId jump request не задан")).orElseThrow(
+                () -> new IllegalArgumentException("Unknown FleetId: " + fleetId));
+        if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+            throw new IllegalStateException("Jump request требует fleet в local StarSystem: " + fleetId);
+        }
+        long worldTick = sessionsById.get(activeSystemId).getClock().getTick();
+        synchronizeSystemToTick(placement.systemId(), worldTick);
+        return fleetJumpService.requestJump(
+                fleetId, destinationSystemId, worldTick, arrivalX, arrivalY);
+    }
+
     /**
      * Передаёт fleet из local SimulationSession во world-owned transit state.
      *
@@ -625,6 +678,7 @@ public final class WorldSimulation {
             StarSystemId systemId, EntityId entityId, DestructionPolicy policy) {
         Optional<FleetId> fleetId = fleetWorldService.findByLocal(systemId, entityId);
         DestructionResult result = destructionService.destroy(systemId, entityId, policy);
+        fleetId.ifPresent(fleetJumpService::remove);
         if (fleetId.isPresent() && !fleetWorldService.unregisterLocal(systemId, entityId)) {
             throw new IllegalStateException(
                     "Destroyed fleet lost world mapping before unregister: " + fleetId.orElseThrow());
@@ -677,10 +731,13 @@ public final class WorldSimulation {
         SimulationSession session = requireLifecycleSession(checkedSystemId);
         Optional<FleetId> fleetId = fleetWorldService.findByLocal(checkedSystemId, entityId);
         boolean removed = session.removeEntity(entityId);
-        if (removed && fleetId.isPresent()
-                && !fleetWorldService.unregisterLocal(checkedSystemId, entityId)) {
-            throw new IllegalStateException(
-                    "Removed fleet lost world mapping before unregister: " + fleetId.orElseThrow());
+        if (removed && fleetId.isPresent()) {
+            FleetId removedFleetId = fleetId.orElseThrow();
+            fleetJumpService.remove(removedFleetId);
+            if (!fleetWorldService.unregisterLocal(checkedSystemId, entityId)) {
+                throw new IllegalStateException(
+                        "Removed fleet lost world mapping before unregister: " + removedFleetId);
+            }
         }
         return removed;
     }
@@ -693,6 +750,27 @@ public final class WorldSimulation {
     /** @return ID системы полного local tick */
     public StarSystemId getActiveSystemId() {
         return activeSystemId;
+    }
+
+    /**
+     * Переключает StarSystem полного local tick без изменения transit state других fleets.
+     *
+     * <p>Target session сначала детерминированно догоняется до текущего authoritative world tick;
+     * после этого прежняя active system становится обычной remote session с тем же tick.</p>
+     *
+     * @param systemId target StarSystem
+     */
+    public void activateSystem(StarSystemId systemId) {
+        StarSystemId target = Objects.requireNonNull(systemId, "Target active StarSystem не задан");
+        if (!sessionsById.containsKey(target)) {
+            throw new IllegalArgumentException("Неизвестная StarSystem: " + target);
+        }
+        if (target.equals(activeSystemId)) {
+            return;
+        }
+        long worldTick = sessionsById.get(activeSystemId).getClock().getTick();
+        synchronizeSystemToTick(target, worldTick);
+        activeSystemId = target;
     }
 
     /** @return число local ticks в одном remote update */
@@ -746,6 +824,22 @@ public final class WorldSimulation {
             throw new IllegalArgumentException("Неизвестная StarSystem: " + checked);
         }
         return session;
+    }
+
+    private void synchronizeSystemToTick(StarSystemId systemId, long worldTick) {
+        SimulationSession session = requireLifecycleSession(systemId);
+        long tick = session.getClock().getTick();
+        if (tick > worldTick) {
+            throw new IllegalStateException(
+                    "StarSystem clock опережает authoritative world tick: " + systemId);
+        }
+        while (tick < worldTick) {
+            long remaining = worldTick - tick;
+            int step = (int) Math.min((long) strategicStepTicks, remaining);
+            session.advanceStrategicSteps(step);
+            totalStrategicUpdatesExecuted = safeAdd(totalStrategicUpdatesExecuted, 1L);
+            tick = session.getClock().getTick();
+        }
     }
 
     private FactionEconomicAccount requireFactionAccount(String factionId) {
