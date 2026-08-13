@@ -2,7 +2,7 @@
 setlocal EnableExtensions
 
 set "PROJECT_DIR=%~dp0"
-set "SPRITE_REL=src\main\resources\assets\ships\heavy_corvette\white_heavy_corvette_01\white_heavy_corvette_01_base.png"
+set "SPRITE_REL=src\main\resources\assets\ships\heavy_corvette\heavy_corvette_white_01\heavy_corvette_white_01_base.png"
 
 pushd "%PROJECT_DIR%" >nul 2>&1
 if errorlevel 1 (
