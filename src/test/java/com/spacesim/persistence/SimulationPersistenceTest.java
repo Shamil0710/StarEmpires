@@ -90,7 +90,7 @@ class SimulationPersistenceTest {
     }
 
     private ContentCatalog changedCatalog() throws IOException {
-        String json = defaultJson().replace("\"basePrice\":10.0", "\"basePrice\":11.0");
+        String json = defaultJson().replaceFirst("\"basePrice\"\\s*:\s*10\\.0", "\"basePrice\": 11.0");
         return ContentCatalogLoader.parse(json);
     }
 

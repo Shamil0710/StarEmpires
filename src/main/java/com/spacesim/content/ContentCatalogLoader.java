@@ -332,6 +332,8 @@ public final class ContentCatalogLoader {
         if (totalInitialStock > capacity) {
             throw new IllegalArgumentException("Стартовый stock station archetype превышает capacity: " + id);
         }
+        ContentCatalog.ConstructionDefinition construction = parseConstruction(
+                node.get("construction"), id, itemsById);
         return new ContentCatalog.StationArchetypeDefinition(
                 id,
                 requireNonBlank(node, "displayName"),
@@ -339,7 +341,30 @@ public final class ContentCatalogLoader {
                 credits,
                 factionId,
                 recipeId,
-                markets);
+                markets,
+                construction);
+    }
+
+    private static ContentCatalog.ConstructionDefinition parseConstruction(
+            JsonValue node,
+            String stationId,
+            Map<String, ContentCatalog.ItemDefinition> itemsById) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        JsonValue value = requireObject(node, "station construction");
+        double fundingCredits = requireDouble(value, "fundingCredits");
+        float buildSeconds = requireFloat(value, "buildSeconds");
+        if (!Double.isFinite(fundingCredits) || fundingCredits <= 0d
+                || !Float.isFinite(buildSeconds) || buildSeconds <= 0f) {
+            throw new IllegalArgumentException("Некорректные construction funding/buildSeconds: " + stationId);
+        }
+        Map<String, Integer> materials = parseAmounts(
+                value.get("materials"), stationId, "construction.materials", itemsById);
+        if (materials.isEmpty()) {
+            throw new IllegalArgumentException("Station construction требует materials: " + stationId);
+        }
+        return new ContentCatalog.ConstructionDefinition(fundingCredits, buildSeconds, materials);
     }
 
     private static Map<String, Integer> parseAmounts(

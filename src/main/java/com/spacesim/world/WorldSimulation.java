@@ -44,6 +44,7 @@ public final class WorldSimulation {
     private final List<FactionStrategicState> factionStrategies;
     private final Map<String, FactionStrategicState> factionStrategiesById;
     private final Map<StarSystemId, String> territoryOwnerBySystem;
+    private final ConstructionProjectService constructionProjectService;
     private final StarSystemId activeSystemId;
     private final int strategicStepTicks;
     private final int remoteUpdateBudgetPerFrame;
@@ -61,6 +62,8 @@ public final class WorldSimulation {
             List<FactionStrategicState> factionStrategies,
             Map<String, FactionStrategicState> factionStrategiesById,
             Map<StarSystemId, String> territoryOwnerBySystem,
+            long nextConstructionProjectIdValue,
+            List<ConstructionProjectState> constructionProjects,
             StarSystemId activeSystemId,
             int strategicStepTicks,
             int remoteUpdateBudgetPerFrame) {
@@ -73,6 +76,12 @@ public final class WorldSimulation {
         this.factionStrategies = List.copyOf(factionStrategies);
         this.factionStrategiesById = Map.copyOf(factionStrategiesById);
         this.territoryOwnerBySystem = Map.copyOf(territoryOwnerBySystem);
+        this.constructionProjectService = new ConstructionProjectService(
+                contentCatalog,
+                this.sessionsById,
+                this.factionAccountsById,
+                nextConstructionProjectIdValue,
+                constructionProjects);
         this.activeSystemId = activeSystemId;
         this.strategicStepTicks = strategicStepTicks;
         this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;
@@ -197,6 +206,8 @@ public final class WorldSimulation {
                 checked.factionStrategies(),
                 strategiesById,
                 territoryOwners,
+                checked.nextConstructionProjectIdValue(),
+                checked.constructionProjects(),
                 activeId,
                 strategicStepTicks,
                 remoteUpdateBudgetPerFrame);
@@ -224,6 +235,7 @@ public final class WorldSimulation {
             strategicUpdates++;
             totalStrategicUpdatesExecuted = safeAdd(totalStrategicUpdatesExecuted, 1L);
         }
+        constructionProjectService.advance();
         return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));
     }
 
@@ -252,7 +264,7 @@ public final class WorldSimulation {
                 break;
             }
             SimulationSession session = sessionsById.get(systemId);
-            for (Entity station : ownedMarketStations(session, faction.runtimeId())) {
+            for (Entity station : ownedMarketStations(systemId, session, faction.runtimeId())) {
                 if (remainingBudget <= 0L) {
                     break;
                 }
@@ -309,7 +321,7 @@ public final class WorldSimulation {
         for (StarSystemId systemId : systemOrder) {
             SimulationSession session = sessionsById.get(systemId);
             boolean controlled = factionId.equals(territoryOwnerBySystem.get(systemId));
-            for (Entity station : marketStations(session)) {
+            for (Entity station : completedMarketStations(systemId, session)) {
                 FactionComponent owner = station.getComponent(FactionComponent.class);
                 if (owner == null) {
                     continue;
@@ -409,7 +421,86 @@ public final class WorldSimulation {
                 topology,
                 List.copyOf(systemStates),
                 List.copyOf(factionStates),
-                factionStrategies);
+                factionStrategies,
+                constructionProjectService.nextIdValue(),
+                constructionProjectService.snapshots());
+    }
+
+    /**
+     * Создаёт persistent physical construction project и его пустую ECS стройплощадку.
+     *
+     * @param ownerFactionContentId faction treasury owner
+     * @param stationArchetypeContentId constructible station archetype
+     * @param systemId target StarSystem
+     * @param x world X coordinate
+     * @param y world Y coordinate
+     * @return stable world-level project ID
+     */
+    public ConstructionProjectId createConstructionProject(
+            String ownerFactionContentId,
+            String stationArchetypeContentId,
+            StarSystemId systemId,
+            float x,
+            float y) {
+        return constructionProjectService.create(
+                ownerFactionContentId, stationArchetypeContentId, systemId, x, y);
+    }
+
+    /**
+     * Физически переводит деньги faction treasury в project-site wallet.
+     *
+     * @param projectId target construction project
+     * @param amountMilliCredits positive transfer amount
+     * @return transferred amount or zero when treasury cannot fund it atomically
+     */
+    public long fundConstructionProject(
+            ConstructionProjectId projectId, long amountMilliCredits) {
+        return constructionProjectService.fund(projectId, amountMilliCredits);
+    }
+
+    /**
+     * Физически переносит construction material из local entity inventory на стройплощадку.
+     *
+     * <p>Это manual/owner delivery path; обычный TradeAI может снабжать тот же site через market
+     * transaction без вызова этого API.</p>
+     *
+     * @param projectId target project
+     * @param sourceEntityId source entity in the target system
+     * @param itemContentId required material content ID
+     * @param amount requested positive units
+     * @return accepted units bounded by remaining requirement
+     */
+    public int deliverConstructionMaterial(
+            ConstructionProjectId projectId,
+            EntityId sourceEntityId,
+            String itemContentId,
+            int amount) {
+        return constructionProjectService.deliver(projectId, sourceEntityId, itemContentId, amount);
+    }
+
+    /**
+     * Отменяет проект до первой material delivery, полностью возвращая remaining wallet в treasury.
+     *
+     * @param projectId target non-terminal project
+     * @return true after successful cancellation
+     */
+    public boolean cancelConstructionProject(ConstructionProjectId projectId) {
+        return constructionProjectService.cancel(projectId);
+    }
+
+    /**
+     * Ищет immutable synchronized construction project snapshot.
+     *
+     * @param projectId project ID or null
+     * @return project snapshot or empty
+     */
+    public Optional<ConstructionProjectState> findConstructionProject(ConstructionProjectId projectId) {
+        return constructionProjectService.find(projectId);
+    }
+
+    /** @return immutable construction projects sorted by stable project ID */
+    public List<ConstructionProjectState> getConstructionProjects() {
+        return constructionProjectService.snapshots();
     }
 
     /**
@@ -536,9 +627,10 @@ public final class WorldSimulation {
         return factionId;
     }
 
-    private List<Entity> ownedMarketStations(SimulationSession session, int runtimeFactionId) {
+    private List<Entity> ownedMarketStations(
+            StarSystemId systemId, SimulationSession session, int runtimeFactionId) {
         List<Entity> result = new ArrayList<>();
-        for (Entity entity : marketStations(session)) {
+        for (Entity entity : completedMarketStations(systemId, session)) {
             FactionComponent faction = entity.getComponent(FactionComponent.class);
             if (faction != null && faction.factionId == runtimeFactionId) {
                 result.add(entity);
@@ -547,12 +639,14 @@ public final class WorldSimulation {
         return result;
     }
 
-    private List<Entity> marketStations(SimulationSession session) {
+    private List<Entity> completedMarketStations(StarSystemId systemId, SimulationSession session) {
         List<Entity> stations = new ArrayList<>();
         for (Entity entity : session.getEngine().getEntities()) {
+            EntityIdComponent id = entity.getComponent(EntityIdComponent.class);
             if (entity.getComponent(MarketComponent.class) == null
                     || entity.getComponent(WalletComponent.class) == null
-                    || entity.getComponent(EntityIdComponent.class) == null) {
+                    || id == null
+                    || constructionProjectService.isConstructionSite(systemId, id.id)) {
                 continue;
             }
             stations.add(entity);

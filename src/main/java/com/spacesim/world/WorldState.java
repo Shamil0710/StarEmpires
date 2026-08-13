@@ -23,15 +23,21 @@ import java.util.Set;
  * @param systems полный набор local simulation snapshots по системам
  * @param factions persistent strategic faction economy в canonical content-ID порядке
  * @param factionStrategies persistent diplomacy/territory state в canonical content-ID порядке
+ * @param nextConstructionProjectIdValue следующий неиспользованный world-level construction project ID
+ * @param constructionProjects persistent construction projects в canonical ID порядке
  */
 public record WorldState(
         int schemaVersion,
         GalaxyTopology topology,
         List<StarSystemSimulationState> systems,
         List<FactionEconomicState> factions,
-        List<FactionStrategicState> factionStrategies) {
+        List<FactionStrategicState> factionStrategies,
+        long nextConstructionProjectIdValue,
+        List<ConstructionProjectState> constructionProjects) {
     /** Текущая версия world-level persistent schema. */
-    public static final int CURRENT_VERSION = 3;
+    public static final int CURRENT_VERSION = 4;
+    /** Stage-8 full strategic schema без construction projects. */
+    public static final int LEGACY_STAGE8_VERSION = 3;
     /** Stage-8 treasury-only schema без diplomacy/territory. */
     public static final int LEGACY_FACTION_TREASURY_VERSION = 2;
     /** Stage-7 world schema без persistent faction economy. */
@@ -48,7 +54,7 @@ public record WorldState(
             int schemaVersion,
             GalaxyTopology topology,
             List<StarSystemSimulationState> systems) {
-        this(schemaVersion, topology, systems, List.of(), List.of());
+        this(schemaVersion, topology, systems, List.of(), List.of(), 1L, List.of());
     }
 
     /**
@@ -64,7 +70,25 @@ public record WorldState(
             GalaxyTopology topology,
             List<StarSystemSimulationState> systems,
             List<FactionEconomicState> factions) {
-        this(schemaVersion, topology, systems, factions, List.of());
+        this(schemaVersion, topology, systems, factions, List.of(), 1L, List.of());
+    }
+
+    /**
+     * Source-compatible конструктор Stage-8 world без construction state.
+     *
+     * @param schemaVersion текущая world schema
+     * @param topology topology галактики
+     * @param systems snapshots систем
+     * @param factions faction economic states
+     * @param factionStrategies diplomacy/territory states
+     */
+    public WorldState(
+            int schemaVersion,
+            GalaxyTopology topology,
+            List<StarSystemSimulationState> systems,
+            List<FactionEconomicState> factions,
+            List<FactionStrategicState> factionStrategies) {
+        this(schemaVersion, topology, systems, factions, factionStrategies, 1L, List.of());
     }
 
     /**
@@ -75,6 +99,8 @@ public record WorldState(
      * @param systems snapshots всех систем
      * @param factions economic faction states
      * @param factionStrategies diplomacy/territory states
+     * @param nextConstructionProjectIdValue следующий construction-project allocator watermark
+     * @param constructionProjects construction project snapshots
      * @throws NullPointerException если обязательное значение не задано
      * @throws IllegalArgumentException при неизвестной версии, duplicate/unknown system ID,
      *         неполном topology coverage, duplicate faction ID или двойном владении территорией
@@ -87,6 +113,10 @@ public record WorldState(
         Objects.requireNonNull(systems, "System states WorldState не заданы");
         Objects.requireNonNull(factions, "Faction states WorldState не заданы");
         Objects.requireNonNull(factionStrategies, "Faction strategic states WorldState не заданы");
+        Objects.requireNonNull(constructionProjects, "Construction projects WorldState не заданы");
+        if (nextConstructionProjectIdValue <= 0L) {
+            throw new IllegalArgumentException("Следующий ConstructionProjectId должен быть положительным");
+        }
         if (topology.systems().isEmpty()) {
             throw new IllegalArgumentException("WorldState должен содержать хотя бы одну StarSystem");
         }
@@ -151,6 +181,50 @@ public record WorldState(
         }
         sortedStrategies.sort(Comparator.naturalOrder());
         factionStrategies = List.copyOf(sortedStrategies);
+
+        List<ConstructionProjectState> sortedProjects = new ArrayList<>(constructionProjects.size());
+        Set<ConstructionProjectId> projectIds = new HashSet<>();
+        long maxProjectId = 0L;
+        for (ConstructionProjectState project : constructionProjects) {
+            ConstructionProjectState value = Objects.requireNonNull(project, "ConstructionProjectState не задан");
+            if (!projectIds.add(value.id())) {
+                throw new IllegalArgumentException("Дублирующий ConstructionProjectId: " + value.id());
+            }
+            if (topology.findSystem(value.systemId()).isEmpty()) {
+                throw new IllegalArgumentException("Construction project ссылается на неизвестную StarSystem: " + value.systemId());
+            }
+            if (!economicFactionIds.contains(value.ownerFactionContentId())) {
+                throw new IllegalArgumentException("Construction project ссылается на неизвестную faction account: "
+                        + value.ownerFactionContentId());
+            }
+            StarSystemSimulationState systemState = null;
+            for (StarSystemSimulationState candidate : systems) {
+                if (candidate.systemId().equals(value.systemId())) {
+                    systemState = candidate;
+                    break;
+                }
+            }
+            if (systemState == null) {
+                throw new IllegalArgumentException("Construction project target session отсутствует");
+            }
+            if (value.constructionSiteEntityId() != null
+                    && systemState.simulationState().entities().stream()
+                    .noneMatch(entity -> entity.id().equals(value.constructionSiteEntityId()))) {
+                throw new IllegalArgumentException("Construction project потерял site entity: " + value.id());
+            }
+            if (value.completedStationEntityId() != null
+                    && systemState.simulationState().entities().stream()
+                    .noneMatch(entity -> entity.id().equals(value.completedStationEntityId()))) {
+                throw new IllegalArgumentException("Completed construction project потерял station entity: " + value.id());
+            }
+            maxProjectId = Math.max(maxProjectId, value.id().value());
+            sortedProjects.add(value);
+        }
+        if (nextConstructionProjectIdValue <= maxProjectId) {
+            throw new IllegalArgumentException("Construction project allocator watermark повторно использует существующий ID");
+        }
+        sortedProjects.sort(Comparator.naturalOrder());
+        constructionProjects = List.copyOf(sortedProjects);
     }
 
     /**
@@ -167,6 +241,8 @@ public record WorldState(
                         WorldTopologyDefaults.DEFAULT_SYSTEM_ID,
                         Objects.requireNonNull(gameState, "GameState legacy world не задан"))),
                 List.of(),
+                List.of(),
+                1L,
                 List.of());
     }
 
@@ -180,7 +256,7 @@ public record WorldState(
     public static WorldState fromLegacyStage7(
             GalaxyTopology topology,
             List<StarSystemSimulationState> systems) {
-        return new WorldState(CURRENT_VERSION, topology, systems, List.of(), List.of());
+        return new WorldState(CURRENT_VERSION, topology, systems, List.of(), List.of(), 1L, List.of());
     }
 
     /**
@@ -195,6 +271,23 @@ public record WorldState(
             GalaxyTopology topology,
             List<StarSystemSimulationState> systems,
             List<FactionEconomicState> factions) {
-        return new WorldState(CURRENT_VERSION, topology, systems, factions, List.of());
+        return new WorldState(CURRENT_VERSION, topology, systems, factions, List.of(), 1L, List.of());
+    }
+
+    /**
+     * Мигрирует Stage-8 schema v3, сохраняя diplomacy/territory и создавая пустой construction layer.
+     *
+     * @param topology decoded topology
+     * @param systems decoded local sessions
+     * @param factions decoded faction economy
+     * @param strategies decoded strategic faction state
+     * @return current WorldState with empty construction projects and allocator starting at one
+     */
+    public static WorldState fromLegacyStage8(
+            GalaxyTopology topology,
+            List<StarSystemSimulationState> systems,
+            List<FactionEconomicState> factions,
+            List<FactionStrategicState> strategies) {
+        return new WorldState(CURRENT_VERSION, topology, systems, factions, strategies, 1L, List.of());
     }
 }

@@ -2,6 +2,10 @@ package com.spacesim.persistence;
 
 import com.spacesim.world.AsteroidFieldId;
 import com.spacesim.world.AsteroidFieldNode;
+import com.spacesim.world.ConstructionMaterialState;
+import com.spacesim.world.ConstructionProjectId;
+import com.spacesim.world.ConstructionProjectState;
+import com.spacesim.world.ConstructionProjectStatus;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionProductionPolicyState;
 import com.spacesim.world.FactionRelationState;
@@ -39,9 +43,9 @@ import java.util.Objects;
  * Детерминированный бинарный codec {@link WorldState}.
  *
  * <p>Local economic payload кодируется существующим {@link GameStateCodec}. World schema v1
- * содержит topology + local sessions, v2 добавляет treasury, а текущая v3 — strategic faction
- * state: diplomacy, territory, fiscal rates, stock/production policies и military/expansion goals.
- * Legacy v1/v2 мигрируются нейтрально без создания отсутствующих денег или strategic policies.</p>
+ * содержит topology + local sessions, v2 добавляет treasury, v3 — strategic faction state, а
+ * текущая v4 добавляет world-level construction projects и их allocator watermark. Legacy v1-v3
+ * мигрируются нейтрально без создания отсутствующих денег, policies или construction projects.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
@@ -57,6 +61,8 @@ public final class WorldStateCodec {
     private static final int MAX_FACTIONS = 10_000;
     private static final int MAX_POLICIES_PER_FACTION = 100_000;
     private static final int MAX_GOALS_PER_FACTION = 100_000;
+    private static final int MAX_CONSTRUCTION_PROJECTS = 100_000;
+    private static final int MAX_CONSTRUCTION_MATERIALS_PER_PROJECT = 10_000;
 
     private WorldStateCodec() {
         throw new AssertionError("WorldStateCodec не создаёт экземпляров");
@@ -85,6 +91,8 @@ public final class WorldStateCodec {
                 writeSystems(output, checked.systems());
                 writeFactions(output, checked.factions());
                 writeFactionStrategies(output, checked.factionStrategies());
+                output.writeLong(checked.nextConstructionProjectIdValue());
+                writeConstructionProjects(output, checked.constructionProjects());
             }
             byte[] bytes = buffer.toByteArray();
             if (bytes.length > MAX_SAVE_BYTES) {
@@ -119,6 +127,7 @@ public final class WorldStateCodec {
             }
             int schemaVersion = input.readInt();
             if (schemaVersion != WorldState.CURRENT_VERSION
+                    && schemaVersion != WorldState.LEGACY_STAGE8_VERSION
                     && schemaVersion != WorldState.LEGACY_FACTION_TREASURY_VERSION
                     && schemaVersion != WorldState.LEGACY_STAGE7_VERSION) {
                 throw new IllegalArgumentException("Неподдерживаемая WorldState schema: " + schemaVersion);
@@ -130,14 +139,24 @@ public final class WorldStateCodec {
                 state = WorldState.fromLegacyStage7(topology, systems);
             } else {
                 List<FactionEconomicState> factions = readFactions(input);
-                state = schemaVersion == WorldState.LEGACY_FACTION_TREASURY_VERSION
-                        ? WorldState.fromLegacyFactionTreasury(topology, systems, factions)
-                        : new WorldState(
+                if (schemaVersion == WorldState.LEGACY_FACTION_TREASURY_VERSION) {
+                    state = WorldState.fromLegacyFactionTreasury(topology, systems, factions);
+                } else {
+                    List<FactionStrategicState> strategies = readFactionStrategies(input);
+                    if (schemaVersion == WorldState.LEGACY_STAGE8_VERSION) {
+                        state = WorldState.fromLegacyStage8(topology, systems, factions, strategies);
+                    } else {
+                        long nextConstructionProjectIdValue = input.readLong();
+                        state = new WorldState(
                                 WorldState.CURRENT_VERSION,
                                 topology,
                                 systems,
                                 factions,
-                                readFactionStrategies(input));
+                                strategies,
+                                nextConstructionProjectIdValue,
+                                readConstructionProjects(input));
+                    }
+                }
             }
             if (input.read() != -1) {
                 throw new IllegalArgumentException("После WorldState обнаружен лишний бинарный хвост");
@@ -256,6 +275,89 @@ public final class WorldStateCodec {
                     readString(input), input.readLong(), input.readLong(), input.readLong()));
         }
         return List.copyOf(factions);
+    }
+
+    private static void writeConstructionProjects(
+            DataOutputStream output,
+            List<ConstructionProjectState> projects) throws IOException {
+        writeCount(output, projects.size(), MAX_CONSTRUCTION_PROJECTS, "constructionProjects");
+        for (ConstructionProjectState project : projects) {
+            output.writeLong(project.id().value());
+            writeString(output, project.ownerFactionContentId());
+            writeString(output, project.stationArchetypeContentId());
+            output.writeLong(project.systemId().value());
+            output.writeFloat(project.x());
+            output.writeFloat(project.y());
+            writeOptionalEntityId(output, project.constructionSiteEntityId());
+            writeCount(output, project.materials().size(),
+                    MAX_CONSTRUCTION_MATERIALS_PER_PROJECT, "constructionMaterials");
+            for (ConstructionMaterialState material : project.materials()) {
+                writeString(output, material.itemContentId());
+                output.writeInt(material.requiredAmount());
+                output.writeInt(material.deliveredAmount());
+            }
+            output.writeLong(project.minimumFundingMilliCredits());
+            output.writeLong(project.projectWalletMilliCredits());
+            output.writeLong(project.buildDurationTicks());
+            writeString(output, project.status().name());
+            output.writeLong(project.createdTick());
+            output.writeLong(project.stateChangedTick());
+            output.writeLong(project.buildStartedTick());
+            output.writeLong(project.completedTick());
+            writeOptionalEntityId(output, project.completedStationEntityId());
+        }
+    }
+
+    private static List<ConstructionProjectState> readConstructionProjects(DataInputStream input)
+            throws IOException {
+        int count = readCount(input, MAX_CONSTRUCTION_PROJECTS, "constructionProjects");
+        List<ConstructionProjectState> projects = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            ConstructionProjectId id = new ConstructionProjectId(input.readLong());
+            String ownerFactionId = readString(input);
+            String stationArchetypeId = readString(input);
+            StarSystemId systemId = new StarSystemId(input.readLong());
+            float x = input.readFloat();
+            float y = input.readFloat();
+            EntityId siteId = readOptionalEntityId(input);
+            int materialCount = readCount(
+                    input, MAX_CONSTRUCTION_MATERIALS_PER_PROJECT, "constructionMaterials");
+            List<ConstructionMaterialState> materials = new ArrayList<>(materialCount);
+            for (int materialIndex = 0; materialIndex < materialCount; materialIndex++) {
+                materials.add(new ConstructionMaterialState(
+                        readString(input), input.readInt(), input.readInt()));
+            }
+            long minimumFunding = input.readLong();
+            long wallet = input.readLong();
+            long buildDurationTicks = input.readLong();
+            ConstructionProjectStatus status;
+            try {
+                status = ConstructionProjectStatus.valueOf(readString(input));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Unknown ConstructionProjectStatus", exception);
+            }
+            long createdTick = input.readLong();
+            long stateChangedTick = input.readLong();
+            long buildStartedTick = input.readLong();
+            long completedTick = input.readLong();
+            EntityId stationId = readOptionalEntityId(input);
+            projects.add(new ConstructionProjectState(
+                    id, ownerFactionId, stationArchetypeId, systemId, x, y, siteId, materials,
+                    minimumFunding, wallet, buildDurationTicks, status, createdTick, stateChangedTick,
+                    buildStartedTick, completedTick, stationId));
+        }
+        return List.copyOf(projects);
+    }
+
+    private static void writeOptionalEntityId(DataOutputStream output, EntityId id) throws IOException {
+        output.writeBoolean(id != null);
+        if (id != null) {
+            output.writeLong(id.value());
+        }
+    }
+
+    private static EntityId readOptionalEntityId(DataInputStream input) throws IOException {
+        return input.readBoolean() ? new EntityId(input.readLong()) : null;
     }
 
     private static void writeFactionStrategies(

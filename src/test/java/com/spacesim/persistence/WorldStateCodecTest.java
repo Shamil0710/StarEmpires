@@ -88,8 +88,11 @@ class WorldStateCodecTest {
         WorldState current = twoSystemWorld(false);
         byte[] currentBytes = WorldStateCodec.encode(current);
 
-        // Current v3 with empty faction layers appends two zero counts: factions + strategies.
-        byte[] legacyBytes = Arrays.copyOf(currentBytes, currentBytes.length - 2 * Integer.BYTES);
+        // Current v4 adds factions + strategies + construction allocator watermark + project count.
+        // Exact v1 layout ends before all four of those layers.
+        byte[] legacyBytes = Arrays.copyOf(
+                currentBytes,
+                currentBytes.length - 3 * Integer.BYTES - Long.BYTES);
         ByteBuffer.wrap(legacyBytes).putInt(8, WorldState.LEGACY_STAGE7_VERSION);
 
         WorldState migrated = WorldStateCodec.decode(legacyBytes);
@@ -112,8 +115,11 @@ class WorldStateCodecTest {
                 List.of());
         byte[] currentBytes = WorldStateCodec.encode(treasuryOnly);
 
-        // v3 appends only the empty strategic-state count after the exact v2 layout.
-        byte[] v2Bytes = Arrays.copyOf(currentBytes, currentBytes.length - Integer.BYTES);
+        // Current v4 appends empty strategic-state count, construction allocator watermark
+        // and empty project count after the exact v2 layout.
+        byte[] v2Bytes = Arrays.copyOf(
+                currentBytes,
+                currentBytes.length - 2 * Integer.BYTES - Long.BYTES);
         ByteBuffer.wrap(v2Bytes).putInt(8, WorldState.LEGACY_FACTION_TREASURY_VERSION);
 
         WorldState migrated = WorldStateCodec.decode(v2Bytes);
@@ -121,6 +127,28 @@ class WorldStateCodecTest {
         assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
         assertEquals(treasuryOnly.factions(), migrated.factions());
         assertEquals(List.of(), migrated.factionStrategies());
+    }
+
+    @Test
+    void stage8SchemaV3МигрируетСStrategicStateНоБезConstruction() {
+        WorldState current = strategicWorld();
+        byte[] currentBytes = WorldStateCodec.encode(current);
+
+        // v4 adds only construction allocator watermark + project count after the exact v3 layout.
+        byte[] v3Bytes = Arrays.copyOf(
+                currentBytes,
+                currentBytes.length - Long.BYTES - Integer.BYTES);
+        ByteBuffer.wrap(v3Bytes).putInt(8, WorldState.LEGACY_STAGE8_VERSION);
+
+        WorldState migrated = WorldStateCodec.decode(v3Bytes);
+
+        assertEquals(WorldState.CURRENT_VERSION, migrated.schemaVersion());
+        assertEquals(current.topology(), migrated.topology());
+        assertEquals(current.systems(), migrated.systems());
+        assertEquals(current.factions(), migrated.factions());
+        assertEquals(current.factionStrategies(), migrated.factionStrategies());
+        assertEquals(1L, migrated.nextConstructionProjectIdValue());
+        assertEquals(List.of(), migrated.constructionProjects());
     }
 
     @Test

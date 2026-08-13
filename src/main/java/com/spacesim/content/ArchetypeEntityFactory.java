@@ -84,6 +84,65 @@ public final class ArchetypeEntityFactory {
     }
 
     /**
+     * Создаёт экономически пустую станцию после physical construction completion.
+     *
+     * <p>Метод сохраняет data-driven market targets/production/archetype metadata, но намеренно
+     * не создаёт стартовые товары или деньги. Owner faction задаётся проектом, а не bootstrap
+     * factionId самого archetype. Поэтому результат безопасно проходит Stage-9A lifecycle create
+     * и не превращает завершение строительства в скрытый resource/money source.</p>
+     *
+     * @param catalog валидированный content catalog
+     * @param archetypeId target station archetype ID
+     * @param name отображаемое имя экземпляра
+     * @param x координата X
+     * @param y координата Y
+     * @param ownerFactionId persistent faction ID владельца проекта
+     * @return economically-empty station Entity без EntityId
+     */
+    public static Entity createConstructedStation(
+            ContentCatalog catalog,
+            String archetypeId,
+            String name,
+            float x,
+            float y,
+            String ownerFactionId) {
+        ContentCatalog checked = requireCatalog(catalog);
+        ContentCatalog.StationArchetypeDefinition definition = checked.findStationArchetype(archetypeId);
+        if (definition == null) {
+            throw new IllegalArgumentException("Неизвестный station archetype: " + archetypeId);
+        }
+        ContentCatalog.FactionDefinition owner = requireFaction(checked, ownerFactionId);
+
+        InventoryComponent inventory = new InventoryComponent();
+        inventory.capacity = definition.inventoryCapacity();
+        MarketComponent market = new MarketComponent();
+        for (ContentCatalog.MarketDefinition rule : definition.markets()) {
+            ContentCatalog.ItemDefinition item = checked.findItem(rule.itemId());
+            if (item == null) {
+                throw new IllegalStateException("Station archetype потерял item: " + rule.itemId());
+            }
+            market.configureTradableItem(
+                    item.runtimeId(), rule.targetStock(), rule.consumptionPerSecond());
+        }
+
+        Entity entity = new Entity()
+                .add(new IdentityComponent(requireName(name), IdentityComponent.Kind.STATION))
+                .add(new ArchetypeComponent(definition.id()))
+                .add(transform(x, y))
+                .add(inventory)
+                .add(new WalletComponent())
+                .add(market)
+                .add(new FactionComponent(owner.runtimeId()))
+                .add(new PriceHistoryComponent());
+        if (definition.recipeId() != null) {
+            ProductionComponent production = new ProductionComponent();
+            production.recipes.add(checked.createRuntimeRecipe(definition.recipeId()));
+            entity.add(production);
+        }
+        return entity;
+    }
+
+    /**
      * Создаёт коммерческий транспорт из ship archetype.
      *
      * @param catalog валидированный content catalog
