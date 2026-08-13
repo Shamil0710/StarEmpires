@@ -71,7 +71,20 @@ final class ConstructionSiteFactory {
                 .add(inventory)
                 .add(new WalletComponent())
                 .add(market)
+                .add(ConstructionBidPolicy.create(checked, station))
                 .add(new FactionComponent(owner.runtimeId()))
                 .add(new PriceHistoryComponent());
+    }
+
+    static void restoreDerivedPolicy(
+            ContentCatalog catalog,
+            ContentCatalog.StationArchetypeDefinition target,
+            Entity site) {
+        Entity checkedSite = Objects.requireNonNull(site, "Construction site не задан");
+        checkedSite.add(ConstructionBidPolicy.create(catalog, target));
+        MarketComponent market = checkedSite.getComponent(MarketComponent.class);
+        if (market != null) {
+            market.isDirty = true;
+        }
     }
 }

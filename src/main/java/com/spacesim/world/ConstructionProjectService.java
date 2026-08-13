@@ -428,6 +428,7 @@ final class ConstructionProjectService {
             return state;
         }
         Entity site = requireSite(state);
+        ConstructionSiteFactory.restoreDerivedPolicy(catalog, target, site);
         ConstructionProjectState refreshed = refresh(state);
         if (refreshed.projectWalletMilliCredits() != state.projectWalletMilliCredits()
                 || !refreshed.materials().equals(state.materials())) {

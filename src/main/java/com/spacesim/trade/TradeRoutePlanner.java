@@ -169,6 +169,10 @@ public final class TradeRoutePlanner {
                     continue;
                 }
                 int amount = Math.min(cargo, consumer.freeCapacity());
+                int demand = Math.max(0, consumer.targetStock(itemId) - consumer.stock(itemId));
+                if (demand > 0) {
+                    amount = Math.min(amount, demand);
+                }
                 long minimumRevenue = safeTradeValue(salePrice, 1);
                 if (amount <= 0
                         || minimumRevenue <= 0L
