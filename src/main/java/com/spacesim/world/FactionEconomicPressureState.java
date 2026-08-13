@@ -26,7 +26,20 @@ public record FactionEconomicPressureState(
         long lastUnmetDemandUnits,
         long cooldownUntilTick) implements Comparable<FactionEconomicPressureState> {
 
-    /** Validates non-negative counters and stable identifiers. */
+    /**
+     * Validates non-negative counters and stable identifiers.
+     *
+     * @param factionContentId observing faction
+     * @param systemId observed system
+     * @param itemContentId observed item
+     * @param bottleneckType last observed physical cause
+     * @param firstObservedTick first tick of the current uninterrupted pressure episode
+     * @param lastObservedTick most recent evaluation tick
+     * @param consecutiveObservations current uninterrupted positive observations
+     * @param peakUnmetDemandUnits peak unmet demand in the current episode
+     * @param lastUnmetDemandUnits most recently observed unmet demand, or zero when clear
+     * @param cooldownUntilTick earliest tick when another investment may be initiated
+     */
     public FactionEconomicPressureState {
         if (factionContentId == null || factionContentId.isBlank()
                 || itemContentId == null || itemContentId.isBlank()
