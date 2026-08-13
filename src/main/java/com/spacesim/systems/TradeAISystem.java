@@ -361,6 +361,7 @@ public class TradeAISystem extends IteratingSystem {
             }
         }
         ShipComponent ship = sm.get(fleet);
+        FactionComponent faction = fm.get(fleet);
         return new FleetTradeProfile(
                 position.position.x,
                 position.position.y,
@@ -372,6 +373,7 @@ public class TradeAISystem extends IteratingSystem {
                 ai.specializedItem,
                 ship != null,
                 ship == null ? null : ship.type,
+                faction == null ? -1 : faction.factionId,
                 inventory.stock,
                 reputation);
     }

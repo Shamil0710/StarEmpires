@@ -23,6 +23,7 @@ public final class FleetTradeProfile {
     private final int specializedItem;
     private final boolean hasShipComponent;
     private final ShipType shipType;
+    private final int factionId;
     private final int[] stock;
     private final float[] reputation;
 
@@ -55,6 +56,41 @@ public final class FleetTradeProfile {
             ShipType shipType,
             int[] stock,
             float[] reputation) {
+        this(x, y, movementSpeed, walletBalanceMilliCredits, inventoryCapacity, totalStock, cargoSpace,
+                specializedItem, hasShipComponent, shipType, -1, stock, reputation);
+    }
+
+    /**
+     * Creates a planning profile with explicit runtime faction membership.
+     *
+     * @param x current X coordinate
+     * @param y current Y coordinate
+     * @param movementSpeed movement speed
+     * @param walletBalanceMilliCredits wallet balance
+     * @param inventoryCapacity physical inventory capacity
+     * @param totalStock total physical cargo
+     * @param cargoSpace AI cargo limit
+     * @param specializedItem specialization item or -1
+     * @param hasShipComponent whether ShipComponent exists
+     * @param shipType cargo policy or null
+     * @param factionId runtime faction ID or -1
+     * @param stock copied stock array
+     * @param reputation copied reputation array
+     */
+    public FleetTradeProfile(
+            float x,
+            float y,
+            float movementSpeed,
+            long walletBalanceMilliCredits,
+            int inventoryCapacity,
+            int totalStock,
+            int cargoSpace,
+            int specializedItem,
+            boolean hasShipComponent,
+            ShipType shipType,
+            int factionId,
+            int[] stock,
+            float[] reputation) {
         if (!Float.isFinite(x) || !Float.isFinite(y)) {
             throw new IllegalArgumentException("Координаты флота должны быть конечными");
         }
@@ -69,6 +105,9 @@ public final class FleetTradeProfile {
         }
         if (specializedItem < -1 || specializedItem >= Constants.MAX_ITEMS) {
             throw new IllegalArgumentException("Некорректная специализация товара");
+        }
+        if (factionId < -1 || factionId >= Constants.MAX_FACTIONS) {
+            throw new IllegalArgumentException("Некорректный runtime faction ID флота");
         }
         if (stock == null || stock.length != Constants.MAX_ITEMS) {
             throw new IllegalArgumentException("stock должен иметь длину Constants.MAX_ITEMS");
@@ -86,6 +125,7 @@ public final class FleetTradeProfile {
         this.specializedItem = specializedItem;
         this.hasShipComponent = hasShipComponent;
         this.shipType = shipType;
+        this.factionId = factionId;
         this.stock = Arrays.copyOf(stock, stock.length);
         this.reputation = Arrays.copyOf(reputation, reputation.length);
     }
@@ -108,6 +148,11 @@ public final class FleetTradeProfile {
     /** @return текущий баланс в milli-credits */
     public long walletBalanceMilliCredits() {
         return walletBalanceMilliCredits;
+    }
+
+    /** @return runtime faction ID или {@code -1} */
+    public int factionId() {
+        return factionId;
     }
 
     /** @return физически свободная вместимость inventory */
@@ -181,6 +226,7 @@ public final class FleetTradeProfile {
                 && specializedItem == other.specializedItem
                 && hasShipComponent == other.hasShipComponent
                 && shipType == other.shipType
+                && factionId == other.factionId
                 && Arrays.equals(stock, other.stock)
                 && Arrays.equals(reputation, other.reputation);
     }
