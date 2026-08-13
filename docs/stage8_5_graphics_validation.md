@@ -4,10 +4,7 @@
 
 Stage 8.5 is an evidence-based decision gate before Stage 9. Its job is to prove whether the current Java/libGDX/LWJGL3 presentation stack can support the intended 2D space-sandbox rendering model without coupling graphics to authoritative simulation state.
 
-The final decision is intentionally deferred until the remaining visual review is complete:
-
-- `KEEP_LIBGDX`, or
-- `MIGRATION_RECOMMENDED` with measured evidence and migration cost.
+The Stage-8.5 decision is complete: **`KEEP_LIBGDX`**. The authoritative final rationale and post-integration evidence are recorded in `docs/stage8_5_technology_decision.md`.
 
 ## 8.5A — Dependency compatibility
 
@@ -220,7 +217,7 @@ hardpoint VFX: ON
 emissive: MISSING / OPTIONAL
 ```
 
-These results strongly exceed the Stage-8.5 60 FPS target for the representative scene. Hardware model/driver details are still required before this becomes a complete reference-machine record.
+These results strongly exceeded the Stage-8.5 60 FPS target for the representative scene and motivated the orientation correction. A later post-integration Representative run with the approved authored engine/emissive pipeline also passed on the reference Windows machine.
 
 The same screenshot also exposed an important visual-contract issue: the authored heavy corvette faced left while procedural ships faced right. That observation directly motivated the explicit `SourceFacing` and runtime-right normalization now implemented.
 
@@ -228,33 +225,34 @@ The same screenshot also exposed an important visual-contract issue: the authore
 
 The original graphics-spike exact head `f078714ddcb9b1eafe82703fbe095628f8794142` passed the full Java 17 CI pipeline and produced the packaged desktop JAR. That exact artifact also rendered successfully under Linux Xvfb/software OpenGL. Those software-renderer FPS numbers remain smoke evidence only and are not used to accept or reject libGDX performance.
 
-## Remaining visual review
+## Completed real-GPU visual review
 
-Use Tactical and Close-up modes to inspect:
+Tactical, Close-up and dedicated asset-pack inspection confirmed:
 
-- runtime nose direction relative to procedural ships;
+- runtime-right nose direction relative to procedural ships;
 - tactical-size silhouette readability;
-- wider-zoom readability;
-- whether the sprite becomes visually noisy when downscaled;
-- three transformed main-engine glow origins;
-- exhaust direction under rotation;
+- three transformed main-engine origins;
+- exhaust direction and attachment under rotation;
 - transformed nose-weapon beam origin;
-- all five weapon hardpoints;
 - pivot/rotation stability;
 - transparent-edge behavior;
-- footprint plausibility relative to visible hull;
-- emissive alignment if an optional mask is later added.
+- emissive alignment;
+- damage-layer alignment;
+- authored engine `OFF / IDLE / THRUST` states.
+
+The remaining four weapon hardpoints are intentionally provisional attachment seams until production weapon/turret art exists; this does not block the rendering-stack decision.
 
 ## Decision guideline
 
-The roadmap target remains 60 FPS at 1920x1080 on the documented reference developer machine. The real-GPU run already exceeds that performance target by a very large margin for the current representative scene, but the final technology decision also considers visual correctness, batching behavior, maintainability and the final asset workflow.
+The roadmap target remains 60 FPS at 1920x1080 on the documented reference developer machine. The final post-integration Representative run at 2560x1369 reached approximately 2376 FPS, 0.43 ms average frame time, 0.60 ms p95, 1.68 ms max and 35 draw calls with 50 ships, 500 asteroids, 2000 particles, authored heavy-corvette thrust/emissive and post-processing enabled. Together with architecture and visual evidence, this supports `KEEP_LIBGDX`.
 
-## Still required before Stage 8.5 closes
+## Stage 8.5 close status
 
-- run the new Tactical and Close-up modes on the real heavy corvette;
-- verify/correct transformed engine and weapon hardpoints from close screenshots;
-- repeat Representative once after orientation normalization to ensure no regression;
-- record CPU/GPU/RAM/driver details for the reference machine;
-- decide whether to create an emissive mask and/or dedicated bloom pass;
-- write the final `KEEP_LIBGDX` or `MIGRATION_RECOMMENDED` decision with evidence;
-- update `docs/development_roadmap.md` with exact final verification and activate Stage 9 only after the gate passes.
+**COMPLETE — `KEEP_LIBGDX`.**
+
+- final decision record exists;
+- roadmap marks Stage 8.5 complete and Stage 9A active;
+- real-GPU hardware profile is documented in the final decision record;
+- authored engine/emissive integration is present in the Representative spike;
+- dedicated production bloom is deferred as a configurable future quality feature, not a technology blocker;
+- `BloomMode = OFF / LIGHT / FULL` is scheduled for Stage 13 / V4 and final graphics settings in Stage 22.
