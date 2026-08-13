@@ -23,7 +23,7 @@ final class Stage9ESetup {
     private static final String MINERS = "faction.miners";
     private static final String STEEL = "item.steel";
     private static final String ENERGY = "item.energy";
-    private static final float RELEASE_DELAY_SECONDS = 35f;
+    private static final float RELEASE_DELAY_SECONDS = 100f;
 
     private Stage9ESetup() {
         throw new AssertionError("Utility class");
