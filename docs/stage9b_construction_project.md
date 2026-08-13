@@ -48,7 +48,15 @@ A non-terminal project owns an ordinary local Ashley Entity with:
 
 The site is created through the Stage-9A lifecycle boundary while economically empty.
 
-This is important: project demand is visible to the existing market/trade stack. A normal trader can discover the site as a consumer, sell required steel/energy through the ordinary bilateral trade path, and receive real project money. There is no virtual construction-delivery formula.
+This is important: project demand is visible to the existing market/trade stack. `MarketDirectory` indexes a funded construction site as a normal physical consumer, so existing TradeAI can discover it, sell required steel/energy through the ordinary bilateral trade path, and receive real project money. There is no virtual construction-delivery formula.
+
+The construction site is nevertheless **not a completed station** for Stage-8 fiscal policy. It is excluded from:
+
+- generic faction station-liquidity subsidy;
+- completed-station tax;
+- foreign-territory station tariff.
+
+Therefore project liquidity can enter only through explicit construction funding (or ordinary sales spending that same funded wallet); fiscal policy cannot silently fund or drain the construction budget.
 
 ## Data-driven construction definitions
 
@@ -113,10 +121,13 @@ The Stage-9B PR is not mergeable until exact-head Java 17 CI proves:
 - project creation and deterministic IDs;
 - treasury funding transfer;
 - partial delivery persistence;
-- v4 binary round-trip;
+- v4 binary round-trip and v1/v2/v3 migration;
 - restore validation;
-- active and remote target systems;
+- construction site appears in existing `MarketDirectory` consumer discovery;
+- construction site remains outside completed-station fiscal/subsidy policy;
+- active and remote target-system progression;
 - cancellation refund before delivery;
+- cancellation after first physical delivery is explicitly rejected;
 - material fulfillment → BUILDING → COMPLETED;
 - construction material ledger sinks;
 - construction site removal;
