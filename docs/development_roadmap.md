@@ -562,7 +562,7 @@ Stage 8.5 завершён, когда:
 
 **Статус:** ACTIVE — STAGE 8.5 GATE PASSED
 
-Текущий implementation focus: **Stage 9B — Persistent Construction Project**.
+Текущий implementation focus: **Stage 9C — Destruction и economic shock**.
 
 ### Цель
 
@@ -607,7 +607,7 @@ Construction project должен быть **физическим экономи
 
 ### Stage 9B — Persistent Construction Project
 
-**Статус:** ACTIVE
+**Статус:** COMPLETE — PR #14 candidate; `docs/stage9b_construction_project.md`
 
 `ConstructionProject` должен хранить как минимум:
 
@@ -641,20 +641,22 @@ COMPLETED
 
 #### Задачи
 
-- [ ] construction requirements описываются data-driven;
-- [ ] проект создаётся без hardcoded simulation recipe;
-- [ ] faction treasury физически финансирует project wallet;
-- [ ] project demand виден обычному market/logistics core;
-- [ ] поставленный материал физически перемещается из cargo/inventory в project storage;
-- [ ] partial delivery сохраняется;
-- [ ] project state сохраняется через world persistence;
-- [ ] completion создаёт station через существующий archetype factory;
-- [ ] station появляется только после material + time requirements;
-- [ ] cancel/refund policy явно определена и не нарушает conservation.
+- [x] construction requirements описываются data-driven;
+- [x] проект создаётся без hardcoded simulation recipe;
+- [x] faction treasury физически финансирует project wallet;
+- [x] project demand виден обычному market/logistics core;
+- [x] поставленный материал физически перемещается из cargo/inventory в project storage;
+- [x] partial delivery сохраняется;
+- [x] project state сохраняется через world persistence;
+- [x] completion создаёт station через существующий archetype factory;
+- [x] station появляется только после material + time requirements;
+- [x] cancel/refund policy явно определена и не нарушает conservation.
 
 Для первой версии не расширять каталог ради реализма: использовать существующие ресурсы, например steel + energy, если этого достаточно для доказательства механики.
 
 ### Stage 9C — Destruction и economic shock
+
+**Статус:** ACTIVE
 
 #### Задачи
 
@@ -1869,20 +1871,20 @@ world shortage/war/discovery
 
 # 9. Текущий следующий шаг
 
-**ACTIVE: Stage 9B — Persistent Construction Project.**
+**ACTIVE: Stage 9C — Destruction и economic shock.**
 
 Stage 8.5 завершён решением `KEEP_LIBGDX`; presentation technology gate больше не блокирует core development.
 
 Immediate implementation sequence:
 
-1. persistent `ConstructionProject` ID/state model и state machine;
-2. data-driven material requirements для station archetype;
-3. project wallet и physical faction funding;
-4. project storage и частичные material deliveries;
-5. save/load continuation construction progress;
-6. completion через Stage-9A lifecycle без magic stock/money creation;
-7. cancellation/refund policy с conservation tests;
-8. затем Stage 9C destruction/economic shock.
+1. explicit destruction API поверх Stage-9A structural removal;
+2. определить cargo/stock fate `DESTROY / SALVAGE / TRANSFER`;
+3. определить money/wallet fate без silent currency loss;
+4. ledger accounting для уничтоженных ресурсов и transfers;
+5. physical salvage entity при выбранной salvage policy;
+6. immediate production/market removal и route invalidation;
+7. events/news hook для значимых потерь;
+8. economic-shock tests, затем Stage 9D bottleneck analysis.
 
 Параллельный visual track продолжает развивать approved asset pipeline. `BloomMode = OFF / LIGHT / FULL` реализуется и benchmark-ится вместе с Stage 13 / V4 Combat VFX, а финальные graphics-quality settings и thresholds входят в Stage 22.
 
