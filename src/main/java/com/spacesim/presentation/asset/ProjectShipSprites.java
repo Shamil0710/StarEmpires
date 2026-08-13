@@ -16,11 +16,11 @@ public final class ProjectShipSprites {
 
     /** Base texture expected by the Stage-8.5 real-art validation. */
     public static final String WHITE_HEAVY_CORVETTE_01_BASE =
-            "assets/ships/heavy_corvette/white_heavy_corvette_01/white_heavy_corvette_01_base.png";
+            "assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_base.png";
 
     /** Optional emissive mask expected beside the base texture. */
     public static final String WHITE_HEAVY_CORVETTE_01_EMISSIVE =
-            "assets/ships/heavy_corvette/white_heavy_corvette_01/white_heavy_corvette_01_emissive.png";
+            "assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_emissive.png";
 
     private ProjectShipSprites() {
     }
