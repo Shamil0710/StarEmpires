@@ -772,7 +772,7 @@ supply chain recovers
 
 ### Stage 10B — Jump transit
 
-**Статус:** COMPLETE candidate — `docs/stage10b_jump_transit.md`
+**Статус:** COMPLETE — PR #20; `docs/stage10b_jump_transit.md`
 
 Минимальная FSM:
 
