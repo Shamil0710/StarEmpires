@@ -4,7 +4,7 @@
 
 Stage 8.5 is an evidence-based decision gate before Stage 9. Its job is to prove whether the current Java/libGDX/LWJGL3 presentation stack can support the intended 2D space-sandbox rendering model without coupling graphics to authoritative simulation state.
 
-The final decision is intentionally deferred until a real desktop validation run is captured:
+The final decision is intentionally deferred until the remaining visual review is complete:
 
 - `KEEP_LIBGDX`, or
 - `MIGRATION_RECOMMENDED` with measured evidence and migration cost.
@@ -89,23 +89,23 @@ utility hardpoints: 1
 
 The source sprite uses normalized hardpoint coordinates with `(0,0)` at bottom-left. Engine visual directions point right (`0°`) and forward weapon visual directions point left (`180°`).
 
-The required base texture must be added with the exact repository path:
+Canonical base texture path:
 
 ```text
-src/main/resources/assets/ships/heavy_corvette/white_heavy_corvette_01/white_heavy_corvette_01_base.png
+src/main/resources/assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_base.png
 ```
 
-An optional future emissive mask is expected beside it as:
+Optional emissive mask path:
 
 ```text
-src/main/resources/assets/ships/heavy_corvette/white_heavy_corvette_01/white_heavy_corvette_01_emissive.png
+src/main/resources/assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_emissive.png
 ```
 
-The directory already contains a `README.md` with the asset-drop contract, so the folder exists in Git before the binary PNG is added.
+The binary sprite is now stored under the canonical filename without browser-added suffixes such as `(1)`.
 
 ## 8.5D — Engine / emissive validation behavior
 
-The desktop spike now attempts to load the heavy-corvette base texture automatically.
+The desktop spike loads the heavy-corvette base texture automatically.
 
 When the texture exists:
 
@@ -118,8 +118,6 @@ When the texture exists:
 - the HUD reports `REAL HEAVY CORVETTE` and whether the emissive asset is present.
 
 When the texture is absent, the representative load still runs with the deterministic procedural fallback and the HUD explicitly reports the missing real asset.
-
-This keeps the performance workload reproducible while making authored-art validation impossible to confuse with fallback rendering.
 
 ## 8.5E/F — Desktop graphics spike
 
@@ -143,22 +141,15 @@ The script:
 
 `run-graphics-validation.cmd --build-only` may be used to build without opening the graphics window.
 
-The equivalent direct JAR launch remains:
-
-```text
-java -jar target/star-empires-1.0-SNAPSHOT-all.jar --graphics-spike
-```
-
 ### Representative workload
 
 The workload is encoded by `GraphicsValidationProfile.representative()`:
 
-- viewport target: `1920 x 1080`;
 - ships: `50`;
 - asteroids/background objects: `500`;
 - active additive particles: `2000`;
 - total representative world/effect objects: `2550`;
-- heavy-corvette hardpoint-driven effects when the real sprite is present;
+- heavy-corvette hardpoint-driven effects;
 - engine/emissive glow;
 - shield-style additive effect;
 - beam/projectile-style geometry;
@@ -169,76 +160,38 @@ The workload is encoded by `GraphicsValidationProfile.representative()`:
 
 The spike disables VSync and the foreground FPS cap so measured frame time is not intentionally clamped to 60 FPS.
 
-Press `ESC` to exit.
+### Real developer-GPU run captured on 2026-08-13
 
-### HUD metrics
-
-The desktop HUD reports:
-
-- current FPS;
-- rolling average frame time;
-- rolling p95 frame time;
-- rolling maximum frame time;
-- SpriteBatch draw calls;
-- maximum sprites per batch;
-- approximate JVM heap in use;
-- active workload counts and viewport size;
-- whether the hero asset is the real heavy corvette or the procedural fallback;
-- whether the optional emissive texture is active.
-
-Frame-time statistics use a rolling 240-frame window.
-
-### Automated build and software-GL smoke evidence
-
-The original graphics-spike exact head `f078714ddcb9b1eafe82703fbe095628f8794142` passed the full Java 17 CI pipeline and produced the packaged desktop JAR.
-
-That exact CI artifact was additionally launched under Linux Xvfb with `LIBGL_ALWAYS_SOFTWARE=1` at a `1920x1080` virtual screen. The application rendered for several seconds without a shader compilation, framebuffer, SpriteBatch or LWJGL runtime exception. A captured frame visibly contained the representative ships, asteroids, engine trails, additive glow, beam and metrics HUD.
-
-One captured software-renderer frame reported approximately:
+A user-supplied Windows screenshot confirms that the authored heavy-corvette texture was actually loaded and rendered on a real desktop GPU. The HUD reported:
 
 ```text
-FPS: 52
-Average frame time: 20.20 ms
-P95 frame time: 29.03 ms
-Max frame time: 82.09 ms
-Draw calls: 16
-Max sprites/batch: 2051
-Heap in use: 6.3 MiB
+viewport: 2560 x 1369
+ships: 50
+asteroids: 500
+particles: 2000
+objects: 2550
+FPS: 3240
+average frame time: 0.35 ms
+p95 frame time: 0.46 ms
+max frame time: 0.84 ms
+draw calls: 16
+max sprites/batch: 2053
+heap: 265.5 MiB
+post-process: ON
+hero asset: REAL HEAVY CORVETTE
+hardpoint VFX: ON
+emissive: MISSING / OPTIONAL
 ```
 
-These numbers are **smoke evidence only**. They were produced by a virtual/software graphics environment and MUST NOT be used to accept or reject libGDX performance. The purpose of this run is runtime API/visual-path validation, not a reference-machine benchmark.
+These results strongly exceed the Stage-8.5 60 FPS target for this representative scene. Hardware model/driver details are still required before this run becomes a complete reference-machine record, but the runtime result already proves real authored texture upload, real GPU execution, hardpoint-driven VFX and framebuffer/post-processing coexist successfully.
 
-The heavy-corvette-aware version requires a new smoke/reference run after the real PNG is added, because the texture upload, authored alpha bounds and hardpoint placement cannot be validated while the file is absent.
+The screenshot also shows the heavy corvette at a larger, readable class scale than the procedural ships, which is appropriate for its heavy-corvette classification. A dedicated tactical/wide-zoom review is still required before finalizing scale and art readability.
 
-## Required manual evidence
+### Earlier software-GL smoke evidence
 
-A Stage-8.5 decision run must record the actual developer machine instead of treating hardware as implicit.
+The original graphics-spike exact head `f078714ddcb9b1eafe82703fbe095628f8794142` passed the full Java 17 CI pipeline and produced the packaged desktop JAR. That exact artifact also rendered successfully under Linux Xvfb/software OpenGL. Those software-renderer FPS numbers are smoke evidence only and are not used to accept or reject libGDX performance.
 
-Capture:
-
-```text
-Date:
-OS:
-CPU:
-GPU:
-RAM:
-Java runtime:
-Display / viewport:
-Driver version if relevant:
-
-Heavy corvette HUD state: REAL / FALLBACK
-Emissive state: ON / MISSING
-FPS:
-Average frame time:
-P95 frame time:
-Max frame time:
-Draw calls:
-Max sprites/batch:
-Heap in use:
-Visual defects observed:
-```
-
-A screenshot or short capture of the representative scene should accompany the numbers so visual correctness and performance are evaluated together.
+## Remaining visual review
 
 For the real heavy corvette specifically inspect:
 
@@ -251,21 +204,17 @@ For the real heavy corvette specifically inspect:
 - pivot/rotation stability;
 - transparent-edge behavior;
 - footprint plausibility relative to the visible hull;
-- emissive alignment if the optional mask exists.
+- emissive alignment if an optional mask is later added.
 
 ## Decision guideline
 
-The roadmap target remains 60 FPS at 1920x1080 on the documented reference developer machine. The decision must not use FPS alone: p95 frame time, visible artifacts, batching behavior, post-processing stability, asset workflow and maintainability all count.
-
-A representative 60 FPS frame budget is approximately `16.67 ms`; therefore average frame time below that value with materially worse p95 spikes still requires investigation.
+The roadmap target remains 60 FPS at 1920x1080 on the documented reference developer machine. The real-GPU run already exceeds that performance target by a very large margin for the current representative scene, but the final technology decision also considers visual correctness, batching behavior, maintainability and the final asset workflow.
 
 ## Still required before Stage 8.5 closes
 
-- add the selected heavy-corvette base PNG at the documented asset path;
-- execute the representative scene and validate its actual pivot/scale/engine/weapon placement;
-- optionally create the emissive mask after base-art placement is accepted;
-- execute and record the representative desktop run on the reference developer machine;
-- inspect visual quality at tactical and wider zoom levels;
-- decide whether a dedicated bloom pass is required beyond the current additive glow + color/vignette post-process proof;
+- complete tactical/wide-zoom visual review of the real heavy corvette;
+- verify or adjust engine and weapon hardpoint placement from close screenshots;
+- record CPU/GPU/RAM/driver details for the reference machine;
+- decide whether to create an emissive mask and/or dedicated bloom pass;
 - write the final `KEEP_LIBGDX` or `MIGRATION_RECOMMENDED` decision with evidence;
 - update `docs/development_roadmap.md` with exact final verification and activate Stage 9 only after the gate passes.
