@@ -1,0 +1,1 @@
+Stage 10B exact-tick orchestration checkpoint. No gameplay state change; used to trigger CI after source updates.
