@@ -49,9 +49,7 @@
 - deterministic fixed-tick simulation;
 - versioned binary persistence.
 
-**Технологическое решение считается предварительно зафиксированным до завершения Stage 8.5.**
-
-Stage 8.5 выполняет последнюю целевую проверку визуального потенциала и актуальности rendering stack до дальнейшего масштабного развития simulation/gameplay core. Миграция на другой движок или основной язык допускается только как результат этого evidence-based decision gate с оценкой стоимости миграции и потери уже реализованной инфраструктуры.
+**Stage 8.5 завершён с решением `KEEP_LIBGDX`.** Production presentation stack зафиксирован как Java 17 + libGDX 1.14.2 + LWJGL3, Ashley 1.7.4 и VisUI 1.5.9. Решение основано на real-GPU Representative/Tactical/Close-up validation, production-like heavy-corvette asset pipeline и зелёном Java-17 CI. Повторная миграция рассматривается только при появлении нового измеримого фундаментального ограничения.
 
 ---
 
@@ -307,7 +305,21 @@ Trade AI выбирает экономически лучший локальны
 
 ## Stage 8.5 — Graphics / Technology Validation
 
-**Статус:** ACTIVE
+**Статус:** COMPLETE — TECHNOLOGY DECISION `KEEP_LIBGDX`
+
+### Итог Stage 8.5
+
+- libGDX обновлён до `1.14.2`, VisUI до `1.5.9`, Ashley сохранён `1.7.4`;
+- presentation pipeline отделён от authoritative simulation/headless core;
+- production-like heavy-corvette asset contract подтверждён на real GPU;
+- source-facing/hardpoint orientation normalization работает для sprite, engines и weapons;
+- `OFF / IDLE / THRUST`, emissive и severe-damage layers прошли dedicated visual acceptance;
+- финальный Representative после authored integration: 2560x1369, 50 ships, 500 asteroids, 2000 particles, ~2376 FPS, avg ~0.43 ms, p95 ~0.60 ms, max ~1.68 ms, 35 draw calls;
+- reference GPU: NVIDIA GeForce RTX 4070, RAM 31.92 GiB, Windows 11 Pro build 26100;
+- Java 17 compatibility подтверждена CI; local real-GPU run выполнялся выбранным JDK 24.0.2;
+- final decision record: `docs/stage8_5_technology_decision.md`.
+
+Dedicated production bloom не блокирует gate: capability доказана emissive/additive/FBO path, а configurable `BloomMode` запланирован в последующих visual stages.
 
 ### Цель
 
@@ -548,7 +560,9 @@ Stage 8.5 завершён, когда:
 
 ## Stage 9 — Dynamic Economy: строительство, lifecycle и воспроизводство экономики
 
-**Статус:** PLANNED — BLOCKED BY STAGE 8.5
+**Статус:** ACTIVE — STAGE 8.5 GATE PASSED
+
+Текущий implementation focus: **Stage 9A — Entity lifecycle infrastructure**.
 
 ### Цель
 
@@ -1555,7 +1569,9 @@ Mission строится поверх реальных world state/events.
 - notifications;
 - filters/search;
 - keyboard shortcuts;
-- accessibility basics.
+- accessibility basics;
+- graphics-quality settings с persistent `BloomMode = OFF / LIGHT / FULL`;
+- sensible hardware/profile defaults, при этом пользователь может переопределить bloom вручную.
 
 ### Stage 22B — Onboarding
 
@@ -1587,7 +1603,9 @@ Mission строится поверх реальных world state/events.
 - galaxy route planning;
 - UI with thousands of assets;
 - save/load size/time;
-- long-running construction/war economy.
+- long-running construction/war economy;
+- отдельные graphics baselines для `BloomMode.OFF`, `BloomMode.LIGHT` и `BloomMode.FULL`;
+- release thresholds должны гарантировать приемлемый gameplay FPS как минимум для `OFF/LIGHT`, а `FULL` остаётся quality tier, а не gameplay requirement.
 
 ### Stage 22E — Release quality gates
 
@@ -1649,15 +1667,21 @@ Candidate можно отдать внешнему игроку без developer
 
 Construction stages желательно визуализировать через ту же persistent project state.
 
-## V4 — Combat VFX
+## V4 — Combat VFX и production post-processing
 
-Базовые capabilities проверяются Stage 8.5; production content развивается параллельно Stage 13.
+Базовые capabilities проверены Stage 8.5; production content развивается параллельно Stage 13.
 
 - muzzle/beam/projectile;
 - shields;
 - hit feedback;
 - destruction;
-- salvage/debris.
+- salvage/debris;
+- реализовать и benchmark-нуть `BloomMode = OFF / LIGHT / FULL`;
+- `OFF` — fallback/performance/accessibility без bloom pass;
+- `LIGHT` — целевой restrained gameplay default с bounded low-cost bloom вокруг emissive/VFX;
+- `FULL` — high-quality multi-pass режим для мощного hardware/cinematic presentation;
+- gameplay readability и simulation correctness не должны зависеть от `FULL`;
+- отдельно измерять frame-time/draw/pass cost каждого BloomMode на representative combat scene.
 
 ## V5 — Strategic map / empire UI
 
@@ -1841,19 +1865,19 @@ world shortage/war/discovery
 
 # 9. Текущий следующий шаг
 
-**ACTIVE: Stage 8.5 — Graphics / Technology Validation.**
+**ACTIVE: Stage 9A — Entity lifecycle infrastructure.**
 
-Первый implementation sequence:
+Stage 8.5 завершён решением `KEEP_LIBGDX`; presentation technology gate больше не блокирует core development.
 
-1. создать отдельную stage branch от актуального зелёного `main` после merge roadmap PR;
-2. проверить migration libGDX/VisUI на актуальные совместимые stable versions;
-3. сохранить headless simulation isolation и пройти regression suite;
-4. выделить presentation/render-pipeline boundary;
-5. подключить production-like ship sprite/atlas contract;
-6. реализовать engine animation + emissive/additive pass;
-7. собрать visual technology spike с particles, weapons, shields, post-processing и HUD;
-8. добавить rendering observability;
-9. снять representative/stress baseline;
-10. зафиксировать technology decision record.
+Immediate implementation sequence:
 
-После успешного Stage 8.5 следующий core этап — **Stage 9: Dynamic Economy**, затем **Stage 10: Inter-system logistics** и **Stage 11: Autonomous Faction Expansion**. Полноценный combat intentionally переносится в playable milestone после появления межсистемной экономики и player state.
+1. authoritative create/register/disable/destroy/unregister lifecycle для persistent local entities;
+2. deterministic allocation новых `EntityId`;
+3. safe station/ship removal с invalidation route/cache/index state;
+4. save/load continuation после runtime create/destroy;
+5. проверить отсутствие dangling persistent references и conservation regressions;
+6. после green Stage 9A перейти к persistent `ConstructionProject` (Stage 9B).
+
+Параллельный visual track продолжает развивать approved asset pipeline. `BloomMode = OFF / LIGHT / FULL` реализуется и benchmark-ится вместе с Stage 13 / V4 Combat VFX, а финальные graphics-quality settings и thresholds входят в Stage 22.
+
+После Stage 9 следующий core этап — **Stage 10: Inter-system logistics**, затем **Stage 11: Autonomous Faction Expansion**. Полноценный combat остаётся в playable milestone после появления межсистемной экономики и player state.
