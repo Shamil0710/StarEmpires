@@ -6,7 +6,6 @@ import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.PriceHistoryComponent;
-import com.spacesim.components.ProcurementPolicyComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
@@ -72,7 +71,7 @@ final class ConstructionSiteFactory {
                 .add(inventory)
                 .add(new WalletComponent())
                 .add(market)
-                .add(new ProcurementPolicyComponent(ConstructionBidPolicy.buyPriceMultiplier(checked, station)))
+                .add(ConstructionBidPolicy.create(checked, station))
                 .add(new FactionComponent(owner.runtimeId()))
                 .add(new PriceHistoryComponent());
     }
@@ -82,8 +81,7 @@ final class ConstructionSiteFactory {
             ContentCatalog.StationArchetypeDefinition target,
             Entity site) {
         Entity checkedSite = Objects.requireNonNull(site, "Construction site не задан");
-        checkedSite.add(new ProcurementPolicyComponent(
-                ConstructionBidPolicy.buyPriceMultiplier(catalog, target)));
+        checkedSite.add(ConstructionBidPolicy.create(catalog, target));
         MarketComponent market = checkedSite.getComponent(MarketComponent.class);
         if (market != null) {
             market.isDirty = true;
