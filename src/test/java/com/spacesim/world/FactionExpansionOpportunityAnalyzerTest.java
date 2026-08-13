@@ -57,6 +57,7 @@ class FactionExpansionOpportunityAnalyzerTest {
     void resourceWeightedPolicyCanPreferRicherTwoHopFrontier() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(0x11A2L);
+        materializeRemoteAsteroids(world);
         setRemainingAsteroidResource(world, DemoGalaxyFactory.INNER_SYSTEM_ID, 1L);
         setRemainingAsteroidResource(world, DemoGalaxyFactory.FRONTIER_SYSTEM_ID, 1_000_000L);
         ExpansionOpportunityPolicy resourceOnly = new ExpansionOpportunityPolicy(
@@ -110,6 +111,29 @@ class FactionExpansionOpportunityAnalyzerTest {
         assertTrue(FactionExpansionOpportunityAnalyzer
                 .analyze(poorWorld, content, TRADE_LEAGUE)
                 .isEmpty());
+    }
+
+    private static void materializeRemoteAsteroids(WorldSimulation world) {
+        float fixedStep = world.findSession(DemoGalaxyFactory.ACTIVE_SYSTEM_ID)
+                .orElseThrow()
+                .getClock()
+                .getFixedStepSeconds();
+        int guard = 0;
+        while ((!hasAsteroids(world, DemoGalaxyFactory.INNER_SYSTEM_ID)
+                || !hasAsteroids(world, DemoGalaxyFactory.FRONTIER_SYSTEM_ID))
+                && guard++ < 100) {
+            world.advanceFrame(fixedStep);
+        }
+        assertTrue(guard < 100, "Remote scheduler did not materialize asteroid sources");
+    }
+
+    private static boolean hasAsteroids(WorldSimulation world, StarSystemId systemId) {
+        for (Entity entity : world.findSession(systemId).orElseThrow().getEngine().getEntities()) {
+            if (entity.getComponent(AsteroidComponent.class) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void setRemainingAsteroidResource(
