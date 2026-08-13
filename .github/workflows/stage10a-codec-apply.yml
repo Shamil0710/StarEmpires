@@ -1,0 +1,167 @@
+name: Stage 10A codec apply
+
+on:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: agent/stage10a-fleet-world-identity
+
+      - name: Apply codec changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/main/java/com/spacesim/persistence/WorldStateCodec.java')
+          text = path.read_text()
+
+          text = text.replace(
+              'import com.spacesim.world.FactionStrategicState;\n',
+              'import com.spacesim.world.FactionStrategicState;\n'
+              'import com.spacesim.world.FleetId;\n'
+              'import com.spacesim.world.FleetLocationKind;\n'
+              'import com.spacesim.world.FleetPlacementState;\n'
+              'import com.spacesim.world.FleetTransitState;\n')
+
+          text = text.replace(
+              '    private static final int MAX_ECONOMIC_PRESSURE_STATES = 1_000_000;\n',
+              '    private static final int MAX_ECONOMIC_PRESSURE_STATES = 1_000_000;\n'
+              '    private static final int MAX_FLEETS = 1_000_000;\n')
+
+          text = text.replace(
+              '                writeEconomicPressureStates(output, checked.factionEconomicPressures());\n',
+              '                writeEconomicPressureStates(output, checked.factionEconomicPressures());\n'
+              '                output.writeLong(checked.nextFleetIdValue());\n'
+              '                writeFleetPlacements(output, checked.fleets());\n')
+
+          text = text.replace(
+              '            if (schemaVersion != WorldState.CURRENT_VERSION\n'
+              '                    && schemaVersion != WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION',
+              '            if (schemaVersion != WorldState.CURRENT_VERSION\n'
+              '                    && schemaVersion != WorldState.LEGACY_STAGE9_PRESSURE_VERSION\n'
+              '                    && schemaVersion != WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION')
+
+          old = """                        if (schemaVersion == WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION) {
+                            state = WorldState.fromLegacyStage9Construction(
+                                    topology, systems, factions, strategies,
+                                    nextConstructionProjectIdValue, projects);
+                        } else {
+                            state = new WorldState(
+                                    WorldState.CURRENT_VERSION,
+                                    topology,
+                                    systems,
+                                    factions,
+                                    strategies,
+                                    nextConstructionProjectIdValue,
+                                    projects,
+                                    readEconomicPressureStates(input));
+                        }"""
+          new = """                        if (schemaVersion == WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION) {
+                            state = WorldState.fromLegacyStage9Construction(
+                                    topology, systems, factions, strategies,
+                                    nextConstructionProjectIdValue, projects);
+                        } else {
+                            List<FactionEconomicPressureState> pressures = readEconomicPressureStates(input);
+                            if (schemaVersion == WorldState.LEGACY_STAGE9_PRESSURE_VERSION) {
+                                state = WorldState.fromLegacyStage9Pressure(
+                                        topology, systems, factions, strategies,
+                                        nextConstructionProjectIdValue, projects, pressures);
+                            } else {
+                                state = new WorldState(
+                                        WorldState.CURRENT_VERSION,
+                                        topology,
+                                        systems,
+                                        factions,
+                                        strategies,
+                                        nextConstructionProjectIdValue,
+                                        projects,
+                                        pressures,
+                                        input.readLong(),
+                                        readFleetPlacements(input));
+                            }
+                        }"""
+          if old not in text:
+              raise SystemExit('decode marker missing')
+          text = text.replace(old, new)
+
+          marker = '    private static void writeOptionalEntityId(DataOutputStream output, EntityId id) throws IOException {'
+          methods = """    private static void writeFleetPlacements(
+            DataOutputStream output,
+            List<FleetPlacementState> fleets) throws IOException {
+        writeCount(output, fleets.size(), MAX_FLEETS, \"fleetPlacements\");
+        for (FleetPlacementState fleet : fleets) {
+            output.writeLong(fleet.id().value());
+            writeString(output, fleet.locationKind().name());
+            if (fleet.locationKind() == FleetLocationKind.IN_SYSTEM) {
+                output.writeLong(fleet.systemId().value());
+                output.writeLong(fleet.localEntityId().value());
+            } else {
+                FleetTransitState transit = fleet.transitState();
+                output.writeLong(transit.originSystemId().value());
+                output.writeLong(transit.destinationSystemId().value());
+                byte[] payload = FleetPayloadCodec.encode(transit.entityState());
+                if (payload.length <= 0 || payload.length > MAX_GAMESTATE_PAYLOAD_BYTES) {
+                    throw new IllegalArgumentException(\"Fleet transit payload exceeds limit\");
+                }
+                output.writeInt(payload.length);
+                output.write(payload);
+            }
+        }
+    }
+
+    private static List<FleetPlacementState> readFleetPlacements(DataInputStream input) throws IOException {
+        int count = readCount(input, MAX_FLEETS, \"fleetPlacements\");
+        List<FleetPlacementState> fleets = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            FleetId id = new FleetId(input.readLong());
+            FleetLocationKind kind;
+            try {
+                kind = FleetLocationKind.valueOf(readString(input));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException(\"Unknown FleetLocationKind\", exception);
+            }
+            if (kind == FleetLocationKind.IN_SYSTEM) {
+                fleets.add(new FleetPlacementState(
+                        id, kind, new StarSystemId(input.readLong()),
+                        new EntityId(input.readLong()), null));
+            } else {
+                StarSystemId origin = new StarSystemId(input.readLong());
+                StarSystemId destination = new StarSystemId(input.readLong());
+                int payloadLength = input.readInt();
+                if (payloadLength <= 0 || payloadLength > MAX_GAMESTATE_PAYLOAD_BYTES) {
+                    throw new IllegalArgumentException(\"Invalid fleet transit payload length\");
+                }
+                byte[] payload = input.readNBytes(payloadLength);
+                if (payload.length != payloadLength) {
+                    throw new EOFException(\"Fleet transit payload truncated\");
+                }
+                fleets.add(new FleetPlacementState(
+                        id, kind, null, null,
+                        new FleetTransitState(origin, destination, FleetPayloadCodec.decode(payload))));
+            }
+        }
+        return List.copyOf(fleets);
+    }
+
+"""
+          if marker not in text:
+              raise SystemExit('method marker missing')
+          text = text.replace(marker, methods + marker)
+          path.write_text(text)
+          PY
+
+          git rm .github/workflows/stage10a-codec-apply.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/persistence/WorldStateCodec.java
+          git commit -m "feat: persist Stage 10A fleet placements"
+          git push origin HEAD:agent/stage10a-fleet-world-identity
