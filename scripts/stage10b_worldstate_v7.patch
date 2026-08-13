@@ -1,0 +1,199 @@
+--- a/src/main/java/com/spacesim/world/WorldState.java
++++ b/src/main/java/com/spacesim/world/WorldState.java
+@@ -16,7 +16,8 @@
+  * <p>Topology определяет Galaxy/Sector/StarSystem hierarchy, каждый
+  * {@link StarSystemSimulationState} хранит обычный {@link GameState} локального economic core,
+  * faction layers хранят treasury/strategy/pressure, construction layer — реальные проекты,
+- * а Stage-10 fleet layer отделяет устойчивый {@link FleetId} от system-local EntityId.</p>
++ * Stage-10 fleet layer отделяет устойчивый {@link FleetId} от system-local EntityId, а
++ * Stage-10B jump layer сохраняет активную фазу межсистемного перехода.</p>
+  *
+  * @param schemaVersion версия world-level persistent schema
+  * @param topology immutable topology галактики
+@@ -28,6 +29,7 @@
+  * @param factionEconomicPressures persistent faction pressure/hysteresis states
+  * @param nextFleetIdValue следующий неиспользованный world-level FleetId
+  * @param fleets persistent fleet placement states в canonical FleetId порядке
++ * @param fleetJumps persistent active jump states в canonical FleetId порядке
+  */
+ public record WorldState(
+         int schemaVersion,
+@@ -39,9 +41,12 @@
+         List<ConstructionProjectState> constructionProjects,
+         List<FactionEconomicPressureState> factionEconomicPressures,
+         long nextFleetIdValue,
+-        List<FleetPlacementState> fleets) {
++        List<FleetPlacementState> fleets,
++        List<FleetJumpState> fleetJumps) {
+     /** Текущая версия world-level persistent schema. */
+-    public static final int CURRENT_VERSION = 6;
++    public static final int CURRENT_VERSION = 7;
++    /** Stage-10A schema с FleetId/placement layer, но без active jump FSM. */
++    public static final int LEGACY_STAGE10A_VERSION = 6;
+     /** Stage-9D/9E schema с persistent economic pressure, но без world FleetId layer. */
+     public static final int LEGACY_STAGE9_PRESSURE_VERSION = 5;
+     /** Stage-9B/9C schema с construction projects, но без persistent economic pressure. */
+@@ -154,6 +159,36 @@
+                 FleetBootstrap.create(systems));
+     }
+ 
++    /**
++     * Source-compatible Stage-10A constructor без active jump state.
++     *
++     * @param schemaVersion текущая world schema
++     * @param topology topology галактики
++     * @param systems snapshots систем
++     * @param factions faction economic states
++     * @param factionStrategies diplomacy/territory states
++     * @param nextConstructionProjectIdValue construction allocator watermark
++     * @param constructionProjects persistent construction projects
++     * @param factionEconomicPressures persistent faction pressure states
++     * @param nextFleetIdValue world FleetId allocator watermark
++     * @param fleets persistent fleet placements
++     */
++    public WorldState(
++            int schemaVersion,
++            GalaxyTopology topology,
++            List<StarSystemSimulationState> systems,
++            List<FactionEconomicState> factions,
++            List<FactionStrategicState> factionStrategies,
++            long nextConstructionProjectIdValue,
++            List<ConstructionProjectState> constructionProjects,
++            List<FactionEconomicPressureState> factionEconomicPressures,
++            long nextFleetIdValue,
++            List<FleetPlacementState> fleets) {
++        this(schemaVersion, topology, systems, factions, factionStrategies,
++                nextConstructionProjectIdValue, constructionProjects, factionEconomicPressures,
++                nextFleetIdValue, fleets, List.of());
++    }
++
+     private WorldState(
+             int schemaVersion,
+             GalaxyTopology topology,
+@@ -166,7 +201,7 @@
+             FleetBootstrap.Result fleetBootstrap) {
+         this(schemaVersion, topology, systems, factions, factionStrategies,
+                 nextConstructionProjectIdValue, constructionProjects, factionEconomicPressures,
+-                fleetBootstrap.nextId(), fleetBootstrap.placements());
++                fleetBootstrap.nextId(), fleetBootstrap.placements(), List.of());
+     }
+ 
+     /**
+@@ -182,6 +217,7 @@
+      * @param factionEconomicPressures persistent faction pressure states
+      * @param nextFleetIdValue следующий world FleetId allocator watermark
+      * @param fleets world-level fleet placement states
++     * @param fleetJumps active persistent jump states
+      * @throws NullPointerException если обязательное значение не задано
+      * @throws IllegalArgumentException при неизвестной версии, duplicate/unknown IDs,
+      *         неполном topology/fleet coverage или несовместимом fleet location state
+@@ -197,6 +233,7 @@
+         Objects.requireNonNull(constructionProjects, "Construction projects WorldState не заданы");
+         Objects.requireNonNull(factionEconomicPressures, "Economic pressure states WorldState не заданы");
+         Objects.requireNonNull(fleets, "Fleet placement states WorldState не заданы");
++        Objects.requireNonNull(fleetJumps, "Fleet jump states WorldState не заданы");
+         if (nextConstructionProjectIdValue <= 0L) {
+             throw new IllegalArgumentException("Следующий ConstructionProjectId должен быть положительным");
+         }
+@@ -385,6 +422,55 @@
+         }
+         sortedFleets.sort(Comparator.naturalOrder());
+         fleets = List.copyOf(sortedFleets);
++
++        List<FleetJumpState> sortedJumps = new ArrayList<>(fleetJumps.size());
++        Set<FleetId> jumpFleetIds = new HashSet<>();
++        for (FleetJumpState jump : fleetJumps) {
++            FleetJumpState value = Objects.requireNonNull(jump, "FleetJumpState не задан");
++            if (!jumpFleetIds.add(value.fleetId())) {
++                throw new IllegalArgumentException("Fleet имеет несколько active jump states: " + value.fleetId());
++            }
++            if (topology.findSystem(value.originSystemId()).isEmpty()
++                    || topology.findSystem(value.destinationSystemId()).isEmpty()
++                    || !topology.neighbors(value.originSystemId()).contains(value.destinationSystemId())) {
++                throw new IllegalArgumentException(
++                        "Fleet jump не имеет direct topology connection: " + value.fleetId());
++            }
++            FleetPlacementState placement = findFleetPlacement(fleets, value.fleetId());
++            if (placement == null) {
++                throw new IllegalArgumentException(
++                        "Fleet jump ссылается на неизвестный FleetId: " + value.fleetId());
++            }
++            switch (value.phase()) {
++                case MOVING_TO_JUMP, JUMP_PENDING -> {
++                    if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
++                            || !value.originSystemId().equals(placement.systemId())) {
++                        throw new IllegalArgumentException(
++                                "Pre-jump phase не совпадает с origin placement: " + value.fleetId());
++                    }
++                }
++                case IN_TRANSIT -> {
++                    FleetTransitState transit = placement.transitState();
++                    if (placement.locationKind() != FleetLocationKind.IN_TRANSIT
++                            || transit == null
++                            || !value.originSystemId().equals(transit.originSystemId())
++                            || !value.destinationSystemId().equals(transit.destinationSystemId())) {
++                        throw new IllegalArgumentException(
++                                "Jump transit phase не совпадает с physical transit: " + value.fleetId());
++                    }
++                }
++                case ARRIVING -> {
++                    if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
++                            || !value.destinationSystemId().equals(placement.systemId())) {
++                        throw new IllegalArgumentException(
++                                "Arrival phase не совпадает с destination placement: " + value.fleetId());
++                    }
++                }
++            }
++            sortedJumps.add(value);
++        }
++        sortedJumps.sort(Comparator.naturalOrder());
++        fleetJumps = List.copyOf(sortedJumps);
+     }
+ 
+     /**
+@@ -492,6 +578,45 @@
+                 nextConstructionProjectIdValue, projects, pressures);
+     }
+ 
++    /**
++     * Мигрирует Stage-10A schema v6 без выдуманных active jump states.
++     *
++     * @param topology decoded topology
++     * @param systems decoded local sessions
++     * @param factions decoded faction economy
++     * @param strategies decoded strategic faction state
++     * @param nextConstructionProjectIdValue decoded construction allocator watermark
++     * @param projects decoded construction projects
++     * @param pressures decoded economic pressure states
++     * @param nextFleetIdValue decoded FleetId allocator watermark
++     * @param fleets decoded fleet placements
++     * @return current WorldState with empty active jump layer
++     */
++    public static WorldState fromLegacyStage10A(
++            GalaxyTopology topology,
++            List<StarSystemSimulationState> systems,
++            List<FactionEconomicState> factions,
++            List<FactionStrategicState> strategies,
++            long nextConstructionProjectIdValue,
++            List<ConstructionProjectState> projects,
++            List<FactionEconomicPressureState> pressures,
++            long nextFleetIdValue,
++            List<FleetPlacementState> fleets) {
++        return new WorldState(CURRENT_VERSION, topology, systems, factions, strategies,
++                nextConstructionProjectIdValue, projects, pressures,
++                nextFleetIdValue, fleets, List.of());
++    }
++
++    private static FleetPlacementState findFleetPlacement(
++            List<FleetPlacementState> fleets, FleetId fleetId) {
++        for (FleetPlacementState placement : fleets) {
++            if (placement.id().equals(fleetId)) {
++                return placement;
++            }
++        }
++        return null;
++    }
++
+     private static StarSystemSimulationState findSystemState(
+             List<StarSystemSimulationState> systems,
+             StarSystemId id) {
