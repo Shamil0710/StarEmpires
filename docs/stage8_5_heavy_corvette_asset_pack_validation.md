@@ -80,19 +80,51 @@ The validator does not assume that the left edge of the PNG canvas is the nozzle
 
 The visible effect is scaled relative to the rendered heavy-corvette height and placed independently on all three main-engine hardpoints. This makes the validation resilient to transparent margins and different idle/thrust canvas aspect ratios.
 
-## Acceptance review
+## Measured pack
 
-The asset pack passes this review when:
+All five resources use a `1536 x 1024` canvas.
 
-- all five files load;
-- base/emissive/damage report `full-frame canvas MATCH`;
-- base has no baked long exhaust plume;
-- emissive lights align with the base hull when toggled;
-- damage aligns with the same hull when toggled;
-- engine `OFF` leaves no visible thrust plume;
-- engine `IDLE` attaches cleanly to all three nozzles;
-- engine `THRUST` attaches to the same nozzles and extends behind the runtime-right ship;
-- rotation preserves layer and engine alignment;
-- hardpoints remain attached through the full rotation.
+```text
+BASE          alpha [22,51]-[1457,950]   1436 x 900
+EMISSIVE      alpha [43,89]-[1359,897]   1317 x 809
+DAMAGE        alpha [18,65]-[1373,902]   1356 x 838
+ENGINE IDLE   alpha [194,289]-[1293,711] 1100 x 423
+ENGINE THRUST alpha [19,229]-[1519,776]  1501 x 548
+```
 
-After this dedicated review passes, the accepted engine-state rendering can be integrated into the representative Stage-8.5 graphics spike without changing its benchmark workload definition.
+`base/emissive/damage`: **full-frame canvas MATCH**.
+
+## Real-GPU acceptance — 2026-08-13
+
+Dedicated Windows real-GPU review passed.
+
+- Engine OFF — **PASS**;
+- Engine IDLE — **PASS**;
+- Engine THRUST — **PASS**;
+- emissive alignment — **PASS**;
+- damage alignment — **PASS**;
+- three main engine hardpoints — **PASS**;
+- source-left to runtime-right normalization — **PASS**.
+
+No manual engine-VFX scale or attachment adjustment is required from the current review.
+
+The damage layer reads visually as **heavy/severe damage**. When multi-stage damage presentation is introduced, this texture should be treated as the high-damage state rather than as a generic low-damage overlay.
+
+Detailed review evidence:
+
+- `docs/stage8_5_asset_pack_real_gpu_review_2026-08-13.md`;
+- `docs/stage8_5_asset_pack_smoke_2026-08-13.md`.
+
+## Acceptance result
+
+**ASSET PACK REAL-GPU REVIEW: PASS**
+
+The dedicated asset-pack review is no longer a Stage-8.5 blocker.
+
+Next implementation step:
+
+1. use the approved authored engine-state assets in the main Representative graphics spike instead of the hero ship's procedural exhaust;
+2. repeat Representative real-GPU metrics after the integration;
+3. record reference machine CPU/GPU/RAM/driver information;
+4. finalize emissive/bloom policy;
+5. issue the Stage-8.5 technology decision.
