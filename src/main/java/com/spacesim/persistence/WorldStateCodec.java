@@ -25,8 +25,9 @@ import java.util.Objects;
  * Детерминированный бинарный codec {@link WorldState}.
  *
  * <p>Schema v1 хранит topology + local sessions, v2 добавляет faction treasury, v3 strategic
- * state, v4 construction projects, v5 economic pressure/hysteresis, а v6 world-level fleet
- * placement/transit state. Local entity payload продолжает кодироваться {@link GameStateCodec}.</p>
+ * state, v4 construction projects, v5 economic pressure/hysteresis, v6 world-level fleet
+ * placement/transit state, а v7 active jump FSM. Local entity payload продолжает кодироваться
+ * {@link GameStateCodec}.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
@@ -68,6 +69,7 @@ public final class WorldStateCodec {
                 WorldFactionBinary.writePressures(output, checked.factionEconomicPressures());
                 output.writeLong(checked.nextFleetIdValue());
                 WorldFleetBinary.write(output, checked.fleets());
+                WorldFleetBinary.writeJumps(output, checked.fleetJumps());
             }
 
             byte[] bytes = buffer.toByteArray();
@@ -190,6 +192,7 @@ public final class WorldStateCodec {
 
     private static void requireSupportedSchema(int schemaVersion) {
         if (schemaVersion != WorldState.CURRENT_VERSION
+                && schemaVersion != WorldState.LEGACY_STAGE10A_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE9_PRESSURE_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE8_VERSION
@@ -238,6 +241,21 @@ public final class WorldStateCodec {
                     pressures);
         }
 
+        long nextFleetId = input.readLong();
+        var fleets = WorldFleetBinary.read(input);
+        if (schemaVersion == WorldState.LEGACY_STAGE10A_VERSION) {
+            return WorldState.fromLegacyStage10A(
+                    topology,
+                    systems,
+                    factions,
+                    strategies,
+                    nextProjectId,
+                    projects,
+                    pressures,
+                    nextFleetId,
+                    fleets);
+        }
+
         return new WorldState(
                 WorldState.CURRENT_VERSION,
                 topology,
@@ -247,7 +265,8 @@ public final class WorldStateCodec {
                 nextProjectId,
                 projects,
                 pressures,
-                input.readLong(),
-                WorldFleetBinary.read(input));
+                nextFleetId,
+                fleets,
+                WorldFleetBinary.readJumps(input));
     }
 }
