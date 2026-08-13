@@ -80,7 +80,9 @@ public final class TradeRoutePlanner {
             for (TradeOpportunity opportunity : directory.opportunities(itemId)) {
                 MarketDirectory.StationMarket supplier = directory.find(opportunity.buyStationId());
                 MarketDirectory.StationMarket consumer = directory.find(opportunity.sellStationId());
-                if (supplier == null || consumer == null) {
+                if (supplier == null || consumer == null
+                        || !supplier.canTrade(fleet.factionId())
+                        || !consumer.canTrade(fleet.factionId())) {
                     continue;
                 }
 
@@ -164,6 +166,9 @@ public final class TradeRoutePlanner {
                 continue;
             }
             for (MarketDirectory.StationMarket consumer : directory.consumers(itemId)) {
+                if (!consumer.canTrade(fleet.factionId())) {
+                    continue;
+                }
                 float salePrice = effectiveBuyPrice(consumer, itemId, fleet);
                 if (!isPositiveFinite(salePrice)) {
                     continue;

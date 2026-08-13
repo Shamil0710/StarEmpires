@@ -4,6 +4,7 @@ import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
+import com.spacesim.components.FactionMarketAccessComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.TransformComponent;
@@ -44,6 +45,8 @@ public final class MarketDirectory {
     private final ComponentMapper<InventoryComponent> im = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<WalletComponent> wm = ComponentMapper.getFor(WalletComponent.class);
     private final ComponentMapper<FactionComponent> fm = ComponentMapper.getFor(FactionComponent.class);
+    private final ComponentMapper<FactionMarketAccessComponent> fam =
+            ComponentMapper.getFor(FactionMarketAccessComponent.class);
     private final Set<EntityId> seenLiveIds = new HashSet<>();
 
     private List<StationMarket> stations = List.of();
@@ -271,7 +274,8 @@ public final class MarketDirectory {
         MarketComponent market = mm.get(entity);
         WalletComponent wallet = wm.get(entity);
         int factionId = fm.has(entity) ? fm.get(entity).factionId : -1;
-        return previous.matchesLiveState(transform, factionId, wallet, inventory, market);
+        FactionMarketAccessComponent access = fam.has(entity) ? fam.get(entity) : null;
+        return previous.matchesLiveState(transform, factionId, wallet, inventory, market, access);
     }
 
     private boolean isMarketEntity(Entity entity) {
@@ -375,11 +379,15 @@ public final class MarketDirectory {
         InventoryComponent inventory = im.get(entity);
         WalletComponent wallet = wm.get(entity);
         int factionId = fm.has(entity) ? fm.get(entity).factionId : -1;
+        FactionMarketAccessComponent access = fam.has(entity) ? fam.get(entity) : null;
         return new StationMarket(
                 id,
                 transform.position.x,
                 transform.position.y,
                 factionId,
+                access != null,
+                access == null || access.canTrade(-1),
+                access == null ? new boolean[0] : access.copyAllowedFactionIds(),
                 wallet.getBalanceMilliCredits(),
                 inventory.capacity,
                 inventory.getTotalStock(),
@@ -493,6 +501,9 @@ public final class MarketDirectory {
         private final float x;
         private final float y;
         private final int factionId;
+        private final boolean hasAccessPolicy;
+        private final boolean allowUnfactioned;
+        private final boolean[] allowedFactionIds;
         private final long walletBalanceMilliCredits;
         private final int inventoryCapacity;
         private final int totalStock;
@@ -507,6 +518,9 @@ public final class MarketDirectory {
                 float x,
                 float y,
                 int factionId,
+                boolean hasAccessPolicy,
+                boolean allowUnfactioned,
+                boolean[] allowedFactionIds,
                 long walletBalanceMilliCredits,
                 int inventoryCapacity,
                 int totalStock,
@@ -519,6 +533,9 @@ public final class MarketDirectory {
             this.x = x;
             this.y = y;
             this.factionId = factionId;
+            this.hasAccessPolicy = hasAccessPolicy;
+            this.allowUnfactioned = allowUnfactioned;
+            this.allowedFactionIds = Arrays.copyOf(allowedFactionIds, allowedFactionIds.length);
             this.walletBalanceMilliCredits = walletBalanceMilliCredits;
             this.inventoryCapacity = inventoryCapacity;
             this.totalStock = totalStock;
@@ -547,6 +564,23 @@ public final class MarketDirectory {
         /** @return runtime faction ID или {@code -1} */
         public int factionId() {
             return factionId;
+        }
+
+        /**
+         * Checks immutable market access for a planning participant.
+         *
+         * @param participantFactionId runtime faction ID or {@code -1}
+         * @return whether planning may consider this market
+         */
+        public boolean canTrade(int participantFactionId) {
+            if (!hasAccessPolicy) {
+                return true;
+            }
+            if (participantFactionId < 0) {
+                return allowUnfactioned;
+            }
+            return participantFactionId < allowedFactionIds.length
+                    && allowedFactionIds[participantFactionId];
         }
 
         /** @return station wallet balance */
@@ -616,7 +650,8 @@ public final class MarketDirectory {
                 int liveFactionId,
                 WalletComponent wallet,
                 InventoryComponent inventory,
-                MarketComponent market) {
+                MarketComponent market,
+                FactionMarketAccessComponent access) {
             return transform != null
                     && wallet != null
                     && inventory != null
@@ -624,6 +659,10 @@ public final class MarketDirectory {
                     && Float.floatToIntBits(x) == Float.floatToIntBits(transform.position.x)
                     && Float.floatToIntBits(y) == Float.floatToIntBits(transform.position.y)
                     && factionId == liveFactionId
+                    && hasAccessPolicy == (access != null)
+                    && (!hasAccessPolicy
+                    || (allowUnfactioned == access.canTrade(-1)
+                    && Arrays.equals(allowedFactionIds, access.copyAllowedFactionIds())))
                     && walletBalanceMilliCredits == wallet.getBalanceMilliCredits()
                     && inventoryCapacity == inventory.capacity
                     && Arrays.equals(stock, inventory.stock)
