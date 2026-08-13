@@ -1,0 +1,66 @@
+name: Stage 9C semantic integration
+
+on:
+  push:
+    branches: [agent/stage9c-destruction-shock]
+    paths: ['.github/workflows/stage9c-semantic-integration.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: agent/stage9c-destruction-shock
+          fetch-depth: 0
+      - name: Integrate persistent news and construction failure semantics
+        shell: python
+        run: |
+          from pathlib import Path
+
+          # GlobalEventManager external persistent news hook.
+          p = Path('src/main/java/com/spacesim/events/GlobalEventManager.java')
+          text = p.read_text(encoding='utf-8')
+          marker = '''    /**\n     * Извлекает все накопленные новости и очищает внутреннюю очередь.'''
+          if 'public void publishNews(NewsArticle article)' not in text:
+              if marker not in text:
+                  raise SystemExit('GlobalEventManager news marker missing')
+              method = '''    /**\n     * Добавляет deterministic gameplay news в persistent очередь без изменения RNG/event set.\n     *\n     * @param article статья с game-time timestamp\n     */\n    public void publishNews(NewsArticle article) {\n        pendingNews.add(Objects.requireNonNull(article, "Публикуемая новость не задана"));\n    }\n\n'''
+              text = text.replace(marker, method + marker, 1)
+              p.write_text(text, encoding='utf-8')
+
+          # Completed construction history must survive later station destruction.
+          p = Path('src/main/java/com/spacesim/world/WorldState.java')
+          text = p.read_text(encoding='utf-8')
+          old = '''            if (value.completedStationEntityId() != null\n                    && systemState.simulationState().entities().stream()\n                    .noneMatch(entity -> entity.id().equals(value.completedStationEntityId()))) {\n                throw new IllegalArgumentException("Completed construction project потерял station entity: " + value.id());\n            }\n'''
+          if old in text:
+              text = text.replace(old, '', 1)
+          p.write_text(text, encoding='utf-8')
+
+          # ConstructionProjectService terminal FAILED + explicit fail-by-site API.
+          p = Path('src/main/java/com/spacesim/world/ConstructionProjectService.java')
+          text = p.read_text(encoding='utf-8')
+          old = '''        if (isTerminal(state.status())) {\n            if (state.status() == ConstructionProjectStatus.COMPLETED\n                    && session.getEntityRegistry().find(state.completedStationEntityId()) == null) {\n                throw new IllegalArgumentException("Restored construction project потерял completed station");\n            }\n            return state;\n        }'''
+          if old in text:
+              text = text.replace(old, '''        if (isTerminal(state.status())) {\n            return state;\n        }''', 1)
+          old_terminal = '''    private static boolean isTerminal(ConstructionProjectStatus status) {\n        return status == ConstructionProjectStatus.COMPLETED || status == ConstructionProjectStatus.CANCELLED;\n    }'''
+          if old_terminal in text:
+              text = text.replace(old_terminal, '''    private static boolean isTerminal(ConstructionProjectStatus status) {\n        return status == ConstructionProjectStatus.COMPLETED\n                || status == ConstructionProjectStatus.CANCELLED\n                || status == ConstructionProjectStatus.FAILED;\n    }''', 1)
+          marker = '''    boolean isConstructionSite(StarSystemId systemId, EntityId entityId) {'''
+          if 'ConstructionProjectId failDestroyedSite(' not in text:
+              if marker not in text:
+                  raise SystemExit('ConstructionProjectService site marker missing')
+              method = '''    ConstructionProjectId failDestroyedSite(\n            StarSystemId systemId, EntityId entityId, long tick) {\n        if (systemId == null || entityId == null) {\n            return null;\n        }\n        for (ConstructionProjectState state : new ArrayList<>(projects.values())) {\n            if (isTerminal(state.status())\n                    || !state.systemId().equals(systemId)\n                    || !entityId.equals(state.constructionSiteEntityId())) {\n                continue;\n            }\n            ConstructionProjectState refreshed = refresh(state);\n            ConstructionProjectState failed = copy(\n                    refreshed, ConstructionProjectStatus.FAILED, tick, refreshed.buildStartedTick(), tick,\n                    null, null, refreshed.materials(), 0L);\n            projects.put(state.id(), failed);\n            return state.id();\n        }\n        return null;\n    }\n\n'''
+              text = text.replace(marker, method + marker, 1)
+          p.write_text(text, encoding='utf-8')
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/stage9c-semantic-integration.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: integrate Stage 9C failure and news semantics"
+          git push origin HEAD:agent/stage9c-destruction-shock
