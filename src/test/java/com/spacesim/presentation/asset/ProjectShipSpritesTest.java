@@ -21,6 +21,7 @@ class ProjectShipSpritesTest {
         assertEquals(0.5f, spec.pivotY());
         assertEquals(86.4f, spec.collisionWidth());
         assertEquals(41.8f, spec.collisionHeight());
+        assertEquals(SourceFacing.LEFT, spec.sourceFacing());
         assertTrue(spec.collisionWidth() < spec.worldWidth());
         assertTrue(spec.collisionHeight() < spec.worldHeight());
     }
