@@ -1,0 +1,54 @@
+name: Stage 9B site policy patch
+
+on:
+  push:
+    branches: [agent/stage9b-construction-project]
+    paths: ['.github/workflows/stage9b-site-policy-patch.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: agent/stage9b-construction-project
+          fetch-depth: 0
+      - name: Exclude construction sites from completed-station fiscal policies
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('src/main/java/com/spacesim/world/ConstructionProjectService.java')
+          text = p.read_text(encoding='utf-8')
+          marker = '''    long nextIdValue() {\n        return idAllocator.peekNextValue();\n    }\n\n'''
+          addition = '''    boolean isConstructionSite(StarSystemId systemId, EntityId entityId) {\n        if (systemId == null || entityId == null) {\n            return false;\n        }\n        for (ConstructionProjectState state : projects.values()) {\n            if (!isTerminal(state.status())\n                    && state.systemId().equals(systemId)\n                    && entityId.equals(state.constructionSiteEntityId())) {\n                return true;\n            }\n        }\n        return false;\n    }\n\n'''
+          if marker not in text:
+              raise SystemExit('ConstructionProjectService insertion marker missing')
+          p.write_text(text.replace(marker, marker + addition, 1), encoding='utf-8')
+
+          p = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace(
+              'for (Entity station : ownedMarketStations(session, faction.runtimeId())) {',
+              'for (Entity station : ownedMarketStations(systemId, session, faction.runtimeId())) {',
+              1)
+          text = text.replace(
+              'for (Entity station : marketStations(session)) {',
+              'for (Entity station : completedMarketStations(systemId, session)) {',
+              1)
+          old = '''    private List<Entity> ownedMarketStations(SimulationSession session, int runtimeFactionId) {\n        List<Entity> result = new ArrayList<>();\n        for (Entity entity : marketStations(session)) {\n            FactionComponent faction = entity.getComponent(FactionComponent.class);\n            if (faction != null && faction.factionId == runtimeFactionId) {\n                result.add(entity);\n            }\n        }\n        return result;\n    }\n\n    private List<Entity> marketStations(SimulationSession session) {\n        List<Entity> stations = new ArrayList<>();\n        for (Entity entity : session.getEngine().getEntities()) {\n            if (entity.getComponent(MarketComponent.class) == null\n                    || entity.getComponent(WalletComponent.class) == null\n                    || entity.getComponent(EntityIdComponent.class) == null) {\n                continue;\n            }\n            stations.add(entity);\n        }\n        stations.sort(Comparator.comparingLong(entity ->\n                entity.getComponent(EntityIdComponent.class).id.value()));\n        return stations;\n    }\n'''
+          new = '''    private List<Entity> ownedMarketStations(\n            StarSystemId systemId, SimulationSession session, int runtimeFactionId) {\n        List<Entity> result = new ArrayList<>();\n        for (Entity entity : completedMarketStations(systemId, session)) {\n            FactionComponent faction = entity.getComponent(FactionComponent.class);\n            if (faction != null && faction.factionId == runtimeFactionId) {\n                result.add(entity);\n            }\n        }\n        return result;\n    }\n\n    private List<Entity> completedMarketStations(StarSystemId systemId, SimulationSession session) {\n        List<Entity> stations = new ArrayList<>();\n        for (Entity entity : session.getEngine().getEntities()) {\n            EntityIdComponent id = entity.getComponent(EntityIdComponent.class);\n            if (entity.getComponent(MarketComponent.class) == null\n                    || entity.getComponent(WalletComponent.class) == null\n                    || id == null\n                    || constructionProjectService.isConstructionSite(systemId, id.id)) {\n                continue;\n            }\n            stations.add(entity);\n        }\n        stations.sort(Comparator.comparingLong(entity ->\n                entity.getComponent(EntityIdComponent.class).id.value()));\n        return stations;\n    }\n'''
+          if old not in text:
+              raise SystemExit('WorldSimulation market station helper fragment missing')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/stage9b-site-policy-patch.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world .github/workflows/stage9b-site-policy-patch.yml
+          git commit -m "fix: keep construction sites outside station fiscal policy"
+          git push origin HEAD:agent/stage9b-construction-project
