@@ -4,6 +4,7 @@ import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
 import com.spacesim.components.ArchetypeComponent;
 import com.spacesim.components.EntityIdComponent;
+import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.ProductionComponent;
 import com.spacesim.content.ContentCatalog;
@@ -29,10 +30,12 @@ class DestructionEconomicShockTest {
         SimulationSession session = foundry.session();
         Entity target = foundry.entity();
         EntityId targetId = target.getComponent(EntityIdComponent.class).id;
+        int steelItemId = content.findItem("item.steel").runtimeId();
         assertNotNull(target.getComponent(ProductionComponent.class));
         assertNotNull(target.getComponent(MarketComponent.class));
 
         int foundriesBefore = countArchetype(world, "station.foundry");
+        long unmetSteelBefore = aggregateUnmetMarketDemand(session, steelItemId);
         MarketDirectory beforeDirectory = new MarketDirectory(content);
         beforeDirectory.rebuild(session.getEngine().getEntities());
         assertNotNull(beforeDirectory.find(targetId));
@@ -48,11 +51,18 @@ class DestructionEconomicShockTest {
         MarketDirectory afterDirectory = new MarketDirectory(content);
         afterDirectory.rebuild(session.getEngine().getEntities());
         assertEquals(null, afterDirectory.find(targetId));
+        long unmetSteelAfter = aggregateUnmetMarketDemand(session, steelItemId);
+        assertTrue(unmetSteelAfter > unmetSteelBefore,
+                "Потеря local steel supplier должна увеличить unmet market demand");
+        assertTrue(unmetSteelAfter - unmetSteelBefore >= 60L,
+                "Foundry surplus должен исчезнуть из покрытия существующего steel deficit");
         assertTrue(session.getEventManager().snapshotState().pendingNews().stream()
                 .anyMatch(article -> article.content() != null && article.content().contains("Уничтожен объект")));
 
         WorldSimulation restored = WorldSimulation.restore(world.snapshot(), DemoGalaxyFactory.ACTIVE_SYSTEM_ID);
         assertFalse(restored.findSession(foundry.systemId()).orElseThrow().getEntityRegistry().contains(targetId));
+        assertEquals(unmetSteelAfter,
+                aggregateUnmetMarketDemand(restored.findSession(foundry.systemId()).orElseThrow(), steelItemId));
     }
 
     @Test
@@ -99,6 +109,25 @@ class DestructionEconomicShockTest {
             }
         }
         return count;
+    }
+
+    private static long aggregateUnmetMarketDemand(SimulationSession session, int itemId) {
+        long deficit = 0L;
+        long surplus = 0L;
+        for (Entity entity : session.getEngine().getEntities()) {
+            MarketComponent market = entity.getComponent(MarketComponent.class);
+            InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
+            if (market == null || inventory == null || !market.isTradable(itemId)) {
+                continue;
+            }
+            long delta = (long) market.targetStock[itemId] - inventory.stock[itemId];
+            if (delta > 0L) {
+                deficit += delta;
+            } else {
+                surplus -= delta;
+            }
+        }
+        return Math.max(0L, deficit - surplus);
     }
 
     private record LocatedEntity(StarSystemId systemId, SimulationSession session, Entity entity) {
