@@ -1,0 +1,103 @@
+name: Stage 9D world wiring
+
+on:
+  push:
+    branches:
+      - agent/stage9d-bottleneck-investment
+    paths:
+      - .github/workflows/stage9d-world-wiring.yml
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage9d-bottleneck-investment
+          fetch-depth: 0
+      - name: Wire pressure and investment state into WorldSimulation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  '    private final DestructionService destructionService;\n    private final StarSystemId activeSystemId;',
+                  '    private final DestructionService destructionService;\n    private final FactionEconomicPressureTracker economicPressureTracker;\n    private final StarSystemId activeSystemId;'
+              ),
+              (
+                  '            long nextConstructionProjectIdValue,\n            List<ConstructionProjectState> constructionProjects,\n            StarSystemId activeSystemId,',
+                  '            long nextConstructionProjectIdValue,\n            List<ConstructionProjectState> constructionProjects,\n            List<FactionEconomicPressureState> factionEconomicPressures,\n            StarSystemId activeSystemId,'
+              ),
+              (
+                  '        this.destructionService = new DestructionService(\n                contentCatalog,\n                this.sessionsById,\n                this.factionAccountsById,\n                this.constructionProjectService);\n        this.activeSystemId = activeSystemId;',
+                  '        this.destructionService = new DestructionService(\n                contentCatalog,\n                this.sessionsById,\n                this.factionAccountsById,\n                this.constructionProjectService);\n        this.economicPressureTracker = new FactionEconomicPressureTracker(factionEconomicPressures);\n        this.activeSystemId = activeSystemId;'
+              ),
+              (
+                  '                checked.nextConstructionProjectIdValue(),\n                checked.constructionProjects(),\n                activeId,',
+                  '                checked.nextConstructionProjectIdValue(),\n                checked.constructionProjects(),\n                checked.factionEconomicPressures(),\n                activeId,'
+              ),
+              (
+                  '        constructionProjectService.advance();\n        return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));\n    }\n\n    /**\n     * Выполняет deterministic subsidy decision поддержки station liquidity.',
+                  '''        constructionProjectService.advance();
+        return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));
+    }
+
+    /**
+     * Выполняет один deterministic Stage-9D economic investment decision для всех factions.
+     *
+     * <p>Метод сначала измеряет physical bottlenecks, обновляет persistent hysteresis, затем даёт
+     * каждой faction не более одной возможности создать и профинансировать обычный Stage-9B
+     * ConstructionProject. Вызывающий scheduler определяет cadence решений.</p>
+     *
+     * @return число новых construction projects, созданных этим decision
+     */
+    public int applyEconomicInvestmentDecision() {
+        EconomicBottleneckReport report = EconomicBottleneckAnalyzer.analyze(this, contentCatalog);
+        long tick = sessionsById.get(activeSystemId).getClock().getTick();
+        economicPressureTracker.observe(factionStrategies, report, tick);
+        int createdProjects = 0;
+        for (String factionId : factionOrder) {
+            if (FactionInvestmentPlanner.evaluateFaction(this, contentCatalog, economicPressureTracker, factionId)
+                    .isPresent()) {
+                createdProjects++;
+            }
+        }
+        return createdProjects;
+    }
+
+    /** @return canonical immutable persistent Stage-9D pressure states */
+    public List<FactionEconomicPressureState> getFactionEconomicPressureStates() {
+        return economicPressureTracker.snapshots();
+    }
+
+    /**
+     * Выполняет deterministic subsidy decision поддержки station liquidity.'''
+              ),
+              (
+                  '                factionStrategies,\n                constructionProjectService.nextIdValue(),\n                constructionProjectService.snapshots());',
+                  '                factionStrategies,\n                constructionProjectService.nextIdValue(),\n                constructionProjectService.snapshots(),\n                economicPressureTracker.snapshots());'
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one WorldSimulation marker, found {count}: {old[:90]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+          rm -f .github/workflows/stage9d-world-wiring.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: wire Stage 9D economic decisions into world runtime"
+          git push origin HEAD:agent/stage9d-bottleneck-investment
