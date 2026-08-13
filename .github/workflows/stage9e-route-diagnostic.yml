@@ -1,0 +1,128 @@
+name: Stage 9E route diagnostic
+
+on:
+  push:
+    branches:
+      - agent/stage9e-readywork3
+    paths:
+      - .github/workflows/stage9e-route-diagnostic.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage9e-readywork3
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Add focused route diagnostic test and self-remove workflow
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          test = r'''package com.spacesim.benchmark;
+
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.components.IdentityComponent;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
+import com.spacesim.components.ProcurementPolicyComponent;
+import com.spacesim.components.TradeAIComponent;
+import com.spacesim.components.WalletComponent;
+import com.spacesim.content.ContentCatalog;
+import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.persistence.EntityId;
+import com.spacesim.simulation.SimulationSession;
+import com.spacesim.world.ConstructionProjectState;
+import com.spacesim.world.WorldSimulation;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class Stage9ERouteStateTest {
+    @Test
+    void energyReserveReachesConstructionDemand() {
+        ContentCatalog content = ContentCatalogLoader.loadDefault();
+        WorldSimulation world = DemoGalaxyFactory.create(0x9E5EEDL);
+        for (int tick = 0; tick < 1_000; tick++) {
+            world.advanceFrame(0.1f);
+        }
+        SimulationSession inner = world.findSession(DemoGalaxyFactory.INNER_SYSTEM_ID).orElseThrow();
+        Entity foundry = Stage9EMetrics.requireFoundry(inner);
+        EntityId salvageId = Stage9ESetup.createReserveNetwork(world, content, foundry);
+        Stage9ESetup.applyShock(world, foundry, salvageId);
+
+        ConstructionProjectState project = null;
+        for (int elapsed = 1; elapsed <= 1_000; elapsed++) {
+            world.advanceFrame(0.1f);
+            if (elapsed % 100 == 0) {
+                if (project == null) {
+                    world.applyEconomicInvestmentDecision();
+                }
+                world.applyLiquiditySupport("faction.miners");
+            }
+            project = Stage9EMetrics.findReplacementProject(world);
+        }
+        assertNotNull(project);
+        Entity energy = findByName(inner, "Corona Energy Reserve");
+        Entity site = inner.getEntityRegistry().find(project.constructionSiteEntityId());
+        assertNotNull(energy);
+        assertNotNull(site);
+
+        int energyId = content.findItem("item.energy").runtimeId();
+        InventoryComponent cargo = energy.getComponent(InventoryComponent.class);
+        TradeAIComponent ai = energy.getComponent(TradeAIComponent.class);
+        InventoryComponent siteInventory = site.getComponent(InventoryComponent.class);
+        MarketComponent market = site.getComponent(MarketComponent.class);
+        WalletComponent wallet = site.getComponent(WalletComponent.class);
+        ProcurementPolicyComponent policy = site.getComponent(ProcurementPolicyComponent.class);
+        String diagnostic = "cargo=" + cargo.stock[energyId]
+                + ", state=" + ai.state
+                + ", target=" + ai.targetStationId
+                + ", sell=" + ai.sellStationId
+                + ", targetItem=" + ai.targetItem
+                + ", targetAmount=" + ai.targetAmount
+                + ", cooldown=" + ai.routeSearchCooldown
+                + ", site=" + project.constructionSiteEntityId()
+                + ", siteStock=" + siteInventory.stock[energyId]
+                + ", siteTarget=" + market.targetStock[energyId]
+                + ", siteBuy=" + market.buyPrices[energyId]
+                + ", siteSell=" + market.sellPrices[energyId]
+                + ", siteWallet=" + wallet.getBalanceMilliCredits()
+                + ", policy=" + (policy == null ? "null" : policy.buyPrice(energyId))
+                + ", delivered=" + Stage9EMetrics.delivered(project, "item.energy");
+        assertTrue(Stage9EMetrics.delivered(project, "item.energy") > 0, diagnostic);
+    }
+
+    private static Entity findByName(SimulationSession session, String name) {
+        for (Entity entity : session.getEngine().getEntities()) {
+            IdentityComponent identity = entity.getComponent(IdentityComponent.class);
+            if (identity != null && name.equals(identity.name)) {
+                return entity;
+            }
+        }
+        return null;
+    }
+}
+'''
+          Path('src/test/java/com/spacesim/benchmark/Stage9ERouteStateTest.java').write_text(test, encoding='utf-8')
+          Path('.github/workflows/stage9e-route-diagnostic.yml').unlink()
+          PY
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/test/java/com/spacesim/benchmark/Stage9ERouteStateTest.java .github/workflows/stage9e-route-diagnostic.yml
+          git commit -m "test: add Stage 9E route-state regression"
+          git push origin HEAD:agent/stage9e-readywork3
+      - name: Run route diagnostic
+        shell: bash
+        run: ./mvnw -B -Dtest=Stage9ERouteStateTest test
