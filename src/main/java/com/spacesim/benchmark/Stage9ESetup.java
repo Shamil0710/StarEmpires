@@ -22,32 +22,41 @@ import com.spacesim.world.WorldSimulation;
 final class Stage9ESetup {
     private static final String MINERS = "faction.miners";
     private static final String STEEL = "item.steel";
+    private static final String ENERGY = "item.energy";
+    private static final float RELEASE_DELAY_SECONDS = 35f;
 
     private Stage9ESetup() {
         throw new AssertionError("Utility class");
     }
 
-    static EntityId createReserve(WorldSimulation world, ContentCatalog content, Entity foundry) {
-        TransformComponent transform = replacementZone(world);
-        InventoryComponent inventory = new InventoryComponent();
-        inventory.capacity = 5_000;
-        TradeAIComponent trade = new TradeAIComponent();
-        trade.specializedItem = content.findItem(STEEL).runtimeId();
-        trade.cargoSpace = 5_000;
-        trade.movementSpeed = 180f;
-        trade.routeSearchCooldown = 35f;
-        Entity reserve = new Entity()
-                .add(new IdentityComponent("Corona Strategic Reserve", IdentityComponent.Kind.FLEET))
-                .add(transform)
-                .add(inventory)
-                .add(new WalletComponent())
-                .add(trade)
-                .add(new ShipComponent(ShipType.MATERIAL_CARRIER))
-                .add(new FactionComponent(content.findFaction(MINERS).runtimeId()));
-        return world.createEntity(DemoGalaxyFactory.INNER_SYSTEM_ID, reserve);
+    static EntityId createReserveNetwork(WorldSimulation world, ContentCatalog content, Entity foundry) {
+        TransformComponent zone = replacementZone(world);
+        Entity salvage = salvageVault(foundry, content);
+        Entity steel = reserveCarrier(
+                "Corona Steel Reserve",
+                zone.position.x - 20f,
+                zone.position.y,
+                content,
+                STEEL,
+                ShipType.MATERIAL_CARRIER,
+                500,
+                500);
+        Entity energy = reserveCarrier(
+                "Corona Energy Reserve",
+                zone.position.x + 20f,
+                zone.position.y,
+                content,
+                ENERGY,
+                ShipType.GAS_LIQUID_CARRIER,
+                300,
+                300);
+        EntityId salvageId = world.createEntity(DemoGalaxyFactory.INNER_SYSTEM_ID, salvage);
+        world.createEntity(DemoGalaxyFactory.INNER_SYSTEM_ID, steel);
+        world.createEntity(DemoGalaxyFactory.INNER_SYSTEM_ID, energy);
+        return salvageId;
     }
 
-    static void applyShock(WorldSimulation world, Entity foundry, EntityId reserveId) {
+    static void applyShock(WorldSimulation world, Entity foundry, EntityId salvageId) {
         EntityIdComponent foundryId = foundry.getComponent(EntityIdComponent.class);
         if (foundryId == null || foundryId.id == null) {
             throw new IllegalStateException("Stage 9E foundry не имеет persistent EntityId");
@@ -58,7 +67,50 @@ final class Stage9ESetup {
                 new DestructionPolicy(
                         ResourceDestructionFate.TRANSFER_TO_ENTITY,
                         MoneyDestructionFate.SINK,
-                        reserveId));
+                        salvageId));
+    }
+
+    private static Entity salvageVault(Entity foundry, ContentCatalog content) {
+        TransformComponent source = foundry.getComponent(TransformComponent.class);
+        TransformComponent transform = new TransformComponent();
+        transform.position.set(source.position);
+        InventoryComponent inventory = new InventoryComponent();
+        inventory.capacity = 5_000;
+        return new Entity()
+                .add(new IdentityComponent("Corona Salvage Vault", IdentityComponent.Kind.SALVAGE))
+                .add(transform)
+                .add(inventory)
+                .add(new FactionComponent(content.findFaction(MINERS).runtimeId()));
+    }
+
+    private static Entity reserveCarrier(
+            String name,
+            float x,
+            float y,
+            ContentCatalog content,
+            String itemContentId,
+            ShipType type,
+            int capacity,
+            int stock) {
+        int itemId = content.findItem(itemContentId).runtimeId();
+        TransformComponent transform = new TransformComponent();
+        transform.position.set(x, y);
+        InventoryComponent inventory = new InventoryComponent();
+        inventory.capacity = capacity;
+        inventory.stock[itemId] = stock;
+        TradeAIComponent trade = new TradeAIComponent();
+        trade.specializedItem = itemId;
+        trade.cargoSpace = capacity;
+        trade.movementSpeed = 220f;
+        trade.routeSearchCooldown = RELEASE_DELAY_SECONDS;
+        return new Entity()
+                .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
+                .add(transform)
+                .add(inventory)
+                .add(new WalletComponent())
+                .add(trade)
+                .add(new ShipComponent(type))
+                .add(new FactionComponent(content.findFaction(MINERS).runtimeId()));
     }
 
     private static TransformComponent replacementZone(WorldSimulation world) {
