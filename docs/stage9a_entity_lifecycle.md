@@ -77,7 +77,7 @@ When a removed ID is used as `buyStationId`, `sellStationId` or `targetStationId
 - state returns to `IDLE`;
 - route-search cooldown becomes zero so replanning is allowed immediately.
 
-`TradeAISystem.invalidateAfterEntityRemoval(...)` also removes a destroyed fleet's failed-search cache entry. If a market was removed, `MarketDirectory.invalidate()` immediately drops station snapshots, supplier/consumer indexes and opportunity shortlists while advancing market revision.
+`TradeAISystem.invalidateAfterEntityRemoval(...)` also removes a removed fleet's failed-search cache entry. If a market was removed, `MarketDirectory.invalidate()` immediately drops station snapshots, supplier/consumer indexes and opportunity shortlists while advancing market revision.
 
 ### Mining
 
@@ -123,9 +123,10 @@ Automated coverage includes:
 9. removed entity absent from session snapshot and restore;
 10. active-system create/save/load/remove;
 11. remote-system create/save/load/remove;
-12. structural lifecycle does not append economic ledger entries.
+12. structural lifecycle does not append economic ledger entries;
+13. two independent sessions with the same seed and lifecycle commands produce identical IDs and final snapshots.
 
-GitHub Actions Java 17 verification on the Stage-9A branch passed tests, coverage/Javadoc and desktop packaging.
+A merge is allowed only after the latest ordinary branch commit passes GitHub Actions Java 17 tests, coverage/Javadoc and desktop packaging. This final documentation commit intentionally provides that exact-head CI trigger after the one-shot roadmap automation.
 
 ## Definition of Done result
 
