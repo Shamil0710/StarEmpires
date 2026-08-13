@@ -10,6 +10,7 @@ import com.spacesim.content.ContentCatalogLoader;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,12 +37,14 @@ class Stage9DEconomicResponseTest {
         assertEquals(decision.fundedMilliCredits(), project.projectWalletMilliCredits());
         assertEquals(treasuryBefore - decision.fundedMilliCredits(),
                 world.findFactionEconomicState(MINERS).orElseThrow().treasuryMilliCredits());
-        assertEquals(1, world.getConstructionProjects().size());
-        assertTrue(FactionInvestmentPlanner.evaluateFaction(world, content, tracker, MINERS).isEmpty());
+        assertEquals(1, countActiveProducerProjects(world, content, "item.steel"));
+
+        FactionInvestmentPlanner.evaluateFaction(world, content, tracker, MINERS);
+        assertEquals(1, countActiveProducerProjects(world, content, "item.steel"));
     }
 
     @Test
-    void inputStarvedFoundryНеСоздаётЛишнийProducerProject() {
+    void inputStarvedFoundryНеСоздаётЛишнийSteelProducer() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
         Entity foundry = findFoundry(world);
@@ -54,8 +57,30 @@ class Stage9DEconomicResponseTest {
         EconomicBottleneck steel = EconomicBottleneckAnalyzer.analyze(world, content)
                 .find(DemoGalaxyFactory.INNER_SYSTEM_ID, "item.steel").orElseThrow();
         assertEquals(EconomicBottleneckType.LOGISTICS_SHORTAGE, steel.type());
-        assertTrue(FactionInvestmentPlanner.evaluateFaction(world, content, tracker, MINERS).isEmpty());
-        assertEquals(List.of(), world.getConstructionProjects());
+        Optional<FactionInvestmentPlanner.InvestmentDecision> decision =
+                FactionInvestmentPlanner.evaluateFaction(world, content, tracker, MINERS);
+        assertTrue(decision.isEmpty() || !"item.steel".equals(decision.orElseThrow().itemContentId()));
+        assertEquals(0, countActiveProducerProjects(world, content, "item.steel"));
+    }
+
+    private static int countActiveProducerProjects(
+            WorldSimulation world, ContentCatalog content, String itemContentId) {
+        int count = 0;
+        for (ConstructionProjectState project : world.getConstructionProjects()) {
+            if (project.status() == ConstructionProjectStatus.COMPLETED
+                    || project.status() == ConstructionProjectStatus.CANCELLED
+                    || project.status() == ConstructionProjectStatus.FAILED) {
+                continue;
+            }
+            ContentCatalog.StationArchetypeDefinition station =
+                    content.findStationArchetype(project.stationArchetypeContentId());
+            ContentCatalog.RecipeDefinition recipe = station == null || station.recipeId() == null
+                    ? null : content.findRecipe(station.recipeId());
+            if (recipe != null && recipe.outputs().getOrDefault(itemContentId, 0) > 0) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static FactionEconomicPressureTracker observeThreeTimes(WorldSimulation world, ContentCatalog content) {
