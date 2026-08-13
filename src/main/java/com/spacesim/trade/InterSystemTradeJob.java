@@ -1,8 +1,12 @@
 package com.spacesim.trade;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MarketComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.controllers.TradeController;
+import com.spacesim.economy.Money;
 import com.spacesim.simulation.SimulationSession;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
@@ -22,6 +26,12 @@ import java.util.Objects;
  * Consequently goods, wallets, ledgers, world FleetId handoff and Stage-10B jump timing all remain
  * physical and authoritative.</p>
  *
+ * <p>A route is only a planning snapshot. Destination stock, price, free capacity and liquidity may
+ * legally change while the fleet is in transit. On arrival the executor therefore revalidates the
+ * live consumer and sells the largest still-valid portion of the purchased cargo. Any unsold
+ * remainder remains physically in the fleet inventory for later replanning; access restrictions are
+ * never bypassed.</p>
+ *
  * <p>Local jump-gate coordinates are not yet part of world topology. Intermediate hops therefore
  * materialize at the neutral local origin coordinate {@code (0,0)}. The final hop materializes at
  * the consumer market coordinate so the Stage-10E acceptance loop does not invent a separate
@@ -36,9 +46,9 @@ public final class InterSystemTradeJob {
         JUMPING,
         /** Fleet reached the consumer system and must sell the cargo. */
         SELLING,
-        /** Planned cargo was physically delivered and sold. */
+        /** A positive live-valid portion of the cargo was physically delivered and sold. */
         COMPLETED,
-        /** Live world state invalidated the planned job. */
+        /** Live world state invalidated the planned job before any destination sale. */
         FAILED
     }
 
@@ -46,6 +56,7 @@ public final class InterSystemTradeJob {
     private final GalacticTradeRoute route;
     private State state = State.BUYING;
     private int currentPathIndex;
+    private int soldAmount;
     private String failureReason;
 
     /**
@@ -104,6 +115,16 @@ public final class InterSystemTradeJob {
     /** @return current execution phase */
     public State state() {
         return state;
+    }
+
+    /** @return amount physically sold at the destination, zero before a successful sale */
+    public int soldAmount() {
+        return soldAmount;
+    }
+
+    /** @return planned purchased cargo left in the fleet after a partial destination sale */
+    public int remainingCargoAmount() {
+        return Math.max(0, route.amount() - soldAmount);
     }
 
     /** @return {@code true} after either successful completion or a permanent execution failure */
@@ -183,16 +204,79 @@ public final class InterSystemTradeJob {
         Entity fleet = requireEntity(session, placement.localEntityId(), "fleet");
         Entity consumer = requireEntity(session, route.sellStationId(), "consumer");
         TradeController controller = new TradeController(session.getLedger());
-        if (!controller.sellToStation(
+        ReputationComponent reputation = fleet.getComponent(ReputationComponent.class);
+
+        int liveAmount = maximumLiveSellAmount(controller, consumer, fleet, reputation);
+        if (liveAmount <= 0
+                || !controller.sellToStation(
                 consumer,
                 fleet,
                 route.itemId(),
-                route.amount(),
-                fleet.getComponent(ReputationComponent.class))) {
+                liveAmount,
+                reputation)) {
             fail("Consumer transaction became invalid before sale");
             return;
         }
+        soldAmount = liveAmount;
         state = State.COMPLETED;
+    }
+
+    private int maximumLiveSellAmount(
+            TradeController controller,
+            Entity consumer,
+            Entity fleet,
+            ReputationComponent reputation) {
+        if (!controller.canTradeWithStation(fleet, consumer)) {
+            return 0;
+        }
+        InventoryComponent consumerInventory = consumer.getComponent(InventoryComponent.class);
+        InventoryComponent fleetInventory = fleet.getComponent(InventoryComponent.class);
+        MarketComponent market = consumer.getComponent(MarketComponent.class);
+        WalletComponent consumerWallet = consumer.getComponent(WalletComponent.class);
+        WalletComponent fleetWallet = fleet.getComponent(WalletComponent.class);
+        if (consumerInventory == null
+                || fleetInventory == null
+                || market == null
+                || consumerWallet == null
+                || fleetWallet == null
+                || !market.isTradable(route.itemId())) {
+            return 0;
+        }
+
+        int demand = Math.max(0, market.targetStock[route.itemId()] - consumerInventory.stock[route.itemId()]);
+        int high = Math.min(
+                route.amount(),
+                Math.min(
+                        fleetInventory.stock[route.itemId()],
+                        Math.min(controller.getFreeCapacity(consumerInventory), demand)));
+        if (high <= 0) {
+            return 0;
+        }
+
+        float unitPrice = controller.getEffectiveBuyPrice(consumer, route.itemId(), reputation);
+        if (!Float.isFinite(unitPrice) || unitPrice <= 0f) {
+            return 0;
+        }
+
+        int low = 0;
+        while (low < high) {
+            int candidate = low + (high - low + 1) / 2;
+            long value;
+            try {
+                value = Money.tradeValue(unitPrice, candidate);
+            } catch (IllegalArgumentException exception) {
+                high = candidate - 1;
+                continue;
+            }
+            if (value > 0L
+                    && consumerWallet.canDebit(value)
+                    && fleetWallet.canCredit(value)) {
+                low = candidate;
+            } else {
+                high = candidate - 1;
+            }
+        }
+        return low;
     }
 
     private MarketDirectory.StationMarket destinationMarketSnapshot(WorldSimulation world) {
