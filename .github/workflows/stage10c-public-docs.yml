@@ -1,0 +1,29 @@
+name: Stage 10C public docs
+
+on:
+  push:
+    branches:
+      - agent/stage10c-galactic-route-planner
+    paths:
+      - .github/workflows/stage10c-public-docs.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 scripts/stage10c_public_docs.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/trade/GalacticTradeOpportunity.java
+          git add src/main/java/com/spacesim/trade/GalacticTradeRoute.java
+          git add src/main/java/com/spacesim/trade/TradeRouteCostModel.java
+          git rm scripts/stage10c_public_docs.py
+          git rm .github/workflows/stage10c-public-docs.yml
+          git commit -m "docs: complete Stage 10C public API docs"
+          git push origin HEAD:${GITHUB_REF_NAME}
