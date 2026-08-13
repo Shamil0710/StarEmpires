@@ -1,0 +1,59 @@
+name: Stage 9D roadmap update
+
+on:
+  push:
+    branches:
+      - agent/stage9d-bottleneck-investment
+    paths:
+      - .github/workflows/stage9d-roadmap-update.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage9d-bottleneck-investment
+          fetch-depth: 0
+      - name: Update Stage 9 roadmap status
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('docs/development_roadmap.md')
+          text = path.read_text(encoding='utf-8')
+          replacements = [
+              ('Текущий implementation focus: **Stage 9C — Destruction и economic shock**.', 'Текущий implementation focus: **Stage 9E — Economic resilience benchmark**.'),
+              ('### Stage 9C — Destruction и economic shock\n\n**Статус:** ACTIVE', '### Stage 9C — Destruction и economic shock\n\n**Статус:** COMPLETE — PR #15; `docs/stage9c_destruction_and_economic_shock.md`'),
+              ('- [ ] production-safe API уничтожения station/ship;', '- [x] production-safe API уничтожения station/ship;'),
+              ('- [ ] destruction удаляет производственную мощность и market availability;', '- [x] destruction удаляет производственную мощность и market availability;'),
+              ('- [ ] судьба cargo/stock при уничтожении задана явно: destroyed/salvage/transfer;', '- [x] судьба cargo/stock при уничтожении задана явно: destroyed/salvage/transfer;'),
+              ('- [ ] resource sink от уничтожения отражается в ledger;', '- [x] resource sink от уничтожения отражается в ledger;'),
+              ('- [ ] destruction создаёт измеримый stockout/unmet demand;', '- [x] destruction создаёт измеримый stockout/unmet demand;'),
+              ('- [ ] route planner корректно реагирует на исчезнувший market;', '- [x] route planner корректно реагирует на исчезнувший market;'),
+              ('- [ ] events/news могут сообщить об экономически значимом уничтожении.', '- [x] events/news могут сообщить об экономически значимом уничтожении.'),
+              ('### Stage 9D — Bottleneck analysis и AI investment\n\nAI должен реагировать', '### Stage 9D — Bottleneck analysis и AI investment\n\n**Статус:** COMPLETE — PR #16 candidate; `docs/stage9d_economic_response.md`\n\nAI должен реагировать'),
+              ('- [ ] deterministic bottleneck report;', '- [x] deterministic bottleneck report;'),
+              ('- [ ] distinction между production shortage и logistics shortage;', '- [x] distinction между production shortage и logistics shortage;'),
+              ('- [ ] faction investment candidate selection;', '- [x] faction investment candidate selection;'),
+              ('- [ ] affordability/budget check;', '- [x] affordability/budget check;'),
+              ('- [ ] expected economic utility / strategic utility;', '- [x] expected economic utility / strategic utility;'),
+              ('- [ ] anti-thrashing cooldown/hysteresis;', '- [x] anti-thrashing cooldown/hysteresis;'),
+              ('- [ ] AI создаёт construction project через тот же API, что позднее будет использовать игрок;', '- [x] AI создаёт construction project через тот же API, что позднее будет использовать игрок;'),
+              ('- [ ] исключить бесконечное строительство из-за временного demand spike.', '- [x] исключить бесконечное строительство из-за временного demand spike.'),
+              ('### Stage 9E — Economic resilience benchmark\n\nAcceptance scenario:', '### Stage 9E — Economic resilience benchmark\n\n**Статус:** ACTIVE\n\nAcceptance scenario:'),
+          ]
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit('Roadmap marker mismatch: ' + old)
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add docs/development_roadmap.md
+          git commit -m "docs: complete Stage 9D and activate Stage 9E"
+          git push origin HEAD:agent/stage9d-bottleneck-investment
