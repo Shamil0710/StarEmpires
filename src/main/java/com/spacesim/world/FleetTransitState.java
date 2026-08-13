@@ -4,21 +4,31 @@ import com.spacesim.persistence.EntityState;
 
 import java.util.Objects;
 
-/** Persistent snapshot флота между двумя local StarSystems. */
+/**
+ * Persistent fleet snapshot between two local systems.
+ *
+ * @param originSystemId origin system
+ * @param destinationSystemId destination system
+ * @param entityState detached entity snapshot
+ */
 public record FleetTransitState(
         StarSystemId originSystemId,
         StarSystemId destinationSystemId,
         EntityState entityState) {
-    /** Проверяет обязательные поля transit snapshot. */
+    /**
+     * @param originSystemId origin system
+     * @param destinationSystemId destination system
+     * @param entityState detached entity snapshot
+     */
     public FleetTransitState {
-        Objects.requireNonNull(originSystemId, "Transit origin StarSystemId не задан");
-        Objects.requireNonNull(destinationSystemId, "Transit destination StarSystemId не задан");
-        Objects.requireNonNull(entityState, "Transit EntityState не задан");
+        Objects.requireNonNull(originSystemId, "Transit origin system is required");
+        Objects.requireNonNull(destinationSystemId, "Transit destination system is required");
+        Objects.requireNonNull(entityState, "Transit entity state is required");
         if (originSystemId.equals(destinationSystemId)) {
-            throw new IllegalArgumentException("Transit должен менять StarSystem");
+            throw new IllegalArgumentException("Transit must change system");
         }
         if (entityState.identity() == null || !"FLEET".equals(entityState.identity().kindName())) {
-            throw new IllegalArgumentException("Transit state должен описывать fleet");
+            throw new IllegalArgumentException("Transit state must describe a fleet");
         }
     }
 }
