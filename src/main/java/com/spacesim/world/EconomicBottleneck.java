@@ -1,6 +1,6 @@
 package com.spacesim.world;
 
-public record EconomicBottleneck(
+record EconomicBottleneck(
         StarSystemId systemId,
         String itemContentId,
         EconomicBottleneckType type,
