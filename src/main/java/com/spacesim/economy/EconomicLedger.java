@@ -5,13 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Последовательный журнал экономических движений игровой сессии.
- *
- * <p>Ledger не меняет кошельки или склады сам: authoritative systems сначала успешно выполняют
- * операцию, затем фиксируют её здесь. Журнал и следующий sequence входят в {@link State}, поэтому
- * диагностика после save/load остаётся одной непрерывной последовательностью.</p>
- */
+/** Последовательный журнал экономических движений игровой сессии. */
 public final class EconomicLedger {
     /**
      * Сериализуемый snapshot журнала.
@@ -22,11 +16,6 @@ public final class EconomicLedger {
     public record State(long nextSequence, List<EconomicTransaction> entries) {
         /**
          * Проверяет монотонность и копирует список.
-         *
-         * <p>После диагностического {@link EconomicLedger#clear()} список может быть пустым либо
-         * начинаться не с sequence {@code 1}; {@code nextSequence} при этом намеренно не
-         * сбрасывается. Поэтому snapshot требует только непрерывность сохранённого хвоста и точное
-         * продолжение его последней записи.</p>
          *
          * @param nextSequence sequence следующей записи
          * @param entries накопленные записи
@@ -65,12 +54,7 @@ public final class EconomicLedger {
     public EconomicLedger() {
     }
 
-    /**
-     * Восстанавливает журнал и его sequence из сохранённого состояния.
-     *
-     * @param state сохранённый ledger
-     * @throws NullPointerException если state не задан
-     */
+    /** @param state сохранённый ledger */
     public EconomicLedger(State state) {
         State checked = Objects.requireNonNull(state, "Состояние EconomicLedger не задано");
         entries.addAll(checked.entries());
@@ -83,204 +67,133 @@ public final class EconomicLedger {
     }
 
     /**
-     * Фиксирует успешно завершённую торговую операцию.
-     *
-     * @param buyer непустое диагностическое имя покупателя
-     * @param seller непустое диагностическое имя продавца
-     * @param itemId неотрицательный идентификатор товара
-     * @param itemAmount строго положительное количество товара
-     * @param moneyMilliCredits строго положительная сумма transfer в milli-credits
-     * @return созданная запись
+     * @param buyer покупатель
+     * @param seller продавец
+     * @param itemId товар
+     * @param itemAmount количество
+     * @param moneyMilliCredits сумма
+     * @return запись
      */
-    public EconomicTransaction recordTrade(
-            String buyer,
-            String seller,
-            int itemId,
-            long itemAmount,
-            long moneyMilliCredits) {
+    public EconomicTransaction recordTrade(String buyer, String seller, int itemId, long itemAmount, long moneyMilliCredits) {
         requireName(buyer, "Покупатель");
         requireName(seller, "Продавец");
         if (itemId < 0 || itemAmount <= 0L || moneyMilliCredits <= 0L) {
             throw new IllegalArgumentException("Торговая запись должна содержать положительный товар и сумму");
         }
-        return append(new EconomicTransaction(
-                nextSequenceValue(),
-                EconomicTransaction.Type.TRADE,
-                buyer,
-                seller,
-                itemId,
-                itemAmount,
-                moneyMilliCredits,
-                "trade"));
+        return append(new EconomicTransaction(nextSequenceValue(), EconomicTransaction.Type.TRADE,
+                buyer, seller, itemId, itemAmount, moneyMilliCredits, "trade"));
     }
 
     /**
-     * Фиксирует обычный денежный transfer между существующими экономическими участниками.
-     *
-     * <p>Метод вызывается только после успешного authoritative изменения обоих балансов и не
-     * обозначает денежный source/sink. Он нужен world-level policy, налогам и другим переводам,
-     * которые не сопровождаются движением товара.</p>
-     *
-     * @param source непустое диагностическое имя плательщика
-     * @param destination непустое диагностическое имя получателя
-     * @param amountMilliCredits строго положительная сумма transfer
-     * @param reason непустая причина перевода
-     * @return созданная запись
+     * @param source плательщик
+     * @param destination получатель
+     * @param amountMilliCredits сумма
+     * @param reason причина
+     * @return запись
      */
-    public EconomicTransaction recordMoneyTransfer(
-            String source,
-            String destination,
-            long amountMilliCredits,
-            String reason) {
+    public EconomicTransaction recordMoneyTransfer(String source, String destination, long amountMilliCredits, String reason) {
         requireName(source, "Источник transfer");
         requireName(destination, "Получатель transfer");
         requirePositive(amountMilliCredits, "Сумма денежного transfer");
-        return append(new EconomicTransaction(
-                nextSequenceValue(),
-                EconomicTransaction.Type.MONEY_TRANSFER,
-                source,
-                destination,
-                -1,
-                0L,
-                amountMilliCredits,
-                requireReason(reason)));
+        return append(new EconomicTransaction(nextSequenceValue(), EconomicTransaction.Type.MONEY_TRANSFER,
+                source, destination, -1, 0L, amountMilliCredits, requireReason(reason)));
     }
 
     /**
-     * Фиксирует явное создание денег.
-     *
-     * @param destination непустое имя получателя
-     * @param amountMilliCredits строго положительная созданная сумма
-     * @param reason непустая причина source-операции
-     * @return созданная запись
+     * @param destination получатель
+     * @param amountMilliCredits сумма
+     * @param reason причина
+     * @return запись
      */
-    public EconomicTransaction recordMoneySource(
-            String destination,
-            long amountMilliCredits,
-            String reason) {
+    public EconomicTransaction recordMoneySource(String destination, long amountMilliCredits, String reason) {
         requireName(destination, "Получатель");
         requirePositive(amountMilliCredits, "Сумма денежного source");
-        return append(new EconomicTransaction(
-                nextSequenceValue(),
-                EconomicTransaction.Type.MONEY_SOURCE,
-                "",
-                destination,
-                -1,
-                0L,
-                amountMilliCredits,
-                requireReason(reason)));
+        return append(new EconomicTransaction(nextSequenceValue(), EconomicTransaction.Type.MONEY_SOURCE,
+                "", destination, -1, 0L, amountMilliCredits, requireReason(reason)));
     }
 
     /**
-     * Фиксирует явное уничтожение денег.
-     *
-     * @param source непустое имя источника
-     * @param amountMilliCredits строго положительная уничтоженная сумма
-     * @param reason непустая причина sink-операции
-     * @return созданная запись
+     * @param source источник
+     * @param amountMilliCredits сумма
+     * @param reason причина
+     * @return запись
      */
-    public EconomicTransaction recordMoneySink(
-            String source,
-            long amountMilliCredits,
-            String reason) {
+    public EconomicTransaction recordMoneySink(String source, long amountMilliCredits, String reason) {
         requireName(source, "Источник");
         requirePositive(amountMilliCredits, "Сумма денежного sink");
-        return append(new EconomicTransaction(
-                nextSequenceValue(),
-                EconomicTransaction.Type.MONEY_SINK,
-                source,
-                "",
-                -1,
-                0L,
-                amountMilliCredits,
-                requireReason(reason)));
+        return append(new EconomicTransaction(nextSequenceValue(), EconomicTransaction.Type.MONEY_SINK,
+                source, "", -1, 0L, amountMilliCredits, requireReason(reason)));
     }
 
     /**
-     * Фиксирует появление физического ресурса из внешнего для товарного пула источника.
-     *
-     * @param destination непустое имя получателя
-     * @param itemId неотрицательный идентификатор товара
-     * @param itemAmount строго положительное количество появившегося товара
-     * @param reason непустая причина появления ресурса
-     * @return созданная запись
+     * @param destination получатель
+     * @param itemId товар
+     * @param itemAmount количество
+     * @param reason причина
+     * @return запись
      */
-    public EconomicTransaction recordResourceSource(
-            String destination,
-            int itemId,
-            long itemAmount,
-            String reason) {
+    public EconomicTransaction recordResourceSource(String destination, int itemId, long itemAmount, String reason) {
         requireName(destination, "Получатель ресурса");
         requireItem(itemId, itemAmount);
-        return append(new EconomicTransaction(
-                nextSequenceValue(),
-                EconomicTransaction.Type.RESOURCE_SOURCE,
-                "",
-                destination,
-                itemId,
-                itemAmount,
-                0L,
-                requireReason(reason)));
+        return append(new EconomicTransaction(nextSequenceValue(), EconomicTransaction.Type.RESOURCE_SOURCE,
+                "", destination, itemId, itemAmount, 0L, requireReason(reason)));
     }
 
     /**
-     * Фиксирует исчезновение физического ресурса из товарного пула.
-     *
-     * @param source непустое имя источника
-     * @param itemId неотрицательный идентификатор товара
-     * @param itemAmount строго положительное количество исчезнувшего товара
-     * @param reason непустая причина потребления
-     * @return созданная запись
+     * @param source источник
+     * @param itemId товар
+     * @param itemAmount количество
+     * @param reason причина
+     * @return запись
      */
-    public EconomicTransaction recordResourceSink(
-            String source,
-            int itemId,
-            long itemAmount,
-            String reason) {
+    public EconomicTransaction recordResourceSink(String source, int itemId, long itemAmount, String reason) {
         requireName(source, "Источник ресурса");
         requireItem(itemId, itemAmount);
-        return append(new EconomicTransaction(
-                nextSequenceValue(),
-                EconomicTransaction.Type.RESOURCE_SINK,
-                source,
-                "",
-                itemId,
-                itemAmount,
-                0L,
-                requireReason(reason)));
+        return append(new EconomicTransaction(nextSequenceValue(), EconomicTransaction.Type.RESOURCE_SINK,
+                source, "", itemId, itemAmount, 0L, requireReason(reason)));
     }
 
     /**
-     * Фиксирует производственное преобразование как диагностическое событие.
+     * Фиксирует физический transfer товара без создания или уничтожения ресурса.
      *
-     * @param actor непустое имя производственной сущности
-     * @param reason непустое имя/описание рецепта
-     * @return созданная запись
+     * @param source источник
+     * @param destination получатель
+     * @param itemId товар
+     * @param itemAmount количество
+     * @param reason причина
+     * @return запись
+     */
+    public EconomicTransaction recordResourceTransfer(
+            String source, String destination, int itemId, long itemAmount, String reason) {
+        requireName(source, "Источник resource transfer");
+        requireName(destination, "Получатель resource transfer");
+        requireItem(itemId, itemAmount);
+        return append(new EconomicTransaction(nextSequenceValue(), EconomicTransaction.Type.RESOURCE_TRANSFER,
+                source, destination, itemId, itemAmount, 0L, requireReason(reason)));
+    }
+
+    /**
+     * @param actor производственная сущность
+     * @param reason рецепт
+     * @return запись
      */
     public EconomicTransaction recordResourceTransform(String actor, String reason) {
         requireName(actor, "Производственная сущность");
-        return append(new EconomicTransaction(
-                nextSequenceValue(),
-                EconomicTransaction.Type.RESOURCE_TRANSFORM,
-                actor,
-                actor,
-                -1,
-                0L,
-                0L,
-                requireReason(reason)));
+        return append(new EconomicTransaction(nextSequenceValue(), EconomicTransaction.Type.RESOURCE_TRANSFORM,
+                actor, actor, -1, 0L, 0L, requireReason(reason)));
     }
 
-    /** @return живое неизменяемое представление всех записей в порядке sequence */
+    /** @return живое неизменяемое представление всех записей */
     public List<EconomicTransaction> getEntries() {
         return entriesView;
     }
 
-    /** @return число зафиксированных экономических операций */
+    /** @return число записей */
     public int size() {
         return entries.size();
     }
 
-    /** Удаляет все записи, не меняя authoritative economic state или sequence. */
+    /** Удаляет диагностические записи без изменения authoritative state. */
     public void clear() {
         entries.clear();
     }
