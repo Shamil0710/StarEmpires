@@ -9,9 +9,9 @@ import java.util.Set;
  * Presentation-only contract for one ship sprite asset.
  *
  * <p>The contract explicitly separates art dimensions from gameplay geometry. Collision/selection
- * footprint is declared explicitly rather than inferred from transparent PNG pixels. Texture paths
- * and hardpoints are presentation metadata and therefore do not participate in save identity or
- * economic/content semantics.</p>
+ * footprint is declared explicitly rather than inferred from transparent PNG pixels. Texture paths,
+ * authored facing and hardpoints are presentation metadata and therefore do not participate in save
+ * identity or economic/content semantics.</p>
  */
 public final class ShipSpriteSpec {
     private final String assetId;
@@ -23,24 +23,10 @@ public final class ShipSpriteSpec {
     private final float pivotY;
     private final float collisionWidth;
     private final float collisionHeight;
+    private final SourceFacing sourceFacing;
     private final List<VisualHardpoint> hardpoints;
 
-    /**
-     * Creates a validated sprite specification with a circular footprint.
-     *
-     * <p>This compatibility constructor is convenient for compact ships. Broad or elongated ships
-     * should use the width/height footprint constructor instead.</p>
-     *
-     * @param assetId stable presentation asset identifier
-     * @param baseTexturePath non-blank classpath/resource path for the base sprite
-     * @param emissiveTexturePath optional emissive resource path; null/blank means none
-     * @param worldWidth positive intended rendered width in world units
-     * @param worldHeight positive intended rendered height in world units
-     * @param pivotX normalized horizontal pivot in [0,1]
-     * @param pivotY normalized vertical pivot in [0,1]
-     * @param collisionRadius positive circular footprint radius in world units
-     * @param hardpoints immutable-by-copy presentation attachment points
-     */
+    /** Creates a validated sprite specification with a circular footprint and right-facing source art. */
     public ShipSpriteSpec(
             String assetId,
             String baseTexturePath,
@@ -61,11 +47,64 @@ public final class ShipSpriteSpec {
                 pivotY,
                 validatedDiameter(collisionRadius),
                 validatedDiameter(collisionRadius),
+                SourceFacing.RIGHT,
+                hardpoints);
+    }
+
+    /** Creates a validated sprite specification with a circular footprint and explicit source facing. */
+    public ShipSpriteSpec(
+            String assetId,
+            String baseTexturePath,
+            String emissiveTexturePath,
+            float worldWidth,
+            float worldHeight,
+            float pivotX,
+            float pivotY,
+            float collisionRadius,
+            SourceFacing sourceFacing,
+            List<VisualHardpoint> hardpoints) {
+        this(
+                assetId,
+                baseTexturePath,
+                emissiveTexturePath,
+                worldWidth,
+                worldHeight,
+                pivotX,
+                pivotY,
+                validatedDiameter(collisionRadius),
+                validatedDiameter(collisionRadius),
+                sourceFacing,
+                hardpoints);
+    }
+
+    /** Creates a validated sprite specification with an elliptical footprint and right-facing source art. */
+    public ShipSpriteSpec(
+            String assetId,
+            String baseTexturePath,
+            String emissiveTexturePath,
+            float worldWidth,
+            float worldHeight,
+            float pivotX,
+            float pivotY,
+            float collisionWidth,
+            float collisionHeight,
+            List<VisualHardpoint> hardpoints) {
+        this(
+                assetId,
+                baseTexturePath,
+                emissiveTexturePath,
+                worldWidth,
+                worldHeight,
+                pivotX,
+                pivotY,
+                collisionWidth,
+                collisionHeight,
+                SourceFacing.RIGHT,
                 hardpoints);
     }
 
     /**
-     * Creates a validated sprite specification with an explicit elliptical footprint.
+     * Creates a validated sprite specification with an explicit elliptical footprint and source facing.
      *
      * @param assetId stable presentation asset identifier
      * @param baseTexturePath non-blank classpath/resource path for the base sprite
@@ -76,7 +115,8 @@ public final class ShipSpriteSpec {
      * @param pivotY normalized vertical pivot in [0,1]
      * @param collisionWidth positive footprint width in world units
      * @param collisionHeight positive footprint height in world units
-     * @param hardpoints immutable-by-copy presentation attachment points
+     * @param sourceFacing authored horizontal forward direction before runtime normalization
+     * @param hardpoints immutable-by-copy presentation attachment points in authored sprite space
      */
     public ShipSpriteSpec(
             String assetId,
@@ -88,6 +128,7 @@ public final class ShipSpriteSpec {
             float pivotY,
             float collisionWidth,
             float collisionHeight,
+            SourceFacing sourceFacing,
             List<VisualHardpoint> hardpoints) {
         this.assetId = requireText(assetId, "Asset ID");
         this.baseTexturePath = requireText(baseTexturePath, "Base texture path");
@@ -112,6 +153,7 @@ public final class ShipSpriteSpec {
                 || collisionHeight <= 0f) {
             throw new IllegalArgumentException("Collision footprint dimensions must be finite and positive");
         }
+        this.sourceFacing = Objects.requireNonNull(sourceFacing, "Source facing must not be null");
         Objects.requireNonNull(hardpoints, "Hardpoints must not be null");
         this.hardpoints = List.copyOf(hardpoints);
         Set<String> ids = new HashSet<>();
@@ -174,13 +216,12 @@ public final class ShipSpriteSpec {
         return collisionHeight;
     }
 
-    /**
-     * Returns a conservative circular bound for compatibility with callers that only support a
-     * radius. New presentation/selection code should prefer {@link #collisionWidth()} and
-     * {@link #collisionHeight()}.
-     *
-     * @return half of the larger explicit footprint dimension
-     */
+    /** @return authored horizontal forward direction before runtime normalization */
+    public SourceFacing sourceFacing() {
+        return sourceFacing;
+    }
+
+    /** @return half of the larger explicit footprint dimension */
     public float collisionRadius() {
         return Math.max(collisionWidth, collisionHeight) * 0.5f;
     }
