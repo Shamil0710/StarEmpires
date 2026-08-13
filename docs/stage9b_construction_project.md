@@ -1,6 +1,6 @@
 # Stage 9B — Persistent Construction Project
 
-**Status:** implementation / verification in progress
+**Status:** COMPLETE candidate — awaiting exact-head CI
 
 ## Core model
 
@@ -33,49 +33,21 @@ BUILDING
 COMPLETED
 ```
 
-`CANCELLED` is allowed only before any construction material is delivered. This deliberate first policy makes cancellation conservation-safe without inventing a material salvage/refund destination. Later designs can expand it explicitly.
+`CANCELLED` is allowed only before any construction material is delivered. This first policy is conservation-safe without inventing a material salvage/refund destination.
 
 ## Physical construction site
 
-A non-terminal project owns an ordinary local Ashley Entity with:
+A non-terminal project owns an ordinary local Ashley market entity with empty inventory/wallet, market targets equal to required materials, owner faction and price history. It is created through Stage 9A while economically empty.
 
-- `TransformComponent`;
-- empty `InventoryComponent` sized to the total requirements;
-- empty `WalletComponent`;
-- `MarketComponent` whose target stocks equal the required construction materials;
-- owner `FactionComponent`;
-- `PriceHistoryComponent`.
+`MarketDirectory` indexes a funded site as a normal consumer, so existing TradeAI can discover it and sell required steel/energy using the ordinary bilateral trade path. There is no virtual construction-delivery formula.
 
-The site is created through the Stage-9A lifecycle boundary while economically empty.
-
-This is important: project demand is visible to the existing market/trade stack. `MarketDirectory` indexes a funded construction site as a normal physical consumer, so existing TradeAI can discover it, sell required steel/energy through the ordinary bilateral trade path, and receive real project money. There is no virtual construction-delivery formula.
-
-The construction site is nevertheless **not a completed station** for Stage-8 fiscal policy. It is excluded from:
-
-- generic faction station-liquidity subsidy;
-- completed-station tax;
-- foreign-territory station tariff.
-
-Therefore project liquidity can enter only through explicit construction funding (or ordinary sales spending that same funded wallet); fiscal policy cannot silently fund or drain the construction budget.
+The site is not a completed station for Stage-8 fiscal policy: it is excluded from generic station-liquidity subsidy, station tax and foreign-territory station tariff. Construction liquidity enters only through explicit project funding and is spent through real trades.
 
 ## Data-driven construction definitions
 
-Production station archetypes now declare a `construction` object in `catalog-v1.json`:
+Production station archetypes declare `construction` requirements in `catalog-v1.json`, including minimum funding, build seconds and material amounts. These values participate in the semantic content fingerprint. Current production requirements deliberately reuse existing steel + energy rather than expanding content prematurely.
 
-```json
-{
-  "fundingCredits": 40000.0,
-  "buildSeconds": 35.0,
-  "materials": {
-    "item.steel": 180,
-    "item.energy": 120
-  }
-}
-```
-
-The definition participates in the content fingerprint. A station archetype without this section remains loadable for narrow legacy/test catalogs but is explicitly not constructible through Stage 9B.
-
-## Funding and material movement
+## Funding, delivery and completion
 
 Funding is a real atomic transfer:
 
@@ -83,53 +55,45 @@ Funding is a real atomic transfer:
 faction treasury → construction-site wallet
 ```
 
-and is recorded as `MONEY_TRANSFER` in the local economic ledger.
+with `MONEY_TRANSFER` ledger accounting. Manual owner delivery physically moves inventory units; ordinary TradeAI delivery uses normal market trade and spends site liquidity.
 
-Manual/owner delivery physically moves units from a local source entity inventory to the same site inventory. Ordinary TradeAI delivery instead uses the existing trade transaction and spends site wallet liquidity.
+On completion:
 
-## Completion
-
-Once requirements are fulfilled:
-
-1. project enters `BUILDING` at the target-system clock tick;
-2. active or remote simulation advances the same target clock;
-3. after `buildDurationTicks`, required goods are consumed from site inventory;
-4. each consumed material is recorded as a `RESOURCE_SINK` with a station-construction reason because the tradable commodity pool has been transformed into a persistent station asset;
-5. unused project money is returned to owner treasury with `MONEY_TRANSFER` accounting;
-6. the now-empty construction site is structurally removed through Stage 9A;
-7. `ArchetypeEntityFactory.createConstructedStation(...)` creates a finished station with the target market/production/archetype metadata but **zero initial goods and zero magic starting credits**;
-8. that empty station enters the simulation through Stage-9A lifecycle create;
-9. project becomes `COMPLETED` and persists its completed station ID.
-
-Bootstrap `startingCredits`/`initialStock` remain bootstrap semantics only and are not reused as construction rewards.
+1. all required materials must physically exist at the site;
+2. `BUILDING` advances on the target-system clock, including remote coarse simulation;
+3. required goods become explicit `RESOURCE_SINK` entries because tradable commodities are transformed into the station asset;
+4. unused project money returns to the owner treasury;
+5. the empty site is removed through Stage 9A;
+6. the finished station is created through Stage 9A with target archetype/market/production metadata but **zero bootstrap stock and zero magic starting credits**;
+7. project persists `COMPLETED` with the completed station ID.
 
 ## Persistence
 
-`WorldState` schema advances from v3 to v4 and stores:
+`WorldState` advances from v3 to v4 and stores construction-project allocator watermark plus ordered project states. v1/v2/v3 legacy worlds migrate to v4 without invented projects or economic value. The codec bounds project/material counts and validates site/station references. Runtime restore verifies persisted project wallet/material state against the physical site.
 
-- `nextConstructionProjectIdValue`;
-- ordered `ConstructionProjectState` records.
+## Verification
 
-WorldState v3 migrates neutrally to v4 with no projects and allocator watermark `1`. The binary codec includes bounded project/material counts and terminal/non-terminal entity references.
+Automated coverage now includes:
 
-Runtime restore validates project state against the physical construction-site inventory/wallet and target station/content definitions.
-
-## Verification target
-
-The Stage-9B PR is not mergeable until exact-head Java 17 CI proves:
-
-- project creation and deterministic IDs;
+- project creation and stable IDs;
+- data-driven construction requirements and fingerprint sensitivity;
 - treasury funding transfer;
 - partial delivery persistence;
 - v4 binary round-trip and v1/v2/v3 migration;
 - restore validation;
-- construction site appears in existing `MarketDirectory` consumer discovery;
-- construction site remains outside completed-station fiscal/subsidy policy;
+- site discovery through existing `MarketDirectory` consumer path;
+- site exclusion from completed-station fiscal/subsidy policy;
 - active and remote target-system progression;
 - cancellation refund before delivery;
-- cancellation after first physical delivery is explicitly rejected;
+- explicit rejection of cancellation after first physical delivery;
 - material fulfillment → BUILDING → COMPLETED;
 - construction material ledger sinks;
-- construction site removal;
-- finished station has no bootstrap money/stock source;
-- money/resource conservation invariants.
+- construction-site removal;
+- finished station with no bootstrap money/stock source;
+- money/resource conservation boundaries.
+
+The final diagnostic run confirmed **all 324 tests passing**; the only remaining gate at that point was strict Javadoc on new public record constructors, which has now been corrected. This ordinary connector commit intentionally triggers the final exact-head Java 17 CI including tests, coverage, Javadoc and packaging.
+
+## Consequence
+
+After exact-head CI succeeds, Stage 9B can merge and Stage 9C — Destruction and Economic Shock — becomes active.
