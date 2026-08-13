@@ -25,7 +25,23 @@ class ContentFingerprintTest {
     void изменениеИгровогоПараметраМеняетSemanticFingerprint() throws IOException {
         String json = defaultJson();
         ContentCatalog original = ContentCatalogLoader.parse(json);
-        String changedJson = json.replaceFirst("\\\"basePrice\\\":10\\.0", "\\\"basePrice\\\":11.0");
+        String changedJson = json.replaceFirst(
+                "\\\"basePrice\\\"\\s*:\\s*10\\.0",
+                "\\\"basePrice\\\": 11.0");
+        assertNotEquals(json, changedJson, "Test mutation должна реально менять production catalog JSON");
+        ContentCatalog changed = ContentCatalogLoader.parse(changedJson);
+
+        assertNotEquals(original.getFingerprint(), changed.getFingerprint());
+    }
+
+    @Test
+    void изменениеConstructionRequirementsМеняетSemanticFingerprint() throws IOException {
+        String json = defaultJson();
+        ContentCatalog original = ContentCatalogLoader.parse(json);
+        String changedJson = json.replaceFirst(
+                "\\\"fundingCredits\\\"\\s*:\\s*25000\\.0",
+                "\\\"fundingCredits\\\": 25001.0");
+        assertNotEquals(json, changedJson, "Construction mutation должна реально менять production catalog JSON");
         ContentCatalog changed = ContentCatalogLoader.parse(changedJson);
 
         assertNotEquals(original.getFingerprint(), changed.getFingerprint());
