@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.LongConsumer;
 
 /**
  * Headless authoritative игровая сессия, владеющая всеми stateful-узлами симуляции.
@@ -250,6 +251,18 @@ public final class SimulationSession {
      */
     public int advanceFrame(float realDeltaSeconds) {
         return loop.advanceFrame(realDeltaSeconds);
+    }
+
+    /**
+     * Продвигает render-frame и сообщает world orchestrator о каждой fixed-tick границе.
+     *
+     * @param realDeltaSeconds конечный неотрицательный render delta
+     * @param afterFixedTick callback после каждого полностью исполненного local tick
+     * @return число выполненных simulation ticks
+     * @throws NullPointerException если callback не задан
+     */
+    public int advanceFrame(float realDeltaSeconds, LongConsumer afterFixedTick) {
+        return loop.advanceFrame(realDeltaSeconds, afterFixedTick);
     }
 
     /**
