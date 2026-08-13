@@ -37,6 +37,7 @@ final class Stage9ERecoveryRunner {
 
         SimulationSession inner = world.findSession(DemoGalaxyFactory.INNER_SYSTEM_ID).orElseThrow();
         Entity foundry = Stage9EMetrics.requireFoundry(inner);
+        Stage9EInitialStock.apply(foundry, content);
         EntityId reserveId = Stage9ESetup.createReserve(world, content, foundry);
         int steelId = content.findItem(STEEL).runtimeId();
         int weaponsId = content.findItem(WEAPONS).runtimeId();
