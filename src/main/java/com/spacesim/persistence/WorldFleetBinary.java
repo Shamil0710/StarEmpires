@@ -1,6 +1,8 @@
 package com.spacesim.persistence;
 
 import com.spacesim.world.FleetId;
+import com.spacesim.world.FleetJumpPhase;
+import com.spacesim.world.FleetJumpState;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.FleetTransitState;
@@ -83,5 +85,43 @@ final class WorldFleetBinary {
                     new FleetTransitState(origin, destination, FleetPayloadCodec.decode(payload))));
         }
         return List.copyOf(fleets);
+    }
+
+    static void writeJumps(DataOutputStream out, List<FleetJumpState> jumps) throws IOException {
+        WorldIoSupport.writeCount(out, jumps.size(), MAX_FLEETS, "fleetJumps");
+        for (FleetJumpState jump : jumps) {
+            out.writeLong(jump.fleetId().value());
+            WorldIoSupport.writeString(out, jump.phase().name());
+            out.writeLong(jump.originSystemId().value());
+            out.writeLong(jump.destinationSystemId().value());
+            out.writeLong(jump.phaseStartedTick());
+            out.writeLong(jump.phaseEndsTick());
+            out.writeFloat(jump.arrivalX());
+            out.writeFloat(jump.arrivalY());
+        }
+    }
+
+    static List<FleetJumpState> readJumps(DataInputStream in) throws IOException {
+        int count = WorldIoSupport.readCount(in, MAX_FLEETS, "fleetJumps");
+        List<FleetJumpState> jumps = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            FleetId fleetId = new FleetId(in.readLong());
+            FleetJumpPhase phase;
+            try {
+                phase = FleetJumpPhase.valueOf(WorldIoSupport.readString(in));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Unknown FleetJumpPhase", exception);
+            }
+            jumps.add(new FleetJumpState(
+                    fleetId,
+                    phase,
+                    new StarSystemId(in.readLong()),
+                    new StarSystemId(in.readLong()),
+                    in.readLong(),
+                    in.readLong(),
+                    in.readFloat(),
+                    in.readFloat()));
+        }
+        return List.copyOf(jumps);
     }
 }
