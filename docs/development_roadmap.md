@@ -562,7 +562,7 @@ Stage 8.5 завершён, когда:
 
 **Статус:** ACTIVE — STAGE 8.5 GATE PASSED
 
-Текущий implementation focus: **Stage 9A — Entity lifecycle infrastructure**.
+Текущий implementation focus: **Stage 9B — Persistent Construction Project**.
 
 ### Цель
 
@@ -584,17 +584,19 @@ Construction project должен быть **физическим экономи
 
 ### Stage 9A — Entity lifecycle infrastructure
 
+**Статус:** COMPLETE — PR #13 candidate; `docs/stage9a_entity_lifecycle.md`
+
 #### Задачи
 
-- [ ] определить authoritative lifecycle persistent local entities: create/register/disable/destroy/unregister;
-- [ ] обеспечить deterministic allocation `EntityId` для созданных runtime объектов;
-- [ ] добавить безопасный removal path для stations и ships;
-- [ ] удаление станции инвалидирует route planner state и cached opportunities;
-- [ ] dangling persistent references не переживают destroy;
-- [ ] `EntityRegistry`, `MarketDirectory`, spatial indexes и simulation systems согласованно видят removal;
-- [ ] save/load корректно сохраняет мир после create/destroy;
-- [ ] active и remote systems поддерживают изменяемый entity count;
-- [ ] destruction/removal не нарушает money/resource accounting.
+- [x] определить authoritative lifecycle persistent local entities: create/register/disable/destroy/unregister;
+- [x] обеспечить deterministic allocation `EntityId` для созданных runtime объектов;
+- [x] добавить безопасный removal path для stations и ships;
+- [x] удаление станции инвалидирует route planner state и cached opportunities;
+- [x] dangling persistent references не переживают destroy;
+- [x] `EntityRegistry`, `MarketDirectory`, spatial indexes и simulation systems согласованно видят removal;
+- [x] save/load корректно сохраняет мир после create/destroy;
+- [x] active и remote systems поддерживают изменяемый entity count;
+- [x] destruction/removal не нарушает money/resource accounting.
 
 #### Acceptance tests
 
@@ -604,6 +606,8 @@ Construction project должен быть **физическим экономи
 - уничтоженный объект отсутствует после world save/load.
 
 ### Stage 9B — Persistent Construction Project
+
+**Статус:** ACTIVE
 
 `ConstructionProject` должен хранить как минимум:
 
@@ -1865,18 +1869,20 @@ world shortage/war/discovery
 
 # 9. Текущий следующий шаг
 
-**ACTIVE: Stage 9A — Entity lifecycle infrastructure.**
+**ACTIVE: Stage 9B — Persistent Construction Project.**
 
 Stage 8.5 завершён решением `KEEP_LIBGDX`; presentation technology gate больше не блокирует core development.
 
 Immediate implementation sequence:
 
-1. authoritative create/register/disable/destroy/unregister lifecycle для persistent local entities;
-2. deterministic allocation новых `EntityId`;
-3. safe station/ship removal с invalidation route/cache/index state;
-4. save/load continuation после runtime create/destroy;
-5. проверить отсутствие dangling persistent references и conservation regressions;
-6. после green Stage 9A перейти к persistent `ConstructionProject` (Stage 9B).
+1. persistent `ConstructionProject` ID/state model и state machine;
+2. data-driven material requirements для station archetype;
+3. project wallet и physical faction funding;
+4. project storage и частичные material deliveries;
+5. save/load continuation construction progress;
+6. completion через Stage-9A lifecycle без magic stock/money creation;
+7. cancellation/refund policy с conservation tests;
+8. затем Stage 9C destruction/economic shock.
 
 Параллельный visual track продолжает развивать approved asset pipeline. `BloomMode = OFF / LIGHT / FULL` реализуется и benchmark-ится вместе с Stage 13 / V4 Combat VFX, а финальные graphics-quality settings и thresholds входят в Stage 22.
 
