@@ -4,6 +4,7 @@ import com.badlogic.ashley.core.Engine;
 import com.spacesim.events.GlobalEventManager;
 
 import java.util.Objects;
+import java.util.function.LongConsumer;
 
 /**
  * Исполняет фиксированные simulation ticks поверх Ashley-движка.
@@ -14,6 +15,8 @@ import java.util.Objects;
 public final class SimulationLoop {
     /** Защитная граница работы одного render frame; непройденные ticks остаются в accumulator. */
     public static final int DEFAULT_MAX_STEPS_PER_FRAME = 2_048;
+
+    private static final LongConsumer NO_AFTER_TICK_CALLBACK = ignored -> { };
 
     private final SimulationClock clock;
     private final GlobalEventManager eventManager;
@@ -65,12 +68,30 @@ public final class SimulationLoop {
      * @return число simulation ticks, реально исполненных в этом вызове
      */
     public int advanceFrame(float realDeltaSeconds) {
+        return advanceFrame(realDeltaSeconds, NO_AFTER_TICK_CALLBACK);
+    }
+
+    /**
+     * Исполняет render frame и вызывает callback после каждого полностью выполненного fixed tick.
+     *
+     * <p>Callback получает уже увеличенный authoritative tick после обновления events и Ashley
+     * Engine. Это даёт world-level orchestration точную границу между соседними ticks и не меняет
+     * обычный pipeline, когда используется {@link #advanceFrame(float)}.</p>
+     *
+     * @param realDeltaSeconds прошедшее реальное время кадра
+     * @param afterFixedTick callback, вызываемый ровно один раз после каждого исполненного tick
+     * @return число simulation ticks, реально исполненных в этом вызове
+     * @throws NullPointerException если callback не задан
+     */
+    public int advanceFrame(float realDeltaSeconds, LongConsumer afterFixedTick) {
+        LongConsumer callback = Objects.requireNonNull(afterFixedTick, "Fixed-tick callback не задан");
         clock.addFrameTime(realDeltaSeconds);
         int executedSteps = 0;
         while (executedSteps < maxStepsPerFrame && clock.hasPendingStep()) {
             float fixedStep = clock.consumeStep();
             eventManager.update(fixedStep);
             engine.update(fixedStep);
+            callback.accept(clock.getTick());
             executedSteps++;
         }
         return executedSteps;
