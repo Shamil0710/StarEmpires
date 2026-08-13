@@ -1,0 +1,104 @@
+name: Stage 9C base semantics
+
+on:
+  push:
+    branches: [agent/stage9c-destruction-shock]
+    paths: ['.github/workflows/stage9c-base-semantics.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: agent/stage9c-destruction-shock
+          fetch-depth: 0
+      - name: Add resource-transfer ledger, salvage identity, persistent news hook and project failure semantics
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{path}: expected one fragment, found {text.count(old)}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              'src/main/java/com/spacesim/economy/EconomicTransaction.java',
+              '''        /** Явное исчезновение физического ресурса, например потребление. */\n        RESOURCE_SINK,\n        /** Производственное преобразование входных товаров в выходные. */''',
+              '''        /** Явное исчезновение физического ресурса, например потребление. */\n        RESOURCE_SINK,\n        /** Физический transfer ресурса между двумя persistent участниками без source/sink. */\n        RESOURCE_TRANSFER,\n        /** Производственное преобразование входных товаров в выходные. */''')
+
+          p = Path('src/main/java/com/spacesim/economy/EconomicLedger.java')
+          text = p.read_text(encoding='utf-8')
+          marker = '''    /**\n     * Регистрирует производственное преобразование ресурсов.'''
+          method = '''    /**\n     * Регистрирует физический transfer товара между persistent участниками без создания/sink.\n     *\n     * @param source диагностический источник\n     * @param destination диагностический получатель\n     * @param itemId runtime item ID\n     * @param amount положительное количество\n     * @param reason непустое объяснение transfer\n     */\n    public void recordResourceTransfer(\n            String source, String destination, int itemId, long amount, String reason) {\n        add(EconomicTransaction.Type.RESOURCE_TRANSFER, source, destination, itemId, amount, 0L, reason);\n    }\n\n'''
+          if marker not in text:
+              raise SystemExit('EconomicLedger insertion marker missing')
+          text = text.replace(marker, method + marker, 1)
+          p.write_text(text, encoding='utf-8')
+
+          replace_once(
+              'src/main/java/com/spacesim/components/IdentityComponent.java',
+              '''        /** Ограниченный природный источник ресурса, который исчезает после истощения. */\n        ASTEROID\n''',
+              '''        /** Ограниченный природный источник ресурса, который исчезает после истощения. */\n        ASTEROID,\n\n        /** Неподвижный контейнер физического salvage после уничтожения объекта. */\n        SALVAGE\n''')
+
+          p = Path('src/main/java/com/spacesim/events/GlobalEventManager.java')
+          text = p.read_text(encoding='utf-8')
+          marker = '''    /**\n     * Извлекает все накопленные новости и очищает внутреннюю очередь.'''
+          method = '''    /**\n     * Добавляет deterministic external gameplay news в persistent очередь менеджера.\n     *\n     * <p>Статья обязана использовать game-time timestamp. Метод не меняет RNG и не создаёт\n     * EconomyEvent, поэтому подходит для lifecycle/destruction/strategic notifications.</p>\n     *\n     * @param article новая статья\n     */\n    public void publishNews(NewsArticle article) {\n        pendingNews.add(Objects.requireNonNull(article, "Публикуемая новость не задана"));\n    }\n\n'''
+          if marker not in text:
+              raise SystemExit('GlobalEventManager insertion marker missing')
+          text = text.replace(marker, method + marker, 1)
+          p.write_text(text, encoding='utf-8')
+
+          replace_once(
+              'src/main/java/com/spacesim/world/ConstructionProjectStatus.java',
+              '''    /** Project was cancelled before any construction material was delivered. */\n    CANCELLED\n''',
+              '''    /** Project was cancelled before any construction material was delivered. */\n    CANCELLED,\n    /** Physical construction site was destroyed before project completion. */\n    FAILED\n''')
+
+          p = Path('src/main/java/com/spacesim/world/ConstructionProjectState.java')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace(
+              '''        boolean terminal = status == ConstructionProjectStatus.COMPLETED\n                || status == ConstructionProjectStatus.CANCELLED;''',
+              '''        boolean terminal = status == ConstructionProjectStatus.COMPLETED\n                || status == ConstructionProjectStatus.CANCELLED\n                || status == ConstructionProjectStatus.FAILED;''',
+              1)
+          p.write_text(text, encoding='utf-8')
+
+          p = Path('src/main/java/com/spacesim/world/WorldState.java')
+          text = p.read_text(encoding='utf-8')
+          old = '''            if (value.completedStationEntityId() != null\n                    && systemState.simulationState().entities().stream()\n                    .noneMatch(entity -> entity.id().equals(value.completedStationEntityId()))) {\n                throw new IllegalArgumentException("Completed construction project потерял station entity: " + value.id());\n            }\n'''
+          if old in text:
+              text = text.replace(old, '', 1)
+          else:
+              raise SystemExit('WorldState completed-station live-reference check missing')
+          p.write_text(text, encoding='utf-8')
+
+          p = Path('src/main/java/com/spacesim/world/ConstructionProjectService.java')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace(
+              '''        if (isTerminal(state.status())) {\n            if (state.status() == ConstructionProjectStatus.COMPLETED\n                    && session.getEntityRegistry().find(state.completedStationEntityId()) == null) {\n                throw new IllegalArgumentException("Restored construction project потерял completed station");\n            }\n            return state;\n        }''',
+              '''        if (isTerminal(state.status())) {\n            return state;\n        }''',
+              1)
+          text = text.replace(
+              '''    private static boolean isTerminal(ConstructionProjectStatus status) {\n        return status == ConstructionProjectStatus.COMPLETED || status == ConstructionProjectStatus.CANCELLED;\n    }''',
+              '''    private static boolean isTerminal(ConstructionProjectStatus status) {\n        return status == ConstructionProjectStatus.COMPLETED\n                || status == ConstructionProjectStatus.CANCELLED\n                || status == ConstructionProjectStatus.FAILED;\n    }''',
+              1)
+          marker = '''    boolean isConstructionSite(StarSystemId systemId, EntityId entityId) {'''
+          method = '''    ConstructionProjectId failDestroyedSite(\n            StarSystemId systemId, EntityId entityId, long tick) {\n        if (systemId == null || entityId == null) {\n            return null;\n        }\n        for (ConstructionProjectState state : new ArrayList<>(projects.values())) {\n            if (isTerminal(state.status())\n                    || !state.systemId().equals(systemId)\n                    || !entityId.equals(state.constructionSiteEntityId())) {\n                continue;\n            }\n            ConstructionProjectState refreshed = refresh(state);\n            ConstructionProjectState failed = copy(\n                    refreshed,\n                    ConstructionProjectStatus.FAILED,\n                    tick,\n                    refreshed.buildStartedTick(),\n                    tick,\n                    null,\n                    null,\n                    refreshed.materials(),\n                    0L);\n            projects.put(state.id(), failed);\n            return state.id();\n        }\n        return null;\n    }\n\n'''
+          if marker not in text:
+              raise SystemExit('ConstructionProjectService site marker missing')
+          text = text.replace(marker, method + marker, 1)
+          p.write_text(text, encoding='utf-8')
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/stage9c-base-semantics.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add Stage 9C destruction accounting semantics"
+          git push origin HEAD:agent/stage9c-destruction-shock
