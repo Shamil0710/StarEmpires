@@ -39,7 +39,6 @@ final class Stage9ESetup {
                 content,
                 STEEL,
                 ShipType.MATERIAL_CARRIER,
-                500,
                 500);
         Entity energy = reserveCarrier(
                 "Corona Energy Reserve",
@@ -48,11 +47,12 @@ final class Stage9ESetup {
                 content,
                 ENERGY,
                 ShipType.GAS_LIQUID_CARRIER,
-                300,
                 300);
         EntityId salvageId = world.createEntity(DemoGalaxyFactory.INNER_SYSTEM_ID, salvage);
         world.createEntity(DemoGalaxyFactory.INNER_SYSTEM_ID, steel);
         world.createEntity(DemoGalaxyFactory.INNER_SYSTEM_ID, energy);
+        steel.getComponent(InventoryComponent.class).stock[content.findItem(STEEL).runtimeId()] = 500;
+        energy.getComponent(InventoryComponent.class).stock[content.findItem(ENERGY).runtimeId()] = 300;
         return salvageId;
     }
 
@@ -90,14 +90,12 @@ final class Stage9ESetup {
             ContentCatalog content,
             String itemContentId,
             ShipType type,
-            int capacity,
-            int stock) {
+            int capacity) {
         int itemId = content.findItem(itemContentId).runtimeId();
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = capacity;
-        inventory.stock[itemId] = stock;
         TradeAIComponent trade = new TradeAIComponent();
         trade.specializedItem = itemId;
         trade.cargoSpace = capacity;
