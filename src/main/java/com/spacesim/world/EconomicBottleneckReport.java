@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-public record EconomicBottleneckReport(List<EconomicBottleneck> bottlenecks) {
+record EconomicBottleneckReport(List<EconomicBottleneck> bottlenecks) {
     public EconomicBottleneckReport {
         bottlenecks = List.copyOf(Objects.requireNonNull(bottlenecks, "Bottleneck list не задан"));
     }
