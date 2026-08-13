@@ -2,7 +2,12 @@
 setlocal EnableExtensions
 
 set "PROJECT_DIR=%~dp0"
-set "SPRITE_REL=src\main\resources\assets\ships\heavy_corvette\heavy_corvette_white_01\heavy_corvette_white_01_base.png"
+set "ASSET_DIR=src\main\resources\assets\ships\heavy_corvette\heavy_corvette_white_01"
+set "BASE_REL=%ASSET_DIR%\heavy_corvette_white_01_base.png"
+set "EMISSIVE_REL=%ASSET_DIR%\heavy_corvette_white_01_emissive.png"
+set "DAMAGE_REL=%ASSET_DIR%\heavy_corvette_white_01_damage.png"
+set "IDLE_REL=%ASSET_DIR%\heavy_corvette_white_01_engine_idle.png"
+set "THRUST_REL=%ASSET_DIR%\heavy_corvette_white_01_engine_thrust.png"
 
 pushd "%PROJECT_DIR%" >nul 2>&1
 if errorlevel 1 (
@@ -30,17 +35,15 @@ echo ============================================================
 echo Star Empires - Stage 8.5 Graphics Validation
 echo ============================================================
 echo.
-
-if exist "%PROJECT_DIR%%SPRITE_REL%" (
-    echo [ASSET] Heavy corvette sprite found:
-    echo         %SPRITE_REL%
-) else (
-    echo [WARNING] Heavy corvette sprite is NOT present.
-    echo           The test will use its procedural fallback.
-    echo           Put the PNG here with the exact filename:
-    echo           %SPRITE_REL%
-)
-
+echo Heavy Corvette asset pack:
+call :asset_status "BASE" "%BASE_REL%"
+call :asset_status "EMISSIVE" "%EMISSIVE_REL%"
+call :asset_status "DAMAGE" "%DAMAGE_REL%"
+call :asset_status "ENGINE IDLE" "%IDLE_REL%"
+call :asset_status "ENGINE THRUST" "%THRUST_REL%"
+echo.
+echo Canonical folder:
+echo   %ASSET_DIR%
 echo.
 echo Controls inside the validation window:
 echo   1 - Representative performance scene
@@ -90,6 +93,14 @@ if not "%APP_EXIT_CODE%"=="0" (
 
 popd
 exit /b %APP_EXIT_CODE%
+
+:asset_status
+if exist "%PROJECT_DIR%%~2" (
+    echo [OK]      %~1 - %~2
+) else (
+    echo [MISSING] %~1 - %~2
+)
+exit /b 0
 
 :failure
 echo.
