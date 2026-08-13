@@ -63,6 +63,26 @@ class Stage9DEconomicResponseTest {
         assertEquals(0, countActiveProducerProjects(world, content, "item.steel"));
     }
 
+    @Test
+    void repeatedObservationInSameTickНеУскоряетHysteresis() {
+        ContentCatalog content = ContentCatalogLoader.loadDefault();
+        WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
+        destroyFoundry(world);
+        FactionStrategicState strategy = world.findFactionStrategicState(MINERS).orElseThrow();
+        FactionEconomicPressureTracker tracker = new FactionEconomicPressureTracker(List.of());
+        EconomicBottleneckReport report = EconomicBottleneckAnalyzer.analyze(world, content);
+        long tick = world.findSession(world.getActiveSystemId()).orElseThrow().getClock().getTick();
+
+        tracker.observe(List.of(strategy), report, tick);
+        tracker.observe(List.of(strategy), report, tick);
+        tracker.observe(List.of(strategy), report, tick);
+
+        FactionEconomicPressureState steel =
+                tracker.find(MINERS, DemoGalaxyFactory.INNER_SYSTEM_ID, "item.steel");
+        assertEquals(1, steel.consecutiveObservations());
+        assertTrue(FactionInvestmentPlanner.evaluateFaction(world, content, tracker, MINERS).isEmpty());
+    }
+
     private static int countActiveProducerProjects(
             WorldSimulation world, ContentCatalog content, String itemContentId) {
         int count = 0;
