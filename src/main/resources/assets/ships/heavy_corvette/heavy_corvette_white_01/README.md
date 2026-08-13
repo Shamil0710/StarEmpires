@@ -1,48 +1,69 @@
-# Heavy Corvette White 01 — asset folder
+# Heavy Corvette White 01 — complete asset pack
 
-This directory is the Stage-8.5 production-like sprite integration point for the first **heavy corvette** visual.
+This directory is the canonical Stage-8.5 integration point for the first **heavy corvette** production-like visual pack.
 
-## Base sprite
-
-Canonical filename:
+## Upload exactly these five PNG files
 
 ```text
 heavy_corvette_white_01_base.png
+heavy_corvette_white_01_emissive.png
+heavy_corvette_white_01_damage.png
+heavy_corvette_white_01_engine_idle.png
+heavy_corvette_white_01_engine_thrust.png
 ```
 
-Repository path:
+All five paths are registered in `ProjectShipSprites.whiteHeavyCorvette01Assets()` and covered by unit tests.
+
+## Full-frame ship layers
+
+The following three textures must use the **same canvas size, same pixel alignment and same authored ship placement**:
 
 ```text
-src/main/resources/assets/ships/heavy_corvette/heavy_corvette_white_01/heavy_corvette_white_01_base.png
+heavy_corvette_white_01_base.png
+heavy_corvette_white_01_emissive.png
+heavy_corvette_white_01_damage.png
 ```
 
-The authored source convention is:
+Rules:
 
-- top-down view;
-- source nose points **left**;
-- source main exhaust points **right**;
 - transparent background;
-- no collision geometry is inferred from alpha bounds.
+- top-down view;
+- source nose points **LEFT**;
+- source engines are on the **RIGHT**;
+- do not manually flip the files;
+- base sprite must not contain baked long engine plume;
+- emissive contains only self-lit regions;
+- damage is a transparent overlay that aligns pixel-perfect with base.
 
-The runtime presentation convention is different by design:
+The runtime convention is:
 
 ```text
 runtime forward = RIGHT / positive local X
 ```
 
-`ProjectShipSprites.whiteHeavyCorvette01()` declares `SourceFacing.LEFT`. The presentation transform mirrors the texture, hardpoint positions and visual directions together, so the source PNG itself should **not** be manually flipped.
+`SourceFacing.LEFT` causes base/emissive/damage layers and hardpoints to be mirrored consistently by presentation code.
 
-## Optional emissive texture
-
-An emissive-only mask may be placed beside the base sprite as:
+## Engine VFX layers
 
 ```text
-heavy_corvette_white_01_emissive.png
+heavy_corvette_white_01_engine_idle.png
+heavy_corvette_white_01_engine_thrust.png
 ```
 
-The emissive mask must use the same authored orientation and pixel alignment as the base texture. Runtime orientation normalization will be applied to both layers together.
+These are ship-specific exhaust sprites. Preferred authored convention for this pack:
 
-## Current presentation contract
+- transparent background;
+- horizontal top-down plume;
+- source-space nozzle attachment is at the **LEFT-center** edge of the VFX image;
+- source-space plume extends to the **RIGHT**, matching the source ship whose engines exhaust right;
+- idle is shorter/dimmer than thrust;
+- no ship hull or background is baked into the VFX texture.
+
+After runtime orientation normalization the exhaust will be placed behind the right-facing ship and extend left.
+
+Exact engine VFX scale/anchor will be validated from the uploaded images rather than guessed from filenames.
+
+## Current ship presentation contract
 
 - asset ID: `ship.heavy_corvette.white_01`;
 - source facing: `LEFT`;
@@ -54,4 +75,23 @@ The emissive mask must use the same authored orientation and pixel alignment as 
 - 5 weapon hardpoints;
 - 1 utility hardpoint.
 
-Use `run-graphics-validation.cmd` and switch to Tactical (`2`) or Close-up (`3`) to verify the authored asset. Close-up enables hardpoint markers automatically; `H` toggles them and `R` toggles rotation.
+## Validation
+
+Run:
+
+```text
+run-graphics-validation.cmd
+```
+
+The script checks the canonical filenames before building. Existing visual review controls remain:
+
+```text
+1 - Representative
+2 - Tactical
+3 - Close-up
+H - hardpoints
+R - rotate
+ESC - exit
+```
+
+Once the full five-file pack is uploaded, the next integration pass will bind damage and idle/thrust sprites to the existing normalized ship/hardpoint pipeline and validate exact VFX dimensions/alignment on the real asset.
