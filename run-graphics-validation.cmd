@@ -42,6 +42,17 @@ if exist "%PROJECT_DIR%%SPRITE_REL%" (
 )
 
 echo.
+echo Controls inside the validation window:
+echo   1 - Representative performance scene
+echo   2 - Tactical scale/readability review
+echo   3 - Close-up heavy-corvette inspection
+echo   H - Toggle hardpoint markers
+echo   R - Toggle preview rotation
+echo ESC - Exit
+echo.
+echo Runtime ship-forward convention: RIGHT.
+echo The heavy-corvette source art faces LEFT and is normalized automatically.
+echo.
 echo [1/2] Building the validation JAR and running package-phase tests...
 call "%PROJECT_DIR%mvnw.cmd" --batch-mode --no-transfer-progress clean package
 if errorlevel 1 (
@@ -66,8 +77,7 @@ if /I "%~1"=="--build-only" (
 )
 
 echo.
-echo [2/2] Starting Stage 8.5 representative graphics test...
-echo       ESC closes the validation scene.
+echo [2/2] Starting Stage 8.5 graphics validation...
 echo.
 "%JAVA_EXE%" -jar "%APP_JAR%" --graphics-spike
 set "APP_EXIT_CODE=%ERRORLEVEL%"
