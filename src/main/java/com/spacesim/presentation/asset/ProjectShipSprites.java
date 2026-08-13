@@ -25,6 +25,8 @@ public final class ProjectShipSprites {
      * convention is forward-right. {@link SpriteOrientationTransform} therefore mirrors the sprite,
      * hardpoint positions and visual directions as one transform. Hardpoint coordinates retain the
      * authored-source convention with normalized origin at bottom-left.</p>
+     *
+     * @return immutable heavy-corvette presentation specification
      */
     public static ShipSpriteSpec whiteHeavyCorvette01() {
         return new ShipSpriteSpec(
