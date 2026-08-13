@@ -279,6 +279,20 @@ final class ConstructionProjectService {
         return idAllocator.peekNextValue();
     }
 
+    boolean isConstructionSite(StarSystemId systemId, EntityId entityId) {
+        if (systemId == null || entityId == null) {
+            return false;
+        }
+        for (ConstructionProjectState state : projects.values()) {
+            if (!isTerminal(state.status())
+                    && state.systemId().equals(systemId)
+                    && entityId.equals(state.constructionSiteEntityId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private ConstructionProjectState complete(ConstructionProjectState state, long tick) {
         ConstructionProjectState refreshed = refresh(state);
         if (!refreshed.materialsFulfilled()) {

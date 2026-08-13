@@ -264,7 +264,7 @@ public final class WorldSimulation {
                 break;
             }
             SimulationSession session = sessionsById.get(systemId);
-            for (Entity station : ownedMarketStations(session, faction.runtimeId())) {
+            for (Entity station : ownedMarketStations(systemId, session, faction.runtimeId())) {
                 if (remainingBudget <= 0L) {
                     break;
                 }
@@ -321,7 +321,7 @@ public final class WorldSimulation {
         for (StarSystemId systemId : systemOrder) {
             SimulationSession session = sessionsById.get(systemId);
             boolean controlled = factionId.equals(territoryOwnerBySystem.get(systemId));
-            for (Entity station : marketStations(session)) {
+            for (Entity station : completedMarketStations(systemId, session)) {
                 FactionComponent owner = station.getComponent(FactionComponent.class);
                 if (owner == null) {
                     continue;
@@ -627,9 +627,10 @@ public final class WorldSimulation {
         return factionId;
     }
 
-    private List<Entity> ownedMarketStations(SimulationSession session, int runtimeFactionId) {
+    private List<Entity> ownedMarketStations(
+            StarSystemId systemId, SimulationSession session, int runtimeFactionId) {
         List<Entity> result = new ArrayList<>();
-        for (Entity entity : marketStations(session)) {
+        for (Entity entity : completedMarketStations(systemId, session)) {
             FactionComponent faction = entity.getComponent(FactionComponent.class);
             if (faction != null && faction.factionId == runtimeFactionId) {
                 result.add(entity);
@@ -638,12 +639,14 @@ public final class WorldSimulation {
         return result;
     }
 
-    private List<Entity> marketStations(SimulationSession session) {
+    private List<Entity> completedMarketStations(StarSystemId systemId, SimulationSession session) {
         List<Entity> stations = new ArrayList<>();
         for (Entity entity : session.getEngine().getEntities()) {
+            EntityIdComponent id = entity.getComponent(EntityIdComponent.class);
             if (entity.getComponent(MarketComponent.class) == null
                     || entity.getComponent(WalletComponent.class) == null
-                    || entity.getComponent(EntityIdComponent.class) == null) {
+                    || id == null
+                    || constructionProjectService.isConstructionSite(systemId, id.id)) {
                 continue;
             }
             stations.add(entity);
