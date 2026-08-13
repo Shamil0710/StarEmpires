@@ -37,8 +37,29 @@ class ShipSpriteSpecTest {
         assertEquals(0.5f, spec.pivotX());
         assertEquals(0.5f, spec.pivotY());
         assertEquals(12f, spec.collisionRadius());
+        assertEquals(SourceFacing.RIGHT, spec.sourceFacing());
         assertEquals(List.of(engine), spec.hardpoints());
         assertThrows(UnsupportedOperationException.class, () -> spec.hardpoints().clear());
+    }
+
+    @Test
+    void supportsExplicitLeftFacingSourceArt() {
+        ShipSpriteSpec spec = new ShipSpriteSpec(
+                "ship.left",
+                "left.png",
+                null,
+                20f,
+                10f,
+                0.5f,
+                0.5f,
+                14f,
+                6f,
+                SourceFacing.LEFT,
+                List.of());
+
+        assertEquals(SourceFacing.LEFT, spec.sourceFacing());
+        assertEquals(14f, spec.collisionWidth());
+        assertEquals(6f, spec.collisionHeight());
     }
 
     @Test
@@ -87,6 +108,20 @@ class ShipSpriteSpecTest {
                         0.5f,
                         1f,
                         List.of(engine, engine)));
+        assertThrows(
+                NullPointerException.class,
+                () -> new ShipSpriteSpec(
+                        "id",
+                        "base.png",
+                        null,
+                        1f,
+                        1f,
+                        0.5f,
+                        0.5f,
+                        1f,
+                        1f,
+                        null,
+                        List.of()));
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new VisualHardpoint("id", VisualHardpointType.ENGINE, -0.1f, 0.5f, 0f));
