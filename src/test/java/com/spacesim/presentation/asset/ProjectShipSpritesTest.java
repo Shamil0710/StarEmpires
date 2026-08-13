@@ -27,6 +27,19 @@ class ProjectShipSpritesTest {
     }
 
     @Test
+    void heavyCorvetteRegistersCompleteFiveTextureAssetPack() {
+        ShipVisualAssetSet assets = ProjectShipSprites.whiteHeavyCorvette01Assets();
+
+        assertEquals(ProjectShipSprites.WHITE_HEAVY_CORVETTE_01_BASE, assets.baseTexturePath());
+        assertEquals(ProjectShipSprites.WHITE_HEAVY_CORVETTE_01_EMISSIVE, assets.emissiveTexturePath());
+        assertEquals(ProjectShipSprites.WHITE_HEAVY_CORVETTE_01_DAMAGE, assets.damageTexturePath());
+        assertEquals(ProjectShipSprites.WHITE_HEAVY_CORVETTE_01_ENGINE_IDLE, assets.engineIdleTexturePath());
+        assertEquals(ProjectShipSprites.WHITE_HEAVY_CORVETTE_01_ENGINE_THRUST, assets.engineThrustTexturePath());
+        assertEquals(5, assets.allTexturePaths().size());
+        assertEquals(5L, assets.allTexturePaths().stream().distinct().count());
+    }
+
+    @Test
     void heavyCorvetteDefinesExpectedEngineWeaponAndUtilityHardpoints() {
         ShipSpriteSpec spec = ProjectShipSprites.whiteHeavyCorvette01();
 
