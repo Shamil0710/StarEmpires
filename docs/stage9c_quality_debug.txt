@@ -1,0 +1,3 @@
+Stage 9C temporary quality diagnostic is obsolete.
+
+The final Stage 9C exact-head Java 17 CI passed after the strict Javadoc fix and the measurable steel-demand shock test. This placeholder remains only because the connector delete operation was unavailable during finalization and should be removed in the next maintenance commit.

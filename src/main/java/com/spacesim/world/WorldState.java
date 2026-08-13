@@ -212,11 +212,6 @@ public record WorldState(
                     .noneMatch(entity -> entity.id().equals(value.constructionSiteEntityId()))) {
                 throw new IllegalArgumentException("Construction project потерял site entity: " + value.id());
             }
-            if (value.completedStationEntityId() != null
-                    && systemState.simulationState().entities().stream()
-                    .noneMatch(entity -> entity.id().equals(value.completedStationEntityId()))) {
-                throw new IllegalArgumentException("Completed construction project потерял station entity: " + value.id());
-            }
             maxProjectId = Math.max(maxProjectId, value.id().value());
             sortedProjects.add(value);
         }

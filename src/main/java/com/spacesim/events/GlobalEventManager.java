@@ -382,6 +382,15 @@ public class GlobalEventManager {
     }
 
     /**
+     * Добавляет deterministic gameplay news в persistent очередь без изменения RNG/event set.
+     *
+     * @param article статья с game-time timestamp
+     */
+    public void publishNews(NewsArticle article) {
+        pendingNews.add(Objects.requireNonNull(article, "Публикуемая новость не задана"));
+    }
+
+    /**
      * Извлекает все накопленные новости и очищает внутреннюю очередь.
      *
      * @return новый изменяемый список накопленных новостей

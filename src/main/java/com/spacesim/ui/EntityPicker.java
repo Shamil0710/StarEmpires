@@ -13,8 +13,8 @@ import com.spacesim.components.TransformComponent;
  * радиус выбора остаётся одинаковым при любом размере и увеличении карты. Сущности без
  * идентичности, пространственного компонента, конечной позиции, находящиеся за пределами мира
  * или текущего обзора не участвуют в выборе. При равном расстоянии приоритет типов равен
- * {@code флот > астероид > станция}: так небольшой подвижный корабль или источник ресурса проще
- * выбрать поверх крупного стационарного объекта.</p>
+ * {@code флот > астероид/salvage > станция}: так небольшой подвижный корабль, источник ресурса
+ * или salvage проще выбрать поверх крупного стационарного объекта.</p>
  */
 public final class EntityPicker {
     private static final ComponentMapper<IdentityComponent> IDENTITIES =
@@ -110,7 +110,7 @@ public final class EntityPicker {
         }
         return switch (kind) {
             case STATION -> 0;
-            case ASTEROID -> 1;
+            case ASTEROID, SALVAGE -> 1;
             case FLEET -> 2;
         };
     }

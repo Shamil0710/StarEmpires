@@ -11,30 +11,23 @@ import java.util.Set;
 /**
  * Immutable persistent snapshot of one world-level construction project.
  *
- * <p>The physical construction site is a normal local ECS market identified by
- * {@link #constructionSiteEntityId()}. Required/delivered materials and project-wallet balance are
- * duplicated into this world-level state at snapshot time so diagnostics and migration do not need
- * to reconstruct project semantics from arbitrary ECS components. Runtime restore validates the
- * duplicated values against the site entity.</p>
- *
  * @param id stable world-level project ID
  * @param ownerFactionContentId owner faction content ID
  * @param stationArchetypeContentId target station archetype content ID
  * @param systemId target StarSystem
  * @param x target world X coordinate
  * @param y target world Y coordinate
- * @param constructionSiteEntityId local construction-site entity while project is non-terminal;
- *                                 {@code null} after completion/cancellation
- * @param materials sorted immutable material requirements
- * @param minimumFundingMilliCredits minimum wallet balance that activates project demand
+ * @param constructionSiteEntityId local site ID while non-terminal
+ * @param materials canonical material requirements/history
+ * @param minimumFundingMilliCredits minimum project liquidity
  * @param projectWalletMilliCredits current project/site wallet balance
- * @param buildDurationTicks required target-system fixed ticks in BUILDING state
+ * @param buildDurationTicks required target-system build ticks
  * @param status persistent state-machine state
- * @param createdTick target-system tick when project was created
- * @param stateChangedTick target-system tick of latest state transition
- * @param buildStartedTick target-system tick when BUILDING began, or {@code -1}
- * @param completedTick completion/cancellation tick, or {@code -1}
- * @param completedStationEntityId created station ID for COMPLETED state, otherwise {@code null}
+ * @param createdTick project creation tick
+ * @param stateChangedTick latest transition tick
+ * @param buildStartedTick BUILDING start tick or -1
+ * @param completedTick terminal transition tick or -1
+ * @param completedStationEntityId historical created station ID only for COMPLETED
  */
 public record ConstructionProjectState(
         ConstructionProjectId id,
@@ -64,17 +57,17 @@ public record ConstructionProjectState(
      * @param systemId target StarSystem
      * @param x target world X coordinate
      * @param y target world Y coordinate
-     * @param constructionSiteEntityId local site ID or null only for terminal states
-     * @param materials material requirements
+     * @param constructionSiteEntityId local site ID while non-terminal
+     * @param materials material requirements/history
      * @param minimumFundingMilliCredits minimum project liquidity
      * @param projectWalletMilliCredits current project wallet balance
-     * @param buildDurationTicks required build duration in target-system ticks
-     * @param status persistent state-machine state
+     * @param buildDurationTicks required build duration
+     * @param status persistent status
      * @param createdTick creation tick
      * @param stateChangedTick latest transition tick
      * @param buildStartedTick BUILDING start or -1
      * @param completedTick terminal tick or -1
-     * @param completedStationEntityId final station ID only for COMPLETED
+     * @param completedStationEntityId historical station ID for COMPLETED
      */
     public ConstructionProjectState {
         Objects.requireNonNull(id, "Construction project ID не задан");
@@ -114,7 +107,8 @@ public record ConstructionProjectState(
         materials = List.copyOf(sorted);
 
         boolean terminal = status == ConstructionProjectStatus.COMPLETED
-                || status == ConstructionProjectStatus.CANCELLED;
+                || status == ConstructionProjectStatus.CANCELLED
+                || status == ConstructionProjectStatus.FAILED;
         if (terminal) {
             if (constructionSiteEntityId != null) {
                 throw new IllegalArgumentException("Terminal construction project не должен сохранять site entity");
@@ -125,28 +119,37 @@ public record ConstructionProjectState(
         } else if (constructionSiteEntityId == null) {
             throw new IllegalArgumentException("Non-terminal construction project требует site entity");
         }
+
         if (status == ConstructionProjectStatus.COMPLETED) {
             if (completedStationEntityId == null) {
-                throw new IllegalArgumentException("Completed project требует station entity ID");
+                throw new IllegalArgumentException("Completed project требует historical station entity ID");
             }
             if (buildStartedTick < createdTick) {
                 throw new IllegalArgumentException("Completed project требует buildStartedTick");
             }
             for (ConstructionMaterialState material : materials) {
                 if (!material.fulfilled()) {
-                    throw new IllegalArgumentException("Completed project должен иметь все delivered materials");
+                    throw new IllegalArgumentException("Completed project должен иметь fulfilled material history");
                 }
             }
         } else if (completedStationEntityId != null) {
-            throw new IllegalArgumentException("Only completed project может ссылаться на completed station");
+            throw new IllegalArgumentException("Only COMPLETED project может ссылаться на station ID");
         }
+
         if (status == ConstructionProjectStatus.BUILDING && buildStartedTick < createdTick) {
             throw new IllegalArgumentException("BUILDING project требует buildStartedTick");
         }
-        if (status != ConstructionProjectStatus.BUILDING
+        if (status == ConstructionProjectStatus.FAILED) {
+            if (projectWalletMilliCredits != 0L) {
+                throw new IllegalArgumentException("FAILED project не должен сохранять wallet value");
+            }
+            if (buildStartedTick != -1L && buildStartedTick < createdTick) {
+                throw new IllegalArgumentException("FAILED buildStartedTick некорректен");
+            }
+        } else if (status != ConstructionProjectStatus.BUILDING
                 && status != ConstructionProjectStatus.COMPLETED
                 && buildStartedTick != -1L) {
-            throw new IllegalArgumentException("buildStartedTick допустим только для BUILDING/COMPLETED");
+            throw new IllegalArgumentException("buildStartedTick допустим только для BUILDING/COMPLETED/FAILED");
         }
         if (!terminal && completedTick != -1L) {
             throw new IllegalArgumentException("Non-terminal project не должен иметь completedTick");

@@ -279,6 +279,45 @@ final class ConstructionProjectService {
         return idAllocator.peekNextValue();
     }
 
+    ConstructionProjectState findBySite(StarSystemId systemId, EntityId entityId) {
+        if (systemId == null || entityId == null) {
+            return null;
+        }
+        for (ConstructionProjectState state : projects.values()) {
+            if (!isTerminal(state.status())
+                    && state.systemId().equals(systemId)
+                    && entityId.equals(state.constructionSiteEntityId())) {
+                return snapshotState(state);
+            }
+        }
+        return null;
+    }
+
+    ConstructionProjectId failDestroyedSite(ConstructionProjectState beforeDestruction, long tick) {
+        if (beforeDestruction == null) {
+            return null;
+        }
+        ConstructionProjectState current = projects.get(beforeDestruction.id());
+        if (current == null || isTerminal(current.status())
+                || !current.systemId().equals(beforeDestruction.systemId())
+                || !Objects.equals(current.constructionSiteEntityId(), beforeDestruction.constructionSiteEntityId())) {
+            throw new IllegalStateException("Construction project изменился во время destruction: "
+                    + beforeDestruction.id());
+        }
+        ConstructionProjectState failed = copy(
+                beforeDestruction,
+                ConstructionProjectStatus.FAILED,
+                tick,
+                beforeDestruction.buildStartedTick(),
+                tick,
+                null,
+                null,
+                beforeDestruction.materials(),
+                0L);
+        projects.put(beforeDestruction.id(), failed);
+        return beforeDestruction.id();
+    }
+
     boolean isConstructionSite(StarSystemId systemId, EntityId entityId) {
         if (systemId == null || entityId == null) {
             return false;
@@ -386,10 +425,6 @@ final class ConstructionProjectService {
         requireFactionAccount(state.ownerFactionContentId());
         SimulationSession session = requireSession(state.systemId());
         if (isTerminal(state.status())) {
-            if (state.status() == ConstructionProjectStatus.COMPLETED
-                    && session.getEntityRegistry().find(state.completedStationEntityId()) == null) {
-                throw new IllegalArgumentException("Restored construction project потерял completed station");
-            }
             return state;
         }
         Entity site = requireSite(state);
@@ -475,7 +510,9 @@ final class ConstructionProjectService {
     }
 
     private static boolean isTerminal(ConstructionProjectStatus status) {
-        return status == ConstructionProjectStatus.COMPLETED || status == ConstructionProjectStatus.CANCELLED;
+        return status == ConstructionProjectStatus.COMPLETED
+                || status == ConstructionProjectStatus.CANCELLED
+                || status == ConstructionProjectStatus.FAILED;
     }
 
     private static String normalizedId(String value, String label) {

@@ -45,6 +45,7 @@ public final class WorldSimulation {
     private final Map<String, FactionStrategicState> factionStrategiesById;
     private final Map<StarSystemId, String> territoryOwnerBySystem;
     private final ConstructionProjectService constructionProjectService;
+    private final DestructionService destructionService;
     private final StarSystemId activeSystemId;
     private final int strategicStepTicks;
     private final int remoteUpdateBudgetPerFrame;
@@ -82,6 +83,11 @@ public final class WorldSimulation {
                 this.factionAccountsById,
                 nextConstructionProjectIdValue,
                 constructionProjects);
+        this.destructionService = new DestructionService(
+                contentCatalog,
+                this.sessionsById,
+                this.factionAccountsById,
+                this.constructionProjectService);
         this.activeSystemId = activeSystemId;
         this.strategicStepTicks = strategicStepTicks;
         this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;
@@ -511,6 +517,19 @@ public final class WorldSimulation {
      */
     public Optional<SimulationSession> findSession(StarSystemId systemId) {
         return Optional.ofNullable(systemId == null ? null : sessionsById.get(systemId));
+    }
+
+    /**
+     * Экономически разрешает destruction policy и затем структурно удаляет persistent Entity.
+     *
+     * @param systemId target StarSystem
+     * @param entityId destroyed persistent local Entity ID
+     * @param policy explicit resource/money fate
+     * @return immutable accounting/result diagnostics
+     */
+    public DestructionResult destroyEntity(
+            StarSystemId systemId, EntityId entityId, DestructionPolicy policy) {
+        return destructionService.destroy(systemId, entityId, policy);
     }
 
     /**
