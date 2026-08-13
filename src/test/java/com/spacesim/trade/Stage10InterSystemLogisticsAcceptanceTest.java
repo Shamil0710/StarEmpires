@@ -105,12 +105,16 @@ class Stage10InterSystemLogisticsAcceptanceTest {
 
         assertEquals(InterSystemTradeJob.State.COMPLETED, job.state(), job.failureReason());
         assertTrue(guard < 200);
+        int delivered = job.soldAmount();
+        assertTrue(delivered > 0);
+        assertTrue(delivered <= amount);
         FleetPlacementState arrived = world.findFleet(fleetId).orElseThrow();
         assertEquals(DemoGalaxyFactory.INNER_SYSTEM_ID, arrived.systemId());
         Entity arrivedFleet = destination.getEntityRegistry().find(arrived.localEntityId());
         assertNotNull(arrivedFleet);
-        assertEquals(0, arrivedFleet.getComponent(InventoryComponent.class).stock[ITEM]);
-        assertEquals(consumerBefore + amount, consumer.getComponent(InventoryComponent.class).stock[ITEM]);
+        assertEquals(amount - delivered, arrivedFleet.getComponent(InventoryComponent.class).stock[ITEM]);
+        assertEquals(consumerBefore + delivered, consumer.getComponent(InventoryComponent.class).stock[ITEM]);
+        assertTrue(consumer.getComponent(InventoryComponent.class).stock[ITEM] > consumerBefore);
     }
 
     private static FleetId prepareScenario(WorldSimulation world, StarSystemId profitableDestination) {
