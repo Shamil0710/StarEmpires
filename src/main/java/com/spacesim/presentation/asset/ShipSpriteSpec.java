@@ -26,7 +26,19 @@ public final class ShipSpriteSpec {
     private final SourceFacing sourceFacing;
     private final List<VisualHardpoint> hardpoints;
 
-    /** Creates a validated sprite specification with a circular footprint and right-facing source art. */
+    /**
+     * Creates a validated sprite specification with a circular footprint and right-facing source art.
+     *
+     * @param assetId stable presentation asset identifier
+     * @param baseTexturePath non-blank classpath/resource path for the base sprite
+     * @param emissiveTexturePath optional emissive resource path; null/blank means none
+     * @param worldWidth positive intended rendered width in world units
+     * @param worldHeight positive intended rendered height in world units
+     * @param pivotX normalized horizontal pivot in [0,1]
+     * @param pivotY normalized vertical pivot in [0,1]
+     * @param collisionRadius positive circular footprint radius in world units
+     * @param hardpoints immutable-by-copy presentation attachment points in authored sprite space
+     */
     public ShipSpriteSpec(
             String assetId,
             String baseTexturePath,
@@ -51,7 +63,20 @@ public final class ShipSpriteSpec {
                 hardpoints);
     }
 
-    /** Creates a validated sprite specification with a circular footprint and explicit source facing. */
+    /**
+     * Creates a validated sprite specification with a circular footprint and explicit source facing.
+     *
+     * @param assetId stable presentation asset identifier
+     * @param baseTexturePath non-blank classpath/resource path for the base sprite
+     * @param emissiveTexturePath optional emissive resource path; null/blank means none
+     * @param worldWidth positive intended rendered width in world units
+     * @param worldHeight positive intended rendered height in world units
+     * @param pivotX normalized horizontal pivot in [0,1]
+     * @param pivotY normalized vertical pivot in [0,1]
+     * @param collisionRadius positive circular footprint radius in world units
+     * @param sourceFacing authored horizontal forward direction before runtime normalization
+     * @param hardpoints immutable-by-copy presentation attachment points in authored sprite space
+     */
     public ShipSpriteSpec(
             String assetId,
             String baseTexturePath,
@@ -77,7 +102,20 @@ public final class ShipSpriteSpec {
                 hardpoints);
     }
 
-    /** Creates a validated sprite specification with an elliptical footprint and right-facing source art. */
+    /**
+     * Creates a validated sprite specification with an elliptical footprint and right-facing source art.
+     *
+     * @param assetId stable presentation asset identifier
+     * @param baseTexturePath non-blank classpath/resource path for the base sprite
+     * @param emissiveTexturePath optional emissive resource path; null/blank means none
+     * @param worldWidth positive intended rendered width in world units
+     * @param worldHeight positive intended rendered height in world units
+     * @param pivotX normalized horizontal pivot in [0,1]
+     * @param pivotY normalized vertical pivot in [0,1]
+     * @param collisionWidth positive footprint width in world units
+     * @param collisionHeight positive footprint height in world units
+     * @param hardpoints immutable-by-copy presentation attachment points in authored sprite space
+     */
     public ShipSpriteSpec(
             String assetId,
             String baseTexturePath,
