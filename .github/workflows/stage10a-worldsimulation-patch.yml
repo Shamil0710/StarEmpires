@@ -1,0 +1,32 @@
+name: Stage 10A WorldSimulation patch
+
+on:
+  push:
+    branches:
+      - agent/stage10a-fleet-world-identity
+    paths:
+      - .github/workflows/stage10a-worldsimulation-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+
+      - name: Apply WorldSimulation patch
+        run: python3 scripts/stage10a_worldsimulation_patch.py
+
+      - name: Commit integration and remove temporary patch files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/WorldSimulation.java
+          git rm scripts/stage10a_worldsimulation_patch.py
+          git rm .github/workflows/stage10a-worldsimulation-patch.yml
+          git commit -m "feat: integrate world fleet transit"
+          git push origin HEAD:${GITHUB_REF_NAME}
