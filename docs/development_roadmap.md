@@ -2,10 +2,11 @@
 
 > Canonical core-development status and transition document.
 >
-> Last synchronized: **2026-08-14** after Stage 12 merge.
+> Last synchronized: **2026-08-14** after Stage 13 merge.
 >
 > Detailed historical roadmap before Stage 11: `docs/archive/development_roadmap_pre_stage11_2026-08-13.md`.
-> Completion records: `docs/stage11_autonomous_faction_expansion.md`, `docs/stage12_playable_actor.md`.
+> Completion records: `docs/stage11_autonomous_faction_expansion.md`, `docs/stage12_playable_actor.md`, `docs/stage13_combat_vertical_slice.md`.
+> Presentation/navigation plan: `docs/ui_navigation_roadmap.md`.
 
 ---
 
@@ -53,7 +54,7 @@ Stage 8.5 decision remains **`KEEP_LIBGDX`**. Reconsider the presentation stack 
 | --- | --- | --- | --- |
 | **v0.1 Economic Sandbox** | correct/scalable economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions, construction, logistics, autonomous expansion | 7–11 + 8.5 | **COMPLETE** |
-| **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining/combat, first progression loop | 12–14 | **ACTIVE** |
+| **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining/combat, first progression loop | 12–14 | **ACTIVE — Stage 14** |
 | **v0.4 Fleet & Empire Sandbox** | player fleets, stations, faction, strategic war | 15–18 | PLANNED |
 | **v0.5 RPG & Living World** | exploration, NPC, missions, reputation | 19–20 | PLANNED |
 | **v0.6 Content & Balance Alpha** | breadth + long-run stability | 21 | PLANNED |
@@ -172,7 +173,7 @@ living multi-system economy
 
 # MILESTONE v0.3 — PLAYABLE SPACE SANDBOX
 
-**ACTIVE.** Stage 12 is complete; Stage 13 is the current core stage.
+**ACTIVE.** Stage 12 and Stage 13 are complete; **Stage 14 is the current core stage.**
 
 ## Stage 12 — Player State, Ownership, Travel and Manual Trade
 
@@ -249,44 +250,92 @@ No virtual delivery, player-only price formula, instant travel or UI Transform m
 
 ## Stage 13 — Combat Vertical Slice
 
+**COMPLETE — PR #35. Functional merge main `8023b780`.**
+
+Technical record: `docs/stage13_combat_vertical_slice.md`.
+
+- canonical content now has data-driven weapon definitions and `ship.guard_frigate` references `weapon.pulse_laser_mk1`;
+- shared `CombatCommandComponent` carries target/fire intent for both player and AI;
+- shared `CombatRuntimeComponent` carries weapon/cooldown runtime state;
+- `CombatController` is the single range/cooldown/shield/hull damage boundary;
+- `CombatAISystem` chooses only a target and uses deterministic nearest + lowest-EntityId tie-break;
+- `PlayerRuntime` exposes target/fire commands without applying damage directly;
+- lethal shots are queued out of Ashley iteration and resolved through ordinary `WorldSimulation.destroyEntity(..., DestructionPolicy.salvageResources())`;
+- physical FleetId loss and resource salvage are observable consequences;
+- no scripted respawn, replacement grant or player-only damage formula.
+
+Final PR #35 CI #915 passed **412/412 tests**, JaCoCo, strict Javadoc and desktop packaging.
+
+### Stage 13 DoD
+
+A player-controlled ship and an AI ship can enter the same physical combat model, acquire targets, exchange deterministic data-driven weapon fire, validate range/cooldown, damage shields/hull, destroy a real asset through the ordinary world destruction pipeline and expose a physical salvage/loss consequence. **Completed.**
+
+Deliberate seams remain for later stages: projectile/VFX breadth, tactical pursuit and fleet doctrine, diplomacy-aware rules of engagement, high-fidelity remote warfare, persistent sub-second cooldown/target intent and a complete player-facing combat HUD.
+
+## Stage 14 — First Complete Player Economic Loop
+
 **ACTIVE — current core stage.**
 
-Minimum scope:
+Goal: convert the now-proven travel/trade/combat primitives into the first coherent hour of actual play, while improving navigation/readability enough that the loop can be evaluated by a human rather than only through technical harnesses.
 
-- target acquisition/selection;
-- positioning and range;
-- at least one data-driven weapon definition;
-- cooldown/fire state;
-- shields/hull;
-- deterministic damage and physical destruction;
-- combat AI using the same authoritative fire/damage pipeline as player commands;
-- salvage/resource-sink seam;
-- economic aftermath of ship loss.
-
-Player and AI must share one authoritative damage/destruction path. Ship loss must remove a real asset and create downstream replacement/economic pressure rather than a scripted respawn.
-
-### Stage 13 DoD target
-
-A player-controlled ship and an AI ship can enter the same physical combat model, acquire targets, exchange deterministic weapon fire through data-driven weapon state, damage shields/hull, destroy an asset through the ordinary destruction pipeline, and expose a measurable economic/salvage consequence.
-
-## Stage 14 — First complete player economic loop
-
-**PLANNED.**
+Target loop:
 
 ```text
-explore
+explore / read local situation
 → find opportunity
 → trade / mine / fight
-→ earn credits
-→ upgrade or buy ship
-→ take larger opportunities
+→ earn or preserve real credits/resources
+→ buy / switch / improve a real ship
+→ take a larger opportunity
 ```
 
-Player mining must consume finite resources; ship purchase must use real wallet/ownership transfer. Add playtest telemetry such as credits/hour, profit/hour, travel downtime, cargo utilization and losses.
+### 14A — Player mining
+
+- expose player mining intent through the existing physical mining/resource pipeline;
+- mining must consume finite asteroid/resource stock and put real items into the active ship inventory;
+- reuse `MiningSystem`/ordinary inventory accounting rather than a player-only yield function;
+- expose why mining cannot start: out of range, invalid resource, cargo full, depleted target, incompatible ship/equipment;
+- add deterministic acceptance for finite extraction and save/load continuity where persistent state changes.
+
+### 14B — Ship purchase / active-ship progression
+
+- purchase or acquire an already-real ship through authoritative wallet/ownership transfer;
+- no free replacement or debug-granted progression asset;
+- support selecting/switching the active owned FleetId safely;
+- preserve cargo, ownership and physical placement semantics;
+- define the minimal upgrade/progression seam only where it can reuse real content/economic state rather than a parallel stat grant.
+
+### 14C — Playable navigation, HUD and readability baseline
+
+Stage 14 must not postpone all usability work until Stage 22. Implement the first required slice from `docs/ui_navigation_roadmap.md`:
+
+- bounded camera zoom in/out, with player-follow behavior preserved and HUD scale independent from world zoom;
+- coherent playable HUD that separates ship state, cargo/economy, navigation/interaction and combat state;
+- local sector/system minimap showing at minimum player, stations, relevant fleets/hostiles and travel/navigation landmarks available from actual world state;
+- readable current target and combat hull/shields/cooldown/range feedback;
+- contextual failure/status messages instead of raw technical IDs as the primary player feedback;
+- declutter rules sufficient to keep the first playable test readable at several zoom levels.
+
+The minimap/UI is presentation only: it may read authoritative state but may not invent teleportation, price, combat, mining or travel rules.
+
+The **full global galaxy/empire map is not a Stage-14 requirement**. Its functional layers grow with Stage 15–18 fleet/empire systems, while later exploration/mission layers arrive with Stage 19–20.
+
+### 14D — First-hour acceptance and telemetry
+
+Build one internal playable scenario without debug income/resource grants that exercises the complete loop and records at least:
+
+- credits/hour and net profit/loss;
+- trade/mining/fight contributions;
+- travel and idle downtime;
+- cargo utilization;
+- damage/losses;
+- time/opportunity cost to reach the first ship progression event.
+
+The acceptance must prove that the same physical world and economy continue running around the player throughout the loop.
 
 ### v0.3 DoD
 
-First internal playable hour without debug grants: travel + economy + mining/combat + progression to a better ship.
+First internal playable hour without debug grants: travel + economy + finite mining + combat + real ship progression, with camera zoom, a readable HUD and a functional local minimap sufficient to understand and test what is happening on screen.
 
 ---
 
@@ -298,13 +347,15 @@ First internal playable hour without debug grants: travel + economy + mining/com
 
 Persistent grouping and orders: HOLD, MOVE, TRADE, MINE, ESCORT, PATROL, FOLLOW. Owned autonomous economic fleets reuse existing planners rather than passive-income formulas.
 
+Begin the functional global-map layer for owned fleet selection, movement/order context and known-system navigation using the existing galaxy topology/route planner rather than a UI-only route model.
+
 ## Stage 16 — Player construction / station ownership
 
-Player uses the same Stage-9 ConstructionProject: chooses archetype/system/location/funding, delivers materials manually or through owned logistics, and receives a real operating station.
+Player uses the same Stage-9 ConstructionProject: chooses archetype/system/location/funding, delivers materials manually or through owned logistics, and receives a real operating station. Global-map/management UI gains owned stations, projects and supply requirements from authoritative state.
 
 ## Stage 17 — Player faction
 
-Data-driven founding requirements followed by reuse of Stage-8 treasury, territory, relations, access, taxes, subsidies and strategic policies.
+Data-driven founding requirements followed by reuse of Stage-8 treasury, territory, relations, access, taxes, subsidies and strategic policies. Global-map layers gain faction/territory context.
 
 ## Stage 18 — Strategic warfare / territory / politics
 
@@ -314,7 +365,8 @@ Data-driven founding requirements followed by reuse of Stage-8 treasury, territo
 - runtime jump-route availability/risk overlay shared by planner + executor;
 - blockade -> throughput loss -> shortage/price/economic response benchmark;
 - explicit territory transition rule;
-- Stage-11 economic outposts integrate with military conquest here.
+- Stage-11 economic outposts integrate with military conquest here;
+- global map exposes fleets, territory, fronts, route risk/blockades and relevant economic overlays without replacing authoritative planners.
 
 ### v0.4 DoD
 
@@ -328,11 +380,11 @@ Player grows from one ship into autonomous fleets/stations/faction and wages war
 
 ## Stage 19 — Exploration / discovery / world generation
 
-Persistent discovered systems/routes/stations/resources; deterministic seed-driven galaxy generation; faction/economy bootstrap; data-driven anomalies, derelicts and special locations.
+Persistent discovered systems/routes/stations/resources; deterministic seed-driven galaxy generation; faction/economy bootstrap; data-driven anomalies, derelicts and special locations. Global/local maps respect discovery state and add exploration/anomaly layers.
 
 ## Stage 20 — NPC / missions / reputation / progression
 
-Persistent NPCs only where identity matters. Missions arise from actual world state: haul, deliver, mine, escort, bounty, investigate, defend. Shortage, loss, expansion, war and discovery should create dynamic contracts. Reputation connects to access, contracts and faction relations.
+Persistent NPCs only where identity matters. Missions arise from actual world state: haul, deliver, mine, escort, bounty, investigate, defend. Shortage, loss, expansion, war and discovery should create dynamic contracts. Reputation connects to access, contracts and faction relations. Map/UI layers may expose known mission/objective context without leaking undiscovered state.
 
 ---
 
@@ -354,8 +406,8 @@ Full-world benchmarks must include inter-system trade, construction, faction exp
 
 ## Stage 22 — UX / onboarding / performance / release hardening
 
-- unified HUD and management UI;
-- map layers, filters/search and notifications;
+- unify and polish the HUD/management UI established earlier rather than creating it for the first time here;
+- production-quality map layers, filters/search, notifications, input discoverability and accessibility/scaling;
 - onboarding for first trade/mining/combat/fleet/station;
 - autosave/backup/corrupt-save UX and supported migration window;
 - performance profiling of large combat, many remote systems, route planning, large asset lists and save/load;
@@ -371,8 +423,9 @@ Visual work may proceed in parallel but never substitutes a functional stage DoD
 - **V1 Ship sprite pipeline:** grounded top-down language, size grammar, hardpoints, pivots/collision conventions.
 - **V2 Engine/movement animation:** idle/thrust/maneuver from real movement state.
 - **V3 Station language:** construction, industrial, mining, trade, military, colony and faction differentiation.
-- **V4 Combat VFX:** weapons, shields/hits/destruction/salvage and benchmarked BloomMode tiers alongside Stage 13.
-- **V5 Strategic map / empire UI:** territory, fleets, trade flows, shortages and wars alongside Stage 15–18.
+- **V4 Combat VFX:** weapons, shields/hits/destruction/salvage and benchmarked BloomMode tiers; Stage 13 establishes mechanics, later stages improve presentation.
+- **V5 Playable navigation/readability:** camera zoom, unified HUD and local minimap alongside Stage 14.
+- **V6 Strategic map / empire UI:** topology/navigation first, then territory, fleets, trade flows, shortages and wars alongside Stage 15–18.
 
 Gameplay never depends on a particular sprite asset. Presentation metadata remains data-driven over simulation archetypes.
 
@@ -400,6 +453,10 @@ Construction, trade, expansion and warfare use real entities, cargo, wallets, tr
 
 Player-facing commands adapt to common simulation controllers. A separate player-only implementation requires explicit justification and tests proving invariants are still shared.
 
+## Presentation read-only boundary
+
+HUD, minimap and global-map layers may read authoritative simulation/player state and submit ordinary commands, but they may not mutate physical/economic/combat state directly or introduce UI-only gameplay rules.
+
 ## Observability / performance
 
 Major systems require measurable metrics and benchmarks. Optimize from evidence or where algorithmic scaling is structurally unacceptable; avoid speculative micro-optimization.
@@ -417,22 +474,24 @@ Major systems require measurable metrics and benchmarks. Optimize from evidence 
 7. Deterministic decision code requires tie-break coverage.
 8. Player and AI reuse common simulation APIs unless a separate path is explicitly justified.
 9. Do not expand content breadth before mechanics stabilize.
-10. Update this roadmap only after factual completion/merge evidence exists.
+10. UI/map layers remain read-only views + command adapters over authoritative state.
+11. Update this roadmap only after factual completion/merge evidence exists.
 
 ---
 
 # 7. Current next step
 
-**ACTIVE: Stage 13 — Combat Vertical Slice.**
+**ACTIVE: Stage 14 — First Complete Player Economic Loop.**
 
 Immediate implementation order:
 
-1. audit current ship/destruction/content seams and define one authoritative combat state/damage boundary;
-2. add minimal data-driven weapon + persistent/runtime cooldown/fire state with deterministic targeting/range rules;
-3. add shield/hull damage and route destruction through existing physical lifecycle/destruction services;
-4. expose the same fire/target commands to player and combat AI;
-5. add salvage/resource-sink/economic-loss seam without fabricated replacement assets;
-6. build end-to-end acceptance where player and AI use the same combat pipeline and a destroyed ship changes physical/economic state;
-7. only after Stage 13 DoD begin Stage 14.
+1. audit existing MiningSystem/resource-node/player-control seams and expose finite player mining through shared physical inventory/resource rules;
+2. add real player ship purchase/acquisition + active-owned-ship switching through wallet/ownership transfer, with no free progression asset;
+3. implement the Stage-14 presentation baseline from `docs/ui_navigation_roadmap.md`: bounded camera zoom, readable unified HUD and local minimap;
+4. surface live trade/mining/combat/navigation state and contextual rejection reasons without raw technical IDs as primary feedback;
+5. assemble an internal playable scenario that can trade, mine and fight in one continuous world and reach a real ship progression event;
+6. add telemetry for credits/profit, downtime, cargo utilization and losses;
+7. add end-to-end acceptance/continuation coverage and keep all existing economic/combat/persistence gates green;
+8. only after Stage 14 DoD close milestone v0.3 and begin Stage 15 player fleets/orders + the first functional global-map layer.
 
-Stage 12 is closed. Do not expand player-UI breadth or add a parallel player economy before Stage 13 proves combat through the same shared physical core.
+Stage 13 is closed. The next work should make the existing physical systems cohere into a playable loop rather than expanding combat breadth or creating a parallel player economy.
