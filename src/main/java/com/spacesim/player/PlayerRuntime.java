@@ -1,6 +1,9 @@
 package com.spacesim.player;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.ArchetypeComponent;
+import com.spacesim.components.CombatCommandComponent;
+import com.spacesim.components.CombatComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.MiningComponent;
 import com.spacesim.components.PlayerControlledComponent;
@@ -10,6 +13,7 @@ import com.spacesim.content.ContentCatalog;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.simulation.SimulationSession;
 import com.spacesim.systems.PlayerDirectControlSystem;
+import com.spacesim.world.CombatDestructionResolver;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
@@ -29,6 +33,10 @@ import java.util.Optional;
  * changes only {@link PlayerControlledComponent}; physical Transform mutation remains inside the
  * simulation update. The active player fleet's system is kept as the world's full-rate active
  * system, while jump travel delegates to the existing Stage-10 jump FSM.</p>
+ *
+ * <p>Stage 13 adds combat intent without a player-only damage path. Player code writes the same
+ * {@link CombatCommandComponent} as CombatAI; local {@code CombatSystem} resolves the shot and this
+ * runtime only bridges lethal results into the ordinary world destruction pipeline after a tick.</p>
  */
 public final class PlayerRuntime {
     private static final float DEFAULT_DOCKING_RANGE = 10f;
@@ -108,6 +116,7 @@ public final class PlayerRuntime {
     public WorldSimulation.AdvanceReport advanceFrame(float realDeltaSeconds) {
         synchronizeDirectControlBinding();
         WorldSimulation.AdvanceReport report = world.advanceFrame(realDeltaSeconds);
+        CombatDestructionResolver.resolve(world);
         reconcileOwnedFleets();
         reconcileDocking();
         synchronizePlayerLocationAndControl();
@@ -154,6 +163,60 @@ public final class PlayerRuntime {
     }
 
     /**
+     * Selects a local physical combat target for the active player ship.
+     *
+     * @param targetId persistent local EntityId in the active ship's current system
+     * @return true when both active ship and target are live combat entities
+     */
+    public boolean selectCombatTarget(EntityId targetId) {
+        EntityId checkedTargetId = Objects.requireNonNull(targetId, "Combat targetId not set");
+        ActiveShip active = activeLocalShip().orElse(null);
+        if (active == null || active.entity().getComponent(CombatComponent.class) == null
+                || player.docked() || world.findFleetJump(active.placement().fleetId()).isPresent()) {
+            return false;
+        }
+        Entity target = active.session().getEntityRegistry().find(checkedTargetId);
+        if (target == null || target == active.entity()
+                || target.getComponent(CombatComponent.class) == null
+                || target.getComponent(TransformComponent.class) == null) {
+            return false;
+        }
+        CombatCommandComponent command = ensureCombatCommand(active.entity());
+        command.targetId = checkedTargetId;
+        return true;
+    }
+
+    /**
+     * Sets or clears continuous fire intent for the selected combat target.
+     *
+     * @param firing true to request fire whenever range/cooldown allows
+     * @return true when the active ship has a combat command and accepted the intent
+     */
+    public boolean setFireIntent(boolean firing) {
+        ActiveShip active = activeLocalShip().orElse(null);
+        if (active == null || active.entity().getComponent(CombatComponent.class) == null
+                || player.docked() || world.findFleetJump(active.placement().fleetId()).isPresent()) {
+            return false;
+        }
+        CombatCommandComponent command = ensureCombatCommand(active.entity());
+        if (firing && command.targetId == null) {
+            return false;
+        }
+        command.fireRequested = firing;
+        return true;
+    }
+
+    /** Clears the transient target/fire command of the active combat ship. */
+    public void clearCombatIntent() {
+        activeLocalShip().ifPresent(active -> {
+            CombatCommandComponent command = active.entity().getComponent(CombatCommandComponent.class);
+            if (command != null) {
+                command.clear();
+            }
+        });
+    }
+
+    /**
      * Docks at a live market only when the active ship is already inside physical docking range.
      *
      * @param stationId system-local persistent market EntityId
@@ -188,6 +251,7 @@ public final class PlayerRuntime {
         control.stop();
         control.docked = true;
         active.transform().velocity.setZero();
+        clearCombatIntent();
         return true;
     }
 
@@ -224,6 +288,7 @@ public final class PlayerRuntime {
             return false;
         }
         stopMovement();
+        clearCombatIntent();
         world.requestFleetJump(fleetId, target, 0f, 0f);
         return true;
     }
@@ -347,6 +412,15 @@ public final class PlayerRuntime {
         return control;
     }
 
+    private static CombatCommandComponent ensureCombatCommand(Entity entity) {
+        CombatCommandComponent command = entity.getComponent(CombatCommandComponent.class);
+        if (command == null) {
+            command = new CombatCommandComponent();
+            entity.add(command);
+        }
+        return command;
+    }
+
     private static void suppressAutonomousBehavior(Entity entity) {
         TradeAIComponent trade = entity.getComponent(TradeAIComponent.class);
         if (trade != null) {
@@ -361,7 +435,7 @@ public final class PlayerRuntime {
         }
     }
 
-    private static float movementSpeed(Entity entity) {
+    private float movementSpeed(Entity entity) {
         TradeAIComponent trade = entity.getComponent(TradeAIComponent.class);
         if (trade != null && Float.isFinite(trade.movementSpeed) && trade.movementSpeed > 0f) {
             return trade.movementSpeed;
@@ -369,6 +443,12 @@ public final class PlayerRuntime {
         MiningComponent mining = entity.getComponent(MiningComponent.class);
         if (mining != null && Float.isFinite(mining.movementSpeed) && mining.movementSpeed > 0f) {
             return mining.movementSpeed;
+        }
+        ArchetypeComponent archetype = entity.getComponent(ArchetypeComponent.class);
+        ContentCatalog.ShipArchetypeDefinition ship = archetype == null
+                ? null : content.findShipArchetype(archetype.contentId);
+        if (ship != null && Float.isFinite(ship.movementSpeed()) && ship.movementSpeed() > 0f) {
+            return ship.movementSpeed();
         }
         return 0f;
     }

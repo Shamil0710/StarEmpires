@@ -17,6 +17,11 @@ public record FleetPlacementState(
         StarSystemId systemId,
         EntityId localEntityId,
         FleetTransitState transitState) implements Comparable<FleetPlacementState> {
+    /** @return stable fleet identifier using an explicit semantic accessor */
+    public FleetId fleetId() {
+        return id;
+    }
+
     @Override
     public int compareTo(FleetPlacementState other) {
         return id.compareTo(other.id);

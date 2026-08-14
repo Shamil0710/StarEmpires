@@ -23,9 +23,9 @@ import java.util.regex.Pattern;
  * Загружает и валидирует versioned JSON-каталог игрового контента.
  *
  * <p>Loader не использует OpenGL/desktop backend и безопасен для headless simulation. Items и
- * recipes являются минимальным ядром parse-контракта; factions/shipArchetypes/stationArchetypes
- * допускаются пустыми для узких тестовых/инструментальных каталогов. Встроенный production catalog
- * обязан содержать все группы и проверяется строже в {@link #loadDefault()}.</p>
+ * recipes являются минимальным ядром parse-контракта; factions/weapons/shipArchetypes/
+ * stationArchetypes допускаются пустыми для узких тестовых/инструментальных каталогов. Встроенный
+ * production catalog обязан содержать все группы и проверяется строже в {@link #loadDefault()}.</p>
  */
 public final class ContentCatalogLoader {
     /** Текущая поддерживаемая версия JSON schema каталога. */
@@ -55,6 +55,7 @@ public final class ContentCatalogLoader {
             }
             ContentCatalog catalog = parse(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
             if (catalog.getFactions().isEmpty()
+                    || catalog.getWeapons().isEmpty()
                     || catalog.getShipArchetypes().isEmpty()
                     || catalog.getStationArchetypes().isEmpty()) {
                 throw new IllegalStateException("Встроенный content catalog не содержит все production-группы");
@@ -140,6 +141,19 @@ public final class ContentCatalogLoader {
             factions.sort(Comparator.comparingInt(ContentCatalog.FactionDefinition::runtimeId));
         }
 
+        Map<String, ContentCatalog.WeaponDefinition> weaponsById = new LinkedHashMap<>();
+        List<ContentCatalog.WeaponDefinition> weapons = new ArrayList<>();
+        JsonValue weaponNodes = optionalArray(root, "weapons");
+        if (weaponNodes != null) {
+            for (JsonValue node = weaponNodes.child; node != null; node = node.next) {
+                ContentCatalog.WeaponDefinition weapon = parseWeapon(requireObject(node, "weapon"));
+                validateNewId(weapon.id(), "weapon");
+                putUnique(weaponsById, weapon.id(), weapon, "weapon content ID");
+                weapons.add(weapon);
+            }
+            weapons.sort(Comparator.comparing(ContentCatalog.WeaponDefinition::id));
+        }
+
         Map<String, ContentCatalog.ShipArchetypeDefinition> shipsById = new LinkedHashMap<>();
         List<ContentCatalog.ShipArchetypeDefinition> ships = new ArrayList<>();
         JsonValue shipNodes = optionalArray(root, "shipArchetypes");
@@ -147,7 +161,7 @@ public final class ContentCatalogLoader {
             for (JsonValue node = shipNodes.child; node != null; node = node.next) {
                 ContentCatalog.ShipArchetypeDefinition ship = parseShip(requireObject(node, "ship archetype"));
                 validateNewId(ship.id(), "ship archetype");
-                validateShip(ship);
+                validateShip(ship, weaponsById);
                 putUnique(shipsById, ship.id(), ship, "ship archetype ID");
                 ships.add(ship);
             }
@@ -174,6 +188,7 @@ public final class ContentCatalogLoader {
                 orderedItems,
                 recipes,
                 factions,
+                weapons,
                 ships,
                 stations,
                 itemsById,
@@ -181,6 +196,7 @@ public final class ContentCatalogLoader {
                 recipesById,
                 factionsById,
                 factionsByRuntimeId,
+                weaponsById,
                 shipsById,
                 stationsById);
     }
@@ -232,6 +248,15 @@ public final class ContentCatalogLoader {
                 requireNonBlank(node, "displayName"));
     }
 
+    private static ContentCatalog.WeaponDefinition parseWeapon(JsonValue node) {
+        return new ContentCatalog.WeaponDefinition(
+                requireString(node, "id"),
+                requireNonBlank(node, "displayName"),
+                requireFloat(node, "damagePerShot"),
+                requireFloat(node, "cooldownSeconds"),
+                requireFloat(node, "range"));
+    }
+
     private static ContentCatalog.ShipArchetypeDefinition parseShip(JsonValue node) {
         String id = requireString(node, "id");
         ShipType role;
@@ -253,10 +278,13 @@ public final class ContentCatalogLoader {
                 requireFloat(node, "hull"),
                 requireFloat(node, "shields"),
                 requireFloat(node, "damagePerSecond"),
-                requireFloat(node, "weaponRange"));
+                requireFloat(node, "weaponRange"),
+                optionalString(node, "weaponId"));
     }
 
-    private static void validateShip(ContentCatalog.ShipArchetypeDefinition ship) {
+    private static void validateShip(
+            ContentCatalog.ShipArchetypeDefinition ship,
+            Map<String, ContentCatalog.WeaponDefinition> weaponsById) {
         if (ship.cargoCapacity() < 0
                 || !isNonNegativeFinite(ship.movementSpeed())
                 || !Double.isFinite(ship.startingCredits()) || ship.startingCredits() < 0d
@@ -278,9 +306,18 @@ public final class ContentCatalogLoader {
                 || ship.dockingRange() <= 0f)) {
             throw new IllegalArgumentException("Mining archetype требует mining-параметры: " + ship.id());
         }
-        if (ship.role().isCombat()
-                && (ship.hull() <= 0f || ship.damagePerSecond() <= 0f || ship.weaponRange() <= 0f)) {
-            throw new IllegalArgumentException("Combat archetype требует combat-параметры: " + ship.id());
+        if (ship.role().isCombat()) {
+            if (ship.hull() <= 0f || ship.damagePerSecond() <= 0f || ship.weaponRange() <= 0f
+                    || ship.movementSpeed() <= 0f || ship.weaponId() == null) {
+                throw new IllegalArgumentException("Combat archetype требует combat/movement/weapon параметры: " + ship.id());
+            }
+            ContentCatalog.WeaponDefinition weapon = weaponsById.get(ship.weaponId());
+            if (weapon == null) {
+                throw new IllegalArgumentException(
+                        "Combat archetype ссылается на неизвестное weapon: " + ship.id() + " -> " + ship.weaponId());
+            }
+        } else if (ship.weaponId() != null) {
+            throw new IllegalArgumentException("Не-combat archetype не может иметь weaponId: " + ship.id());
         }
     }
 

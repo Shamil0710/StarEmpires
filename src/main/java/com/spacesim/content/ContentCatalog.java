@@ -22,7 +22,7 @@ import java.util.TreeMap;
  *
  * <p>Persistent контент адресуется стабильными строковыми ID, а горячий simulation path продолжает
  * работать с плотными целочисленными runtime ID. Каталог хранит товары, рецепты, фракционные
- * метаданные, корабельные и станционные archetypes. Малые Java enum вроде {@link ShipType}
+ * метаданные, оружие, корабельные и станционные archetypes. Малые Java enum вроде {@link ShipType}
  * обозначают только функциональные runtime-роли систем, а не конкретные модели контента.</p>
  *
  * <p>Semantic SHA-256 fingerprint не зависит от JSON whitespace или порядка независимых записей,
@@ -34,6 +34,7 @@ public final class ContentCatalog {
     private final List<ItemDefinition> items;
     private final List<RecipeDefinition> recipes;
     private final List<FactionDefinition> factions;
+    private final List<WeaponDefinition> weapons;
     private final List<ShipArchetypeDefinition> shipArchetypes;
     private final List<StationArchetypeDefinition> stationArchetypes;
     private final Map<String, ItemDefinition> itemsById;
@@ -41,6 +42,7 @@ public final class ContentCatalog {
     private final Map<String, RecipeDefinition> recipesById;
     private final Map<String, FactionDefinition> factionsById;
     private final Map<Integer, FactionDefinition> factionsByRuntimeId;
+    private final Map<String, WeaponDefinition> weaponsById;
     private final Map<String, ShipArchetypeDefinition> shipsById;
     private final Map<String, StationArchetypeDefinition> stationsById;
     private final String fingerprint;
@@ -50,6 +52,7 @@ public final class ContentCatalog {
             List<ItemDefinition> items,
             List<RecipeDefinition> recipes,
             List<FactionDefinition> factions,
+            List<WeaponDefinition> weapons,
             List<ShipArchetypeDefinition> shipArchetypes,
             List<StationArchetypeDefinition> stationArchetypes,
             Map<String, ItemDefinition> itemsById,
@@ -57,12 +60,14 @@ public final class ContentCatalog {
             Map<String, RecipeDefinition> recipesById,
             Map<String, FactionDefinition> factionsById,
             Map<Integer, FactionDefinition> factionsByRuntimeId,
+            Map<String, WeaponDefinition> weaponsById,
             Map<String, ShipArchetypeDefinition> shipsById,
             Map<String, StationArchetypeDefinition> stationsById) {
         this.schemaVersion = schemaVersion;
         this.items = List.copyOf(items);
         this.recipes = List.copyOf(recipes);
         this.factions = List.copyOf(factions);
+        this.weapons = List.copyOf(weapons);
         this.shipArchetypes = List.copyOf(shipArchetypes);
         this.stationArchetypes = List.copyOf(stationArchetypes);
         this.itemsById = immutableOrderedCopy(itemsById);
@@ -70,6 +75,7 @@ public final class ContentCatalog {
         this.recipesById = immutableOrderedCopy(recipesById);
         this.factionsById = immutableOrderedCopy(factionsById);
         this.factionsByRuntimeId = immutableOrderedCopy(factionsByRuntimeId);
+        this.weaponsById = immutableOrderedCopy(weaponsById);
         this.shipsById = immutableOrderedCopy(shipsById);
         this.stationsById = immutableOrderedCopy(stationsById);
         this.fingerprint = computeFingerprint();
@@ -93,6 +99,11 @@ public final class ContentCatalog {
     /** @return фракции в runtime-порядке */
     public List<FactionDefinition> getFactions() {
         return factions;
+    }
+
+    /** @return data-driven оружие в deterministic content-порядке */
+    public List<WeaponDefinition> getWeapons() {
+        return weapons;
     }
 
     /** @return корабельные archetypes */
@@ -158,6 +169,16 @@ public final class ContentCatalog {
      */
     public FactionDefinition findFaction(int runtimeId) {
         return factionsByRuntimeId.get(runtimeId);
+    }
+
+    /**
+     * Ищет оружие по persistent content ID.
+     *
+     * @param contentId persistent weapon ID
+     * @return описание оружия либо {@code null}
+     */
+    public WeaponDefinition findWeapon(String contentId) {
+        return weaponsById.get(contentId);
     }
 
     /**
@@ -240,6 +261,14 @@ public final class ContentCatalog {
             canonical.append("faction|").append(faction.runtimeId()).append('|')
                     .append(faction.id()).append('|').append(faction.displayName()).append('\n');
         }
+        List<WeaponDefinition> orderedWeapons = new ArrayList<>(weapons);
+        orderedWeapons.sort(Comparator.comparing(WeaponDefinition::id));
+        for (WeaponDefinition weapon : orderedWeapons) {
+            canonical.append("weapon|").append(weapon.id()).append('|').append(weapon.displayName()).append('|')
+                    .append(Float.floatToIntBits(weapon.damagePerShot())).append('|')
+                    .append(Float.floatToIntBits(weapon.cooldownSeconds())).append('|')
+                    .append(Float.floatToIntBits(weapon.range())).append('\n');
+        }
         List<ShipArchetypeDefinition> orderedShips = new ArrayList<>(shipArchetypes);
         orderedShips.sort(Comparator.comparing(ShipArchetypeDefinition::id));
         for (ShipArchetypeDefinition ship : orderedShips) {
@@ -253,7 +282,8 @@ public final class ContentCatalog {
                     .append(Float.floatToIntBits(ship.hull())).append('|')
                     .append(Float.floatToIntBits(ship.shields())).append('|')
                     .append(Float.floatToIntBits(ship.damagePerSecond())).append('|')
-                    .append(Float.floatToIntBits(ship.weaponRange())).append('\n');
+                    .append(Float.floatToIntBits(ship.weaponRange())).append('|')
+                    .append(ship.weaponId()).append('\n');
         }
         List<StationArchetypeDefinition> orderedStations = new ArrayList<>(stationArchetypes);
         orderedStations.sort(Comparator.comparing(StationArchetypeDefinition::id));
@@ -377,6 +407,37 @@ public final class ContentCatalog {
     }
 
     /**
+     * Один data-driven weapon archetype Stage 13.
+     *
+     * @param id стабильный persistent weapon content ID
+     * @param displayName отображаемое имя оружия
+     * @param damagePerShot урон одного успешного выстрела
+     * @param cooldownSeconds минимальная задержка между выстрелами
+     * @param range физическая дальность выстрела в world units
+     */
+    public record WeaponDefinition(
+            String id, String displayName, float damagePerShot, float cooldownSeconds, float range) {
+        /**
+         * Validates immutable weapon metadata.
+         *
+         * @param id стабильный persistent weapon content ID
+         * @param displayName отображаемое имя оружия
+         * @param damagePerShot урон одного успешного выстрела
+         * @param cooldownSeconds минимальная задержка между выстрелами
+         * @param range физическая дальность выстрела
+         */
+        public WeaponDefinition {
+            Objects.requireNonNull(id, "Weapon ID не задан");
+            Objects.requireNonNull(displayName, "Weapon displayName не задан");
+            if (!Float.isFinite(damagePerShot) || damagePerShot <= 0f
+                    || !Float.isFinite(cooldownSeconds) || cooldownSeconds <= 0f
+                    || !Float.isFinite(range) || range <= 0f) {
+                throw new IllegalArgumentException("Weapon damage/cooldown/range должны быть конечными и положительными");
+            }
+        }
+    }
+
+    /**
      * Конкретный data-driven корабельный archetype поверх небольшой runtime-роли {@link ShipType}.
      *
      * @param id стабильный persistent archetype ID
@@ -390,13 +451,15 @@ public final class ContentCatalog {
      * @param dockingRange радиус разгрузки для miner-role, иначе 0
      * @param hull корпус combat-role, иначе 0
      * @param shields щит combat-role, иначе 0
-     * @param damagePerSecond урон combat-role, иначе 0
-     * @param weaponRange дальность combat-role, иначе 0
+     * @param damagePerSecond legacy diagnostic DPS combat-role, иначе 0
+     * @param weaponRange legacy diagnostic дальность combat-role, иначе 0
+     * @param weaponId data-driven weapon ID combat-role, иначе {@code null}
      */
     public record ShipArchetypeDefinition(
             String id, String displayName, ShipType role, int cargoCapacity, float movementSpeed,
             double startingCredits, float extractionPerSecond, float extractionRange,
-            float dockingRange, float hull, float shields, float damagePerSecond, float weaponRange) {
+            float dockingRange, float hull, float shields, float damagePerSecond, float weaponRange,
+            String weaponId) {
         /**
          * @param id стабильный persistent archetype ID
          * @param displayName отображаемое имя типа
@@ -409,8 +472,9 @@ public final class ContentCatalog {
          * @param dockingRange радиус разгрузки
          * @param hull корпус
          * @param shields щит
-         * @param damagePerSecond урон
-         * @param weaponRange дальность
+         * @param damagePerSecond legacy diagnostic DPS
+         * @param weaponRange legacy diagnostic дальность
+         * @param weaponId data-driven weapon ID
          */
         public ShipArchetypeDefinition {
             Objects.requireNonNull(id, "Ship archetype ID не задан");

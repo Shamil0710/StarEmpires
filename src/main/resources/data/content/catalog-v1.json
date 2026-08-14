@@ -110,6 +110,15 @@
       "displayName": "Шахтёры"
     }
   ],
+  "weapons": [
+    {
+      "id": "weapon.pulse_laser_mk1",
+      "displayName": "Импульсный лазер Mk I",
+      "damagePerShot": 21.0,
+      "cooldownSeconds": 0.5,
+      "range": 150.0
+    }
+  ],
   "shipArchetypes": [
     {
       "id": "ship.ore_hauler",
@@ -206,7 +215,7 @@
       "displayName": "Сторожевой фрегат",
       "role": "COMBAT_SHIP",
       "cargoCapacity": 0,
-      "movementSpeed": 0.0,
+      "movementSpeed": 150.0,
       "startingCredits": 0.0,
       "extractionPerSecond": 0.0,
       "extractionRange": 0.0,
@@ -214,7 +223,8 @@
       "hull": 320.0,
       "shields": 180.0,
       "damagePerSecond": 42.0,
-      "weaponRange": 150.0
+      "weaponRange": 150.0,
+      "weaponId": "weapon.pulse_laser_mk1"
     }
   ],
   "stationArchetypes": [
