@@ -20,7 +20,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Stage-12D manual market interface reusing the same authoritative TradeController as AI.
+ * Manual market interface reusing the same authoritative TradeController as AI.
  *
  * <p>The player wallet/reputation live in PlayerState while cargo lives physically on the active
  * ship. Each command creates a non-persistent participant proxy that shares the ship's real
@@ -205,7 +205,8 @@ public final class PlayerMarketService {
                 previous.discoveredSystemIds(),
                 previous.discoveredObjects(),
                 previous.homeSystemId(),
-                previous.dockedAt());
+                previous.dockedAt(),
+                previous.fleetOrders());
         runtime.replacePlayerState(updated);
     }
 
