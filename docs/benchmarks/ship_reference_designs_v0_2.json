@@ -65,7 +65,7 @@
       "derived": {
         "maxAccelerationMps2": 1.0280373832,
         "sustainedAccelerationMps2": 0.2803738318,
-        "nominalDeltaVMps": 32861.9336667
+        "nominalDeltaVMps": 32902.3412608
       },
       "loadout": [
         "2x S point-defense laser",
@@ -102,7 +102,7 @@
       "derived": {
         "maxAccelerationMps2": 0.8086934546,
         "sustainedAccelerationMps2": 0.2021733637,
-        "nominalDeltaVMps": 37972.2830106
+        "nominalDeltaVMps": 37964.5151771
       },
       "loadout": [
         "2x S point-defense laser",
@@ -140,7 +140,7 @@
       "derived": {
         "maxAccelerationMps2": 0.6019975373,
         "sustainedAccelerationMps2": 0.1504993843,
-        "nominalDeltaVMps": 38466.4483795
+        "nominalDeltaVMps": 38454.7100515
       },
       "loadout": [
         "4x S point-defense laser",
@@ -174,9 +174,9 @@
       "installedSelectableVolumeM3": 31990.0,
       "optimalCrew": 320,
       "derived": {
-        "maxAccelerationMps2": 0.3984123246,
-        "sustainedAccelerationMps2": 0.0996030811,
-        "nominalDeltaVMps": 43993.6410046
+        "maxAccelerationMps2": 0.3984120434,
+        "sustainedAccelerationMps2": 0.0996030109,
+        "nominalDeltaVMps": 43962.9685573
       },
       "loadout": [
         "4x S point-defense laser",
@@ -214,7 +214,7 @@
       "derived": {
         "maxAccelerationMps2": 0.5096291598,
         "sustainedAccelerationMps2": 0.1325035816,
-        "nominalDeltaVMps": 41495.0273777
+        "nominalDeltaVMps": 41514.0928089
       },
       "loadout": [
         "4x S point-defense laser",
@@ -251,9 +251,9 @@
       "installedSelectableVolumeM3": 111415.0,
       "optimalCrew": 1000,
       "derived": {
-        "maxAccelerationMps2": 0.2519399394,
-        "sustainedAccelerationMps2": 0.0604655855,
-        "nominalDeltaVMps": 45560.9329574
+        "maxAccelerationMps2": 0.2519399375,
+        "sustainedAccelerationMps2": 0.0604655850,
+        "nominalDeltaVMps": 45642.9126613
       },
       "loadout": [
         "6x S point-defense laser",
@@ -301,9 +301,9 @@
         "shipAndAviationSparesKg": 5000000000.0
       },
       "derived": {
-        "maxAccelerationMps2": 0.1771155305,
-        "sustainedAccelerationMps2": 0.0491987585,
-        "nominalDeltaVMps": 50021.5749705
+        "maxAccelerationMps2": 0.1771154970,
+        "sustainedAccelerationMps2": 0.0491987492,
+        "nominalDeltaVMps": 50019.8943088
       },
       "loadout": [
         "8x S point-defense laser",
