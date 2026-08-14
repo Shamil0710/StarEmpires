@@ -7,6 +7,7 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.ProcurementPolicyComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
@@ -112,11 +113,18 @@ public final class PlayableTestWorldFactory {
                 InventoryComponent sourceInventory = sourceStation.getComponent(InventoryComponent.class);
                 FactionComponent sourceFaction = sourceStation.getComponent(FactionComponent.class);
                 IdentityComponent sourceIdentity = sourceStation.getComponent(IdentityComponent.class);
-                if (sourceMarket == null || sourceInventory == null || sourceFaction == null || sourceIdentity == null) {
+                ProcurementPolicyComponent sourceProcurement =
+                        sourceStation.getComponent(ProcurementPolicyComponent.class);
+                if (sourceMarket == null
+                        || sourceInventory == null
+                        || sourceFaction == null
+                        || sourceIdentity == null
+                        || sourceProcurement != null) {
                     continue;
                 }
                 Entity destinationStation = findMarketByName(destinationSession, sourceIdentity.name);
-                if (destinationStation == null) {
+                if (destinationStation == null
+                        || destinationStation.getComponent(ProcurementPolicyComponent.class) != null) {
                     continue;
                 }
                 MarketComponent destinationMarket = destinationStation.getComponent(MarketComponent.class);
