@@ -411,12 +411,13 @@ class Stage16EndToEndAcceptanceTest {
         for (int frame = 0; frame < maximumFrames; frame++) {
             FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
             if (placement.locationKind() == FleetLocationKind.IN_SYSTEM
-                    && destination.equals(placement.systemId())) {
+                    && destination.equals(placement.systemId())
+                    && runtime.world().findFleetJump(fleetId).isEmpty()) {
                 return;
             }
             runtime.advanceFrame(0.1f);
         }
-        throw new AssertionError("Fleet did not arrive at " + destination + " within frame budget");
+        throw new AssertionError("Fleet did not fully finish arrival at " + destination + " within frame budget");
     }
 
     private static Entity entity(PlayerRuntime runtime, FleetPlacementState placement) {
