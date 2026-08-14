@@ -29,12 +29,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * First functional Stage-15 global fleet-command map.
+ * Functional Stage-15/16 global fleet and owned-asset command map.
  *
  * <p>The application intentionally remains a thin strategic presentation harness. It advances the
  * same {@link PlayerRuntime}, renders only {@link com.spacesim.player.GlobalFleetMapModel} output
  * and submits commands through {@link PlayerStrategicCommandService}. It never mutates transforms,
- * transit, economy or threat state directly.</p>
+ * transit, economy, construction or threat state directly.</p>
  *
  * <p>Controls: Up/Down select owned fleet; Left/Right select discovered system; Enter MOVE;
  * H HOLD; F FOLLOW active fleet; E ESCORT active fleet; P PATROL all discovered systems;
@@ -54,7 +54,7 @@ public final class Stage15FleetMapGame extends ApplicationAdapter {
     private Path savePath;
     private int fleetIndex;
     private int systemIndex;
-    private String status = "Stage 15 strategic fleet map ready.";
+    private String status = "Strategic fleet/construction map ready.";
 
     /** Creates the map application; libGDX resources are allocated in {@link #create()}. */
     public Stage15FleetMapGame() {
@@ -217,7 +217,7 @@ public final class Stage15FleetMapGame extends ApplicationAdapter {
             commands = new PlayerStrategicCommandService(runtime);
             fleetIndex = 0;
             systemIndex = 0;
-            status = "Save loaded with fleet orders and threat intelligence.";
+            status = "Save loaded with fleet, threat and construction ownership state.";
         } catch (IOException | RuntimeException exception) {
             status = "Load failed: " + safeMessage(exception);
         }
@@ -265,10 +265,12 @@ public final class Stage15FleetMapGame extends ApplicationAdapter {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         float top = Gdx.graphics.getHeight() - 14f;
-        font.draw(batch, "STAR EMPIRES — STAGE 15 GLOBAL FLEET MAP", 12f, top);
+        font.draw(batch, "STAR EMPIRES — STAGE 16 GLOBAL ASSET MAP", 12f, top);
         font.draw(batch,
                 "Credits " + String.format(Locale.ROOT, "%,.2f", Money.toCredits(runtime.player().walletMilliCredits()))
                         + "   Fleets " + snapshot.fleets().size()
+                        + "   Projects " + snapshot.projects().size()
+                        + "   Stations " + snapshot.stations().size()
                         + "   Known systems " + snapshot.systems().size(),
                 12f,
                 top - 20f);
@@ -279,7 +281,17 @@ public final class Stage15FleetMapGame extends ApplicationAdapter {
                     top - 40f);
         }
         if (system != null) {
-            font.draw(batch, "Destination " + system.name(), 12f, top - 60f);
+            long projectCount = snapshot.projects().stream()
+                    .filter(project -> project.systemId().equals(system.systemId()))
+                    .count();
+            long stationCount = snapshot.stations().stream()
+                    .filter(station -> station.systemId().equals(system.systemId()))
+                    .count();
+            font.draw(batch,
+                    "Destination " + system.name() + "   owned projects " + projectCount
+                            + "   owned stations " + stationCount,
+                    12f,
+                    top - 60f);
         }
         if (fleet != null && system != null) {
             PlayerRouteRiskView route = commands.previewMove(fleet.fleetId(), system.systemId()).orElse(null);
@@ -290,6 +302,24 @@ public final class Stage15FleetMapGame extends ApplicationAdapter {
                                 route.path(), route.travelTicks(), route.riskCostTicks(), route.vulnerability()),
                         12f,
                         top - 80f);
+            }
+        }
+        if (system != null) {
+            GlobalFleetMapSnapshot.ConstructionProjectMarker project = snapshot.projects().stream()
+                    .filter(candidate -> candidate.systemId().equals(system.systemId()))
+                    .findFirst().orElse(null);
+            if (project != null) {
+                font.draw(batch,
+                        String.format(Locale.ROOT,
+                                "Project #%d %s  %.0f%%  missing %d  funding shortfall %,.2f cr  supply fleets %s",
+                                project.projectId().value(),
+                                project.status(),
+                                project.buildProgress() * 100d,
+                                project.missingMaterialUnits(),
+                                Money.toCredits(project.fundingShortfallMilliCredits()),
+                                project.supplyFleetIds()),
+                        12f,
+                        top - 100f);
             }
         }
         font.draw(batch,
