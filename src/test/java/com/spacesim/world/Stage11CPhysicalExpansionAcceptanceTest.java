@@ -1,6 +1,8 @@
 package com.spacesim.world;
 
+import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.persistence.WorldStateCodec;
@@ -38,10 +40,8 @@ class Stage11CPhysicalExpansionAcceptanceTest {
 
         FleetId supportFleet = null;
         com.spacesim.persistence.EntityId originalLocalFleetId = null;
+        long supportWalletBefore = -1L;
         boolean savedMidTransit = false;
-        long moneyBefore = runtime.snapshot().factions().stream()
-                .filter(state -> TRADE_LEAGUE.equals(state.factionContentId()))
-                .findFirst().orElseThrow().treasuryMilliCredits();
 
         StrategicGrowthState.Plan current = created;
         for (int iteration = 0; iteration < 20_000 && !current.status().terminal(); iteration++) {
@@ -50,6 +50,7 @@ class Stage11CPhysicalExpansionAcceptanceTest {
                 supportFleet = current.assignedSupportFleetIds().get(0);
                 FleetPlacementState placement = runtime.world().findFleet(supportFleet).orElseThrow();
                 originalLocalFleetId = placement.localEntityId();
+                supportWalletBefore = fleetWalletBalance(runtime.world(), supportFleet);
             }
 
             if (!savedMidTransit
@@ -89,11 +90,9 @@ class Stage11CPhysicalExpansionAcceptanceTest {
         assertEquals(FleetLocationKind.IN_SYSTEM, finalPlacement.locationKind());
         assertNotEquals(originalLocalFleetId, finalPlacement.localEntityId(),
                 "Physical inter-system handoff must allocate a new local EntityId");
-
-        long moneyAfter = runtime.snapshot().factions().stream()
-                .filter(state -> TRADE_LEAGUE.equals(state.factionContentId()))
-                .findFirst().orElseThrow().treasuryMilliCredits();
-        assertTrue(moneyAfter < moneyBefore, "Expansion must consume real faction money/material logistics");
+        assertTrue(supportWalletBefore > 0L);
+        assertTrue(fleetWalletBalance(runtime.world(), supportFleet) < supportWalletBefore,
+                "Support fleet must pay real credits to source-system suppliers");
     }
 
     @Test
@@ -107,6 +106,13 @@ class Stage11CPhysicalExpansionAcceptanceTest {
         assertTrue(opportunities.stream().allMatch(candidate ->
                 !candidate.controllingFactionContentId().isEmpty()));
         assertTrue(runtime.planBestUnclaimed(TRADE_LEAGUE).isEmpty());
+    }
+
+    private static long fleetWalletBalance(WorldSimulation world, FleetId fleetId) {
+        FleetPlacementState placement = world.findFleet(fleetId).orElseThrow();
+        Entity fleet = world.findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().find(placement.localEntityId());
+        return fleet.getComponent(WalletComponent.class).getBalanceMilliCredits();
     }
 
     private static WorldState withoutController(WorldState state, StarSystemId target) {
