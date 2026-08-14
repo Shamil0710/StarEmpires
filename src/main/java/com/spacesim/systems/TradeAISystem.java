@@ -6,10 +6,12 @@ import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
+import com.spacesim.components.DelegatedFleetComponent;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.PlayerControlledComponent;
 import com.spacesim.components.ProcurementPolicyComponent;
 import com.spacesim.components.ReputationComponent;
 import com.spacesim.components.ShipComponent;
@@ -49,8 +51,8 @@ import java.util.Objects;
  * <p>Обычное движение generic NPC не имеет отдельной кинематической реализации: этот system
  * пишет только transient flight intent через {@link InertialNavigation}; фактические ускорение,
  * торможение и перемещение выполняет {@link AutonomousFlightSystem} через общий
- * {@link com.spacesim.flight.FlightDynamics}. Поэтому масса реального груза влияет на generic
- * trader тем же способом, что на корабль игрока и delegated fleet.</p>
+ * {@link com.spacesim.flight.FlightDynamics}. Player-controlled и Stage-15 delegated ships имеют
+ * отдельного владельца intent, поэтому generic TradeAI не меняет их команду.</p>
  *
  * <p>Persistent-план в {@link TradeAIComponent} содержит только устойчивые {@link EntityId}.
  * Перед движением и сделкой ID разрешается через {@link EntityRegistry}; stale route безопасно
@@ -59,10 +61,6 @@ import java.util.Objects;
  * <p>Authoritative деньги хранятся в {@link WalletComponent}, сделки выполняет
  * {@link TradeController} и записывает в общий {@link EconomicLedger}. По умолчанию новые грузы
  * сравниваются по gross profit/second, а уже купленный cargo — по revenue/second.</p>
- *
- * <p>Отрицательный результат pure planner кэшируется только для точной пары
- * {@code MarketDirectory.revision + FleetTradeProfile}. Cache является transient runtime detail и
- * не входит в persistent state: при изменении любого market/fleet input planner выполняется снова.</p>
  */
 public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
@@ -179,10 +177,6 @@ public class TradeAISystem extends IteratingSystem {
     /**
      * Invalidates transient planner state after authoritative entity removal.
      *
-     * <p>The removed entity ID is dropped from per-fleet negative-search cache. When the removed
-     * entity was a market, the shared immutable market snapshot is discarded immediately so no
-     * route planner invocation can observe it as a candidate.</p>
-     *
      * @param removedId persistent ID that left the local simulation
      * @param marketRemoved whether the removed entity participated as a market station
      */
@@ -210,6 +204,7 @@ public class TradeAISystem extends IteratingSystem {
                 MarketComponent.class,
                 InventoryComponent.class,
                 WalletComponent.class).get());
+        AutonomousFlightSystem.installIfMissing(engine);
     }
 
     /**
@@ -226,9 +221,13 @@ public class TradeAISystem extends IteratingSystem {
         super.update(deltaTime);
     }
 
-    /** Исполняет текущее состояние одного торгового флота. */
+    /** Исполняет текущее состояние одного generic торгового флота. */
     @Override
     protected void processEntity(Entity fleet, float deltaTime) {
+        if (fleet.getComponent(PlayerControlledComponent.class) != null
+                || fleet.getComponent(DelegatedFleetComponent.class) != null) {
+            return;
+        }
         TradeAIComponent ai = am.get(fleet);
         TransformComponent transform = tm.get(fleet);
         if (ai.state == null) {
@@ -242,14 +241,12 @@ public class TradeAISystem extends IteratingSystem {
                 InertialNavigation.stop(fleet, ai.movementSpeed);
                 processIdle(fleet, ai, transform, deltaTime);
             }
-            case TRAVEL_TO_BUY -> navigate(
-                    fleet, ai.buyStationId, ai, TradeAIComponent.State.BUYING);
+            case TRAVEL_TO_BUY -> navigate(fleet, ai.buyStationId, ai, TradeAIComponent.State.BUYING);
             case BUYING -> {
                 InertialNavigation.stop(fleet, ai.movementSpeed);
                 buyCargo(fleet, ai);
             }
-            case TRAVEL_TO_SELL -> navigate(
-                    fleet, ai.sellStationId, ai, TradeAIComponent.State.SELLING);
+            case TRAVEL_TO_SELL -> navigate(fleet, ai.sellStationId, ai, TradeAIComponent.State.SELLING);
             case SELLING -> {
                 InertialNavigation.stop(fleet, ai.movementSpeed);
                 sellCargo(fleet, ai);
@@ -268,9 +265,7 @@ public class TradeAISystem extends IteratingSystem {
         FleetTradeProfile profile = createFleetTradeProfile(fleet, ai, position);
         EntityId fleetId = idm.get(fleet).id;
         long marketRevision = marketDirectory.revision();
-        FailedRouteSearch previousFailure = fleetId == null
-                ? null
-                : failedRouteSearches.get(fleetId);
+        FailedRouteSearch previousFailure = fleetId == null ? null : failedRouteSearches.get(fleetId);
 
         boolean routeFound;
         if (previousFailure != null
@@ -286,9 +281,7 @@ public class TradeAISystem extends IteratingSystem {
                 if (routeFound) {
                     failedRouteSearches.remove(fleetId);
                 } else {
-                    failedRouteSearches.put(
-                            fleetId,
-                            new FailedRouteSearch(marketRevision, profile));
+                    failedRouteSearches.put(fleetId, new FailedRouteSearch(marketRevision, profile));
                 }
             }
         }
@@ -304,7 +297,6 @@ public class TradeAISystem extends IteratingSystem {
         if (route == null) {
             return false;
         }
-
         ai.buyStationId = route.buyStationId();
         ai.sellStationId = route.sellStationId();
         ai.targetStationId = route.buyStationId();
@@ -316,8 +308,7 @@ public class TradeAISystem extends IteratingSystem {
         return true;
     }
 
-    private boolean findFactionProcurementSale(
-            Entity fleet, TradeAIComponent ai, FleetTradeProfile profile) {
+    private boolean findFactionProcurementSale(Entity fleet, TradeAIComponent ai, FleetTradeProfile profile) {
         FactionComponent fleetFaction = fm.get(fleet);
         if (fleetFaction == null || marketStations == null) {
             return false;
@@ -337,21 +328,18 @@ public class TradeAISystem extends IteratingSystem {
         MarketDirectory procurementDirectory = new MarketDirectory(contentCatalog);
         procurementDirectory.rebuild(procurementMarkets);
         ai.resetRoute();
-        return applySaleRoute(
-                ai, routePlanner.findBestExistingCargoSale(profile, procurementDirectory).orElse(null));
+        return applySaleRoute(ai, routePlanner.findBestExistingCargoSale(profile, procurementDirectory).orElse(null));
     }
 
     private boolean findSellRoute(TradeAIComponent ai, FleetTradeProfile profile) {
         ai.resetRoute();
-        return applySaleRoute(
-                ai, routePlanner.findBestExistingCargoSale(profile, marketDirectory).orElse(null));
+        return applySaleRoute(ai, routePlanner.findBestExistingCargoSale(profile, marketDirectory).orElse(null));
     }
 
     private boolean applySaleRoute(TradeAIComponent ai, TradeSaleRoute route) {
         if (route == null) {
             return false;
         }
-
         ai.buyStationId = null;
         ai.sellStationId = route.sellStationId();
         ai.targetStationId = route.sellStationId();
@@ -363,10 +351,7 @@ public class TradeAISystem extends IteratingSystem {
         return true;
     }
 
-    private FleetTradeProfile createFleetTradeProfile(
-            Entity fleet,
-            TradeAIComponent ai,
-            TransformComponent position) {
+    private FleetTradeProfile createFleetTradeProfile(Entity fleet, TradeAIComponent ai, TransformComponent position) {
         InventoryComponent inventory = im.get(fleet);
         WalletComponent wallet = wm.get(fleet);
         ReputationComponent reputationComponent = rm.get(fleet);
@@ -421,29 +406,18 @@ public class TradeAISystem extends IteratingSystem {
         if (transferable <= 0) {
             return 0;
         }
-
         transferable = Math.min(transferable,
-                safeMaximumAffordable(
-                        fleetWallet.getBalanceMilliCredits(), purchasePrice, transferable));
+                safeMaximumAffordable(fleetWallet.getBalanceMilliCredits(), purchasePrice, transferable));
         transferable = Math.min(transferable,
-                safeMaximumAffordable(
-                        Long.MAX_VALUE - buyWallet.getBalanceMilliCredits(),
-                        purchasePrice,
-                        transferable));
+                safeMaximumAffordable(Long.MAX_VALUE - buyWallet.getBalanceMilliCredits(), purchasePrice, transferable));
         transferable = Math.min(transferable,
-                safeMaximumAffordable(
-                        sellWallet.getBalanceMilliCredits(), salePrice, transferable));
+                safeMaximumAffordable(sellWallet.getBalanceMilliCredits(), salePrice, transferable));
         transferable = Math.min(transferable,
-                safeMaximumAffordable(
-                        Long.MAX_VALUE - fleetWallet.getBalanceMilliCredits(), salePrice, transferable));
+                safeMaximumAffordable(Long.MAX_VALUE - fleetWallet.getBalanceMilliCredits(), salePrice, transferable));
         return Math.max(0, transferable);
     }
 
-    private void navigate(
-            Entity fleet,
-            EntityId targetId,
-            TradeAIComponent ai,
-            TradeAIComponent.State arrivalState) {
+    private void navigate(Entity fleet, EntityId targetId, TradeAIComponent ai, TradeAIComponent.State arrivalState) {
         Entity target = resolveActiveMarketStation(targetId);
         if (target == null) {
             InertialNavigation.stop(fleet, ai.movementSpeed);
@@ -454,7 +428,6 @@ public class TradeAISystem extends IteratingSystem {
             InertialNavigation.clear(fleet);
             return;
         }
-
         InertialNavigation.Status status = InertialNavigation.approach(
                 fleet, tm.get(target), ai.movementSpeed, ARRIVAL_DISTANCE);
         if (status == InertialNavigation.Status.ARRIVED) {
@@ -478,10 +451,8 @@ public class TradeAISystem extends IteratingSystem {
         }
 
         ReputationComponent reputation = rm.get(fleet);
-        float purchasePrice = tradeController.getEffectiveSellPrice(
-                buyStation, ai.targetItem, reputation);
-        float salePrice = tradeController.getEffectiveBuyPrice(
-                sellStation, ai.targetItem, reputation);
+        float purchasePrice = tradeController.getEffectiveSellPrice(buyStation, ai.targetItem, reputation);
+        float salePrice = tradeController.getEffectiveBuyPrice(sellStation, ai.targetItem, reputation);
         if (!isPositiveFinitePrice(purchasePrice)
                 || !isPositiveFinitePrice(salePrice)
                 || salePrice <= purchasePrice) {
@@ -490,19 +461,12 @@ public class TradeAISystem extends IteratingSystem {
         }
 
         int amount = Math.min(ai.targetAmount, calculateTradeAmount(
-                fleet,
-                ai,
-                buyStation,
-                sellStation,
-                ai.targetItem,
-                purchasePrice,
-                salePrice));
+                fleet, ai, buyStation, sellStation, ai.targetItem, purchasePrice, salePrice));
         if (amount <= 0 || !tradeController.buyFromStation(
                 buyStation, fleet, ai.targetItem, amount, reputation)) {
             abandonRoute(ai);
             return;
         }
-
         ai.targetAmount = amount;
         ai.targetStationId = ai.sellStationId;
         ai.state = TradeAIComponent.State.TRAVEL_TO_SELL;
@@ -522,8 +486,7 @@ public class TradeAISystem extends IteratingSystem {
         WalletComponent stationWallet = wm.get(sellStation);
         WalletComponent fleetWallet = wm.get(fleet);
         ReputationComponent reputation = rm.get(fleet);
-        float salePrice = tradeController.getEffectiveBuyPrice(
-                sellStation, ai.targetItem, reputation);
+        float salePrice = tradeController.getEffectiveBuyPrice(sellStation, ai.targetItem, reputation);
         if (!isPositiveFinitePrice(salePrice)) {
             abandonRoute(ai);
             return;
@@ -534,8 +497,7 @@ public class TradeAISystem extends IteratingSystem {
         amount = Math.min(amount,
                 safeMaximumAffordable(stationWallet.getBalanceMilliCredits(), salePrice, amount));
         amount = Math.min(amount,
-                safeMaximumAffordable(
-                        Long.MAX_VALUE - fleetWallet.getBalanceMilliCredits(), salePrice, amount));
+                safeMaximumAffordable(Long.MAX_VALUE - fleetWallet.getBalanceMilliCredits(), salePrice, amount));
         if (amount <= 0 || !tradeController.sellToStation(
                 sellStation, fleet, ai.targetItem, amount, reputation)) {
             abandonRoute(ai);
@@ -566,8 +528,7 @@ public class TradeAISystem extends IteratingSystem {
             return false;
         }
         ShipComponent ship = sm.get(fleet);
-        return ship == null
-                || (ship.type != null && ship.type.canPurchase(item.category(), item.mineable()));
+        return ship == null || (ship.type != null && ship.type.canPurchase(item.category(), item.mineable()));
     }
 
     private boolean isValidItem(int itemId) {
