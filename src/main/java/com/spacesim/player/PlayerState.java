@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Persistent Stage-12A state of the human player, independent from simulation entities.
+ * Persistent Stage-12 state of the human player, independent from simulation entities.
  *
  * <p>World simulation remains player-agnostic. This record stores the durable actor layer that
  * references physical fleets through stable world-level FleetIds and discovered local objects
@@ -24,6 +24,7 @@ import java.util.Set;
  * @param discoveredSystemIds systems known to the player
  * @param discoveredObjects system-qualified discovered object references
  * @param homeSystemId optional home/start system; must already be discovered
+ * @param dockedAt optional currently docked market/station reference; must already be discovered
  */
 public record PlayerState(
         long walletMilliCredits,
@@ -33,7 +34,33 @@ public record PlayerState(
         FleetId activeFleetId,
         List<StarSystemId> discoveredSystemIds,
         List<DiscoveredObjectRef> discoveredObjects,
-        StarSystemId homeSystemId) {
+        StarSystemId homeSystemId,
+        DiscoveredObjectRef dockedAt) {
+
+    /**
+     * Source-compatible Stage-12A constructor for an undocked player.
+     *
+     * @param walletMilliCredits personal non-negative balance
+     * @param factionContentId optional faction affiliation
+     * @param reputations reputation entries
+     * @param ownedFleetIds owned fleets
+     * @param activeFleetId active fleet
+     * @param discoveredSystemIds discovered systems
+     * @param discoveredObjects discovered objects
+     * @param homeSystemId optional home system
+     */
+    public PlayerState(
+            long walletMilliCredits,
+            String factionContentId,
+            List<PlayerReputationState> reputations,
+            List<FleetId> ownedFleetIds,
+            FleetId activeFleetId,
+            List<StarSystemId> discoveredSystemIds,
+            List<DiscoveredObjectRef> discoveredObjects,
+            StarSystemId homeSystemId) {
+        this(walletMilliCredits, factionContentId, reputations, ownedFleetIds, activeFleetId,
+                discoveredSystemIds, discoveredObjects, homeSystemId, null);
+    }
 
     /**
      * Validates and canonicalizes player state.
@@ -46,6 +73,7 @@ public record PlayerState(
      * @param discoveredSystemIds discovered systems
      * @param discoveredObjects discovered system-local objects
      * @param homeSystemId optional home/start system
+     * @param dockedAt optional current docking reference
      */
     public PlayerState {
         if (walletMilliCredits < 0L) {
@@ -114,10 +142,18 @@ public record PlayerState(
         }
         objectCopy.sort(DiscoveredObjectRef::compareTo);
         discoveredObjects = List.copyOf(objectCopy);
+        if (dockedAt != null && !objects.contains(dockedAt)) {
+            throw new IllegalArgumentException("Docked station must be a discovered object");
+        }
     }
 
     /** @return whether the player currently has a named faction affiliation */
     public boolean affiliated() {
         return factionContentId != null;
+    }
+
+    /** @return whether the active ship is currently docked */
+    public boolean docked() {
+        return dockedAt != null;
     }
 }
