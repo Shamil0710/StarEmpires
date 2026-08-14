@@ -27,7 +27,8 @@ import java.util.Objects;
  *
  * <p>The envelope embeds an unchanged {@link WorldStateCodec} payload plus player state. A raw
  * pre-Stage-12 WorldState save is accepted as a legacy input and migrates to a current
- * {@link PlayableWorldState} with no initialized player.</p>
+ * {@link PlayableWorldState} with no initialized player. Playable schema v1 migrates with an
+ * undocked player because persistent docking was introduced in schema v2.</p>
  */
 public final class PlayableWorldStateCodec {
     private static final int MAGIC = 0x53545053;
@@ -108,9 +109,7 @@ public final class PlayableWorldStateCodec {
                 throw new IllegalArgumentException("Unsupported playable file version: " + fileVersion);
             }
             int schemaVersion = input.readInt();
-            if (schemaVersion != PlayableWorldState.CURRENT_VERSION) {
-                throw new IllegalArgumentException("Unsupported playable schema: " + schemaVersion);
-            }
+            requireSupportedSchema(schemaVersion);
             int worldLength = input.readInt();
             if (worldLength <= 0 || worldLength > MAX_WORLD_BYTES || worldLength > input.available()) {
                 throw new IllegalArgumentException("Embedded WorldState length is invalid");
@@ -120,11 +119,11 @@ public final class PlayableWorldStateCodec {
                 throw new IllegalArgumentException("Embedded WorldState is truncated");
             }
             WorldState world = WorldStateCodec.decode(worldBytes);
-            PlayerState player = input.readBoolean() ? readPlayer(input) : null;
+            PlayerState player = input.readBoolean() ? readPlayer(input, schemaVersion) : null;
             if (input.read() != -1) {
                 throw new IllegalArgumentException("Unexpected trailing bytes after playable state");
             }
-            return new PlayableWorldState(schemaVersion, world, player);
+            return new PlayableWorldState(PlayableWorldState.CURRENT_VERSION, world, player);
         } catch (EOFException exception) {
             throw new IllegalArgumentException("Playable save is truncated", exception);
         } catch (IOException exception) {
@@ -186,6 +185,13 @@ public final class PlayableWorldStateCodec {
         return decode(Files.readAllBytes(source));
     }
 
+    private static void requireSupportedSchema(int schemaVersion) {
+        if (schemaVersion != PlayableWorldState.CURRENT_VERSION
+                && schemaVersion != PlayableWorldState.LEGACY_STAGE12A_VERSION) {
+            throw new IllegalArgumentException("Unsupported playable schema: " + schemaVersion);
+        }
+    }
+
     private static boolean hasPlayableMagic(byte[] bytes) {
         if (bytes.length < Integer.BYTES) {
             return false;
@@ -228,17 +234,20 @@ public final class PlayableWorldStateCodec {
 
         output.writeInt(player.discoveredObjects().size());
         for (DiscoveredObjectRef reference : player.discoveredObjects()) {
-            output.writeLong(reference.systemId().value());
-            output.writeLong(reference.entityId().value());
+            writeObjectRef(output, reference);
         }
 
         output.writeBoolean(player.homeSystemId() != null);
         if (player.homeSystemId() != null) {
             output.writeLong(player.homeSystemId().value());
         }
+        output.writeBoolean(player.dockedAt() != null);
+        if (player.dockedAt() != null) {
+            writeObjectRef(output, player.dockedAt());
+        }
     }
 
-    private static PlayerState readPlayer(DataInputStream input) throws IOException {
+    private static PlayerState readPlayer(DataInputStream input, int schemaVersion) throws IOException {
         long wallet = input.readLong();
         String affiliation = readNullableContentId(input);
 
@@ -264,12 +273,24 @@ public final class PlayableWorldStateCodec {
         int objectCount = readCount(input, "discovered objects", MAX_DISCOVERED_OBJECTS);
         List<DiscoveredObjectRef> objects = new ArrayList<>(objectCount);
         for (int index = 0; index < objectCount; index++) {
-            objects.add(new DiscoveredObjectRef(
-                    new StarSystemId(input.readLong()),
-                    new EntityId(input.readLong())));
+            objects.add(readObjectRef(input));
         }
         StarSystemId home = input.readBoolean() ? new StarSystemId(input.readLong()) : null;
-        return new PlayerState(wallet, affiliation, reputations, fleets, activeFleet, systems, objects, home);
+        DiscoveredObjectRef dockedAt = schemaVersion >= PlayableWorldState.CURRENT_VERSION
+                && input.readBoolean() ? readObjectRef(input) : null;
+        return new PlayerState(
+                wallet, affiliation, reputations, fleets, activeFleet, systems, objects, home, dockedAt);
+    }
+
+    private static void writeObjectRef(DataOutputStream output, DiscoveredObjectRef reference) throws IOException {
+        output.writeLong(reference.systemId().value());
+        output.writeLong(reference.entityId().value());
+    }
+
+    private static DiscoveredObjectRef readObjectRef(DataInputStream input) throws IOException {
+        return new DiscoveredObjectRef(
+                new StarSystemId(input.readLong()),
+                new EntityId(input.readLong()));
     }
 
     private static void writeNullableContentId(DataOutputStream output, String value) throws IOException {

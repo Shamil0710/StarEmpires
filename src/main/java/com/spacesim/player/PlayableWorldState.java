@@ -5,7 +5,7 @@ import com.spacesim.world.WorldState;
 import java.util.Objects;
 
 /**
- * Stage-12 playable save envelope combining the independent world with optional player state.
+ * Playable save envelope combining the independent world with optional player state.
  *
  * <p>The underlying WorldState remains unaware of the player. A {@code null} player is valid only
  * as a migration result for pre-Stage-12 saves before a playable actor has been initialized.</p>
@@ -18,8 +18,10 @@ public record PlayableWorldState(
         int schemaVersion,
         WorldState worldState,
         PlayerState playerState) {
-    /** Current playable-layer persistent schema. */
-    public static final int CURRENT_VERSION = 1;
+    /** Current playable-layer persistent schema with persistent docking state. */
+    public static final int CURRENT_VERSION = 2;
+    /** Stage-12A schema before persistent docking state. */
+    public static final int LEGACY_STAGE12A_VERSION = 1;
 
     /**
      * Validates one playable save snapshot.
