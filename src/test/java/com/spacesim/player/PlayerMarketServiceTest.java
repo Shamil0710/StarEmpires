@@ -108,7 +108,7 @@ class PlayerMarketServiceTest {
                             && shipInventory.getFreeCapacity() >= 2) {
                         String factionId = content.findFaction(stationFaction.factionId).id();
                         PlayerState player = new PlayerState(
-                                10_000_000L,
+                                1_000_000_000L,
                                 factionId,
                                 List.of(new PlayerReputationState(factionId, 20f)),
                                 List.of(placement.id()),
