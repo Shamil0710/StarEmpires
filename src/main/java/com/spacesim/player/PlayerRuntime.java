@@ -228,7 +228,11 @@ public final class PlayerRuntime {
         return true;
     }
 
-    /** Sets global pause across all local sessions without bypassing their fixed clocks. */
+    /**
+     * Sets global pause across all local sessions without bypassing their fixed clocks.
+     *
+     * @param paused new global pause state
+     */
     public void setPaused(boolean paused) {
         for (StarSystemNode node : world.getTopology().systems()) {
             world.findSession(node.id()).orElseThrow().getClock().setPaused(paused);
