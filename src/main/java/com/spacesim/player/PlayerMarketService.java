@@ -58,16 +58,12 @@ public final class PlayerMarketService {
         for (ContentCatalog.ItemDefinition item : content.getItems()) {
             int id = item.runtimeId();
             rows.add(new PlayerMarketItemView(
-                    item.id(),
-                    item.displayName(),
-                    id,
+                    item.id(), item.displayName(), id,
                     context.stationInventory().stock[id],
                     context.market().targetStock[id],
                     context.shipInventory().stock[id],
-                    context.controller().getEffectiveSellPrice(
-                            context.station(), id, context.proxyReputation()),
-                    context.controller().getEffectiveBuyPrice(
-                            context.station(), id, context.proxyReputation()),
+                    context.controller().getEffectiveSellPrice(context.station(), id, context.proxyReputation()),
+                    context.controller().getEffectiveBuyPrice(context.station(), id, context.proxyReputation()),
                     context.market().isTradable(id)));
         }
         return Optional.of(new PlayerMarketView(
@@ -97,11 +93,7 @@ public final class PlayerMarketService {
             return false;
         }
         if (!context.controller().buyFromStation(
-                context.station(),
-                context.proxy(),
-                item.runtimeId(),
-                amount,
-                context.proxyReputation())) {
+                context.station(), context.proxy(), item.runtimeId(), amount, context.proxyReputation())) {
             return false;
         }
         persistProxyFinancialState(context);
@@ -122,11 +114,7 @@ public final class PlayerMarketService {
             return false;
         }
         if (!context.controller().sellToStation(
-                context.station(),
-                context.proxy(),
-                item.runtimeId(),
-                amount,
-                context.proxyReputation())) {
+                context.station(), context.proxy(), item.runtimeId(), amount, context.proxyReputation())) {
             return false;
         }
         persistProxyFinancialState(context);
@@ -181,22 +169,13 @@ public final class PlayerMarketService {
         }
         proxy.add(proxyReputation);
         return new TradeContext(
-                player,
-                session,
-                ship,
-                station,
-                shipInventory,
-                stationInventory,
-                market,
-                new TradeController(session.getLedger()),
-                proxy,
-                proxyWallet,
-                proxyReputation);
+                player, session, ship, station, shipInventory, stationInventory, market,
+                new TradeController(session.getLedger()), proxy, proxyWallet, proxyReputation);
     }
 
     private void persistProxyFinancialState(TradeContext context) {
         PlayerState previous = context.player();
-        PlayerState updated = new PlayerState(
+        runtime.replacePlayerState(new PlayerState(
                 context.proxyWallet().getBalanceMilliCredits(),
                 previous.factionContentId(),
                 snapshotReputation(context.proxyReputation()),
@@ -206,8 +185,8 @@ public final class PlayerMarketService {
                 previous.discoveredObjects(),
                 previous.homeSystemId(),
                 previous.dockedAt(),
-                previous.fleetOrders());
-        runtime.replacePlayerState(updated);
+                previous.fleetOrders(),
+                previous.threatIntel()));
     }
 
     private List<PlayerReputationState> snapshotReputation(ReputationComponent reputation) {
