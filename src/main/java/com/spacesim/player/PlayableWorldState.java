@@ -18,8 +18,10 @@ public record PlayableWorldState(
         int schemaVersion,
         WorldState worldState,
         PlayerState playerState) {
-    /** Current playable-layer schema with persistent Stage-15 fleet orders. */
-    public static final int CURRENT_VERSION = 3;
+    /** Current playable-layer schema with persistent non-omniscient threat intelligence. */
+    public static final int CURRENT_VERSION = 4;
+    /** Stage-15A schema with persistent fleet orders but no threat intelligence. */
+    public static final int LEGACY_FLEET_ORDERS_VERSION = 3;
     /** Stage-12 docking schema before persistent fleet orders. */
     public static final int LEGACY_DOCKING_VERSION = 2;
     /** Stage-12A schema before persistent docking state. */
