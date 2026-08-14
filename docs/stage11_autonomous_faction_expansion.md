@@ -1,6 +1,6 @@
 # Stage 11 — Autonomous Faction Expansion
 
-Status: COMPLETE implementation candidate on PR #27. Final main-roadmap status is synchronized only after this PR is merged and green.
+Status: **COMPLETE** — Stage 11A PR #24, Stage 11B PR #25, Stage 11C PR #26, Stage 11D PR #27; final Stage-11 main merge `f5b58c7`. Final PR #27 Java-17 CI run #838 passed tests, coverage, strict Javadoc and desktop packaging.
 
 ## Goal
 
@@ -121,4 +121,4 @@ These remain Stage 18, Stage 12/15/16 and Stage 19 responsibilities according to
 
 ## Definition of Done
 
-A faction can independently choose an economically/strategically justified unclaimed neighboring system, persist its intent, allocate real budget and a real fleet, purchase and transport physical construction resources between StarSystems, complete an ordinary Stage-9 station project, and establish a new territorial/economic node. Multiple factions competing for the same target resolve deterministically from physical completion timing without scripted spawn or automatic military conquest.
+A faction can independently choose an economically/strategically justified unclaimed neighboring system, persist its intent, allocate real budget and a real fleet, purchase and transport physical construction resources between StarSystems, complete an ordinary Stage-9 station project, and establish a new territorial/economic node. Multiple factions competing for the same target resolve deterministically from physical completion timing without scripted spawn or automatic military conquest. **Выполнено.**
