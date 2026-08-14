@@ -7,6 +7,7 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.spacesim.components.AsteroidComponent;
+import com.spacesim.components.DelegatedFleetComponent;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
@@ -39,14 +40,15 @@ import java.util.Objects;
  *
  * <p>Autonomous mode сохраняет цикл: поиск, инерционный полёт, физическая добыча, возвращение и
  * продажа через {@link TradeController}. Система больше не меняет position/velocity generic miner
- * напрямую: она пишет только {@link com.spacesim.components.FlightCommandComponent} через
- * {@link InertialNavigation}, а {@link AutonomousFlightSystem} применяет общий
- * {@link com.spacesim.flight.FlightDynamics} после AI intent systems.</p>
+ * напрямую: она пишет только transient flight intent через {@link InertialNavigation}, а
+ * {@link AutonomousFlightSystem} применяет общий {@link com.spacesim.flight.FlightDynamics}.</p>
  *
  * <p>Command mode активируется наличием {@link MiningCommandComponent}: Stage 14A использует его
  * на directly controlled ship, а Stage 15 — на delegated owned fleet. В command mode эта система
  * не владеет навигацией и не продаёт груз автоматически; она только валидирует цель и применяет тот
- * же physical extraction boundary.</p>
+ * же physical extraction boundary. Inactive player-owned fleets also carry
+ * {@link DelegatedFleetComponent}; generic autonomous mining must not overwrite their Stage-15
+ * flight command.</p>
  *
  * <p>Добыча сама не является resource source: сумма {@code asteroid.remainingResource + cargo}
  * сохраняется. Деньги возникают у добытчика только после обычной рыночной продажи.</p>
@@ -103,8 +105,7 @@ public final class MiningSystem extends IteratingSystem {
                 MiningComponent.class,
                 InventoryComponent.class,
                 TransformComponent.class).get());
-        tradeController = new TradeController(
-                Objects.requireNonNull(ledger, "EconomicLedger не задан"));
+        tradeController = new TradeController(Objects.requireNonNull(ledger, "EconomicLedger не задан"));
         this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
     }
 
@@ -164,6 +165,14 @@ public final class MiningSystem extends IteratingSystem {
                     playerControl != null && playerControl.docked,
                     deltaTime);
             return;
+        }
+
+        DelegatedFleetComponent delegated = entity.getComponent(DelegatedFleetComponent.class);
+        if (delegated != null) {
+            if (!mining.active) {
+                return;
+            }
+            entity.remove(DelegatedFleetComponent.class);
         }
 
         WalletComponent wallet = walletMapper.get(entity);
@@ -243,13 +252,11 @@ public final class MiningSystem extends IteratingSystem {
             if (command.status == MiningCommandComponent.Status.DEPLETED && target == null) {
                 return;
             }
-            command.status = toManualStatus(
-                    validateExtractionTarget(mining, inventory, transform, target), false);
+            command.status = toManualStatus(validateExtractionTarget(mining, inventory, transform, target), false);
             return;
         }
 
-        ExtractionResult result = extractResource(
-                miner, mining, inventory, transform, target, deltaTime);
+        ExtractionResult result = extractResource(miner, mining, inventory, transform, target, deltaTime);
         command.extractedLastTick = result.extracted();
         command.status = toManualStatus(result.status(), true);
 
@@ -257,16 +264,13 @@ public final class MiningSystem extends IteratingSystem {
             command.status = MiningCommandComponent.Status.DEPLETED;
             command.miningRequested = false;
             mining.extractionRemainder = 0d;
-            if (target != null && asteroidMapper.has(target)
-                    && asteroidMapper.get(target).isDepleted()) {
+            if (target != null && asteroidMapper.has(target) && asteroidMapper.get(target).isDepleted()) {
                 removeDepletedTarget(mining, target);
             }
         }
     }
 
-    private MiningCommandComponent.Status toManualStatus(
-            ExtractionStatus status,
-            boolean requested) {
+    private MiningCommandComponent.Status toManualStatus(ExtractionStatus status, boolean requested) {
         return switch (status) {
             case VALID, WAITING, EXTRACTED -> requested
                     ? MiningCommandComponent.Status.MINING
@@ -306,10 +310,7 @@ public final class MiningSystem extends IteratingSystem {
         mining.state = MiningComponent.State.TRAVEL_TO_ASTEROID;
     }
 
-    private void travelToAsteroid(
-            Entity miner,
-            MiningComponent mining,
-            InventoryComponent inventory) {
+    private void travelToAsteroid(Entity miner, MiningComponent mining, InventoryComponent inventory) {
         if (inventory.getFreeCapacity() <= 0) {
             beginReturn(mining);
             stop(miner, mining.movementSpeed);
@@ -321,12 +322,8 @@ public final class MiningSystem extends IteratingSystem {
             stop(miner, mining.movementSpeed);
             return;
         }
-
         InertialNavigation.Status status = InertialNavigation.approach(
-                miner,
-                transformMapper.get(target),
-                mining.movementSpeed,
-                mining.extractionRange);
+                miner, transformMapper.get(target), mining.movementSpeed, mining.extractionRange);
         if (status == InertialNavigation.Status.ARRIVED) {
             mining.state = MiningComponent.State.MINING;
         }
@@ -341,8 +338,7 @@ public final class MiningSystem extends IteratingSystem {
             float deltaTime) {
         stop(miner, mining.movementSpeed);
         Entity target = registry.find(mining.targetAsteroidId);
-        ExtractionResult result = extractResource(
-                miner, mining, inventory, transform, target, deltaTime);
+        ExtractionResult result = extractResource(miner, mining, inventory, transform, target, deltaTime);
 
         switch (result.status()) {
             case INVALID_TARGET, INVALID_RESOURCE -> {
@@ -374,7 +370,7 @@ public final class MiningSystem extends IteratingSystem {
                 return;
             }
             case VALID, WAITING, EXTRACTED -> {
-                // Continue braking while the shared extraction boundary operates.
+                // Shared extraction boundary remains active while braking intent is applied.
             }
         }
 
@@ -394,8 +390,7 @@ public final class MiningSystem extends IteratingSystem {
             TransformComponent transform,
             Entity target,
             float deltaTime) {
-        ExtractionStatus validation = validateExtractionTarget(
-                mining, inventory, transform, target);
+        ExtractionStatus validation = validateExtractionTarget(mining, inventory, transform, target);
         if (validation != ExtractionStatus.VALID) {
             return new ExtractionResult(validation, 0, false);
         }
@@ -408,8 +403,7 @@ public final class MiningSystem extends IteratingSystem {
         int itemCapacity = Integer.MAX_VALUE - currentStock;
         AsteroidComponent asteroid = asteroidMapper.get(target);
         long maximumExtraction = Math.min(
-                Math.min((long) freeCapacity, itemCapacity),
-                asteroid.remainingResource);
+                Math.min((long) freeCapacity, itemCapacity), asteroid.remainingResource);
         if (maximumExtraction <= 0L) {
             return new ExtractionResult(
                     asteroid.isDepleted() ? ExtractionStatus.DEPLETED : ExtractionStatus.CARGO_FULL,
@@ -430,15 +424,11 @@ public final class MiningSystem extends IteratingSystem {
             return new ExtractionResult(ExtractionStatus.WAITING, 0, false);
         }
 
-        int extracted = completedUnits >= maximumExtraction
-                ? (int) maximumExtraction
-                : (int) completedUnits;
+        int extracted = completedUnits >= maximumExtraction ? (int) maximumExtraction : (int) completedUnits;
         inventory.stock[mining.resourceItem] = currentStock + extracted;
         asteroid.remainingResource -= extracted;
         mining.totalMined = saturatedAdd(normalizedCounter(mining.totalMined), extracted);
-        mining.extractionRemainder = completedUnits >= maximumExtraction
-                ? 0d
-                : produced - extracted;
+        mining.extractionRemainder = completedUnits >= maximumExtraction ? 0d : produced - extracted;
 
         MarketComponent minerMarket = marketMapper.get(miner);
         if (minerMarket != null) {
@@ -474,8 +464,7 @@ public final class MiningSystem extends IteratingSystem {
         if (!isWithinRange(transform, transformMapper.get(target), mining.extractionRange)) {
             return ExtractionStatus.OUT_OF_RANGE;
         }
-        if (inventory.getFreeCapacity() <= 0
-                || inventory.stock[mining.resourceItem] == Integer.MAX_VALUE) {
+        if (inventory.getFreeCapacity() <= 0 || inventory.stock[mining.resourceItem] == Integer.MAX_VALUE) {
             return ExtractionStatus.CARGO_FULL;
         }
         return ExtractionStatus.VALID;
@@ -498,10 +487,7 @@ public final class MiningSystem extends IteratingSystem {
             return;
         }
         InertialNavigation.Status status = InertialNavigation.approach(
-                miner,
-                transformMapper.get(base),
-                mining.movementSpeed,
-                mining.dockingRange);
+                miner, transformMapper.get(base), mining.movementSpeed, mining.dockingRange);
         if (status == InertialNavigation.Status.ARRIVED) {
             mining.state = MiningComponent.State.UNLOADING;
         }
@@ -523,32 +509,17 @@ public final class MiningSystem extends IteratingSystem {
         ReputationComponent reputation = reputationMapper.get(miner);
         Entity base = registry.find(mining.homeBaseId);
         if (!isUsableBase(base, miner, mining.resourceItem, reputation)
-                || !isWithinRange(
-                        transform,
-                        transformMapper.get(base),
-                        mining.dockingRange)) {
+                || !isWithinRange(transform, transformMapper.get(base), mining.dockingRange)) {
             mining.homeBaseId = null;
             mining.state = MiningComponent.State.RETURNING_TO_BASE;
             return;
         }
 
         InventoryComponent baseInventory = inventoryMapper.get(base);
-        float salePrice = tradeController.getEffectiveBuyPrice(
-                base,
-                mining.resourceItem,
-                reputation);
+        float salePrice = tradeController.getEffectiveBuyPrice(base, mining.resourceItem, reputation);
         int amount = Math.min(cargo, baseInventory.getFreeCapacity());
-        amount = Math.min(amount, maximumBasePurchaseAmount(
-                base,
-                miner,
-                salePrice,
-                amount));
-        if (amount <= 0 || !tradeController.sellToStation(
-                base,
-                miner,
-                mining.resourceItem,
-                amount,
-                reputation)) {
+        amount = Math.min(amount, maximumBasePurchaseAmount(base, miner, salePrice, amount));
+        if (amount <= 0 || !tradeController.sellToStation(base, miner, mining.resourceItem, amount, reputation)) {
             mining.homeBaseId = null;
             mining.state = MiningComponent.State.RETURNING_TO_BASE;
             return;
@@ -653,10 +624,7 @@ public final class MiningSystem extends IteratingSystem {
     }
 
     private boolean isMiningRoleCompatible(ShipComponent ship, MiningComponent mining) {
-        return ship != null
-                && ship.type != null
-                && ship.type.isMining()
-                && mining != null;
+        return ship != null && ship.type != null && ship.type.isMining() && mining != null;
     }
 
     private boolean isUsableAsteroid(Entity entity, int resourceItem) {
@@ -667,10 +635,7 @@ public final class MiningSystem extends IteratingSystem {
     }
 
     private boolean isUsableAsteroidCandidate(Entity entity, int resourceItem) {
-        if (entity == null
-                || !idMapper.has(entity)
-                || !asteroidMapper.has(entity)
-                || !transformMapper.has(entity)) {
+        if (entity == null || !idMapper.has(entity) || !asteroidMapper.has(entity) || !transformMapper.has(entity)) {
             return false;
         }
         AsteroidComponent asteroid = asteroidMapper.get(entity);
@@ -731,14 +696,9 @@ public final class MiningSystem extends IteratingSystem {
             return 0;
         }
         try {
-            int payable = Money.maximumAffordable(
-                    baseWallet.getBalanceMilliCredits(),
-                    price,
-                    maximumAmount);
+            int payable = Money.maximumAffordable(baseWallet.getBalanceMilliCredits(), price, maximumAmount);
             int receivable = Money.maximumAffordable(
-                    Long.MAX_VALUE - minerWallet.getBalanceMilliCredits(),
-                    price,
-                    maximumAmount);
+                    Long.MAX_VALUE - minerWallet.getBalanceMilliCredits(), price, maximumAmount);
             return Math.min(payable, receivable);
         } catch (IllegalArgumentException exception) {
             return 0;
@@ -805,10 +765,7 @@ public final class MiningSystem extends IteratingSystem {
                 && Float.isFinite(transform.velocity.y);
     }
 
-    private boolean isWithinRange(
-            TransformComponent first,
-            TransformComponent second,
-            float range) {
+    private boolean isWithinRange(TransformComponent first, TransformComponent second, float range) {
         double distanceSquared = distanceSquared(first, second);
         double allowed = (double) range + DISTANCE_EPSILON;
         return distanceSquared <= allowed * allowed;
@@ -860,10 +817,7 @@ public final class MiningSystem extends IteratingSystem {
     }
 
     private long saturatedAdd(long counter, int amount) {
-        if (Long.MAX_VALUE - counter < amount) {
-            return Long.MAX_VALUE;
-        }
-        return counter + amount;
+        return Long.MAX_VALUE - counter < amount ? Long.MAX_VALUE : counter + amount;
     }
 
     private static void stop(Entity miner, float speedCap) {
@@ -882,9 +836,6 @@ public final class MiningSystem extends IteratingSystem {
         INVALID_CONFIGURATION
     }
 
-    private record ExtractionResult(
-            ExtractionStatus status,
-            int extracted,
-            boolean depletedAfterExtraction) {
+    private record ExtractionResult(ExtractionStatus status, int extracted, boolean depletedAfterExtraction) {
     }
 }
