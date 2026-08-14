@@ -217,7 +217,9 @@ public final class PlayerFleetEconomyService {
                 previous.homeSystemId(),
                 previous.dockedAt(),
                 previous.fleetOrders(),
-                previous.threatIntel()));
+                previous.threatIntel(),
+                previous.ownedConstructionProjectIds(),
+                previous.ownedStations()));
     }
 
     private List<PlayerReputationState> snapshotReputation(ReputationComponent reputation) {

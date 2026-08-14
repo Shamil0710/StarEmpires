@@ -109,6 +109,8 @@ public final class PlayerThreatIntelService {
                 player.homeSystemId(),
                 player.dockedAt(),
                 player.fleetOrders(),
-                intel);
+                intel,
+                player.ownedConstructionProjectIds(),
+                player.ownedStations());
     }
 }
