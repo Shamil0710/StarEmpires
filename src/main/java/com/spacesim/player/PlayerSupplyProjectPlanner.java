@@ -1,13 +1,10 @@
 package com.spacesim.player;
 
 import com.badlogic.ashley.core.Entity;
-import com.spacesim.components.ArchetypeComponent;
 import com.spacesim.components.FactionMarketAccessComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
-import com.spacesim.components.MiningComponent;
 import com.spacesim.components.ShipComponent;
-import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.world.FleetId;
@@ -157,21 +154,5 @@ public final class PlayerSupplyProjectPlanner {
 
     private static boolean positiveFinite(float value) {
         return Float.isFinite(value) && value > 0f;
-    }
-
-    @SuppressWarnings("unused")
-    private float movementSpeed(Entity entity) {
-        TradeAIComponent trade = entity == null ? null : entity.getComponent(TradeAIComponent.class);
-        if (trade != null && Float.isFinite(trade.movementSpeed) && trade.movementSpeed > 0f) {
-            return trade.movementSpeed;
-        }
-        MiningComponent mining = entity == null ? null : entity.getComponent(MiningComponent.class);
-        if (mining != null && Float.isFinite(mining.movementSpeed) && mining.movementSpeed > 0f) {
-            return mining.movementSpeed;
-        }
-        ArchetypeComponent archetype = entity == null ? null : entity.getComponent(ArchetypeComponent.class);
-        ContentCatalog.ShipArchetypeDefinition ship = archetype == null
-                ? null : content.findShipArchetype(archetype.contentId);
-        return ship == null ? 0f : ship.movementSpeed();
     }
 }
