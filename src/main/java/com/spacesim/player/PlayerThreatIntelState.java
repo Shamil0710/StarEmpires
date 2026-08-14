@@ -103,7 +103,13 @@ public record PlayerThreatIntelState(
                 PlayerThreatIntelKind.LINK, first, second, dangerScore, confidence, observedTick);
     }
 
-    /** @return true when this observation describes the supplied undirected corridor */
+    /**
+     * Checks whether this observation describes a supplied undirected corridor.
+     *
+     * @param first first candidate endpoint
+     * @param second second candidate endpoint
+     * @return true when this LINK observation matches the same canonical corridor
+     */
     public boolean matchesLink(StarSystemId first, StarSystemId second) {
         if (kind != PlayerThreatIntelKind.LINK || first == null || second == null) {
             return false;
