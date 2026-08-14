@@ -17,6 +17,10 @@ import com.spacesim.content.ContentCatalog;
 import com.spacesim.flight.FlightDynamics;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.world.ConstructionMaterialState;
+import com.spacesim.world.ConstructionProjectId;
+import com.spacesim.world.ConstructionProjectState;
+import com.spacesim.world.ConstructionProjectStatus;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetJumpState;
 import com.spacesim.world.FleetLocationKind;
@@ -34,11 +38,11 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Stage-15 runtime bridge from durable player fleet intent to ordinary physical simulation APIs.
+ * Runtime bridge from durable player fleet intent to ordinary physical simulation APIs.
  *
  * <p>Inactive player-owned fleets receive a transient {@link DelegatedFleetComponent}. Generic
  * TradeAI/autonomous Mining must not own movement while that marker is present; the persistent
- * Stage-15 order is the sole decision source and writes ordinary {@link FlightCommandComponent}
+ * player order is the sole decision source and writes ordinary {@link FlightCommandComponent}
  * intent. {@link com.spacesim.systems.AutonomousFlightSystem} and {@link FlightDynamics} remain the
  * only normal-flight Transform integrators.</p>
  *
@@ -47,6 +51,11 @@ import java.util.Set;
  * live target FleetId on every decision and maintain a physical separation radius. PATROL cycles
  * its persistent system list, dwells physically at each waypoint, then uses the same cumulative
  * route-risk planner and Stage-10 jump FSM as other delegated movement.</p>
+ *
+ * <p>Stage-16 SUPPLY_PROJECT dynamically chooses a known physical supplier with
+ * {@link PlayerSupplyProjectPlanner}, purchases only real remaining project demand through the
+ * ordinary trade boundary, then transfers the same cargo into the owned site through
+ * {@link PlayerConstructionService}. No self-sale, cargo reservation or virtual delivery exists.</p>
  *
  * <p>Civilian survival interrupts but never overwrites a durable economic order when a live
  * non-owned combatant is actually targeting that FleetId. The ship accelerates away through the
@@ -66,6 +75,8 @@ final class PlayerFleetOrderExecutor {
     private final ContentCatalog content;
     private final PlayerFleetEconomyService economy;
     private final PlayerFleetRoutePlanner routePlanner;
+    private final PlayerSupplyProjectPlanner supplyPlanner;
+    private final PlayerConstructionService construction;
     private final PlayerThreatObserver threatObserver;
     private final Map<FleetId, SurvivalState> survival = new HashMap<>();
     private final Map<FleetId, PatrolState> patrolStates = new HashMap<>();
@@ -77,6 +88,8 @@ final class PlayerFleetOrderExecutor {
         this.content = Objects.requireNonNull(content, "ContentCatalog not set");
         this.economy = new PlayerFleetEconomyService(runtime);
         this.routePlanner = new PlayerFleetRoutePlanner(runtime);
+        this.supplyPlanner = new PlayerSupplyProjectPlanner(runtime);
+        this.construction = new PlayerConstructionService(runtime);
         this.threatObserver = new PlayerThreatObserver(runtime);
     }
 
@@ -150,6 +163,7 @@ final class PlayerFleetOrderExecutor {
                 case FOLLOW -> executeFollow(order, placement, entity, player, FOLLOW_RADIUS);
                 case ESCORT -> executeFollow(order, placement, entity, player, ESCORT_RADIUS);
                 case PATROL -> executePatrol(order, placement, entity, player);
+                case SUPPLY_PROJECT -> executeSupplyProject(order, placement, entity, player);
                 case HOLD -> hold(entity);
             }
         }
@@ -282,6 +296,77 @@ final class PlayerFleetOrderExecutor {
             economy.sellMaximum(order.fleetId(), target, order.itemContentId());
         } else {
             economy.buyMaximum(order.fleetId(), target, order.itemContentId());
+        }
+    }
+
+    private void executeSupplyProject(
+            PlayerFleetOrderState order,
+            FleetPlacementState placement,
+            Entity entity,
+            PlayerState player) {
+        ConstructionProjectState project = resolveOwnedSupplyProject(player, order);
+        ContentCatalog.ItemDefinition item = content.findItem(order.itemContentId());
+        InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
+        if (project == null || item == null || inventory == null) {
+            hold(entity);
+            return;
+        }
+        int remaining = remainingRequired(project, item.id());
+        if (remaining <= 0) {
+            hold(entity);
+            return;
+        }
+        int cargo = inventory.stock[item.runtimeId()];
+        if (cargo > 0) {
+            Entity site = resolveEntity(project.systemId(), project.constructionSiteEntityId());
+            TransformComponent siteTransform = site == null ? null : site.getComponent(TransformComponent.class);
+            if (siteTransform == null) {
+                hold(entity);
+                return;
+            }
+            boolean arrived = navigateTo(
+                    order.fleetId(),
+                    placement,
+                    entity,
+                    player,
+                    project.systemId(),
+                    siteTransform.position.x,
+                    siteTransform.position.y,
+                    ARRIVAL_RADIUS);
+            if (arrived) {
+                construction.deliverMaterial(
+                        project.id(),
+                        order.fleetId(),
+                        item.id(),
+                        Math.min(cargo, remaining));
+            }
+            return;
+        }
+
+        DiscoveredObjectRef siteRef = new DiscoveredObjectRef(
+                project.systemId(), project.constructionSiteEntityId());
+        PlayerSupplyProjectPlan plan = supplyPlanner.plan(order.fleetId(), siteRef, item.id()).orElse(null);
+        if (plan == null) {
+            hold(entity);
+            return;
+        }
+        Entity supplier = resolveEntity(plan.supplier().systemId(), plan.supplier().entityId());
+        TransformComponent supplierTransform = supplier == null ? null : supplier.getComponent(TransformComponent.class);
+        if (supplierTransform == null) {
+            hold(entity);
+            return;
+        }
+        boolean arrived = navigateTo(
+                order.fleetId(),
+                placement,
+                entity,
+                player,
+                plan.supplier().systemId(),
+                supplierTransform.position.x,
+                supplierTransform.position.y,
+                ARRIVAL_RADIUS);
+        if (arrived && economy.isBerthed(order.fleetId(), plan.supplier())) {
+            economy.buyUpTo(order.fleetId(), plan.supplier(), item.id(), remaining);
         }
     }
 
@@ -498,6 +583,34 @@ final class PlayerFleetOrderExecutor {
             }
         }
         return result;
+    }
+
+    private ConstructionProjectState resolveOwnedSupplyProject(
+            PlayerState player,
+            PlayerFleetOrderState order) {
+        for (ConstructionProjectId projectId : player.ownedConstructionProjectIds()) {
+            ConstructionProjectState project = world.findConstructionProject(projectId).orElse(null);
+            if (project != null
+                    && project.systemId().equals(order.targetSystemId())
+                    && project.constructionSiteEntityId().equals(order.targetEntityId())
+                    && project.status() != ConstructionProjectStatus.BUILDING
+                    && project.status() != ConstructionProjectStatus.COMPLETED
+                    && project.status() != ConstructionProjectStatus.CANCELLED
+                    && project.status() != ConstructionProjectStatus.FAILED
+                    && remainingRequired(project, order.itemContentId()) > 0) {
+                return project;
+            }
+        }
+        return null;
+    }
+
+    private static int remainingRequired(ConstructionProjectState project, String itemContentId) {
+        for (ConstructionMaterialState material : project.materials()) {
+            if (material.itemContentId().equals(itemContentId)) {
+                return material.remainingAmount();
+            }
+        }
+        return 0;
     }
 
     private Entity resolveEntity(FleetPlacementState placement) {
