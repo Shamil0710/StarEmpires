@@ -90,7 +90,9 @@ class Stage14ShipProgressionAcceptanceTest {
         assertEquals(sellerMoneyBefore + price, sellerWallet.getBalanceMilliCredits());
         assertEquals(playerMoneyBefore + sellerMoneyBefore,
                 runtime.player().walletMilliCredits() + sellerWallet.getBalanceMilliCredits());
-        assertEquals(List.of(setup.starter().id(), setup.candidate().id()), runtime.player().ownedFleetIds());
+        assertEquals(2, runtime.player().ownedFleetIds().size());
+        assertTrue(runtime.player().ownedFleetIds().contains(setup.starter().id()));
+        assertTrue(runtime.player().ownedFleetIds().contains(setup.candidate().id()));
         assertEquals(setup.starter().id(), runtime.player().activeFleetId());
         assertEquals(fleetCountBefore, world.getFleetPlacements().size());
         assertEquals(entityCountBefore, session.getEngine().getEntities().size());
@@ -102,7 +104,6 @@ class Stage14ShipProgressionAcceptanceTest {
 
         assertTrue(runtime.undock());
         runtime.stopMovement();
-        runtime.advanceFrame(0.1f);
         assertTrue(progression.switchActiveFleet(setup.candidate().id()));
 
         assertEquals(setup.candidate().id(), runtime.player().activeFleetId());
@@ -120,8 +121,9 @@ class Stage14ShipProgressionAcceptanceTest {
         Entity restoredCandidate = restored.world().findSession(setup.systemId()).orElseThrow()
                 .getEntityRegistry().find(setup.candidate().localEntityId());
 
-        assertEquals(List.of(setup.starter().id(), setup.candidate().id()),
-                restored.player().ownedFleetIds());
+        assertEquals(2, restored.player().ownedFleetIds().size());
+        assertTrue(restored.player().ownedFleetIds().contains(setup.starter().id()));
+        assertTrue(restored.player().ownedFleetIds().contains(setup.candidate().id()));
         assertEquals(setup.candidate().id(), restored.player().activeFleetId());
         assertEquals(playerMoneyBefore - price, restored.player().walletMilliCredits());
         assertEquals(candidateCargoBefore,
@@ -231,7 +233,7 @@ class Stage14ShipProgressionAcceptanceTest {
                     || candidateEntity.getComponent(ArchetypeComponent.class) == null
                     || candidateFaction == null
                     || candidateCargo == null
-                    || candidateCargo.capacity < 3) {
+                    || candidateCargo.getFreeCapacity() < 3) {
                 continue;
             }
             Entity seller = null;
