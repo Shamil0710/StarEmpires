@@ -53,7 +53,8 @@ public final class CombatAISystem extends EntitySystem {
     @Override
     public void update(float deltaTime) {
         ImmutableArray<Entity> combatants = getEngine().getEntitiesFor(COMBATANTS);
-        for (Entity attacker : combatants) {
+        for (int attackerIndex = 0; attackerIndex < combatants.size(); attackerIndex++) {
+            Entity attacker = combatants.get(attackerIndex);
             CombatComponent attackerCombat = combatMapper.get(attacker);
             if (attackerCombat == null || attackerCombat.hull <= 0f
                     || attacker.getComponent(PlayerControlledComponent.class) != null) {
@@ -92,7 +93,8 @@ public final class CombatAISystem extends EntitySystem {
         float bestDistanceSquared = Float.POSITIVE_INFINITY;
         long bestId = Long.MAX_VALUE;
 
-        for (Entity candidate : combatants) {
+        for (int candidateIndex = 0; candidateIndex < combatants.size(); candidateIndex++) {
+            Entity candidate = combatants.get(candidateIndex);
             if (candidate == attacker) {
                 continue;
             }
