@@ -6,17 +6,21 @@ import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.persistence.EntityId;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Pure read model that classifies local-system entities for the compact Stage-14C minimap.
  *
- * <p>Classification intentionally mirrors the simple Stage-13 combat seam: a combat-capable fleet
- * of a different faction is treated as hostile for presentation. This is not a permanent diplomacy
- * model; Stage 18 will replace the temporary rule with authoritative relations/ROE.</p>
+ * <p>Player ownership takes precedence over the temporary Stage-13 faction-hostility rule because
+ * Stage 12 deliberately keeps ownership independent from legal/faction identity. For unowned
+ * fleets, a combat-capable fleet of a different faction is treated as hostile for presentation.
+ * Stage 18 will replace that temporary fallback with authoritative diplomacy/ROE.</p>
  */
 public final class LocalMinimapModel {
     private LocalMinimapModel() {
@@ -28,9 +32,15 @@ public final class LocalMinimapModel {
      *
      * @param entities current local-system entities
      * @param playerEntity currently controlled entity, or {@code null}
+     * @param ownedLocalEntityIds persistent local IDs of all player-owned fleets materialized here
      * @return deterministic minimap snapshot
      */
-    public static LocalMinimapSnapshot capture(Iterable<Entity> entities, Entity playerEntity) {
+    public static LocalMinimapSnapshot capture(
+            Iterable<Entity> entities,
+            Entity playerEntity,
+            Set<EntityId> ownedLocalEntityIds) {
+        Set<EntityId> owned = Set.copyOf(Objects.requireNonNull(
+                ownedLocalEntityIds, "Owned local EntityIds not set"));
         if (entities == null) {
             return new LocalMinimapSnapshot(List.of());
         }
@@ -47,7 +57,8 @@ public final class LocalMinimapModel {
             if (id == null || identity == null || transform == null) {
                 continue;
             }
-            LocalMinimapSnapshot.Kind kind = classify(entity, playerEntity, playerFaction, identity);
+            LocalMinimapSnapshot.Kind kind = classify(
+                    entity, playerEntity, playerFaction, identity, id.id, owned);
             markers.add(new LocalMinimapSnapshot.Marker(
                     id.id,
                     kind,
@@ -63,7 +74,9 @@ public final class LocalMinimapModel {
             Entity entity,
             Entity playerEntity,
             FactionComponent playerFaction,
-            IdentityComponent identity) {
+            IdentityComponent identity,
+            EntityId entityId,
+            Set<EntityId> owned) {
         if (entity == playerEntity) {
             return LocalMinimapSnapshot.Kind.PLAYER;
         }
@@ -71,11 +84,18 @@ public final class LocalMinimapModel {
             case STATION -> LocalMinimapSnapshot.Kind.STATION;
             case ASTEROID -> LocalMinimapSnapshot.Kind.ASTEROID;
             case SALVAGE -> LocalMinimapSnapshot.Kind.SALVAGE;
-            case FLEET -> classifyFleet(entity, playerFaction);
+            case FLEET -> classifyFleet(entity, playerFaction, entityId, owned);
         };
     }
 
-    private static LocalMinimapSnapshot.Kind classifyFleet(Entity entity, FactionComponent playerFaction) {
+    private static LocalMinimapSnapshot.Kind classifyFleet(
+            Entity entity,
+            FactionComponent playerFaction,
+            EntityId entityId,
+            Set<EntityId> owned) {
+        if (owned.contains(entityId)) {
+            return LocalMinimapSnapshot.Kind.FRIENDLY_FLEET;
+        }
         FactionComponent faction = entity.getComponent(FactionComponent.class);
         if (playerFaction != null && faction != null && faction.factionId == playerFaction.factionId) {
             return LocalMinimapSnapshot.Kind.FRIENDLY_FLEET;
