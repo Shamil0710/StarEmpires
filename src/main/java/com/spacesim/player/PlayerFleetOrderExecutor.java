@@ -5,6 +5,7 @@ import com.spacesim.components.ArchetypeComponent;
 import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.CombatCommandComponent;
 import com.spacesim.components.CombatComponent;
+import com.spacesim.components.DelegatedFleetComponent;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FlightCommandComponent;
 import com.spacesim.components.InventoryComponent;
@@ -17,8 +18,10 @@ import com.spacesim.flight.FlightDynamics;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.simulation.SimulationSession;
 import com.spacesim.world.FleetId;
+import com.spacesim.world.FleetJumpState;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
+import com.spacesim.world.LocalSystemCoordinates;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldSimulation;
 
@@ -33,27 +36,30 @@ import java.util.Set;
 /**
  * Stage-15 runtime bridge from durable player fleet intent to ordinary physical simulation APIs.
  *
- * <p>Inactive player-owned fleets are removed from legacy autonomous movement and default to HOLD.
- * HOLD/MOVE/TRADE/MINE all use transient {@link FlightCommandComponent}; the shared
- * {@link com.spacesim.systems.AutonomousFlightSystem} and {@link FlightDynamics} exclusively own
- * velocity/Transform integration. Inter-system navigation reuses the existing Stage-10 jump FSM.
- * TRADE uses {@link PlayerFleetEconomyService} and the ordinary TradeController. MINE drives the
- * ordinary MiningSystem through {@link MiningCommandComponent}.</p>
+ * <p>Inactive player-owned fleets receive a transient {@link DelegatedFleetComponent}. Generic
+ * TradeAI/autonomous Mining must not own movement while that marker is present; the persistent
+ * Stage-15 order is the sole decision source and writes ordinary {@link FlightCommandComponent}
+ * intent. {@link com.spacesim.systems.AutonomousFlightSystem} and {@link FlightDynamics} remain the
+ * only normal-flight Transform integrators.</p>
  *
- * <p>Stage 15D civilian survival interrupts, but never overwrites, a durable economic order when a
- * live non-owned combatant is actually targeting that FleetId. The ship physically accelerates
- * away through the same flight controller and keeps fleeing for a bounded threat-clear hysteresis
- * window before resuming the original order. Stage 15E inter-system navigation chooses its next
- * hop from {@link PlayerFleetRoutePlanner}, which accumulates whole-route system/link exposure from
- * persistent observed intel instead of using destination-only danger or omniscient remote state.</p>
+ * <p>TRADE reuses {@link PlayerFleetEconomyService} and the ordinary TradeController. MINE drives
+ * the ordinary MiningSystem through {@link MiningCommandComponent}. FOLLOW and ESCORT resolve the
+ * live target FleetId on every decision and maintain a physical separation radius. PATROL cycles
+ * its persistent system list, dwells physically at each waypoint, then uses the same cumulative
+ * route-risk planner and Stage-10 jump FSM as other delegated movement.</p>
  *
- * <p>ESCORT/PATROL/FOLLOW remain safe HOLD until the following Stage-15 convoy slice.</p>
+ * <p>Civilian survival interrupts but never overwrites a durable economic order when a live
+ * non-owned combatant is actually targeting that FleetId. The ship accelerates away through the
+ * same inertial flight controller and resumes the original order after bounded hysteresis.</p>
  */
 final class PlayerFleetOrderExecutor {
     private static final float ARRIVAL_RADIUS = 2f;
+    private static final float FOLLOW_RADIUS = 28f;
+    private static final float ESCORT_RADIUS = 38f;
     private static final float STOP_SPEED = 0.25f;
     private static final float MIN_APPROACH_SPEED_CAP = 1f;
     private static final long THREAT_CLEAR_HYSTERESIS_TICKS = 30L;
+    private static final long PATROL_DWELL_TICKS = 20L;
 
     private final PlayerRuntime runtime;
     private final WorldSimulation world;
@@ -62,6 +68,7 @@ final class PlayerFleetOrderExecutor {
     private final PlayerFleetRoutePlanner routePlanner;
     private final PlayerThreatObserver threatObserver;
     private final Map<FleetId, SurvivalState> survival = new HashMap<>();
+    private final Map<FleetId, PatrolState> patrolStates = new HashMap<>();
     private boolean preparing;
 
     PlayerFleetOrderExecutor(PlayerRuntime runtime, ContentCatalog content) {
@@ -76,9 +83,9 @@ final class PlayerFleetOrderExecutor {
     /**
      * Reconciles delegated control before the next authoritative world update.
      *
-     * <p>The active FleetId always remains under direct player control. Every other owned FleetId
-     * is processed in stable ID order. The reentrancy guard allows a real delegated trade or intel
-     * update to replace PlayerState without recursively executing another fleet-order pass.</p>
+     * <p>The active FleetId remains under direct player control. Every other owned FleetId is
+     * processed in stable ID order. A reentrancy guard allows real trade/intel mutations to replace
+     * PlayerState without recursively executing another order pass.</p>
      */
     void prepare() {
         if (preparing) {
@@ -113,11 +120,17 @@ final class PlayerFleetOrderExecutor {
             }
             if (fleetId.equals(player.activeFleetId())) {
                 survival.remove(fleetId);
+                patrolStates.remove(fleetId);
+                entity.remove(DelegatedFleetComponent.class);
                 entity.remove(FlightCommandComponent.class);
                 continue;
             }
+            ensureDelegatedMarker(entity);
             suppressLegacyAutonomy(entity);
             PlayerFleetOrderState order = explicitOrders.get(fleetId);
+            if (order == null || order.type() != FleetOrderType.PATROL) {
+                patrolStates.remove(fleetId);
+            }
             if (handleCivilianSurvival(fleetId, placement, entity, ownedLocalIds)) {
                 clearMiningRequest(entity);
                 continue;
@@ -134,11 +147,14 @@ final class PlayerFleetOrderExecutor {
                 case MOVE -> executeMove(order, placement, entity, player);
                 case TRADE -> executeTrade(order, placement, entity, player);
                 case MINE -> executeMine(order, placement, entity, player);
+                case FOLLOW -> executeFollow(order, placement, entity, player, FOLLOW_RADIUS);
+                case ESCORT -> executeFollow(order, placement, entity, player, ESCORT_RADIUS);
+                case PATROL -> executePatrol(order, placement, entity, player);
                 case HOLD -> hold(entity);
-                case ESCORT, PATROL, FOLLOW -> hold(entity);
             }
         }
         survival.keySet().removeIf(fleetId -> !player.ownedFleetIds().contains(fleetId));
+        patrolStates.keySet().removeIf(fleetId -> !player.ownedFleetIds().contains(fleetId));
     }
 
     private boolean handleCivilianSurvival(
@@ -305,8 +321,9 @@ final class PlayerFleetOrderExecutor {
             hold(entity);
             return;
         }
-        boolean inMiningPosition = navigateTo(order.fleetId(), placement, entity, player, order.targetSystemId(),
-                targetTransform.position.x, targetTransform.position.y, Math.max(0f, mining.extractionRange));
+        boolean inMiningPosition = navigateTo(order.fleetId(), placement, entity, player,
+                order.targetSystemId(), targetTransform.position.x, targetTransform.position.y,
+                Math.max(0f, mining.extractionRange));
         MiningCommandComponent command = ensureMiningCommand(entity);
         command.targetAsteroidId = order.targetEntityId();
         command.miningRequested = inMiningPosition;
@@ -337,6 +354,71 @@ final class PlayerFleetOrderExecutor {
         }
     }
 
+    private void executeFollow(
+            PlayerFleetOrderState order,
+            FleetPlacementState placement,
+            Entity entity,
+            PlayerState player,
+            float separationRadius) {
+        FleetPlacementState targetPlacement = world.findFleet(order.targetFleetId()).orElse(null);
+        if (targetPlacement == null) {
+            hold(entity);
+            return;
+        }
+        if (targetPlacement.locationKind() == FleetLocationKind.IN_SYSTEM) {
+            Entity target = resolveEntity(targetPlacement);
+            TransformComponent targetTransform = target == null ? null : target.getComponent(TransformComponent.class);
+            if (targetTransform == null) {
+                hold(entity);
+                return;
+            }
+            navigateTo(order.fleetId(), placement, entity, player, targetPlacement.systemId(),
+                    targetTransform.position.x, targetTransform.position.y, separationRadius);
+            return;
+        }
+        FleetJumpState jump = world.findFleetJump(order.targetFleetId()).orElse(null);
+        if (jump == null) {
+            hold(entity);
+            return;
+        }
+        navigateTo(order.fleetId(), placement, entity, player, jump.destinationSystemId(),
+                LocalSystemCoordinates.ARRIVAL_X, LocalSystemCoordinates.ARRIVAL_Y, separationRadius);
+    }
+
+    private void executePatrol(
+            PlayerFleetOrderState order,
+            FleetPlacementState placement,
+            Entity entity,
+            PlayerState player) {
+        List<StarSystemId> route = order.patrolSystemIds();
+        if (route.isEmpty()) {
+            hold(entity);
+            return;
+        }
+        int currentIndex = route.indexOf(placement.systemId());
+        if (currentIndex < 0) {
+            patrolStates.remove(order.fleetId());
+            navigateTo(order.fleetId(), placement, entity, player, route.get(0),
+                    LocalSystemCoordinates.ARRIVAL_X, LocalSystemCoordinates.ARRIVAL_Y, ARRIVAL_RADIUS);
+            return;
+        }
+
+        SimulationSession session = world.findSession(placement.systemId()).orElse(null);
+        long tick = session == null ? 0L : session.getClock().getTick();
+        PatrolState state = patrolStates.get(order.fleetId());
+        if (state == null || !state.systemId().equals(placement.systemId())) {
+            state = new PatrolState(placement.systemId(), saturatedTickAdd(tick, PATROL_DWELL_TICKS));
+            patrolStates.put(order.fleetId(), state);
+        }
+        if (tick < state.dwellUntilTick()) {
+            hold(entity);
+            return;
+        }
+        StarSystemId next = route.get((currentIndex + 1) % route.size());
+        navigateTo(order.fleetId(), placement, entity, player, next,
+                LocalSystemCoordinates.ARRIVAL_X, LocalSystemCoordinates.ARRIVAL_Y, ARRIVAL_RADIUS);
+    }
+
     private boolean navigateTo(
             FleetId fleetId,
             FleetPlacementState placement,
@@ -346,6 +428,10 @@ final class PlayerFleetOrderExecutor {
             float targetX,
             float targetY,
             float arrivalRange) {
+        if (targetSystem == null) {
+            hold(entity);
+            return false;
+        }
         if (!placement.systemId().equals(targetSystem)) {
             hold(entity);
             TransformComponent transform = entity.getComponent(TransformComponent.class);
@@ -363,7 +449,8 @@ final class PlayerFleetOrderExecutor {
 
         TransformComponent transform = entity.getComponent(TransformComponent.class);
         float baseSpeed = movementSpeed(entity);
-        if (transform == null || baseSpeed <= 0f || !Float.isFinite(arrivalRange) || arrivalRange < 0f) {
+        if (transform == null || baseSpeed <= 0f || !Float.isFinite(arrivalRange) || arrivalRange < 0f
+                || !Float.isFinite(targetX) || !Float.isFinite(targetY)) {
             hold(entity);
             return false;
         }
@@ -456,6 +543,12 @@ final class PlayerFleetOrderExecutor {
         return command;
     }
 
+    private static void ensureDelegatedMarker(Entity entity) {
+        if (entity.getComponent(DelegatedFleetComponent.class) == null) {
+            entity.add(new DelegatedFleetComponent());
+        }
+    }
+
     private static void clearMiningRequest(Entity entity) {
         MiningCommandComponent command = entity.getComponent(MiningCommandComponent.class);
         if (command != null) {
@@ -489,9 +582,16 @@ final class PlayerFleetOrderExecutor {
         return Long.MAX_VALUE - counter < amount ? Long.MAX_VALUE : counter + amount;
     }
 
+    private static long saturatedTickAdd(long tick, long duration) {
+        return Long.MAX_VALUE - tick < duration ? Long.MAX_VALUE : tick + duration;
+    }
+
     private record SurvivalState(long lastThreatTick, float axisX, float axisY) {
     }
 
     private record EscapeVector(float axisX, float axisY) {
+    }
+
+    private record PatrolState(StarSystemId systemId, long dwellUntilTick) {
     }
 }
