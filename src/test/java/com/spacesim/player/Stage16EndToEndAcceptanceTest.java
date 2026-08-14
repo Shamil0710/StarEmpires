@@ -6,6 +6,7 @@ import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
@@ -40,7 +41,7 @@ class Stage16EndToEndAcceptanceTest {
     private static final String ENERGY_ID = "item.energy";
 
     @Test
-    void completePhysicalPlayerConstructionLoopSurvivesRemoteBuildFinanceAndDestruction() {
+    void completePhysicalLoopCombinesExternalTradeOwnedSupplyRemoteBuildFinanceAndDestruction() {
         PlayableTestWorldFactory.Scenario scenario = PlayableTestWorldFactory.create(16_999L);
         PlayerRuntime runtime = scenario.runtime();
         ContentCatalog content = scenario.content();
@@ -49,185 +50,194 @@ class Stage16EndToEndAcceptanceTest {
         assertNotNull(steel);
         assertNotNull(energy);
 
-        PlayerState initial = runtime.player();
-        runtime.replacePlayerState(PlayerRuntime.copyWithOwnershipAndWallet(
-                initial,
-                100_000_000L,
-                initial.ownedFleetIds(),
-                initial.activeFleetId()));
+        preparePlayerFixture(runtime, steel, energy);
         FleetPlacementState activeFleet = runtime.world().findFleet(runtime.player().activeFleetId()).orElseThrow();
-        Entity activeShip = entity(runtime, activeFleet);
-        InventoryComponent activeCargo = activeShip.getComponent(InventoryComponent.class);
-        activeCargo.capacity = Math.max(activeCargo.capacity, 10_000);
-        activeCargo.stock[steel.runtimeId()] += 120;
-        activeCargo.stock[energy.runtimeId()] += 60;
-
-        FleetPlacementState energyTanker = findFleetByArchetype(
-                runtime,
-                activeFleet.systemId(),
-                "ship.energy_tanker",
-                activeFleet.id());
-        PlayerState beforeOwnership = runtime.player();
-        List<FleetId> owned = new ArrayList<>(beforeOwnership.ownedFleetIds());
-        owned.add(energyTanker.id());
-        runtime.replacePlayerState(PlayerRuntime.copyWithOwnershipAndWallet(
-                beforeOwnership,
-                beforeOwnership.walletMilliCredits(),
-                owned,
-                beforeOwnership.activeFleetId()));
+        FleetPlacementState steelHauler = findFleetByArchetype(
+                runtime, activeFleet.systemId(), "ship.steel_hauler", activeFleet.id());
+        addOwnedFleet(runtime, steelHauler.id());
 
         PlayerConstructionService construction = new PlayerConstructionService(runtime);
-        PlayerConstructionPlacementView validPlacement = findValidPlacement(construction);
-        ConstructionProjectId projectId = construction.createProject(
-                PROJECT_ARCHETYPE,
-                validPlacement.x(),
-                validPlacement.y());
+        PlayerConstructionPlacementView location = findValidPlacement(construction);
+        ConstructionProjectId projectId = construction.createProject(PROJECT_ARCHETYPE, location.x(), location.y());
         ConstructionProjectState project = runtime.world().findConstructionProject(projectId).orElseThrow();
         assertEquals(project.minimumFundingMilliCredits(),
                 construction.fundProject(projectId, project.minimumFundingMilliCredits()));
         runtime.advanceFrame(0.2f);
 
-        SimulationSession constructionSession = runtime.world().findSession(project.systemId()).orElseThrow();
-        Entity site = constructionSession.getEntityRegistry().find(project.constructionSiteEntityId());
-        assertNotNull(site);
-        Entity foundry = findMarketByArchetype(runtime, project.systemId(), "station.foundry");
-        Entity externalTrader = findTraderOfDifferentFaction(
-                constructionSession,
-                content.findFaction("faction.miners").runtimeId());
-        configureOneUnitPhysicalTrade(
-                externalTrader,
-                foundry,
-                site,
-                steel.runtimeId());
-        int steelBeforeExternal = delivered(runtime, projectId, STEEL_ID);
-        advanceUntilDeliveredAtLeast(runtime, projectId, STEEL_ID, steelBeforeExternal + 1, 8_000);
-        int steelAfterExternal = delivered(runtime, projectId, STEEL_ID);
-        assertTrue(steelAfterExternal > steelBeforeExternal,
-                "ordinary external TradeAI must physically satisfy part of construction steel demand");
-        TradeAIComponent externalTrade = externalTrader.getComponent(TradeAIComponent.class);
-        externalTrade.state = TradeAIComponent.State.IDLE;
-        externalTrade.resetRoute();
-        externalTrade.routeSearchCooldown = Float.MAX_VALUE;
-
-        PlayerFleetOrderService fleetOrders = new PlayerFleetOrderService(runtime);
-        int energyBeforeOwnedSupply = delivered(runtime, projectId, ENERGY_ID);
-        assertTrue(fleetOrders.supplyProject(energyTanker.id(), projectId, ENERGY_ID));
-        advanceUntilDeliveredAtLeast(runtime, projectId, ENERGY_ID, energyBeforeOwnedSupply + 1, 10_000);
-        int energyAfterOwnedSupply = delivered(runtime, projectId, ENERGY_ID);
-        assertTrue(energyAfterOwnedSupply > energyBeforeOwnedSupply,
-                "owned SUPPLY_PROJECT must buy and physically deliver part of required energy");
-        assertTrue(fleetOrders.clear(energyTanker.id()));
-
-        ConstructionProjectState beforeManual = runtime.world().findConstructionProject(projectId).orElseThrow();
-        Entity currentSite = runtime.world().findSession(project.systemId()).orElseThrow()
-                .getEntityRegistry().find(project.constructionSiteEntityId());
-        TransformComponent siteTransform = currentSite.getComponent(TransformComponent.class);
-        FleetPlacementState activeAtSource = runtime.world().findFleet(runtime.player().activeFleetId()).orElseThrow();
-        Entity currentActiveShip = entity(runtime, activeAtSource);
-        TransformComponent activeTransform = currentActiveShip.getComponent(TransformComponent.class);
-        activeTransform.position.set(siteTransform.position);
-        activeTransform.velocity.setZero();
-        for (ConstructionMaterialState material : beforeManual.materials()) {
-            int remaining = material.remainingAmount();
-            if (remaining <= 0) {
-                continue;
-            }
-            assertEquals(remaining, construction.deliverMaterial(
-                    projectId,
-                    activeAtSource.id(),
-                    material.itemContentId(),
-                    remaining));
-        }
-        assertTrue(runtime.world().findConstructionProject(projectId).orElseThrow().materialsFulfilled());
+        performExternalEnergyDelivery(runtime, content, projectId, energy);
+        performOwnedSteelSupply(runtime, projectId, steelHauler.id());
+        physicallyDeliverRemainingFixtureCargo(runtime, construction, projectId);
         advanceUntilStatus(runtime, projectId, ConstructionProjectStatus.BUILDING, 100);
+
         ConstructionProjectState building = runtime.world().findConstructionProject(projectId).orElseThrow();
         long buildStartedTick = building.buildStartedTick();
         long buildDurationTicks = building.buildDurationTicks();
-        List<ConstructionMaterialState> completedBill = building.materials();
-
-        StarSystemId remoteSystem = scenario.route().otherEnd(project.systemId());
+        List<ConstructionMaterialState> fulfilledBill = building.materials();
+        StarSystemId sourceSystem = building.systemId();
+        StarSystemId remoteSystem = scenario.route().otherEnd(sourceSystem);
         assertNotNull(remoteSystem);
+
         assertTrue(runtime.requestJump(remoteSystem));
-        advanceUntilFleetArrives(runtime, activeAtSource.id(), remoteSystem, 2_000);
-        assertFalse(project.systemId().equals(runtime.world().getActiveSystemId()));
+        advanceUntilFleetArrives(runtime, activeFleet.id(), remoteSystem, 2_000);
         assertEquals(ConstructionProjectStatus.BUILDING,
                 runtime.world().findConstructionProject(projectId).orElseThrow().status());
+        assertFalse(sourceSystem.equals(runtime.world().getActiveSystemId()));
 
-        byte[] midBuildSave = PlayableWorldStateCodec.encode(runtime.snapshot());
         PlayerRuntime restored = PlayerRuntime.restore(
-                PlayableWorldStateCodec.decode(midBuildSave),
+                PlayableWorldStateCodec.decode(PlayableWorldStateCodec.encode(runtime.snapshot())),
                 content,
                 remoteSystem);
-        ConstructionProjectState restoredBuilding = restored.world().findConstructionProject(projectId).orElseThrow();
-        assertEquals(ConstructionProjectStatus.BUILDING, restoredBuilding.status());
-        assertEquals(buildStartedTick, restoredBuilding.buildStartedTick());
-        assertEquals(buildDurationTicks, restoredBuilding.buildDurationTicks());
-        assertEquals(completedBill, restoredBuilding.materials());
+        ConstructionProjectState restoredBuild = restored.world().findConstructionProject(projectId).orElseThrow();
+        assertEquals(ConstructionProjectStatus.BUILDING, restoredBuild.status());
+        assertEquals(buildStartedTick, restoredBuild.buildStartedTick());
+        assertEquals(buildDurationTicks, restoredBuild.buildDurationTicks());
+        assertEquals(fulfilledBill, restoredBuild.materials());
 
         advanceUntilStatus(restored, projectId, ConstructionProjectStatus.COMPLETED, 4_000);
         ConstructionProjectState completed = restored.world().findConstructionProject(projectId).orElseThrow();
         EntityId stationId = completed.completedStationEntityId();
         assertNotNull(stationId);
-        OwnedStationRef ownedStation = new OwnedStationRef(project.systemId(), stationId);
+        OwnedStationRef ownedStation = new OwnedStationRef(sourceSystem, stationId);
         assertTrue(restored.player().ownedStations().contains(ownedStation));
         assertFalse(restored.player().ownedConstructionProjectIds().contains(projectId));
 
-        assertTrue(restored.requestJump(project.systemId()));
-        advanceUntilFleetArrives(restored, activeAtSource.id(), project.systemId(), 2_000);
-        SimulationSession completedSession = restored.world().findSession(project.systemId()).orElseThrow();
-        Entity station = completedSession.getEntityRegistry().find(stationId);
-        assertNotNull(station);
-        FleetPlacementState returnedFleet = restored.world().findFleet(activeAtSource.id()).orElseThrow();
-        Entity returnedShip = entity(restored, returnedFleet);
-        TransformComponent returnedTransform = returnedShip.getComponent(TransformComponent.class);
-        TransformComponent stationTransform = station.getComponent(TransformComponent.class);
-        returnedTransform.position.set(stationTransform.position);
-        returnedTransform.velocity.setZero();
-        assertTrue(restored.dockAt(stationId));
-
+        assertTrue(restored.requestJump(sourceSystem));
+        advanceUntilFleetArrives(restored, activeFleet.id(), sourceSystem, 2_000);
+        dockAtCompletedStation(restored, activeFleet.id(), sourceSystem, stationId);
         PlayerStationFinanceService finance = new PlayerStationFinanceService(restored);
-        PlayerStationFinanceView financeBefore = finance.view().orElseThrow();
-        long combinedMoneyBefore = Math.addExact(
-                financeBefore.playerWalletMilliCredits(), financeBefore.stationWalletMilliCredits());
-        long deposit = 2_000_000L;
-        long withdraw = 750_000L;
-        assertTrue(finance.deposit(deposit));
-        assertTrue(finance.withdraw(withdraw));
-        PlayerStationFinanceView financeAfter = finance.view().orElseThrow();
-        assertEquals(combinedMoneyBefore,
-                Math.addExact(financeAfter.playerWalletMilliCredits(), financeAfter.stationWalletMilliCredits()));
+        PlayerStationFinanceView beforeFinance = finance.view().orElseThrow();
+        long combinedBefore = Math.addExact(
+                beforeFinance.playerWalletMilliCredits(), beforeFinance.stationWalletMilliCredits());
+        assertTrue(finance.deposit(2_000_000L));
+        assertTrue(finance.withdraw(750_000L));
+        PlayerStationFinanceView afterFinance = finance.view().orElseThrow();
+        assertEquals(combinedBefore,
+                Math.addExact(afterFinance.playerWalletMilliCredits(), afterFinance.stationWalletMilliCredits()));
         assertTrue(restored.undock());
 
-        byte[] postFinanceSave = PlayableWorldStateCodec.encode(restored.snapshot());
         PlayerRuntime finalRuntime = PlayerRuntime.restore(
-                PlayableWorldStateCodec.decode(postFinanceSave),
+                PlayableWorldStateCodec.decode(PlayableWorldStateCodec.encode(restored.snapshot())),
                 content,
-                project.systemId());
-        Entity persistedStation = finalRuntime.world().findSession(project.systemId()).orElseThrow()
+                sourceSystem);
+        Entity persistedStation = finalRuntime.world().findSession(sourceSystem).orElseThrow()
                 .getEntityRegistry().find(stationId);
         assertNotNull(persistedStation);
-        assertEquals(financeAfter.stationWalletMilliCredits(),
+        assertEquals(afterFinance.stationWalletMilliCredits(),
                 persistedStation.getComponent(WalletComponent.class).getBalanceMilliCredits());
-        assertEquals(financeAfter.playerWalletMilliCredits(), finalRuntime.player().walletMilliCredits());
+        assertEquals(afterFinance.playerWalletMilliCredits(), finalRuntime.player().walletMilliCredits());
         assertTrue(finalRuntime.player().ownedStations().contains(ownedStation));
         long walletBeforeDestruction = finalRuntime.player().walletMilliCredits();
 
-        finalRuntime.world().destroyEntity(project.systemId(), stationId, DestructionPolicy.destroyAll());
+        finalRuntime.world().destroyEntity(sourceSystem, stationId, DestructionPolicy.destroyAll());
         finalRuntime.advanceFrame(0.1f);
-
         assertFalse(finalRuntime.player().ownedStations().contains(ownedStation));
         assertEquals(walletBeforeDestruction, finalRuntime.player().walletMilliCredits(),
-                "ordinary station destruction must not create a replacement/refund grant");
+                "ordinary station destruction must not create a refund or replacement grant");
         ConstructionProjectState historical = finalRuntime.world().findConstructionProject(projectId).orElseThrow();
         assertEquals(ConstructionProjectStatus.COMPLETED, historical.status());
         assertEquals(stationId, historical.completedStationEntityId());
     }
 
-    private static void configureOneUnitPhysicalTrade(
-            Entity trader,
-            Entity source,
-            Entity destination,
-            int itemId) {
+    private static void preparePlayerFixture(
+            PlayerRuntime runtime,
+            ContentCatalog.ItemDefinition steel,
+            ContentCatalog.ItemDefinition energy) {
+        PlayerState initial = runtime.player();
+        runtime.replacePlayerState(PlayerRuntime.copyWithOwnershipAndWallet(
+                initial, 100_000_000L, initial.ownedFleetIds(), initial.activeFleetId()));
+        FleetPlacementState active = runtime.world().findFleet(runtime.player().activeFleetId()).orElseThrow();
+        InventoryComponent cargo = entity(runtime, active).getComponent(InventoryComponent.class);
+        cargo.capacity = Math.max(cargo.capacity, 10_000);
+        cargo.stock[steel.runtimeId()] += 120;
+        cargo.stock[energy.runtimeId()] += 60;
+    }
+
+    private static void addOwnedFleet(PlayerRuntime runtime, FleetId fleetId) {
+        PlayerState player = runtime.player();
+        List<FleetId> fleets = new ArrayList<>(player.ownedFleetIds());
+        fleets.add(fleetId);
+        runtime.replacePlayerState(PlayerRuntime.copyWithOwnershipAndWallet(
+                player, player.walletMilliCredits(), fleets, player.activeFleetId()));
+    }
+
+    private static void performExternalEnergyDelivery(
+            PlayerRuntime runtime,
+            ContentCatalog content,
+            ConstructionProjectId projectId,
+            ContentCatalog.ItemDefinition energy) {
+        ConstructionProjectState project = runtime.world().findConstructionProject(projectId).orElseThrow();
+        SimulationSession session = runtime.world().findSession(project.systemId()).orElseThrow();
+        Entity site = session.getEntityRegistry().find(project.constructionSiteEntityId());
+        Entity source = findMarketByArchetype(runtime, project.systemId(), "station.power_plant");
+        Entity trader = findExternalTraderForItem(
+                session, content.findFaction("faction.miners").runtimeId(), energy.runtimeId());
+        configureOneUnitPhysicalTrade(trader, source, site, energy.runtimeId());
+        int before = delivered(runtime, projectId, ENERGY_ID);
+        advanceUntilDeliveredAtLeast(runtime, projectId, ENERGY_ID, before + 1, 8_000);
+        assertTrue(delivered(runtime, projectId, ENERGY_ID) > before,
+                "external generic TradeAI must physically satisfy part of construction energy demand");
+        TradeAIComponent ai = trader.getComponent(TradeAIComponent.class);
+        ai.state = TradeAIComponent.State.IDLE;
+        ai.resetRoute();
+        ai.routeSearchCooldown = Float.MAX_VALUE;
+    }
+
+    private static void performOwnedSteelSupply(
+            PlayerRuntime runtime,
+            ConstructionProjectId projectId,
+            FleetId steelHauler) {
+        PlayerFleetOrderService orders = new PlayerFleetOrderService(runtime);
+        int before = delivered(runtime, projectId, STEEL_ID);
+        assertTrue(orders.supplyProject(steelHauler, projectId, STEEL_ID));
+        advanceUntilDeliveredAtLeast(runtime, projectId, STEEL_ID, before + 1, 10_000);
+        assertTrue(delivered(runtime, projectId, STEEL_ID) > before,
+                "owned SUPPLY_PROJECT must physically buy and deliver part of construction steel");
+        assertTrue(orders.clear(steelHauler));
+    }
+
+    private static void physicallyDeliverRemainingFixtureCargo(
+            PlayerRuntime runtime,
+            PlayerConstructionService construction,
+            ConstructionProjectId projectId) {
+        ConstructionProjectState project = runtime.world().findConstructionProject(projectId).orElseThrow();
+        FleetPlacementState active = runtime.world().findFleet(runtime.player().activeFleetId()).orElseThrow();
+        Entity ship = entity(runtime, active);
+        Entity site = runtime.world().findSession(project.systemId()).orElseThrow()
+                .getEntityRegistry().find(project.constructionSiteEntityId());
+        TransformComponent shipTransform = ship.getComponent(TransformComponent.class);
+        TransformComponent siteTransform = site.getComponent(TransformComponent.class);
+        shipTransform.position.set(siteTransform.position);
+        shipTransform.velocity.setZero();
+        boolean transferred = false;
+        for (ConstructionMaterialState material : project.materials()) {
+            int remaining = material.remainingAmount();
+            if (remaining > 0) {
+                assertEquals(remaining, construction.deliverMaterial(
+                        projectId, active.id(), material.itemContentId(), remaining));
+                transferred = true;
+            }
+        }
+        assertTrue(transferred, "aggregate scenario must retain some demand for physical owner delivery");
+        assertTrue(runtime.world().findConstructionProject(projectId).orElseThrow().materialsFulfilled());
+    }
+
+    private static void dockAtCompletedStation(
+            PlayerRuntime runtime,
+            FleetId fleetId,
+            StarSystemId systemId,
+            EntityId stationId) {
+        SimulationSession session = runtime.world().findSession(systemId).orElseThrow();
+        Entity station = session.getEntityRegistry().find(stationId);
+        FleetPlacementState fleet = runtime.world().findFleet(fleetId).orElseThrow();
+        Entity ship = entity(runtime, fleet);
+        TransformComponent shipTransform = ship.getComponent(TransformComponent.class);
+        TransformComponent stationTransform = station.getComponent(TransformComponent.class);
+        shipTransform.position.set(stationTransform.position);
+        shipTransform.velocity.setZero();
+        assertTrue(runtime.dockAt(stationId));
+    }
+
+    private static void configureOneUnitPhysicalTrade(Entity trader, Entity source, Entity destination, int itemId) {
         TradeAIComponent ai = trader.getComponent(TradeAIComponent.class);
         InventoryComponent cargo = trader.getComponent(InventoryComponent.class);
         EntityIdComponent sourceId = source.getComponent(EntityIdComponent.class);
@@ -238,8 +248,6 @@ class Stage16EndToEndAcceptanceTest {
         assertNotNull(cargo);
         assertNotNull(sourceId);
         assertNotNull(destinationId);
-        assertNotNull(traderTransform);
-        assertNotNull(sourceTransform);
         cargo.stock[itemId] = 0;
         ai.buyStationId = sourceId.id;
         ai.sellStationId = destinationId.id;
@@ -253,26 +261,27 @@ class Stage16EndToEndAcceptanceTest {
         traderTransform.velocity.setZero();
     }
 
-    private static Entity findTraderOfDifferentFaction(SimulationSession session, int excludedFactionId) {
+    private static Entity findExternalTraderForItem(
+            SimulationSession session,
+            int excludedFactionId,
+            int itemId) {
         for (Entity entity : session.getEngine().getEntities()) {
             TradeAIComponent ai = entity.getComponent(TradeAIComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
+            ShipComponent ship = entity.getComponent(ShipComponent.class);
             InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
             TransformComponent transform = entity.getComponent(TransformComponent.class);
             if (ai != null && faction != null && faction.factionId != excludedFactionId
+                    && ship != null && ship.canPurchaseItem(itemId)
                     && inventory != null && transform != null) {
                 return entity;
             }
         }
-        throw new AssertionError("No external trader from another faction in construction system");
+        throw new AssertionError("No external trader from another faction can purchase requested item");
     }
 
-    private static Entity findMarketByArchetype(
-            PlayerRuntime runtime,
-            StarSystemId systemId,
-            String archetypeId) {
-        SimulationSession session = runtime.world().findSession(systemId).orElseThrow();
-        for (Entity entity : session.getEngine().getEntities()) {
+    private static Entity findMarketByArchetype(PlayerRuntime runtime, StarSystemId systemId, String archetypeId) {
+        for (Entity entity : runtime.world().findSession(systemId).orElseThrow().getEngine().getEntities()) {
             ArchetypeComponent archetype = entity.getComponent(ArchetypeComponent.class);
             if (archetype != null && archetypeId.equals(archetype.contentId)
                     && entity.getComponent(MarketComponent.class) != null
@@ -292,8 +301,7 @@ class Stage16EndToEndAcceptanceTest {
         SimulationSession session = runtime.world().findSession(systemId).orElseThrow();
         for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
-                    || !systemId.equals(placement.systemId())
-                    || placement.id().equals(excluded)) {
+                    || !systemId.equals(placement.systemId()) || placement.id().equals(excluded)) {
                 continue;
             }
             Entity candidate = session.getEntityRegistry().find(placement.localEntityId());
