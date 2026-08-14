@@ -33,6 +33,7 @@ import java.util.Objects;
  * @param remainingBuildTicks remaining assembly ticks once/while BUILDING
  * @param buildProgress normalized assembly progress in [0,1]
  * @param legalFactionContentId optional legal/faction affiliation of the resulting station
+ * @param territorialAccessCurrentlyAllowed whether current strategic access policy still permits construction in the system
  * @param cancellation current authoritative cancellation decision
  * @param supplyFleetIds owned fleets currently assigned SUPPLY_PROJECT to this site
  */
@@ -54,6 +55,7 @@ public record PlayerConstructionProjectView(
         long remainingBuildTicks,
         double buildProgress,
         String legalFactionContentId,
+        boolean territorialAccessCurrentlyAllowed,
         PlayerConstructionCancellationView cancellation,
         List<FleetId> supplyFleetIds) implements Comparable<PlayerConstructionProjectView> {
 
@@ -77,6 +79,7 @@ public record PlayerConstructionProjectView(
      * @param remainingBuildTicks remaining assembly ticks
      * @param buildProgress normalized assembly progress
      * @param legalFactionContentId optional legal affiliation
+     * @param territorialAccessCurrentlyAllowed current strategic access result
      * @param cancellation current cancellation decision
      * @param supplyFleetIds fleets currently supplying this project
      */
