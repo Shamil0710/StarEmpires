@@ -1,5 +1,6 @@
 package com.spacesim.player;
 
+import com.spacesim.world.ConstructionProjectId;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.StarSystemId;
 
@@ -12,10 +13,16 @@ import java.util.Set;
 /**
  * Persistent state of the human player, independent from simulation entities.
  *
- * <p>World simulation remains player-agnostic. The durable actor layer references physical fleets
- * through stable world-level FleetIds, discovered local objects through StarSystem-qualified IDs,
- * delegated work through declarative {@link PlayerFleetOrderState} values and non-omniscient route
- * danger through explicit {@link PlayerThreatIntelState} observations.</p>
+ * <p>{@code WorldState} remains player-agnostic. The durable actor layer references physical
+ * fleets through {@link FleetId}, world construction projects through
+ * {@link ConstructionProjectId}, completed physical stations through {@link OwnedStationRef},
+ * discovered local objects through system-qualified IDs, delegated work through declarative
+ * {@link PlayerFleetOrderState} values and non-omniscient danger through explicit
+ * {@link PlayerThreatIntelState} observations.</p>
+ *
+ * <p>Stage 16 deliberately keeps asset ownership independent from legal/faction affiliation. An
+ * independent player may therefore own projects and stations without being represented as a hidden
+ * simulation faction.</p>
  *
  * @param walletMilliCredits personal non-negative balance in authoritative milli-credits
  * @param factionContentId optional faction/legal affiliation; {@code null} means independent
@@ -28,6 +35,8 @@ import java.util.Set;
  * @param dockedAt optional currently docked market/station reference; must already be discovered
  * @param fleetOrders persistent delegated orders, at most one per owned FleetId
  * @param threatIntel persistent observed system/link danger intelligence
+ * @param ownedConstructionProjectIds world construction projects economically owned by the player
+ * @param ownedStations physical completed stations owned by the player
  */
 public record PlayerState(
         long walletMilliCredits,
@@ -40,7 +49,41 @@ public record PlayerState(
         StarSystemId homeSystemId,
         DiscoveredObjectRef dockedAt,
         List<PlayerFleetOrderState> fleetOrders,
-        List<PlayerThreatIntelState> threatIntel) {
+        List<PlayerThreatIntelState> threatIntel,
+        List<ConstructionProjectId> ownedConstructionProjectIds,
+        List<OwnedStationRef> ownedStations) {
+
+    /**
+     * Source-compatible Stage-15 constructor before player construction ownership.
+     *
+     * @param walletMilliCredits personal non-negative balance
+     * @param factionContentId optional faction affiliation
+     * @param reputations reputation entries
+     * @param ownedFleetIds owned fleets
+     * @param activeFleetId active fleet
+     * @param discoveredSystemIds discovered systems
+     * @param discoveredObjects discovered objects
+     * @param homeSystemId optional home system
+     * @param dockedAt optional current docking reference
+     * @param fleetOrders persistent delegated orders
+     * @param threatIntel persistent observed danger intelligence
+     */
+    public PlayerState(
+            long walletMilliCredits,
+            String factionContentId,
+            List<PlayerReputationState> reputations,
+            List<FleetId> ownedFleetIds,
+            FleetId activeFleetId,
+            List<StarSystemId> discoveredSystemIds,
+            List<DiscoveredObjectRef> discoveredObjects,
+            StarSystemId homeSystemId,
+            DiscoveredObjectRef dockedAt,
+            List<PlayerFleetOrderState> fleetOrders,
+            List<PlayerThreatIntelState> threatIntel) {
+        this(walletMilliCredits, factionContentId, reputations, ownedFleetIds, activeFleetId,
+                discoveredSystemIds, discoveredObjects, homeSystemId, dockedAt, fleetOrders,
+                threatIntel, List.of(), List.of());
+    }
 
     /**
      * Source-compatible Stage-15A constructor before persistent threat intelligence.
@@ -68,7 +111,8 @@ public record PlayerState(
             DiscoveredObjectRef dockedAt,
             List<PlayerFleetOrderState> fleetOrders) {
         this(walletMilliCredits, factionContentId, reputations, ownedFleetIds, activeFleetId,
-                discoveredSystemIds, discoveredObjects, homeSystemId, dockedAt, fleetOrders, List.of());
+                discoveredSystemIds, discoveredObjects, homeSystemId, dockedAt, fleetOrders,
+                List.of(), List.of(), List.of());
     }
 
     /**
@@ -95,7 +139,8 @@ public record PlayerState(
             StarSystemId homeSystemId,
             DiscoveredObjectRef dockedAt) {
         this(walletMilliCredits, factionContentId, reputations, ownedFleetIds, activeFleetId,
-                discoveredSystemIds, discoveredObjects, homeSystemId, dockedAt, List.of(), List.of());
+                discoveredSystemIds, discoveredObjects, homeSystemId, dockedAt,
+                List.of(), List.of(), List.of(), List.of());
     }
 
     /**
@@ -120,23 +165,26 @@ public record PlayerState(
             List<DiscoveredObjectRef> discoveredObjects,
             StarSystemId homeSystemId) {
         this(walletMilliCredits, factionContentId, reputations, ownedFleetIds, activeFleetId,
-                discoveredSystemIds, discoveredObjects, homeSystemId, null, List.of(), List.of());
+                discoveredSystemIds, discoveredObjects, homeSystemId, null,
+                List.of(), List.of(), List.of(), List.of());
     }
 
     /**
      * Validates and canonicalizes player state.
      *
      * @param walletMilliCredits personal non-negative balance
-     * @param factionContentId optional faction content ID
+     * @param factionContentId optional faction/legal affiliation
      * @param reputations reputation entries
-     * @param ownedFleetIds owned world-level fleet IDs
+     * @param ownedFleetIds owned fleet IDs
      * @param activeFleetId active fleet or {@code null}
      * @param discoveredSystemIds discovered systems
      * @param discoveredObjects discovered system-local objects
-     * @param homeSystemId optional home/start system
+     * @param homeSystemId optional home system
      * @param dockedAt optional current docking reference
      * @param fleetOrders delegated persistent orders
      * @param threatIntel persistent observed danger intelligence
+     * @param ownedConstructionProjectIds player-owned world construction projects
+     * @param ownedStations player-owned completed physical stations
      */
     public PlayerState {
         if (walletMilliCredits < 0L) {
@@ -162,30 +210,19 @@ public record PlayerState(
         reputationCopy.sort(PlayerReputationState::compareTo);
         reputations = List.copyOf(reputationCopy);
 
-        List<FleetId> fleetCopy = new ArrayList<>(
-                Objects.requireNonNull(ownedFleetIds, "Owned FleetIds not set"));
-        Set<FleetId> fleets = new HashSet<>();
-        for (FleetId fleetId : fleetCopy) {
-            if (!fleets.add(Objects.requireNonNull(fleetId, "Owned FleetId not set"))) {
-                throw new IllegalArgumentException("Duplicate owned FleetId: " + fleetId);
-            }
-        }
-        fleetCopy.sort(FleetId::compareTo);
+        List<FleetId> fleetCopy = canonicalUnique(
+                ownedFleetIds, "Owned FleetIds not set", "Owned FleetId not set", "Duplicate owned FleetId");
         ownedFleetIds = List.copyOf(fleetCopy);
+        Set<FleetId> fleets = Set.copyOf(fleetCopy);
         if (activeFleetId != null && !fleets.contains(activeFleetId)) {
             throw new IllegalArgumentException("Active FleetId must be player-owned");
         }
 
-        List<StarSystemId> systemCopy = new ArrayList<>(
-                Objects.requireNonNull(discoveredSystemIds, "Discovered systems not set"));
-        Set<StarSystemId> systems = new HashSet<>();
-        for (StarSystemId systemId : systemCopy) {
-            if (!systems.add(Objects.requireNonNull(systemId, "Discovered system ID not set"))) {
-                throw new IllegalArgumentException("Duplicate discovered StarSystem: " + systemId);
-            }
-        }
-        systemCopy.sort(StarSystemId::compareTo);
+        List<StarSystemId> systemCopy = canonicalUnique(
+                discoveredSystemIds, "Discovered systems not set", "Discovered system ID not set",
+                "Duplicate discovered StarSystem");
         discoveredSystemIds = List.copyOf(systemCopy);
+        Set<StarSystemId> systems = Set.copyOf(systemCopy);
         if (homeSystemId != null && !systems.contains(homeSystemId)) {
             throw new IllegalArgumentException("Home StarSystem must be discovered");
         }
@@ -241,6 +278,29 @@ public record PlayerState(
         }
         intelCopy.sort(PlayerThreatIntelState::compareTo);
         threatIntel = List.copyOf(intelCopy);
+
+        List<ConstructionProjectId> projectCopy = canonicalUnique(
+                ownedConstructionProjectIds,
+                "Owned construction project IDs not set",
+                "Owned ConstructionProjectId not set",
+                "Duplicate owned ConstructionProjectId");
+        ownedConstructionProjectIds = List.copyOf(projectCopy);
+
+        List<OwnedStationRef> stationCopy = new ArrayList<>(Objects.requireNonNull(
+                ownedStations, "Owned stations not set"));
+        Set<OwnedStationRef> stationRefs = new HashSet<>();
+        for (OwnedStationRef station : stationCopy) {
+            OwnedStationRef value = Objects.requireNonNull(station, "Owned station ref not set");
+            if (!systems.contains(value.systemId())) {
+                throw new IllegalArgumentException("Owned station belongs to an undiscovered system: "
+                        + value.systemId());
+            }
+            if (!stationRefs.add(value)) {
+                throw new IllegalArgumentException("Duplicate owned station: " + value);
+            }
+        }
+        stationCopy.sort(OwnedStationRef::compareTo);
+        ownedStations = List.copyOf(stationCopy);
     }
 
     /** @return whether the player currently has a named faction affiliation */
@@ -251,5 +311,22 @@ public record PlayerState(
     /** @return whether the active ship is currently docked */
     public boolean docked() {
         return dockedAt != null;
+    }
+
+    private static <T extends Comparable<? super T>> List<T> canonicalUnique(
+            List<T> source,
+            String listMessage,
+            String entryMessage,
+            String duplicateMessage) {
+        List<T> copy = new ArrayList<>(Objects.requireNonNull(source, listMessage));
+        Set<T> seen = new HashSet<>();
+        for (T entry : copy) {
+            T checked = Objects.requireNonNull(entry, entryMessage);
+            if (!seen.add(checked)) {
+                throw new IllegalArgumentException(duplicateMessage + ": " + checked);
+            }
+        }
+        copy.sort(null);
+        return copy;
     }
 }

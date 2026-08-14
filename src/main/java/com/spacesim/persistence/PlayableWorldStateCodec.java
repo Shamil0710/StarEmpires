@@ -2,12 +2,14 @@ package com.spacesim.persistence;
 
 import com.spacesim.player.DiscoveredObjectRef;
 import com.spacesim.player.FleetOrderType;
+import com.spacesim.player.OwnedStationRef;
 import com.spacesim.player.PlayableWorldState;
 import com.spacesim.player.PlayerFleetOrderState;
 import com.spacesim.player.PlayerReputationState;
 import com.spacesim.player.PlayerState;
 import com.spacesim.player.PlayerThreatIntelKind;
 import com.spacesim.player.PlayerThreatIntelState;
+import com.spacesim.world.ConstructionProjectId;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldState;
@@ -31,8 +33,9 @@ import java.util.Objects;
  *
  * <p>The envelope embeds an unchanged {@link WorldStateCodec} payload plus player state. Raw
  * pre-player WorldState saves migrate with no player. Playable schema v1 migrates undocked,
- * schema v2 adds docking, schema v3 adds persistent fleet orders, and current schema v4 adds
- * non-omniscient observed threat intelligence without serializing transient survival state.</p>
+ * schema v2 adds docking, schema v3 adds persistent fleet orders, schema v4 adds non-omniscient
+ * observed threat intelligence, and current schema v5 adds explicit player construction-project
+ * and completed-station ownership without putting human-player identity into {@code WorldState}.</p>
  */
 public final class PlayableWorldStateCodec {
     private static final int MAGIC = 0x53545053;
@@ -47,6 +50,8 @@ public final class PlayableWorldStateCodec {
     private static final int MAX_FLEET_ORDERS = 100_000;
     private static final int MAX_PATROL_SYSTEMS = 4096;
     private static final int MAX_THREAT_INTEL = 200_000;
+    private static final int MAX_OWNED_CONSTRUCTION_PROJECTS = 100_000;
+    private static final int MAX_OWNED_STATIONS = 100_000;
 
     private PlayableWorldStateCodec() {
         throw new AssertionError("PlayableWorldStateCodec does not create instances");
@@ -194,6 +199,7 @@ public final class PlayableWorldStateCodec {
 
     private static void requireSupportedSchema(int schemaVersion) {
         if (schemaVersion != PlayableWorldState.CURRENT_VERSION
+                && schemaVersion != PlayableWorldState.LEGACY_THREAT_INTEL_VERSION
                 && schemaVersion != PlayableWorldState.LEGACY_FLEET_ORDERS_VERSION
                 && schemaVersion != PlayableWorldState.LEGACY_DOCKING_VERSION
                 && schemaVersion != PlayableWorldState.LEGACY_STAGE12A_VERSION) {
@@ -219,6 +225,9 @@ public final class PlayableWorldStateCodec {
         requireCount("discovered objects", player.discoveredObjects().size(), MAX_DISCOVERED_OBJECTS);
         requireCount("fleet orders", player.fleetOrders().size(), MAX_FLEET_ORDERS);
         requireCount("threat intel", player.threatIntel().size(), MAX_THREAT_INTEL);
+        requireCount("owned construction projects", player.ownedConstructionProjectIds().size(),
+                MAX_OWNED_CONSTRUCTION_PROJECTS);
+        requireCount("owned stations", player.ownedStations().size(), MAX_OWNED_STATIONS);
 
         output.writeLong(player.walletMilliCredits());
         writeNullableContentId(output, player.factionContentId());
@@ -266,6 +275,16 @@ public final class PlayableWorldStateCodec {
         for (PlayerThreatIntelState intel : player.threatIntel()) {
             writeThreatIntel(output, intel);
         }
+
+        output.writeInt(player.ownedConstructionProjectIds().size());
+        for (ConstructionProjectId projectId : player.ownedConstructionProjectIds()) {
+            output.writeLong(projectId.value());
+        }
+
+        output.writeInt(player.ownedStations().size());
+        for (OwnedStationRef station : player.ownedStations()) {
+            writeOwnedStation(output, station);
+        }
     }
 
     private static PlayerState readPlayer(DataInputStream input, int schemaVersion) throws IOException {
@@ -311,7 +330,7 @@ public final class PlayableWorldStateCodec {
         }
 
         List<PlayerThreatIntelState> intel = List.of();
-        if (schemaVersion >= PlayableWorldState.CURRENT_VERSION) {
+        if (schemaVersion >= PlayableWorldState.LEGACY_THREAT_INTEL_VERSION) {
             int intelCount = readCount(input, "threat intel", MAX_THREAT_INTEL);
             List<PlayerThreatIntelState> decodedIntel = new ArrayList<>(intelCount);
             for (int index = 0; index < intelCount; index++) {
@@ -319,9 +338,28 @@ public final class PlayableWorldStateCodec {
             }
             intel = List.copyOf(decodedIntel);
         }
+
+        List<ConstructionProjectId> projects = List.of();
+        List<OwnedStationRef> stations = List.of();
+        if (schemaVersion >= PlayableWorldState.CURRENT_VERSION) {
+            int projectCount = readCount(input, "owned construction projects", MAX_OWNED_CONSTRUCTION_PROJECTS);
+            List<ConstructionProjectId> decodedProjects = new ArrayList<>(projectCount);
+            for (int index = 0; index < projectCount; index++) {
+                decodedProjects.add(new ConstructionProjectId(input.readLong()));
+            }
+            projects = List.copyOf(decodedProjects);
+
+            int stationCount = readCount(input, "owned stations", MAX_OWNED_STATIONS);
+            List<OwnedStationRef> decodedStations = new ArrayList<>(stationCount);
+            for (int index = 0; index < stationCount; index++) {
+                decodedStations.add(readOwnedStation(input));
+            }
+            stations = List.copyOf(decodedStations);
+        }
+
         return new PlayerState(
                 wallet, affiliation, reputations, fleets, activeFleet, systems, objects,
-                home, dockedAt, orders, intel);
+                home, dockedAt, orders, intel, projects, stations);
     }
 
     private static void writeFleetOrder(DataOutputStream output, PlayerFleetOrderState order) throws IOException {
@@ -400,6 +438,17 @@ public final class PlayableWorldStateCodec {
 
     private static DiscoveredObjectRef readObjectRef(DataInputStream input) throws IOException {
         return new DiscoveredObjectRef(
+                new StarSystemId(input.readLong()),
+                new EntityId(input.readLong()));
+    }
+
+    private static void writeOwnedStation(DataOutputStream output, OwnedStationRef reference) throws IOException {
+        output.writeLong(reference.systemId().value());
+        output.writeLong(reference.stationEntityId().value());
+    }
+
+    private static OwnedStationRef readOwnedStation(DataInputStream input) throws IOException {
+        return new OwnedStationRef(
                 new StarSystemId(input.readLong()),
                 new EntityId(input.readLong()));
     }

@@ -5,6 +5,7 @@ import com.spacesim.components.ArchetypeComponent;
 import com.spacesim.components.CombatCommandComponent;
 import com.spacesim.components.CombatComponent;
 import com.spacesim.components.FlightCommandComponent;
+import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.MiningComponent;
 import com.spacesim.components.PlayerControlledComponent;
@@ -16,6 +17,7 @@ import com.spacesim.simulation.SimulationSession;
 import com.spacesim.systems.AutonomousFlightSystem;
 import com.spacesim.systems.PlayerDirectControlSystem;
 import com.spacesim.world.CombatDestructionResolver;
+import com.spacesim.world.ConstructionProjectId;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
@@ -37,8 +39,9 @@ import java.util.Optional;
  * {@link FlightCommandComponent} intent before each authoritative world advance. Direct control
  * always wins for the active FleetId.</p>
  *
- * <p>Combat intent still uses the same {@link CombatCommandComponent} as CombatAI; lethal results
- * are bridged into the ordinary world destruction pipeline after a tick.</p>
+ * <p>Stage 16 keeps player construction-project and completed-station ownership in
+ * {@link PlayerState}. World construction/station entities remain ordinary world state. Runtime
+ * reconciliation removes destroyed station references but does not invent replacement assets.</p>
  */
 public final class PlayerRuntime {
     private static final float DEFAULT_DOCKING_RANGE = 10f;
@@ -55,6 +58,7 @@ public final class PlayerRuntime {
         validateReferences(this.world, this.content, this.player);
         installPlayerControlSystems();
         this.fleetOrderExecutor = new PlayerFleetOrderExecutor(this, this.content);
+        reconcileOwnedStations();
         synchronizePlayerLocationAndControl();
         fleetOrderExecutor.prepare();
     }
@@ -110,6 +114,7 @@ public final class PlayerRuntime {
     /** @return current immutable player state after ownership/docking reconciliation */
     public PlayerState player() {
         reconcileOwnedFleets();
+        reconcileOwnedStations();
         reconcileDocking();
         return player;
     }
@@ -130,6 +135,7 @@ public final class PlayerRuntime {
         WorldSimulation.AdvanceReport report = world.advanceFrame(realDeltaSeconds);
         CombatDestructionResolver.resolve(world);
         reconcileOwnedFleets();
+        reconcileOwnedStations();
         reconcileDocking();
         synchronizePlayerLocationAndControl();
         return report;
@@ -138,6 +144,7 @@ public final class PlayerRuntime {
     /** @return atomic playable snapshot after ownership/docking reconciliation */
     public PlayableWorldState snapshot() {
         reconcileOwnedFleets();
+        reconcileOwnedStations();
         reconcileDocking();
         return new PlayableWorldState(PlayableWorldState.CURRENT_VERSION, world.snapshot(), player);
     }
@@ -356,6 +363,7 @@ public final class PlayerRuntime {
         PlayerState previous = player;
         player = checked;
         releaseRemovedOwnedFleets(previous, checked);
+        reconcileOwnedStations();
         synchronizePlayerLocationAndControl();
         fleetOrderExecutor.prepare();
     }
@@ -519,6 +527,25 @@ public final class PlayerRuntime {
                 player.discoveredSystemIds(), player.discoveredObjects(), null);
     }
 
+    private void reconcileOwnedStations() {
+        if (player.ownedStations().isEmpty()) {
+            return;
+        }
+        List<OwnedStationRef> survivors = new ArrayList<>();
+        for (OwnedStationRef reference : player.ownedStations()) {
+            SimulationSession session = world.findSession(reference.systemId()).orElse(null);
+            Entity entity = session == null ? null : session.getEntityRegistry().find(reference.stationEntityId());
+            IdentityComponent identity = entity == null ? null : entity.getComponent(IdentityComponent.class);
+            if (identity != null && identity.kind == IdentityComponent.Kind.STATION) {
+                survivors.add(reference);
+            }
+        }
+        if (survivors.size() != player.ownedStations().size()) {
+            player = copyWithConstructionOwnership(
+                    player, player.ownedConstructionProjectIds(), survivors);
+        }
+    }
+
     private void reconcileDocking() {
         DiscoveredObjectRef docked = player.dockedAt();
         if (docked == null) {
@@ -565,6 +592,26 @@ public final class PlayerRuntime {
                 source.discoveredSystemIds(), source.discoveredObjects(), docked);
     }
 
+    static PlayerState copyWithConstructionOwnership(
+            PlayerState source,
+            List<ConstructionProjectId> ownedProjectIds,
+            List<OwnedStationRef> ownedStations) {
+        return new PlayerState(
+                source.walletMilliCredits(),
+                source.factionContentId(),
+                source.reputations(),
+                source.ownedFleetIds(),
+                source.activeFleetId(),
+                source.discoveredSystemIds(),
+                source.discoveredObjects(),
+                source.homeSystemId(),
+                source.dockedAt(),
+                source.fleetOrders(),
+                source.threatIntel(),
+                ownedProjectIds,
+                ownedStations);
+    }
+
     private static PlayerState copyPlayer(
             PlayerState source,
             long walletMilliCredits,
@@ -584,7 +631,9 @@ public final class PlayerRuntime {
                 source.homeSystemId(),
                 dockedAt,
                 ordersForOwned(source.fleetOrders(), ownedFleetIds),
-                source.threatIntel());
+                source.threatIntel(),
+                source.ownedConstructionProjectIds(),
+                source.ownedStations());
     }
 
     private static List<PlayerFleetOrderState> ordersForOwned(
@@ -635,6 +684,11 @@ public final class PlayerRuntime {
                 throw new IllegalArgumentException("Player owns unknown FleetId: " + fleetId);
             }
         }
+        for (ConstructionProjectId projectId : player.ownedConstructionProjectIds()) {
+            if (world.findConstructionProject(projectId).isEmpty()) {
+                throw new IllegalArgumentException("Player owns unknown ConstructionProjectId: " + projectId);
+            }
+        }
         for (StarSystemId systemId : player.discoveredSystemIds()) {
             if (world.getTopology().findSystem(systemId).isEmpty()) {
                 throw new IllegalArgumentException("Player discovered unknown StarSystem: " + systemId);
@@ -643,6 +697,12 @@ public final class PlayerRuntime {
         for (DiscoveredObjectRef reference : player.discoveredObjects()) {
             if (world.getTopology().findSystem(reference.systemId()).isEmpty()) {
                 throw new IllegalArgumentException("Player discovery references unknown StarSystem: "
+                        + reference.systemId());
+            }
+        }
+        for (OwnedStationRef reference : player.ownedStations()) {
+            if (world.getTopology().findSystem(reference.systemId()).isEmpty()) {
+                throw new IllegalArgumentException("Owned station references unknown StarSystem: "
                         + reference.systemId());
             }
         }
