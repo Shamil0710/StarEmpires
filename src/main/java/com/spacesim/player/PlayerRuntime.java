@@ -5,6 +5,8 @@ import com.spacesim.world.FleetId;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldSimulation;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -12,7 +14,9 @@ import java.util.Objects;
  *
  * <p>The wrapper deliberately does not move player data into the simulation core. It validates
  * persistent references against the current world, forwards time advancement unchanged and
- * snapshots world + player atomically through {@link PlayableWorldState}.</p>
+ * snapshots world + player atomically through {@link PlayableWorldState}. Stage-12B additionally
+ * reconciles destroyed world fleets out of player ownership without changing their faction/legal
+ * components.</p>
  */
 public final class PlayerRuntime {
     private final WorldSimulation world;
@@ -72,23 +76,27 @@ public final class PlayerRuntime {
         return world;
     }
 
-    /** @return current immutable player state */
+    /** @return current immutable player state after ownership reconciliation */
     public PlayerState player() {
+        reconcileOwnedFleets();
         return player;
     }
 
     /**
-     * Advances the unchanged fixed-tick world pipeline.
+     * Advances the unchanged fixed-tick world pipeline and reconciles destroyed owned fleets.
      *
      * @param realDeltaSeconds render/frame delta
      * @return ordinary WorldSimulation advance report
      */
     public WorldSimulation.AdvanceReport advanceFrame(float realDeltaSeconds) {
-        return world.advanceFrame(realDeltaSeconds);
+        WorldSimulation.AdvanceReport report = world.advanceFrame(realDeltaSeconds);
+        reconcileOwnedFleets();
+        return report;
     }
 
-    /** @return atomic playable snapshot of current world and player state */
+    /** @return atomic playable snapshot after ownership reconciliation */
     public PlayableWorldState snapshot() {
+        reconcileOwnedFleets();
         return new PlayableWorldState(
                 PlayableWorldState.CURRENT_VERSION,
                 world.snapshot(),
@@ -99,6 +107,39 @@ public final class PlayerRuntime {
         PlayerState checked = Objects.requireNonNull(replacement, "Replacement PlayerState not set");
         validateReferences(world, content, checked);
         player = checked;
+    }
+
+    private void reconcileOwnedFleets() {
+        List<FleetId> survivors = new ArrayList<>();
+        for (FleetId fleetId : player.ownedFleetIds()) {
+            if (world.findFleet(fleetId).isPresent()) {
+                survivors.add(fleetId);
+            }
+        }
+        if (survivors.size() == player.ownedFleetIds().size()) {
+            return;
+        }
+        FleetId active = player.activeFleetId();
+        if (active != null && !survivors.contains(active)) {
+            active = survivors.isEmpty() ? null : survivors.get(0);
+        }
+        player = copyWithOwnershipAndWallet(player, player.walletMilliCredits(), survivors, active);
+    }
+
+    static PlayerState copyWithOwnershipAndWallet(
+            PlayerState source,
+            long walletMilliCredits,
+            List<FleetId> ownedFleetIds,
+            FleetId activeFleetId) {
+        return new PlayerState(
+                walletMilliCredits,
+                source.factionContentId(),
+                source.reputations(),
+                ownedFleetIds,
+                activeFleetId,
+                source.discoveredSystemIds(),
+                source.discoveredObjects(),
+                source.homeSystemId());
     }
 
     private static void validateReferences(
