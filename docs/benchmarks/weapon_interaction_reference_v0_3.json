@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "status": "authoring-benchmark-only",
+  "unitSystem": "SI",
+  "sourceDocument": "docs/ship_mathematics_v0_3.md",
+  "externalEngineeringBasis": [
+    {"source": "NASA NTRS 20230000548", "topic": "state estimation and covariance in navigation EKF"},
+    {"source": "NASA NTRS 20250002787", "topic": "navigation filter best practices"},
+    {"source": "NACA/NASA NTRS 20090033671", "topic": "target-seeking and proportional-navigation family"},
+    {"source": "NASA NTRS 20110003031", "topic": "precision pointing and aperture in deep-space laser systems"},
+    {"source": "NASA TP 20030068423", "topic": "hypervelocity debris shielding and ballistic-limit methods"},
+    {"source": "NASA-TM-103565", "topic": "limitations and disagreement of empirical penetration equations"}
+  ],
+  "trackBenchmarkSeed": {
+    "fireControlAngularSigmaRad": 5e-08,
+    "velocitySigmaMps": 0.03,
+    "reactionDelayAfterDetectedShotS": 3.0,
+    "maneuverSigmaFractionOfAvailableLateralAcceleration": 0.15,
+    "note": "Future-tech balance seed. Production covariance must be derived from sensor measurements, geometry, track age and ECM."
+  },
+  "targetBenchmarks": [
+    {"hullClass": "CORVETTE", "benchmarkProjectedAreaM2": 135.2, "equivalentRadiusM": 6.560144557252417, "benchmarkLateralAccelerationMps2": 0.35},
+    {"hullClass": "FRIGATE", "benchmarkProjectedAreaM2": 312.0, "equivalentRadiusM": 9.965574970333758, "benchmarkLateralAccelerationMps2": 0.25},
+    {"hullClass": "DESTROYER", "benchmarkProjectedAreaM2": 618.8, "equivalentRadiusM": 14.034605714822547, "benchmarkLateralAccelerationMps2": 0.2},
+    {"hullClass": "CRUISER", "benchmarkProjectedAreaM2": 1608.75, "equivalentRadiusM": 22.62920744078708, "benchmarkLateralAccelerationMps2": 0.12},
+    {"hullClass": "BATTLECRUISER", "benchmarkProjectedAreaM2": 2925.0, "equivalentRadiusM": 30.513217088461644, "benchmarkLateralAccelerationMps2": 0.1},
+    {"hullClass": "BATTLESHIP", "benchmarkProjectedAreaM2": 6077.5, "equivalentRadiusM": 43.98327333523493, "benchmarkLateralAccelerationMps2": 0.06}
+  ],
+  "kineticWeapons": [
+    {"id": "weapon.kinetic.m_coilgun_v0_3", "sizeClass": "M", "projectileMassKg": 25.0, "muzzleVelocityMps": 15000.0, "weaponPointingSigmaRad": 2.5e-07, "muzzleEnergyJ": 2812500000.0},
+    {"id": "weapon.kinetic.l_coilgun_v0_3", "sizeClass": "L", "projectileMassKg": 150.0, "muzzleVelocityMps": 20000.0, "weaponPointingSigmaRad": 1e-07, "muzzleEnergyJ": 30000000000.0},
+    {"id": "weapon.kinetic.xl_capital_v0_3", "sizeClass": "XL", "projectileMassKg": 1000.0, "muzzleVelocityMps": 30000.0, "weaponPointingSigmaRad": 4e-08, "muzzleEnergyJ": 450000000000.0}
+  ],
+  "kineticP50Benchmarks": [
+    {"weaponId": "weapon.kinetic.m_coilgun_v0_3", "targetHullClass": "CORVETTE", "p50RangeM": 263037.55010316265, "timeOfFlightAtP50S": 17.535836673544175, "sigmaAimPlaneAtP50M": 5.571673785515271},
+    {"weaponId": "weapon.kinetic.m_coilgun_v0_3", "targetHullClass": "FRIGATE", "p50RangeM": 363099.2477782086, "timeOfFlightAtP50S": 24.20661651854724, "sigmaAimPlaneAtP50M": 8.463980074709088},
+    {"weaponId": "weapon.kinetic.l_coilgun_v0_3", "targetHullClass": "CRUISER", "p50RangeM": 982858.7432747683, "timeOfFlightAtP50S": 49.14293716373842, "sigmaAimPlaneAtP50M": 19.21947920270032},
+    {"weaponId": "weapon.kinetic.l_coilgun_v0_3", "targetHullClass": "BATTLECRUISER", "p50RangeM": 1234142.9580448447, "timeOfFlightAtP50S": 61.707147902242234, "sigmaAimPlaneAtP50M": 25.915540470151385},
+    {"weaponId": "weapon.kinetic.xl_capital_v0_3", "targetHullClass": "BATTLESHIP", "p50RangeM": 2819430.91298755, "timeOfFlightAtP50S": 93.98103043291833, "sigmaAimPlaneAtP50M": 37.355952891641756}
+  ],
+  "guidedWeapons": [
+    {"id": "weapon.interceptor.s_fleet_v0_3", "role": "S_FLEET_INTERCEPTOR", "wetMassKg": 1200, "dryMassKg": 700, "propellantMassKg": 500, "exhaustVelocityMps": 30000, "thrustN": 180000, "massFlowKgPerSec": 6.0, "burnTimeS": 83.33333333333333, "initialAccelerationMps2": 150.0, "finalAccelerationMps2": 257.14285714285717, "nominalDeltaVMps": 16169.895021980607, "terminalReserveDeltaVMps": 4000, "minimumJetPowerW": 2700000000.0, "seekerAcquisitionRangeMSeed": 250000, "navigationConstantSeed": 4.0},
+    {"id": "weapon.interceptor.extended_v0_3", "role": "EXTENDED_AREA_INTERCEPTOR", "wetMassKg": 4000, "dryMassKg": 2000, "propellantMassKg": 2000, "exhaustVelocityMps": 35000, "thrustN": 400000, "massFlowKgPerSec": 11.428571428571429, "burnTimeS": 175.0, "initialAccelerationMps2": 100.0, "finalAccelerationMps2": 200.0, "nominalDeltaVMps": 24260.151319598084, "terminalReserveDeltaVMps": 6000, "minimumJetPowerW": 7000000000.0, "seekerAcquisitionRangeMSeed": 500000, "navigationConstantSeed": 4.0},
+    {"id": "weapon.missile.m_antiship_v0_3", "role": "M_ANTI_SHIP", "wetMassKg": 12000, "dryMassKg": 5000, "propellantMassKg": 7000, "exhaustVelocityMps": 40000, "thrustN": 600000, "massFlowKgPerSec": 15.0, "burnTimeS": 466.6666666666667, "initialAccelerationMps2": 50.0, "finalAccelerationMps2": 120.0, "nominalDeltaVMps": 35018.74949415599, "terminalReserveDeltaVMps": 8000, "minimumJetPowerW": 12000000000.0, "seekerAcquisitionRangeMSeed": 1000000, "navigationConstantSeed": 4.0},
+    {"id": "weapon.torpedo.l_heavy_v0_3", "role": "L_HEAVY_TORPEDO", "wetMassKg": 120000, "dryMassKg": 40000, "propellantMassKg": 80000, "exhaustVelocityMps": 50000, "thrustN": 3000000, "massFlowKgPerSec": 60.0, "burnTimeS": 1333.3333333333333, "initialAccelerationMps2": 25.0, "finalAccelerationMps2": 75.0, "nominalDeltaVMps": 54930.61443340549, "terminalReserveDeltaVMps": 12000, "minimumJetPowerW": 75000000000.0, "seekerAcquisitionRangeMSeed": 1500000, "navigationConstantSeed": 4.0}
+  ],
+  "defensiveBatterySeeds": [
+    {"id": "module.battery.m_fleet_interceptor_v0_3", "mountSizeClass": "M", "interceptorWeaponId": "weapon.interceptor.s_fleet_v0_3", "magazineCount": 24, "launchCells": 2, "launchCyclePerCellS": 4.0, "terminalSupportChannels": 2},
+    {"id": "module.battery.l_area_defense_v0_3", "mountSizeClass": "L", "interceptorWeaponId": "weapon.interceptor.extended_v0_3", "magazineCount": 48, "launchCells": 4, "launchCyclePerCellS": 6.0, "terminalSupportChannels": 6}
+  ],
+  "laserWeapons": [
+    {
+      "id": "weapon.laser.s_pd_v0_3", "sizeClass": "S", "beamOutputPowerW": 5000000.0, "wavelengthM": 1.064e-06, "apertureM": 0.5, "pointingJitterRad": 5e-08, "benchmarkTargetAbsorptivity": 0.5, "benchmarkAbsorbedFluenceThresholdJPerM2": 8000000.0,
+      "derivedRangeTable": [
+        {"rangeM": 100000.0, "spotRadiusM": 0.2596641435701125, "incidentIrradianceWPerM2": 23604573.923904266, "idealContinuousDwellToBenchmarkThresholdS": 0.6778347303188074},
+        {"rangeM": 200000.0, "spotRadiusM": 0.519328287140225, "incidentIrradianceWPerM2": 5901143.480976067, "idealContinuousDwellToBenchmarkThresholdS": 2.7113389212752295},
+        {"rangeM": 300000.0, "spotRadiusM": 0.7789924307103376, "incidentIrradianceWPerM2": 2622730.4359893617, "idealContinuousDwellToBenchmarkThresholdS": 6.100512572869269},
+        {"rangeM": 500000.0, "spotRadiusM": 1.2983207178505627, "incidentIrradianceWPerM2": 944182.9569561706, "idealContinuousDwellToBenchmarkThresholdS": 16.945868257970183},
+        {"rangeM": 750000.0, "spotRadiusM": 1.9474810767758441, "incidentIrradianceWPerM2": 419636.869758298, "idealContinuousDwellToBenchmarkThresholdS": 38.12820358043292},
+        {"rangeM": 1000000.0, "spotRadiusM": 2.5966414357011254, "incidentIrradianceWPerM2": 236045.73923904265, "idealContinuousDwellToBenchmarkThresholdS": 67.78347303188073}
+      ]
+    },
+    {
+      "id": "weapon.laser.m_battery_v0_3", "sizeClass": "M", "beamOutputPowerW": 30000000.0, "wavelengthM": 1.064e-06, "apertureM": 1.5, "pointingJitterRad": 5e-08, "benchmarkTargetAbsorptivity": 0.5, "benchmarkAbsorbedFluenceThresholdJPerM2": 8000000.0,
+      "derivedRangeTable": [
+        {"rangeM": 500000.0, "spotRadiusM": 0.4334149521083821, "incidentIrradianceWPerM2": 50835090.685645655, "idealContinuousDwellToBenchmarkThresholdS": 0.3147432174153263},
+        {"rangeM": 1000000.0, "spotRadiusM": 0.8668299042167642, "incidentIrradianceWPerM2": 12708772.671411414, "idealContinuousDwellToBenchmarkThresholdS": 1.2589728696613052},
+        {"rangeM": 2000000.0, "spotRadiusM": 1.7336598084335284, "incidentIrradianceWPerM2": 3177193.1678528534, "idealContinuousDwellToBenchmarkThresholdS": 5.035891478645221},
+        {"rangeM": 3000000.0, "spotRadiusM": 2.600489712650293, "incidentIrradianceWPerM2": 1412085.8523790454, "idealContinuousDwellToBenchmarkThresholdS": 11.330755826951751}
+      ]
+    },
+    {
+      "id": "weapon.laser.l_heavy_v0_3", "sizeClass": "L", "beamOutputPowerW": 100000000.0, "wavelengthM": 1.064e-06, "apertureM": 4.0, "pointingJitterRad": 5e-08, "benchmarkTargetAbsorptivity": 0.25, "benchmarkAbsorbedFluenceThresholdJPerM2": 250000000.0,
+      "derivedRangeTable": [
+        {"rangeM": 1000000.0, "spotRadiusM": 0.3283492506463202, "incidentIrradianceWPerM2": 295241952.2194288, "idealContinuousDwellToBenchmarkThresholdS": 3.3870525258442377},
+        {"rangeM": 2000000.0, "spotRadiusM": 0.6566985012926404, "incidentIrradianceWPerM2": 73810488.0548572, "idealContinuousDwellToBenchmarkThresholdS": 13.54821010337695},
+        {"rangeM": 3000000.0, "spotRadiusM": 0.9850477519389608, "incidentIrradianceWPerM2": 32804661.3577143, "idealContinuousDwellToBenchmarkThresholdS": 30.48347273259815},
+        {"rangeM": 5000000.0, "spotRadiusM": 1.6417462532316012, "incidentIrradianceWPerM2": 11809678.08877715, "idealContinuousDwellToBenchmarkThresholdS": 84.67631314610595}
+      ]
+    }
+  ],
+  "materialBenchmarkSeeds": {
+    "status": "noncanonical-until-material-catalog",
+    "missileVulnerableSurface": {"absorptivity": 0.5, "disableFluenceJPerM2": 8000000.0},
+    "militaryOuterLayer": {"absorptivity": 0.25, "localDamageFluenceJPerM2": 250000000.0},
+    "note": "Do not treat these as real-material truth; they exist to exercise the laser solver."
+  },
+  "armorModelPolicy": {
+    "debrisRegime": "Use material/configuration-specific empirical ballistic-limit models only inside their documented validation envelope.",
+    "heavyPenetratorRegime": "Preserve physical impact inputs and use calibrated response tables/models; do not extrapolate MMOD equations to capital penetrators."
+  }
+}
