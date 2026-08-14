@@ -207,7 +207,9 @@ class MiningSystemTest {
         engine.update(5f);
 
         assertEquals(0f, transform(miner).position.x, 0f);
-        assertEquals(MiningComponent.State.TRAVEL_TO_ASTEROID, mining(miner).state);
+        assertEquals(MiningComponent.State.SEARCHING, mining(miner).state,
+                "zero propulsion is invalid navigation and must not fake a travel state or teleport");
+        assertNull(mining(miner).targetAsteroidId);
     }
 
     @Test
