@@ -224,11 +224,17 @@ public class TradeAISystem extends IteratingSystem {
     /** Исполняет текущее состояние одного generic торгового флота. */
     @Override
     protected void processEntity(Entity fleet, float deltaTime) {
-        if (fleet.getComponent(PlayerControlledComponent.class) != null
-                || fleet.getComponent(DelegatedFleetComponent.class) != null) {
+        if (fleet.getComponent(PlayerControlledComponent.class) != null) {
             return;
         }
         TradeAIComponent ai = am.get(fleet);
+        DelegatedFleetComponent delegated = fleet.getComponent(DelegatedFleetComponent.class);
+        if (delegated != null) {
+            if (ai.routeSearchCooldown == Float.MAX_VALUE) {
+                return;
+            }
+            fleet.remove(DelegatedFleetComponent.class);
+        }
         TransformComponent transform = tm.get(fleet);
         if (ai.state == null) {
             InertialNavigation.stop(fleet, ai.movementSpeed);
