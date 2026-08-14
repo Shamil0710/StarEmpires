@@ -127,9 +127,9 @@ public final class FlightDynamics {
         }
 
         Vector2 current = checkedTransform.velocity;
-        Vector2 deltaVelocity = desired.sub(current);
+        Vector2 deltaVelocity = new Vector2(desired).sub(current);
         if (deltaVelocity.len2() > EPSILON * EPSILON) {
-            boolean braking = isBraking(current, desiredVelocity);
+            boolean braking = isBraking(current, desired);
             float acceleration = braking
                     ? checkedProfile.brakingAcceleration()
                     : checkedProfile.acceleration();
@@ -139,10 +139,7 @@ public final class FlightDynamics {
             }
             current.add(deltaVelocity);
         } else {
-            current.set(desiredVelocity);
-            if (current.len2() > checkedProfile.speedCap() * checkedProfile.speedCap()) {
-                current.nor().scl(checkedProfile.speedCap());
-            }
+            current.set(desired);
         }
         checkedTransform.position.mulAdd(current, deltaSeconds);
     }
@@ -229,7 +226,18 @@ public final class FlightDynamics {
             float speedCap,
             float acceleration,
             float brakingAcceleration) {
-        /** Validates the resolved immutable physical profile. */
+        /**
+         * Validates the resolved immutable physical profile.
+         *
+         * @param dryMass hull/structure mass before cargo
+         * @param cargoMass mass contributed by real inventory contents
+         * @param totalMass total translational mass
+         * @param thrust available acceleration thrust
+         * @param brakingThrust available counter-thrust
+         * @param speedCap assisted maximum speed
+         * @param acceleration current maximum acceleration at this mass
+         * @param brakingAcceleration current maximum braking acceleration at this mass
+         */
         public Profile {
             if (!positive(dryMass) || cargoMass < 0f || !Float.isFinite(cargoMass)
                     || !positive(totalMass) || !positive(thrust) || !positive(brakingThrust)
