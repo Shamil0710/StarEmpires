@@ -18,6 +18,7 @@ final class DeterministicSalvoHarness {
     static final double AREA_DEFENSE_RANGE_M = 700_000.0;
     static final double FLEET_INTERCEPTOR_RANGE_M = 350_000.0;
     static final double POINT_DEFENSE_RANGE_M = 300_000.0;
+    static final double MIN_SAFE_INTERCEPT_RANGE_M = 10_000.0;
 
     static final double LASER_BEAM_POWER_W = 5_000_000.0;
     static final double LASER_WAVELENGTH_M = 1.064e-6;
@@ -131,9 +132,8 @@ final class DeterministicSalvoHarness {
             double launcherOffsetYM,
             DefenseCounters counters) {
         // One L area-defense battery: four launch cells, six terminal-support channels.
-        // The synchronized first wave therefore reserves four threats at entry and two after the
-        // first 6 s cell recycle. Further simultaneous terminal solutions would exceed the six
-        // support channels and are intentionally left to inner layers.
+        // The synchronized first wave reserves four threats at entry and two after the first
+        // 6 s cell recycle. Further simultaneous terminal solutions exceed the six support channels.
         for (int launch = 0; launch < 6; launch++) {
             double launchTime = launch < 4 ? AREA_ENTRY_TIME_S : AREA_ENTRY_TIME_S + 6.0;
             counters.areaInterceptorsExpended++;
@@ -153,7 +153,6 @@ final class DeterministicSalvoHarness {
         }
 
         // Two M fleet-interceptor batteries: each has two cells and two terminal-support channels.
-        // All four first-wave channels are consumed by the synchronized terminal attack.
         for (int launch = 0; launch < 4; launch++) {
             counters.fleetInterceptorsExpended++;
             Threat target = nextGuidedThreat(threats);
@@ -322,14 +321,18 @@ final class DeterministicSalvoHarness {
 
         while (time <= IMPACT_TIME_S + INTEGRATION_STEP_S) {
             MotionState target = guidedThreatState(targetId, time);
+            double protectedRangeM = Math.hypot(target.xM, target.yM);
             double rx = target.xM - xM;
             double ry = target.yM - yM;
             double rangeM = Math.hypot(rx, ry);
             closestRangeM = Math.min(closestRangeM, rangeM);
             if (rangeM <= spec.proximityKillRadiusM) {
-                return new InterceptResult(true, time, closestRangeM);
+                return new InterceptResult(
+                        protectedRangeM >= MIN_SAFE_INTERCEPT_RANGE_M,
+                        time,
+                        closestRangeM);
             }
-            if (target.xM <= 0.0) {
+            if (target.xM <= 0.0 || protectedRangeM < MIN_SAFE_INTERCEPT_RANGE_M) {
                 return new InterceptResult(false, time, closestRangeM);
             }
 
@@ -374,9 +377,12 @@ final class DeterministicSalvoHarness {
             SegmentApproach segmentApproach = segmentClosestApproach(rx, ry, endRx, endRy);
             closestRangeM = Math.min(closestRangeM, segmentApproach.distanceM);
             if (segmentApproach.distanceM <= spec.proximityKillRadiusM) {
+                double interceptTime = time + segmentApproach.segmentFraction * INTEGRATION_STEP_S;
+                MotionState interceptTarget = guidedThreatState(targetId, interceptTime);
+                double interceptProtectedRangeM = Math.hypot(interceptTarget.xM, interceptTarget.yM);
                 return new InterceptResult(
-                        true,
-                        time + segmentApproach.segmentFraction * INTEGRATION_STEP_S,
+                        interceptProtectedRangeM >= MIN_SAFE_INTERCEPT_RANGE_M,
+                        interceptTime,
                         closestRangeM);
             }
 
