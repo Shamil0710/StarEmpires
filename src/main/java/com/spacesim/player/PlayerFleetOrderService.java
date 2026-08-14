@@ -132,6 +132,8 @@ public final class PlayerFleetOrderService {
                 source.homeSystemId(),
                 source.dockedAt(),
                 orders,
-                source.threatIntel());
+                source.threatIntel(),
+                source.ownedConstructionProjectIds(),
+                source.ownedStations());
     }
 }
