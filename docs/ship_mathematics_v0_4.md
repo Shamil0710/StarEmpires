@@ -33,7 +33,7 @@ Stage 13 остаётся минимальным игровым vertical slice �
 = 48 incoming guided weapons
 ```
 
-Terminal benchmark начинается не в момент старта с корветов, а когда surviving missiles уже входят в defensive battlespace:
+Terminal benchmark начинается, когда surviving missiles входят в defensive battlespace:
 
 ```text
 initial range            = 800 000 m
@@ -42,10 +42,7 @@ nominal time to impact   = 44.444... s
 incoming threats         = 48
 ```
 
-Это сознательное разделение фаз:
-
-1. long-range launch / boost / coast позднее моделируется отдельным engagement layer;
-2. v0.4 проверяет именно saturation behavior последней оборонительной фазы.
+Long-range boost/coast и attrition до 800 km относятся к следующему engagement layer. v0.4 проверяет насыщение последних эшелонов обороны.
 
 Все величины хранятся в SI.
 
@@ -53,9 +50,7 @@ incoming threats         = 48
 
 ## 3. Детерминированная траектория атакующей ракеты
 
-Каждая ракета получает небольшой уникальный начальный lateral offset и детерминированный jink, который затухает к точке атаки.
-
-Концептуально:
+Каждая ракета получает уникальный lateral offset и детерминированный jink, затухающий к точке атаки:
 
 ```text
 x(t) = max(0, R0 - Vc × t)
@@ -65,12 +60,7 @@ f(t) = x(t) / R0
 y(t) = f(t) × [offset_i + A_i × sin(omega_i × t + phase_i)]
 ```
 
-Параметры отличаются по `threatId`, но не используют случайный runtime RNG.
-
-Это необходимо по двум причинам:
-
-- все одинаковые initial states дают одинаковый результат bit-for-bit на одной JVM/math implementation;
-- ракеты не летят идеально по одной математической прямой, поэтому PN и point-defense должны реально работать с 2D geometry.
+Параметры зависят от `threatId`, но не используют runtime RNG. Это даёт воспроизводимость и одновременно не заставляет 48 ракет лететь по одной математической прямой.
 
 Текущий jink — benchmark trajectory, а не финальный missile AI.
 
@@ -101,7 +91,7 @@ terminal support channels = 6
 magazine                  = 48
 ```
 
-Для синхронной первой волны один защитник способен выделить:
+Для синхронной первой волны один защитник может поддерживать:
 
 ```text
 4 interceptors immediately at area-entry
@@ -109,7 +99,7 @@ magazine                  = 48
 =6 first-wave supported area intercepts
 ```
 
-Оставшиеся ракеты проходят во внутренние эшелоны. Это не искусственный лимит `maxTargets=6`: он представляет количество одновременно поддерживаемых terminal fire-control solutions.
+Это ограничение каналов fire control, а не абстрактный `maxTargets`.
 
 ---
 
@@ -138,27 +128,31 @@ terminal support channels = 2
 magazine                  = 24
 ```
 
-Reference battleship имеет две такие батареи, поэтому синхронная terminal wave получает ещё четыре first-wave intercept solutions.
+Reference battleship имеет две M batteries. Один escort destroyer добавляет ещё две.
 
-Итого до laser point defense:
+При **close-screen formation** оба корабля могут реализовать этот эшелон:
 
 ```text
 Battleship alone:
-6 area + 4 fleet = 10 planned interceptor kills
+6 area + 4 fleet = 10 safe interceptor kills
 
-Battleship + one Escort Destroyer:
-12 area + 8 fleet = 20 planned interceptor kills
+Battleship + one close-screen Escort Destroyer:
+12 area + 8 fleet = 20 safe interceptor kills
 ```
 
-Каждый kill всё равно проходит реальный PN integrator; число каналов не означает гарантированный hit.
+Каждый kill всё равно проходит реальный PN integrator.
 
 ---
 
 ## 6. Реальная 2D proportional-navigation integration
 
-Перехватчик не телепортируется в точку встречи.
+Fixed step:
 
-На шаге `dt = 0.02 s` рассчитываются:
+```text
+dt = 0.02 s
+```
+
+На каждом шаге считаются:
 
 ```text
 relative position
@@ -175,29 +169,23 @@ Lateral command:
 a_lateral = N × closingVelocity × LOS_rate
 ```
 
-после чего он ограничивается текущим доступным ускорением двигателя.
+Он ограничивается текущим доступным ускорением двигателя. Оставшаяся acceleration budget направляется к линии визирования.
 
-Оставшаяся acceleration budget используется для движения к линии визирования.
-
-Масса уменьшается по мере расхода рабочего тела, поэтому acceleration растёт физически, а не через scripted terminal bonus.
-
-Для предотвращения numerical tunneling при десятках km/s harness проверяет closest approach не только в discrete sample, но и по относительному segment между соседними fixed steps.
+Масса падает по мере расхода propellant, поэтому acceleration растёт физически. Для предотвращения numerical tunneling closest approach проверяется также по относительному segment между соседними fixed steps.
 
 ---
 
 ## 7. Safe intercept: proximity fuse около собственного корпуса не является успехом
 
-Первый CI v0.4 обнаружил важный физический edge case.
+Первый CI v0.4 обнаружил важный edge case: слишком поздно запущенный interceptor формально входил в proximity envelope атакующей ракеты уже практически в точке защищаемого корабля.
 
-Перехватчик, стартовавший слишком поздно, успевал формально войти в proximity envelope атакующей ракеты уже практически в точке защищаемого корабля. Математически расстояние между объектами было маленьким, но тактического перехвата не происходило.
-
-Поэтому введён seed:
+Введён authoring seed:
 
 ```text
 minimumSafeInterceptRange = 10 000 m
 ```
 
-Успешный interceptor kill требует одновременно:
+Успешная оборона требует:
 
 ```text
 interceptorMissDistance <= proximityEnvelope
@@ -205,25 +193,43 @@ AND
 distanceFromProtectedShip >= minimumSafeInterceptRange
 ```
 
-Это временная coarse approximation будущей fragment/debris модели.
-
-Позже вместо одной границы должны учитываться:
-
-- blast / fragment cone;
-- residual body mass;
-- relative velocity;
-- interception geometry;
-- armor-facing exposure;
-- debris dispersion;
-- время до пересечения защищаемого объёма.
-
-До появления этих данных «сбить» ракету внутри собственного корабля запрещено считать успешной обороной.
+Это coarse precursor будущей fragment/debris модели. Позже одна граница будет заменена физикой residual body, fragment cone, relative velocity и interception geometry.
 
 ---
 
-## 8. Эшелон 3 — S point-defense laser
+## 8. Formation geometry стала частью доктрины
 
-Reference PD laser сохраняет v0.3 параметры:
+Второй CI выявил ещё один важный эффект: оружие escort не может считаться находящимся в точке защищаемого линкора.
+
+Изначально reference destroyer был поставлен на lateral offset `25 km`. При launch range `350 km` S interceptor с этой позиции достигал атакующей ракеты только примерно в `9.8 km` от линкора — уже внутри safe-intercept boundary.
+
+Проверка того же перехватчика показывает примерно:
+
+```text
+escort offset 15 km -> safe intercept ~18.5 km from protected ship
+escort offset 20 km -> safe intercept ~12 km
+escort offset 25 km -> ~9.8 km, unsafe
+```
+
+Поэтому reference **close-screen** spacing для v0.4:
+
+```text
+Escort Destroyer lateral offset = 15 000 m
+```
+
+Это не означает, что все эсминцы обязаны лететь в 15 km. Наоборот, результат фиксирует будущий doctrinal trade-off:
+
+- close screen лучше использует inner interceptors;
+- wide screen улучшает пространственное покрытие outer defense;
+- formation spacing должно стать настраиваемым параметром fleet AI, а не визуальным украшением.
+
+v0.5 обязан отдельно sweep-ить formation spacing.
+
+---
+
+## 9. Эшелон 3 — распределённый S point-defense laser
+
+Reference PD laser:
 
 ```text
 beam output power      = 5 MW
@@ -251,15 +257,18 @@ incidentFlux = beamPower / (pi × spotRadius²)
 absorbedFlux = incidentFlux × absorptivity
 ```
 
-Поэтому laser effectiveness непрерывно зависит от range и dwell time.
+Важное уточнение v0.4: каждый emitter использует **собственную позицию**.
+
+- 6 battleship lasers стреляют из `y = 0`;
+- 4 destroyer lasers стреляют из `y = +15 km`.
+
+Поэтому escort PD получает собственную геометрию range/dwell и не превращается в бесплатные дополнительные башни линкора.
 
 ---
 
-## 9. Guidance mission kill ≠ physical hard kill
+## 10. Guidance mission kill ≠ physical hard kill
 
-Это одно из главных решений v0.4.
-
-Временные authoring seeds:
+Authoring seeds:
 
 ```text
 missile surface absorptivity       = 0.50
@@ -267,16 +276,14 @@ guidance-kill absorbed fluence     = 8 MJ/m²
 hard-kill absorbed fluence         = 80 MJ/m²
 ```
 
-`8 MJ/m²` и `80 MJ/m²` **не являются заявлением о свойствах реального материала**. Они существуют как калибровочные величины до material/warhead catalog.
+Эти значения не являются утверждением о реальных материалах.
 
-После достижения guidance-kill threshold ракета:
+После guidance kill ракета:
 
 1. теряет активное наведение;
-2. сохраняет текущую массу, позицию и velocity vector;
+2. сохраняет текущие position/velocity/mass;
 3. переходит в ballistic propagation;
-4. больше не следует запрограммированной guided trajectory.
-
-Затем рассчитывается её closest approach к защищаемому кораблю.
+4. получает реальный closest approach к защищаемому кораблю.
 
 Если:
 
@@ -284,7 +291,7 @@ hard-kill absorbed fluence         = 80 MJ/m²
 ballisticClosestApproach > 60 m
 ```
 
-то guidance kill достаточен: ракета промахивается.
+она безопасно промахивается.
 
 Если:
 
@@ -292,32 +299,31 @@ ballisticClosestApproach > 60 m
 ballisticClosestApproach <= 60 m
 ```
 
-то корпус остаётся опасным и PD laser продолжает dwell до hard-kill threshold либо до момента прохода closest approach.
-
-Таким образом электронно мёртвая ракета не исчезает из симуляции.
+PD продолжает dwell до physical hard kill либо до прохода closest approach.
 
 ---
 
-## 10. Почему это особенно важно при 18 km/s
+## 11. Почему это важно при 18 km/s
 
-Reference M anti-ship missile имеет wet mass `12 000 kg`.
-
-Даже без warhead её kinetic energy при terminal velocity `18 000 m/s`:
+Reference M anti-ship missile wet mass:
 
 ```text
-E = 0.5 × m × v²
-  = 0.5 × 12 000 × 18 000²
+12 000 kg
+```
+
+При `18 000 m/s` её kinetic energy без учёта warhead:
+
+```text
+E = 0.5 × 12 000 × 18 000²
   ≈ 1.944 × 10^12 J
   ≈ 1.94 TJ
 ```
 
-Поэтому поздний guidance kill не является безопасным автоматически.
-
-Это ещё один системный аргумент в пользу layered defense и раннего перехвата.
+Поэтому поздний electronic kill не делает тело безопасным автоматически.
 
 ---
 
-## 11. Reference defenders
+## 12. Reference defenders
 
 ### Battleship alone
 
@@ -327,23 +333,21 @@ E = 0.5 × m × v²
 6 × S PD laser
 ```
 
-### Battleship + Escort Destroyer
-
-Дополнительно:
+### Battleship + close-screen Escort Destroyer
 
 ```text
+Destroyer offset = +15 km lateral
+
 +1 × L area-defense battery
 +2 × M fleet-interceptor battery
 +4 × S PD laser
 ```
 
-Destroyer расположен на lateral offset `25 km` от линкора, поэтому interceptor PN geometry у него отличается, а не копируется из точки линкора.
+Все defensive systems используют позицию собственного корабля.
 
 ---
 
-## 12. Calibration result для текущего v0.4 seed
-
-Reference expected result, который должен оставаться зафиксирован acceptance tests после CI validation:
+## 13. Calibration result v0.4
 
 ### Battleship alone
 
@@ -359,17 +363,17 @@ terminal leakers                        3
 aggregate laser beam time             ~87.64 s
 ```
 
-Final accounting:
+Accounting:
 
 ```text
 10 interceptor kills
 +5 guidance-kill ballistic misses
 +30 laser hard kills
 +3 leakers
-=48 threats
+=48
 ```
 
-### Battleship + Escort Destroyer
+### Battleship + one close-screen Escort Destroyer
 
 ```text
 incoming threats                       48
@@ -377,113 +381,99 @@ area interceptor kills                 12
 fleet interceptor kills                 8
 pre-laser safe interceptions           20
 laser guidance mission kills           28
-  of which ballistic miss neutralized   6
-laser physical hard kills              22
+  of which ballistic miss neutralized   9
+laser physical hard kills              19
 terminal leakers                        0
-aggregate laser beam time            ~143.12 s
+aggregate laser beam time            ~140.88 s
 ```
 
-Final accounting:
+Accounting:
 
 ```text
 20 interceptor kills
-+6 guidance-kill ballistic misses
-+22 laser hard kills
++9 guidance-kill ballistic misses
++19 laser hard kills
 +0 leakers
-=48 threats
+=48
 ```
 
-Важно: `laser guidance mission kills` является overlapping diagnostic и не суммируется отдельно с hard kills.
+`laser guidance mission kills` — overlapping diagnostic: hard-killed ракета сначала могла получить guidance kill, поэтому mission-kill count не складывается отдельно с final accounting.
 
 ---
 
-## 13. Что означает результат для доктрины
+## 14. Что результат говорит о доктрине
 
-В рамках **одной синхронной первой terminal wave**:
+В рамках одной синхронной terminal wave:
 
-- линкор сам по себе имеет серьёзную layered defense;
-- но часть плотного корветного залпа всё равно проходит;
-- добавление одного dedicated escort destroyer удваивает first-wave interceptor depth;
-- дополнительные четыре PD emitters дают больше parallel dwell capacity;
-- escort переводит reference first wave из `3 leakers` в `0 leakers`.
+- battleship сам имеет серьёзную layered defense;
+- но плотный корветный залп всё равно создаёт leakers;
+- close-screen destroyer удваивает first-wave interceptor depth;
+- дополнительные четыре PD emitters дают parallel dwell из своей позиции;
+- reference first wave меняется с `3 leakers` до `0`.
 
-Это именно требуемая роль эсминца:
+Эсминец полезен не как уменьшенный источник capital DPS, а как корабль, который изменяет survival envelope всей группы.
 
-> он не существует ради меньшего аналога DPS линкора; он меняет survival envelope всей группы.
-
-При этом `0 leakers` **не означает неуязвимость**.
-
-Для отражения этой волны группа:
-
-- расходует реальные interceptor rounds;
-- занимает terminal support channels;
-- использует значительный суммарный laser dwell;
-- ещё не сталкивается с fragment cloud от hard kills;
-- ещё не отражает вторую/третью волну при частично пустых магазинах;
-- ещё не испытывает ECM/decoys/sensor degradation.
-
-Поэтому следующий залп может дать другой результат даже при той же численности атакующих.
+`0 leakers` не означает неуязвимость: расходуются interceptor magazines и laser duty cycle; fragments, ECM, decoys, repeated waves и sensor degradation пока отсутствуют.
 
 ---
 
-## 14. Почему результат не является окончательным combat balance
+## 15. Что пока намеренно упрощено
 
-Следующие упрощения намеренны:
+1. long-range attrition до 800 km не моделируется;
+2. все incoming missiles одного reference subtype;
+3. tracks достаточны для launch authorization;
+4. ECM/ECCM/decoys отсутствуют;
+5. fluence thresholds — calibration seeds;
+6. hard kill пока не создаёт fragment cloud;
+7. interceptor kill тоже не создаёт debris;
+8. terminal support scheduler пока first-wave budget, а не continuous queue;
+9. battleship не маневрирует;
+10. missile jink deterministic, не adaptive;
+11. destroyer не является отдельной целью атакующей стороны.
 
-1. attacking missile wave уже дошла до 800 km; long-range attrition не моделируется;
-2. все 48 missiles принадлежат одному reference M subtype;
-3. sensor tracks считаются достаточными для запуска defensive solutions;
-4. ECM/ECCM/decoys пока не включены;
-5. hard-kill threshold является calibration seed, а не material truth;
-6. после `80 MJ/m²` объект считается physically neutralized без fragment cloud;
-7. interceptor proximity kill также пока не создаёт residual fragments;
-8. terminal support scheduling представлен first-wave channel budget, а не полноценной continuous fire-control queue;
-9. defender maneuver отсутствует;
-10. attacker terminal AI использует deterministic benchmark jink, а не adaptive evasion.
-
-Из-за пунктов 6–7 текущая модель, вероятно, **оптимистична для защитника на очень коротких дистанциях**.
+Из-за отсутствия fragments текущая terminal defense, вероятно, оптимистична на малых дистанциях.
 
 ---
 
-## 15. Acceptance invariants v0.4
+## 16. Acceptance invariants v0.4
 
 CI должен доказывать:
 
 1. одинаковый initial state даёт идентичный `SalvoReport`;
-2. все 48 угроз accounted — ни одна не исчезает без outcome;
-3. unescorted battleship получает хотя бы один leaker;
-4. escort destroyer уменьшает число leakers минимум вдвое;
-5. L/M interceptor expenditure ограничен реальными first-wave channels;
-6. своевременный PN intercept происходит до impact;
-7. слишком поздний proximity event внутри safe-intercept boundary не считается успешной защитой;
-8. guidance kill не равен physical hard kill;
-9. часть guidance-killed missiles требует дополнительного laser dwell;
-10. Stage-13 production combat не изменяется этим benchmark.
+2. все 48 threats accounted;
+3. battleship alone получает `3` leakers в calibration seed;
+4. battleship + close-screen destroyer получает `0` leakers в той же первой волне;
+5. L/M expenditure ограничен launch/support channels;
+6. timely PN intercept происходит до impact;
+7. proximity внутри 10 km safe boundary не считается успешной защитой;
+8. 15 km escort spacing позволяет M-layer safely defend central battleship;
+9. 25 km spacing уже слишком велико для того же 350 km inner-layer launch seed;
+10. destroyer lasers используют его собственную позицию;
+11. guidance kill не равен physical hard kill;
+12. Stage-13 production combat не изменяется benchmark-кодом.
 
 ---
 
-## 16. Promotion gate в production combat
+## 17. Promotion gate в production combat
 
-Прежде чем переносить harness в main simulation systems, требуется:
+До переноса solver в authoritative simulation нужны:
 
 - data-driven `GuidedWeaponDefinition`;
-- projectile / missile runtime identity;
-- authoritative track/covariance input из sensor model;
+- projectile/missile runtime identity;
+- track/covariance input из sensor model;
 - dynamic launcher/cell/channel scheduler;
-- persistent or explicitly transient missile-state policy;
-- deterministic destruction/fragment output;
-- warhead and material response model;
+- missile persistence policy;
+- deterministic fragment/debris output;
+- warhead/material response model;
 - combat save/load policy;
-- AI/player commands, использующие один shared weapon boundary;
-- performance profiling для десятков/сотен simultaneously guided objects.
+- единый player/AI weapon boundary;
+- profiling сотен simultaneously guided objects.
 
-До выполнения gate test harness остаётся эталонным solver experiment, а не вторым скрытым combat engine.
+До этого harness остаётся эталонным solver experiment, а не вторым combat engine.
 
 ---
 
-## 17. Следующий шаг — v0.5
-
-Следующая версия должна превратить одиночный acceptance point в deterministic parameter sweep.
+## 18. Следующий шаг — v0.5 parameter sweep
 
 Минимальная матрица:
 
@@ -491,6 +481,7 @@ CI должен доказывать:
 attacking corvettes: 8 / 16 / 24 / 32 / 48
 escort destroyers:   0 / 1 / 2 / 3
 salvo waves:          1 / 2 / 3
+formation offset:     5 / 10 / 15 / 20 / 25 / 40 km
 ```
 
 Дополнительно варьировать:
@@ -498,22 +489,23 @@ salvo waves:          1 / 2 / 3
 - terminal entry velocity;
 - arrival dispersion;
 - salvo timing;
-- spent magazines между волнами;
+- magazines between waves;
 - laser thermal duty cycle;
 - sensor covariance;
 - ECM / decoy pressure;
 - safe interception range;
 - hard-kill threshold;
-- fragment/debris persistence.
+- fragments/debris persistence.
 
-Выходом должны стать уже не отдельные `3 vs 0`, а curves:
+Выходом должны стать curves:
 
 ```text
-P / deterministic fraction of leakers vs salvo size
+leakers vs salvo size
 interceptor expenditure per defended capital
 laser dwell saturation
 ammo endurance over repeated waves
 marginal value of each additional escort
+marginal value of formation spacing
 ```
 
-Именно по этим кривым следует балансировать число slots и fleet doctrine перед promotion в Stage 17.5 combat depth.
+Именно по этим кривым следует балансировать slots и fleet doctrine перед promotion в Stage 17.5 Combat Depth.
