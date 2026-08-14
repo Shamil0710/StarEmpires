@@ -19,7 +19,12 @@ public record OwnedStationRef(
         StarSystemId systemId,
         EntityId stationEntityId) implements Comparable<OwnedStationRef> {
 
-    /** Validates a persistent owned-station reference. */
+    /**
+     * Validates a persistent owned-station reference.
+     *
+     * @param systemId system containing the station entity
+     * @param stationEntityId stable system-local station entity ID
+     */
     public OwnedStationRef {
         Objects.requireNonNull(systemId, "Owned station system not set");
         Objects.requireNonNull(stationEntityId, "Owned station EntityId not set");
