@@ -1,39 +1,53 @@
-# Star Empires — Development Roadmap
+# Star Empires — дорожная карта разработки
 
-> Canonical core-development status and transition document.
+> Канонический документ статуса и переходов между этапами разработки.
 >
-> Last synchronized: **2026-08-14 after Stage-15 completion, PR #51 inertial/jump hardening and PR #52 documentation merge**.
+> Последняя синхронизация: **2026-08-14 после завершения Stage 15, post-Stage-15 hardening PR #51, документационного PR #52 и синхронизации roadmap PR #53**.
 >
-> Historical detail before Stage 11: `docs/archive/development_roadmap_pre_stage11_2026-08-13.md`.
-> Major completion records: `docs/stage11_autonomous_faction_expansion.md`, `docs/stage12_playable_actor.md`, `docs/stage13_combat_vertical_slice.md`, `docs/stage14a_player_mining.md`, `docs/stage14b_ship_progression.md`, `docs/stage14c_playable_navigation.md`, `docs/stage14_complete_player_economic_loop.md`, `docs/stage15_player_fleets.md`, `docs/post_stage15_inertial_jump_hardening.md`.
-> Cross-cutting plans: `docs/ui_navigation_roadmap.md`, `docs/ai_behavior_roadmap.md`, `docs/cumulative_route_risk_model.md`, `docs/flight_dynamics_and_combat_depth_roadmap.md`, `docs/ship_pricing_roadmap.md`, `docs/stage16_construction_timing.md`.
+> Начиная с Stage 16 вся новая и содержательно изменяемая проектная документация ведётся **на русском языке**. Имена классов, enum, content ID, API, формулы и другие технические идентификаторы сохраняются в оригинальном виде, чтобы документация однозначно сопоставлялась с кодом.
+>
+> Старые completion-records не переводятся массово только ради перевода; они переводятся при следующем содержательном обновлении.
+>
+> Основные документы: `docs/stage11_autonomous_faction_expansion.md`, `docs/stage12_playable_actor.md`, `docs/stage13_combat_vertical_slice.md`, `docs/stage14_complete_player_economic_loop.md`, `docs/stage15_player_fleets.md`, `docs/post_stage15_inertia_and_jump_hardening.md`, `docs/stage16_player_construction.md`, `docs/stage16_construction_timing.md`, `docs/stage16_acceptance_matrix.md`.
+>
+> Сквозные планы: `docs/ui_navigation_roadmap.md`, `docs/ai_behavior_roadmap.md`, `docs/cumulative_route_risk_model.md`, `docs/flight_dynamics_and_combat_depth_roadmap.md`, `docs/ship_pricing_roadmap.md`.
 
 ---
 
-# 1. Project goal and invariant
+# 1. Цель проекта и главный инвариант
 
-**Star Empires** is a 2D top-down space sandbox-RPG/strategy with a living physical economy and a world that continues to exist independently of the player.
+**Star Empires** — 2D top-down космическая sandbox-RPG/strategy с живой физической экономикой и миром, существующим независимо от игрока.
 
-Progression target:
+Целевая прогрессия:
 
 ```text
-one ship
-→ trader / miner / mercenary
-→ several ships
-→ company and autonomous fleets
-→ owned stations
-→ player faction
-→ territory, diplomacy and war
-→ regional / galactic power
+один корабль
+→ торговец / шахтёр / наёмник
+→ несколько собственных кораблей
+→ компания и автономные флоты
+→ собственные станции
+→ собственная фракция
+→ территория, дипломатия и война
+→ региональная / галактическая держава
 ```
 
-Primary invariant: **player and AI reuse the same physical world rules whenever practical.**
+Главный инвариант:
 
-No separate player economy, passive-income substitute, virtual delivery, instant travel/construction, hidden resource grant, scripted replacement or player-only combat/movement formula without an explicit justified design decision.
+> **Игрок и AI используют одни и те же физические и экономические правила везде, где это практически возможно.**
+
+Запрещены без отдельного обоснованного design decision:
+
+- отдельная «экономика игрока»;
+- пассивный доход как замена реальному движению товаров/денег;
+- виртуальные доставки;
+- мгновенные путешествия/строительство;
+- скрытые resource grants;
+- scripted replacement уничтоженных активов;
+- player-only combat/movement formula.
 
 ---
 
-# 2. Production stack
+# 2. Технологический стек
 
 - Java 17;
 - libGDX 1.14.2 / LWJGL3;
@@ -46,23 +60,23 @@ No separate player economy, passive-income substitute, virtual delivery, instant
 - deterministic fixed-tick simulation;
 - versioned bounded binary persistence.
 
-Stage 8.5 decision remains **`KEEP_LIBGDX`**. Reconsider presentation technology only after a new measured fundamental limitation appears.
+Решение Stage 8.5 остаётся **`KEEP_LIBGDX`**. Пересматривать presentation technology только при появлении нового измеренного фундаментального ограничения.
 
 ---
 
-# 3. Milestones
+# 3. Основные milestones
 
-| Milestone | Goal | Stages | Status |
+| Milestone | Цель | Stages | Статус |
 | --- | --- | --- | --- |
-| **v0.1 Economic Sandbox** | correct/scalable economic core | 0–6 | **COMPLETE** |
-| **v0.2 Living Galactic Economy** | multi-system factions, logistics, construction, autonomous expansion | 7–11 + 8.5 | **COMPLETE** |
-| **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining/combat, real ship progression, readable local play | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | player fleets, stations, faction, strategic war | 15–18 + 17.5 | **ACTIVE — Stage 16** |
-| **v0.5 RPG & Living World** | exploration, NPC, missions, reputation | 19–20 | PLANNED |
-| **v0.6 Content & Balance Alpha** | breadth + long-run stability | 21 | PLANNED |
+| **v0.1 Economic Sandbox** | корректное и масштабируемое ядро экономики | 0–6 | **COMPLETE** |
+| **v0.2 Living Galactic Economy** | многосистемные фракции, логистика, строительство, автономная экспансия | 7–11 + 8.5 | **COMPLETE** |
+| **v0.3 Playable Space Sandbox** | корабль игрока, путешествия, торговля, добыча, бой, прогрессия кораблей, читаемая локальная игра | 12–14 | **COMPLETE** |
+| **v0.4 Fleet & Empire Sandbox** | флоты игрока, станции, фракция, стратегическая война | 15–18 + 17.5 | **ACTIVE — Stage 16** |
+| **v0.5 RPG & Living World** | исследование, NPC, миссии, репутация | 19–20 | PLANNED |
+| **v0.6 Content & Balance Alpha** | объём контента и долговременная стабильность | 21 | PLANNED |
 | **v0.7 Polish / Release Candidate** | UX, onboarding, performance, save hardening | 22 | PLANNED |
 
-Repository-administration debt remains: mandatory branch protection for `main` is not configurable through the currently available connector action. Functional CI gates remain mandatory before every core merge.
+Административный долг репозитория: обязательная branch protection для `main` пока не настраивается доступным connector API. Поэтому полный CI gate остаётся ручным обязательным условием перед каждым core merge.
 
 ---
 
@@ -70,37 +84,37 @@ Repository-administration debt remains: mandatory branch protection for `main` i
 
 **COMPLETE.**
 
-## Stage 0 — Repository health
+## Stage 0 — здоровье репозитория
 
-**COMPLETE — PR #1.** Clean Java-17 build, JUnit, JaCoCo, strict Javadoc, runnable shaded desktop JAR and GitHub Actions.
+**COMPLETE — PR #1.** Чистая Java-17 сборка, JUnit, JaCoCo, strict Javadoc, runnable shaded desktop JAR и GitHub Actions.
 
-## Stage 1 — Deterministic time
+## Stage 1 — детерминированное время
 
-**COMPLETE — PR #2.** Fixed step `0.1s`, pause/time scale, named deterministic RNG streams, explicit system ordering and FPS-independent simulation results.
+**COMPLETE — PR #2.** Fixed step `0.1s`, pause/time scale, именованные RNG streams, явный порядок систем и независимость simulation результата от FPS.
 
-## Stage 2 — Money / economic invariants
+## Stage 2 — деньги и экономические инварианты
 
-**COMPLETE — PR #3.** Authoritative integer milli-credits, finite liquidity, atomic bilateral trade, `EconomicLedger` and explicit source/sink/transfer/transform semantics.
+**COMPLETE — PR #3.** Integer milli-credits, конечная ликвидность, atomic bilateral trade, `EconomicLedger`, явные source/sink/transfer/transform semantics.
 
-## Stage 3 — Identity / persistence
+## Stage 3 — identity и persistence
 
-**COMPLETE — PR #4.** Stable `EntityId`, versioned state, bounded codecs, safe replacement and deterministic continuation tests.
+**COMPLETE — PR #4.** Stable `EntityId`, versioned state, bounded codecs, безопасная замена сущностей и deterministic continuation tests.
 
-## Stage 4 — Data-driven content
+## Stage 4 — data-driven content
 
-**COMPLETE — PR #5.** Versioned JSON catalog with stable content IDs, items, recipes, factions, ships, stations, validation, fingerprint and save binding.
+**COMPLETE — PR #5.** Versioned JSON catalog со stable content IDs, товарами, recipes, factions, ships, stations, validation, fingerprint и save binding.
 
-## Stage 5 — Local logistics / route planning
+## Stage 5 — локальная логистика и route planning
 
-**COMPLETE — PR #6.** Pure bounded `TradeRoutePlanner`, immutable market directory, profit/time scoring, deterministic tie-breaks and stale-route policy.
+**COMPLETE — PR #6.** Bounded `TradeRoutePlanner`, immutable market directory, profit/time scoring, deterministic tie-breaks и stale-route policy.
 
-## Stage 6 — Headless scalability / observability
+## Stage 6 — headless scalability / observability
 
-**COMPLETE — PR #7/#8.** Large headless economic benchmark, accounting diagnostics, supply-chain failure detection and machine-readable reports.
+**COMPLETE — PR #7/#8.** Большой headless economic benchmark, accounting diagnostics, выявление проблем supply chain и machine-readable reports.
 
 ### v0.1 DoD
 
-The economic core is deterministic, conserves money/goods under explicit rules, saves with stable identity, scales headlessly and exposes measurable failures. **Completed.**
+Экономическое ядро детерминировано, сохраняет деньги/товары в рамках явных правил, корректно сохраняется, масштабируется headless и выдаёт измеримые diagnostics. **Milestone завершён.**
 
 ---
 
@@ -108,66 +122,66 @@ The economic core is deterministic, conserves money/goods under explicit rules, 
 
 **COMPLETE.**
 
-## Stage 7 — World hierarchy / simulation levels
+## Stage 7 — иерархия мира и уровни симуляции
 
-**COMPLETE — PR #9.** `Galaxy -> Sector -> StarSystem`, typed stable IDs, topology, `WorldState`, one full-rate active system and bounded remote strategic updates.
+**COMPLETE — PR #9.** `Galaxy -> Sector -> StarSystem`, typed stable IDs, topology, `WorldState`, одна full-rate active system и bounded remote strategic updates.
 
-## Stage 8 — Factions as economic actors
+## Stage 8 — фракции как экономические акторы
 
-**COMPLETE — PR #10.** Treasury, budgets, subsidies, diplomacy, territory, market access, taxes/tariffs, strategic demand and persistence. Policies move real money/resources.
+**COMPLETE — PR #10.** Treasury, budgets, subsidies, diplomacy, territory, market access, taxes/tariffs, strategic demand и persistence. Политики двигают реальные деньги и ресурсы.
 
-## Stage 8.5 — Graphics / technology validation
+## Stage 8.5 — проверка графического/технологического направления
 
-**COMPLETE — `KEEP_LIBGDX`.** Production-like sprite/VFX seam, presentation/simulation separation, real-GPU validation and Java-17 CI.
+**COMPLETE — `KEEP_LIBGDX`.** Production-like sprite/VFX seam, separation presentation/simulation, real-GPU validation и Java-17 CI.
 
-## Stage 9 — Dynamic economy
+## Stage 9 — динамическая экономика
 
 **COMPLETE.**
 
-- lifecycle create/remove and persistence;
-- construction with real funding/materials/build time;
-- destruction with physical loss/salvage/economic shock;
-- bottleneck diagnosis and investment response;
-- replacement/recovery benchmark after producer destruction.
+- lifecycle create/remove + persistence;
+- строительство с реальным funding/materials/build time;
+- destruction с физической потерей/salvage/economic shock;
+- анализ bottleneck и инвестиционная реакция;
+- benchmark восстановления экономики после уничтожения producer.
 
-Stage 9 DoD: economy can physically degrade, diagnose a bottleneck, invest and recover without scripted respawn. **Completed.**
+Stage 9 DoD: экономика может физически деградировать, выявить bottleneck, инвестировать и восстановиться без scripted respawn.
 
-## Stage 10 — Inter-system logistics
+## Stage 10 — межсистемная логистика
 
 **COMPLETE — PR #23.**
 
 - persistent world-level `FleetId`;
-- authoritative jump FSM with deterministic timing and mid-transit persistence;
-- weighted multi-hop galactic routing;
+- authoritative jump FSM с deterministic timing и mid-transit persistence;
+- weighted multi-hop routing;
 - bounded discovery/revision invalidation;
-- real supplier purchase → fleet transit → destination revalidation → physical sale;
-- unsold cargo remains aboard.
+- реальная цепочка supplier purchase → fleet transit → destination revalidation → physical sale;
+- непроданный cargo остаётся на корабле.
 
-## Stage 11 — Autonomous faction expansion
+## Stage 11 — автономная экспансия фракций
 
-**COMPLETE — PR #24–#27.** Technical record: `docs/stage11_autonomous_faction_expansion.md`.
+**COMPLETE — PR #24–#27.** Технический record: `docs/stage11_autonomous_faction_expansion.md`.
 
 - deterministic opportunity ranking;
 - persistent strategic growth plans;
-- real faction budget/fleet/material transport;
+- реальные faction budget/fleet/material transport;
 - ordinary Stage-9 construction;
 - deterministic physical competition;
-- no automatic conquest shortcut.
+- нет automatic conquest shortcut.
 
 ### v0.2 end-to-end
 
 ```text
-living multi-system economy
-→ destruction / shortage
-→ AI investment and recovery
-→ physical inter-system logistics
+живая многосистемная экономика
+→ разрушение / дефицит
+→ AI investment и recovery
+→ физическая межсистемная логистика
 → persistent expansion plan
-→ real construction supply
-→ new station / economic node
+→ реальное снабжение стройки
+→ новая станция / economic node
 → deterministic territorial growth
 ```
 
-**v0.2 complete.**
+**v0.2 завершён.**
 
 ---
 
@@ -175,154 +189,80 @@ living multi-system economy
 
 **COMPLETE.**
 
-Detailed Stage-14 closure: `docs/stage14_complete_player_economic_loop.md`.
+Подробное закрытие Stage 14: `docs/stage14_complete_player_economic_loop.md`.
 
-## Stage 12 — Player State, Ownership, Travel and Manual Trade
+## Stage 12 — Player State, ownership, travel и manual trade
 
-**COMPLETE — PR #29–#32.** Technical record: `docs/stage12_playable_actor.md`.
+**COMPLETE — PR #29–#32.**
 
-Key result:
+Основной результат:
 
-- player state is an envelope above player-agnostic `WorldState`;
-- ownership is independent from faction membership;
-- player directly controls an existing `FleetId` through fixed-tick intent;
-- docking requires physical range;
-- travel reuses Stage-10 jump FSM;
-- manual trade reuses the same `TradeController` as AI;
-- real cargo remains in the real ship inventory;
-- wallet/ownership/discovery/docking persist through save/load.
+- `PlayerState` является envelope над player-agnostic `WorldState`;
+- владение отделено от faction membership;
+- игрок напрямую управляет существующим `FleetId` через fixed-tick intent;
+- docking требует физического range;
+- путешествия используют Stage-10 jump FSM;
+- manual trade использует тот же `TradeController`, что и AI;
+- cargo остаётся в реальном ship inventory;
+- wallet/ownership/discovery/docking переживают save/load.
 
 ## Stage 13 — Combat Vertical Slice
 
-**COMPLETE — PR #35.** Technical record: `docs/stage13_combat_vertical_slice.md`.
+**COMPLETE — PR #35.**
 
-- data-driven first weapon/hull combat data;
-- shared player/AI target+fire command component;
-- shared range/cooldown/shield/hull resolver;
-- deterministic simple CombatAI target selection;
-- lethal results go through ordinary world destruction/salvage;
-- no player-only damage or combat reward path.
+- data-driven первая combat-конфигурация hull/weapon;
+- общие player/AI target+fire commands;
+- общий range/cooldown/shield/hull resolver;
+- deterministic простой CombatAI;
+- lethal result идёт через обычный destruction/salvage;
+- нет player-only damage/reward path.
 
-Advanced tactical combat AI remains intentionally deferred until richer movement/fitting/armor/shield/weapon capability exists.
+Advanced tactical AI сознательно отложен до появления полноценной movement/fitting/armor/shield/weapon глубины.
 
-## Stage 14 — First Complete Player Economic Loop
+## Stage 14 — первый полный игровой экономический цикл
 
-**COMPLETE — 14A PR #39, 14B PR #41, 14C PR #43, final 14D/14E PR #45.**
+**COMPLETE — 14A PR #39, 14B PR #41, 14C PR #43, финальные 14D/14E PR #45.**
 
-Functional final merge:
+Финальный functional merge Stage 14: `0393eccf790269651bcedbdfd8e4eaf8b60ca06a`.
 
-`0393eccf790269651bcedbdfd8e4eaf8b60ca06a`
+CI #1010 / run `31811876633`: **431/431 tests**, strict Javadoc, JaCoCo, shaded desktop package.
 
-Final remaining-slice validation: **CI #1010**, workflow run `31811876633`, **431/431 tests** plus strict Javadoc, JaCoCo and shaded desktop packaging.
+### 14A — добыча игроком
 
-### 14A — Player mining
+**COMPLETE.** Реальный finite asteroid reserve, общий `MiningSystem`, cargo в ship inventory, продажа только через обычный market controller.
 
-**COMPLETE.**
+### 14B — покупка корабля / прогрессия
 
-- transient manual mining intent;
-- finite real asteroid reserve;
-- shared `MiningSystem` extraction;
-- mined units go into active physical ship inventory;
-- no mining-to-money shortcut;
-- sale goes through ordinary market controller;
-- persistent cargo/resource reserve survives save/load.
+**COMPLETE.** Покупка передаёт существующий `FleetId`; реальные wallet transfer; нет clone/spawn/teleport/reset. Future live valuation описана в `docs/ship_pricing_roadmap.md`.
 
-### 14B — Ship purchase / active-ship progression
+### 14C — navigation / HUD / minimap
 
-**COMPLETE.**
+**COMPLETE.** Camera zoom/follow, HUD, ownership-aware minimap, readable economy/mining/combat feedback, read-only presentation boundary.
 
-- purchase transfers an already-existing real `FleetId`;
-- real player wallet decreases and real seller wallet increases;
-- no spawn/clone/teleport/reset on purchase;
-- active-FleetId switching is separate from purchase;
-- cargo/identity/position/ownership persist;
-- explicit Stage-14 price is temporary; future live valuation is specified in `docs/ship_pricing_roadmap.md`.
+### 14E — общая инерционная модель
 
-### 14C — Playable navigation / HUD / local minimap
-
-**COMPLETE.** Completion record: `docs/stage14c_playable_navigation.md`.
-
-- bounded mouse-wheel zoom;
-- active-ship follow;
-- HUD scale independent from world zoom;
-- local minimap from authoritative ECS state;
-- ownership-aware marker classification;
-- zoom declutter;
-- readable economy/mining/combat feedback;
-- presentation is read-only + ordinary commands only.
-
-### 14E — Shared inertial flight baseline
-
-**COMPLETE — PR #45, generalized for generic NPC local movement by PR #51.**
-
-`PlayerDirectControlSystem` uses shared `FlightDynamics` instead of assigning velocity instantly.
-
-Baseline dependency:
+**COMPLETE — PR #45, затем распространена на generic NPC в PR #51.**
 
 ```text
-dry hull / structure mass
-+ real cargo mass
+dry hull/structure mass
++ cargo mass
 = total mass
 
-thrust / total mass
-= acceleration
-
-braking thrust / total mass
-= braking acceleration
+thrust / total mass = acceleration
+braking thrust / total mass = braking acceleration
 ```
 
-Stage-14 compatibility choice: **1 cargo inventory unit = 1 normalized mass unit**. Per-item/equipment/armor/ammunition mass belongs to later fitting/content depth.
+Текущий compatibility rule: **1 cargo inventory unit = 1 normalized mass unit** до появления authoritative per-item mass.
 
-Implemented and validated:
+В PR #51 полностью закрыт старый direct-position movement generic `TradeAISystem` / autonomous `MiningSystem`. Direct player, delegated fleet, generic traders и generic miners используют общий `FlightDynamics`.
 
-- finite acceleration;
-- finite braking/counter-thrust;
-- loaded same-hull freighter responds worse than empty one;
-- light combat ship responds better than loaded heavy carrier;
-- direct player control and autonomous local movement share `FlightDynamics`;
-- `PlayerFlightService/View` expose read-only speed/mass/acceleration/braking/stopping diagnostics;
-- equivalent player/autonomous intent produces identical physical evolution in deterministic tests.
+### 14D — first-hour acceptance / telemetry
 
-The former generic `TradeAISystem` / autonomous `MiningSystem` direct-position compatibility path was fully retired in PR #51. Generic local traders/miners now emit flight intent and use the same inertial integration boundary. New local movement code must not reintroduce direct `Transform.position`/impossible-velocity shortcuts.
+**COMPLETE — PR #45.** Полный 3600-second deterministic сценарий физически проходит trade, jump, mining, ship progression, combat, save/load и продолжение инерционного полёта без debug income/resource grants.
 
-### 14D — First-hour acceptance / telemetry
+### v0.3 DoD
 
-**COMPLETE — PR #45.**
-
-Telemetry tracks without mutating gameplay:
-
-- credits/hour and wallet delta;
-- ordinary trade contribution;
-- mined-cargo sale contribution;
-- ship-purchase spending;
-- travel/mining/combat/idle time;
-- cargo utilization;
-- damage/loss;
-- time to first real ship progression.
-
-Integrated deterministic acceptance executes:
-
-```text
-physical flight + dock
-→ ordinary buy
-→ undock + finite braking
-→ Stage-10 jump
-→ physical dock + ordinary sell
-→ buy/switch real miner FleetId
-→ finite asteroid mining
-→ ordinary mined-cargo sale
-→ buy/switch real combat FleetId
-→ shared combat + destruction
-→ continue living world to 3600 simulation seconds
-→ save/load
-→ continue inertial flight after restore
-```
-
-The acceptance intentionally does not reserve market capacity for the player. Live AI competition remains active during the test.
-
-### v0.3 DoD result
-
-A coherent first playable hour is mechanically proven without debug income/resource grants: physical travel, shared economy, finite mining, combat, real ship progression, readable local UI/minimap and persistent continuation all operate in one world. **v0.3 complete.**
+Игрок может пройти связанный физический цикл: полёт → торговля → добыча → прогрессия кораблей → бой → сохранение/продолжение, пока мир живёт независимо. **v0.3 завершён.**
 
 ---
 
@@ -330,234 +270,323 @@ A coherent first playable hour is mechanically proven without debug income/resou
 
 **ACTIVE — Stage 16.**
 
-## Stage 15 — Player Fleets / Autonomous Orders
+## Stage 15 — флоты игрока / автономные приказы
 
-**COMPLETE — functional PR #47, #48 and #49; post-completion hardening PR #51.** Technical record: `docs/stage15_player_fleets.md` and `docs/post_stage15_inertial_jump_hardening.md`.
+**COMPLETE — PR #47, #48, #49; hardening PR #51.**
 
-Goal achieved: the player can own several physical `FleetId`s, directly control one and delegate persistent real work to the others without passive-income abstractions or a second movement/economy implementation.
+Документы: `docs/stage15_player_fleets.md`, `docs/post_stage15_inertia_and_jump_hardening.md`.
 
-### 15A — Persistent fleet orders foundation
+Цель достигнута: игрок владеет несколькими реальными FleetId, напрямую управляет одним и выдаёт остальным persistent orders без passive income и без отдельной AI economy/movement модели.
 
-**COMPLETE.** Persistent deterministic orders with stable references:
+### 15A — persistent fleet orders
 
-- `HOLD`;
-- `MOVE`;
-- `TRADE`;
-- `MINE`;
-- `ESCORT`;
-- `PATROL`;
-- `FOLLOW`.
+**COMPLETE.** `HOLD`, `MOVE`, `TRADE`, `MINE`, `ESCORT`, `PATROL`, `FOLLOW`; состояние переживает save/load.
 
-Order state survives save/load and references existing physical `FleetId`s.
-
-### 15B — Shared inertial local order execution
+### 15B — shared inertial execution
 
 **COMPLETE.**
 
 ```text
-persistent fleet order / generic AI intent
+persistent order / generic AI intent
 → FlightCommandComponent
 → AutonomousFlightSystem
 → FlightDynamics
 → authoritative Transform
 ```
 
-Player-owned delegated fleets and generic local traders/miners now obey the same mass/thrust/acceleration/braking constraints as direct player control. Cargo affects autonomous mobility through the same mass calculation.
+Cargo влияет на autonomous mobility через тот же mass calculation.
 
-`DelegatedFleetComponent` prevents legacy/generic AI from overwriting Stage-15 order intent while a fleet is delegated and releases stale ownership if a former player fleet returns to generic AI.
+### 15C — autonomous economic orders
 
-### 15C — Autonomous economic orders
+**COMPLETE.** `TRADE` и `MINE` используют реальные markets/inventories/mining resources и Stage-10 physical transit.
 
-**COMPLETE.**
+### 15D — civilian survival / replanning
 
-`TRADE` and `MINE` use real movement, Stage-10 jump transit, real inventories and existing authoritative economic/mining controllers. No passive income, virtual delivery or invented cargo.
+**COMPLETE baseline.** Наблюдаемая атака временно прерывает работу, flee использует физическое движение, persistent order сохраняется, hysteresis предотвращает oscillation.
 
-### 15D — Civilian survival / replanning
+### 15E — cumulative whole-route risk
 
-**COMPLETE baseline.**
+**COMPLETE baseline.** Risk оценивается по всем известным system/link segments с confidence/aging и actor-specific cargo/damage/mobility/escort context. Danger score остаётся exposure, а не выдуманной вероятностью.
 
-- observed attacks can interrupt civilian delegated work;
-- flee uses shared physical movement;
-- original persistent order is retained;
-- deterministic hysteresis prevents immediate oscillation;
-- work resumes after the observed threat clears.
+### 15F — FOLLOW / ESCORT / PATROL
 
-### 15E — Cumulative whole-route risk
+**COMPLETE baseline.** Реальное физическое следование, operational co-located escort mitigation, persistent patrol waypoints и Stage-10 transit без teleport.
 
-**COMPLETE baseline.**
+### 15G — первая функциональная global map
 
-Fundamental invariant:
-
-> **Route danger is evaluated across the entire traversed route, not only the destination.**
-
-Current exposure form uses known system/link intelligence with confidence/aging and actor-specific cargo, damage, mobility and real escort context. Danger scores remain exposure values, not fake probabilities.
-
-### 15F — Escort / convoy / patrol / follow
-
-**COMPLETE baseline.**
-
-- `FOLLOW` resolves and physically follows the target FleetId;
-- `ESCORT` requires a real co-located operational escort to reduce protected actor vulnerability and never erases raw route danger;
-- `PATROL` retains a persistent waypoint cycle, physical dwell and real Stage-10 transit;
-- no group order teleports members.
-
-Advanced weapon-aware screening/cohesion tactics remain correctly gated behind Stage 17.5/18.
-
-### 15G — First functional global-map layer
-
-**COMPLETE baseline.**
-
-The map exposes discovered topology, owned fleets, transit/order state and known threat intelligence only. It submits ordinary persistent commands and previews the same route planner used by execution. It cannot teleport fleets or reveal arbitrary hidden remote NPC state.
-
-### Stage 15 DoD result
-
-Multiple owned persistent FleetIds can receive saved autonomous orders, execute representative move/trade/mine/follow/escort/patrol behavior through shared movement/economy rules, react to observed danger, choose routes using cumulative whole-route risk and remain manageable through the first strategic map layer. **Stage 15 complete.**
+**COMPLETE baseline.** Discovered topology, owned fleets, orders/transit, known threat intel, ordinary command submission и тот же route planner, что использует execution.
 
 ### Post-Stage-15 hardening — PR #51
 
-**COMPLETE.** Final hardening closed the generic-NPC movement debt and clarified player jump semantics.
+**COMPLETE.**
 
-- generic `TradeAISystem` and autonomous `MiningSystem` no longer directly move `Transform`;
-- generic local NPC movement now shares `FlightDynamics`;
-- same-hull cargo mass changes NPC acceleration exactly through the physical mass model;
-- `FOLLOW`, `ESCORT` and `PATROL` execution and route-risk integration are covered by clean-build acceptance;
-- `J` preserves the Stage-10 finite jump FSM rather than teleporting instantly;
-- after arrival, the same `FleetId` materializes at the canonical local-system center `(1000, 700)` under the current map layout;
-- active-system tracking follows the ship and camera projection centers it on screen;
-- current Anchor → Corona demo travel takes about 13 fixed ticks (~1.3 simulation seconds at x1).
+- generic TradeAI/Mining direct movement debt закрыт;
+- все текущие локальные корабли используют shared inertia;
+- `FOLLOW/ESCORT/PATROL` покрыты acceptance;
+- `J` использует конечный Stage-10 FSM, а не instant teleport;
+- canonical arrival — `(1000,700)` для текущей local map;
+- тот же FleetId после arrival становится active entity новой системы;
+- камера центрируется на нём;
+- Anchor → Corona в текущем demo занимает около 13 fixed ticks / ~1.3 simulation seconds на x1.
 
-PR #51 validation: **CI #1151 / run `31826504541`, 454/454 tests**, strict Javadoc, JaCoCo and shaded desktop package all green.
+PR #51: CI #1151 / run `31826504541`, **454/454 tests**, strict Javadoc, JaCoCo, desktop package.
 
-## Stage 16 — Player construction / station ownership
+### Stage 15 DoD
 
-**ACTIVE — current core stage.** Timing foundation already merged in PR #51; specification: `docs/stage16_construction_timing.md`.
+Несколько owned FleetId могут получать persistent autonomous orders, физически торговать/добывать/следовать/эскортировать/патрулировать, реагировать на известную угрозу и использовать whole-route risk через стратегическую карту. **Stage 15 завершён.**
 
-Goal: let the player create and own persistent stations by using the ordinary Stage-9 physical construction pipeline: real funding, real materials, physical logistics, build time and a real resulting station. No instant UI construction and no virtual material delivery.
+---
 
-### 16A — Player project-authoring boundary
+# Stage 16 — строительство игрока и владение станциями
 
-Implement a player-facing construction service that can:
+**ACTIVE — текущий основной этап.**
 
-- enumerate buildable station archetypes from authoritative content/unlocks;
-- validate chosen system/location;
-- calculate project funding and required material bill;
-- create an ordinary persistent `ConstructionProject` rather than spawning a station;
-- expose human-readable rejection reasons without UI-side rule duplication.
+Главная спецификация: `docs/stage16_player_construction.md`.
 
-### 16B — Material-driven construction duration
+Формула времени: `docs/stage16_construction_timing.md`.
 
-**FOUNDATION IMPLEMENTED in PR #51.** New projects already derive duration from the actual authored material bill:
+Acceptance matrix: `docs/stage16_acceptance_matrix.md`.
+
+Цель:
+
+> Игрок должен построить настоящую persistent станцию через тот же Stage-9 physical construction core: собственные деньги, физическая стройплощадка, реальный спрос на материалы, реальная доставка, simulation-time строительство, ordinary station entity и отдельное player ownership.
+
+## 16A — ownership/schema separation
+
+**ACTIVE FIRST SLICE.**
+
+Необходимо:
+
+- добавить persistent ownership player construction projects;
+- добавить persistent ownership готовых station entities;
+- сохранить `WorldState` player-agnostic;
+- разделить project beneficiary/ownership, optional faction/legal affiliation и funding source;
+- добавить migration PlayerState/world construction contract;
+- определить explicit settlement policy остатка site wallet.
+
+Рекомендуемые player fields:
 
 ```text
-materialWork = Σ(requiredAmount × constructionHandlingWeight(itemCategory))
+ownedConstructionProjectIds
+ownedStationRefs
+```
 
-buildTimeSeconds =
+Player ownership не должен автоматически переписывать `FactionComponent`.
+
+## 16B — placement / project authoring
+
+Player-facing `PlayerConstructionService` + read-only view/policies должны:
+
+- перечислять buildable station archetypes;
+- показывать funding/materials/materialWork/ETA;
+- валидировать discovered/current system;
+- валидировать physical location/clearance;
+- не разрешать размещение в jump-arrival exclusion zone;
+- проверять territory/construction access;
+- создавать обычный `ConstructionProject`, а не готовую станцию.
+
+Первый baseline: физическое placement только в active system. Remote construction позже требует реального builder/capability.
+
+## 16C — player funding / site economy
+
+```text
+PlayerState wallet
+→ atomic transfer
+→ construction site WalletComponent
+→ EconomicLedger
+```
+
+`minimumFunding` является project/site liquidity, а не магической «ценой станции».
+
+Construction site остаётся обычным `MarketComponent + InventoryComponent + WalletComponent` и публикует реальный спрос на недостающие материалы.
+
+## 16D — физические материалы / supply logistics
+
+Manual player delivery обязана проверять:
+
+- owned source FleetId;
+- ту же StarSystem;
+- отсутствие jump transit;
+- physical transfer/docking range;
+- достаточно малую скорость;
+- реальный ship cargo;
+- remaining project requirement.
+
+Обычные NPC traders могут снабжать site через существующий trade path.
+
+Желательный Stage-16 fleet extension: persistent `SUPPLY_PROJECT`, который использует Stage-15 market/risk/movement APIs и физически доставляет недостающие материалы.
+
+## 16E — build execution / time / capability seam
+
+**TIME FOUNDATION уже реализован в PR #51.**
+
+```text
+materialWork = Σ(requiredAmount × constructionHandlingWeight)
+
+buildTime =
     baseSetupSeconds
   + materialWork / baselineAssemblyRate
 ```
 
-Current normalized handling work values:
+Текущие work values:
 
 - `MATERIAL = 1.00`;
 - `GAS_LIQUID = 0.55`;
 - `FINISHED_GOODS = 1.60`;
-- baseline assembly rate = `12 work units / simulation second`.
+- `baselineAssemblyRate = 12 work/s`.
 
-These are **construction handling/work units, not fake kilograms**. The old authored `buildSeconds` is retained as base setup/archetype-complexity allowance instead of representing the entire build duration.
+Это work units, не килограммы.
 
-The computed `buildDurationTicks` is persisted when a project is created. Later balance/content changes therefore do not rewrite the duration of construction already under way.
-
-Example from the current content: `station.mining_base` has 180 required units / 153 weighted work; 25 seconds base setup + 12.75 seconds material assembly = **37.75 simulation seconds**.
-
-### 16C — Physical funding/material delivery
-
-Player projects must use the same physical project requirements as AI/factions:
+Сохраняется lifecycle:
 
 ```text
-player/company funding
-+ physically delivered required goods
-→ project becomes build-ready
-→ ordinary construction ticking
-→ completion
+PLANNED
+→ FUNDED
+→ AWAITING_MATERIALS
+→ BUILDING
+→ COMPLETED
 ```
 
-Required materials must exist in real inventories/markets/fleets and be transferred through authoritative controllers. Do not convert missing materials directly into a money surcharge or silently source them from nowhere.
+с terminal `CANCELLED` / `FAILED`.
 
-### 16D — Completion / ownership / persistence
+Будущий `effectiveAssemblyRate` должен зависеть от реального builder/site capability. Уже созданный project хранит resolved `buildDurationTicks`.
 
-On completion:
+## 16F — completion / owned station / finance
 
-- create the ordinary station entity/archetype through the existing lifecycle/content boundary;
-- assign player ownership without rewriting unrelated faction/legal identity unless explicitly required by the future faction system;
-- keep station identity stable and persistent;
-- preserve construction/project state through save/load;
-- ensure destroyed projects/stations follow normal physical destruction/economic consequences.
-
-### 16E — Construction management / strategic-map UX
-
-Expose from authoritative state:
-
-- project location/archetype;
-- funding status;
-- delivered / missing materials;
-- material-work estimate;
-- current build duration/progress/ETA;
-- ownership/resulting station;
-- clear reasons why construction cannot start or continue.
-
-The map/UI remains read-only plus ordinary construction/logistics commands.
-
-### Stage 16 DoD
-
-At minimum prove an end-to-end player station project:
+После completion:
 
 ```text
-select buildable station archetype/location
-→ fund ordinary project
-→ source and physically deliver required materials
-→ project starts only after real requirements are satisfied
-→ build time derives from authoritative material/work policy
-→ same world continues while project builds
-→ real persistent station is created
-→ player owns it
-→ save/load preserves project or completed station
+site removed
+→ required materials consumed as explicit construction sink
+→ ordinary station entity created
+→ resulting EntityId recorded
+→ PlayerState получает ownership этой physical station
 ```
 
-No debug grants, instant spawning or virtual deliveries are allowed in the Stage-16 acceptance.
+Station ownership и faction/legal identity остаются разными понятиями.
 
-## Future technology tiers — ships and structures
+Минимальная station finance boundary:
 
-**PLANNED cross-cutting content/system requirement.** Introduce explicit data-driven technology tiers for both **station/building archetypes** and **ship/hull archetypes** once Stage-16 construction and the later fitting/content foundations make the distinction mechanically meaningful.
+```text
+player wallet ↔ station WalletComponent
+```
 
-The tier is **not** a generic quality level and must not become an arbitrary `T2 × 2`, `T3 × 3` multiplier for price, damage, HP or construction time.
+только через atomic transfer + ledger.
 
-Intended semantics:
+**Никакого автоматического passive profit transfer.** Станции нужен реальный operating capital.
+
+## 16G — project/station UI и strategic map
+
+Показывать из authoritative state:
+
+- archetype/location;
+- funding/site wallet;
+- delivered/required/missing materials;
+- materialWork;
+- build progress/ETA;
+- status/failure reason;
+- owned completed stations;
+- supply routes/orders.
+
+Local placement preview не меняет мир до accepted command.
+
+## 16H — cancellation / failure / hardening
+
+Нужно закрыть текущий material-fate debt:
+
+- cancel до материалов → refund и removal;
+- cancel после partial delivery → материалы не исчезают, а становятся physically recoverable;
+- voluntary cancel после `BUILDING` можно запретить до появления корректного salvage-by-progress;
+- destroyed site → `FAILED` без refund/respawn shortcut;
+- multiple player/NPC projects конкурируют за одни markets/materials deterministic образом.
+
+### Stage 16 Definition of Done
+
+Автоматизированный deterministic сценарий должен доказать:
+
+```text
+player wallet + owned fleet
+→ valid site/archetype selection
+→ real project/site creation
+→ real player funding
+→ real market/cargo sourcing
+→ physical owned-fleet delivery
+→ full material fulfillment
+→ BUILDING only after fulfillment
+→ leave system / remote simulation continues
+→ save/load mid-project
+→ completion after authoritative ticks
+→ ordinary physical station entity
+→ player ownership of exact resulting EntityId
+→ ordinary station market/production/wallet behavior
+→ player deposit/withdraw through real transfers
+→ save/load completed station
+→ ordinary destruction removes asset without free replacement
+```
+
+Обязательные отрицательные проверки:
+
+- нельзя строить в invalid/undiscovered location;
+- нельзя строить без territory access;
+- нельзя передать material через всю систему;
+- нельзя построить без физических материалов;
+- нельзя ускорить строительство простой доплатой;
+- нельзя получить duplicate project/station повторной командой;
+- нельзя потерять/удвоить деньги при rollback;
+- нельзя изменить persisted duration после load;
+- UI не может мутировать construction state напрямую.
+
+---
+
+# Будущие технологические тиры кораблей и построек
+
+**PLANNED cross-cutting requirement.**
+
+Технологические тиры вводятся, когда Stage 16 construction и Stage 17.5 fitting/shipbuilding дают им реальные механические последствия.
+
+Ключевой принцип:
+
+> **Tech tier — это уровень технологической/производственной сложности, а не линейное качество объекта.**
+
+Запрещена модель:
+
+```text
+T2 = ×2 цена / HP / damage / build time
+T3 = ×3
+```
+
+Предпочтительная причинная цепочка:
 
 ```text
 tech tier
-→ required technological knowledge/unlock
-→ required component/material sophistication
-→ minimum capable shipyard/construction facility
-→ production/assembly complexity
-→ possible specialized labor/tooling/time requirements
-→ economic scarcity and therefore emergent price effects
+→ prerequisite technology/unlock
+→ более специализированные components/materials
+→ required facility/shipyard capability
+→ tooling/integration complexity
+→ ограниченное число производителей
+→ более сложная logistics/supply chain
+→ scarcity/market pressure
+→ эмерджентная цена и доступность
 ```
 
-### Structure/station tech tier
+## Tech tier станций
 
-A future `StationArchetype.techTier` (or equivalent stable content field) should be able to influence:
+Будущий `StationArchetype.techTier` или stable equivalent должен влиять на:
 
-- whether the player/faction possesses the required technology;
-- minimum construction-site / yard capability;
-- access to higher-tier or specialized components;
-- assembly complexity and commissioning/setup work;
-- which station modules/functions can be built;
-- repair/upgrade infrastructure requirements where later introduced.
+- technology ownership/unlock;
+- minimum construction facility capability;
+- specialized component requirements;
+- assembly/commissioning complexity;
+- module/function availability;
+- repair/upgrade infrastructure;
+- возможные licenses/faction restrictions.
 
-The construction-duration policy should then evolve conceptually toward:
+Целевая формула времени:
 
 ```text
-materialWork = Σ(quantity × authoritativeUnitMassOrHandlingWork)
+materialWork = Σ(quantity × authoritativeMassOrHandlingWork)
+
+effectiveAssemblyRate = f(real site/builder capability)
 
 buildTime =
     (baseSetupTime + materialWork / effectiveAssemblyRate)
@@ -565,73 +594,96 @@ buildTime =
     × complexityFactor
 ```
 
-`effectiveAssemblyRate` should later be allowed to depend on the actual construction site/yard capability. Higher tier should usually require more sophisticated inputs and infrastructure; it does not need to be slower in every case if a sufficiently advanced yard has correspondingly better assembly capability.
+Higher tier не обязан всегда строиться дольше: advanced yard может иметь высокий effective assembly rate.
 
-### Ship tech tier
+## Tech tier кораблей
 
-A future `ShipArchetype.techTier` (or equivalent) should influence:
+Будущий `ShipArchetype.techTier` должен влиять на:
 
 - required shipyard class/capability;
-- component/fitting technology prerequisites;
-- production tooling and complexity;
-- access/unlock rules;
-- repair/refit requirements where relevant;
-- valuation indirectly through real components, production cost, scarcity, seller policy and market conditions.
+- component/fitting prerequisites;
+- tooling/production complexity;
+- repair/refit requirements;
+- blueprint/unlock rules;
+- valuation **косвенно** через реальные components, production cost, scarcity, condition, seller policy и market state.
 
-Tech tier must **not** replace hull class/role. A high-tier courier can remain physically smaller than a lower-tier freighter; tier expresses technological/industrial sophistication, while hull class expresses physical role/envelope.
+Tech tier не заменяет hull class/role. Маленький high-tier courier может быть меньше low-tier bulk freighter.
 
-### Tier integration rule
+## Capability + specialization
 
-When tech tiers are introduced:
+Одной tier-цифры может быть недостаточно. В будущем допустимы capability tags, например:
 
-1. add stable bounded content fields and validation to ship/station archetypes;
-2. define migration/default behavior for existing content explicitly;
-3. expose capability checks through shared player/AI production APIs;
-4. make construction/shipbuilding consume real tier-appropriate components and capable facilities;
-5. integrate ship price through `docs/ship_pricing_roadmap.md` rather than a blanket tier price multiplier;
-6. add deterministic acceptance proving that insufficient technology/facility capability rejects production and sufficient capability succeeds through ordinary physical production;
-7. preserve already-started construction contracts: balance/tier edits must not silently rewrite persisted project duration/resources unless an explicit migration requires it.
+```text
+CAP_HEAVY_HULL
+CAP_PRECISION_ELECTRONICS
+CAP_MILITARY_REACTOR
+CAP_CAPITAL_ASSEMBLY
+```
 
-## Stage 17 — Player faction
+Условие production может требовать и достаточный tier, и нужную specialization.
+
+## Persistence rule tiers
+
+При введении tiers:
+
+1. stable bounded content fields + validation;
+2. явная migration/default для существующего content;
+3. shared player/AI capability checks;
+4. реальные tier-appropriate components/facilities;
+5. ship price через `docs/ship_pricing_roadmap.md`, не blanket multiplier;
+6. deterministic acceptance для insufficient/sufficient technology/facility;
+7. already-started projects сохраняют свой resolved contract.
+
+---
+
+# Stage 17 — собственная фракция игрока
 
 **PLANNED.**
 
-Reuse Stage-8 treasury, territory, relations, access, taxes/subsidies and policies. Introduce data-driven faction doctrine for civilian risk, escort preference and broad aggression/retreat choices.
+Использовать Stage-8 treasury, territory, relations, access, taxes/subsidies и policies.
 
-Technology ownership/unlocks should begin to become faction/player state here if not introduced earlier by a minimal Stage-16 construction requirement. The system must remain shared by player and AI factions.
+Stage 16 owned stations/fleets должны перейти под player faction без замены физических EntityId/FleetId.
 
-## Stage 17.5 — Combat Depth / Ship Fitting Foundation
+Technology ownership/unlocks должен стать общим player/faction state здесь, если минимальный technology requirement не понадобится раньше.
 
-**PLANNED prerequisite before advanced tactical combat AI.**
+---
 
-Required capability foundation:
+# Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-- several materially different hull classes;
-- explicit ship tech-tier integration where sufficiently meaningful content exists;
-- armor beyond generic hull HP;
+**PLANNED prerequisite перед advanced tactical AI.**
+
+Необходимая база:
+
+- несколько materially different hull classes;
+- meaningful ship tech-tier integration при достаточном content;
+- armor больше generic hull HP;
 - richer shield behavior;
-- several weapon families/range envelopes;
+- несколько weapon families/range envelopes;
 - fitting/equipment foundation;
 - equipment/armor/cargo/ammunition mass integration;
-- stable combat-capability query APIs;
-- deterministic enriched-combat tests.
+- stable combat-capability APIs;
+- deterministic enriched combat tests.
 
-## Stage 18 — Strategic Warfare + Advanced Combat Behavior
+Здесь же должна появиться authoritative база для будущего shipbuilding/player shipyards.
 
-**PLANNED after Stage 17.5 gate.**
+---
+
+# Stage 18 — strategic warfare + advanced combat behavior
+
+**PLANNED после Stage 17.5 gate.**
 
 - formal war/peace/hostility;
 - fronts/blockades/territory objectives;
 - advanced weapon/range/mobility-aware tactical AI;
 - escort/screen/intercept/retreat/pursuit;
 - replacement logistics;
-- shared threat intelligence with confidence/freshness/decay;
-- conflict-driven traffic rerouting and economic consequences;
+- shared threat intelligence confidence/freshness/decay;
+- conflict-driven traffic rerouting и economic consequences;
 - strategic global-map overlays.
 
 ### v0.4 DoD
 
-Player grows from one ship into autonomous fleets/stations/faction and wages conflicts whose consequences change physical assets, trade routes, supply chains and territory.
+Игрок развивается от одного корабля до автономных fleets/stations/faction и участвует в конфликтах, которые меняют реальные assets, trade routes, supply chains и territory.
 
 ---
 
@@ -639,13 +691,15 @@ Player grows from one ship into autonomous fleets/stations/faction and wages con
 
 **PLANNED.**
 
-## Stage 19 — Exploration / discovery / world generation
+## Stage 19 — исследование / discovery / world generation
 
-Persistent discovered systems/routes/stations/resources; deterministic seed-driven galaxy generation; anomalies, derelicts and special locations. Information availability remains explicit.
+Persistent discovered systems/routes/stations/resources; deterministic seed-driven galaxy generation; anomalies, derelicts, special locations. Доступность информации остаётся explicit.
 
 ## Stage 20 — NPC / missions / reputation / progression
 
-Persistent NPCs where identity matters. Missions arise from actual world state: haul, mine, escort, bounty, investigate, defend, shortage, expansion, war and discovery. Persistent commanders may apply bounded personality/doctrine modifiers without omniscience.
+Persistent NPC там, где identity важна. Missions должны возникать из реального world state: haul, mine, escort, bounty, investigate, defend, shortage, expansion, war, discovery.
+
+Persistent commanders могут давать bounded personality/doctrine modifiers без omniscience.
 
 ---
 
@@ -653,13 +707,13 @@ Persistent NPCs where identity matters. Missions arise from actual world state: 
 
 **PLANNED.**
 
-## Stage 21 — Content breadth / balance / long-run stability
+## Stage 21 — ширина контента / баланс / long-run stability
 
-Expand resources, components, ships, stations and faction differentiation after mechanics stabilize.
+Расширить resources, components, ships, stations и faction differentiation после стабилизации механик.
 
-This is also the main breadth/balance phase for a richer technology ladder once the underlying tier rules are stable. Expand tier diversity only after construction, shipbuilding/fitting and faction technology ownership have authoritative mechanics.
+Это также основной этап расширения technology ladder после стабилизации tier mechanics.
 
-Long-run soak/benchmark matrices must detect:
+Long-run soak/benchmark matrix должна выявлять:
 
 - inflation/deflation;
 - permanent shortages/dead economies;
@@ -671,9 +725,10 @@ Long-run soak/benchmark matrices must detect:
 - engage/retreat or route-choice oscillation;
 - escorts abandoning convoys;
 - danger that never decays;
-- universal route avoidance or suicidal profit chasing;
-- higher technology tiers becoming mandatory linear upgrades instead of differentiated economic/industrial choices;
-- high-tier production bypassing real component/facility bottlenecks.
+- universal risk avoidance или suicidal profit chasing;
+- tech tiers превращаются в обязательные линейные upgrades;
+- high-tier production обходит реальные component/facility bottlenecks;
+- construction queues/material logistics создают runaway backlog или бесплатное производство.
 
 ---
 
@@ -683,124 +738,147 @@ Long-run soak/benchmark matrices must detect:
 
 ## Stage 22 — UX / onboarding / performance / release hardening
 
-- unify/polish HUD and management UI built earlier;
+- унификация и polish HUD/management UI;
 - production global/local map filters/search/notifications;
 - input discoverability/accessibility/scaling;
-- onboarding for first trade/mining/combat/fleet/station;
-- autosave/backup/corrupt-save UX and supported migration window;
-- profiling large combat, remote worlds, route planning, asset lists and save/load;
-- final visual settings and release baselines;
+- onboarding first trade/mining/combat/fleet/station;
+- autosave/backup/corrupt-save UX и supported migration window;
+- profiling large combat, remote worlds, route planning, asset lists, construction и save/load;
+- final graphics settings/release baselines;
 - clean build/regression/soak/save-load-soak gates.
 
 ---
 
-# 4. Parallel Visual / UX Track
+# 4. Параллельный Visual / UX track
 
-Visual work proceeds in parallel but never substitutes a functional stage DoD.
+Visual work развивается параллельно, но не заменяет functional DoD.
 
 - **V1 Ship sprite pipeline:** grounded top-down language, size grammar, hardpoints, pivots/collision conventions.
-- **V2 Engine/movement:** idle/thrust/maneuver tied progressively to actual movement/thrust state.
-- **V3 Station language:** construction, industrial, mining, trade, military, colony, faction differentiation; future technology tiers should remain visually legible through believable infrastructure/material sophistication rather than arbitrary ornament density.
+- **V2 Engine/movement:** idle/thrust/maneuver привязываются к реальной movement/thrust state.
+- **V3 Station language:** construction, industrial, mining, trade, military, colony, faction differentiation; будущие tech tiers визуально выражаются через правдоподобную инфраструктуру/material sophistication, а не случайное количество декора.
 - **V4 Combat VFX:** weapons, shields/hits/destruction/salvage.
-- **V5 Playable navigation/readability:** Stage-14 camera/HUD/local minimap baseline — **COMPLETE baseline**.
-- **V6 Strategic map / empire UI:** topology/navigation first, then fleet/orders, territory, trade flows, shortages, cumulative danger, construction and wars alongside Stage 15–18.
+- **V5 Playable navigation/readability:** Stage-14 baseline — **COMPLETE**.
+- **V6 Strategic map / empire UI:** topology/navigation → fleets/orders → construction/stations → territory/trade/risk/war в Stages 15–18.
 
-Gameplay never depends on one specific sprite asset. Presentation metadata remains data-driven over authoritative simulation archetypes.
+Gameplay не зависит от одного конкретного sprite asset. Presentation metadata остаётся data-driven поверх authoritative archetypes.
 
 ---
 
-# 5. Cross-cutting engineering rules
+# 5. Сквозные инженерные правила
 
 ## Persistence
 
-Every persistent domain object defines stable identity, schema/file-format ownership, bounded codec, migration policy and continuation tests.
+Каждый persistent domain object имеет stable identity, schema ownership, bounded codec, migration policy и continuation tests.
 
 ## Determinism
 
-Every planner/AI uses deterministic iteration and tie-breaks. RNG is named and used only where randomness is an explicit design requirement.
+Planner/AI используют deterministic iteration/tie-breaks. RNG именован и применяется только там, где randomness — явное design requirement.
 
 ## Economic conservation
 
-Every money/resource mutation uses transfer/source/sink/transform semantics and ledger/invariant coverage. No hidden income/resource creation.
+Каждое изменение денег/ресурсов имеет transfer/source/sink/transform semantics и ledger/invariant coverage. Скрытого дохода/ресурсов нет.
 
 ## Physicality
 
-Construction, trade, mining, progression, expansion and warfare use real entities, finite resources/cargo, wallets, travel and build time. Remote simulation may reduce fidelity but may not invent incompatible consequences.
+Construction, trade, mining, progression, expansion и warfare используют реальные entities, finite resources/cargo, wallets, travel и build time. Remote simulation может снижать fidelity, но не создавать несовместимые последствия.
 
 ## Shared player/AI core
 
-Player-facing commands and AI intent adapt to common simulation controllers. Separate player-only implementations require explicit justification and invariant coverage.
+Player-facing commands и AI intent адаптируются к общим simulation controllers. Player-only реализация требует explicit justification.
 
 ## Movement physicality
 
-All current high-fidelity local direct-player, delegated-fleet, generic-trader and generic-miner movement uses shared mass/thrust/acceleration limits through `FlightDynamics`. Flight assist may simplify intent but may not grant instantaneous acceleration/braking unavailable to equivalent ships. Cargo/equipment/armor affect mobility through authoritative physical data as those systems mature.
-
-No new local AI/player movement system may directly snap normal movement position/velocity around the shared flight boundary unless the operation is an explicit structural materialization event such as arrival/spawn/load with documented semantics.
+Direct player, delegated fleet, generic trader и generic miner используют shared `FlightDynamics`. Normal local movement не имеет права напрямую snap `Transform.position/velocity`, кроме explicit structural materialization events (spawn/load/jump arrival) с документированной семантикой.
 
 ## Jump / structural materialization
 
-Inter-system travel uses the Stage-10 finite jump FSM. A jump is not ordinary local movement and may structurally detach/materialize a persistent `FleetId`. Arrival coordinates must use a documented canonical local-system anchor and presentation must follow the authoritative active FleetId/system after materialization.
+Inter-system travel использует Stage-10 finite jump FSM. Persistent FleetId может временно отсоединяться от local ECS и материализоваться в destination. Arrival anchor и camera follow должны быть authoritative/documented.
 
 ## AI information / route risk
 
-Danger decisions use available observations/intelligence rather than automatic global omniscience. Strategic risk evaluates the **full traversed route — systems and links —** with actor-specific exposure/vulnerability, not destination danger alone.
+Risk decisions используют доступные observations/intelligence. Whole-route risk оценивает все traversed systems/links, а не только destination.
 
 ## Construction physicality
 
-Construction duration and feasibility must derive from authoritative project/archetype/material/facility data. New projects persist their resolved construction contract so later balance changes do not silently alter work already under way. Missing physical materials/facility capability must not be replaced by a hidden currency shortcut.
+Construction feasibility/time определяются authoritative project/archetype/material/facility data. Missing materials/capability нельзя заменить hidden currency shortcut.
+
+Уже начатый project хранит resolved construction contract.
+
+## Ownership vs faction identity
+
+Владение кораблём/станцией игроком — отдельный persistent слой и не должно неявно переписывать faction/legal identity. Это особенно важно до Stage 17.
 
 ## Technology tiers
 
-Future ship/station technology tiers are data-driven production/technology constraints, not arbitrary stat/price multipliers. Tier consequences should emerge through real component requirements, capable yards/sites, production complexity, unlocks, logistics/scarcity and fitting capabilities. Player and AI use the same tier/capability checks.
+Future ship/station tiers — data-driven technology/production constraints, а не blanket stat/price multipliers. Player и AI используют одинаковые tier/capability checks.
 
 ## Presentation read-only boundary
 
-HUD/minimap/global-map layers may read authoritative state and submit ordinary commands, but may not mutate economy/combat/mining/ownership/physics directly or introduce UI-only gameplay rules.
+HUD/minimap/global-map/construction UI читают authoritative state и отправляют ordinary commands, но не мутируют economy/combat/mining/ownership/physics/construction напрямую.
+
+## Documentation language
+
+Начиная с Stage 16:
+
+- новая проектная документация — на русском;
+- обновляемый roadmap — на русском;
+- новые stage specifications/acceptance matrices/completion records — на русском;
+- code identifiers и content IDs не переводятся;
+- исторические документы переводятся при содержательном обновлении, а не массовой механической операцией.
 
 ## Measure before optimization
 
-Major systems require diagnostics/benchmarks. Optimize from evidence or structurally unacceptable algorithmic scaling rather than speculative micro-optimization.
+Крупные системы получают diagnostics/benchmarks. Оптимизация делается по измерениям или явной структурной проблеме scaling, а не по предположениям.
 
 ---
 
-# 6. Stage transition rules
+# 6. Правила перехода между stages
 
-1. `main` remains stable.
-2. New core work starts from current green `main`.
-3. Broken CI blocks merge/stage transition.
-4. Every stage has explicit vertical slice and DoD.
-5. Persistent changes require migration/continuation coverage.
-6. Economic changes require conservation/invariant coverage.
-7. Deterministic decision code requires tie-break coverage.
-8. Player and AI reuse common APIs unless separation is explicitly justified.
-9. Do not expand content breadth before mechanics stabilize.
-10. UI/map layers remain read-only views + command adapters.
-11. Advanced tactical combat AI does not begin before the combat-depth gate.
-12. Strategic danger-aware routing scores the entire traversed path, not only destination.
-13. Generic/local ship movement debt is **closed as of PR #51**: direct player, delegated fleet, generic TradeAI and autonomous mining use the shared inertial flight boundary. Do not reintroduce direct normal-movement `Transform` mutation.
-14. Generated ship pricing must eventually use live economic/material/component/fitting/condition/relationship inputs while retaining authoritative real-asset ownership transfer.
-15. Construction duration must derive from real project/material/facility complexity inputs; already-started projects retain their persisted resolved duration.
-16. Future ship/station technology tiers must be explicit stable content/system data and must not be implemented as blanket price/stat multipliers.
-17. Update this roadmap only after factual completion/merge evidence exists.
+1. `main` остаётся стабильным.
+2. Core work начинается от текущего green `main`.
+3. Broken CI блокирует merge и stage transition.
+4. Каждый stage имеет explicit vertical slice и DoD.
+5. Persistent changes требуют migration/continuation coverage.
+6. Economic changes требуют conservation/invariant coverage.
+7. Deterministic decision code требует tie-break coverage.
+8. Player и AI используют общие APIs, если разделение не обосновано.
+9. Не расширять content breadth до стабилизации mechanics.
+10. UI/map остаются views + command adapters.
+11. Advanced tactical combat AI не начинается до combat-depth gate.
+12. Strategic danger routing оценивает весь путь.
+13. Generic/local movement debt закрыт PR #51; direct normal-movement `Transform` mutation не возвращается.
+14. Generated ship pricing в будущем использует live economy/material/component/fitting/condition/relationship inputs и real-asset ownership transfer.
+15. Construction time определяется реальными project/material/facility inputs; already-started projects сохраняют resolved duration.
+16. Player station ownership отделено от faction identity; Stage 16 не создаёт скрытую player faction.
+17. Future tech tiers — stable content/system data, не blanket multipliers.
+18. Новая/обновляемая документация с Stage 16 ведётся на русском.
+19. Этот roadmap меняется только после фактически подтверждённых implementation/merge evidence либо при явном изменении будущего плана пользователем.
 
 ---
 
-# 7. Current next step
+# 7. Текущий следующий шаг
 
-**ACTIVE: Stage 16 — Player Construction / Station Ownership.**
+**ACTIVE: Stage 16 — строительство игрока и владение станциями.**
 
-Stage 15 is factually complete through PR #47/#48/#49, with post-completion inertial/jump hardening in PR #51. PR #51 merged as `a32584a928d97a014dd2cbb32fdeaed4fe0c65eb`; CI #1151 / run `31826504541` passed **454/454 tests**, strict Javadoc, JaCoCo and shaded desktop packaging. Documentation hardening was merged through PR #52; `main` after that merge was `0b3105e1af6d3ef6beba2e92963bab5012ff37c6`.
+Фактическая база перед началом implementation:
 
-Immediate Stage-16 implementation order:
+- Stage 15 COMPLETE;
+- generic NPC inertia debt CLOSED;
+- finite `J` jump + canonical arrival/camera centering покрыты acceptance;
+- current build-time formula уже в production `ConstructionDurationPolicy`;
+- `ConstructionProjectService` уже создаёт physical site, funding/material state, BUILDING lifecycle, completion station и persistence;
+- главный architectural gap — Stage-9 construction пока жёстко связывает owner с faction treasury, тогда как игрок до Stage 17 является отдельным economic actor.
 
-1. add the player-facing project-authoring/query boundary over ordinary Stage-9 construction projects;
-2. preserve the already-merged material-driven construction-duration policy and expose its work/ETA diagnostics;
-3. require real project funding and physical delivery of every required material;
-4. create the resulting station only through the ordinary lifecycle/content boundary and transfer real ownership to the player;
-5. persist/continue both in-progress projects and completed station ownership;
-6. expose project/site/material/progress information through the strategic map/UI without UI-side construction rules;
-7. add end-to-end deterministic acceptance from project selection through material logistics to a completed persistent player-owned station;
-8. prepare, but do not prematurely fabricate, the future tech-tier fields/capability model for stations and ships; introduce them when technology/facility/component distinctions become authoritative enough to validate properly;
-9. only after Stage-16 DoD proceed to Stage 17 player-faction integration.
+Immediate implementation order:
 
-Do **not** begin advanced weapon-aware tactical AI now. Do **not** create instant stations or virtual deliveries. Do **not** implement technology tiers as arbitrary linear upgrades; they must be grounded in the physical production/economy systems already established.
+1. **16A:** player project/station ownership schema + separation ownership/legal faction/funding source;
+2. **16B:** authoritative project query/create + placement/access policy;
+3. **16C:** atomic player-wallet funding + construction-site economy;
+4. **16D:** physical manual material delivery, затем owned-fleet supply integration;
+5. **16E:** сохранить уже работающую duration policy, добавить progress/remote continuation/capability seam;
+6. **16F:** completion → exact station ownership + station wallet deposit/withdraw;
+7. **16G:** local construction placement UI + strategic project/station management;
+8. **16H:** cancellation/material fate, failure, persistence, deterministic end-to-end acceptance;
+9. после Stage-16 DoD перейти к **Stage 17 — собственная фракция игрока**.
+
+Не начинать сейчас advanced tactical AI. Не создавать instant stations/virtual delivery. Не создавать player faction только ради обхода Stage-9 ownership. Не вводить tech tiers как произвольные линейные коэффициенты.

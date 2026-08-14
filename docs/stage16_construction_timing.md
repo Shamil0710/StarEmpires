@@ -1,18 +1,20 @@
-# Star Empires — Stage 16 Construction Timing Foundation
+# Star Empires — Stage 16: модель времени строительства
 
-> Status: **ACTIVE FOUNDATION — Stage 16 is not complete**
+> Статус: **ACTIVE FOUNDATION — Stage 16 ещё не завершён**
 >
-> Functional foundation merged in **PR #51** at `a32584a928d97a014dd2cbb32fdeaed4fe0c65eb`.
+> Функциональная база слита в **PR #51** (`a32584a928d97a014dd2cbb32fdeaed4fe0c65eb`).
 >
-> Validation: **CI #1151**, run `31826504541`, **454/454 tests passed** plus strict Javadoc, JaCoCo and desktop packaging.
+> Валидация: **CI #1151**, run `31826504541`, **454/454 теста**, strict Javadoc, JaCoCo и desktop packaging.
+>
+> Полная спецификация Stage 16: `docs/stage16_player_construction.md`.
 
 ---
 
-## 1. Design goal
+## 1. Цель модели
 
-Station construction time must emerge from the physical scale of the project instead of being a single arbitrary final timer stored on a station archetype.
+Время строительства станции должно зависеть от физического масштаба и производственной сложности проекта, а не быть одним произвольным финальным таймером в station archetype.
 
-The immediate Stage-16 rule is:
+Текущее правило Stage 16:
 
 ```text
 materialWork =
@@ -23,43 +25,43 @@ buildTime =
   + materialWork / baselineAssemblyRate
 ```
 
-The existing authored `construction.buildSeconds` value is therefore reinterpreted as **base setup / archetype-complexity allowance**, not the complete build duration.
+Существующее значение `construction.buildSeconds` переосмыслено как **базовое время подготовки / archetype complexity allowance**, а не как полная длительность строительства.
 
-The material bill is authoritative: if a station needs more real components, the project normally requires more assembly work and therefore more time.
+Material bill остаётся authoritative: если объект требует больше реальных компонентов, он обычно требует больше сборочной работы и времени.
 
 ---
 
-## 2. Why the current weight is not kilograms
+## 2. Почему текущий «вес» — не килограммы
 
-The present content catalog does not yet expose authoritative physical mass for every item/component. Calling the current cargo units kilograms would create false precision and would later make the fitting/mass model harder to correct.
+Content catalog пока не содержит authoritative physical mass для каждого предмета/компонента. Если назвать текущие cargo units килограммами, мы создадим ложную точность и усложним будущую интеграцию fitting/mass модели.
 
-For this Stage-16 foundation, each item category therefore receives a normalized **construction handling / fabrication work** value:
+Поэтому сейчас каждая item category получает нормализованный объём **construction handling / fabrication work**:
 
-| Category | Work per required unit |
+| Категория | Work на требуемую единицу |
 | --- | ---: |
 | `MATERIAL` | `1.00` |
 | `GAS_LIQUID` | `0.55` |
 | `FINISHED_GOODS` | `1.60` |
 
-Interpretation:
+Интерпретация:
 
-- raw structural material is the reference work unit;
-- bulk tanked fluid/energy cargo requires less assembly handling per inventory unit;
-- finished assemblies/components require more placement, integration and testing work.
+- сырой structural material — базовая единица работы;
+- жидкости/энергетические bulk cargo требуют меньше assembly handling на inventory unit;
+- готовые assemblies/components требуют больше монтажа, интеграции и тестирования.
 
-Current baseline site throughput:
+Текущая базовая производительность site:
 
 ```text
 12 construction-work units / simulation second
 ```
 
-These are balance parameters, not physical SI units.
+Это balance parameters, а не физические SI units.
 
 ---
 
-## 3. Current authoritative formula
+## 3. Текущая authoritative формула
 
-Implemented in `ConstructionDurationPolicy`:
+Реализована в `ConstructionDurationPolicy`:
 
 ```text
 W = Σ(q_i × h_i)
@@ -69,21 +71,21 @@ T_material = W / R
 T_total = T_setup + T_material
 ```
 
-Where:
+Где:
 
-- `q_i` — exact required amount from the station construction material bill;
-- `h_i` — normalized handling/fabrication work for the item's category;
+- `q_i` — точное required amount из material bill станции;
+- `h_i` — normalized handling/fabrication work для категории предмета;
 - `R` — baseline assembly rate;
-- `T_setup` — existing authored `buildSeconds`, now treated as setup/complexity allowance;
-- `T_total` — build duration used when creating the real construction project.
+- `T_setup` — authored `buildSeconds`, теперь setup/complexity allowance;
+- `T_total` — длительность, используемая при создании реального construction project.
 
-The final time is converted into authoritative fixed ticks and stored in `ConstructionProjectState.buildDurationTicks`.
+Итоговое время переводится в authoritative fixed ticks и сохраняется в `ConstructionProjectState.buildDurationTicks`.
 
 ---
 
-## 4. Example: mining base
+## 4. Пример: mining base
 
-Current `station.mining_base` requirements:
+Текущие требования `station.mining_base`:
 
 ```text
 120 steel × 1.00 = 120 work
@@ -92,7 +94,7 @@ Current `station.mining_base` requirements:
 material work       = 153 work
 ```
 
-At 12 work/s:
+При 12 work/s:
 
 ```text
 material assembly = 153 / 12 = 12.75 s
@@ -101,15 +103,15 @@ base setup        = 25.00 s
 calculated total  = 37.75 s
 ```
 
-This is intentionally longer than the old standalone 25-second timer because physical material scale now contributes to construction time.
+Это намеренно дольше старого отдельного 25-секундного таймера: теперь физический масштаб материалов действительно участвует во времени строительства.
 
 ---
 
 ## 5. Persistence rule
 
-The formula is evaluated **when a new project is created**.
+Формула вычисляется **в момент создания нового проекта**.
 
-After creation:
+После создания:
 
 ```text
 calculated total seconds
@@ -118,102 +120,135 @@ calculated total seconds
 → persisted save contract
 ```
 
-An ongoing project does not recalculate its duration on load.
+Уже идущий проект не пересчитывает длительность после load.
 
-This is important because future balance changes to assembly rate, category weights, tech tiers or complexity must not silently change an already-started construction project after save/load.
+Это необходимо, потому что будущие изменения assembly rate, category weights, tech tiers, complexity или capability площадки не должны молча менять уже начатую стройку.
 
-`ConstructionDurationIntegrationTest` proves that a new real `WorldSimulation` project receives the calculated tick duration and preserves the exact value through `WorldStateCodec` save/restore.
+`ConstructionDurationIntegrationTest` доказывает, что новый реальный project получает рассчитанное число ticks и сохраняет точное значение через `WorldStateCodec` save/restore.
 
 ---
 
-## 6. Planned tech-tier / complexity extension
+## 6. Будущее расширение: tech tier, complexity и capability
 
-The architecture leaves an explicit seam for the user's proposed technology/structure coefficient, but PR #51 deliberately does not invent arbitrary tiers before the content model defines them.
+Архитектура оставляет явную точку расширения для технологического тира и коэффициента сложности, но PR #51 сознательно не вводит искусственные tiers до появления authoritative content model.
 
-The intended future form is:
+Целевая форма:
 
 ```text
+materialWork =
+    Σ(quantity_i × work_i)
+
+effectiveAssemblyRate =
+    baselineAssemblyRate
+  × builderCapability
+  × siteInfrastructure
+  × conditionFactor
+
 baseWorkTime =
     baseSetupSeconds
-  + materialWork / assemblyRate
+  + materialWork / effectiveAssemblyRate
 
 finalBuildTime =
     baseWorkTime
   × techTierFactor
   × complexityFactor
-  × siteCapabilityFactor
 ```
-
-Possible meanings:
 
 ### `techTierFactor`
 
-Represents technological difficulty, precision and integration requirements rather than simple physical size.
+Отражает технологическую сложность, точность и объём интеграционных требований, а не просто физический размер.
 
-Examples of the future qualitative relation:
+Качественная иерархия может выглядеть так:
 
 ```text
-simple storage / mining platform
-< industrial refinery
+простая storage / mining platform
+< промышленный refinery
 < advanced shipyard
 < high-tech research / military installation
 ```
 
-Exact tiers and multipliers must be data-driven and introduced only when station technology classes become authoritative content.
+Но точные tiers и коэффициенты должны быть data-driven.
 
 ### `complexityFactor`
 
-Represents structural/system integration difficulty inside the same broad technology tier. It can distinguish, for example, a large but mechanically simple depot from a smaller but highly integrated electronics/weapon facility.
+Различает объекты внутри одного широкого tech tier. Например, большой механически простой depot может иметь меньшую integration complexity, чем более компактный research facility с большим количеством высокоточных систем.
 
-### `siteCapabilityFactor`
+### `effectiveAssemblyRate`
 
-A later construction fleet, specialized builder, orbital yard, damaged site or upgraded construction infrastructure may change effective assembly throughput. This factor must come from real world assets/capabilities rather than a free UI bonus.
+Должен зависеть от реально существующей инфраструктуры:
+
+- базовая construction site;
+- специализированный builder;
+- orbital yard;
+- upgraded construction facility;
+- повреждённая/ограниченная площадка.
+
+Высокий tech tier не обязан всегда означать более долгую стройку: sufficiently advanced yard может компенсировать часть сложности большей производительностью.
 
 ---
 
-## 7. Future real-mass integration
+## 7. Будущая интеграция настоящей массы компонентов
 
-When items/components receive authoritative unit mass, the formula should evolve without changing project persistence or the construction-site pipeline.
+Когда items/components получат authoritative unit mass, формула должна развиваться без изменения persistence contract проекта.
 
-A likely shape is:
+Возможная форма:
 
 ```text
 materialWork_i =
     quantity_i
-  × f(unitMass_i, fabricationClass_i, installationComplexity_i)
+  × f(
+        unitMass_i,
+        fabricationClass_i,
+        installationComplexity_i
+    )
 ```
 
-This keeps a useful distinction between:
+Нужно сохранять различие между:
 
-- physically massive bulk structure;
-- light but technically difficult electronics;
-- preassembled modules;
-- fluids/consumables that may be delivered but not structurally assembled.
+- физически массивной bulk structure;
+- лёгкой, но технически сложной электроникой;
+- готовыми preassembled modules;
+- fluids/consumables, которые нужно доставить, но не обязательно долго монтировать.
 
-Mass alone should therefore not necessarily become the only determinant of construction time.
+Поэтому масса не должна автоматически становиться единственным фактором времени строительства.
 
 ---
 
-## 8. Stage-16 boundary
+## 8. Связь с tech tiers кораблей
 
-This timing foundation does **not** mark Stage 16 complete.
-
-Stage 16 still needs the player-facing construction/station-ownership vertical slice using the existing Stage-9 physical project pipeline:
+Аналогичная модель понадобится при будущем shipbuilding:
 
 ```text
-player chooses legal site / station archetype
-→ real funding
+ship production work
+→ hull/component material work
+→ required shipyard capability
+→ ship tech tier
+→ fitting/integration complexity
+→ authoritative production time
+```
+
+`ShipArchetype.techTier` не должен напрямую задавать цену или боевую силу. Его эффект должен проявляться через реальные компоненты, доступные верфи, tooling, время, scarcity и fitting requirements.
+
+---
+
+## 9. Граница Stage 16
+
+Наличие формулы времени **не означает завершение Stage 16**.
+
+Полный vertical slice должен использовать существующий Stage-9 physical project pipeline:
+
+```text
+игрок выбирает legal site / station archetype
+→ real player funding
 → physical construction site
 → real material demand
 → physical deliveries
 → formula-derived build duration
 → construction progress
-→ real completed station
+→ ordinary completed station entity
 → player ownership
 → ordinary station economy / logistics
 → save/load continuation
 ```
 
-No instant placement, virtual materials or UI-only completion is allowed.
-
-The duration policy is now the authoritative time boundary that this vertical slice should consume.
+Запрещены instant placement, virtual materials и UI-only completion.
