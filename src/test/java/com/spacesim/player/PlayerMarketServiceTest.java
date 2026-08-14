@@ -135,6 +135,7 @@ class PlayerMarketServiceTest {
     }
 
     private static void dockForTest(MarketFixture fixture) {
+        fixture.runtime.advanceFrame(0.1f);
         TransformComponent shipTransform = fixture.ship.getComponent(TransformComponent.class);
         TransformComponent stationTransform = fixture.station.getComponent(TransformComponent.class);
         shipTransform.position.set(stationTransform.position);
