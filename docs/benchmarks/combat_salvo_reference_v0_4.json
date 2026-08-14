@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "status": "authoring-benchmark-only",
+  "unitSystem": "SI",
+  "sourceDocument": "docs/ship_mathematics_v0_4.md",
+  "harness": "com.spacesim.combat.benchmark.DeterministicSalvoHarness",
+  "scenario": {
+    "attackingTorpedoCorvettes": 24,
+    "initialMissilesPerCorvette": 2,
+    "incomingThreatCount": 48,
+    "terminalEntryRangeM": 800000.0,
+    "terminalClosingVelocityMps": 18000.0,
+    "nominalImpactTimeS": 44.44444444444444,
+    "integrationStepS": 0.02
+  },
+  "incomingMissileReference": {
+    "sourceWeaponId": "weapon.missile.m_antiship_v0_3",
+    "wetMassKg": 12000.0,
+    "referenceTerminalVelocityMps": 18000.0,
+    "terminalKineticEnergyJ": 1944000000000.0
+  },
+  "areaInterceptorReference": {
+    "sourceWeaponId": "weapon.interceptor.extended_v0_3",
+    "wetMassKg": 4000.0,
+    "dryMassKg": 2000.0,
+    "exhaustVelocityMps": 35000.0,
+    "thrustN": 400000.0,
+    "navigationConstant": 4.0,
+    "proximityEnvelopeM": 150.0,
+    "engagementRangeM": 700000.0,
+    "batteryLaunchCells": 4,
+    "batteryCellCycleS": 6.0,
+    "batteryTerminalSupportChannels": 6,
+    "batteryMagazineCount": 48
+  },
+  "fleetInterceptorReference": {
+    "sourceWeaponId": "weapon.interceptor.s_fleet_v0_3",
+    "wetMassKg": 1200.0,
+    "dryMassKg": 700.0,
+    "exhaustVelocityMps": 30000.0,
+    "thrustN": 180000.0,
+    "navigationConstant": 4.0,
+    "proximityEnvelopeM": 100.0,
+    "engagementRangeM": 350000.0,
+    "batteryLaunchCells": 2,
+    "batteryCellCycleS": 4.0,
+    "batteryTerminalSupportChannels": 2,
+    "batteryMagazineCount": 24
+  },
+  "interceptSafetyPolicy": {
+    "minimumSafeInterceptRangeM": 10000.0,
+    "meaning": "A proximity-fuse event inside this distance from the protected ship is not credited as a successful defensive intercept. This is a coarse precursor to explicit fragment/debris simulation."
+  },
+  "pointDefenseLaserReference": {
+    "sourceWeaponId": "weapon.laser.s_pd_v0_3",
+    "beamOutputPowerW": 5000000.0,
+    "wavelengthM": 0.000001064,
+    "apertureM": 0.5,
+    "pointingJitterRad": 0.00000005,
+    "engagementRangeM": 300000.0,
+    "retargetDelayS": 0.4,
+    "missileSurfaceAbsorptivity": 0.5,
+    "guidanceKillAbsorbedFluenceJPerM2": 8000000.0,
+    "hardKillAbsorbedFluenceJPerM2": 80000000.0,
+    "dangerousBallisticClosestApproachM": 60.0,
+    "note": "Fluence thresholds are calibration seeds, not claims about real material performance."
+  },
+  "defenders": {
+    "battleship": {
+      "areaDefenseBatteries": 1,
+      "fleetInterceptorBatteries": 2,
+      "pointDefenseLasers": 6,
+      "positionXM": 0.0,
+      "positionYM": 0.0
+    },
+    "escortDestroyer": {
+      "areaDefenseBatteries": 1,
+      "fleetInterceptorBatteries": 2,
+      "pointDefenseLasers": 4,
+      "positionXM": 0.0,
+      "positionYM": 25000.0
+    }
+  },
+  "calibrationExpectedResults": {
+    "battleshipOnly": {
+      "incomingThreats": 48,
+      "areaInterceptorsExpended": 6,
+      "areaInterceptorKills": 6,
+      "fleetInterceptorsExpended": 4,
+      "fleetInterceptorKills": 4,
+      "pointDefenseLasers": 6,
+      "laserMissionKills": 35,
+      "laserBallisticMissNeutralizations": 5,
+      "laserHardKills": 30,
+      "laserBeamSecondsApprox": 87.64,
+      "terminalLeakers": 3,
+      "accounting": "10 interceptor kills + 5 ballistic misses after mission kill + 30 hard kills + 3 leakers = 48"
+    },
+    "battleshipPlusOneEscortDestroyer": {
+      "incomingThreats": 48,
+      "areaInterceptorsExpended": 12,
+      "areaInterceptorKills": 12,
+      "fleetInterceptorsExpended": 8,
+      "fleetInterceptorKills": 8,
+      "pointDefenseLasers": 10,
+      "laserMissionKills": 28,
+      "laserBallisticMissNeutralizations": 6,
+      "laserHardKills": 22,
+      "laserBeamSecondsApprox": 143.12,
+      "terminalLeakers": 0,
+      "accounting": "20 interceptor kills + 6 ballistic misses after mission kill + 22 hard kills + 0 leakers = 48"
+    }
+  },
+  "knownOptimisticSeamsForDefense": [
+    "Hard-killed missiles do not yet create fragment clouds.",
+    "Interceptor proximity kills do not yet propagate residual fragment/debris trajectories.",
+    "Sensor tracks are assumed sufficient for defensive launch authorization.",
+    "ECM, decoys and sensor degradation are not yet active in this benchmark."
+  ]
+}
