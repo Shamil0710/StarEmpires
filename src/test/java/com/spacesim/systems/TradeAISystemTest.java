@@ -66,11 +66,12 @@ class TradeAISystemTest {
         int goodsBefore = totalFood(source, destination, fleet);
 
         engine.update(0f);
-        engine.update(0f);
-        engine.update(0f);
-        engine.update(1f);
-        engine.update(0f);
+        float startX = transform(fleet).position.x;
+        advanceUntilLedgerSize(engine, ledger, 2, 2_000);
 
+        assertEquals(2, ledger.size());
+        assertTrue(transform(fleet).position.x > startX,
+                "Trader must physically travel rather than complete the route from its start point");
         assertEquals(goodsBefore, totalFood(source, destination, fleet));
         assertEquals(moneyBefore, totalMoney(source, destination, fleet));
         assertEquals(90, inventory(source).stock[Constants.ITEM_FOOD]);
@@ -82,7 +83,6 @@ class TradeAISystemTest {
         assertEquals(TradeAIComponent.State.IDLE, ai(fleet).state);
         assertEquals(0L, ai(fleet).expectedProfitMilliCredits);
         assertNull(ai(fleet).targetStationId);
-        assertEquals(2, ledger.size());
     }
 
     @Test
@@ -195,13 +195,12 @@ class TradeAISystemTest {
         assertEquals(TradeAIComponent.State.TRAVEL_TO_SELL, ai(fleet).state);
         assertEquals(id(destination), ai(fleet).sellStationId);
 
-        engine.update(1f);
-        engine.update(0f);
+        advanceUntilLedgerSize(engine, ledger, 1, 2_000);
 
+        assertEquals(1, ledger.size());
         assertEquals(0, inventory(fleet).stock[Constants.ITEM_FOOD]);
         assertEquals(3, inventory(destination).stock[Constants.ITEM_FOOD]);
         assertEquals(Money.fromCredits(160d), wallet(fleet).getBalanceMilliCredits());
-        assertEquals(1, ledger.size());
     }
 
     @Test
@@ -340,9 +339,16 @@ class TradeAISystemTest {
                 .add(new IdentityComponent(name, IdentityComponent.Kind.FLEET))
                 .add(transform)
                 .add(inventory)
+                .add(new ShipComponent(ShipType.FINISHED_GOODS_CARRIER))
                 .add(new WalletComponent(Money.fromCredits(credits)))
                 .add(ai)
                 .add(new ReputationComponent()));
+    }
+
+    private void advanceUntilLedgerSize(Engine engine, EconomicLedger ledger, int expectedSize, int maxSteps) {
+        for (int step = 0; step < maxSteps && ledger.size() < expectedSize; step++) {
+            engine.update(0.1f);
+        }
     }
 
     private Entity identified(Entity entity) {
