@@ -56,8 +56,9 @@ public final class PlayableTestWorldFactory {
         Setup setup = findSetup(world, content);
         prepareDestinationShortage(world, setup);
 
-        // Materialize real market prices through the ordinary fixed-tick pipeline before play.
-        world.advanceFrame(0.1f);
+        // Ten normal local ticks also trigger the ordinary bounded remote strategic update.
+        // Both test-route markets therefore materialize prices through the production scheduler.
+        world.advanceFrame(1.0f);
         placePlayerShipNearSource(world, setup);
 
         MarketComponent sourceMarket = setup.sourceStation().getComponent(MarketComponent.class);
