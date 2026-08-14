@@ -1,5 +1,9 @@
 package com.spacesim.player;
 
+import com.spacesim.world.ConstructionMaterialState;
+import com.spacesim.world.ConstructionProjectId;
+import com.spacesim.world.ConstructionProjectState;
+import com.spacesim.world.ConstructionProjectStatus;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.StarSystemId;
 
@@ -9,11 +13,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Authoritative player-facing Stage-15 service for assigning durable orders to owned FleetIds.
+ * Authoritative player-facing service for assigning durable orders to owned FleetIds.
  *
  * <p>The service changes only persistent player intent. It never moves a ship, jumps a fleet,
- * creates cargo or performs a trade. Runtime execution is delegated to the ordinary simulation
- * boundaries by {@link PlayerFleetOrderExecutor}.</p>
+ * creates cargo or performs a trade. Runtime execution is delegated to ordinary simulation
+ * boundaries by {@link PlayerFleetOrderExecutor}. Stage-16 construction supply persists the
+ * physical site reference already supported by the Stage-15 order schema.</p>
  */
 public final class PlayerFleetOrderService {
     private final PlayerRuntime runtime;
@@ -44,6 +49,37 @@ public final class PlayerFleetOrderService {
         orders.add(checked);
         runtime.replacePlayerState(copyWithOrders(player, orders));
         return true;
+    }
+
+    /**
+     * Assigns construction supply using an owned project ID rather than exposing its site ID to UI.
+     *
+     * <p>The durable order stores the project's persistent physical construction-site reference.
+     * This fits the existing save schema and is revalidated against current project ownership on
+     * every execution pass.</p>
+     *
+     * @param fleetId owned cargo fleet to delegate
+     * @param projectId owned live construction project to supply
+     * @param itemContentId required project material to acquire and deliver
+     * @return true when project ownership/material requirements are currently valid and order persists
+     */
+    public boolean supplyProject(
+            FleetId fleetId,
+            ConstructionProjectId projectId,
+            String itemContentId) {
+        ConstructionProjectId checkedProject = Objects.requireNonNull(projectId, "ConstructionProjectId not set");
+        PlayerState player = runtime.player();
+        if (!player.ownedConstructionProjectIds().contains(checkedProject)) {
+            return false;
+        }
+        ConstructionProjectState project = runtime.world().findConstructionProject(checkedProject).orElse(null);
+        if (project == null || !supplyable(project) || !requires(project, itemContentId)) {
+            return false;
+        }
+        return issue(PlayerFleetOrderState.supplyProject(
+                fleetId,
+                new DiscoveredObjectRef(project.systemId(), project.constructionSiteEntityId()),
+                itemContentId));
     }
 
     /**
@@ -93,9 +129,15 @@ public final class PlayerFleetOrderService {
         if (order.secondarySystemId() != null && !knownSystem(player, order.secondarySystemId())) {
             return false;
         }
-        if (order.targetEntityId() != null && !player.discoveredObjects().contains(
-                new DiscoveredObjectRef(order.targetSystemId(), order.targetEntityId()))) {
-            return false;
+        if (order.targetEntityId() != null) {
+            if (order.type() == FleetOrderType.SUPPLY_PROJECT) {
+                if (!isOwnedSupplySite(player, order)) {
+                    return false;
+                }
+            } else if (!player.discoveredObjects().contains(
+                    new DiscoveredObjectRef(order.targetSystemId(), order.targetEntityId()))) {
+                return false;
+            }
         }
         if (order.secondaryEntityId() != null && !player.discoveredObjects().contains(
                 new DiscoveredObjectRef(order.secondarySystemId(), order.secondaryEntityId()))) {
@@ -113,6 +155,37 @@ public final class PlayerFleetOrderService {
             }
         }
         return true;
+    }
+
+    private boolean isOwnedSupplySite(PlayerState player, PlayerFleetOrderState order) {
+        for (ConstructionProjectId projectId : player.ownedConstructionProjectIds()) {
+            ConstructionProjectState project = runtime.world().findConstructionProject(projectId).orElse(null);
+            if (project != null
+                    && project.systemId().equals(order.targetSystemId())
+                    && project.constructionSiteEntityId().equals(order.targetEntityId())
+                    && supplyable(project)
+                    && requires(project, order.itemContentId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean supplyable(ConstructionProjectState project) {
+        return project.status() != ConstructionProjectStatus.BUILDING
+                && project.status() != ConstructionProjectStatus.COMPLETED
+                && project.status() != ConstructionProjectStatus.CANCELLED
+                && project.status() != ConstructionProjectStatus.FAILED;
+    }
+
+    private static boolean requires(ConstructionProjectState project, String itemContentId) {
+        String item = itemContentId == null ? "" : itemContentId.strip();
+        for (ConstructionMaterialState material : project.materials()) {
+            if (material.itemContentId().equals(item) && material.remainingAmount() > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean knownSystem(PlayerState player, StarSystemId systemId) {
