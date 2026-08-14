@@ -169,7 +169,23 @@ public record PlayerState(
                 List.of(), List.of(), List.of(), List.of());
     }
 
-    /** Validates and canonicalizes player state. */
+    /**
+     * Validates and canonicalizes player state.
+     *
+     * @param walletMilliCredits personal non-negative balance
+     * @param factionContentId optional faction/legal affiliation
+     * @param reputations reputation entries
+     * @param ownedFleetIds owned fleet IDs
+     * @param activeFleetId active fleet or {@code null}
+     * @param discoveredSystemIds discovered systems
+     * @param discoveredObjects discovered system-local objects
+     * @param homeSystemId optional home system
+     * @param dockedAt optional current docking reference
+     * @param fleetOrders delegated persistent orders
+     * @param threatIntel persistent observed danger intelligence
+     * @param ownedConstructionProjectIds player-owned world construction projects
+     * @param ownedStations player-owned completed physical stations
+     */
     public PlayerState {
         if (walletMilliCredits < 0L) {
             throw new IllegalArgumentException("Player wallet cannot be negative");
