@@ -4,10 +4,13 @@ import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
 import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.EntityIdComponent;
+import com.spacesim.components.FactionComponent;
+import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.MiningComponent;
 import com.spacesim.components.ShipComponent;
+import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.simulation.SimulationSession;
@@ -29,30 +32,24 @@ class Stage15TradeMineOrdersAcceptanceTest {
     void delegatedTradePhysicallyBuysJumpsAndSellsWithoutPassiveIncome() {
         PlayableTestWorldFactory.Scenario scenario = PlayableTestWorldFactory.create(15_201L);
         PlayerRuntime runtime = scenario.runtime();
-        PlayableTestWorldFactory.Route route = scenario.route();
-        ContentCatalog.ItemDefinition item = scenario.content().findItem(route.itemContentId());
-        FleetPlacementState delegated = findCompatibleInactiveFleet(
-                runtime, route.sourceSystem(), item.runtimeId(), false);
-        Entity source = marketByName(runtime, route.sourceSystem(), route.sourceStationName());
-        Entity destination = marketByName(runtime, route.destinationSystem(), route.destinationStationName());
-        DiscoveredObjectRef sourceRef = ref(route.sourceSystem(), source);
-        DiscoveredObjectRef destinationRef = ref(route.destinationSystem(), destination);
-        initializeOwnershipAndDiscovery(runtime, delegated.id(), List.of(sourceRef, destinationRef));
+        TradeFixture trade = tradeLeagueFixture(runtime, scenario.content());
+        initializeOwnershipAndDiscovery(runtime, trade.fleet().id(), List.of(trade.sourceRef(), trade.destinationRef()));
 
-        Entity delegatedShip = entity(runtime, delegated.id());
+        Entity delegatedShip = entity(runtime, trade.fleet().id());
         InventoryComponent cargo = delegatedShip.getComponent(InventoryComponent.class);
         clearInventory(cargo);
-        // One real unit is sufficient to prove the complete economic loop without reserving
-        // destination capacity from competing live NPC traders during the physical trip.
+        // One real unit is enough to prove the complete economic loop and avoids reserving market
+        // capacity from competing civilian traders. The trade-league hull also isolates this
+        // economic acceptance from the separate Stage-15 survival/flee slice.
         cargo.capacity = 1;
         TransformComponent shipTransform = delegatedShip.getComponent(TransformComponent.class);
-        TransformComponent sourceTransform = source.getComponent(TransformComponent.class);
+        TransformComponent sourceTransform = trade.source().getComponent(TransformComponent.class);
         shipTransform.position.set(sourceTransform.position.x - 60f, sourceTransform.position.y);
         shipTransform.velocity.setZero();
 
         long walletBefore = runtime.player().walletMilliCredits();
         assertTrue(new PlayerFleetOrderService(runtime).issue(PlayerFleetOrderState.trade(
-                delegated.id(), sourceRef, destinationRef, route.itemContentId())));
+                trade.fleet().id(), trade.sourceRef(), trade.destinationRef(), trade.item().id())));
 
         boolean bought = false;
         long walletAfterBuy = walletBefore;
@@ -60,23 +57,23 @@ class Stage15TradeMineOrdersAcceptanceTest {
         boolean sold = false;
         for (int step = 0; step < 6000 && !sold; step++) {
             runtime.advanceFrame(0.1f);
-            if (runtime.world().findFleetJump(delegated.id()).isPresent()) {
+            if (runtime.world().findFleetJump(trade.fleet().id()).isPresent()) {
                 observedTransit = true;
             }
-            Entity current = entityOrNull(runtime, delegated.id());
+            Entity current = entityOrNull(runtime, trade.fleet().id());
             if (current == null) {
                 continue;
             }
             InventoryComponent currentCargo = current.getComponent(InventoryComponent.class);
-            int aboard = currentCargo.stock[item.runtimeId()];
+            int aboard = currentCargo.stock[trade.item().runtimeId()];
             if (!bought && aboard > 0) {
                 bought = true;
                 walletAfterBuy = runtime.player().walletMilliCredits();
             }
-            FleetPlacementState placement = runtime.world().findFleet(delegated.id()).orElseThrow();
+            FleetPlacementState placement = runtime.world().findFleet(trade.fleet().id()).orElseThrow();
             if (bought
                     && placement.locationKind() == FleetLocationKind.IN_SYSTEM
-                    && route.destinationSystem().equals(placement.systemId())
+                    && DemoGalaxyFactory.INNER_SYSTEM_ID.equals(placement.systemId())
                     && aboard == 0) {
                 sold = true;
             }
@@ -89,7 +86,7 @@ class Stage15TradeMineOrdersAcceptanceTest {
         assertTrue(runtime.player().walletMilliCredits() > walletAfterBuy,
                 "sale revenue must come from the ordinary destination market transaction");
         assertEquals(FleetOrderType.TRADE,
-                new PlayerFleetOrderService(runtime).order(delegated.id()).orElseThrow().type());
+                new PlayerFleetOrderService(runtime).order(trade.fleet().id()).orElseThrow().type());
     }
 
     @Test
@@ -153,31 +150,64 @@ class Stage15TradeMineOrdersAcceptanceTest {
         assertTrue(mining.totalDelivered > 0L);
     }
 
-    private static FleetPlacementState findCompatibleInactiveFleet(
-            PlayerRuntime runtime,
-            StarSystemId systemId,
-            int itemId,
-            boolean miningRequired) {
-        FleetId active = runtime.player().activeFleetId();
-        SimulationSession session = runtime.world().findSession(systemId).orElseThrow();
+    private static TradeFixture tradeLeagueFixture(PlayerRuntime runtime, ContentCatalog content) {
+        ContentCatalog.FactionDefinition tradeLeague = content.findFaction("faction.trade_league");
+        if (tradeLeague == null) {
+            throw new AssertionError("Trade League faction is required by demo content");
+        }
+        SimulationSession sourceSession = runtime.world().findSession(DemoGalaxyFactory.ACTIVE_SYSTEM_ID).orElseThrow();
+        SimulationSession destinationSession = runtime.world().findSession(DemoGalaxyFactory.INNER_SYSTEM_ID).orElseThrow();
+        FleetId directActive = runtime.player().activeFleetId();
         for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
-                    || !systemId.equals(placement.systemId())
-                    || placement.id().equals(active)) {
+                    || !DemoGalaxyFactory.ACTIVE_SYSTEM_ID.equals(placement.systemId())
+                    || placement.id().equals(directActive)) {
                 continue;
             }
-            Entity entity = session.getEntityRegistry().find(placement.localEntityId());
-            ShipComponent ship = entity == null ? null : entity.getComponent(ShipComponent.class);
-            InventoryComponent inventory = entity == null ? null : entity.getComponent(InventoryComponent.class);
-            TransformComponent transform = entity == null ? null : entity.getComponent(TransformComponent.class);
-            MiningComponent mining = entity == null ? null : entity.getComponent(MiningComponent.class);
-            if (ship != null && inventory != null && transform != null
-                    && ship.canPurchaseItem(itemId)
-                    && (!miningRequired || mining != null)) {
-                return placement;
+            Entity ship = sourceSession.getEntityRegistry().find(placement.localEntityId());
+            FactionComponent faction = ship == null ? null : ship.getComponent(FactionComponent.class);
+            TradeAIComponent trade = ship == null ? null : ship.getComponent(TradeAIComponent.class);
+            ShipComponent role = ship == null ? null : ship.getComponent(ShipComponent.class);
+            InventoryComponent inventory = ship == null ? null : ship.getComponent(InventoryComponent.class);
+            if (faction == null || faction.factionId != tradeLeague.runtimeId()
+                    || trade == null || trade.specializedItem < 0 || role == null || inventory == null) {
+                continue;
+            }
+            ContentCatalog.ItemDefinition item = content.getItems().stream()
+                    .filter(candidate -> candidate.runtimeId() == trade.specializedItem)
+                    .findFirst().orElse(null);
+            if (item == null || !role.canPurchaseItem(item.runtimeId())) {
+                continue;
+            }
+            for (Entity source : sourceSession.getEngine().getEntities()) {
+                MarketComponent sourceMarket = source.getComponent(MarketComponent.class);
+                InventoryComponent sourceInventory = source.getComponent(InventoryComponent.class);
+                IdentityComponent identity = source.getComponent(IdentityComponent.class);
+                if (sourceMarket == null || sourceInventory == null || identity == null
+                        || !sourceMarket.isTradable(item.runtimeId())
+                        || sourceInventory.stock[item.runtimeId()] < 1) {
+                    continue;
+                }
+                Entity destination = marketByNameOrNull(destinationSession, identity.name);
+                MarketComponent destinationMarket = destination == null
+                        ? null : destination.getComponent(MarketComponent.class);
+                InventoryComponent destinationInventory = destination == null
+                        ? null : destination.getComponent(InventoryComponent.class);
+                if (destinationMarket == null || destinationInventory == null
+                        || !destinationMarket.isTradable(item.runtimeId())
+                        || destinationInventory.getFreeCapacity() < 1) {
+                    continue;
+                }
+                return new TradeFixture(
+                        placement,
+                        item,
+                        source,
+                        destination,
+                        ref(DemoGalaxyFactory.ACTIVE_SYSTEM_ID, source),
+                        ref(DemoGalaxyFactory.INNER_SYSTEM_ID, destination));
             }
         }
-        throw new AssertionError("No compatible delegated fleet in " + systemId);
+        throw new AssertionError("No safe Trade League delegated trade fixture found");
     }
 
     private static FleetPlacementState findMiningInactiveFleet(PlayerRuntime runtime, StarSystemId systemId) {
@@ -229,17 +259,16 @@ class Stage15TradeMineOrdersAcceptanceTest {
         throw new AssertionError("No market for delegated mining resource");
     }
 
-    private static Entity marketByName(PlayerRuntime runtime, StarSystemId systemId, String name) {
-        SimulationSession session = runtime.world().findSession(systemId).orElseThrow();
+    private static Entity marketByNameOrNull(SimulationSession session, String name) {
         for (Entity entity : session.getEngine().getEntities()) {
-            var identity = entity.getComponent(com.spacesim.components.IdentityComponent.class);
+            IdentityComponent identity = entity.getComponent(IdentityComponent.class);
             if (identity != null && name.equals(identity.name)
                     && entity.getComponent(MarketComponent.class) != null
                     && entity.getComponent(EntityIdComponent.class) != null) {
                 return entity;
             }
         }
-        throw new AssertionError("Market not found: " + name);
+        return null;
     }
 
     private static void initializeOwnershipAndDiscovery(
@@ -301,5 +330,14 @@ class Stage15TradeMineOrdersAcceptanceTest {
         for (int index = 0; index < inventory.stock.length; index++) {
             inventory.stock[index] = 0;
         }
+    }
+
+    private record TradeFixture(
+            FleetPlacementState fleet,
+            ContentCatalog.ItemDefinition item,
+            Entity source,
+            Entity destination,
+            DiscoveredObjectRef sourceRef,
+            DiscoveredObjectRef destinationRef) {
     }
 }
