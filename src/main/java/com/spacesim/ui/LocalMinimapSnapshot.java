@@ -42,7 +42,15 @@ public record LocalMinimapSnapshot(List<Marker> markers) {
      * @param worldY authoritative world Y position
      */
     public record Marker(EntityId entityId, Kind kind, String name, float worldX, float worldY) {
-        /** Validates immutable marker values. */
+        /**
+         * Validates immutable marker values.
+         *
+         * @param entityId stable local persistent ID
+         * @param kind presentation classification
+         * @param name human-readable object name
+         * @param worldX authoritative world X position
+         * @param worldY authoritative world Y position
+         */
         public Marker {
             Objects.requireNonNull(entityId, "Minimap EntityId not set");
             Objects.requireNonNull(kind, "Minimap kind not set");
@@ -53,7 +61,11 @@ public record LocalMinimapSnapshot(List<Marker> markers) {
         }
     }
 
-    /** Validates and defensively copies the marker list. */
+    /**
+     * Validates and defensively copies the marker list.
+     *
+     * @param markers deterministically ordered visible semantic markers
+     */
     public LocalMinimapSnapshot {
         markers = List.copyOf(Objects.requireNonNull(markers, "Minimap markers not set"));
     }
