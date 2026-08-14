@@ -1,7 +1,6 @@
 package com.spacesim.world;
 
 import com.badlogic.ashley.core.Entity;
-import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.WalletComponent;
@@ -25,6 +24,12 @@ import java.util.Optional;
  * local market entity with an InventoryComponent, WalletComponent and MarketComponent. Existing
  * TradeAI therefore discovers the same targetStock shortage and can deliver materials through the
  * ordinary bilateral trade path. Manual material delivery uses the same physical inventory.</p>
+ *
+ * <p>Stage 16 separates project settlement from legal/faction identity. Existing faction projects
+ * continue to use faction treasury settlement. Passing no faction owner creates an economically
+ * external project whose human-player ownership remains outside {@link WorldState}; external
+ * funding/refund is intentionally handled by the player-facing Stage-16 boundary rather than by
+ * this faction-treasury method.</p>
  *
  * <p>New project duration is derived by {@link ConstructionDurationPolicy}: authored buildSeconds
  * is only the base setup/complexity allowance and the real material bill contributes additional
@@ -64,8 +69,20 @@ final class ConstructionProjectService {
             StarSystemId systemId,
             float x,
             float y) {
-        String ownerId = normalizedId(ownerFactionContentId, "Construction owner faction");
-        FactionEconomicAccount owner = requireFactionAccount(ownerId);
+        final ConstructionSettlementKind settlementKind;
+        final String ownerId;
+        final String legalFactionId;
+        if (ownerFactionContentId == null) {
+            settlementKind = ConstructionSettlementKind.EXTERNAL_OWNER;
+            ownerId = null;
+            legalFactionId = null;
+        } else {
+            ownerId = normalizedId(ownerFactionContentId, "Construction owner faction");
+            FactionEconomicAccount owner = requireFactionAccount(ownerId);
+            settlementKind = ConstructionSettlementKind.FACTION_TREASURY;
+            legalFactionId = owner.factionContentId();
+        }
+
         ContentCatalog.StationArchetypeDefinition target = requireConstructible(stationArchetypeContentId);
         SimulationSession session = requireSession(systemId);
         if (!Float.isFinite(x) || !Float.isFinite(y)) {
@@ -73,7 +90,7 @@ final class ConstructionProjectService {
         }
 
         ConstructionProjectId projectId = idAllocator.allocate();
-        Entity site = ConstructionSiteFactory.create(catalog, projectId, target, owner.factionContentId(), x, y);
+        Entity site = ConstructionSiteFactory.create(catalog, projectId, target, legalFactionId, x, y);
         EntityId siteId = session.createEntity(site);
         long tick = session.getClock().getTick();
         long minimumFunding = Money.fromCredits(target.construction().fundingCredits());
@@ -102,7 +119,9 @@ final class ConstructionProjectService {
                 tick,
                 -1L,
                 -1L,
-                null);
+                null,
+                settlementKind,
+                legalFactionId);
         projects.put(projectId, state);
         return projectId;
     }
@@ -112,6 +131,7 @@ final class ConstructionProjectService {
             throw new IllegalArgumentException("Construction funding amount должен быть положительным");
         }
         ConstructionProjectState state = requireNonTerminal(projectId);
+        requireFactionSettlement(state, "Faction construction funding");
         if (state.status() == ConstructionProjectStatus.BUILDING) {
             throw new IllegalStateException("Нельзя финансировать уже строящийся project");
         }
@@ -213,6 +233,10 @@ final class ConstructionProjectService {
         WalletComponent projectWallet = requireComponent(site, WalletComponent.class, "construction site wallet");
         long refund = projectWallet.getBalanceMilliCredits();
         if (refund > 0L) {
+            if (refreshed.settlementKind() != ConstructionSettlementKind.FACTION_TREASURY) {
+                throw new IllegalStateException(
+                        "Funded external-owner project требует player-facing refund boundary");
+            }
             FactionEconomicAccount owner = requireFactionAccount(refreshed.ownerFactionContentId());
             if (!projectWallet.transferTo(owner.treasury(), refund)) {
                 throw new IllegalStateException("Не удалось вернуть construction project wallet в treasury");
@@ -341,6 +365,10 @@ final class ConstructionProjectService {
     }
 
     private ConstructionProjectState complete(ConstructionProjectState state, long tick) {
+        if (state.settlementKind() != ConstructionSettlementKind.FACTION_TREASURY) {
+            throw new IllegalStateException(
+                    "External-owner completion требует Stage-16 player settlement/ownership boundary");
+        }
         ConstructionProjectState refreshed = refresh(state);
         if (!refreshed.materialsFulfilled()) {
             throw new IllegalStateException("BUILDING project потерял delivered materials: " + state.id());
@@ -387,7 +415,7 @@ final class ConstructionProjectService {
                 target.displayName() + " #" + refreshed.id().value(),
                 refreshed.x(),
                 refreshed.y(),
-                refreshed.ownerFactionContentId());
+                refreshed.legalFactionContentId());
         EntityId stationId = session.createEntity(station);
         return copy(
                 refreshed,
@@ -430,7 +458,10 @@ final class ConstructionProjectService {
 
     private ConstructionProjectState validateRestored(ConstructionProjectState state) {
         ContentCatalog.StationArchetypeDefinition target = requireConstructible(state.stationArchetypeContentId());
-        requireFactionAccount(state.ownerFactionContentId());
+        if (state.settlementKind() == ConstructionSettlementKind.FACTION_TREASURY) {
+            requireFactionAccount(state.ownerFactionContentId());
+        }
+        requireLegalFaction(state.legalFactionContentId());
         requireSession(state.systemId());
         if (isTerminal(state.status())) {
             return state;
@@ -472,6 +503,18 @@ final class ConstructionProjectService {
             throw new IllegalArgumentException("Construction owner не имеет faction treasury: " + factionId);
         }
         return account;
+    }
+
+    private void requireLegalFaction(String factionId) {
+        if (factionId != null && catalog.findFaction(factionId) == null) {
+            throw new IllegalArgumentException("Construction legal faction неизвестна: " + factionId);
+        }
+    }
+
+    private static void requireFactionSettlement(ConstructionProjectState state, String operation) {
+        if (state.settlementKind() != ConstructionSettlementKind.FACTION_TREASURY) {
+            throw new IllegalStateException(operation + " недоступно для external-owner project");
+        }
     }
 
     private ConstructionProjectState requireNonTerminal(ConstructionProjectId id) {
@@ -556,6 +599,7 @@ final class ConstructionProjectService {
                 source.id(), source.ownerFactionContentId(), source.stationArchetypeContentId(),
                 source.systemId(), source.x(), source.y(), siteId, materials,
                 source.minimumFundingMilliCredits(), wallet, source.buildDurationTicks(), status,
-                source.createdTick(), stateChangedTick, buildStartedTick, completedTick, completedStationId);
+                source.createdTick(), stateChangedTick, buildStartedTick, completedTick, completedStationId,
+                source.settlementKind(), source.legalFactionContentId());
     }
 }
