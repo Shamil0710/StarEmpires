@@ -60,6 +60,7 @@ final class PlayerFleetOrderExecutor {
     private final ContentCatalog content;
     private final PlayerFleetEconomyService economy;
     private final PlayerFleetRoutePlanner routePlanner;
+    private final PlayerThreatObserver threatObserver;
     private final Map<FleetId, SurvivalState> survival = new HashMap<>();
     private boolean preparing;
 
@@ -69,6 +70,7 @@ final class PlayerFleetOrderExecutor {
         this.content = Objects.requireNonNull(content, "ContentCatalog not set");
         this.economy = new PlayerFleetEconomyService(runtime);
         this.routePlanner = new PlayerFleetRoutePlanner(runtime);
+        this.threatObserver = new PlayerThreatObserver(runtime);
     }
 
     /**
@@ -84,6 +86,7 @@ final class PlayerFleetOrderExecutor {
         }
         preparing = true;
         try {
+            threatObserver.observe();
             prepareOrders();
         } finally {
             preparing = false;
@@ -166,9 +169,7 @@ final class PlayerFleetOrderExecutor {
         return false;
     }
 
-    private List<Entity> attackersTargeting(
-            FleetPlacementState placement,
-            Set<EntityId> ownedLocalIds) {
+    private List<Entity> attackersTargeting(FleetPlacementState placement, Set<EntityId> ownedLocalIds) {
         SimulationSession session = world.findSession(placement.systemId()).orElse(null);
         if (session == null) {
             return List.of();
@@ -230,8 +231,7 @@ final class PlayerFleetOrderExecutor {
             FleetPlacementState placement,
             Entity entity,
             PlayerState player) {
-        navigateTo(
-                order.fleetId(), placement, entity, player, order.targetSystemId(),
+        navigateTo(order.fleetId(), placement, entity, player, order.targetSystemId(),
                 order.targetX(), order.targetY(), ARRIVAL_RADIUS);
     }
 
@@ -257,8 +257,7 @@ final class PlayerFleetOrderExecutor {
             hold(entity);
             return;
         }
-        boolean arrived = navigateTo(
-                order.fleetId(), placement, entity, player, target.systemId(),
+        boolean arrived = navigateTo(order.fleetId(), placement, entity, player, target.systemId(),
                 marketTransform.position.x, marketTransform.position.y, ARRIVAL_RADIUS);
         if (!arrived || !economy.isBerthed(order.fleetId(), target)) {
             return;
@@ -306,10 +305,8 @@ final class PlayerFleetOrderExecutor {
             hold(entity);
             return;
         }
-        boolean inMiningPosition = navigateTo(
-                order.fleetId(), placement, entity, player, order.targetSystemId(),
-                targetTransform.position.x, targetTransform.position.y,
-                Math.max(0f, mining.extractionRange));
+        boolean inMiningPosition = navigateTo(order.fleetId(), placement, entity, player, order.targetSystemId(),
+                targetTransform.position.x, targetTransform.position.y, Math.max(0f, mining.extractionRange));
         MiningCommandComponent command = ensureMiningCommand(entity);
         command.targetAsteroidId = order.targetEntityId();
         command.miningRequested = inMiningPosition;
@@ -329,8 +326,7 @@ final class PlayerFleetOrderExecutor {
             hold(entity);
             return;
         }
-        boolean arrived = navigateTo(
-                order.fleetId(), placement, entity, player, delivery.systemId(),
+        boolean arrived = navigateTo(order.fleetId(), placement, entity, player, delivery.systemId(),
                 marketTransform.position.x, marketTransform.position.y, ARRIVAL_RADIUS);
         if (!arrived || !economy.isBerthed(order.fleetId(), delivery)) {
             return;
@@ -382,9 +378,7 @@ final class PlayerFleetOrderExecutor {
         FlightDynamics.Profile profile = FlightDynamics.profile(entity, baseSpeed);
         float stoppingLimited = FlightDynamics.stoppingLimitedSpeed(
                 Math.max(0f, distance - arrivalRange), profile);
-        float requestedSpeedCap = Math.min(
-                baseSpeed,
-                Math.max(MIN_APPROACH_SPEED_CAP, stoppingLimited));
+        float requestedSpeedCap = Math.min(baseSpeed, Math.max(MIN_APPROACH_SPEED_CAP, stoppingLimited));
         ensureFlightCommand(entity).set(dx / distance, dy / distance, requestedSpeedCap);
         return false;
     }
