@@ -51,6 +51,16 @@
     "minimumSafeInterceptRangeM": 10000.0,
     "meaning": "A proximity-fuse event inside this distance from the protected ship is not credited as a successful defensive intercept. This is a coarse precursor to explicit fragment/debris simulation."
   },
+  "formationReference": {
+    "closeScreenEscortOffsetM": 15000.0,
+    "validatedGeometryObservation": {
+      "fleetInterceptorLaunchRangeM": 350000.0,
+      "offset15000MSafeInterceptRangeFromProtectedShipApproxM": 18500.0,
+      "offset20000MSafeInterceptRangeFromProtectedShipApproxM": 12000.0,
+      "offset25000MOutcome": "unsafe; proximity occurs at approximately 9800 m, inside the 10000 m safe-intercept boundary"
+    },
+    "note": "Formation spacing is a physical/doctrinal parameter. v0.5 must sweep it instead of treating escort position as cosmetic."
+  },
   "pointDefenseLaserReference": {
     "sourceWeaponId": "weapon.laser.s_pd_v0_3",
     "beamOutputPowerW": 5000000.0,
@@ -73,12 +83,13 @@
       "positionXM": 0.0,
       "positionYM": 0.0
     },
-    "escortDestroyer": {
+    "closeScreenEscortDestroyer": {
       "areaDefenseBatteries": 1,
       "fleetInterceptorBatteries": 2,
       "pointDefenseLasers": 4,
       "positionXM": 0.0,
-      "positionYM": 25000.0
+      "positionYM": 15000.0,
+      "pointDefenseUsesOwnPosition": true
     }
   },
   "calibrationExpectedResults": {
@@ -96,7 +107,7 @@
       "terminalLeakers": 3,
       "accounting": "10 interceptor kills + 5 ballistic misses after mission kill + 30 hard kills + 3 leakers = 48"
     },
-    "battleshipPlusOneEscortDestroyer": {
+    "battleshipPlusOneCloseScreenEscortDestroyer": {
       "incomingThreats": 48,
       "areaInterceptorsExpended": 12,
       "areaInterceptorKills": 12,
@@ -104,17 +115,18 @@
       "fleetInterceptorKills": 8,
       "pointDefenseLasers": 10,
       "laserMissionKills": 28,
-      "laserBallisticMissNeutralizations": 6,
-      "laserHardKills": 22,
-      "laserBeamSecondsApprox": 143.12,
+      "laserBallisticMissNeutralizations": 9,
+      "laserHardKills": 19,
+      "laserBeamSecondsApprox": 140.88,
       "terminalLeakers": 0,
-      "accounting": "20 interceptor kills + 6 ballistic misses after mission kill + 22 hard kills + 0 leakers = 48"
+      "accounting": "20 interceptor kills + 9 ballistic misses after mission kill + 19 hard kills + 0 leakers = 48"
     }
   },
   "knownOptimisticSeamsForDefense": [
     "Hard-killed missiles do not yet create fragment clouds.",
     "Interceptor proximity kills do not yet propagate residual fragment/debris trajectories.",
     "Sensor tracks are assumed sufficient for defensive launch authorization.",
-    "ECM, decoys and sensor degradation are not yet active in this benchmark."
+    "ECM, decoys and sensor degradation are not yet active in this benchmark.",
+    "The destroyer is not yet an alternate target for the attacking salvo."
   ]
 }
