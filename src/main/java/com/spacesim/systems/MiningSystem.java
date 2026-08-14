@@ -29,18 +29,18 @@ import com.spacesim.persistence.EntityRegistry;
 import java.util.Objects;
 
 /**
- * Управляет автономной и ручной добычей конечных астероидных ресурсов.
+ * Управляет автономной и командной добычей конечных астероидных ресурсов.
  *
  * <p>Persistent-состояние {@link MiningComponent} хранит цели только как устойчивые
  * {@link EntityId}. Перед движением, добычей и разгрузкой система разрешает их через
  * {@link EntityRegistry}. Исчезнувший астероид или рынок поэтому безопасно инвалидирует ссылку без
  * сохранения runtime-объекта Ashley.</p>
  *
- * <p>Автономный режим сохраняет полный исторический цикл: поиск, полёт, физическая добыча,
- * возвращение и продажа через {@link TradeController}. Stage 14A добавляет ручной режим для
- * {@link PlayerControlledComponent}: {@link MiningCommandComponent} выбирает цель и запрашивает
- * добычу, но система не двигает такой корабль и не продаёт его груз автоматически. Оба режима
- * используют один и тот же физический extraction boundary.</p>
+ * <p>Legacy autonomous mode сохраняет исторический цикл: поиск, полёт, физическая добыча,
+ * возвращение и продажа через {@link TradeController}. Command mode активируется наличием
+ * {@link MiningCommandComponent}: Stage 14A использует его на directly controlled ship, а Stage 15
+ * — на delegated owned fleet. В command mode система никогда не двигает корабль и не продаёт груз
+ * автоматически; она только валидирует цель и применяет тот же physical extraction boundary.</p>
  *
  * <p>Добыча сама не является resource source: сумма {@code asteroid.remainingResource + cargo}
  * сохраняется. Деньги возникают у добытчика только после обычной рыночной продажи.</p>
@@ -137,7 +137,7 @@ public final class MiningSystem extends IteratingSystem {
         super.update(deltaTime);
     }
 
-    /** Выполняет текущий ручной либо автономный этап одного добывающего корабля. */
+    /** Выполняет текущий командный либо legacy autonomous этап одного добывающего корабля. */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         ShipComponent ship = shipMapper.get(entity);
@@ -145,9 +145,17 @@ public final class MiningSystem extends IteratingSystem {
         InventoryComponent inventory = inventoryMapper.get(entity);
         TransformComponent transform = transformMapper.get(entity);
         PlayerControlledComponent playerControl = playerControlledMapper.get(entity);
+        MiningCommandComponent command = miningCommandMapper.get(entity);
 
-        if (playerControl != null) {
-            processManualMining(entity, ship, mining, inventory, transform, playerControl, deltaTime);
+        if (playerControl != null || command != null) {
+            processCommandMining(
+                    entity,
+                    ship,
+                    mining,
+                    inventory,
+                    transform,
+                    playerControl != null && playerControl.docked,
+                    deltaTime);
             return;
         }
 
@@ -183,13 +191,13 @@ public final class MiningSystem extends IteratingSystem {
         }
     }
 
-    private void processManualMining(
+    private void processCommandMining(
             Entity miner,
             ShipComponent ship,
             MiningComponent mining,
             InventoryComponent inventory,
             TransformComponent transform,
-            PlayerControlledComponent control,
+            boolean docked,
             float deltaTime) {
         MiningCommandComponent command = miningCommandMapper.get(miner);
         if (command == null) {
@@ -199,7 +207,7 @@ public final class MiningSystem extends IteratingSystem {
         mining.active = false;
         mining.state = MiningComponent.State.PAUSED;
 
-        if (control.docked) {
+        if (docked) {
             command.status = MiningCommandComponent.Status.DOCKED;
             return;
         }
