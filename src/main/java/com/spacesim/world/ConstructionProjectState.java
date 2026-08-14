@@ -11,8 +11,11 @@ import java.util.Set;
 /**
  * Immutable persistent snapshot of one world-level construction project.
  *
+ * <p>Stage 16 separates economic settlement from legal/faction identity. Human-player ownership is
+ * intentionally not stored here and remains in the playable envelope.</p>
+ *
  * @param id stable world-level project ID
- * @param ownerFactionContentId owner faction content ID
+ * @param ownerFactionContentId faction treasury owner for {@link ConstructionSettlementKind#FACTION_TREASURY}, otherwise null
  * @param stationArchetypeContentId target station archetype content ID
  * @param systemId target StarSystem
  * @param x target world X coordinate
@@ -28,6 +31,8 @@ import java.util.Set;
  * @param buildStartedTick BUILDING start tick or -1
  * @param completedTick terminal transition tick or -1
  * @param completedStationEntityId historical created station ID only for COMPLETED
+ * @param settlementKind economic settlement mode
+ * @param legalFactionContentId optional legal/faction affiliation of site/resulting station
  */
 public record ConstructionProjectState(
         ConstructionProjectId id,
@@ -46,10 +51,12 @@ public record ConstructionProjectState(
         long stateChangedTick,
         long buildStartedTick,
         long completedTick,
-        EntityId completedStationEntityId) implements Comparable<ConstructionProjectState> {
+        EntityId completedStationEntityId,
+        ConstructionSettlementKind settlementKind,
+        String legalFactionContentId) implements Comparable<ConstructionProjectState> {
 
     /**
-     * Validates project invariants and canonical material ordering.
+     * Source-compatible constructor for legacy faction-treasury projects.
      *
      * @param id stable world-level project ID
      * @param ownerFactionContentId owner faction content ID
@@ -69,9 +76,69 @@ public record ConstructionProjectState(
      * @param completedTick terminal tick or -1
      * @param completedStationEntityId historical station ID for COMPLETED
      */
+    public ConstructionProjectState(
+            ConstructionProjectId id,
+            String ownerFactionContentId,
+            String stationArchetypeContentId,
+            StarSystemId systemId,
+            float x,
+            float y,
+            EntityId constructionSiteEntityId,
+            List<ConstructionMaterialState> materials,
+            long minimumFundingMilliCredits,
+            long projectWalletMilliCredits,
+            long buildDurationTicks,
+            ConstructionProjectStatus status,
+            long createdTick,
+            long stateChangedTick,
+            long buildStartedTick,
+            long completedTick,
+            EntityId completedStationEntityId) {
+        this(id, ownerFactionContentId, stationArchetypeContentId, systemId, x, y,
+                constructionSiteEntityId, materials, minimumFundingMilliCredits,
+                projectWalletMilliCredits, buildDurationTicks, status, createdTick,
+                stateChangedTick, buildStartedTick, completedTick, completedStationEntityId,
+                ConstructionSettlementKind.FACTION_TREASURY, ownerFactionContentId);
+    }
+
+    /**
+     * Validates project invariants and canonical material ordering.
+     *
+     * @param id stable world-level project ID
+     * @param ownerFactionContentId faction treasury owner or null for external settlement
+     * @param stationArchetypeContentId target station archetype content ID
+     * @param systemId target StarSystem
+     * @param x target world X coordinate
+     * @param y target world Y coordinate
+     * @param constructionSiteEntityId local site ID while non-terminal
+     * @param materials material requirements/history
+     * @param minimumFundingMilliCredits minimum project liquidity
+     * @param projectWalletMilliCredits current project wallet balance
+     * @param buildDurationTicks required build duration
+     * @param status persistent status
+     * @param createdTick creation tick
+     * @param stateChangedTick latest transition tick
+     * @param buildStartedTick BUILDING start or -1
+     * @param completedTick terminal tick or -1
+     * @param completedStationEntityId historical station ID for COMPLETED
+     * @param settlementKind project settlement mode
+     * @param legalFactionContentId optional legal/faction affiliation
+     */
     public ConstructionProjectState {
         Objects.requireNonNull(id, "Construction project ID не задан");
-        ownerFactionContentId = requireId(ownerFactionContentId, "Owner faction");
+        Objects.requireNonNull(settlementKind, "Construction settlement kind не задан");
+        ownerFactionContentId = optionalId(ownerFactionContentId, "Owner faction");
+        legalFactionContentId = optionalId(legalFactionContentId, "Legal faction");
+        if (settlementKind == ConstructionSettlementKind.FACTION_TREASURY) {
+            if (ownerFactionContentId == null) {
+                throw new IllegalArgumentException("Faction-treasury project требует owner faction");
+            }
+            if (legalFactionContentId == null) {
+                legalFactionContentId = ownerFactionContentId;
+            }
+        } else if (ownerFactionContentId != null) {
+            throw new IllegalArgumentException("External-owner project не должен иметь faction treasury owner");
+        }
         stationArchetypeContentId = requireId(stationArchetypeContentId, "Station archetype");
         Objects.requireNonNull(systemId, "Construction target system не задан");
         Objects.requireNonNull(status, "Construction status не задан");
@@ -182,6 +249,17 @@ public record ConstructionProjectState(
 
     private static String requireId(String value, String label) {
         String normalized = Objects.requireNonNull(value, label + " не задан").strip();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(label + " не должен быть пустым");
+        }
+        return normalized;
+    }
+
+    private static String optionalId(String value, String label) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.strip();
         if (normalized.isEmpty()) {
             throw new IllegalArgumentException(label + " не должен быть пустым");
         }

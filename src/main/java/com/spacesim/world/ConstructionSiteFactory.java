@@ -23,7 +23,7 @@ final class ConstructionSiteFactory {
             ContentCatalog catalog,
             ConstructionProjectId projectId,
             ContentCatalog.StationArchetypeDefinition target,
-            String ownerFactionContentId,
+            String legalFactionContentId,
             float x,
             float y) {
         ContentCatalog checked = Objects.requireNonNull(catalog, "ContentCatalog construction site не задан");
@@ -34,9 +34,12 @@ final class ConstructionSiteFactory {
         if (construction == null) {
             throw new IllegalArgumentException("Station archetype не имеет construction definition: " + station.id());
         }
-        ContentCatalog.FactionDefinition owner = checked.findFaction(ownerFactionContentId);
-        if (owner == null) {
-            throw new IllegalArgumentException("Неизвестная owner faction: " + ownerFactionContentId);
+        ContentCatalog.FactionDefinition legalFaction = null;
+        if (legalFactionContentId != null) {
+            legalFaction = checked.findFaction(legalFactionContentId);
+            if (legalFaction == null) {
+                throw new IllegalArgumentException("Неизвестная legal faction: " + legalFactionContentId);
+            }
         }
         if (!Float.isFinite(x) || !Float.isFinite(y)) {
             throw new IllegalArgumentException("Construction site coordinates должны быть конечными");
@@ -63,7 +66,7 @@ final class ConstructionSiteFactory {
 
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
-        return new Entity()
+        Entity result = new Entity()
                 .add(new IdentityComponent(
                         "Стройплощадка " + station.displayName() + " #" + projectId.value(),
                         IdentityComponent.Kind.STATION))
@@ -72,8 +75,11 @@ final class ConstructionSiteFactory {
                 .add(new WalletComponent())
                 .add(market)
                 .add(ConstructionBidPolicy.create(checked, station))
-                .add(new FactionComponent(owner.runtimeId()))
                 .add(new PriceHistoryComponent());
+        if (legalFaction != null) {
+            result.add(new FactionComponent(legalFaction.runtimeId()));
+        }
+        return result;
     }
 
     static void restoreDerivedPolicy(
