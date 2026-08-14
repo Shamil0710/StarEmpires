@@ -6,13 +6,15 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.spacesim.components.PlayerControlledComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.flight.FlightDynamics;
 
 /**
  * Fixed-tick physical movement executor for the directly controlled player ship.
  *
  * <p>Input code never writes Transform directly. It changes only transient
- * {@link PlayerControlledComponent} intent; this Ashley system applies movement using simulation
- * delta time, preserving pause/time-scale/fixed-step semantics.</p>
+ * {@link PlayerControlledComponent} intent; this Ashley system applies the shared Stage-14E
+ * mass/thrust model through {@link FlightDynamics}. Releasing input therefore requests zero desired
+ * velocity and produces finite counter-thrust braking rather than an instantaneous stop.</p>
  */
 public final class PlayerDirectControlSystem extends IteratingSystem {
     private final ComponentMapper<PlayerControlledComponent> controlMapper =
@@ -25,7 +27,7 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
         super(Family.all(PlayerControlledComponent.class, TransformComponent.class).get());
     }
 
-    /** Applies one fixed-tick movement step. */
+    /** Applies one fixed-tick movement step under finite acceleration/braking limits. */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         PlayerControlledComponent control = controlMapper.get(entity);
@@ -36,15 +38,14 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
                 || control.movementSpeed <= 0f
                 || !Float.isFinite(deltaTime)
                 || deltaTime <= 0f) {
-            if (transform != null) {
-                transform.velocity.setZero();
-            }
             return;
         }
 
-        float velocityX = control.axisX * control.movementSpeed;
-        float velocityY = control.axisY * control.movementSpeed;
-        transform.velocity.set(velocityX, velocityY);
-        transform.position.mulAdd(transform.velocity, deltaTime);
+        FlightDynamics.advance(
+                transform,
+                FlightDynamics.profile(entity, control.movementSpeed),
+                control.axisX,
+                control.axisY,
+                deltaTime);
     }
 }
