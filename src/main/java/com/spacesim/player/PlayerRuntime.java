@@ -18,6 +18,8 @@ import com.spacesim.systems.AutonomousFlightSystem;
 import com.spacesim.systems.PlayerDirectControlSystem;
 import com.spacesim.world.CombatDestructionResolver;
 import com.spacesim.world.ConstructionProjectId;
+import com.spacesim.world.ConstructionProjectState;
+import com.spacesim.world.ConstructionProjectStatus;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
@@ -41,7 +43,9 @@ import java.util.Optional;
  *
  * <p>Stage 16 keeps player construction-project and completed-station ownership in
  * {@link PlayerState}. World construction/station entities remain ordinary world state. Runtime
- * reconciliation removes destroyed station references but does not invent replacement assets.</p>
+ * reconciliation converts a completed owned project into an {@link OwnedStationRef}, removes
+ * cancelled/failed project ownership, and removes destroyed station references without inventing
+ * replacement assets.</p>
  */
 public final class PlayerRuntime {
     private static final float DEFAULT_DOCKING_RANGE = 10f;
@@ -528,21 +532,38 @@ public final class PlayerRuntime {
     }
 
     private void reconcileOwnedStations() {
-        if (player.ownedStations().isEmpty()) {
-            return;
+        List<ConstructionProjectId> activeProjects = new ArrayList<>();
+        List<OwnedStationRef> stationCandidates = new ArrayList<>(player.ownedStations());
+        for (ConstructionProjectId projectId : player.ownedConstructionProjectIds()) {
+            ConstructionProjectState project = world.findConstructionProject(projectId).orElse(null);
+            if (project == null) {
+                continue;
+            }
+            if (project.status() == ConstructionProjectStatus.COMPLETED
+                    && project.completedStationEntityId() != null) {
+                OwnedStationRef completed = new OwnedStationRef(
+                        project.systemId(), project.completedStationEntityId());
+                if (!stationCandidates.contains(completed)) {
+                    stationCandidates.add(completed);
+                }
+            } else if (project.status() != ConstructionProjectStatus.CANCELLED
+                    && project.status() != ConstructionProjectStatus.FAILED) {
+                activeProjects.add(projectId);
+            }
         }
-        List<OwnedStationRef> survivors = new ArrayList<>();
-        for (OwnedStationRef reference : player.ownedStations()) {
+
+        List<OwnedStationRef> liveStations = new ArrayList<>();
+        for (OwnedStationRef reference : stationCandidates) {
             SimulationSession session = world.findSession(reference.systemId()).orElse(null);
             Entity entity = session == null ? null : session.getEntityRegistry().find(reference.stationEntityId());
             IdentityComponent identity = entity == null ? null : entity.getComponent(IdentityComponent.class);
             if (identity != null && identity.kind == IdentityComponent.Kind.STATION) {
-                survivors.add(reference);
+                liveStations.add(reference);
             }
         }
-        if (survivors.size() != player.ownedStations().size()) {
-            player = copyWithConstructionOwnership(
-                    player, player.ownedConstructionProjectIds(), survivors);
+        if (!activeProjects.equals(player.ownedConstructionProjectIds())
+                || !liveStations.equals(player.ownedStations())) {
+            player = copyWithConstructionOwnership(player, activeProjects, liveStations);
         }
     }
 
