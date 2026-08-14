@@ -21,10 +21,10 @@ class ShipMathematicsV04AcceptanceTest {
         assertEquals(DeterministicSalvoHarness.INCOMING_THREATS, battleshipOnly.accountedThreats());
         assertEquals(DeterministicSalvoHarness.INCOMING_THREATS, escorted.accountedThreats());
 
-        assertTrue(battleshipOnly.leakers() > 0,
-                "An unescorted line ship must not make the synchronized corvette wave irrelevant");
-        assertTrue(escorted.leakers() < battleshipOnly.leakers(),
-                "One area-defense destroyer must materially reduce terminal leakers");
+        assertEquals(3, battleshipOnly.leakers(),
+                "The calibrated unescorted battleship must not make the corvette wave irrelevant");
+        assertEquals(0, escorted.leakers(),
+                "The reference first wave should be stopped by battleship plus one dedicated escort");
         assertTrue(escorted.leakers() * 2 <= battleshipOnly.leakers(),
                 "The reference escort should cut first-wave leakers by at least half");
     }
@@ -43,14 +43,21 @@ class ShipMathematicsV04AcceptanceTest {
         assertEquals(6, battleshipOnly.areaInterceptorKills());
         assertEquals(4, battleshipOnly.fleetInterceptorKills());
         assertEquals(6, battleshipOnly.pointDefenseLasers());
+        assertEquals(35, battleshipOnly.laserMissionKills());
+        assertEquals(5, battleshipOnly.laserBallisticMissNeutralizations());
+        assertEquals(30, battleshipOnly.laserHardKills());
+        assertEquals(87.64, battleshipOnly.laserBeamSeconds(), 0.05);
 
         assertEquals(12, escorted.areaInterceptorsExpended());
         assertEquals(8, escorted.fleetInterceptorsExpended());
         assertEquals(12, escorted.areaInterceptorKills());
         assertEquals(8, escorted.fleetInterceptorKills());
         assertEquals(10, escorted.pointDefenseLasers());
+        assertEquals(28, escorted.laserMissionKills());
+        assertEquals(6, escorted.laserBallisticMissNeutralizations());
+        assertEquals(22, escorted.laserHardKills());
+        assertEquals(143.12, escorted.laserBeamSeconds(), 0.05);
 
-        assertTrue(escorted.laserBeamSeconds() > 0.0);
         assertTrue(battleshipOnly.laserMissionKills() > battleshipOnly.laserBallisticMissNeutralizations(),
                 "A guidance kill must not automatically erase a still-dangerous 12 t missile body");
         assertTrue(battleshipOnly.laserHardKills() > 0,
@@ -58,7 +65,7 @@ class ShipMathematicsV04AcceptanceTest {
     }
 
     @Test
-    void proportionalNavigationInterceptHasARealTimeAndAccelerationEnvelope() {
+    void proportionalNavigationInterceptHasARealTimeAndSafeDistanceEnvelope() {
         double areaEntryTime = (DeterministicSalvoHarness.INITIAL_RANGE_M
                 - DeterministicSalvoHarness.AREA_DEFENSE_RANGE_M)
                 / DeterministicSalvoHarness.INCOMING_SPEED_MPS;
@@ -77,6 +84,6 @@ class ShipMathematicsV04AcceptanceTest {
         assertTrue(timely.closestRangeM() <= 150.0);
 
         assertFalse(tooLate.success(),
-                "A missile launched one second before impact cannot teleport into an interception");
+                "A proximity event inside the protected ship's safe-intercept boundary is not defense");
     }
 }
