@@ -8,7 +8,6 @@ import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StarSystemNode;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -17,11 +16,13 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Builds the Stage-15 global strategic map strictly from player-known authoritative state.
+ * Builds the global strategic map strictly from player-known authoritative state.
  *
- * <p>No remote NPC entity scan occurs here. The model projects discovered topology, explicit
- * persistent threat intel and player-owned FleetIds only. This makes the strategic presentation a
- * read model rather than an alternate simulation or an omniscient debugger.</p>
+ * <p>No arbitrary remote NPC entity scan occurs here. The model projects discovered topology,
+ * explicit persistent threat intel and player-owned FleetIds only. Stage-16 construction projects
+ * and completed stations are projected through {@link PlayerConstructionManagementModel}, keeping
+ * all economic/progress calculations in the authoritative read model rather than duplicating them
+ * in map/UI code.</p>
  */
 public final class GlobalFleetMapModel {
     private GlobalFleetMapModel() {
@@ -29,10 +30,10 @@ public final class GlobalFleetMapModel {
     }
 
     /**
-     * Captures the current first-layer strategic map.
+     * Captures the current strategic map.
      *
      * @param runtime playable runtime whose player knowledge defines visibility
-     * @return deterministic known-world map snapshot
+     * @return deterministic known-world and owned-asset map snapshot
      */
     public static GlobalFleetMapSnapshot capture(PlayerRuntime runtime) {
         PlayerRuntime checked = Objects.requireNonNull(runtime, "PlayerRuntime not set");
@@ -62,14 +63,13 @@ public final class GlobalFleetMapModel {
                     intel == null ? 0d : intel.dangerScore(),
                     intel == null ? 0f : intel.confidence()));
         }
-        systems.sort(Comparator.comparing(GlobalFleetMapSnapshot.SystemMarker::systemId));
 
         List<GlobalFleetMapSnapshot.LinkMarker> links = new ArrayList<>();
         List<StarSystemId> orderedSystems = new ArrayList<>(discovered);
-        orderedSystems.sort(Comparator.naturalOrder());
+        orderedSystems.sort(StarSystemId::compareTo);
         for (StarSystemId first : orderedSystems) {
             List<StarSystemId> neighbors = new ArrayList<>(checked.world().getTopology().neighbors(first));
-            neighbors.sort(Comparator.naturalOrder());
+            neighbors.sort(StarSystemId::compareTo);
             for (StarSystemId second : neighbors) {
                 if (!discovered.contains(second) || first.compareTo(second) >= 0) {
                     continue;
@@ -88,9 +88,6 @@ public final class GlobalFleetMapModel {
                         intel == null ? 0f : intel.confidence()));
             }
         }
-        links.sort(Comparator
-                .comparing(GlobalFleetMapSnapshot.LinkMarker::first)
-                .thenComparing(GlobalFleetMapSnapshot.LinkMarker::second));
 
         Map<FleetId, FleetOrderType> orderByFleet = new HashMap<>();
         for (PlayerFleetOrderState order : player.fleetOrders()) {
@@ -116,7 +113,38 @@ public final class GlobalFleetMapModel {
                     fleetId.equals(player.activeFleetId()),
                     orderByFleet.getOrDefault(fleetId, FleetOrderType.HOLD)));
         }
-        fleets.sort(Comparator.comparing(GlobalFleetMapSnapshot.FleetMarker::fleetId));
-        return new GlobalFleetMapSnapshot(systems, links, fleets);
+
+        PlayerConstructionManagementSnapshot construction =
+                new PlayerConstructionManagementModel(checked).capture();
+        List<GlobalFleetMapSnapshot.ConstructionProjectMarker> projects = new ArrayList<>();
+        for (PlayerConstructionProjectView project : construction.projects()) {
+            if (!discovered.contains(project.systemId())) {
+                continue;
+            }
+            projects.add(new GlobalFleetMapSnapshot.ConstructionProjectMarker(
+                    project.projectId(),
+                    project.systemId(),
+                    project.stationArchetypeContentId(),
+                    project.stationDisplayName(),
+                    project.status(),
+                    project.buildProgress(),
+                    project.totalMissingUnits(),
+                    project.fundingShortfallMilliCredits(),
+                    project.territorialAccessCurrentlyAllowed(),
+                    project.supplyFleetIds()));
+        }
+        List<GlobalFleetMapSnapshot.OwnedStationMarker> stations = new ArrayList<>();
+        for (PlayerOwnedStationView station : construction.stations()) {
+            if (!discovered.contains(station.systemId())) {
+                continue;
+            }
+            stations.add(new GlobalFleetMapSnapshot.OwnedStationMarker(
+                    station.reference(),
+                    station.stationArchetypeContentId(),
+                    station.stationDisplayName(),
+                    station.walletMilliCredits(),
+                    station.legalFactionContentId()));
+        }
+        return new GlobalFleetMapSnapshot(systems, links, fleets, projects, stations);
     }
 }
