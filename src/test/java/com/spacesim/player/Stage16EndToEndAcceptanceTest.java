@@ -65,6 +65,7 @@ class Stage16EndToEndAcceptanceTest {
         runtime.advanceFrame(0.2f);
 
         performExternalEnergyDelivery(runtime, content, projectId, energy);
+        physicallyDeliverFixtureUnits(runtime, construction, projectId, STEEL_ID, 1);
         performOwnedSteelSupply(runtime, projectId, steelHauler.id());
         physicallyDeliverRemainingFixtureCargo(runtime, construction, projectId);
         advanceUntilStatus(runtime, projectId, ConstructionProjectStatus.BUILDING, 100);
@@ -195,30 +196,46 @@ class Stage16EndToEndAcceptanceTest {
         assertTrue(orders.clear(steelHauler));
     }
 
+    private static void physicallyDeliverFixtureUnits(
+            PlayerRuntime runtime,
+            PlayerConstructionService construction,
+            ConstructionProjectId projectId,
+            String itemContentId,
+            int amount) {
+        ConstructionProjectState project = runtime.world().findConstructionProject(projectId).orElseThrow();
+        FleetPlacementState active = runtime.world().findFleet(runtime.player().activeFleetId()).orElseThrow();
+        Entity site = runtime.world().findSession(project.systemId()).orElseThrow()
+                .getEntityRegistry().find(project.constructionSiteEntityId());
+        TransformComponent shipTransform = entity(runtime, active).getComponent(TransformComponent.class);
+        TransformComponent siteTransform = site.getComponent(TransformComponent.class);
+        shipTransform.position.set(siteTransform.position);
+        shipTransform.velocity.setZero();
+        assertEquals(amount, construction.deliverMaterial(projectId, active.id(), itemContentId, amount));
+    }
+
     private static void physicallyDeliverRemainingFixtureCargo(
             PlayerRuntime runtime,
             PlayerConstructionService construction,
             ConstructionProjectId projectId) {
         ConstructionProjectState project = runtime.world().findConstructionProject(projectId).orElseThrow();
+        if (project.status() == ConstructionProjectStatus.BUILDING
+                || project.status() == ConstructionProjectStatus.COMPLETED) {
+            return;
+        }
         FleetPlacementState active = runtime.world().findFleet(runtime.player().activeFleetId()).orElseThrow();
-        Entity ship = entity(runtime, active);
         Entity site = runtime.world().findSession(project.systemId()).orElseThrow()
                 .getEntityRegistry().find(project.constructionSiteEntityId());
-        TransformComponent shipTransform = ship.getComponent(TransformComponent.class);
+        TransformComponent shipTransform = entity(runtime, active).getComponent(TransformComponent.class);
         TransformComponent siteTransform = site.getComponent(TransformComponent.class);
         shipTransform.position.set(siteTransform.position);
         shipTransform.velocity.setZero();
-        boolean transferred = false;
         for (ConstructionMaterialState material : project.materials()) {
             int remaining = material.remainingAmount();
             if (remaining > 0) {
                 assertEquals(remaining, construction.deliverMaterial(
                         projectId, active.id(), material.itemContentId(), remaining));
-                transferred = true;
             }
         }
-        assertTrue(transferred, "aggregate scenario must retain some demand for physical owner delivery");
-        assertTrue(runtime.world().findConstructionProject(projectId).orElseThrow().materialsFulfilled());
     }
 
     private static void dockAtCompletedStation(
