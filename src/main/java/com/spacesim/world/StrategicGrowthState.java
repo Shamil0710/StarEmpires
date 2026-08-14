@@ -14,20 +14,31 @@ public final class StrategicGrowthState {
 
     /** Persisted strategic reason. */
     public enum Reason {
+        /** Expansion primarily secures finite mineable resources. */
         RESOURCE_ACCESS,
+        /** Expansion primarily serves unmet market demand. */
         MARKET_DEMAND,
+        /** Expansion primarily extends an existing trade network. */
         TRADE_NETWORK,
+        /** Expansion primarily extends spatial reach through jump topology. */
         STRATEGIC_REACH,
+        /** Multiple physical signals contribute without one dominant reason. */
         BALANCED
     }
 
     /** Persistent lifecycle. */
     public enum Status {
+        /** Plan exists but has not yet been approved for physical execution. */
         PLANNED,
+        /** Budget/target checks passed and execution may start. */
         APPROVED,
+        /** Linked Stage-9 construction and logistics are physically active. */
         EXECUTING,
+        /** Anchor construction completed and the growth objective was established. */
         ESTABLISHED,
+        /** Plan was deliberately cancelled before establishment. */
         CANCELLED,
+        /** Plan terminated because authoritative execution became impossible. */
         FAILED;
 
         /** @return true for terminal states */
