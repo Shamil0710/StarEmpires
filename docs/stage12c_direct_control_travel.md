@@ -1,6 +1,6 @@
 # Stage 12C — Direct Ship Control and Travel
 
-Status: implementation branch `agent/stage12c-direct-control-travel`.
+Status: **COMPLETE — PR #31, main `342659b`.**
 
 ## Production control model
 
@@ -25,44 +25,21 @@ The physical cargo, wallet, faction/legal context and FleetId remain unchanged.
 
 `setMovementIntent(x, y)` changes only control intent. Vectors above unit magnitude are normalized.
 
-`PlayerShipView` exposes a read-only snapshot of:
-
-- stable FleetId;
-- current StarSystemId;
-- current local EntityId;
-- position;
-- velocity;
-- docked state.
-
-Presentation code can therefore follow/select the active ship without owning or changing simulation state.
+`PlayerShipView` exposes a read-only snapshot of stable FleetId, current system/local entity identity, position, velocity and docked state. Presentation code can therefore follow/select the active ship without owning or changing simulation state.
 
 ## Docking
 
-Docking does not teleport the ship.
+Docking does not teleport the ship. `dockAt(EntityId)` succeeds only when the active fleet is locally materialized, no jump is active, the target is a live market in the same system and current physical distance is inside docking range.
 
-`dockAt(EntityId)` succeeds only when:
+A successful dock stops input/velocity and persists a system-qualified `DiscoveredObjectRef` as `PlayerState.dockedAt`. The station is added to discovery if necessary.
 
-- the active fleet is locally materialized;
-- no jump is active;
-- target is a live market entity in the same StarSystem;
-- current physical distance is inside docking range.
-
-A successful dock stops input/velocity and persists a system-qualified `DiscoveredObjectRef` as `PlayerState.dockedAt`. The station is also added to discovery if necessary.
-
-Playable schema v2 introduces this persistent docking reference. Stage-12A playable schema v1 migrates as undocked; raw v0.2 `WorldState` migration still creates no player.
+Playable schema v2 introduced this persistent docking reference. Stage-12A playable schema v1 migrates as undocked; raw v0.2 `WorldState` migration still creates no player.
 
 ## Jump travel
 
-The player does not receive a separate travel implementation.
+The player does not receive a separate travel implementation. `requestJump(destination)` requires an undocked active ship and a direct topology neighbor, then calls the existing Stage-10 `WorldSimulation.requestFleetJump(...)` FSM.
 
-`requestJump(destination)` requires an undocked active ship and a direct topology neighbor, then calls the existing Stage-10 `WorldSimulation.requestFleetJump(...)` FSM.
-
-After materialization in the destination system, `PlayerRuntime`:
-
-- keeps the same world-level FleetId;
-- activates the destination StarSystem as the full-rate local system;
-- rebinds transient direct control to the new local EntityId;
-- records the destination as discovered.
+After materialization in the destination system, `PlayerRuntime` keeps the same world-level FleetId, activates the destination system at full local rate, rebinds transient direct control to the new local EntityId and records the destination as discovered.
 
 ## Time controls
 
