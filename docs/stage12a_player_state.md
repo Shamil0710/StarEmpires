@@ -1,6 +1,6 @@
 # Stage 12A — Player State
 
-Status: implementation branch `agent/stage12a-player-state`.
+Status: **COMPLETE — PR #29, main `3a7efe1`.**
 
 ## Goal
 
@@ -49,7 +49,7 @@ worldState = decoded legacy world
 playerState = null
 ```
 
-No ship, wallet balance, discovery or faction affiliation is invented during migration. Player creation/bootstrap is an explicit future/application action.
+No ship, wallet balance, discovery or faction affiliation is invented during migration. Player creation/bootstrap remains an explicit application action.
 
 ## Runtime boundary
 
@@ -75,6 +75,6 @@ Stage-12A tests cover:
 - invalid ownership reference rejection;
 - deterministic world + player continuation after save/load.
 
-## Deferred to 12B–12D
+## Follow-up integration
 
-12A does not yet implement ownership transfer, destruction cleanup, direct controls, docking, jump commands, manual market actions or player UI. Those build on this schema rather than introducing another source of truth.
+12B–12D subsequently built ownership transfer, destruction cleanup, direct control, persistent docking, Stage-10 jump travel and manual market interaction on this schema without introducing another player-state source of truth.
