@@ -14,16 +14,22 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Thin GPU renderer for the player-known Stage-15 strategic map.
+ * Thin GPU renderer for the player-known strategic map.
  *
  * <p>All visibility/classification is prepared by {@link com.spacesim.player.GlobalFleetMapModel};
- * the renderer therefore has no access to WorldSimulation or hidden entities.</p>
+ * the renderer therefore has no access to WorldSimulation or hidden entities. Stage-16 project and
+ * owned-station markers are presentation-only projections of the authoritative construction
+ * management snapshot.</p>
  */
 public final class GlobalFleetMapRenderer {
     private static final float PADDING = 70f;
     private static final float SYSTEM_RADIUS = 8f;
     private static final float SELECTED_RADIUS = 13f;
     private static final float FLEET_OFFSET = 14f;
+    private static final float PROJECT_OFFSET_X = -18f;
+    private static final float PROJECT_OFFSET_Y = 20f;
+    private static final float STATION_OFFSET_X = 18f;
+    private static final float STATION_OFFSET_Y = 20f;
 
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
@@ -100,6 +106,34 @@ public final class GlobalFleetMapRenderer {
             }
             shapes.rect(point.x() - 4f, y - 3f, 8f, 6f);
         }
+        for (GlobalFleetMapSnapshot.ConstructionProjectMarker project : checked.projects()) {
+            Point point = points.get(project.systemId());
+            if (point == null) {
+                continue;
+            }
+            float offset = (project.projectId().value() % 3L) * 6f;
+            float x = point.x() + PROJECT_OFFSET_X - offset;
+            float y = point.y() + PROJECT_OFFSET_Y + offset;
+            if (!project.territorialAccessCurrentlyAllowed()) {
+                shapes.setColor(Color.RED);
+            } else if (project.fundingShortfallMilliCredits() > 0L || project.missingMaterialUnits() > 0L) {
+                shapes.setColor(Color.ORANGE);
+            } else {
+                shapes.setColor(Color.GOLD);
+            }
+            shapes.triangle(x, y + 5f, x - 5f, y - 4f, x + 5f, y - 4f);
+        }
+        for (GlobalFleetMapSnapshot.OwnedStationMarker station : checked.stations()) {
+            Point point = points.get(station.systemId());
+            if (point == null) {
+                continue;
+            }
+            long stableOffset = station.reference().stationEntityId().value() % 3L;
+            float x = point.x() + STATION_OFFSET_X + stableOffset * 7f;
+            float y = point.y() + STATION_OFFSET_Y + stableOffset * 5f;
+            shapes.setColor(Color.GREEN);
+            shapes.rect(x - 5f, y - 5f, 10f, 10f);
+        }
         shapes.end();
 
         batch.setProjectionMatrix(camera.combined);
@@ -128,6 +162,33 @@ public final class GlobalFleetMapRenderer {
                     "F#" + fleet.fleetId().value() + " " + fleet.orderType(),
                     point.x() + 7f,
                     y + 5f);
+        }
+        for (GlobalFleetMapSnapshot.ConstructionProjectMarker project : checked.projects()) {
+            Point point = points.get(project.systemId());
+            if (point == null) {
+                continue;
+            }
+            float offset = (project.projectId().value() % 3L) * 6f;
+            float x = point.x() + PROJECT_OFFSET_X - offset;
+            float y = point.y() + PROJECT_OFFSET_Y + offset;
+            font.draw(batch,
+                    String.format("P#%d %s %.0f%% miss %d",
+                            project.projectId().value(),
+                            project.status(),
+                            project.buildProgress() * 100d,
+                            project.missingMaterialUnits()),
+                    x - 10f,
+                    y + 18f);
+        }
+        for (GlobalFleetMapSnapshot.OwnedStationMarker station : checked.stations()) {
+            Point point = points.get(station.systemId());
+            if (point == null) {
+                continue;
+            }
+            long stableOffset = station.reference().stationEntityId().value() % 3L;
+            float x = point.x() + STATION_OFFSET_X + stableOffset * 7f;
+            float y = point.y() + STATION_OFFSET_Y + stableOffset * 5f;
+            font.draw(batch, "Owned " + station.stationDisplayName(), x + 7f, y + 5f);
         }
         batch.end();
     }
