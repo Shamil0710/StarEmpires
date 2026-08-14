@@ -3,6 +3,8 @@
 > Статус: **ACTIVE TEST PLAN**
 >
 > Основная спецификация: `docs/stage16_player_construction.md`.
+>
+> Политика открытого рыночного снабжения: `docs/stage16_open_market_supply.md`.
 
 ---
 
@@ -154,31 +156,110 @@ Accepted amount ограничен remaining requirement; лишний cargo о�
 
 ---
 
-## 6. Группа E — живая рыночная поставка
+## 6. Группа E — открытая живая рыночная поставка
 
-### E1 — site publishes real demand
+Эта группа обязательна для Stage 16. Владение проектом не создаёт монополию на снабжение: стройплощадка является обычным физическим покупателем для любого economic actor с market access.
 
-Недостающие товары отражаются в `MarketComponent`/target stock и доступны обычному торговому планировщику.
+### E1 — site publishes only remaining demand
 
-### E2 — generic NPC trade supply
+Для каждого item demand соответствует фактически недостающему requirement.
 
-Обычный NPC trader:
+После частичной поставки buy demand уменьшается. После fulfillment buy demand исчезает.
+
+### E2 — supplier from another faction
+
+Обычный NPC trader другой faction, который имеет legal/market access и считает сделку выгодной:
 
 ```text
-покупает реальный товар
-→ физически движется
-→ продаёт construction site
+видит construction demand
+→ выбирает реального supplier
+→ покупает реальный товар
+→ физически движется / прыгает
+→ продаёт construction site через обычный TradeController
 ```
 
-Деньги site уменьшаются, trader/seller wallets изменяются обычным trade path, stock site растёт.
+Проверяется, что принадлежность к faction владельца проекта не требуется.
 
-### E3 — no reservation
+### E3 — neutral independent supplier
 
-Если другой NPC раньше забрал stock поставщика, player project не получает зарезервированный товар из воздуха.
+Нейтральный независимый trader с разрешённым доступом может снабжать площадку на тех же экономических условиях, что и faction trader.
 
-### E4 — insufficient site liquidity
+### E4 — hostile / embargoed supplier rejected
 
-Site с недостаточным wallet не может купить товар, даже если demand существует.
+Hostile actor или сторона без market access не может выполнить продажу на construction site через обычный market path.
+
+Demand при этом не исчезает и не превращается в скрытую поставку.
+
+### E5 — physical trade conservation
+
+В полном внешнем supply loop:
+
+```text
+supplier market stock ↓
+trader cargo ↑
+trader physically travels
+trader cargo ↓
+site inventory ↑
+site wallet ↓
+seller/trader-side money ↑
+```
+
+Все денежные изменения проходят через ordinary trade/ledger semantics.
+
+### E6 — insufficient site liquidity
+
+Site с недостаточным `WalletComponent` не может купить товар, даже если demand существует и маршрут выгоден.
+
+После реального дополнительного funding закупка снова может стать исполнимой.
+
+### E7 — no hard reservation
+
+Если другой покупатель раньше забрал supplier stock, выбранный construction route не получает зарезервированный товар из воздуха.
+
+`route selected != guaranteed future transaction`.
+
+### E8 — competing suppliers / stale demand
+
+Два trader выбирают один и тот же demand.
+
+Первый прибывает и закрывает большую часть или весь requirement. Второй при прибытии обязан повторно проверить market state:
+
+- продаёт только фактически оставшийся demand;
+- при нулевом demand не получает виртуальную выплату;
+- лишний cargo остаётся на корабле;
+- AI перепланирует его обычным способом.
+
+### E9 — route-risk utility
+
+Внешний trader оценивает construction opportunity с учётом cumulative whole-route risk, а не только destination buy price.
+
+При достаточно опасном промежуточном маршруте более прибыльная номинально стройплощадка может быть отвергнута в пользу более безопасной сделки.
+
+### E10 — BUILDING waits for physical delivery
+
+Наличие buy order или перевозчика `en route` не считается fulfillment.
+
+```text
+order exists         → недостаточно
+cargo in transit     → недостаточно
+cargo in site stock  → считается delivered
+```
+
+Project не может перейти в `BUILDING`, пока реальный site inventory/material state не закрывает весь bill.
+
+### E11 — save/load open demand
+
+Save/load сохраняет:
+
+- delivered materials;
+- remaining requirements;
+- site wallet;
+- market demand, выводимый из authoritative state;
+- отсутствие дублированных orders/resources после restore.
+
+### E12 — construction creates regional economic pressure
+
+В интеграционном сценарии крупный project должен создавать обычный дополнительный спрос, который видят существующие trade planners. Тест не обязан фиксировать конкретную цену как balance constant, но должен доказать, что construction demand входит в общий economic opportunity space и конкурирует за реальные материалы с другими покупателями.
 
 ---
 
@@ -205,6 +286,10 @@ Order не может завершить delivery без фактическог�
 ### F5 — save/load continuation
 
 Persistent supply order продолжает тот же project после загрузки.
+
+### F6 — owner delivery does not require self-sale
+
+Owned fleet может передать физический cargo в собственный project через owner-delivery boundary без искусственной рыночной продажи самому себе и без создания денег.
 
 ---
 
@@ -312,10 +397,13 @@ Player-owned station принимает участие в существующе
 → выбрать station archetype
 → создать site в допустимой точке
 → fund из player wallet
-→ купить хотя бы часть materials на обычном рынке
-→ физически перевезти owned FleetId
-→ передать cargo в range
-→ остальную поставку выполнить ordinary economy или owned supply order
+→ site публикует реальный спрос на недостающие materials
+→ внешний trader другой faction с market access выбирает выгодную поставку
+→ trader физически покупает и доставляет часть materials обычным TradeController
+→ игрок покупает ещё часть materials на обычном рынке
+→ физически перевозит owned FleetId
+→ передаёт cargo в range
+→ остальную поставку выполняет ordinary economy или owned supply order
 → дождаться полного material bill
 → начать BUILDING
 → уйти в другую систему
@@ -338,7 +426,8 @@ Player-owned station принимает участие в существующе
 - instant delivery;
 - station spawn до completion;
 - UI mutation;
-- отключение конкурирующей экономики ради успеха теста.
+- отключение конкурирующей экономики ради успеха теста;
+- artificial supplier reservation ради гарантированного успеха construction trade.
 
 ---
 
@@ -352,4 +441,6 @@ Player-owned station принимает участие в существующе
 - desktop shaded JAR packaging green;
 - persistence migration tests green;
 - deterministic construction continuation green;
-- минимум один multi-system/end-to-end player construction acceptance green.
+- минимум один multi-system/end-to-end player construction acceptance green;
+- минимум один внешний supplier другой faction/independent actor успешно снабжает construction site через обычную рыночную экономику;
+- минимум один hostile/blocked supplier корректно отклоняется обычным access policy.
