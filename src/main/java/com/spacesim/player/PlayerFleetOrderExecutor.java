@@ -143,10 +143,6 @@ final class PlayerFleetOrderExecutor {
         float speed = movementSpeed(entity);
         if (speed <= 0f) {
             entity.remove(FlightCommandComponent.class);
-            TransformComponent transform = entity.getComponent(TransformComponent.class);
-            if (transform != null && transform.velocity.len2() <= STOP_SPEED * STOP_SPEED) {
-                transform.velocity.setZero();
-            }
             return;
         }
         FlightCommandComponent command = ensureFlightCommand(entity);
