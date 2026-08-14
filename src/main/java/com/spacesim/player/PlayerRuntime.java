@@ -308,14 +308,22 @@ public final class PlayerRuntime {
         return true;
     }
 
-    /** Sets global pause across all local sessions without bypassing their fixed clocks. */
+    /**
+     * Sets global pause across all local sessions without bypassing their fixed clocks.
+     *
+     * @param paused true to pause every local simulation clock
+     */
     public void setPaused(boolean paused) {
         for (StarSystemNode node : world.getTopology().systems()) {
             world.findSession(node.id()).orElseThrow().getClock().setPaused(paused);
         }
     }
 
-    /** Sets global simulation time scale across all local sessions. */
+    /**
+     * Sets global simulation time scale across all local sessions.
+     *
+     * @param timeScale non-negative simulation time multiplier
+     */
     public void setTimeScale(double timeScale) {
         for (StarSystemNode node : world.getTopology().systems()) {
             world.findSession(node.id()).orElseThrow().getClock().setTimeScale(timeScale);
