@@ -42,7 +42,21 @@ public record PlayerFleetOrderState(
         float targetY,
         List<StarSystemId> patrolSystemIds) implements Comparable<PlayerFleetOrderState> {
 
-    /** Validates and canonicalizes one durable order. */
+    /**
+     * Validates and canonicalizes one durable order.
+     *
+     * @param fleetId player-owned fleet receiving the order
+     * @param type durable order category
+     * @param targetSystemId primary target system, when required
+     * @param targetEntityId primary system-local target entity, when required
+     * @param secondarySystemId secondary target system for two-endpoint orders
+     * @param secondaryEntityId secondary system-local target entity
+     * @param targetFleetId physical fleet followed/protected by escort/follow orders
+     * @param itemContentId stable item content ID used by trade/mining orders
+     * @param targetX local MOVE target X
+     * @param targetY local MOVE target Y
+     * @param patrolSystemIds deterministic PATROL cycle
+     */
     public PlayerFleetOrderState {
         fleetId = Objects.requireNonNull(fleetId, "Fleet order FleetId not set");
         type = Objects.requireNonNull(type, "Fleet order type not set");
@@ -76,7 +90,12 @@ public record PlayerFleetOrderState(
                 targetFleetId, itemContentId, patrolSystemIds, fleetId);
     }
 
-    /** @return a persistent braking/hold order for the fleet */
+    /**
+     * Creates a persistent physical HOLD order.
+     *
+     * @param fleetId ordered fleet
+     * @return validated HOLD order
+     */
     public static PlayerFleetOrderState hold(FleetId fleetId) {
         return new PlayerFleetOrderState(
                 fleetId, FleetOrderType.HOLD, null, null, null, null, null, null,
@@ -157,12 +176,24 @@ public record PlayerFleetOrderState(
                 List.of());
     }
 
-    /** @return persistent ESCORT order targeting another FleetId */
+    /**
+     * Creates a persistent ESCORT order targeting another FleetId.
+     *
+     * @param fleetId ordered escort fleet
+     * @param protectedFleetId physical fleet to protect
+     * @return validated ESCORT order
+     */
     public static PlayerFleetOrderState escort(FleetId fleetId, FleetId protectedFleetId) {
         return fleetTarget(fleetId, FleetOrderType.ESCORT, protectedFleetId);
     }
 
-    /** @return persistent FOLLOW order targeting another FleetId */
+    /**
+     * Creates a persistent FOLLOW order targeting another FleetId.
+     *
+     * @param fleetId ordered follower fleet
+     * @param followedFleetId physical fleet to follow
+     * @return validated FOLLOW order
+     */
     public static PlayerFleetOrderState follow(FleetId fleetId, FleetId followedFleetId) {
         return fleetTarget(fleetId, FleetOrderType.FOLLOW, followedFleetId);
     }
