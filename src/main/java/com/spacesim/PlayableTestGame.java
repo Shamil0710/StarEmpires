@@ -15,7 +15,12 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.kotcrab.vis.ui.VisUI;
+import com.spacesim.components.AsteroidComponent;
+import com.spacesim.components.CombatCommandComponent;
+import com.spacesim.components.CombatComponent;
+import com.spacesim.components.CombatRuntimeComponent;
 import com.spacesim.components.EntityIdComponent;
+import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
@@ -30,9 +35,17 @@ import com.spacesim.player.PlayableWorldState;
 import com.spacesim.player.PlayerMarketItemView;
 import com.spacesim.player.PlayerMarketService;
 import com.spacesim.player.PlayerMarketView;
+import com.spacesim.player.PlayerMiningService;
+import com.spacesim.player.PlayerMiningView;
 import com.spacesim.player.PlayerRuntime;
+import com.spacesim.player.PlayerShipProgressionService;
 import com.spacesim.player.PlayerShipView;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.ui.LocalMinimapModel;
+import com.spacesim.ui.LocalMinimapRenderer;
+import com.spacesim.ui.LocalMinimapSnapshot;
+import com.spacesim.ui.PlayableCameraState;
+import com.spacesim.ui.PlayableMapEntityFilter;
 import com.spacesim.ui.WorldMapLayout;
 import com.spacesim.ui.WorldMapRenderer;
 import com.spacesim.world.FleetId;
@@ -50,33 +63,45 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Manually playable Stage-12 desktop test harness.
+ * Manually playable Stage-14 desktop test harness.
  *
- * <p>The application is intentionally thin: it translates keyboard input into PlayerRuntime
- * commands, follows the active physical ship, exposes a read-only HUD and delegates every world
- * mutation to the already verified fixed-tick, jump and TradeController pipelines. It is a test
- * client for production core behavior rather than a second gameplay implementation.</p>
+ * <p>The application remains intentionally thin: keyboard/mouse input is translated into ordinary
+ * {@link PlayerRuntime}, market, mining and ownership/progression commands. World-space rendering,
+ * HUD and minimap read authoritative state only. No presentation code teleports ships, creates
+ * goods, awards credits, applies damage or performs mining directly.</p>
  */
 public final class PlayableTestGame extends ApplicationAdapter {
     private static final float MAP_PADDING = 18f;
-    private static final float FOLLOW_ZOOM = 2.4f;
-    private static final float TRANSIT_ZOOM = 1.0f;
-    private static final float HUD_WIDTH = 650f;
+    private static final float TRANSIT_ZOOM = 1f;
     private static final float HUD_UPDATE_INTERVAL_SECONDS = 0.1f;
+    private static final float SHIP_PANEL_WIDTH = 470f;
+    private static final float CONTEXT_PANEL_WIDTH = 650f;
+    private static final float MINIMAP_WIDTH = 310f;
+    private static final float MINIMAP_HEIGHT = 220f;
+    private static final float MINIMAP_MARGIN = 16f;
+    private static final float MINIMAP_PADDING = 8f;
+    private static final float MINIMAP_ZOOM = 2.2f;
     private static final String SAVE_FILE = "saves/playable-test-world.sav";
 
     private PlayableTestWorldFactory.Scenario scenario;
     private ContentCatalog content;
     private PlayerRuntime playerRuntime;
     private PlayerMarketService marketService;
+    private PlayerMiningService miningService;
+    private PlayerShipProgressionService progressionService;
     private WorldSimulation world;
     private SimulationSession activeSession;
     private StarSystemId boundSystemId;
 
     private Stage stage;
-    private Label hudLabel;
+    private Label shipHudLabel;
+    private Label contextHudLabel;
+    private Label statusHudLabel;
     private WorldMapRenderer worldMapRenderer;
+    private LocalMinimapRenderer minimapRenderer;
     private WorldMapLayout mapLayout;
+    private WorldMapLayout minimapLayout;
+    private final PlayableCameraState cameraState = new PlayableCameraState();
     private Path savePath;
 
     private boolean moveUp;
@@ -92,7 +117,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
     public PlayableTestGame() {
     }
 
-    /** Creates the deterministic test world, HUD, follow camera and keyboard command adapter. */
+    /** Creates the deterministic test world, HUD, follow camera, minimap and command adapter. */
     @Override
     public void create() {
         VisUI.load();
@@ -101,33 +126,68 @@ public final class PlayableTestGame extends ApplicationAdapter {
         stage = new Stage(new ScreenViewport());
         Skin skin = VisUI.getSkin();
         worldMapRenderer = new WorldMapRenderer(skin.get(Label.LabelStyle.class).font);
-        hudLabel = new Label("", skin);
-        hudLabel.setAlignment(Align.topLeft);
-        hudLabel.setWrap(true);
-        Table hud = new Table();
-        hud.setFillParent(true);
-        hud.top().left().pad(12f);
-        hud.add(hudLabel).width(HUD_WIDTH).top().left();
-        hud.setTouchable(Touchable.disabled);
-        stage.addActor(hud);
+        minimapRenderer = new LocalMinimapRenderer(skin.get(Label.LabelStyle.class).font);
+        createHud(skin);
 
         savePath = Gdx.files.local(SAVE_FILE).file().toPath();
         Gdx.input.setInputProcessor(new InputMultiplexer(createInputAdapter(), stage));
-        updateMapLayout();
+        updateMapLayouts();
         updateHud();
         Gdx.gl.glClearColor(0.018f, 0.025f, 0.045f, 1f);
+    }
+
+    private void createHud(Skin skin) {
+        shipHudLabel = new Label("", skin);
+        shipHudLabel.setAlignment(Align.topLeft);
+        shipHudLabel.setWrap(true);
+        shipHudLabel.setTouchable(Touchable.disabled);
+
+        contextHudLabel = new Label("", skin);
+        contextHudLabel.setAlignment(Align.bottomLeft);
+        contextHudLabel.setWrap(true);
+        contextHudLabel.setTouchable(Touchable.disabled);
+
+        statusHudLabel = new Label("", skin);
+        statusHudLabel.setAlignment(Align.center);
+        statusHudLabel.setWrap(true);
+        statusHudLabel.setTouchable(Touchable.disabled);
+
+        Table root = new Table();
+        root.setFillParent(true);
+        root.top().left().pad(12f);
+        root.add(shipHudLabel).width(SHIP_PANEL_WIDTH).top().left();
+        root.row();
+        root.add().expandY();
+        root.row();
+        root.add(contextHudLabel).width(CONTEXT_PANEL_WIDTH).bottom().left();
+        root.setTouchable(Touchable.disabled);
+        stage.addActor(root);
+
+        Table status = new Table();
+        status.setFillParent(true);
+        status.bottom().padBottom(10f);
+        status.add(statusHudLabel).width(760f).center();
+        status.setTouchable(Touchable.disabled);
+        stage.addActor(status);
     }
 
     private void resetScenario() {
         scenario = PlayableTestWorldFactory.create(PlayableTestWorldFactory.DEFAULT_TEST_SEED);
         content = scenario.content();
         playerRuntime = scenario.runtime();
-        marketService = new PlayerMarketService(playerRuntime, content);
+        rebindPlayerServices();
         world = playerRuntime.world();
         bindActiveSession();
         clearMovementKeys();
         selectedMarketIndex = 0;
         lastDockedAt = null;
+        cameraState.reset();
+    }
+
+    private void rebindPlayerServices() {
+        marketService = new PlayerMarketService(playerRuntime, content);
+        miningService = new PlayerMiningService(playerRuntime);
+        progressionService = new PlayerShipProgressionService(playerRuntime);
     }
 
     private void bindActiveSession() {
@@ -150,6 +210,11 @@ public final class PlayableTestGame extends ApplicationAdapter {
                     case Input.Keys.J -> jumpAlongTestRoute();
                     case Input.Keys.B -> tradeSelected(true);
                     case Input.Keys.V -> tradeSelected(false);
+                    case Input.Keys.M -> selectNearestAsteroid();
+                    case Input.Keys.R -> toggleMining();
+                    case Input.Keys.T -> selectNearestCombatTarget();
+                    case Input.Keys.F -> toggleFire();
+                    case Input.Keys.TAB -> switchOwnedShip();
                     case Input.Keys.UP, Input.Keys.LEFT_BRACKET -> cycleMarketItem(-1);
                     case Input.Keys.DOWN, Input.Keys.RIGHT_BRACKET -> cycleMarketItem(1);
                     case Input.Keys.SPACE -> togglePause();
@@ -160,6 +225,10 @@ public final class PlayableTestGame extends ApplicationAdapter {
                     case Input.Keys.F5 -> saveGame();
                     case Input.Keys.F9 -> loadGame();
                     case Input.Keys.F2 -> resetWorldFromInput();
+                    case Input.Keys.HOME -> {
+                        cameraState.reset();
+                        statusMessage = "Camera zoom reset.";
+                    }
                     default -> {
                         return false;
                     }
@@ -180,6 +249,13 @@ public final class PlayableTestGame extends ApplicationAdapter {
                     }
                 }
                 applyMovementIntent();
+                return true;
+            }
+
+            @Override
+            public boolean scrolled(float amountX, float amountY) {
+                cameraState.scroll(amountY);
+                statusMessage = String.format(Locale.ROOT, "Camera zoom %.2fx.", cameraState.zoom());
                 return true;
             }
         };
@@ -208,7 +284,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
     private void toggleDocking() {
         if (playerRuntime.player().docked()) {
             if (playerRuntime.undock()) {
-                statusMessage = "Undocked. Press J to jump when ready.";
+                statusMessage = "Undocked.";
                 lastDockedAt = null;
             }
             return;
@@ -220,12 +296,13 @@ public final class PlayableTestGame extends ApplicationAdapter {
         }
         if (playerRuntime.dockAt(target.entityId())) {
             clearMovementKeys();
-            statusMessage = "Docked at " + target.name() + ". B buys, V sells.";
+            miningService.clear();
+            statusMessage = "Docked at " + target.name() + ".";
             lastDockedAt = null;
         } else {
             statusMessage = String.format(
                     Locale.ROOT,
-                    "Too far from %s: %.1f units. Move closer and press E.",
+                    "Docking rejected: %s is %.1f units away; move inside docking range.",
                     target.name(),
                     target.distance());
         }
@@ -234,24 +311,26 @@ public final class PlayableTestGame extends ApplicationAdapter {
     private void jumpAlongTestRoute() {
         PlayerShipView ship = playerRuntime.activeShipView().orElse(null);
         if (ship == null) {
-            statusMessage = world.findFleetJump(playerRuntime.player().activeFleetId()).isPresent()
+            FleetId activeFleet = playerRuntime.player().activeFleetId();
+            statusMessage = activeFleet != null && world.findFleetJump(activeFleet).isPresent()
                     ? "Jump already in progress." : "Active ship is not locally materialized.";
             return;
         }
         if (playerRuntime.player().docked()) {
-            statusMessage = "Undock with E before jumping.";
+            statusMessage = "Undock before jumping.";
             return;
         }
         StarSystemId destination = scenario.route().otherEnd(ship.systemId());
         if (destination == null) {
-            statusMessage = "Current system is outside the curated Anchor-Corona test route.";
+            statusMessage = "Current system is outside the curated test route.";
             return;
         }
         clearMovementKeys();
+        miningService.clear();
         if (playerRuntime.requestJump(destination)) {
-            statusMessage = "Stage-10 jump accepted. Transit is physical and persistent.";
+            statusMessage = "Jump accepted by the authoritative Stage-10 transit FSM.";
         } else {
-            statusMessage = "Jump request rejected by the authoritative travel pipeline.";
+            statusMessage = "Jump rejected by live travel/topology rules.";
         }
     }
 
@@ -273,13 +352,13 @@ public final class PlayableTestGame extends ApplicationAdapter {
     private void tradeSelected(boolean buy) {
         PlayerMarketView view = marketService.view().orElse(null);
         if (view == null) {
-            statusMessage = "Dock at a market before trading.";
+            statusMessage = "Trade rejected: dock at a market first.";
             return;
         }
         synchronizeDockedSelection(view);
         List<PlayerMarketItemView> rows = tradableRows(view);
         if (rows.isEmpty()) {
-            statusMessage = "This market has no tradable items.";
+            statusMessage = "Trade rejected: this market has no tradable goods.";
             return;
         }
         PlayerMarketItemView item = rows.get(Math.min(selectedMarketIndex, rows.size() - 1));
@@ -287,8 +366,84 @@ public final class PlayableTestGame extends ApplicationAdapter {
                 ? marketService.buy(item.itemContentId(), 1)
                 : marketService.sell(item.itemContentId(), 1);
         statusMessage = success
-                ? (buy ? "Bought 1 " : "Sold 1 ") + item.displayName() + " through TradeController."
-                : (buy ? "Buy" : "Sell") + " rejected by live market/wallet/cargo rules.";
+                ? (buy ? "Bought " : "Sold ") + "1 " + item.displayName() + "."
+                : (buy ? "Purchase" : "Sale") + " rejected by live price/wallet/cargo/access rules.";
+    }
+
+    private void selectNearestAsteroid() {
+        Entity asteroid = nearestEntity(IdentityComponent.Kind.ASTEROID, false);
+        EntityIdComponent id = asteroid == null ? null : asteroid.getComponent(EntityIdComponent.class);
+        IdentityComponent identity = asteroid == null ? null : asteroid.getComponent(IdentityComponent.class);
+        if (id == null || !miningService.selectTarget(id.id)) {
+            statusMessage = "Mining target unavailable or active ship lacks compatible mining equipment.";
+            return;
+        }
+        statusMessage = "Mining target selected: " + (identity == null ? id.id : identity.name) + ".";
+    }
+
+    private void toggleMining() {
+        PlayerMiningView view = miningService.view().orElse(null);
+        if (view == null) {
+            statusMessage = "Mining unavailable while the active fleet is not locally materialized.";
+            return;
+        }
+        boolean requested = !view.miningRequested();
+        if (miningService.setMiningRequested(requested)) {
+            statusMessage = requested ? "Mining requested." : "Mining stopped.";
+        } else {
+            statusMessage = "Mining request rejected: " + view.status().getDisplayName() + ".";
+        }
+    }
+
+    private void selectNearestCombatTarget() {
+        Entity target = nearestEntity(IdentityComponent.Kind.FLEET, true);
+        EntityIdComponent id = target == null ? null : target.getComponent(EntityIdComponent.class);
+        IdentityComponent identity = target == null ? null : target.getComponent(IdentityComponent.class);
+        if (id == null || !playerRuntime.selectCombatTarget(id.id)) {
+            statusMessage = "No valid hostile combat target found for the active ship.";
+            return;
+        }
+        statusMessage = "Combat target selected: " + (identity == null ? id.id : identity.name) + ".";
+    }
+
+    private void toggleFire() {
+        Entity ship = activeShipEntity();
+        CombatCommandComponent command = ship == null ? null : ship.getComponent(CombatCommandComponent.class);
+        boolean requested = command == null || !command.fireRequested;
+        if (playerRuntime.setFireIntent(requested)) {
+            statusMessage = requested ? "Fire requested." : "Fire stopped.";
+        } else {
+            statusMessage = "Fire request rejected: select a valid target and remain undocked.";
+        }
+    }
+
+    private void switchOwnedShip() {
+        if (playerRuntime.player().docked()) {
+            statusMessage = "Undock before switching direct control.";
+            return;
+        }
+        FleetId active = playerRuntime.player().activeFleetId();
+        List<FleetId> owned = playerRuntime.player().ownedFleetIds();
+        if (active == null || owned.size() < 2) {
+            statusMessage = "No second owned ship is available for direct-control switching.";
+            return;
+        }
+        int start = Math.max(0, owned.indexOf(active));
+        for (int offset = 1; offset <= owned.size(); offset++) {
+            FleetId candidate = owned.get((start + offset) % owned.size());
+            FleetPlacementState placement = world.findFleet(candidate).orElse(null);
+            if (placement == null
+                    || placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                    || !boundSystemId.equals(placement.systemId())) {
+                continue;
+            }
+            clearMovementKeys();
+            if (progressionService.switchActiveFleet(candidate)) {
+                statusMessage = "Direct control switched to Fleet #" + candidate.value() + ".";
+                return;
+            }
+        }
+        statusMessage = "Ship switch rejected: another owned local ship is not currently switchable.";
     }
 
     private void togglePause() {
@@ -319,13 +474,13 @@ public final class PlayableTestGame extends ApplicationAdapter {
             }
             StarSystemId restoreSystem = restoreSystemFor(state);
             playerRuntime = PlayerRuntime.restore(state, content, restoreSystem);
-            marketService = new PlayerMarketService(playerRuntime, content);
+            rebindPlayerServices();
             world = playerRuntime.world();
             bindActiveSession();
             clearMovementKeys();
             selectedMarketIndex = 0;
             lastDockedAt = null;
-            statusMessage = "Save loaded. FleetId, cargo, wallet and transit state restored.";
+            statusMessage = "Save loaded: FleetId, cargo, ownership, wallet and transit state restored.";
         } catch (IOException | RuntimeException exception) {
             statusMessage = "Load failed: " + safeMessage(exception);
         }
@@ -347,7 +502,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
     private void resetWorldFromInput() {
         resetScenario();
         statusMessage = "Fresh curated world reset. Existing save file was not deleted.";
-        updateMapLayout();
+        updateMapLayouts();
     }
 
     private MarketTarget nearestMarket() {
@@ -368,14 +523,60 @@ public final class PlayableTestGame extends ApplicationAdapter {
             if (market == null || transform == null || entityId == null || identity == null) {
                 continue;
             }
-            float dx = transform.position.x - ship.x();
-            float dy = transform.position.y - ship.y();
-            float distance = (float) Math.sqrt(dx * dx + dy * dy);
+            float distance = distance(ship.x(), ship.y(), transform.position.x, transform.position.y);
             if (best == null || distance < best.distance()) {
                 best = new MarketTarget(entityId.id, identity.name, distance);
             }
         }
         return best;
+    }
+
+    private Entity nearestEntity(IdentityComponent.Kind requiredKind, boolean hostileCombatOnly) {
+        PlayerShipView shipView = playerRuntime.activeShipView().orElse(null);
+        Entity playerEntity = activeShipEntity();
+        if (shipView == null || playerEntity == null) {
+            return null;
+        }
+        FactionComponent playerFaction = playerEntity.getComponent(FactionComponent.class);
+        Entity best = null;
+        float bestDistance = Float.POSITIVE_INFINITY;
+        for (Entity entity : activeSession.getEngine().getEntities()) {
+            if (entity == playerEntity) {
+                continue;
+            }
+            IdentityComponent identity = entity.getComponent(IdentityComponent.class);
+            TransformComponent transform = entity.getComponent(TransformComponent.class);
+            EntityIdComponent id = entity.getComponent(EntityIdComponent.class);
+            if (identity == null || transform == null || id == null || identity.kind != requiredKind) {
+                continue;
+            }
+            if (hostileCombatOnly) {
+                FactionComponent faction = entity.getComponent(FactionComponent.class);
+                if (entity.getComponent(CombatComponent.class) == null
+                        || playerFaction == null
+                        || faction == null
+                        || faction.factionId == playerFaction.factionId) {
+                    continue;
+                }
+            }
+            float currentDistance = distance(
+                    shipView.x(), shipView.y(), transform.position.x, transform.position.y);
+            if (currentDistance < bestDistance
+                    || currentDistance == bestDistance && lowerEntityId(entity, best)) {
+                best = entity;
+                bestDistance = currentDistance;
+            }
+        }
+        return best;
+    }
+
+    private static boolean lowerEntityId(Entity candidate, Entity current) {
+        if (current == null) {
+            return true;
+        }
+        EntityIdComponent candidateId = candidate.getComponent(EntityIdComponent.class);
+        EntityIdComponent currentId = current.getComponent(EntityIdComponent.class);
+        return candidateId != null && currentId != null && candidateId.id.compareTo(currentId.id) < 0;
     }
 
     private void synchronizeDockedSelection(PlayerMarketView view) {
@@ -427,81 +628,167 @@ public final class PlayableTestGame extends ApplicationAdapter {
     }
 
     private void updateHud() {
-        StringBuilder text = new StringBuilder(1024);
-        text.append("STAR EMPIRES — PLAYABLE TEST WORLD\n");
-        text.append("Stage 12 manual acceptance build\n\n");
+        updateShipHud();
+        updateContextHud();
+        statusHudLabel.setText("STATUS — " + statusMessage);
+    }
 
+    private void updateShipHud() {
+        StringBuilder text = new StringBuilder(640);
+        text.append("STAR EMPIRES — v0.3 PLAYABLE SANDBOX\n");
         FleetId activeFleet = playerRuntime.player().activeFleetId();
-        PlayerShipView ship = playerRuntime.activeShipView().orElse(null);
-        text.append("Fleet: ").append(activeFleet == null ? "none" : "#" + activeFleet.value());
-        text.append("   Credits: ").append(formatCredits(playerRuntime.player().walletMilliCredits()));
-        text.append("   Time: x").append(String.format(Locale.ROOT, "%.0f", playerRuntime.getTimeScale()));
+        PlayerShipView shipView = playerRuntime.activeShipView().orElse(null);
+        Entity ship = activeShipEntity();
+        IdentityComponent identity = ship == null ? null : ship.getComponent(IdentityComponent.class);
+        InventoryComponent inventory = activeShipInventory();
+
+        text.append("SHIP\n");
+        text.append(identity == null ? "Active ship" : identity.name);
+        text.append("  Fleet ").append(activeFleet == null ? "—" : "#" + activeFleet.value());
+        text.append("  Owned: ").append(playerRuntime.player().ownedFleetIds().size()).append('\n');
+        text.append("Credits: ").append(formatCredits(playerRuntime.player().walletMilliCredits()));
+        text.append("   Time x").append(String.format(Locale.ROOT, "%.0f", playerRuntime.getTimeScale()));
         if (playerRuntime.isPaused()) {
             text.append(" [PAUSED]");
         }
         text.append('\n');
 
-        if (ship != null) {
-            text.append("System: ").append(systemName(ship.systemId()));
-            text.append(String.format(Locale.ROOT, "   Position: %.1f, %.1f", ship.x(), ship.y()));
-            InventoryComponent inventory = activeShipInventory();
+        if (shipView != null) {
+            float speed = (float) Math.sqrt(shipView.velocityX() * shipView.velocityX()
+                    + shipView.velocityY() * shipView.velocityY());
+            text.append("System: ").append(systemName(shipView.systemId()));
+            text.append(String.format(Locale.ROOT, "   Pos %.0f, %.0f   Speed %.1f\n",
+                    shipView.x(), shipView.y(), speed));
             if (inventory != null) {
-                text.append("   Cargo: ").append(inventory.getTotalStock()).append('/').append(inventory.capacity);
+                text.append("Cargo: ").append(inventory.getTotalStock()).append('/').append(inventory.capacity);
+                String cargo = cargoSummary(inventory);
+                if (!cargo.isEmpty()) {
+                    text.append("  [").append(cargo).append(']');
+                }
+                text.append('\n');
             }
-            text.append(ship.docked() ? "   [DOCKED]\n" : "\n");
+            text.append(shipView.docked() ? "State: DOCKED\n" : "State: FLIGHT\n");
         } else if (activeFleet != null && world.findFleetJump(activeFleet).isPresent()) {
-            text.append("Status: IN TRANSIT through Stage-10 jump FSM\n");
+            text.append("State: JUMP TRANSIT\n");
         } else {
-            text.append("Status: active ship is not locally materialized\n");
+            text.append("State: active ship not locally materialized\n");
         }
 
-        PlayableTestWorldFactory.Route route = scenario.route();
-        text.append("\nRECOMMENDED TEST ROUTE\n");
-        text.append("Buy ").append(route.itemDisplayName())
-                .append(" at ").append(route.sourceStationName())
-                .append(" in ").append(systemName(route.sourceSystem())).append('\n');
-        text.append("J -> ").append(systemName(route.destinationSystem()))
-                .append(" -> dock at ").append(route.destinationStationName())
-                .append(" -> sell the same physical cargo\n");
-        text.append(String.format(
-                Locale.ROOT,
-                "Bootstrap base prices: source sells %.2f cr, destination buys %.2f cr\n",
-                route.sourceSellPriceCredits(),
-                route.destinationBuyPriceCredits()));
+        appendCombatHud(text, ship);
+        shipHudLabel.setText(text.toString());
+    }
 
+    private void appendCombatHud(StringBuilder text, Entity ship) {
+        CombatComponent combat = ship == null ? null : ship.getComponent(CombatComponent.class);
+        if (combat == null) {
+            text.append("Combat: no combat system on this hull\n");
+            return;
+        }
+        CombatRuntimeComponent runtime = ship.getComponent(CombatRuntimeComponent.class);
+        CombatCommandComponent command = ship.getComponent(CombatCommandComponent.class);
+        text.append(String.format(Locale.ROOT,
+                "Combat: Hull %.0f/%.0f  Shield %.0f/%.0f  Range %.0f  Cooldown %.2fs\n",
+                combat.hull,
+                combat.maxHull,
+                combat.shields,
+                combat.maxShields,
+                combat.weaponRange,
+                runtime == null ? 0f : Math.max(0f, runtime.cooldownRemaining)));
+        if (command == null || command.targetId == null) {
+            text.append("Target: none [T nearest hostile]\n");
+            return;
+        }
+        Entity target = activeSession.getEntityRegistry().find(command.targetId);
+        IdentityComponent targetIdentity = target == null ? null : target.getComponent(IdentityComponent.class);
+        TransformComponent targetTransform = target == null ? null : target.getComponent(TransformComponent.class);
+        PlayerShipView shipView = playerRuntime.activeShipView().orElse(null);
+        float targetDistance = targetTransform == null || shipView == null ? Float.NaN : distance(
+                shipView.x(), shipView.y(), targetTransform.position.x, targetTransform.position.y);
+        text.append("Target: ").append(targetIdentity == null ? command.targetId : targetIdentity.name);
+        if (Float.isFinite(targetDistance)) {
+            text.append(String.format(Locale.ROOT, "  %.1f/%.1f", targetDistance, combat.weaponRange));
+            text.append(targetDistance <= combat.weaponRange ? " [IN RANGE]" : " [OUT OF RANGE]");
+        }
+        text.append(command.fireRequested ? "  FIRE REQUESTED\n" : "  [F fire]\n");
+    }
+
+    private void updateContextHud() {
+        StringBuilder text = new StringBuilder(1000);
         PlayerMarketView market = marketService.view().orElse(null);
+        PlayerMiningView mining = miningService.view().orElse(null);
+
+        text.append("INTERACTION / ECONOMY\n");
         if (market != null) {
             synchronizeDockedSelection(market);
             List<PlayerMarketItemView> rows = tradableRows(market);
-            text.append("\nMARKET — access ").append(market.marketAccessAllowed() ? "ALLOWED" : "DENIED").append('\n');
-            text.append("Cargo: ").append(market.cargoUsed()).append('/').append(market.cargoCapacity()).append('\n');
+            text.append("Market access: ").append(market.marketAccessAllowed() ? "ALLOWED" : "DENIED");
+            text.append("  Cargo ").append(market.cargoUsed()).append('/').append(market.cargoCapacity()).append('\n');
             if (!rows.isEmpty()) {
                 selectedMarketIndex = Math.min(selectedMarketIndex, rows.size() - 1);
                 PlayerMarketItemView item = rows.get(selectedMarketIndex);
                 text.append("Selected: ").append(item.displayName())
-                        .append("   Station stock: ").append(item.stationStock())
-                        .append("   Ship cargo: ").append(item.playerCargo()).append('\n');
-                text.append(String.format(
-                        Locale.ROOT,
-                        "Player buy %.2f cr   Player sell %.2f cr   [UP/DOWN select, B buy 1, V sell 1]\n",
-                        item.playerBuyPrice(),
-                        item.playerSellPrice()));
+                        .append("  station ").append(item.stationStock())
+                        .append("  aboard ").append(item.playerCargo()).append('\n');
+                text.append(String.format(Locale.ROOT,
+                        "Buy %.2f cr  Sell %.2f cr  [UP/DOWN select | B buy | V sell]\n",
+                        item.playerBuyPrice(), item.playerSellPrice()));
             }
         } else {
             MarketTarget nearest = nearestMarket();
             if (nearest != null) {
-                text.append(String.format(
-                        Locale.ROOT,
-                        "\nNearest market: %s — %.1f units [E docks inside physical range]\n",
-                        nearest.name(),
-                        nearest.distance()));
+                text.append(String.format(Locale.ROOT,
+                        "Nearest market: %s  %.1f units [E dock]\n",
+                        nearest.name(), nearest.distance()));
             }
         }
 
-        text.append("\nCONTROLS: WASD fly | E dock/undock | J test-route jump | SPACE pause | 1/2/3/4 time x1/x2/x4/x8\n");
-        text.append("F5 save | F9 load | F2 reset fresh world | save: ").append(SAVE_FILE).append('\n');
-        text.append("\nSTATUS: ").append(statusMessage);
-        hudLabel.setText(text.toString());
+        if (mining != null) {
+            text.append("Mining: ").append(mining.status().getDisplayName());
+            if (mining.targetId() != null) {
+                text.append("  target ").append(mining.targetId());
+            }
+            if (mining.targetDistance() != null) {
+                text.append(String.format(Locale.ROOT, "  distance %.1f / range %.1f",
+                        mining.targetDistance(), mining.extractionRange()));
+            }
+            if (mining.targetRemainingResource() != null) {
+                text.append("  reserve ").append(mining.targetRemainingResource());
+            }
+            text.append("  free cargo ").append(mining.freeCargoCapacity());
+            if (mining.extractedLastTick() > 0) {
+                text.append("  +").append(mining.extractedLastTick()).append(" last tick");
+            }
+            text.append(" [M target | R mine]\n");
+        }
+
+        PlayableTestWorldFactory.Route route = scenario.route();
+        text.append("Navigation: ").append(systemName(route.sourceSystem())).append(" ↔ ")
+                .append(systemName(route.destinationSystem())).append(" [J jump]\n");
+        text.append(String.format(Locale.ROOT,
+                "Camera %.2fx [wheel, HOME reset]   [TAB switch owned local ship]\n",
+                cameraState.zoom()));
+        text.append("WASD fly | E dock | T target | F fire | SPACE pause | 1/2/3/4 time | F5 save | F9 load | F2 reset");
+        contextHudLabel.setText(text.toString());
+    }
+
+    private String cargoSummary(InventoryComponent inventory) {
+        StringBuilder result = new StringBuilder();
+        int shown = 0;
+        for (ContentCatalog.ItemDefinition item : content.getItems()) {
+            int amount = inventory.stock[item.runtimeId()];
+            if (amount <= 0) {
+                continue;
+            }
+            if (shown > 0) {
+                result.append(", ");
+            }
+            result.append(item.displayName()).append(' ').append(amount);
+            shown++;
+            if (shown >= 3) {
+                break;
+            }
+        }
+        return result.toString();
     }
 
     private static String formatCredits(long milliCredits) {
@@ -513,7 +800,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
         return message == null || message.isBlank() ? throwable.getClass().getSimpleName() : message;
     }
 
-    private void updateMapLayout() {
+    private void updateMapLayouts() {
         if (stage == null) {
             return;
         }
@@ -522,21 +809,36 @@ public final class PlayableTestGame extends ApplicationAdapter {
         PlayerShipView ship = playerRuntime.activeShipView().orElse(null);
         float centerX = ship == null ? WorldMapLayout.WORLD_WIDTH / 2f : ship.x();
         float centerY = ship == null ? WorldMapLayout.WORLD_HEIGHT / 2f : ship.y();
-        float zoom = ship == null ? TRANSIT_ZOOM : FOLLOW_ZOOM;
+        float zoom = ship == null ? TRANSIT_ZOOM : cameraState.zoom();
         mapLayout = new WorldMapLayout(0f, 0f, width, height, MAP_PADDING, centerX, centerY, zoom);
+
+        float minimapWidth = Math.min(MINIMAP_WIDTH, Math.max(120f, width * 0.28f));
+        float minimapHeight = Math.min(MINIMAP_HEIGHT, Math.max(100f, height * 0.26f));
+        float minimapX = Math.max(0f, width - minimapWidth - MINIMAP_MARGIN);
+        float minimapY = MINIMAP_MARGIN;
+        float minimapZoom = ship == null ? WorldMapLayout.MIN_ZOOM : MINIMAP_ZOOM;
+        minimapLayout = new WorldMapLayout(
+                minimapX,
+                minimapY,
+                minimapWidth,
+                minimapHeight,
+                MINIMAP_PADDING,
+                centerX,
+                centerY,
+                minimapZoom);
     }
 
-    /** Advances the playable fixed-tick world, follows inter-system travel and renders the HUD. */
+    /** Advances the fixed-tick world, follows the active FleetId and renders Stage-14C UI. */
     @Override
     public void render() {
         float renderDelta = Gdx.graphics.getDeltaTime();
         playerRuntime.advanceFrame(renderDelta);
         if (!world.getActiveSystemId().equals(boundSystemId)) {
             bindActiveSession();
-            statusMessage = "Arrived in " + systemName(boundSystemId) + ". Active local EntityId was rebound.";
+            statusMessage = "Arrived in " + systemName(boundSystemId) + ". Active FleetId rebound locally.";
             lastDockedAt = null;
         }
-        updateMapLayout();
+        updateMapLayouts();
         hudAccumulator += renderDelta;
         if (hudAccumulator >= HUD_UPDATE_INTERVAL_SECONDS) {
             hudAccumulator %= HUD_UPDATE_INTERVAL_SECONDS;
@@ -544,23 +846,32 @@ public final class PlayableTestGame extends ApplicationAdapter {
         }
         stage.act(renderDelta);
 
+        Entity playerEntity = activeShipEntity();
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         worldMapRenderer.render(
                 stage.getCamera().combined,
-                activeSession.getEngine().getEntities(),
+                PlayableMapEntityFilter.filter(
+                        activeSession.getEngine().getEntities(), playerEntity, mapLayout.getZoom()),
                 mapLayout,
-                activeShipEntity());
+                playerEntity);
+        LocalMinimapSnapshot minimap = LocalMinimapModel.capture(
+                activeSession.getEngine().getEntities(), playerEntity);
+        minimapRenderer.render(
+                stage.getCamera().combined,
+                minimapLayout,
+                minimap,
+                "LOCAL — " + systemName(boundSystemId));
         stage.draw();
     }
 
-    /** Updates the Scene2D viewport; the follow map is rebuilt on the next frame. */
+    /** Updates the Scene2D viewport; HUD scale remains screen-based and independent from world zoom. */
     @Override
     public void resize(int width, int height) {
         if (width <= 0 || height <= 0 || stage == null) {
             return;
         }
         stage.getViewport().update(width, height, true);
-        updateMapLayout();
+        updateMapLayouts();
     }
 
     /** Releases Scene2D and renderer resources owned by the test client. */
@@ -577,9 +888,19 @@ public final class PlayableTestGame extends ApplicationAdapter {
             worldMapRenderer.dispose();
             worldMapRenderer = null;
         }
+        if (minimapRenderer != null) {
+            minimapRenderer.dispose();
+            minimapRenderer = null;
+        }
         if (VisUI.isLoaded()) {
             VisUI.dispose();
         }
+    }
+
+    private static float distance(float x1, float y1, float x2, float y2) {
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        return (float) Math.sqrt(dx * dx + dy * dy);
     }
 
     private record MarketTarget(EntityId entityId, String name, float distance) {
