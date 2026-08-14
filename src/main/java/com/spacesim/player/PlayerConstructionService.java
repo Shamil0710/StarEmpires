@@ -1,16 +1,21 @@
 package com.spacesim.player;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.InventoryComponent;
+import com.spacesim.components.MiningComponent;
+import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
 import com.spacesim.simulation.SimulationSession;
 import com.spacesim.world.ConstructionDurationPolicy;
+import com.spacesim.world.ConstructionMaterialState;
 import com.spacesim.world.ConstructionProjectId;
 import com.spacesim.world.ConstructionProjectState;
 import com.spacesim.world.ConstructionProjectStatus;
 import com.spacesim.world.ConstructionSettlementKind;
+import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.StarSystemId;
@@ -34,12 +39,15 @@ import java.util.TreeMap;
  * physical construction-site {@link WalletComponent}. The site can therefore pay ordinary market
  * suppliers; extra funding changes liquidity only and never rewrites persisted build duration.</p>
  *
- * <p>The first authoring slice deliberately requires the active owned FleetId to be physically
- * materialized in its current discovered system. Detailed clearance and territory/access checks are
- * the next Stage-16 placement-policy slice and remain outside UI code.</p>
+ * <p>Manual material delivery is also physical: the source must be a real player-owned FleetId in
+ * the same system, locally materialized inside berth range and nearly stopped. Only then does this
+ * adapter invoke the ordinary world construction-material transfer. UI code therefore cannot move
+ * cargo across a system or out of jump transit.</p>
  */
 public final class PlayerConstructionService {
     private static final String PLAYER_LEDGER_NAME = "PLAYER";
+    private static final float DEFAULT_TRANSFER_RANGE = 10f;
+    private static final float MAX_TRANSFER_SPEED = 0.25f;
 
     private final PlayerRuntime runtime;
 
@@ -187,6 +195,71 @@ public final class PlayerConstructionService {
         }
     }
 
+    /**
+     * Physically transfers required construction cargo from one player-owned fleet into the site.
+     *
+     * @param projectId player-owned external construction project
+     * @param sourceFleetId player-owned physical source fleet
+     * @param itemContentId required item content ID
+     * @param amount requested positive whole units
+     * @return accepted units, or zero when the source is not physically berthed/eligible
+     */
+    public int deliverMaterial(
+            ConstructionProjectId projectId,
+            FleetId sourceFleetId,
+            String itemContentId,
+            int amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Construction delivery amount must be positive");
+        }
+        ConstructionProjectState project = requireOwnedExternalProject(projectId);
+        if (project.status() == ConstructionProjectStatus.BUILDING || isTerminal(project.status())) {
+            throw new IllegalStateException("Construction project no longer accepts materials");
+        }
+        FleetId fleetId = Objects.requireNonNull(sourceFleetId, "Source FleetId not set");
+        PlayerState player = runtime.player();
+        if (!player.ownedFleetIds().contains(fleetId)) {
+            return 0;
+        }
+        ContentCatalog.ItemDefinition item = runtime.content().findItem(normalizedItemId(itemContentId));
+        if (item == null || !requiresItem(project, item.id())) {
+            return 0;
+        }
+
+        FleetPlacementState placement = runtime.world().findFleet(fleetId).orElse(null);
+        if (placement == null
+                || placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                || !project.systemId().equals(placement.systemId())
+                || runtime.world().findFleetJump(fleetId).isPresent()) {
+            return 0;
+        }
+        SimulationSession session = runtime.world().findSession(project.systemId()).orElse(null);
+        if (session == null) {
+            return 0;
+        }
+        Entity ship = session.getEntityRegistry().find(placement.localEntityId());
+        Entity site = session.getEntityRegistry().find(project.constructionSiteEntityId());
+        TransformComponent shipTransform = ship == null ? null : ship.getComponent(TransformComponent.class);
+        TransformComponent siteTransform = site == null ? null : site.getComponent(TransformComponent.class);
+        InventoryComponent shipInventory = ship == null ? null : ship.getComponent(InventoryComponent.class);
+        if (shipTransform == null || siteTransform == null || shipInventory == null) {
+            return 0;
+        }
+        float range = transferRange(ship);
+        if (shipTransform.velocity.len2() > MAX_TRANSFER_SPEED * MAX_TRANSFER_SPEED
+                || shipTransform.position.dst2(siteTransform.position) > range * range) {
+            return 0;
+        }
+        if (shipInventory.stock[item.runtimeId()] <= 0) {
+            return 0;
+        }
+        return runtime.world().deliverConstructionMaterial(
+                projectId,
+                placement.localEntityId(),
+                item.id(),
+                amount);
+    }
+
     private ConstructionProjectState requireOwnedExternalProject(ConstructionProjectId projectId) {
         ConstructionProjectId checkedId = Objects.requireNonNull(projectId, "ConstructionProjectId not set");
         PlayerState player = runtime.player();
@@ -216,6 +289,25 @@ public final class PlayerConstructionService {
             throw new IllegalArgumentException("Station archetype is not constructible: " + id);
         }
         return station;
+    }
+
+    private static boolean requiresItem(ConstructionProjectState project, String itemContentId) {
+        for (ConstructionMaterialState material : project.materials()) {
+            if (material.itemContentId().equals(itemContentId) && material.remainingAmount() > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static float transferRange(Entity ship) {
+        MiningComponent mining = ship.getComponent(MiningComponent.class);
+        return mining != null && Float.isFinite(mining.dockingRange) && mining.dockingRange > 0f
+                ? mining.dockingRange : DEFAULT_TRANSFER_RANGE;
+    }
+
+    private static String normalizedItemId(String value) {
+        return value == null ? "" : value.strip();
     }
 
     private void rollbackEmptyProject(ConstructionProjectId projectId, RuntimeException cause) {
