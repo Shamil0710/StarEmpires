@@ -25,6 +25,12 @@ import java.util.Optional;
  * local market entity with an InventoryComponent, WalletComponent and MarketComponent. Existing
  * TradeAI therefore discovers the same targetStock shortage and can deliver materials through the
  * ordinary bilateral trade path. Manual material delivery uses the same physical inventory.</p>
+ *
+ * <p>New project duration is derived by {@link ConstructionDurationPolicy}: authored buildSeconds
+ * is only the base setup/complexity allowance and the real material bill contributes additional
+ * weighted assembly work. Once created, the resulting {@code buildDurationTicks} is persisted as
+ * part of the project contract, so save/load and later balance changes cannot rewrite an ongoing
+ * construction clock.</p>
  */
 final class ConstructionProjectService {
     private final ContentCatalog catalog;
@@ -71,7 +77,8 @@ final class ConstructionProjectService {
         EntityId siteId = session.createEntity(site);
         long tick = session.getClock().getTick();
         long minimumFunding = Money.fromCredits(target.construction().fundingCredits());
-        long buildDurationTicks = buildDurationTicks(target.construction().buildSeconds(), session);
+        ConstructionDurationPolicy.Estimate duration = ConstructionDurationPolicy.estimate(catalog, target);
+        long buildDurationTicks = buildDurationTicks(duration.totalSeconds(), session);
         List<ConstructionMaterialState> materials = new ArrayList<>();
         for (Map.Entry<String, Integer> requirement : target.construction().materials().entrySet()) {
             materials.add(new ConstructionMaterialState(requirement.getKey(), requirement.getValue(), 0));
@@ -160,7 +167,8 @@ final class ConstructionProjectService {
         }
 
         SimulationSession session = requireSession(state.systemId());
-        Entity source = session.getEntityRegistry().find(Objects.requireNonNull(sourceEntityId, "Source EntityId не задан"));
+        Entity source = session.getEntityRegistry().find(
+                Objects.requireNonNull(sourceEntityId, "Source EntityId не задан"));
         if (source == null) {
             throw new IllegalArgumentException("Source Entity отсутствует в target system: " + sourceEntityId);
         }
@@ -423,7 +431,7 @@ final class ConstructionProjectService {
     private ConstructionProjectState validateRestored(ConstructionProjectState state) {
         ContentCatalog.StationArchetypeDefinition target = requireConstructible(state.stationArchetypeContentId());
         requireFactionAccount(state.ownerFactionContentId());
-        SimulationSession session = requireSession(state.systemId());
+        requireSession(state.systemId());
         if (isTerminal(state.status())) {
             return state;
         }
@@ -450,7 +458,8 @@ final class ConstructionProjectService {
     }
 
     private SimulationSession requireSession(StarSystemId systemId) {
-        SimulationSession session = sessionsById.get(Objects.requireNonNull(systemId, "Construction system не задан"));
+        SimulationSession session = sessionsById.get(
+                Objects.requireNonNull(systemId, "Construction system не задан"));
         if (session == null) {
             throw new IllegalArgumentException("Неизвестная construction StarSystem: " + systemId);
         }
@@ -466,7 +475,8 @@ final class ConstructionProjectService {
     }
 
     private ConstructionProjectState requireNonTerminal(ConstructionProjectId id) {
-        ConstructionProjectState state = projects.get(Objects.requireNonNull(id, "ConstructionProjectId не задан"));
+        ConstructionProjectState state = projects.get(
+                Objects.requireNonNull(id, "ConstructionProjectId не задан"));
         if (state == null) {
             throw new IllegalArgumentException("Неизвестный construction project: " + id);
         }
@@ -502,7 +512,7 @@ final class ConstructionProjectService {
         return component;
     }
 
-    private static long buildDurationTicks(float buildSeconds, SimulationSession session) {
+    private static long buildDurationTicks(double buildSeconds, SimulationSession session) {
         double raw = buildSeconds / session.getClock().getFixedStepSeconds();
         if (!Double.isFinite(raw) || raw <= 0d || raw > Long.MAX_VALUE) {
             throw new IllegalArgumentException("Construction build duration не представима в ticks");

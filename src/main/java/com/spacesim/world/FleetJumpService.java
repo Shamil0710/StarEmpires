@@ -15,6 +15,11 @@ import java.util.Optional;
  * <p>The service owns only active jump state. Physical fleet ownership remains in
  * {@link FleetWorldService}; entering {@link FleetJumpPhase#IN_TRANSIT} delegates to the Stage-10A
  * detach boundary and leaving it delegates to the matching attach boundary.</p>
+ *
+ * <p>Stage-10 callers historically used {@code (0,0)} as a placeholder arrival coordinate. The
+ * current bounded local map treats that point as a viewport corner, so that legacy placeholder is
+ * canonicalized to {@link LocalSystemCoordinates}' interior arrival anchor. Explicit non-zero
+ * coordinates remain exact.</p>
  */
 final class FleetJumpService {
     private final GalaxyTopology topology;
@@ -53,6 +58,9 @@ final class FleetJumpService {
         if (worldTick < 0L) {
             throw new IllegalArgumentException("World tick не может быть отрицательным");
         }
+        if (!Float.isFinite(arrivalX) || !Float.isFinite(arrivalY)) {
+            throw new IllegalArgumentException("Jump arrival coordinates должны быть конечными");
+        }
         if (jumpsByFleetId.containsKey(id)) {
             throw new IllegalStateException("Fleet уже выполняет jump: " + id);
         }
@@ -64,6 +72,8 @@ final class FleetJumpService {
         StarSystemId origin = placement.systemId();
         requireDirectConnection(origin, destination);
 
+        float resolvedArrivalX = LocalSystemCoordinates.resolveArrivalX(arrivalX, arrivalY);
+        float resolvedArrivalY = LocalSystemCoordinates.resolveArrivalY(arrivalX, arrivalY);
         long endTick = addTicks(worldTick, timing.approachTicks());
         FleetJumpState state = new FleetJumpState(
                 id,
@@ -72,8 +82,8 @@ final class FleetJumpService {
                 destination,
                 worldTick,
                 endTick,
-                arrivalX,
-                arrivalY);
+                resolvedArrivalX,
+                resolvedArrivalY);
         jumpsByFleetId.put(id, state);
         return state;
     }

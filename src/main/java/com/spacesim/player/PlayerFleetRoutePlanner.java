@@ -36,8 +36,10 @@ import java.util.Set;
  * an arbitrary exposure score, never a probability.</p>
  *
  * <p>The risk multiplier is actor-specific: current real cargo utilization, current damage and
- * shared inertial acceleration affect willingness to use a dangerous route. The planner never
- * reads combatants in unobserved remote systems.</p>
+ * shared inertial acceleration affect vulnerability. A real player-owned operational combat fleet
+ * under a persistent ESCORT order can mitigate expected actor loss only while physically
+ * co-located in the same system. Escort never rewrites observed route danger itself. The planner
+ * never scans combatants in unobserved remote systems.</p>
  */
 public final class PlayerFleetRoutePlanner {
     private static final double RISK_TO_TICKS = 35d;
@@ -45,6 +47,7 @@ public final class PlayerFleetRoutePlanner {
     private static final double UNKNOWN_LINK_EXPOSURE = 0.45d;
     private static final long INTEL_HALF_LIFE_TICKS = 3_000L;
     private static final double COST_EPSILON = 1e-9d;
+    private static final double MAX_ESCORT_MITIGATION = 0.65d;
 
     private final PlayerRuntime runtime;
     private final WorldSimulation world;
@@ -167,14 +170,16 @@ public final class PlayerFleetRoutePlanner {
 
         PlayerThreatIntelState systemIntel = findSystemIntel(player, to);
         PlayerThreatIntelState linkIntel = findLinkIntel(player, from, to);
-        double systemExposure = systemIntel == null
-                ? 0d : effectiveDanger(systemIntel, currentTick);
+        double systemExposure = systemIntel == null ? 0d : effectiveDanger(systemIntel, currentTick);
         double linkTimeScale = Math.max(1d, transit * fixedStep / 10d);
-        double linkExposure = linkIntel == null
-                ? 0d : effectiveDanger(linkIntel, currentTick) * linkTimeScale;
+        double linkExposure = linkIntel == null ? 0d : effectiveDanger(linkIntel, currentTick) * linkTimeScale;
         double uncertainty = (systemIntel == null ? UNKNOWN_SYSTEM_EXPOSURE : 0d)
                 + (linkIntel == null ? UNKNOWN_LINK_EXPOSURE * linkTimeScale : 0d);
-        return new EdgeCost(travelTicks, systemExposure, linkExposure, uncertainty * Math.max(1d, vulnerability * 0.15d));
+        return new EdgeCost(
+                travelTicks,
+                systemExposure,
+                linkExposure,
+                uncertainty * Math.max(1d, vulnerability * 0.15d));
     }
 
     private static PlayerThreatIntelState findSystemIntel(PlayerState player, StarSystemId systemId) {
@@ -243,7 +248,41 @@ public final class PlayerFleetRoutePlanner {
                 mobilityPenalty = 0d;
             }
         }
-        return Math.max(0.5d, 1d + cargoUtilization * 1.5d + damageFraction * 2d + mobilityPenalty);
+        double unescorted = Math.max(0.5d,
+                1d + cargoUtilization * 1.5d + damageFraction * 2d + mobilityPenalty);
+        return Math.max(0.35d, unescorted * escortProtectionFactor(fleetId, placement));
+    }
+
+    private double escortProtectionFactor(FleetId protectedFleet, FleetPlacementState protectedPlacement) {
+        double combinedProtection = 0d;
+        PlayerState player = runtime.player();
+        for (PlayerFleetOrderState order : player.fleetOrders()) {
+            if (order.type() != FleetOrderType.ESCORT
+                    || !protectedFleet.equals(order.targetFleetId())
+                    || !player.ownedFleetIds().contains(order.fleetId())) {
+                continue;
+            }
+            FleetPlacementState escortPlacement = world.findFleet(order.fleetId()).orElse(null);
+            if (escortPlacement == null
+                    || escortPlacement.locationKind() != FleetLocationKind.IN_SYSTEM
+                    || !protectedPlacement.systemId().equals(escortPlacement.systemId())) {
+                continue;
+            }
+            SimulationSession session = world.findSession(escortPlacement.systemId()).orElse(null);
+            Entity escort = session == null
+                    ? null : session.getEntityRegistry().find(escortPlacement.localEntityId());
+            CombatComponent combat = escort == null ? null : escort.getComponent(CombatComponent.class);
+            if (combat == null || !combat.isOperational()) {
+                continue;
+            }
+            double durability = combat.maxHull + combat.maxShields;
+            double combatPower = durability <= 0d
+                    ? 0d : Math.min(1d, combat.damagePerSecond / Math.max(1d, durability * 0.1d));
+            double contribution = 0.20d + 0.25d * combatPower;
+            combinedProtection = 1d - (1d - combinedProtection) * (1d - contribution);
+            combinedProtection = Math.min(MAX_ESCORT_MITIGATION, combinedProtection);
+        }
+        return 1d - combinedProtection;
     }
 
     private float movementSpeed(Entity entity) {

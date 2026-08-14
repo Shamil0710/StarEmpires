@@ -6,12 +6,14 @@ import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
+import com.spacesim.model.ShipType;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.util.SpatialHashGrid;
 import org.junit.jupiter.api.Test;
@@ -88,6 +90,7 @@ class TradeAISystemStaleRouteTest {
         return identified(new Entity()
                 .add(transform)
                 .add(inventory)
+                .add(new ShipComponent(ShipType.FINISHED_GOODS_CARRIER))
                 .add(new WalletComponent(Money.fromCredits(1_000d)))
                 .add(ai)
                 .add(new ReputationComponent()));
