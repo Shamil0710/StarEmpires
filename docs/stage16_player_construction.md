@@ -1,10 +1,16 @@
 # Star Empires — Stage 16: строительство игрока и владение станциями
 
-> Статус: **ACTIVE — детализированная спецификация реализации**
+> Статус: **COMPLETE — историческая implementation specification**
+>
+> Stage 16 закрыт PR #56–#70. Финальный functional merge: PR #70, merge commit `74bb854a79226280f1770032c1725b9ff32fd40e`. Финальный gate: CI #1337 / run `31849675260`, **484/484 tests**, strict Javadoc, JaCoCo и shaded desktop JAR build green.
+>
+> Фактический итог, реализованные slices и сознательно отложенные ограничения: `docs/stage16_completion_record.md`.
+>
+> Ниже сохранена исходная детализированная спецификация Stage 16. Формулировки в будущем времени отражают design contract, по которому велась реализация; при расхождении с фактическим состоянием приоритет имеет completion record и текущий код `main`.
 >
 > Основание: Stage 9 уже содержит физические persistent construction projects; Stage 15 завершён и даёт игроку несколько реальных FleetId, persistent orders и общую инерционную логистику.
 >
-> Базовая формула времени строительства уже реализована в PR #51. Подробности: `docs/stage16_construction_timing.md`.
+> Базовая формула времени строительства реализована в PR #51. Подробности: `docs/stage16_construction_timing.md`.
 
 ---
 
@@ -77,6 +83,8 @@ PlayerState.factionContentId = optional affiliation, а не ownership
 ```
 
 Они не должны больше неявно означать одно и то же.
+
+> Этот архитектурный разрыв фактически закрыт в Stage 16.1–16.3: ownership хранится в `PlayerState`, world construction settlement/legal affiliation разделены, а player funding идёт через отдельную atomic boundary. См. `docs/stage16_completion_record.md`.
 
 ---
 
@@ -670,6 +678,8 @@ Global map может отдавать ordinary commands, но не заверш
 - доставленные материалы **не исчезают** — они остаются в физическом salvage/container/site-remnant inventory либо переводятся в явно созданный recoverable cargo entity;
 - ledger не создаёт и не уничтожает материал без причины.
 
+Фактический Stage-16 boundary выбран консервативнее: после physical delivery required materials voluntary cancellation отклоняется до появления recoverable-material policy. Это не позволяет скрыто потерять или вернуть ресурсы из воздуха.
+
 ### 16H.3. Cancellation во время BUILDING
 
 Для первого Stage 16 можно запретить voluntary cancellation после начала BUILDING, пока нет корректной salvage-by-progress модели.
@@ -815,17 +825,7 @@ higher tier
 → 16H failure/cancel/hardening + end-to-end acceptance
 ```
 
-Практические PR-срезы:
-
-1. **PR 16.1 — ownership/schema + player construction query/create**;
-2. **PR 16.2 — placement/access validation + funding**;
-3. **PR 16.3 — physical manual delivery + construction-site economy**;
-4. **PR 16.4 — autonomous owned-fleet supply / supply diagnostics**;
-5. **PR 16.5 — completion ownership + station finance**;
-6. **PR 16.6 — local/global construction UI**;
-7. **PR 16.7 — cancellation/failure/persistence/soak acceptance + completion docs**.
-
-Допускается объединять соседние PR, если CI и review остаются понятными, но не объединять весь Stage 16 в один большой рискованный merge.
+Практические PR-срезы, запланированные до начала реализации, сохранены как исторический design record. Фактические slices были реализованы в PR #56–#70 и перечислены в `docs/stage16_completion_record.md`.
 
 ---
 
@@ -867,6 +867,8 @@ Stage 16 считается завершённым только когда ав�
 - нельзя после load получить другой buildDuration;
 - UI не может изменить project state напрямую.
 
+**Фактический итог: PASS.** Финальный aggregate acceptance и core CI gate подтверждены PR #70 / CI #1337.
+
 ---
 
 # 8. Что сознательно остаётся после Stage 16
@@ -883,6 +885,7 @@ Stage 16 **не обязан** реализовывать:
 - advanced shipyard queues;
 - workforce/population simulation;
 - сложный salvage прогресса отменённой BUILDING станции;
+- remote project placement без реального builder/capability;
 - advanced tactical combat AI.
 
-Но Stage 16 должен оставить для них стабильные ownership, construction, technology-tier и finance seams.
+Stage 16 оставляет для них стабильные ownership, construction, technology-tier и finance seams.
