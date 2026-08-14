@@ -17,7 +17,9 @@ import java.util.Set;
  * {@link StarSystemSimulationState} хранит обычный {@link GameState} локального economic core,
  * faction layers хранят treasury/strategy/pressure, construction layer — реальные проекты,
  * Stage-10 fleet layer отделяет устойчивый {@link FleetId} от system-local EntityId, а
- * Stage-10B jump layer сохраняет активную фазу межсистемного перехода.</p>
+ * Stage-10B jump layer сохраняет активную фазу межсистемного перехода. Stage 16 schema v8
+ * разделяет faction-treasury settlement и внешнее владение construction project без добавления
+ * human-player identity в WorldState.</p>
  *
  * @param schemaVersion версия world-level persistent schema
  * @param topology immutable topology галактики
@@ -43,8 +45,10 @@ public record WorldState(
         long nextFleetIdValue,
         List<FleetPlacementState> fleets,
         List<FleetJumpState> fleetJumps) {
-    /** Текущая версия world-level persistent schema. */
-    public static final int CURRENT_VERSION = 7;
+    /** Текущая Stage-16 версия world-level persistent schema. */
+    public static final int CURRENT_VERSION = 8;
+    /** Stage-10B/Stage-15 schema с active jump FSM и faction-only construction settlement. */
+    public static final int LEGACY_STAGE10_JUMP_VERSION = 7;
     /** Stage-10A schema с FleetId/placement layer, но без active jump FSM. */
     public static final int LEGACY_STAGE10A_VERSION = 6;
     /** Stage-9D/9E schema с persistent economic pressure, но без world FleetId layer. */
@@ -316,7 +320,8 @@ public record WorldState(
             if (topology.findSystem(value.systemId()).isEmpty()) {
                 throw new IllegalArgumentException("Construction project ссылается на неизвестную StarSystem: " + value.systemId());
             }
-            if (!economicFactionIds.contains(value.ownerFactionContentId())) {
+            if (value.settlementKind() == ConstructionSettlementKind.FACTION_TREASURY
+                    && !economicFactionIds.contains(value.ownerFactionContentId())) {
                 throw new IllegalArgumentException("Construction project ссылается на неизвестную faction account: "
                         + value.ownerFactionContentId());
             }
@@ -605,6 +610,37 @@ public record WorldState(
         return new WorldState(CURRENT_VERSION, topology, systems, factions, strategies,
                 nextConstructionProjectIdValue, projects, pressures,
                 nextFleetIdValue, fleets, List.of());
+    }
+
+    /**
+     * Мигрирует Stage-10B/Stage-15 schema v7 и сохраняет active jump state.
+     *
+     * @param topology decoded topology
+     * @param systems decoded local sessions
+     * @param factions decoded faction economy
+     * @param strategies decoded strategic faction state
+     * @param nextConstructionProjectIdValue decoded construction allocator watermark
+     * @param projects decoded faction-only construction projects
+     * @param pressures decoded economic pressure states
+     * @param nextFleetIdValue decoded FleetId allocator watermark
+     * @param fleets decoded fleet placements
+     * @param jumps decoded active jump states
+     * @return current Stage-16 WorldState
+     */
+    public static WorldState fromLegacyStage10Jump(
+            GalaxyTopology topology,
+            List<StarSystemSimulationState> systems,
+            List<FactionEconomicState> factions,
+            List<FactionStrategicState> strategies,
+            long nextConstructionProjectIdValue,
+            List<ConstructionProjectState> projects,
+            List<FactionEconomicPressureState> pressures,
+            long nextFleetIdValue,
+            List<FleetPlacementState> fleets,
+            List<FleetJumpState> jumps) {
+        return new WorldState(CURRENT_VERSION, topology, systems, factions, strategies,
+                nextConstructionProjectIdValue, projects, pressures,
+                nextFleetIdValue, fleets, jumps);
     }
 
     private static FleetPlacementState findFleetPlacement(
