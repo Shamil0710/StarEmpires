@@ -58,10 +58,7 @@ public final class PlayerFleetEconomyService {
      * @param itemContentId stable content item ID
      * @return whole units transferred, or zero when current physical/economic constraints reject it
      */
-    public int buyMaximum(
-            FleetId fleetId,
-            DiscoveredObjectRef stationRef,
-            String itemContentId) {
+    public int buyMaximum(FleetId fleetId, DiscoveredObjectRef stationRef, String itemContentId) {
         Context context = context(fleetId, stationRef, itemContentId);
         if (context == null || !context.ship().canPurchaseItem(context.item().runtimeId())) {
             return 0;
@@ -69,9 +66,7 @@ public final class PlayerFleetEconomyService {
         int itemId = context.item().runtimeId();
         float price = context.controller().getEffectiveSellPrice(
                 context.station(), itemId, context.proxyReputation());
-        int amount = Math.min(
-                context.stationInventory().stock[itemId],
-                context.shipInventory().getFreeCapacity());
+        int amount = Math.min(context.stationInventory().stock[itemId], context.shipInventory().getFreeCapacity());
         amount = Math.min(amount, affordable(context.proxyWallet().getBalanceMilliCredits(), price, amount));
         if (amount <= 0 || !context.controller().buyFromStation(
                 context.station(), context.proxy(), itemId, amount, context.proxyReputation())) {
@@ -89,22 +84,16 @@ public final class PlayerFleetEconomyService {
      * @param itemContentId stable content item ID
      * @return whole units transferred, or zero when current physical/economic constraints reject it
      */
-    public int sellMaximum(
-            FleetId fleetId,
-            DiscoveredObjectRef stationRef,
-            String itemContentId) {
+    public int sellMaximum(FleetId fleetId, DiscoveredObjectRef stationRef, String itemContentId) {
         Context context = context(fleetId, stationRef, itemContentId);
         if (context == null) {
             return 0;
         }
         int itemId = context.item().runtimeId();
-        int amount = Math.min(
-                context.shipInventory().stock[itemId],
-                context.stationInventory().getFreeCapacity());
+        int amount = Math.min(context.shipInventory().stock[itemId], context.stationInventory().getFreeCapacity());
         float price = context.controller().getEffectiveBuyPrice(
                 context.station(), itemId, context.proxyReputation());
-        amount = Math.min(amount, affordable(
-                context.stationWallet().getBalanceMilliCredits(), price, amount));
+        amount = Math.min(amount, affordable(context.stationWallet().getBalanceMilliCredits(), price, amount));
         amount = Math.min(amount, affordable(
                 Long.MAX_VALUE - context.proxyWallet().getBalanceMilliCredits(), price, amount));
         if (amount <= 0 || !context.controller().sellToStation(
@@ -127,10 +116,7 @@ public final class PlayerFleetEconomyService {
         return context != null && insideBerth(context);
     }
 
-    private Context context(
-            FleetId fleetId,
-            DiscoveredObjectRef stationRef,
-            String itemContentId) {
+    private Context context(FleetId fleetId, DiscoveredObjectRef stationRef, String itemContentId) {
         String normalizedItem = itemContentId == null ? "" : itemContentId.strip();
         ContentCatalog.ItemDefinition item = content.findItem(normalizedItem);
         PhysicalContext physical = physicalContext(fleetId, stationRef);
@@ -178,8 +164,7 @@ public final class PlayerFleetEconomyService {
             return null;
         }
         PlayerState player = runtime.player();
-        if (!player.ownedFleetIds().contains(fleetId)
-                || !player.discoveredObjects().contains(stationRef)) {
+        if (!player.ownedFleetIds().contains(fleetId) || !player.discoveredObjects().contains(stationRef)) {
             return null;
         }
         FleetPlacementState placement = runtime.world().findFleet(fleetId).orElse(null);
@@ -231,7 +216,8 @@ public final class PlayerFleetEconomyService {
                 previous.discoveredObjects(),
                 previous.homeSystemId(),
                 previous.dockedAt(),
-                previous.fleetOrders()));
+                previous.fleetOrders(),
+                previous.threatIntel()));
     }
 
     private List<PlayerReputationState> snapshotReputation(ReputationComponent reputation) {
