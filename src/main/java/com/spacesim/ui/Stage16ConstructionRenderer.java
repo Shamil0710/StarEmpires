@@ -53,7 +53,11 @@ public final class Stage16ConstructionRenderer {
 
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(0.2f, 0.3f, 0.45f, 1f);
-        shapes.rect(checkedLayout.mapX(), checkedLayout.mapY(), checkedLayout.mapWidth(), checkedLayout.mapHeight());
+        shapes.rect(
+                checkedLayout.getMapX(),
+                checkedLayout.getMapY(),
+                checkedLayout.getMapWidth(),
+                checkedLayout.getMapHeight());
         drawWorldCircle(
                 checkedLayout,
                 LocalSystemCoordinates.ARRIVAL_X,
