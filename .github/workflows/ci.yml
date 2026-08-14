@@ -28,8 +28,13 @@ jobs:
       - name: Test, check coverage, build Javadoc and package desktop JAR
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
 
+      # Artifact storage is a publication convenience, not a correctness gate. The mandatory
+      # Maven verify step above already fails the job on tests, JaCoCo, strict Javadoc or package
+      # errors. Do not let temporary GitHub artifact-storage failures turn a green verification
+      # into a false code regression.
       - name: Upload desktop application and reports
         if: success()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: star-empires-${{ github.sha }}
@@ -42,6 +47,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ github.sha }}
