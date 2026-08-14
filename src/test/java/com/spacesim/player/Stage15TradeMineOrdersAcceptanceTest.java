@@ -42,6 +42,9 @@ class Stage15TradeMineOrdersAcceptanceTest {
         Entity delegatedShip = entity(runtime, delegated.id());
         InventoryComponent cargo = delegatedShip.getComponent(InventoryComponent.class);
         clearInventory(cargo);
+        // One real unit is sufficient to prove the complete economic loop without reserving
+        // destination capacity from competing live NPC traders during the physical trip.
+        cargo.capacity = 1;
         TransformComponent shipTransform = delegatedShip.getComponent(TransformComponent.class);
         TransformComponent sourceTransform = source.getComponent(TransformComponent.class);
         shipTransform.position.set(sourceTransform.position.x - 60f, sourceTransform.position.y);
