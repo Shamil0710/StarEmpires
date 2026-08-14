@@ -15,7 +15,9 @@ import java.util.Set;
  *
  * <p>The record intentionally stores stable IDs and value data only. Runtime Ashley entities,
  * routes and movement commands are re-resolved from authoritative world state after load. This
- * keeps orders persistent without serializing transient execution objects.</p>
+ * keeps orders persistent without serializing transient execution objects. Stage-16 construction
+ * supply targets the persistent physical construction-site EntityId; the owning project is resolved
+ * through PlayerState ownership rather than serializing a second redundant project reference.</p>
  *
  * @param fleetId player-owned fleet receiving the order
  * @param type durable order category
@@ -24,7 +26,7 @@ import java.util.Set;
  * @param secondarySystemId secondary target system for two-endpoint orders
  * @param secondaryEntityId secondary system-local target entity
  * @param targetFleetId physical fleet followed/protected by escort/follow orders
- * @param itemContentId stable item content ID used by trade/mining orders
+ * @param itemContentId stable item content ID used by trade/mining/supply orders
  * @param targetX local MOVE target X
  * @param targetY local MOVE target Y
  * @param patrolSystemIds deterministic PATROL cycle
@@ -52,7 +54,7 @@ public record PlayerFleetOrderState(
      * @param secondarySystemId secondary target system for two-endpoint orders
      * @param secondaryEntityId secondary system-local target entity
      * @param targetFleetId physical fleet followed/protected by escort/follow orders
-     * @param itemContentId stable item content ID used by trade/mining orders
+     * @param itemContentId stable item content ID used by trade/mining/supply orders
      * @param targetX local MOVE target X
      * @param targetY local MOVE target Y
      * @param patrolSystemIds deterministic PATROL cycle
@@ -177,6 +179,33 @@ public record PlayerFleetOrderState(
     }
 
     /**
+     * Creates a persistent construction-supply order targeting a physical owned site.
+     *
+     * @param fleetId ordered cargo fleet
+     * @param constructionSite persistent physical construction-site reference
+     * @param itemContentId required material item to acquire and deliver
+     * @return validated SUPPLY_PROJECT order
+     */
+    public static PlayerFleetOrderState supplyProject(
+            FleetId fleetId,
+            DiscoveredObjectRef constructionSite,
+            String itemContentId) {
+        DiscoveredObjectRef site = Objects.requireNonNull(constructionSite, "Construction site not set");
+        return new PlayerFleetOrderState(
+                fleetId,
+                FleetOrderType.SUPPLY_PROJECT,
+                site.systemId(),
+                site.entityId(),
+                null,
+                null,
+                null,
+                itemContentId,
+                0f,
+                0f,
+                List.of());
+    }
+
+    /**
      * Creates a persistent ESCORT order targeting another FleetId.
      *
      * @param fleetId ordered escort fleet
@@ -251,6 +280,13 @@ public record PlayerFleetOrderState(
                 if (targetSystemId == null || targetEntityId == null
                         || targetFleetId != null || itemContentId == null || !patrolSystems.isEmpty()) {
                     throw new IllegalArgumentException("MINE requires asteroid target and item");
+                }
+            }
+            case SUPPLY_PROJECT -> {
+                if (targetSystemId == null || targetEntityId == null
+                        || secondarySystemId != null || secondaryEntityId != null
+                        || targetFleetId != null || itemContentId == null || !patrolSystems.isEmpty()) {
+                    throw new IllegalArgumentException("SUPPLY_PROJECT requires construction site and item only");
                 }
             }
             case ESCORT, FOLLOW -> {
