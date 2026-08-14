@@ -1,10 +1,11 @@
 package com.spacesim.player;
 
 /**
- * Persistent Stage-15 player fleet-order categories.
+ * Persistent player fleet-order categories.
  *
  * <p>The enum describes durable intent only. Execution must go through ordinary movement,
- * jump, economy, mining and combat boundaries rather than mutating world state directly.</p>
+ * jump, economy, mining, construction and combat boundaries rather than mutating world state
+ * directly.</p>
  */
 public enum FleetOrderType {
     /** Remain at the current physical location and brake to rest. */
@@ -20,5 +21,7 @@ public enum FleetOrderType {
     /** Repeatedly traverse a deterministic ordered list of systems. */
     PATROL,
     /** Follow another physical FleetId without providing an escort-risk contribution. */
-    FOLLOW
+    FOLLOW,
+    /** Acquire real required cargo from a known supplier and physically deliver it to an owned construction site. */
+    SUPPLY_PROJECT
 }
