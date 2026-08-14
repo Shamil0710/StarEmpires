@@ -78,6 +78,21 @@ class Stage16ConstructionPlacementPolicyAcceptanceTest {
                         asteroidTransform.position.y).rejection());
     }
 
+    @Test
+    void newlyCreatedConstructionSiteImmediatelyBlocksOverlappingProject() {
+        PlayableTestWorldFactory.Scenario scenario = PlayableTestWorldFactory.create(16_704L);
+        PlayerConstructionService construction = new PlayerConstructionService(scenario.runtime());
+        PlayerConstructionPlacementView valid = findValidPlacement(construction);
+        construction.createProject("station.mining_base", valid.x(), valid.y());
+
+        PlayerConstructionPlacementView overlap = construction.previewPlacement(valid.x(), valid.y());
+
+        assertEquals(ConstructionPlacementRejection.STATION_CLEARANCE, overlap.rejection());
+        assertThrows(IllegalArgumentException.class,
+                () -> construction.createProject("station.mining_base", valid.x(), valid.y()));
+        assertEquals(1, scenario.runtime().player().ownedConstructionProjectIds().size());
+    }
+
     private static PlayerConstructionPlacementView findValidPlacement(PlayerConstructionService construction) {
         for (float y = 100f; y <= Constants.WORLD_HEIGHT - 100f; y += 100f) {
             for (float x = 100f; x <= Constants.WORLD_WIDTH - 100f; x += 100f) {
