@@ -103,7 +103,12 @@ public final class CombatSystem extends IteratingSystem {
      * @param attackerId persistent entity that fired the lethal shot
      */
     public record DestructionRequest(EntityId victimId, EntityId attackerId) {
-        /** Validates stable identities carried across the system/world boundary. */
+        /**
+         * Validates stable identities carried across the system/world boundary.
+         *
+         * @param victimId persistent entity killed by the shot
+         * @param attackerId persistent entity that fired the lethal shot
+         */
         public DestructionRequest {
             Objects.requireNonNull(victimId, "Combat victimId not set");
             Objects.requireNonNull(attackerId, "Combat attackerId not set");
