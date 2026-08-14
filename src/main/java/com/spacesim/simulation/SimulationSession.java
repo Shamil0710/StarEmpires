@@ -17,6 +17,8 @@ import com.spacesim.persistence.EntityState;
 import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.persistence.GameState;
 import com.spacesim.systems.AsteroidSpawnSystem;
+import com.spacesim.systems.CombatAISystem;
+import com.spacesim.systems.CombatSystem;
 import com.spacesim.systems.ConsumptionSystem;
 import com.spacesim.systems.MarketSystem;
 import com.spacesim.systems.MiningSystem;
@@ -240,6 +242,8 @@ public final class SimulationSession {
         engine.addSystem(new MiningSystem(ledger, registry));
         engine.addSystem(new TradeAISystem(
                 new SpatialHashGrid(Constants.CELL_SIZE), ledger, registry, contentCatalog));
+        engine.addSystem(new CombatAISystem(contentCatalog));
+        engine.addSystem(new CombatSystem(contentCatalog, registry));
         engine.addSystem(recorder);
     }
 
