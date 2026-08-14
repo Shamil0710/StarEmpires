@@ -6,7 +6,6 @@ import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
-import com.badlogic.gdx.math.Vector2;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
@@ -23,6 +22,7 @@ import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.controllers.TradeController;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
+import com.spacesim.flight.InertialNavigation;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.trade.FleetTradeProfile;
@@ -43,8 +43,14 @@ import java.util.Objects;
  *
  * <p>Все route decisions — как поиск нового груза, так и реализация уже имеющегося cargo —
  * делегированы {@link TradeRoutePlanner}, который работает только с immutable
- * {@link MarketDirectory} и {@link FleetTradeProfile}. Этот system отвечает за cooldown, движение,
- * повторную валидацию сделки и переходы FSM, но не выполняет supplier-consumer search.</p>
+ * {@link MarketDirectory} и {@link FleetTradeProfile}. Этот system отвечает за cooldown,
+ * повторную валидацию сделки и навигационное намерение, но не интегрирует Transform.</p>
+ *
+ * <p>Обычное движение generic NPC не имеет отдельной кинематической реализации: этот system
+ * пишет только transient flight intent через {@link InertialNavigation}; фактические ускорение,
+ * торможение и перемещение выполняет {@link AutonomousFlightSystem} через общий
+ * {@link com.spacesim.flight.FlightDynamics}. Поэтому масса реального груза влияет на generic
+ * trader тем же способом, что на корабль игрока и delegated fleet.</p>
  *
  * <p>Persistent-план в {@link TradeAIComponent} содержит только устойчивые {@link EntityId}.
  * Перед движением и сделкой ID разрешается через {@link EntityRegistry}; stale route безопасно
@@ -226,18 +232,28 @@ public class TradeAISystem extends IteratingSystem {
         TradeAIComponent ai = am.get(fleet);
         TransformComponent transform = tm.get(fleet);
         if (ai.state == null) {
+            InertialNavigation.stop(fleet, ai.movementSpeed);
             abandonRoute(ai);
             return;
         }
 
         switch (ai.state) {
-            case IDLE -> processIdle(fleet, ai, transform, deltaTime);
-            case TRAVEL_TO_BUY -> move(
-                    transform, ai.buyStationId, deltaTime, ai, TradeAIComponent.State.BUYING);
-            case BUYING -> buyCargo(fleet, ai);
-            case TRAVEL_TO_SELL -> move(
-                    transform, ai.sellStationId, deltaTime, ai, TradeAIComponent.State.SELLING);
-            case SELLING -> sellCargo(fleet, ai);
+            case IDLE -> {
+                InertialNavigation.stop(fleet, ai.movementSpeed);
+                processIdle(fleet, ai, transform, deltaTime);
+            }
+            case TRAVEL_TO_BUY -> navigate(
+                    fleet, ai.buyStationId, ai, TradeAIComponent.State.BUYING);
+            case BUYING -> {
+                InertialNavigation.stop(fleet, ai.movementSpeed);
+                buyCargo(fleet, ai);
+            }
+            case TRAVEL_TO_SELL -> navigate(
+                    fleet, ai.sellStationId, ai, TradeAIComponent.State.SELLING);
+            case SELLING -> {
+                InertialNavigation.stop(fleet, ai.movementSpeed);
+                sellCargo(fleet, ai);
+            }
         }
     }
 
@@ -423,32 +439,28 @@ public class TradeAISystem extends IteratingSystem {
         return Math.max(0, transferable);
     }
 
-    private void move(
-            TransformComponent fleetPosition,
+    private void navigate(
+            Entity fleet,
             EntityId targetId,
-            float deltaTime,
             TradeAIComponent ai,
             TradeAIComponent.State arrivalState) {
         Entity target = resolveActiveMarketStation(targetId);
         if (target == null) {
+            InertialNavigation.stop(fleet, ai.movementSpeed);
             abandonRoute(ai);
             return;
         }
-        if (!Float.isFinite(ai.movementSpeed) || ai.movementSpeed < 0f) {
+        if (!Float.isFinite(ai.movementSpeed) || ai.movementSpeed <= 0f) {
+            InertialNavigation.clear(fleet);
             return;
         }
 
-        Vector2 targetPosition = tm.get(target).position;
-        Vector2 toTarget = targetPosition.cpy().sub(fleetPosition.position);
-        float distance = toTarget.len();
-        float step = ai.movementSpeed * Math.max(0f, deltaTime);
-        if (distance <= step || distance < ARRIVAL_DISTANCE) {
-            fleetPosition.position.set(targetPosition);
+        InertialNavigation.Status status = InertialNavigation.approach(
+                fleet, tm.get(target), ai.movementSpeed, ARRIVAL_DISTANCE);
+        if (status == InertialNavigation.Status.ARRIVED) {
             ai.targetStationId = targetId;
             ai.state = arrivalState;
-            return;
         }
-        fleetPosition.position.mulAdd(toTarget.nor(), step);
     }
 
     private void buyCargo(Entity fleet, TradeAIComponent ai) {
