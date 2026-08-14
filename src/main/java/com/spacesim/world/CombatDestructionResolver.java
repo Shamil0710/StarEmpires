@@ -62,7 +62,13 @@ public final class CombatDestructionResolver {
             StarSystemId systemId,
             CombatSystem.DestructionRequest request,
             DestructionResult destructionResult) {
-        /** Validates immutable diagnostic members. */
+        /**
+         * Validates immutable diagnostic members.
+         *
+         * @param systemId system where the victim physically existed
+         * @param request lethal combat request
+         * @param destructionResult ordinary Stage-9 accounting/lifecycle result
+         */
         public ResolvedCombatDestruction {
             Objects.requireNonNull(systemId, "Combat destruction systemId not set");
             Objects.requireNonNull(request, "Combat destruction request not set");
