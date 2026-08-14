@@ -104,14 +104,25 @@ public final class InertialNavigation {
         }
     }
 
-    /** Removes stale autonomous intent when no valid physical flight profile exists. */
+    /**
+     * Removes stale autonomous intent when no valid physical flight profile exists.
+     *
+     * @param ship ship whose transient autonomous command should be removed
+     */
     public static void clear(Entity ship) {
         if (ship != null) {
             ship.remove(FlightCommandComponent.class);
         }
     }
 
-    /** @return whether the physical ship is already inside the requested range and nearly stopped */
+    /**
+     * Checks whether a physical ship is already inside an interaction radius and nearly stopped.
+     *
+     * @param ship physical ship entity
+     * @param target target transform
+     * @param arrivalRange non-negative interaction radius
+     * @return true when the ship is inside range and below the shared stop-speed threshold
+     */
     public static boolean arrived(Entity ship, TransformComponent target, float arrivalRange) {
         if (ship == null || target == null || !Float.isFinite(arrivalRange) || arrivalRange < 0f) {
             return false;
