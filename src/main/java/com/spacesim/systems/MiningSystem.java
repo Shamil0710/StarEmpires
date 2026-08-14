@@ -10,7 +10,9 @@ import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.MiningCommandComponent;
 import com.spacesim.components.MiningComponent;
+import com.spacesim.components.PlayerControlledComponent;
 import com.spacesim.components.ReputationComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
@@ -27,17 +29,21 @@ import com.spacesim.persistence.EntityRegistry;
 import java.util.Objects;
 
 /**
- * Управляет полным автономным циклом добычи конечных астероидных ресурсов.
+ * Управляет автономной и ручной добычей конечных астероидных ресурсов.
  *
  * <p>Persistent-состояние {@link MiningComponent} хранит цели только как устойчивые
  * {@link EntityId}. Перед движением, добычей и разгрузкой система разрешает их через
  * {@link EntityRegistry}. Исчезнувший астероид или рынок поэтому безопасно инвалидирует ссылку без
  * сохранения runtime-объекта Ashley.</p>
  *
- * <p>Корабль физически переносит ресурс из конечного запаса астероида в трюм и продаёт груз через
- * {@link TradeController}. Добыча сама не является resource source: сумма
- * {@code asteroid.remainingResource + cargo} сохраняется. Authoritative деньги находятся только в
- * {@link WalletComponent}; база должна иметь реальную ликвидность для покупки груза.</p>
+ * <p>Автономный режим сохраняет полный исторический цикл: поиск, полёт, физическая добыча,
+ * возвращение и продажа через {@link TradeController}. Stage 14A добавляет ручной режим для
+ * {@link PlayerControlledComponent}: {@link MiningCommandComponent} выбирает цель и запрашивает
+ * добычу, но система не двигает такой корабль и не продаёт его груз автоматически. Оба режима
+ * используют один и тот же физический extraction boundary.</p>
+ *
+ * <p>Добыча сама не является resource source: сумма {@code asteroid.remainingResource + cargo}
+ * сохраняется. Деньги возникают у добытчика только после обычной рыночной продажи.</p>
  */
 public final class MiningSystem extends IteratingSystem {
     private static final double DISTANCE_EPSILON = 0.0001d;
@@ -49,6 +55,10 @@ public final class MiningSystem extends IteratingSystem {
 
     private final ComponentMapper<ShipComponent> shipMapper = ComponentMapper.getFor(ShipComponent.class);
     private final ComponentMapper<MiningComponent> miningMapper = ComponentMapper.getFor(MiningComponent.class);
+    private final ComponentMapper<MiningCommandComponent> miningCommandMapper =
+            ComponentMapper.getFor(MiningCommandComponent.class);
+    private final ComponentMapper<PlayerControlledComponent> playerControlledMapper =
+            ComponentMapper.getFor(PlayerControlledComponent.class);
     private final ComponentMapper<InventoryComponent> inventoryMapper = ComponentMapper.getFor(InventoryComponent.class);
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper.getFor(TransformComponent.class);
     private final ComponentMapper<AsteroidComponent> asteroidMapper = ComponentMapper.getFor(AsteroidComponent.class);
@@ -86,14 +96,13 @@ public final class MiningSystem extends IteratingSystem {
                 ShipComponent.class,
                 MiningComponent.class,
                 InventoryComponent.class,
-                TransformComponent.class,
-                WalletComponent.class).get());
+                TransformComponent.class).get());
         tradeController = new TradeController(
                 Objects.requireNonNull(ledger, "EconomicLedger не задан"));
         this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
     }
 
-    /** @return ledger, в который система записывает успешные продажи */
+    /** @return ledger, в который система записывает успешные автономные продажи */
     public EconomicLedger getLedger() {
         return tradeController.getLedger();
     }
@@ -128,16 +137,22 @@ public final class MiningSystem extends IteratingSystem {
         super.update(deltaTime);
     }
 
-    /** Выполняет текущий этап автономного цикла одного корабля. */
+    /** Выполняет текущий ручной либо автономный этап одного добывающего корабля. */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         ShipComponent ship = shipMapper.get(entity);
         MiningComponent mining = miningMapper.get(entity);
         InventoryComponent inventory = inventoryMapper.get(entity);
         TransformComponent transform = transformMapper.get(entity);
-        WalletComponent wallet = walletMapper.get(entity);
+        PlayerControlledComponent playerControl = playerControlledMapper.get(entity);
 
-        if (!isValidConfiguration(ship, mining, inventory, transform, wallet)) {
+        if (playerControl != null) {
+            processManualMining(entity, ship, mining, inventory, transform, playerControl, deltaTime);
+            return;
+        }
+
+        WalletComponent wallet = walletMapper.get(entity);
+        if (!isValidAutonomousConfiguration(ship, mining, inventory, transform, wallet)) {
             stop(transform);
             return;
         }
@@ -166,6 +181,88 @@ public final class MiningSystem extends IteratingSystem {
             case UNLOADING -> unloadAtBase(entity, mining, inventory, transform);
             case PAUSED -> stop(transform);
         }
+    }
+
+    private void processManualMining(
+            Entity miner,
+            ShipComponent ship,
+            MiningComponent mining,
+            InventoryComponent inventory,
+            TransformComponent transform,
+            PlayerControlledComponent control,
+            float deltaTime) {
+        MiningCommandComponent command = miningCommandMapper.get(miner);
+        if (command == null) {
+            return;
+        }
+        command.extractedLastTick = 0;
+        mining.active = false;
+        mining.state = MiningComponent.State.PAUSED;
+
+        if (control.docked) {
+            command.status = MiningCommandComponent.Status.DOCKED;
+            return;
+        }
+        if (!isMiningRoleCompatible(ship, mining)) {
+            command.status = MiningCommandComponent.Status.INCOMPATIBLE_SHIP;
+            return;
+        }
+        if (!isValidMiningConfiguration(ship, mining, inventory, transform)) {
+            command.status = MiningCommandComponent.Status.INVALID_CONFIGURATION;
+            return;
+        }
+        if (command.targetAsteroidId == null) {
+            command.status = command.miningRequested
+                    ? MiningCommandComponent.Status.NO_TARGET
+                    : MiningCommandComponent.Status.IDLE;
+            return;
+        }
+
+        Entity target = registry.find(command.targetAsteroidId);
+        if (!Objects.equals(mining.targetAsteroidId, command.targetAsteroidId)) {
+            mining.targetAsteroidId = command.targetAsteroidId;
+            mining.extractionRemainder = 0d;
+        }
+
+        if (!command.miningRequested) {
+            if (command.status == MiningCommandComponent.Status.DEPLETED && target == null) {
+                return;
+            }
+            command.status = toManualStatus(
+                    validateExtractionTarget(mining, inventory, transform, target), false);
+            return;
+        }
+
+        ExtractionResult result = extractResource(
+                miner, mining, inventory, transform, target, deltaTime);
+        command.extractedLastTick = result.extracted();
+        command.status = toManualStatus(result.status(), true);
+
+        if (result.depletedAfterExtraction() || result.status() == ExtractionStatus.DEPLETED) {
+            command.status = MiningCommandComponent.Status.DEPLETED;
+            command.miningRequested = false;
+            mining.extractionRemainder = 0d;
+            if (target != null && asteroidMapper.has(target)
+                    && asteroidMapper.get(target).isDepleted()) {
+                removeDepletedTarget(mining, target);
+            }
+        }
+    }
+
+    private MiningCommandComponent.Status toManualStatus(
+            ExtractionStatus status,
+            boolean requested) {
+        return switch (status) {
+            case VALID, WAITING, EXTRACTED -> requested
+                    ? MiningCommandComponent.Status.MINING
+                    : MiningCommandComponent.Status.READY;
+            case INVALID_TARGET -> MiningCommandComponent.Status.INVALID_TARGET;
+            case INVALID_RESOURCE -> MiningCommandComponent.Status.INVALID_RESOURCE;
+            case OUT_OF_RANGE -> MiningCommandComponent.Status.OUT_OF_RANGE;
+            case CARGO_FULL -> MiningCommandComponent.Status.CARGO_FULL;
+            case DEPLETED -> MiningCommandComponent.Status.DEPLETED;
+            case INVALID_CONFIGURATION -> MiningCommandComponent.Status.INVALID_CONFIGURATION;
+        };
     }
 
     private void searchForAsteroid(
@@ -229,18 +326,69 @@ public final class MiningSystem extends IteratingSystem {
             TransformComponent transform,
             float deltaTime) {
         Entity target = registry.find(mining.targetAsteroidId);
-        if (!isUsableAsteroid(target, mining.resourceItem)) {
-            loseTarget(mining, inventory);
-            stop(transform);
-            return;
+        ExtractionResult result = extractResource(
+                miner, mining, inventory, transform, target, deltaTime);
+
+        switch (result.status()) {
+            case INVALID_TARGET, INVALID_RESOURCE -> {
+                loseTarget(mining, inventory);
+                stop(transform);
+                return;
+            }
+            case DEPLETED -> {
+                if (target != null && asteroidMapper.has(target)) {
+                    removeDepletedTarget(mining, target);
+                }
+                mining.extractionRemainder = 0d;
+                if (inventory.stock[mining.resourceItem] > 0) {
+                    beginReturn(mining);
+                } else {
+                    mining.state = MiningComponent.State.SEARCHING;
+                }
+                stop(transform);
+                return;
+            }
+            case OUT_OF_RANGE -> {
+                mining.state = MiningComponent.State.TRAVEL_TO_ASTEROID;
+                return;
+            }
+            case CARGO_FULL -> {
+                mining.extractionRemainder = 0d;
+                beginReturn(mining);
+                stop(transform);
+                return;
+            }
+            case INVALID_CONFIGURATION -> {
+                stop(transform);
+                return;
+            }
+            case VALID, WAITING, EXTRACTED -> stop(transform);
         }
 
-        TransformComponent targetTransform = transformMapper.get(target);
-        if (!isWithinRange(transform, targetTransform, mining.extractionRange)) {
-            mining.state = MiningComponent.State.TRAVEL_TO_ASTEROID;
-            return;
+        if (result.depletedAfterExtraction()) {
+            removeDepletedTarget(mining, target);
+            beginReturn(mining);
+        } else if (inventory.getFreeCapacity() <= 0) {
+            mining.extractionRemainder = 0d;
+            beginReturn(mining);
         }
-        stop(transform);
+    }
+
+    private ExtractionResult extractResource(
+            Entity miner,
+            MiningComponent mining,
+            InventoryComponent inventory,
+            TransformComponent transform,
+            Entity target,
+            float deltaTime) {
+        ExtractionStatus validation = validateExtractionTarget(
+                mining, inventory, transform, target);
+        if (validation != ExtractionStatus.VALID) {
+            return new ExtractionResult(validation, 0, false);
+        }
+        if (!Float.isFinite(deltaTime) || deltaTime < 0f) {
+            return new ExtractionResult(ExtractionStatus.INVALID_CONFIGURATION, 0, false);
+        }
 
         int currentStock = inventory.stock[mining.resourceItem];
         int freeCapacity = inventory.getFreeCapacity();
@@ -250,29 +398,23 @@ public final class MiningSystem extends IteratingSystem {
                 Math.min((long) freeCapacity, itemCapacity),
                 asteroid.remainingResource);
         if (maximumExtraction <= 0L) {
-            mining.extractionRemainder = 0d;
-            if (asteroid.isDepleted()) {
-                removeDepletedTarget(mining, target);
-            }
-            if (currentStock > 0) {
-                beginReturn(mining);
-            } else {
-                mining.state = MiningComponent.State.SEARCHING;
-            }
-            return;
+            return new ExtractionResult(
+                    asteroid.isDepleted() ? ExtractionStatus.DEPLETED : ExtractionStatus.CARGO_FULL,
+                    0,
+                    false);
         }
 
         double remainder = normalizedRemainder(mining.extractionRemainder);
         double produced = remainder + (double) mining.extractionPerSecond * deltaTime;
-        if (!Double.isFinite(produced) || produced <= 0d) {
+        if (!Double.isFinite(produced) || produced < 0d) {
             mining.extractionRemainder = 0d;
-            return;
+            return new ExtractionResult(ExtractionStatus.INVALID_CONFIGURATION, 0, false);
         }
 
         double completedUnits = Math.floor(produced);
         if (completedUnits < 1d) {
             mining.extractionRemainder = produced;
-            return;
+            return new ExtractionResult(ExtractionStatus.WAITING, 0, false);
         }
 
         int extracted = completedUnits >= maximumExtraction
@@ -289,14 +431,41 @@ public final class MiningSystem extends IteratingSystem {
         if (minerMarket != null) {
             minerMarket.isDirty = true;
         }
+        return new ExtractionResult(ExtractionStatus.EXTRACTED, extracted, asteroid.isDepleted());
+    }
 
-        if (asteroid.isDepleted()) {
-            removeDepletedTarget(mining, target);
-            beginReturn(mining);
-        } else if (inventory.getFreeCapacity() <= 0) {
-            mining.extractionRemainder = 0d;
-            beginReturn(mining);
+    private ExtractionStatus validateExtractionTarget(
+            MiningComponent mining,
+            InventoryComponent inventory,
+            TransformComponent transform,
+            Entity target) {
+        if (target == null
+                || asteroids == null
+                || !asteroids.contains(target, true)
+                || !idMapper.has(target)
+                || !asteroidMapper.has(target)
+                || !transformMapper.has(target)) {
+            return ExtractionStatus.INVALID_TARGET;
         }
+        AsteroidComponent asteroid = asteroidMapper.get(target);
+        if (asteroid.resourceItem != mining.resourceItem) {
+            return ExtractionStatus.INVALID_RESOURCE;
+        }
+        if (asteroid.isDepleted()) {
+            return ExtractionStatus.DEPLETED;
+        }
+        if (asteroid.initialResource <= 0L || asteroid.remainingResource > asteroid.initialResource
+                || !isValidPosition(transformMapper.get(target))) {
+            return ExtractionStatus.INVALID_TARGET;
+        }
+        if (!isWithinRange(transform, transformMapper.get(target), mining.extractionRange)) {
+            return ExtractionStatus.OUT_OF_RANGE;
+        }
+        if (inventory.getFreeCapacity() <= 0
+                || inventory.stock[mining.resourceItem] == Integer.MAX_VALUE) {
+            return ExtractionStatus.CARGO_FULL;
+        }
+        return ExtractionStatus.VALID;
     }
 
     private void returnToBase(
@@ -391,7 +560,11 @@ public final class MiningSystem extends IteratingSystem {
 
         Entity closest = null;
         double closestDistance = Double.POSITIVE_INFINITY;
-        for (Entity candidate : marketBases) {
+        if (marketBases == null) {
+            return null;
+        }
+        for (int index = 0; index < marketBases.size(); index++) {
+            Entity candidate = marketBases.get(index);
             if (!isUsableBaseCandidate(candidate, miner, mining.resourceItem, reputation)) {
                 continue;
             }
@@ -408,7 +581,11 @@ public final class MiningSystem extends IteratingSystem {
     private Entity findClosestAsteroid(TransformComponent transform, int resourceItem) {
         Entity closest = null;
         double closestDistance = Double.POSITIVE_INFINITY;
-        for (Entity candidate : asteroids) {
+        if (asteroids == null) {
+            return null;
+        }
+        for (int index = 0; index < asteroids.size(); index++) {
+            Entity candidate = asteroids.get(index);
             if (!isUsableAsteroidCandidate(candidate, resourceItem)) {
                 continue;
             }
@@ -429,15 +606,24 @@ public final class MiningSystem extends IteratingSystem {
         return component.id;
     }
 
-    private boolean isValidConfiguration(
+    private boolean isValidAutonomousConfiguration(
             ShipComponent ship,
             MiningComponent mining,
             InventoryComponent inventory,
             TransformComponent transform,
             WalletComponent wallet) {
+        return isValidMiningConfiguration(ship, mining, inventory, transform)
+                && wallet != null
+                && wallet.getBalanceMilliCredits() >= 0L;
+    }
+
+    private boolean isValidMiningConfiguration(
+            ShipComponent ship,
+            MiningComponent mining,
+            InventoryComponent inventory,
+            TransformComponent transform) {
         ItemType resource = ItemType.fromId(mining.resourceItem);
-        return ship.type != null
-                && ship.type.isMining()
+        return isMiningRoleCompatible(ship, mining)
                 && resource != null
                 && resource.isMineable()
                 && ship.type.canCarry(resource)
@@ -449,10 +635,15 @@ public final class MiningSystem extends IteratingSystem {
                 && mining.extractionRange >= 0f
                 && Float.isFinite(mining.dockingRange)
                 && mining.dockingRange >= 0f
-                && wallet != null
-                && wallet.getBalanceMilliCredits() >= 0L
                 && isValidInventory(inventory)
                 && isValidPosition(transform);
+    }
+
+    private boolean isMiningRoleCompatible(ShipComponent ship, MiningComponent mining) {
+        return ship != null
+                && ship.type != null
+                && ship.type.isMining()
+                && mining != null;
     }
 
     private boolean isUsableAsteroid(Entity entity, int resourceItem) {
@@ -472,6 +663,7 @@ public final class MiningSystem extends IteratingSystem {
         AsteroidComponent asteroid = asteroidMapper.get(entity);
         return asteroid.resourceItem == resourceItem
                 && !asteroid.isDepleted()
+                && asteroid.initialResource > 0L
                 && asteroid.remainingResource <= asteroid.initialResource
                 && isValidPosition(transformMapper.get(entity));
     }
@@ -718,5 +910,23 @@ public final class MiningSystem extends IteratingSystem {
 
     private boolean isFloatRepresentable(double value) {
         return Double.isFinite(value) && value >= -Float.MAX_VALUE && value <= Float.MAX_VALUE;
+    }
+
+    private enum ExtractionStatus {
+        VALID,
+        WAITING,
+        EXTRACTED,
+        INVALID_TARGET,
+        INVALID_RESOURCE,
+        OUT_OF_RANGE,
+        CARGO_FULL,
+        DEPLETED,
+        INVALID_CONFIGURATION
+    }
+
+    private record ExtractionResult(
+            ExtractionStatus status,
+            int extracted,
+            boolean depletedAfterExtraction) {
     }
 }
