@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "status": "authoring-benchmark-only",
+  "unitSystem": "SI",
+  "sourceDocument": "docs/ship_mathematics_v0_5.md",
+  "harness": "com.spacesim.combat.benchmark.ShipMathematicsV05SweepHarness",
+  "snapshotFingerprintSha256": "5c1ee91e262a410fffd7af46a4d328c7788c82612dd594ae375f3bd9487eac26",
+  "surfaceDefinition": {
+    "attackingTorpedoCorvettes": [8, 16, 24, 32, 48],
+    "missilesPerCorvette": 2,
+    "escortDestroyers": [0, 1, 2, 3],
+    "escortSlotSpacingM": [5000.0, 10000.0, 15000.0, 20000.0, 25000.0, 40000.0],
+    "zeroEscortUsesSpacingM": 0.0,
+    "surfacePointCount": 95
+  },
+  "formationPolicy": {
+    "battleshipOffsetYM": 0.0,
+    "escortSlotOffsets": ["+1×spacing", "-1×spacing", "+2×spacing"],
+    "meaning": "Spacing is adjacent screen-slot spacing, not radial distance of every escort from the battleship."
+  },
+  "enduranceDefinition": {
+    "attackingTorpedoCorvettes": 24,
+    "incomingThreatsPerWave": 48,
+    "waves": 13,
+    "formationCount": 19,
+    "endurancePointCount": 247,
+    "betweenWaveReset": ["launch-cell recycle", "point-defense retarget readiness"],
+    "persistentAcrossWaves": ["L interceptor magazine", "M interceptor magazines"],
+    "areaMagazinePerDefender": 48,
+    "fleetMagazinePerDefender": 48,
+    "areaFirstWaveSupportPerDefender": 6,
+    "fleetFirstWaveSupportPerDefender": 4,
+    "areaMagazineEmptyAfterWave": 8,
+    "fleetMagazineEmptyAfterWave": 12,
+    "wave13State": "missile-defense magazines empty; point-defense lasers only"
+  },
+  "firstWaveTerminalLeakers": {
+    "spacingAxisKm": [5, 10, 15, 20, 25, 40],
+    "zeroEscortByCorvetteCount": {"8": 0, "16": 0, "24": 3, "32": 18, "48": 50},
+    "oneEscortByCorvetteCount": {
+      "8": [0, 0, 0, 0, 0, 0],
+      "16": [0, 0, 0, 0, 0, 0],
+      "24": [0, 0, 0, 0, 0, 0],
+      "32": [0, 0, 0, 0, 0, 4],
+      "48": [16, 19, 20, 21, 30, 34]
+    },
+    "twoEscortsByCorvetteCount": {
+      "8": [0, 0, 0, 0, 0, 0],
+      "16": [0, 0, 0, 0, 0, 0],
+      "24": [0, 0, 0, 0, 0, 0],
+      "32": [0, 0, 0, 0, 0, 0],
+      "48": [0, 0, 0, 0, 10, 18]
+    },
+    "threeEscortsByCorvetteCount": {
+      "8": [0, 0, 0, 0, 0, 0],
+      "16": [0, 0, 0, 0, 0, 0],
+      "24": [0, 0, 0, 0, 0, 0],
+      "32": [0, 0, 0, 0, 0, 0],
+      "48": [0, 0, 0, 0, 1, 12]
+    }
+  },
+  "wave13TerminalLeakersAfterMagazineExhaustion": {
+    "spacingAxisKm": [5, 10, 15, 20, 25, 40],
+    "zeroEscort": 13,
+    "oneEscort": [0, 0, 0, 0, 0, 4],
+    "twoEscorts": [0, 0, 0, 0, 0, 0],
+    "threeEscorts": [0, 0, 0, 0, 0, 0]
+  },
+  "anchorReports": {
+    "24CorvettesBattleshipOnlyWave1": {"incomingThreats": 48, "safeAreaKills": 6, "safeFleetKills": 4, "ballisticMissNeutralizations": 5, "laserHardKills": 30, "terminalLeakers": 3, "aggregateLaserBeamSeconds": 87.64},
+    "24CorvettesOneEscort15kmWave1": {"incomingThreats": 48, "safeAreaKills": 12, "safeFleetKills": 8, "ballisticMissNeutralizations": 9, "laserHardKills": 19, "terminalLeakers": 0, "aggregateLaserBeamSeconds": 140.88},
+    "48CorvettesBattleshipOnlyWave1": {"incomingThreats": 96, "safeAreaKills": 6, "safeFleetKills": 4, "ballisticMissNeutralizations": 6, "laserHardKills": 30, "terminalLeakers": 50, "aggregateLaserBeamSeconds": 87.26},
+    "48CorvettesOneEscort15kmWave1": {"incomingThreats": 96, "safeAreaKills": 12, "safeFleetKills": 8, "ballisticMissNeutralizations": 10, "laserHardKills": 46, "terminalLeakers": 20, "aggregateLaserBeamSeconds": 146.46},
+    "48CorvettesTwoEscorts15kmWave1": {"incomingThreats": 96, "safeAreaKills": 18, "safeFleetKills": 12, "ballisticMissNeutralizations": 13, "laserHardKills": 53, "terminalLeakers": 0, "aggregateLaserBeamSeconds": 205.42},
+    "24CorvettesBattleshipOnlyWave13": {"incomingThreats": 48, "safeAreaKills": 0, "safeFleetKills": 0, "terminalLeakers": 13, "aggregateLaserBeamSeconds": 87.64},
+    "24CorvettesOneEscort15kmWave13": {"incomingThreats": 48, "safeAreaKills": 0, "safeFleetKills": 0, "terminalLeakers": 0, "aggregateLaserBeamSeconds": 146.60}
+  },
+  "currentFindings": [
+    "The unescorted battleship first leaks between 16 and 24 torpedo corvettes.",
+    "At 48 corvettes, one escort is insufficient at every tested spacing.",
+    "At 48 corvettes, two escorts produce zero leakers at 5-20 km slot spacing but leak at 25-40 km.",
+    "With three escorts, the +2×spacing outer slot makes inner-interceptor geometry degrade earlier; 25 km leaves 1 leaker and 40 km leaves 12.",
+    "At the canonical 24-corvette endurance load, one escort at 15 km remains leak-free even on wave 13 after missile-defense magazines are empty, exposing the current PD-laser seed as a dominant endurance defense."
+  ],
+  "knownOptimisticSeams": [
+    "No thermal carryover between waves for point-defense lasers.",
+    "No defender damage or progressive loss of launchers, sensors, or laser emitters.",
+    "No fragment cloud or residual debris after hard kills or interceptor proximity kills.",
+    "No ECM, decoys, sensor degradation, track uncertainty, or fire-control latency beyond configured channel limits.",
+    "Attackers always target the battleship; escorts are not alternate targets.",
+    "Close formation has no collision, mutual-obscuration, blast, fragment, or maneuver-separation penalty.",
+    "Deterministic greedy target allocation is not yet a fleet fire-control optimizer."
+  ]
+}
