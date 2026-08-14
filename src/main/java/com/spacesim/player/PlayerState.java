@@ -14,7 +14,8 @@ import java.util.Set;
  *
  * <p>World simulation remains player-agnostic. The durable actor layer references physical fleets
  * through stable world-level FleetIds, discovered local objects through StarSystem-qualified IDs,
- * and Stage-15 delegated work through declarative {@link PlayerFleetOrderState} values.</p>
+ * delegated work through declarative {@link PlayerFleetOrderState} values and non-omniscient route
+ * danger through explicit {@link PlayerThreatIntelState} observations.</p>
  *
  * @param walletMilliCredits personal non-negative balance in authoritative milli-credits
  * @param factionContentId optional faction/legal affiliation; {@code null} means independent
@@ -26,6 +27,7 @@ import java.util.Set;
  * @param homeSystemId optional home/start system; must already be discovered
  * @param dockedAt optional currently docked market/station reference; must already be discovered
  * @param fleetOrders persistent delegated orders, at most one per owned FleetId
+ * @param threatIntel persistent observed system/link danger intelligence
  */
 public record PlayerState(
         long walletMilliCredits,
@@ -37,7 +39,37 @@ public record PlayerState(
         List<DiscoveredObjectRef> discoveredObjects,
         StarSystemId homeSystemId,
         DiscoveredObjectRef dockedAt,
-        List<PlayerFleetOrderState> fleetOrders) {
+        List<PlayerFleetOrderState> fleetOrders,
+        List<PlayerThreatIntelState> threatIntel) {
+
+    /**
+     * Source-compatible Stage-15A constructor before persistent threat intelligence.
+     *
+     * @param walletMilliCredits personal non-negative balance
+     * @param factionContentId optional faction affiliation
+     * @param reputations reputation entries
+     * @param ownedFleetIds owned fleets
+     * @param activeFleetId active fleet
+     * @param discoveredSystemIds discovered systems
+     * @param discoveredObjects discovered objects
+     * @param homeSystemId optional home system
+     * @param dockedAt optional current docking reference
+     * @param fleetOrders persistent delegated orders
+     */
+    public PlayerState(
+            long walletMilliCredits,
+            String factionContentId,
+            List<PlayerReputationState> reputations,
+            List<FleetId> ownedFleetIds,
+            FleetId activeFleetId,
+            List<StarSystemId> discoveredSystemIds,
+            List<DiscoveredObjectRef> discoveredObjects,
+            StarSystemId homeSystemId,
+            DiscoveredObjectRef dockedAt,
+            List<PlayerFleetOrderState> fleetOrders) {
+        this(walletMilliCredits, factionContentId, reputations, ownedFleetIds, activeFleetId,
+                discoveredSystemIds, discoveredObjects, homeSystemId, dockedAt, fleetOrders, List.of());
+    }
 
     /**
      * Source-compatible pre-Stage-15 constructor with persistent docking and no delegated orders.
@@ -63,7 +95,7 @@ public record PlayerState(
             StarSystemId homeSystemId,
             DiscoveredObjectRef dockedAt) {
         this(walletMilliCredits, factionContentId, reputations, ownedFleetIds, activeFleetId,
-                discoveredSystemIds, discoveredObjects, homeSystemId, dockedAt, List.of());
+                discoveredSystemIds, discoveredObjects, homeSystemId, dockedAt, List.of(), List.of());
     }
 
     /**
@@ -88,7 +120,7 @@ public record PlayerState(
             List<DiscoveredObjectRef> discoveredObjects,
             StarSystemId homeSystemId) {
         this(walletMilliCredits, factionContentId, reputations, ownedFleetIds, activeFleetId,
-                discoveredSystemIds, discoveredObjects, homeSystemId, null, List.of());
+                discoveredSystemIds, discoveredObjects, homeSystemId, null, List.of(), List.of());
     }
 
     /**
@@ -104,6 +136,7 @@ public record PlayerState(
      * @param homeSystemId optional home/start system
      * @param dockedAt optional current docking reference
      * @param fleetOrders delegated persistent orders
+     * @param threatIntel persistent observed danger intelligence
      */
     public PlayerState {
         if (walletMilliCredits < 0L) {
@@ -190,6 +223,24 @@ public record PlayerState(
         }
         orderCopy.sort(PlayerFleetOrderState::compareTo);
         fleetOrders = List.copyOf(orderCopy);
+
+        List<PlayerThreatIntelState> intelCopy = new ArrayList<>(Objects.requireNonNull(
+                threatIntel, "Player threat intel not set"));
+        Set<String> intelKeys = new HashSet<>();
+        for (PlayerThreatIntelState intel : intelCopy) {
+            PlayerThreatIntelState value = Objects.requireNonNull(intel, "Threat intel entry not set");
+            if (!systems.contains(value.systemA())
+                    || value.systemB() != null && !systems.contains(value.systemB())) {
+                throw new IllegalArgumentException("Threat intel references an undiscovered StarSystem");
+            }
+            String key = value.kind() + ":" + value.systemA().value() + ":"
+                    + (value.systemB() == null ? 0L : value.systemB().value());
+            if (!intelKeys.add(key)) {
+                throw new IllegalArgumentException("Duplicate threat intel key: " + key);
+            }
+        }
+        intelCopy.sort(PlayerThreatIntelState::compareTo);
+        threatIntel = List.copyOf(intelCopy);
     }
 
     /** @return whether the player currently has a named faction affiliation */
