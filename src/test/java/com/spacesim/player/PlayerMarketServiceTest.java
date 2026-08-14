@@ -13,6 +13,7 @@ import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.world.ConstructionProjectId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.WorldSimulation;
@@ -29,6 +30,8 @@ class PlayerMarketServiceTest {
     void manualPurchaseUsesRealCargoStationWalletAndPlayerWallet() {
         MarketFixture fixture = fixture(12_201L);
         dockForTest(fixture);
+        PlayerConstructionService construction = new PlayerConstructionService(fixture.runtime);
+        ConstructionProjectId projectId = construction.createProject("station.mining_base", 720f, 620f);
         PlayerMarketService marketService = new PlayerMarketService(fixture.runtime, fixture.content);
         int itemId = fixture.item.runtimeId();
         int stationStockBefore = fixture.stationInventory.stock[itemId];
@@ -51,6 +54,7 @@ class PlayerMarketServiceTest {
         assertTrue(fixture.stationWallet.getBalanceMilliCredits() > stationMoneyBefore);
         assertEquals(totalMoneyBefore,
                 fixture.runtime.player().walletMilliCredits() + fixture.stationWallet.getBalanceMilliCredits());
+        assertEquals(List.of(projectId), fixture.runtime.player().ownedConstructionProjectIds());
     }
 
     @Test
