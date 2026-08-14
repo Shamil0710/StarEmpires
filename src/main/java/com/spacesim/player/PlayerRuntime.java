@@ -4,6 +4,7 @@ import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.ArchetypeComponent;
 import com.spacesim.components.CombatCommandComponent;
 import com.spacesim.components.CombatComponent;
+import com.spacesim.components.FlightCommandComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.MiningComponent;
 import com.spacesim.components.PlayerControlledComponent;
@@ -12,6 +13,7 @@ import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.systems.AutonomousFlightSystem;
 import com.spacesim.systems.PlayerDirectControlSystem;
 import com.spacesim.world.CombatDestructionResolver;
 import com.spacesim.world.FleetId;
@@ -29,20 +31,21 @@ import java.util.Optional;
 /**
  * Runtime owner of the playable layer above an otherwise independent WorldSimulation.
  *
- * <p>Stage-12C installs a transient fixed-tick direct-control system into local sessions. Input
- * changes only {@link PlayerControlledComponent}; physical Transform mutation remains inside the
- * simulation update. The active player fleet's system is kept as the world's full-rate active
- * system, while jump travel delegates to the existing Stage-10 jump FSM.</p>
+ * <p>Direct input changes only {@link PlayerControlledComponent}; physical Transform mutation stays
+ * inside fixed-tick systems. Stage 15 additionally installs the shared
+ * {@link AutonomousFlightSystem} and converts persistent inactive-owned fleet orders into transient
+ * {@link FlightCommandComponent} intent before each authoritative world advance. Direct control
+ * always wins for the active FleetId.</p>
  *
- * <p>Stage 13 adds combat intent without a player-only damage path. Player code writes the same
- * {@link CombatCommandComponent} as CombatAI; local {@code CombatSystem} resolves the shot and this
- * runtime only bridges lethal results into the ordinary world destruction pipeline after a tick.</p>
+ * <p>Combat intent still uses the same {@link CombatCommandComponent} as CombatAI; lethal results
+ * are bridged into the ordinary world destruction pipeline after a tick.</p>
  */
 public final class PlayerRuntime {
     private static final float DEFAULT_DOCKING_RANGE = 10f;
 
     private final WorldSimulation world;
     private final ContentCatalog content;
+    private final PlayerFleetOrderExecutor fleetOrderExecutor;
     private PlayerState player;
 
     private PlayerRuntime(WorldSimulation world, ContentCatalog content, PlayerState player) {
@@ -50,8 +53,10 @@ public final class PlayerRuntime {
         this.content = Objects.requireNonNull(content, "ContentCatalog not set");
         this.player = Objects.requireNonNull(player, "PlayerState not set");
         validateReferences(this.world, this.content, this.player);
-        installDirectControlSystems();
+        installPlayerControlSystems();
+        this.fleetOrderExecutor = new PlayerFleetOrderExecutor(this, this.content);
         synchronizePlayerLocationAndControl();
+        fleetOrderExecutor.prepare();
     }
 
     /**
@@ -100,6 +105,11 @@ public final class PlayerRuntime {
         return world;
     }
 
+    /** @return semantic content catalog shared by player services and world sessions */
+    public ContentCatalog content() {
+        return content;
+    }
+
     /** @return current immutable player state after ownership/docking reconciliation */
     public PlayerState player() {
         reconcileOwnedFleets();
@@ -108,13 +118,18 @@ public final class PlayerRuntime {
     }
 
     /**
-     * Advances the unchanged fixed-tick world pipeline and follows the active fleet after travel.
+     * Advances the fixed-tick world pipeline and follows the active fleet after travel.
+     *
+     * <p>Before the world advances, Stage-15 delegated orders are translated into transient
+     * movement intent. The executor cannot mutate Transform directly; ordinary local/remote
+     * simulation and the Stage-10 jump FSM remain authoritative.</p>
      *
      * @param realDeltaSeconds render/frame delta
      * @return ordinary WorldSimulation advance report
      */
     public WorldSimulation.AdvanceReport advanceFrame(float realDeltaSeconds) {
         synchronizeDirectControlBinding();
+        fleetOrderExecutor.prepare();
         WorldSimulation.AdvanceReport report = world.advanceFrame(realDeltaSeconds);
         CombatDestructionResolver.resolve(world);
         reconcileOwnedFleets();
@@ -293,22 +308,14 @@ public final class PlayerRuntime {
         return true;
     }
 
-    /**
-     * Sets global pause across all local sessions without bypassing their fixed clocks.
-     *
-     * @param paused new global pause state
-     */
+    /** Sets global pause across all local sessions without bypassing their fixed clocks. */
     public void setPaused(boolean paused) {
         for (StarSystemNode node : world.getTopology().systems()) {
             world.findSession(node.id()).orElseThrow().getClock().setPaused(paused);
         }
     }
 
-    /**
-     * Sets global simulation time scale across all local sessions.
-     *
-     * @param timeScale finite non-negative multiplier
-     */
+    /** Sets global simulation time scale across all local sessions. */
     public void setTimeScale(double timeScale) {
         for (StarSystemNode node : world.getTopology().systems()) {
             world.findSession(node.id()).orElseThrow().getClock().setTimeScale(timeScale);
@@ -350,15 +357,21 @@ public final class PlayerRuntime {
     void replacePlayerState(PlayerState replacement) {
         PlayerState checked = Objects.requireNonNull(replacement, "Replacement PlayerState not set");
         validateReferences(world, content, checked);
+        PlayerState previous = player;
         player = checked;
+        releaseRemovedOwnedFleets(previous, checked);
         synchronizePlayerLocationAndControl();
+        fleetOrderExecutor.prepare();
     }
 
-    private void installDirectControlSystems() {
+    private void installPlayerControlSystems() {
         for (StarSystemNode node : world.getTopology().systems()) {
             SimulationSession session = world.findSession(node.id()).orElseThrow();
             if (session.getEngine().getSystem(PlayerDirectControlSystem.class) == null) {
                 session.getEngine().addSystem(new PlayerDirectControlSystem());
+            }
+            if (session.getEngine().getSystem(AutonomousFlightSystem.class) == null) {
+                session.getEngine().addSystem(new AutonomousFlightSystem());
             }
         }
     }
@@ -391,8 +404,8 @@ public final class PlayerRuntime {
                     fleetId = world.findFleetByLocal(node.id(), localId.id).orElse(null);
                 }
                 if (activeId != null && activeId.equals(fleetId)) {
-                    PlayerControlledComponent control = existing == null
-                            ? ensureControl(entity) : existing;
+                    entity.remove(FlightCommandComponent.class);
+                    PlayerControlledComponent control = existing == null ? ensureControl(entity) : existing;
                     control.docked = player.docked();
                     suppressAutonomousBehavior(entity);
                 } else if (existing != null) {
@@ -432,6 +445,21 @@ public final class PlayerRuntime {
         if (mining != null) {
             mining.active = false;
             mining.state = MiningComponent.State.PAUSED;
+        }
+    }
+
+    private static void restoreLegacyAutonomousBehavior(Entity entity) {
+        entity.remove(FlightCommandComponent.class);
+        TradeAIComponent trade = entity.getComponent(TradeAIComponent.class);
+        if (trade != null) {
+            trade.state = TradeAIComponent.State.IDLE;
+            trade.resetRoute();
+            trade.routeSearchCooldown = 0f;
+        }
+        MiningComponent mining = entity.getComponent(MiningComponent.class);
+        if (mining != null) {
+            mining.active = true;
+            mining.state = MiningComponent.State.SEARCHING;
         }
     }
 
@@ -514,6 +542,23 @@ public final class PlayerRuntime {
         }
     }
 
+    private void releaseRemovedOwnedFleets(PlayerState previous, PlayerState current) {
+        for (FleetId fleetId : previous.ownedFleetIds()) {
+            if (current.ownedFleetIds().contains(fleetId)) {
+                continue;
+            }
+            FleetPlacementState placement = world.findFleet(fleetId).orElse(null);
+            if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+                continue;
+            }
+            SimulationSession session = world.findSession(placement.systemId()).orElse(null);
+            Entity entity = session == null ? null : session.getEntityRegistry().find(placement.localEntityId());
+            if (entity != null) {
+                restoreLegacyAutonomousBehavior(entity);
+            }
+        }
+    }
+
     static PlayerState copyWithOwnershipAndWallet(
             PlayerState source,
             long walletMilliCredits,
@@ -541,7 +586,20 @@ public final class PlayerRuntime {
                 discoveredSystems,
                 discoveredObjects,
                 source.homeSystemId(),
-                dockedAt);
+                dockedAt,
+                ordersForOwned(source.fleetOrders(), ownedFleetIds));
+    }
+
+    private static List<PlayerFleetOrderState> ordersForOwned(
+            List<PlayerFleetOrderState> current,
+            List<FleetId> ownedFleetIds) {
+        List<PlayerFleetOrderState> result = new ArrayList<>();
+        for (PlayerFleetOrderState order : current) {
+            if (ownedFleetIds.contains(order.fleetId())) {
+                result.add(order);
+            }
+        }
+        return result;
     }
 
     private static List<StarSystemId> withSystem(List<StarSystemId> current, StarSystemId added) {
@@ -604,6 +662,25 @@ public final class PlayerRuntime {
             Entity station = session == null ? null : session.getEntityRegistry().find(player.dockedAt().entityId());
             if (station == null || station.getComponent(MarketComponent.class) == null) {
                 throw new IllegalArgumentException("Player dockedAt references a non-live market");
+            }
+        }
+        for (PlayerFleetOrderState order : player.fleetOrders()) {
+            if (order.targetSystemId() != null && world.getTopology().findSystem(order.targetSystemId()).isEmpty()) {
+                throw new IllegalArgumentException("Fleet order references unknown target StarSystem: "
+                        + order.targetSystemId());
+            }
+            if (order.secondarySystemId() != null
+                    && world.getTopology().findSystem(order.secondarySystemId()).isEmpty()) {
+                throw new IllegalArgumentException("Fleet order references unknown secondary StarSystem: "
+                        + order.secondarySystemId());
+            }
+            for (StarSystemId systemId : order.patrolSystemIds()) {
+                if (world.getTopology().findSystem(systemId).isEmpty()) {
+                    throw new IllegalArgumentException("Fleet patrol references unknown StarSystem: " + systemId);
+                }
+            }
+            if (order.itemContentId() != null && content.findItem(order.itemContentId()) == null) {
+                throw new IllegalArgumentException("Fleet order references unknown item: " + order.itemContentId());
             }
         }
     }
