@@ -114,7 +114,7 @@ public final class PlayerConstructionCancellationService {
         }
 
         WalletComponent playerWallet = new WalletComponent(previous.walletMilliCredits());
-        if (!context.siteWallet().transferTo(playerWallet, refund)) {
+        if (refund > 0L && !context.siteWallet().transferTo(playerWallet, refund)) {
             return false;
         }
         long resultingWallet = Math.addExact(previous.walletMilliCredits(), refund);
@@ -131,7 +131,7 @@ public final class PlayerConstructionCancellationService {
             }
         } catch (RuntimeException exception) {
             runtime.replacePlayerState(previous);
-            if (!playerWallet.transferTo(context.siteWallet(), refund)) {
+            if (refund > 0L && !playerWallet.transferTo(context.siteWallet(), refund)) {
                 exception.addSuppressed(new IllegalStateException(
                         "Construction cancellation rollback could not restore site money"));
             }
