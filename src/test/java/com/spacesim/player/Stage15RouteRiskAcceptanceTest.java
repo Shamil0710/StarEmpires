@@ -61,7 +61,6 @@ class Stage15RouteRiskAcceptanceTest {
                 .orElseThrow().getClock().getTick();
         PlayerThreatIntelService intel = new PlayerThreatIntelService(fixture.runtime());
         assertTrue(intel.observeSystem(DemoGalaxyFactory.INNER_SYSTEM_ID, 80f, 1f, tick));
-        // Mark the direct link known/safe so uncertainty itself does not decide the comparison.
         assertTrue(intel.observeLink(
                 DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
                 DemoGalaxyFactory.FRONTIER_SYSTEM_ID,
@@ -113,8 +112,8 @@ class Stage15RouteRiskAcceptanceTest {
         List<JumpConnection> links = new ArrayList<>(base.topology().connections());
         links.add(new JumpConnection(DemoGalaxyFactory.ACTIVE_SYSTEM_ID, DemoGalaxyFactory.FRONTIER_SYSTEM_ID));
         GalaxyTopology topology = new GalaxyTopology(
-                base.topology().galaxyId(),
-                base.topology().galaxyName(),
+                base.topology().id(),
+                base.topology().name(),
                 base.topology().sectors(),
                 links);
         WorldState state = new WorldState(
@@ -125,7 +124,7 @@ class Stage15RouteRiskAcceptanceTest {
                 base.factionStrategies(),
                 base.nextConstructionProjectIdValue(),
                 base.constructionProjects(),
-                base.economicPressure(),
+                base.factionEconomicPressures(),
                 base.nextFleetIdValue(),
                 base.fleets(),
                 base.fleetJumps());
