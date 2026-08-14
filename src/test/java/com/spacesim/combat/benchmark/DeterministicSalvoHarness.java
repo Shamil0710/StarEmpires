@@ -30,7 +30,8 @@ final class DeterministicSalvoHarness {
     static final double DANGEROUS_BALLISTIC_MISS_RADIUS_M = 60.0;
     static final double LASER_RETARGET_DELAY_S = 0.4;
 
-    static final double DEFENDER_ESCORT_OFFSET_Y_M = 25_000.0;
+    /** Close-screen reference spacing. Larger spacing becomes a real inner-defense trade-off. */
+    static final double DEFENDER_ESCORT_OFFSET_Y_M = 15_000.0;
     static final double INTEGRATION_STEP_S = 0.02;
 
     private static final double GOLDEN_ANGLE_RAD = 2.399963229728653;
@@ -72,13 +73,12 @@ final class DeterministicSalvoHarness {
 
         DefenseCounters counters = new DefenseCounters();
         scheduleDefenderInterceptors(threats, 0.0, counters);
-        int pointDefenseLasers = 6;
         if (includeEscort) {
             scheduleDefenderInterceptors(threats, DEFENDER_ESCORT_OFFSET_Y_M, counters);
-            pointDefenseLasers += 4;
         }
 
-        LaserCounters laserCounters = runPointDefense(threats, pointDefenseLasers);
+        double[] laserEmitterOffsetsYM = pointDefenseEmitterOffsets(includeEscort);
+        LaserCounters laserCounters = runPointDefense(threats, laserEmitterOffsetsYM);
         int leakers = 0;
         for (Threat threat : threats) {
             if (threat.mode == ThreatMode.GUIDED
@@ -94,7 +94,7 @@ final class DeterministicSalvoHarness {
                 counters.fleetInterceptorKills,
                 counters.areaInterceptorsExpended,
                 counters.fleetInterceptorsExpended,
-                pointDefenseLasers,
+                laserEmitterOffsetsYM.length,
                 laserCounters.missionKills,
                 laserCounters.ballisticMissNeutralizations,
                 laserCounters.hardKills,
@@ -125,6 +125,14 @@ final class DeterministicSalvoHarness {
                 targetId,
                 launchTimeS,
                 launcherOffsetYM);
+    }
+
+    private static double[] pointDefenseEmitterOffsets(boolean includeEscort) {
+        double[] offsets = new double[includeEscort ? 10 : 6];
+        if (includeEscort) {
+            Arrays.fill(offsets, 6, offsets.length, DEFENDER_ESCORT_OFFSET_Y_M);
+        }
+        return offsets;
     }
 
     private static void scheduleDefenderInterceptors(
@@ -180,26 +188,30 @@ final class DeterministicSalvoHarness {
         return null;
     }
 
-    private static LaserCounters runPointDefense(Threat[] threats, int laserCount) {
-        int[] laserTargets = new int[laserCount];
+    private static LaserCounters runPointDefense(Threat[] threats, double[] emitterOffsetsYM) {
+        int[] laserTargets = new int[emitterOffsetsYM.length];
         Arrays.fill(laserTargets, -1);
-        double[] readyAt = new double[laserCount];
+        double[] readyAt = new double[emitterOffsetsYM.length];
         LaserCounters counters = new LaserCounters();
 
         for (double time = 0.0; time <= IMPACT_TIME_S + 1.0e-9; time += INTEGRATION_STEP_S) {
             updateBallisticOutcomes(threats, time);
-            for (int laser = 0; laser < laserCount; laser++) {
+            for (int laser = 0; laser < emitterOffsetsYM.length; laser++) {
                 int targetId = laserTargets[laser];
                 if (targetId >= 0 && !isLaserTargetable(threats[targetId])) {
                     laserTargets[laser] = -1;
                     readyAt[laser] = time + LASER_RETARGET_DELAY_S;
                 }
                 if (laserTargets[laser] < 0 && time + 1.0e-12 >= readyAt[laser]) {
-                    laserTargets[laser] = selectLaserTarget(threats, laserTargets, time);
+                    laserTargets[laser] = selectLaserTarget(
+                            threats,
+                            laserTargets,
+                            time,
+                            emitterOffsetsYM[laser]);
                 }
             }
 
-            for (int laser = 0; laser < laserCount; laser++) {
+            for (int laser = 0; laser < emitterOffsetsYM.length; laser++) {
                 int targetId = laserTargets[laser];
                 if (targetId < 0) {
                     continue;
@@ -209,7 +221,7 @@ final class DeterministicSalvoHarness {
                     continue;
                 }
                 MotionState state = target.motionState(time);
-                double range = Math.hypot(state.xM, state.yM);
+                double range = Math.hypot(state.xM, state.yM - emitterOffsetsYM[laser]);
                 if (range > POINT_DEFENSE_RANGE_M) {
                     continue;
                 }
@@ -263,7 +275,11 @@ final class DeterministicSalvoHarness {
         }
     }
 
-    private static int selectLaserTarget(Threat[] threats, int[] currentTargets, double time) {
+    private static int selectLaserTarget(
+            Threat[] threats,
+            int[] currentTargets,
+            double time,
+            double emitterOffsetYM) {
         int bestId = -1;
         double bestRange = Double.POSITIVE_INFINITY;
         for (Threat threat : threats) {
@@ -271,7 +287,7 @@ final class DeterministicSalvoHarness {
                 continue;
             }
             MotionState state = threat.motionState(time);
-            double range = Math.hypot(state.xM, state.yM);
+            double range = Math.hypot(state.xM, state.yM - emitterOffsetYM);
             if (range > POINT_DEFENSE_RANGE_M) {
                 continue;
             }
