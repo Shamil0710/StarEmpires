@@ -1,6 +1,6 @@
 # Stage 12B — Player Ownership
 
-Status: implementation branch `agent/stage12b-player-ownership`.
+Status: **COMPLETE — PR #30, main `998f373`.**
 
 ## Ownership model
 
