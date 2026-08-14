@@ -67,10 +67,7 @@ public final class PlayerRuntime {
      * @param player initial persistent player state
      * @return playable runtime using the same world instance
      */
-    public static PlayerRuntime create(
-            WorldSimulation world,
-            ContentCatalog content,
-            PlayerState player) {
+    public static PlayerRuntime create(WorldSimulation world, ContentCatalog content, PlayerState player) {
         return new PlayerRuntime(world, content, player);
     }
 
@@ -142,10 +139,7 @@ public final class PlayerRuntime {
     public PlayableWorldState snapshot() {
         reconcileOwnedFleets();
         reconcileDocking();
-        return new PlayableWorldState(
-                PlayableWorldState.CURRENT_VERSION,
-                world.snapshot(),
-                player);
+        return new PlayableWorldState(PlayableWorldState.CURRENT_VERSION, world.snapshot(), player);
     }
 
     /**
@@ -247,8 +241,7 @@ public final class PlayerRuntime {
             return false;
         }
         Entity station = active.session().getEntityRegistry().find(checkedStationId);
-        TransformComponent stationTransform = station == null
-                ? null : station.getComponent(TransformComponent.class);
+        TransformComponent stationTransform = station == null ? null : station.getComponent(TransformComponent.class);
         if (station == null || station.getComponent(MarketComponent.class) == null || stationTransform == null) {
             return false;
         }
@@ -352,14 +345,9 @@ public final class PlayerRuntime {
             return Optional.empty();
         }
         return Optional.of(new PlayerShipView(
-                player.activeFleetId(),
-                active.placement().systemId(),
-                active.placement().localEntityId(),
-                active.transform().position.x,
-                active.transform().position.y,
-                active.transform().velocity.x,
-                active.transform().velocity.y,
-                player.docked()));
+                player.activeFleetId(), active.placement().systemId(), active.placement().localEntityId(),
+                active.transform().position.x, active.transform().position.y,
+                active.transform().velocity.x, active.transform().velocity.y, player.docked()));
     }
 
     void replacePlayerState(PlayerState replacement) {
@@ -595,7 +583,8 @@ public final class PlayerRuntime {
                 discoveredObjects,
                 source.homeSystemId(),
                 dockedAt,
-                ordersForOwned(source.fleetOrders(), ownedFleetIds));
+                ordersForOwned(source.fleetOrders(), ownedFleetIds),
+                source.threatIntel());
     }
 
     private static List<PlayerFleetOrderState> ordersForOwned(
@@ -630,10 +619,7 @@ public final class PlayerRuntime {
         return result;
     }
 
-    private static void validateReferences(
-            WorldSimulation world,
-            ContentCatalog content,
-            PlayerState player) {
+    private static void validateReferences(WorldSimulation world, ContentCatalog content, PlayerState player) {
         if (player.factionContentId() != null && content.findFaction(player.factionContentId()) == null) {
             throw new IllegalArgumentException("Player affiliation references unknown faction: "
                     + player.factionContentId());
@@ -660,10 +646,8 @@ public final class PlayerRuntime {
                         + reference.systemId());
             }
         }
-        if (player.homeSystemId() != null
-                && world.getTopology().findSystem(player.homeSystemId()).isEmpty()) {
-            throw new IllegalArgumentException("Player home references unknown StarSystem: "
-                    + player.homeSystemId());
+        if (player.homeSystemId() != null && world.getTopology().findSystem(player.homeSystemId()).isEmpty()) {
+            throw new IllegalArgumentException("Player home references unknown StarSystem: " + player.homeSystemId());
         }
         if (player.dockedAt() != null) {
             SimulationSession session = world.findSession(player.dockedAt().systemId()).orElse(null);
