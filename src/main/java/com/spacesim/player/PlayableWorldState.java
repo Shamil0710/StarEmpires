@@ -18,13 +18,15 @@ public record PlayableWorldState(
         int schemaVersion,
         WorldState worldState,
         PlayerState playerState) {
-    /** Current playable-layer persistent schema with persistent docking state. */
-    public static final int CURRENT_VERSION = 2;
+    /** Current playable-layer schema with persistent Stage-15 fleet orders. */
+    public static final int CURRENT_VERSION = 3;
+    /** Stage-12 docking schema before persistent fleet orders. */
+    public static final int LEGACY_DOCKING_VERSION = 2;
     /** Stage-12A schema before persistent docking state. */
     public static final int LEGACY_STAGE12A_VERSION = 1;
 
     /**
-     * Validates one playable save snapshot.
+     * Validates one current playable save snapshot.
      *
      * @param schemaVersion playable-layer schema version
      * @param worldState authoritative world state

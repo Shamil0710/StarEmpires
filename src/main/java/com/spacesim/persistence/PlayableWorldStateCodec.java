@@ -1,7 +1,9 @@
 package com.spacesim.persistence;
 
 import com.spacesim.player.DiscoveredObjectRef;
+import com.spacesim.player.FleetOrderType;
 import com.spacesim.player.PlayableWorldState;
+import com.spacesim.player.PlayerFleetOrderState;
 import com.spacesim.player.PlayerReputationState;
 import com.spacesim.player.PlayerState;
 import com.spacesim.world.FleetId;
@@ -23,12 +25,12 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Bounded binary codec for the Stage-12 playable save envelope.
+ * Bounded binary codec for the playable save envelope.
  *
- * <p>The envelope embeds an unchanged {@link WorldStateCodec} payload plus player state. A raw
- * pre-Stage-12 WorldState save is accepted as a legacy input and migrates to a current
- * {@link PlayableWorldState} with no initialized player. Playable schema v1 migrates with an
- * undocked player because persistent docking was introduced in schema v2.</p>
+ * <p>The envelope embeds an unchanged {@link WorldStateCodec} payload plus player state. Raw
+ * pre-player WorldState saves migrate with no player. Playable schema v1 migrates undocked,
+ * schema v2 migrates with docking but no Stage-15 fleet orders, and current schema v3 persists
+ * declarative delegated orders without serializing transient execution objects.</p>
  */
 public final class PlayableWorldStateCodec {
     private static final int MAGIC = 0x53545053;
@@ -40,6 +42,8 @@ public final class PlayableWorldStateCodec {
     private static final int MAX_OWNED_FLEETS = 100_000;
     private static final int MAX_DISCOVERED_SYSTEMS = 100_000;
     private static final int MAX_DISCOVERED_OBJECTS = 1_000_000;
+    private static final int MAX_FLEET_ORDERS = 100_000;
+    private static final int MAX_PATROL_SYSTEMS = 4096;
 
     private PlayableWorldStateCodec() {
         throw new AssertionError("PlayableWorldStateCodec does not create instances");
@@ -85,7 +89,7 @@ public final class PlayableWorldStateCodec {
     }
 
     /**
-     * Decodes a current playable save or migrates a raw legacy WorldState save.
+     * Decodes a current playable save or migrates supported legacy formats.
      *
      * @param bytes playable envelope or pre-Stage-12 WorldState bytes
      * @return current playable state
@@ -187,6 +191,7 @@ public final class PlayableWorldStateCodec {
 
     private static void requireSupportedSchema(int schemaVersion) {
         if (schemaVersion != PlayableWorldState.CURRENT_VERSION
+                && schemaVersion != PlayableWorldState.LEGACY_DOCKING_VERSION
                 && schemaVersion != PlayableWorldState.LEGACY_STAGE12A_VERSION) {
             throw new IllegalArgumentException("Unsupported playable schema: " + schemaVersion);
         }
@@ -208,6 +213,7 @@ public final class PlayableWorldStateCodec {
         requireCount("owned fleets", player.ownedFleetIds().size(), MAX_OWNED_FLEETS);
         requireCount("discovered systems", player.discoveredSystemIds().size(), MAX_DISCOVERED_SYSTEMS);
         requireCount("discovered objects", player.discoveredObjects().size(), MAX_DISCOVERED_OBJECTS);
+        requireCount("fleet orders", player.fleetOrders().size(), MAX_FLEET_ORDERS);
 
         output.writeLong(player.walletMilliCredits());
         writeNullableContentId(output, player.factionContentId());
@@ -245,6 +251,11 @@ public final class PlayableWorldStateCodec {
         if (player.dockedAt() != null) {
             writeObjectRef(output, player.dockedAt());
         }
+
+        output.writeInt(player.fleetOrders().size());
+        for (PlayerFleetOrderState order : player.fleetOrders()) {
+            writeFleetOrder(output, order);
+        }
     }
 
     private static PlayerState readPlayer(DataInputStream input, int schemaVersion) throws IOException {
@@ -276,10 +287,67 @@ public final class PlayableWorldStateCodec {
             objects.add(readObjectRef(input));
         }
         StarSystemId home = input.readBoolean() ? new StarSystemId(input.readLong()) : null;
-        DiscoveredObjectRef dockedAt = schemaVersion >= PlayableWorldState.CURRENT_VERSION
+        DiscoveredObjectRef dockedAt = schemaVersion >= PlayableWorldState.LEGACY_DOCKING_VERSION
                 && input.readBoolean() ? readObjectRef(input) : null;
+
+        List<PlayerFleetOrderState> orders = List.of();
+        if (schemaVersion >= PlayableWorldState.CURRENT_VERSION) {
+            int orderCount = readCount(input, "fleet orders", MAX_FLEET_ORDERS);
+            List<PlayerFleetOrderState> decodedOrders = new ArrayList<>(orderCount);
+            for (int index = 0; index < orderCount; index++) {
+                decodedOrders.add(readFleetOrder(input));
+            }
+            orders = List.copyOf(decodedOrders);
+        }
         return new PlayerState(
-                wallet, affiliation, reputations, fleets, activeFleet, systems, objects, home, dockedAt);
+                wallet, affiliation, reputations, fleets, activeFleet, systems, objects, home, dockedAt, orders);
+    }
+
+    private static void writeFleetOrder(DataOutputStream output, PlayerFleetOrderState order) throws IOException {
+        output.writeLong(order.fleetId().value());
+        output.writeUTF(order.type().name());
+        writeNullableSystemId(output, order.targetSystemId());
+        writeNullableEntityId(output, order.targetEntityId());
+        writeNullableSystemId(output, order.secondarySystemId());
+        writeNullableEntityId(output, order.secondaryEntityId());
+        output.writeBoolean(order.targetFleetId() != null);
+        if (order.targetFleetId() != null) {
+            output.writeLong(order.targetFleetId().value());
+        }
+        writeNullableContentId(output, order.itemContentId());
+        output.writeFloat(order.targetX());
+        output.writeFloat(order.targetY());
+        requireCount("patrol systems", order.patrolSystemIds().size(), MAX_PATROL_SYSTEMS);
+        output.writeInt(order.patrolSystemIds().size());
+        for (StarSystemId systemId : order.patrolSystemIds()) {
+            output.writeLong(systemId.value());
+        }
+    }
+
+    private static PlayerFleetOrderState readFleetOrder(DataInputStream input) throws IOException {
+        FleetId fleetId = new FleetId(input.readLong());
+        FleetOrderType type;
+        try {
+            type = FleetOrderType.valueOf(input.readUTF());
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Unknown persisted fleet order type", exception);
+        }
+        StarSystemId targetSystem = readNullableSystemId(input);
+        EntityId targetEntity = readNullableEntityId(input);
+        StarSystemId secondarySystem = readNullableSystemId(input);
+        EntityId secondaryEntity = readNullableEntityId(input);
+        FleetId targetFleet = input.readBoolean() ? new FleetId(input.readLong()) : null;
+        String itemContentId = readNullableContentId(input);
+        float targetX = input.readFloat();
+        float targetY = input.readFloat();
+        int patrolCount = readCount(input, "patrol systems", MAX_PATROL_SYSTEMS);
+        List<StarSystemId> patrol = new ArrayList<>(patrolCount);
+        for (int index = 0; index < patrolCount; index++) {
+            patrol.add(new StarSystemId(input.readLong()));
+        }
+        return new PlayerFleetOrderState(
+                fleetId, type, targetSystem, targetEntity, secondarySystem, secondaryEntity,
+                targetFleet, itemContentId, targetX, targetY, patrol);
     }
 
     private static void writeObjectRef(DataOutputStream output, DiscoveredObjectRef reference) throws IOException {
@@ -291,6 +359,28 @@ public final class PlayableWorldStateCodec {
         return new DiscoveredObjectRef(
                 new StarSystemId(input.readLong()),
                 new EntityId(input.readLong()));
+    }
+
+    private static void writeNullableSystemId(DataOutputStream output, StarSystemId value) throws IOException {
+        output.writeBoolean(value != null);
+        if (value != null) {
+            output.writeLong(value.value());
+        }
+    }
+
+    private static StarSystemId readNullableSystemId(DataInputStream input) throws IOException {
+        return input.readBoolean() ? new StarSystemId(input.readLong()) : null;
+    }
+
+    private static void writeNullableEntityId(DataOutputStream output, EntityId value) throws IOException {
+        output.writeBoolean(value != null);
+        if (value != null) {
+            output.writeLong(value.value());
+        }
+    }
+
+    private static EntityId readNullableEntityId(DataInputStream input) throws IOException {
+        return input.readBoolean() ? new EntityId(input.readLong()) : null;
     }
 
     private static void writeNullableContentId(DataOutputStream output, String value) throws IOException {
