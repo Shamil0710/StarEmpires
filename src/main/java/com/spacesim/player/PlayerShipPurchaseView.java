@@ -57,7 +57,18 @@ public record PlayerShipPurchaseView(
         }
     }
 
-    /** Validates immutable view fields. */
+    /**
+     * Validates immutable view fields.
+     *
+     * @param status current authoritative eligibility result
+     * @param systemId offer system
+     * @param sellerStationId seller station ID
+     * @param fleetId offered persistent FleetId
+     * @param shipName human-readable live ship name when resolvable, otherwise an empty string
+     * @param archetypeContentId stable ship archetype ID when resolvable, otherwise an empty string
+     * @param priceMilliCredits requested transfer price
+     * @param playerWalletMilliCredits current player wallet
+     */
     public PlayerShipPurchaseView {
         Objects.requireNonNull(status, "Purchase status not set");
         Objects.requireNonNull(systemId, "Purchase systemId not set");
