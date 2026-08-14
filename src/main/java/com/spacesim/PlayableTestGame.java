@@ -15,7 +15,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.kotcrab.vis.ui.VisUI;
-import com.spacesim.components.AsteroidComponent;
 import com.spacesim.components.CombatCommandComponent;
 import com.spacesim.components.CombatComponent;
 import com.spacesim.components.CombatRuntimeComponent;
@@ -58,9 +57,11 @@ import com.spacesim.world.WorldSimulation;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Manually playable Stage-14 desktop test harness.
@@ -391,7 +392,8 @@ public final class PlayableTestGame extends ApplicationAdapter {
         if (miningService.setMiningRequested(requested)) {
             statusMessage = requested ? "Mining requested." : "Mining stopped.";
         } else {
-            statusMessage = "Mining request rejected: " + view.status().getDisplayName() + ".";
+            PlayerMiningView refreshed = miningService.view().orElse(view);
+            statusMessage = "Mining request rejected: " + refreshed.status().getDisplayName() + ".";
         }
     }
 
@@ -538,6 +540,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
             return null;
         }
         FactionComponent playerFaction = playerEntity.getComponent(FactionComponent.class);
+        Set<EntityId> ownedLocal = ownedLocalEntityIds();
         Entity best = null;
         float bestDistance = Float.POSITIVE_INFINITY;
         for (Entity entity : activeSession.getEngine().getEntities()) {
@@ -552,7 +555,8 @@ public final class PlayableTestGame extends ApplicationAdapter {
             }
             if (hostileCombatOnly) {
                 FactionComponent faction = entity.getComponent(FactionComponent.class);
-                if (entity.getComponent(CombatComponent.class) == null
+                if (ownedLocal.contains(id.id)
+                        || entity.getComponent(CombatComponent.class) == null
                         || playerFaction == null
                         || faction == null
                         || faction.factionId == playerFaction.factionId) {
@@ -568,6 +572,19 @@ public final class PlayableTestGame extends ApplicationAdapter {
             }
         }
         return best;
+    }
+
+    private Set<EntityId> ownedLocalEntityIds() {
+        Set<FleetId> owned = Set.copyOf(playerRuntime.player().ownedFleetIds());
+        Set<EntityId> localIds = new HashSet<>();
+        for (FleetPlacementState placement : world.getFleetPlacements()) {
+            if (placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                    && boundSystemId.equals(placement.systemId())
+                    && owned.contains(placement.id())) {
+                localIds.add(placement.localEntityId());
+            }
+        }
+        return Set.copyOf(localIds);
     }
 
     private static boolean lowerEntityId(Entity candidate, Entity current) {
@@ -855,7 +872,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
                 mapLayout,
                 playerEntity);
         LocalMinimapSnapshot minimap = LocalMinimapModel.capture(
-                activeSession.getEngine().getEntities(), playerEntity);
+                activeSession.getEngine().getEntities(), playerEntity, ownedLocalEntityIds());
         minimapRenderer.render(
                 stage.getCamera().combined,
                 minimapLayout,
