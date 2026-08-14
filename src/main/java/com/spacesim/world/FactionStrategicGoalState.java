@@ -13,18 +13,34 @@ import java.util.Set;
  * @param goalId stable ID цели внутри faction state
  * @param type тип стратегической цели
  * @param demandFloors demand floors по stable item IDs
+ * @param growthPlan optional Stage-11 persistent spatial expansion plan; допустим только для EXPANSION
  */
 public record FactionStrategicGoalState(
         String goalId,
         GoalType type,
-        List<FactionStockPolicyState> demandFloors) implements Comparable<FactionStrategicGoalState> {
+        List<FactionStockPolicyState> demandFloors,
+        StrategicGrowthState.Plan growthPlan) implements Comparable<FactionStrategicGoalState> {
 
-    /** Поддерживаемые типы strategic demand текущего Stage 8. */
+    /** Поддерживаемые типы strategic demand. */
     public enum GoalType {
         /** Военный спрос на вооружение/материалы/энергию. */
         MILITARY,
-        /** Спрос расширения на снабжение новых активов и территорий. */
+        /** Спрос расширения и optional physical Stage-11 expansion plan. */
         EXPANSION
+    }
+
+    /**
+     * Source-compatible constructor для Stage-8 goal без physical expansion plan.
+     *
+     * @param goalId stable ID цели
+     * @param type goal type
+     * @param demandFloors demand floors
+     */
+    public FactionStrategicGoalState(
+            String goalId,
+            GoalType type,
+            List<FactionStockPolicyState> demandFloors) {
+        this(goalId, type, demandFloors, null);
     }
 
     /**
@@ -33,6 +49,7 @@ public record FactionStrategicGoalState(
      * @param goalId stable ID цели
      * @param type goal type
      * @param demandFloors demand floors
+     * @param growthPlan optional Stage-11 expansion plan
      */
     public FactionStrategicGoalState {
         goalId = Objects.requireNonNull(goalId, "Strategic goal ID не задан").strip();
@@ -44,6 +61,10 @@ public record FactionStrategicGoalState(
         if (demandFloors.isEmpty()) {
             throw new IllegalArgumentException("Strategic goal должен создавать хотя бы один demand floor");
         }
+        if (growthPlan != null && type != GoalType.EXPANSION) {
+            throw new IllegalArgumentException("Physical growth plan допустим только для EXPANSION goal");
+        }
+
         List<FactionStockPolicyState> sorted = new ArrayList<>(demandFloors.size());
         Set<String> seenItems = new HashSet<>();
         for (FactionStockPolicyState demand : demandFloors) {
@@ -56,6 +77,11 @@ public record FactionStrategicGoalState(
         }
         sorted.sort(Comparator.naturalOrder());
         demandFloors = List.copyOf(sorted);
+    }
+
+    /** @return true when this goal carries a persistent Stage-11 spatial plan */
+    public boolean hasGrowthPlan() {
+        return growthPlan != null;
     }
 
     /** @param other другая goal @return deterministic lexical ordering по stable goal ID */

@@ -24,14 +24,17 @@ import java.util.Objects;
 /**
  * Детерминированный бинарный codec {@link WorldState}.
  *
- * <p>Schema v1 хранит topology + local sessions, v2 добавляет faction treasury, v3 strategic
+ * <p>World schema v1 хранит topology + local sessions, v2 добавляет faction treasury, v3 strategic
  * state, v4 construction projects, v5 economic pressure/hysteresis, v6 world-level fleet
- * placement/transit state, а v7 active jump FSM. Local entity payload продолжает кодироваться
+ * placement/transit state, а v7 active jump FSM. File format v2 добавляет bounded Stage-11
+ * strategic-growth trailer, не меняя top-level WorldState schema. File format v1 мигрируется с
+ * пустыми physical growth plans. Local entity payload продолжает кодироваться
  * {@link GameStateCodec}.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
-    private static final int FILE_FORMAT_VERSION = 1;
+    private static final int LEGACY_FILE_FORMAT_VERSION = 1;
+    private static final int FILE_FORMAT_VERSION = 2;
     private static final int MAX_SAVE_BYTES = 256 * 1024 * 1024;
 
     private WorldStateCodec() {
@@ -70,6 +73,7 @@ public final class WorldStateCodec {
                 output.writeLong(checked.nextFleetIdValue());
                 WorldFleetBinary.write(output, checked.fleets());
                 WorldFleetBinary.writeJumps(output, checked.fleetJumps());
+                WorldStrategicGrowthBinary.write(output, checked.factionStrategies());
             }
 
             byte[] bytes = buffer.toByteArray();
@@ -98,13 +102,12 @@ public final class WorldStateCodec {
                     "Размер WorldState находится вне допустимого диапазона");
         }
 
-        try (DataInputStream input =
-                     new DataInputStream(new ByteArrayInputStream(bytes))) {
+        try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes))) {
             if (input.readInt() != MAGIC) {
                 throw new IllegalArgumentException("Некорректный magic WorldState");
             }
             int fileVersion = input.readInt();
-            if (fileVersion != FILE_FORMAT_VERSION) {
+            if (fileVersion != FILE_FORMAT_VERSION && fileVersion != LEGACY_FILE_FORMAT_VERSION) {
                 throw new IllegalArgumentException(
                         "Неподдерживаемая версия world-файла: " + fileVersion);
             }
@@ -115,6 +118,11 @@ public final class WorldStateCodec {
             GalaxyTopology topology = WorldTopologyBinary.read(input);
             List<StarSystemSimulationState> systems = WorldSystemBinary.read(input);
             WorldState state = readSchema(input, schemaVersion, topology, systems);
+            if (fileVersion == FILE_FORMAT_VERSION) {
+                List<FactionStrategicState> strategies =
+                        WorldStrategicGrowthBinary.readAndAttach(input, state.factionStrategies());
+                state = withStrategies(state, strategies);
+            }
 
             if (input.read() != -1) {
                 throw new IllegalArgumentException(
@@ -268,5 +276,22 @@ public final class WorldStateCodec {
                 nextFleetId,
                 fleets,
                 WorldFleetBinary.readJumps(input));
+    }
+
+    private static WorldState withStrategies(
+            WorldState state,
+            List<FactionStrategicState> strategies) {
+        return new WorldState(
+                state.schemaVersion(),
+                state.topology(),
+                state.systems(),
+                state.factions(),
+                strategies,
+                state.nextConstructionProjectIdValue(),
+                state.constructionProjects(),
+                state.factionEconomicPressures(),
+                state.nextFleetIdValue(),
+                state.fleets(),
+                state.fleetJumps());
     }
 }
