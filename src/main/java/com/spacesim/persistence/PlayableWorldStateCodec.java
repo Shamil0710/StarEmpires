@@ -6,6 +6,8 @@ import com.spacesim.player.PlayableWorldState;
 import com.spacesim.player.PlayerFleetOrderState;
 import com.spacesim.player.PlayerReputationState;
 import com.spacesim.player.PlayerState;
+import com.spacesim.player.PlayerThreatIntelKind;
+import com.spacesim.player.PlayerThreatIntelState;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldState;
@@ -29,8 +31,8 @@ import java.util.Objects;
  *
  * <p>The envelope embeds an unchanged {@link WorldStateCodec} payload plus player state. Raw
  * pre-player WorldState saves migrate with no player. Playable schema v1 migrates undocked,
- * schema v2 migrates with docking but no Stage-15 fleet orders, and current schema v3 persists
- * declarative delegated orders without serializing transient execution objects.</p>
+ * schema v2 adds docking, schema v3 adds persistent fleet orders, and current schema v4 adds
+ * non-omniscient observed threat intelligence without serializing transient survival state.</p>
  */
 public final class PlayableWorldStateCodec {
     private static final int MAGIC = 0x53545053;
@@ -44,6 +46,7 @@ public final class PlayableWorldStateCodec {
     private static final int MAX_DISCOVERED_OBJECTS = 1_000_000;
     private static final int MAX_FLEET_ORDERS = 100_000;
     private static final int MAX_PATROL_SYSTEMS = 4096;
+    private static final int MAX_THREAT_INTEL = 200_000;
 
     private PlayableWorldStateCodec() {
         throw new AssertionError("PlayableWorldStateCodec does not create instances");
@@ -191,6 +194,7 @@ public final class PlayableWorldStateCodec {
 
     private static void requireSupportedSchema(int schemaVersion) {
         if (schemaVersion != PlayableWorldState.CURRENT_VERSION
+                && schemaVersion != PlayableWorldState.LEGACY_FLEET_ORDERS_VERSION
                 && schemaVersion != PlayableWorldState.LEGACY_DOCKING_VERSION
                 && schemaVersion != PlayableWorldState.LEGACY_STAGE12A_VERSION) {
             throw new IllegalArgumentException("Unsupported playable schema: " + schemaVersion);
@@ -214,6 +218,7 @@ public final class PlayableWorldStateCodec {
         requireCount("discovered systems", player.discoveredSystemIds().size(), MAX_DISCOVERED_SYSTEMS);
         requireCount("discovered objects", player.discoveredObjects().size(), MAX_DISCOVERED_OBJECTS);
         requireCount("fleet orders", player.fleetOrders().size(), MAX_FLEET_ORDERS);
+        requireCount("threat intel", player.threatIntel().size(), MAX_THREAT_INTEL);
 
         output.writeLong(player.walletMilliCredits());
         writeNullableContentId(output, player.factionContentId());
@@ -256,6 +261,11 @@ public final class PlayableWorldStateCodec {
         for (PlayerFleetOrderState order : player.fleetOrders()) {
             writeFleetOrder(output, order);
         }
+
+        output.writeInt(player.threatIntel().size());
+        for (PlayerThreatIntelState intel : player.threatIntel()) {
+            writeThreatIntel(output, intel);
+        }
     }
 
     private static PlayerState readPlayer(DataInputStream input, int schemaVersion) throws IOException {
@@ -291,7 +301,7 @@ public final class PlayableWorldStateCodec {
                 && input.readBoolean() ? readObjectRef(input) : null;
 
         List<PlayerFleetOrderState> orders = List.of();
-        if (schemaVersion >= PlayableWorldState.CURRENT_VERSION) {
+        if (schemaVersion >= PlayableWorldState.LEGACY_FLEET_ORDERS_VERSION) {
             int orderCount = readCount(input, "fleet orders", MAX_FLEET_ORDERS);
             List<PlayerFleetOrderState> decodedOrders = new ArrayList<>(orderCount);
             for (int index = 0; index < orderCount; index++) {
@@ -299,8 +309,19 @@ public final class PlayableWorldStateCodec {
             }
             orders = List.copyOf(decodedOrders);
         }
+
+        List<PlayerThreatIntelState> intel = List.of();
+        if (schemaVersion >= PlayableWorldState.CURRENT_VERSION) {
+            int intelCount = readCount(input, "threat intel", MAX_THREAT_INTEL);
+            List<PlayerThreatIntelState> decodedIntel = new ArrayList<>(intelCount);
+            for (int index = 0; index < intelCount; index++) {
+                decodedIntel.add(readThreatIntel(input));
+            }
+            intel = List.copyOf(decodedIntel);
+        }
         return new PlayerState(
-                wallet, affiliation, reputations, fleets, activeFleet, systems, objects, home, dockedAt, orders);
+                wallet, affiliation, reputations, fleets, activeFleet, systems, objects,
+                home, dockedAt, orders, intel);
     }
 
     private static void writeFleetOrder(DataOutputStream output, PlayerFleetOrderState order) throws IOException {
@@ -348,6 +369,28 @@ public final class PlayableWorldStateCodec {
         return new PlayerFleetOrderState(
                 fleetId, type, targetSystem, targetEntity, secondarySystem, secondaryEntity,
                 targetFleet, itemContentId, targetX, targetY, patrol);
+    }
+
+    private static void writeThreatIntel(DataOutputStream output, PlayerThreatIntelState intel) throws IOException {
+        output.writeUTF(intel.kind().name());
+        output.writeLong(intel.systemA().value());
+        writeNullableSystemId(output, intel.systemB());
+        output.writeFloat(intel.dangerScore());
+        output.writeFloat(intel.confidence());
+        output.writeLong(intel.observedTick());
+    }
+
+    private static PlayerThreatIntelState readThreatIntel(DataInputStream input) throws IOException {
+        PlayerThreatIntelKind kind;
+        try {
+            kind = PlayerThreatIntelKind.valueOf(input.readUTF());
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Unknown persisted threat intel kind", exception);
+        }
+        StarSystemId systemA = new StarSystemId(input.readLong());
+        StarSystemId systemB = readNullableSystemId(input);
+        return new PlayerThreatIntelState(
+                kind, systemA, systemB, input.readFloat(), input.readFloat(), input.readLong());
     }
 
     private static void writeObjectRef(DataOutputStream output, DiscoveredObjectRef reference) throws IOException {
