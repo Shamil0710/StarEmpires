@@ -54,7 +54,13 @@ class Stage16EndToEndAcceptanceTest {
         FleetPlacementState activeFleet = runtime.world().findFleet(runtime.player().activeFleetId()).orElseThrow();
         FleetPlacementState steelHauler = findFleetByArchetype(
                 runtime, activeFleet.systemId(), "ship.steel_hauler", activeFleet.id());
-        addOwnedFleet(runtime, steelHauler.id());
+        Entity steelSupplier = findMarketByArchetype(runtime, activeFleet.systemId(), "station.foundry");
+        addOwnedFleetAndDiscoveredSupplier(
+                runtime,
+                steelHauler.id(),
+                new DiscoveredObjectRef(
+                        activeFleet.systemId(),
+                        steelSupplier.getComponent(EntityIdComponent.class).id));
 
         PlayerConstructionService construction = new PlayerConstructionService(runtime);
         PlayerConstructionPlacementView location = findValidPlacement(construction);
@@ -153,12 +159,31 @@ class Stage16EndToEndAcceptanceTest {
         cargo.stock[energy.runtimeId()] += 60;
     }
 
-    private static void addOwnedFleet(PlayerRuntime runtime, FleetId fleetId) {
+    private static void addOwnedFleetAndDiscoveredSupplier(
+            PlayerRuntime runtime,
+            FleetId fleetId,
+            DiscoveredObjectRef supplier) {
         PlayerState player = runtime.player();
         List<FleetId> fleets = new ArrayList<>(player.ownedFleetIds());
         fleets.add(fleetId);
-        runtime.replacePlayerState(PlayerRuntime.copyWithOwnershipAndWallet(
-                player, player.walletMilliCredits(), fleets, player.activeFleetId()));
+        List<DiscoveredObjectRef> objects = new ArrayList<>(player.discoveredObjects());
+        if (!objects.contains(supplier)) {
+            objects.add(supplier);
+        }
+        runtime.replacePlayerState(new PlayerState(
+                player.walletMilliCredits(),
+                player.factionContentId(),
+                player.reputations(),
+                fleets,
+                player.activeFleetId(),
+                player.discoveredSystemIds(),
+                objects,
+                player.homeSystemId(),
+                player.dockedAt(),
+                player.fleetOrders(),
+                player.threatIntel(),
+                player.ownedConstructionProjectIds(),
+                player.ownedStations()));
     }
 
     private static void performExternalEnergyDelivery(
