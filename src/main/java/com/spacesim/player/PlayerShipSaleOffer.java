@@ -24,7 +24,14 @@ public record PlayerShipSaleOffer(
         EntityId sellerStationId,
         FleetId fleetId,
         long priceMilliCredits) {
-    /** Validates stable references and a strictly positive price. */
+    /**
+     * Validates stable references and a strictly positive price.
+     *
+     * @param systemId system containing both the seller and offered fleet
+     * @param sellerStationId persistent local EntityId of the seller station
+     * @param fleetId persistent physical fleet offered for transfer
+     * @param priceMilliCredits positive purchase price in authoritative milli-credits
+     */
     public PlayerShipSaleOffer {
         Objects.requireNonNull(systemId, "Sale-offer systemId not set");
         Objects.requireNonNull(sellerStationId, "Sale-offer sellerStationId not set");
