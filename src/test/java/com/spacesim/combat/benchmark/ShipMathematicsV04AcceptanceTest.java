@@ -24,13 +24,13 @@ class ShipMathematicsV04AcceptanceTest {
         assertEquals(3, battleshipOnly.leakers(),
                 "The calibrated unescorted battleship must not make the corvette wave irrelevant");
         assertEquals(0, escorted.leakers(),
-                "The reference first wave should be stopped by battleship plus one dedicated escort");
+                "The reference first wave should be stopped by battleship plus one close-screen escort");
         assertTrue(escorted.leakers() * 2 <= battleshipOnly.leakers(),
                 "The reference escort should cut first-wave leakers by at least half");
     }
 
     @Test
-    void defensiveDepthComesFromFiniteLaunchersChannelsAndPointDefense() {
+    void defensiveDepthComesFromFiniteLaunchersChannelsAndDistributedPointDefense() {
         DeterministicSalvoHarness.SalvoReport battleshipOnly =
                 DeterministicSalvoHarness.runScenario(false);
         DeterministicSalvoHarness.SalvoReport escorted =
@@ -54,9 +54,9 @@ class ShipMathematicsV04AcceptanceTest {
         assertEquals(8, escorted.fleetInterceptorKills());
         assertEquals(10, escorted.pointDefenseLasers());
         assertEquals(28, escorted.laserMissionKills());
-        assertEquals(6, escorted.laserBallisticMissNeutralizations());
-        assertEquals(22, escorted.laserHardKills());
-        assertEquals(143.12, escorted.laserBeamSeconds(), 0.05);
+        assertEquals(9, escorted.laserBallisticMissNeutralizations());
+        assertEquals(19, escorted.laserHardKills());
+        assertEquals(140.88, escorted.laserBeamSeconds(), 0.05);
 
         assertTrue(battleshipOnly.laserMissionKills() > battleshipOnly.laserBallisticMissNeutralizations(),
                 "A guidance kill must not automatically erase a still-dangerous 12 t missile body");
@@ -65,12 +65,24 @@ class ShipMathematicsV04AcceptanceTest {
     }
 
     @Test
-    void proportionalNavigationInterceptHasARealTimeAndSafeDistanceEnvelope() {
+    void proportionalNavigationExposesSafeDistanceAndFormationGeometry() {
         double areaEntryTime = (DeterministicSalvoHarness.INITIAL_RANGE_M
                 - DeterministicSalvoHarness.AREA_DEFENSE_RANGE_M)
                 / DeterministicSalvoHarness.INCOMING_SPEED_MPS;
-        DeterministicSalvoHarness.InterceptResult timely =
+        double fleetEntryTime = (DeterministicSalvoHarness.INITIAL_RANGE_M
+                - DeterministicSalvoHarness.FLEET_INTERCEPTOR_RANGE_M)
+                / DeterministicSalvoHarness.INCOMING_SPEED_MPS;
+
+        DeterministicSalvoHarness.InterceptResult timelyAreaIntercept =
                 DeterministicSalvoHarness.predictReferenceIntercept(true, 23, areaEntryTime, 0.0);
+        DeterministicSalvoHarness.InterceptResult closeEscortFleetIntercept =
+                DeterministicSalvoHarness.predictReferenceIntercept(
+                        false,
+                        23,
+                        fleetEntryTime,
+                        DeterministicSalvoHarness.DEFENDER_ESCORT_OFFSET_Y_M);
+        DeterministicSalvoHarness.InterceptResult overWideEscortFleetIntercept =
+                DeterministicSalvoHarness.predictReferenceIntercept(false, 23, fleetEntryTime, 25_000.0);
         DeterministicSalvoHarness.InterceptResult tooLate =
                 DeterministicSalvoHarness.predictReferenceIntercept(
                         false,
@@ -78,11 +90,15 @@ class ShipMathematicsV04AcceptanceTest {
                         DeterministicSalvoHarness.IMPACT_TIME_S - 1.0,
                         0.0);
 
-        assertTrue(timely.success());
-        assertTrue(timely.interceptTimeS() > areaEntryTime);
-        assertTrue(timely.interceptTimeS() < DeterministicSalvoHarness.IMPACT_TIME_S);
-        assertTrue(timely.closestRangeM() <= 150.0);
+        assertTrue(timelyAreaIntercept.success());
+        assertTrue(timelyAreaIntercept.interceptTimeS() > areaEntryTime);
+        assertTrue(timelyAreaIntercept.interceptTimeS() < DeterministicSalvoHarness.IMPACT_TIME_S);
+        assertTrue(timelyAreaIntercept.closestRangeM() <= 150.0);
 
+        assertTrue(closeEscortFleetIntercept.success(),
+                "A 15 km close-screen escort can use the 350 km M-interceptor layer safely");
+        assertFalse(overWideEscortFleetIntercept.success(),
+                "At 25 km lateral separation the same inner-layer interceptor reaches the threat too late");
         assertFalse(tooLate.success(),
                 "A proximity event inside the protected ship's safe-intercept boundary is not defense");
     }
