@@ -115,7 +115,15 @@ public final class ConstructionDurationPolicy {
             double baseSetupSeconds,
             double materialAssemblySeconds,
             double totalSeconds) {
-        /** Validates a finite, internally consistent duration breakdown. */
+        /**
+         * Validates a finite, internally consistent duration breakdown.
+         *
+         * @param totalMaterialUnits total required whole item units
+         * @param materialWorkUnits weighted handling/fabrication work
+         * @param baseSetupSeconds authored archetype setup/complexity allowance
+         * @param materialAssemblySeconds time caused specifically by the material bill
+         * @param totalSeconds final calculated build duration
+         */
         public Estimate {
             if (totalMaterialUnits <= 0L
                     || !Double.isFinite(materialWorkUnits) || materialWorkUnits <= 0d
