@@ -57,8 +57,8 @@ public final class GlobalFleetMapModel {
             systems.add(new GlobalFleetMapSnapshot.SystemMarker(
                     node.id(),
                     node.name(),
-                    node.galaxyX(),
-                    node.galaxyY(),
+                    node.x(),
+                    node.y(),
                     intel == null ? 0d : intel.dangerScore(),
                     intel == null ? 0f : intel.confidence()));
         }
