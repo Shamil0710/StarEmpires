@@ -3,6 +3,7 @@ package com.spacesim.player;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
+import com.spacesim.world.LocalSystemCoordinates;
 import com.spacesim.world.StarSystemId;
 
 import java.util.List;
@@ -33,7 +34,7 @@ public final class PlayerStrategicCommandService {
     }
 
     /**
-     * Issues a strategic MOVE toward the conventional local arrival origin of a discovered system.
+     * Issues a strategic MOVE toward the canonical safe local arrival anchor of a discovered system.
      *
      * @param fleetId owned fleet
      * @param destination discovered destination system
@@ -43,8 +44,8 @@ public final class PlayerStrategicCommandService {
         return orders.issue(PlayerFleetOrderState.move(
                 Objects.requireNonNull(fleetId, "Strategic FleetId not set"),
                 Objects.requireNonNull(destination, "Strategic destination not set"),
-                0f,
-                0f));
+                LocalSystemCoordinates.ARRIVAL_X,
+                LocalSystemCoordinates.ARRIVAL_Y));
     }
 
     /**
