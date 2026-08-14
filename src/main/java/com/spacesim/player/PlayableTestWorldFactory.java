@@ -196,7 +196,13 @@ public final class PlayableTestWorldFactory {
      * @param route recommended manual acceptance route
      */
     public record Scenario(ContentCatalog content, PlayerRuntime runtime, Route route) {
-        /** Validates the scenario dependencies. */
+        /**
+         * Validates the scenario dependencies.
+         *
+         * @param content authoritative content catalog
+         * @param runtime initialized player runtime
+         * @param route recommended manual acceptance route
+         */
         public Scenario {
             Objects.requireNonNull(content, "Scenario content not set");
             Objects.requireNonNull(runtime, "Scenario runtime not set");
@@ -225,7 +231,18 @@ public final class PlayableTestWorldFactory {
             String itemDisplayName,
             float sourceSellPriceCredits,
             float destinationBuyPriceCredits) {
-        /** Validates route metadata. */
+        /**
+         * Validates route metadata.
+         *
+         * @param sourceSystem source StarSystem
+         * @param destinationSystem destination StarSystem
+         * @param sourceStationName source market name
+         * @param destinationStationName destination market name
+         * @param itemContentId stable content ID of recommended cargo
+         * @param itemDisplayName display name of recommended cargo
+         * @param sourceSellPriceCredits initialized source station sell price
+         * @param destinationBuyPriceCredits initialized destination station buy price
+         */
         public Route {
             Objects.requireNonNull(sourceSystem, "Route source system not set");
             Objects.requireNonNull(destinationSystem, "Route destination system not set");
