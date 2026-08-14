@@ -59,6 +59,30 @@ public final class PlayerFleetEconomyService {
      * @return whole units transferred, or zero when current physical/economic constraints reject it
      */
     public int buyMaximum(FleetId fleetId, DiscoveredObjectRef stationRef, String itemContentId) {
+        return buyUpTo(fleetId, stationRef, itemContentId, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Buys at most the requested number of real cargo units for an owned fleet.
+     *
+     * <p>This bounded variant is used by construction logistics so a supply order cannot buy more
+     * material than the target project still requires. The same ordinary TradeController performs
+     * the physical inventory and money transfer.</p>
+     *
+     * @param fleetId physical player-owned fleet
+     * @param stationRef discovered physical source market
+     * @param itemContentId stable content item ID
+     * @param maximumUnits positive upper bound on transferred units
+     * @return whole units transferred, or zero when current physical/economic constraints reject it
+     */
+    public int buyUpTo(
+            FleetId fleetId,
+            DiscoveredObjectRef stationRef,
+            String itemContentId,
+            int maximumUnits) {
+        if (maximumUnits <= 0) {
+            throw new IllegalArgumentException("Delegated purchase maximum must be positive");
+        }
         Context context = context(fleetId, stationRef, itemContentId);
         if (context == null || !context.ship().canPurchaseItem(context.item().runtimeId())) {
             return 0;
@@ -66,7 +90,8 @@ public final class PlayerFleetEconomyService {
         int itemId = context.item().runtimeId();
         float price = context.controller().getEffectiveSellPrice(
                 context.station(), itemId, context.proxyReputation());
-        int amount = Math.min(context.stationInventory().stock[itemId], context.shipInventory().getFreeCapacity());
+        int amount = Math.min(maximumUnits,
+                Math.min(context.stationInventory().stock[itemId], context.shipInventory().getFreeCapacity()));
         amount = Math.min(amount, affordable(context.proxyWallet().getBalanceMilliCredits(), price, amount));
         if (amount <= 0 || !context.controller().buyFromStation(
                 context.station(), context.proxy(), itemId, amount, context.proxyReputation())) {
