@@ -35,6 +35,10 @@ import java.util.TreeMap;
  * {@link PlayerState}. The world project uses {@link ConstructionSettlementKind#EXTERNAL_OWNER},
  * so an independent player does not need a hidden faction treasury before Stage 17.</p>
  *
+ * <p>Project authoring is guarded by {@link ConstructionPlacementPolicy}; UI code may preview the
+ * same authoritative result but cannot bypass bounds, permanent-object clearance, jump-arrival or
+ * current territorial access rules.</p>
+ *
  * <p>Player funding is a real atomic money transfer from the persistent personal wallet into the
  * physical construction-site {@link WalletComponent}. The site can therefore pay ordinary market
  * suppliers; extra funding changes liquidity only and never rewrites persisted build duration.</p>
@@ -91,13 +95,28 @@ public final class PlayerConstructionService {
     }
 
     /**
+     * Previews one construction location using exactly the same policy as project creation.
+     *
+     * @param x requested local X coordinate
+     * @param y requested local Y coordinate
+     * @return authoritative read-only placement decision
+     * @throws IllegalStateException when no active owned fleet is physically present in a discovered system
+     */
+    public PlayerConstructionPlacementView previewPlacement(float x, float y) {
+        PlayerState player = runtime.player();
+        FleetPlacementState placement = authoringPlacement(player);
+        return ConstructionPlacementPolicy.evaluate(
+                runtime.world(), player, placement.systemId(), x, y);
+    }
+
+    /**
      * Creates one independent player-owned construction project in the active fleet's system.
      *
      * @param stationArchetypeContentId constructible station archetype content ID
      * @param x finite local-system X coordinate
      * @param y finite local-system Y coordinate
      * @return stable world-level construction project ID
-     * @throws IllegalArgumentException for unknown/non-constructible archetype or invalid coordinates
+     * @throws IllegalArgumentException for unknown/non-constructible archetype or rejected placement
      * @throws IllegalStateException when no owned active fleet is physically present in a discovered system
      */
     public ConstructionProjectId createProject(
@@ -105,23 +124,17 @@ public final class PlayerConstructionService {
             float x,
             float y) {
         String archetypeId = requireConstructible(stationArchetypeContentId).id();
-        if (!Float.isFinite(x) || !Float.isFinite(y)) {
-            throw new IllegalArgumentException("Construction coordinates must be finite");
-        }
-
         PlayerState current = runtime.player();
-        FleetPlacementState placement = current.activeFleetId() == null
-                ? null : runtime.world().findFleet(current.activeFleetId()).orElse(null);
-        if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
-            throw new IllegalStateException("Active player fleet must be physically present to author construction");
-        }
-        StarSystemId systemId = placement.systemId();
-        if (!current.discoveredSystemIds().contains(systemId)) {
-            throw new IllegalStateException("Construction system must be discovered by the player");
+        FleetPlacementState placement = authoringPlacement(current);
+        PlayerConstructionPlacementView placementView = ConstructionPlacementPolicy.evaluate(
+                runtime.world(), current, placement.systemId(), x, y);
+        if (!placementView.allowed()) {
+            throw new IllegalArgumentException(
+                    "Construction placement rejected: " + placementView.rejection());
         }
 
         ConstructionProjectId projectId = runtime.world().createConstructionProject(
-                null, archetypeId, systemId, x, y);
+                null, archetypeId, placement.systemId(), x, y);
         try {
             ConstructionProjectState state = runtime.world().findConstructionProject(projectId).orElseThrow();
             requireExternalContract(state);
@@ -258,6 +271,19 @@ public final class PlayerConstructionService {
                 placement.localEntityId(),
                 item.id(),
                 amount);
+    }
+
+    private FleetPlacementState authoringPlacement(PlayerState player) {
+        FleetPlacementState placement = player.activeFleetId() == null
+                ? null : runtime.world().findFleet(player.activeFleetId()).orElse(null);
+        if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+            throw new IllegalStateException("Active player fleet must be physically present to author construction");
+        }
+        StarSystemId systemId = placement.systemId();
+        if (!player.discoveredSystemIds().contains(systemId)) {
+            throw new IllegalStateException("Construction system must be discovered by the player");
+        }
+        return placement;
     }
 
     private ConstructionProjectState requireOwnedExternalProject(ConstructionProjectId projectId) {
