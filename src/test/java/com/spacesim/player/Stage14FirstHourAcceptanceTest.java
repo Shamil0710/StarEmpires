@@ -24,10 +24,7 @@ import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.StarSystemId;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,9 +47,10 @@ class Stage14FirstHourAcceptanceTest {
         Entity source = marketByName(runtime, route.sourceSystem(), route.sourceStationName());
         driveAndDock(runtime, flight, telemetry, source);
 
-        int tradeUnits = Math.min(
-                PlayableTestWorldFactory.RECOMMENDED_TEST_UNITS,
-                market.view().orElseThrow().cargoCapacity() - market.view().orElseThrow().cargoUsed());
+        // Keep the acceptance transaction deliberately small: the living AI economy continues
+        // trading while the player physically travels, so the test must not reserve destination
+        // warehouse capacity or otherwise freeze competitors for the player's benefit.
+        int tradeUnits = 1;
         long walletBeforeBuy = runtime.player().walletMilliCredits();
         assertTrue(market.buy(route.itemContentId(), tradeUnits));
         telemetry.recordTradeWalletChange(walletBeforeBuy, runtime.player().walletMilliCredits());
@@ -113,7 +111,11 @@ class Stage14FirstHourAcceptanceTest {
         assertTrue(market.sell(content.findItem(miningComponent.resourceItem).id(), minedUnits));
         telemetry.recordMiningSaleWalletChange(walletBeforeOreSale, runtime.player().walletMilliCredits());
 
-        FleetPlacementState combatFleet = findFleet(runtime, runtime.activeShipView().orElseThrow().systemId(), false, true);
+        FleetPlacementState combatFleet = findFleet(
+                runtime,
+                runtime.activeShipView().orElseThrow().systemId(),
+                false,
+                true);
         Entity combatSeller = sellerForFleet(runtime, combatFleet);
         if (!runtime.player().dockedAt().entityId().equals(idOf(combatSeller))) {
             assertTrue(runtime.undock());
