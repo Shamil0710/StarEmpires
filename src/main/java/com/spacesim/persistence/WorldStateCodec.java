@@ -26,10 +26,10 @@ import java.util.Objects;
  *
  * <p>World schema v1 хранит topology + local sessions, v2 добавляет faction treasury, v3 strategic
  * state, v4 construction projects, v5 economic pressure/hysteresis, v6 world-level fleet
- * placement/transit state, а v7 active jump FSM. File format v2 добавляет bounded Stage-11
- * strategic-growth trailer, не меняя top-level WorldState schema. File format v1 мигрируется с
- * пустыми physical growth plans. Local entity payload продолжает кодироваться
- * {@link GameStateCodec}.</p>
+ * placement/transit state, v7 active jump FSM, а Stage-16 schema v8 разделяет construction
+ * settlement и legal/faction identity. Save v4-v7 продолжает читать старый faction-only layout и
+ * мигрирует проекты в {@code FACTION_TREASURY}. File format v2 сохраняет bounded Stage-11
+ * strategic-growth trailer. Local entity payload кодируется {@link GameStateCodec}.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
@@ -200,6 +200,7 @@ public final class WorldStateCodec {
 
     private static void requireSupportedSchema(int schemaVersion) {
         if (schemaVersion != WorldState.CURRENT_VERSION
+                && schemaVersion != WorldState.LEGACY_STAGE10_JUMP_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE10A_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE9_PRESSURE_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION
@@ -231,7 +232,9 @@ public final class WorldStateCodec {
         }
 
         long nextProjectId = input.readLong();
-        List<ConstructionProjectState> projects = WorldConstructionBinary.read(input);
+        List<ConstructionProjectState> projects = schemaVersion == WorldState.CURRENT_VERSION
+                ? WorldConstructionBinary.read(input)
+                : WorldConstructionBinary.readLegacy(input);
         if (schemaVersion == WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION) {
             return WorldState.fromLegacyStage9Construction(
                     topology, systems, factions, strategies, nextProjectId, projects);
@@ -264,6 +267,21 @@ public final class WorldStateCodec {
                     fleets);
         }
 
+        var jumps = WorldFleetBinary.readJumps(input);
+        if (schemaVersion == WorldState.LEGACY_STAGE10_JUMP_VERSION) {
+            return WorldState.fromLegacyStage10Jump(
+                    topology,
+                    systems,
+                    factions,
+                    strategies,
+                    nextProjectId,
+                    projects,
+                    pressures,
+                    nextFleetId,
+                    fleets,
+                    jumps);
+        }
+
         return new WorldState(
                 WorldState.CURRENT_VERSION,
                 topology,
@@ -275,7 +293,7 @@ public final class WorldStateCodec {
                 pressures,
                 nextFleetId,
                 fleets,
-                WorldFleetBinary.readJumps(input));
+                jumps);
     }
 
     private static WorldState withStrategies(
