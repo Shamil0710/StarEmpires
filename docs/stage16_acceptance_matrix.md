@@ -1,10 +1,16 @@
 # Star Empires — Stage 16: матрица приёмки
 
-> Статус: **ACTIVE TEST PLAN**
+> Статус: **COMPLETE / GATE PASSED**
+>
+> Финальное подтверждение: PR #70, CI #1337 / run `31849675260` — **484/484 tests**, strict Javadoc, JaCoCo и shaded desktop JAR build green.
+>
+> Итоговая запись: `docs/stage16_completion_record.md`.
 >
 > Основная спецификация: `docs/stage16_player_construction.md`.
 >
 > Политика открытого рыночного снабжения: `docs/stage16_open_market_supply.md`.
+>
+> Ниже сохранён исторический acceptance contract Stage 16. Формулировки «должен» описывают требования, по которым этап принимался; фактический результат и сознательно отложенные ограничения зафиксированы в completion record.
 
 ---
 
@@ -375,6 +381,8 @@ Player-owned station принимает участие в существующе
 
 После реализации material-fate policy доставленные материалы становятся физически recoverable и не удаляются скрыто.
 
+Фактическая Stage-16 реализация сохраняет более консервативную границу: если required materials уже физически доставлены, voluntary cancellation отклоняется до появления такой policy. Это зафиксировано в `docs/stage16_completion_record.md`.
+
 ### I3 — cancel during BUILDING baseline
 
 До появления salvage-by-progress добровольная отмена BUILDING отклоняется явной причиной.
@@ -429,6 +437,8 @@ Player-owned station принимает участие в существующе
 - отключение конкурирующей экономики ради успеха теста;
 - artificial supplier reservation ради гарантированного успеха construction trade.
 
+Финальный aggregate acceptance реализован в `Stage16EndToEndAcceptanceTest` и прошёл в CI #1337.
+
 ---
 
 ## 12. CI gate Stage 16
@@ -444,3 +454,7 @@ Player-owned station принимает участие в существующе
 - минимум один multi-system/end-to-end player construction acceptance green;
 - минимум один внешний supplier другой faction/independent actor успешно снабжает construction site через обычную рыночную экономику;
 - минимум один hostile/blocked supplier корректно отклоняется обычным access policy.
+
+### Финальный результат
+
+**PASS.** PR #70 / CI #1337 / run `31849675260`: **484/484 tests**, strict Javadoc, JaCoCo и shaded desktop JAR build green. Artifact publication столкнулась с GitHub storage quota, но не является blocking gate по `docs/ci_artifact_publication_policy.md`.
