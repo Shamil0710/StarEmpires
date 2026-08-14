@@ -87,16 +87,16 @@ public final class ArchetypeEntityFactory {
      * Создаёт экономически пустую станцию после physical construction completion.
      *
      * <p>Метод сохраняет data-driven market targets/production/archetype metadata, но намеренно
-     * не создаёт стартовые товары или деньги. Owner faction задаётся проектом, а не bootstrap
-     * factionId самого archetype. Поэтому результат безопасно проходит Stage-9A lifecycle create
-     * и не превращает завершение строительства в скрытый resource/money source.</p>
+     * не создаёт стартовые товары или деньги. Optional legal faction задаётся проектом, а не
+     * bootstrap factionId самого archetype. Независимый external-owner project поэтому может
+     * завершиться обычной station entity без фиктивного {@link FactionComponent}.</p>
      *
      * @param catalog валидированный content catalog
      * @param archetypeId target station archetype ID
      * @param name отображаемое имя экземпляра
      * @param x координата X
      * @param y координата Y
-     * @param ownerFactionId persistent faction ID владельца проекта
+     * @param ownerFactionId optional persistent legal faction ID; {@code null} для independent station
      * @return economically-empty station Entity без EntityId
      */
     public static Entity createConstructedStation(
@@ -111,7 +111,8 @@ public final class ArchetypeEntityFactory {
         if (definition == null) {
             throw new IllegalArgumentException("Неизвестный station archetype: " + archetypeId);
         }
-        ContentCatalog.FactionDefinition owner = requireFaction(checked, ownerFactionId);
+        ContentCatalog.FactionDefinition owner = ownerFactionId == null
+                ? null : requireFaction(checked, ownerFactionId);
 
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = definition.inventoryCapacity();
@@ -132,8 +133,10 @@ public final class ArchetypeEntityFactory {
                 .add(inventory)
                 .add(new WalletComponent())
                 .add(market)
-                .add(new FactionComponent(owner.runtimeId()))
                 .add(new PriceHistoryComponent());
+        if (owner != null) {
+            entity.add(new FactionComponent(owner.runtimeId()));
+        }
         if (definition.recipeId() != null) {
             ProductionComponent production = new ProductionComponent();
             production.recipes.add(checked.createRuntimeRecipe(definition.recipeId()));

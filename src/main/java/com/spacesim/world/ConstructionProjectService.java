@@ -31,6 +31,11 @@ import java.util.Optional;
  * funding/refund is intentionally handled by the player-facing Stage-16 boundary rather than by
  * this faction-treasury method.</p>
  *
+ * <p>On successful completion every project creates the same ordinary station entity. A faction
+ * project returns remaining site liquidity to its treasury as before. An external-owner project
+ * transfers remaining site liquidity into the completed station wallet, preserving money while
+ * providing real operating capital without passive income or a hidden player treasury.</p>
+ *
  * <p>New project duration is derived by {@link ConstructionDurationPolicy}: authored buildSeconds
  * is only the base setup/complexity allowance and the real material bill contributes additional
  * weighted assembly work. Once created, the resulting {@code buildDurationTicks} is persisted as
@@ -365,10 +370,6 @@ final class ConstructionProjectService {
     }
 
     private ConstructionProjectState complete(ConstructionProjectState state, long tick) {
-        if (state.settlementKind() != ConstructionSettlementKind.FACTION_TREASURY) {
-            throw new IllegalStateException(
-                    "External-owner completion требует Stage-16 player settlement/ownership boundary");
-        }
         ConstructionProjectState refreshed = refresh(state);
         if (!refreshed.materialsFulfilled()) {
             throw new IllegalStateException("BUILDING project потерял delivered materials: " + state.id());
@@ -392,21 +393,6 @@ final class ConstructionProjectService {
                     "station-construction:" + refreshed.stationArchetypeContentId());
         }
 
-        WalletComponent projectWallet = requireComponent(site, WalletComponent.class, "construction wallet");
-        long refund = projectWallet.getBalanceMilliCredits();
-        if (refund > 0L) {
-            FactionEconomicAccount owner = requireFactionAccount(refreshed.ownerFactionContentId());
-            if (!projectWallet.transferTo(owner.treasury(), refund)) {
-                throw new IllegalStateException("Не удалось вернуть construction wallet после completion");
-            }
-            session.getLedger().recordMoneyTransfer(
-                    siteName(refreshed), treasuryName(refreshed.ownerFactionContentId()), refund,
-                    "construction-project-completion-refund");
-        }
-        if (!session.removeEntity(refreshed.constructionSiteEntityId())) {
-            throw new IllegalStateException("Construction site исчез до completion: " + refreshed.id());
-        }
-
         ContentCatalog.StationArchetypeDefinition target = requireConstructible(
                 refreshed.stationArchetypeContentId());
         Entity station = ArchetypeEntityFactory.createConstructedStation(
@@ -417,6 +403,33 @@ final class ConstructionProjectService {
                 refreshed.y(),
                 refreshed.legalFactionContentId());
         EntityId stationId = session.createEntity(station);
+
+        WalletComponent projectWallet = requireComponent(site, WalletComponent.class, "construction wallet");
+        long remainingLiquidity = projectWallet.getBalanceMilliCredits();
+        if (remainingLiquidity > 0L) {
+            if (refreshed.settlementKind() == ConstructionSettlementKind.FACTION_TREASURY) {
+                FactionEconomicAccount owner = requireFactionAccount(refreshed.ownerFactionContentId());
+                if (!projectWallet.transferTo(owner.treasury(), remainingLiquidity)) {
+                    throw new IllegalStateException("Не удалось вернуть construction wallet после completion");
+                }
+                session.getLedger().recordMoneyTransfer(
+                        siteName(refreshed), treasuryName(refreshed.ownerFactionContentId()), remainingLiquidity,
+                        "construction-project-completion-refund");
+            } else {
+                WalletComponent stationWallet = requireComponent(
+                        station, WalletComponent.class, "completed station wallet");
+                if (!projectWallet.transferTo(stationWallet, remainingLiquidity)) {
+                    throw new IllegalStateException("Не удалось перенести construction wallet в completed station");
+                }
+                session.getLedger().recordMoneyTransfer(
+                        siteName(refreshed), stationName(stationId), remainingLiquidity,
+                        "construction-project-operating-capital");
+            }
+        }
+        if (!session.removeEntity(refreshed.constructionSiteEntityId())) {
+            throw new IllegalStateException("Construction site исчез до completion: " + refreshed.id());
+        }
+
         return copy(
                 refreshed,
                 ConstructionProjectStatus.COMPLETED,
@@ -583,6 +596,10 @@ final class ConstructionProjectService {
 
     private static String treasuryName(String factionId) {
         return "faction:" + factionId + ":treasury";
+    }
+
+    private static String stationName(EntityId stationId) {
+        return "station:" + stationId.value();
     }
 
     private static ConstructionProjectState copy(
