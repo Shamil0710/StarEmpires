@@ -72,6 +72,17 @@ final class TerritorialControlRuntime {
         return systemId == null ? null : controllerBySystem.get(systemId);
     }
 
+    boolean isContested(StarSystemId systemId) {
+        StarSystemId system = requireSystem(systemId);
+        for (FactionStrategicState strategy : strategies) {
+            TerritorialClaimState claim = strategy.claimFor(system);
+            if (claim != null && claim.status() == TerritorialClaimState.Status.CONTESTED) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     TerritorialClaimState declareClaim(String factionContentId, StarSystemId systemId, long worldTick) {
         String factionId = requireFaction(factionContentId);
         StarSystemId system = requireSystem(systemId);
