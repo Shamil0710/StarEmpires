@@ -1,0 +1,251 @@
+name: Stage17D Runtime Patch
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Patch WorldSimulation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = path.read_text()
+
+          def replace_once(old, new):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, got {count}: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '    private final Map<StarSystemId, String> territoryOwnerBySystem;\n'
+              '    private final ConstructionProjectService constructionProjectService;',
+              '    private final Map<StarSystemId, String> territoryOwnerBySystem;\n'
+              '    private final ConstructionProjectService constructionProjectService;\n'
+              '    private final TerritorialControlRuntime territorialControlRuntime;')
+
+          replace_once(
+              '        this.constructionProjectService = new ConstructionProjectService(\n'
+              '                contentCatalog,\n'
+              '                this.sessionsById,\n'
+              '                this.factionAccountsById,\n'
+              '                nextConstructionProjectIdValue,\n'
+              '                constructionProjects);\n'
+              '        this.destructionService = new DestructionService(',
+              '        this.constructionProjectService = new ConstructionProjectService(\n'
+              '                contentCatalog,\n'
+              '                this.sessionsById,\n'
+              '                this.factionAccountsById,\n'
+              '                nextConstructionProjectIdValue,\n'
+              '                constructionProjects);\n'
+              '        this.territorialControlRuntime = new TerritorialControlRuntime(\n'
+              '                topology,\n'
+              '                this.sessionsById,\n'
+              '                this.factionIdentityResolver,\n'
+              '                this.constructionProjectService,\n'
+              '                factionStrategies);\n'
+              '        this.destructionService = new DestructionService(')
+
+          replace_once(
+              '        constructionProjectService.advance();\n'
+              '        return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));',
+              '        constructionProjectService.advance();\n'
+              '        territorialControlRuntime.advance(activeTick);\n'
+              '        return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));')
+
+          replace_once(
+              '        economicPressureTracker.observe(factionStrategies, report, tick);',
+              '        economicPressureTracker.observe(territorialControlRuntime.snapshots(), report, tick);')
+
+          replace_once(
+              '        FactionStrategicState strategy = factionStrategiesById.get(factionId);',
+              '        FactionStrategicState strategy = territorialControlRuntime.find(factionId);')
+
+          replace_once(
+              '            boolean controlled = factionId.equals(territoryOwnerBySystem.get(systemId));',
+              '            boolean controlled = factionId.equals(territorialControlRuntime.controller(systemId));')
+
+          replace_once(
+              '        return Optional.ofNullable(factionContentId == null ? null : factionStrategiesById.get(factionContentId));',
+              '        return Optional.ofNullable(factionContentId == null ? null : territorialControlRuntime.find(factionContentId));')
+
+          replace_once(
+              '        return Optional.ofNullable(systemId == null ? null : territoryOwnerBySystem.get(systemId));',
+              '        return Optional.ofNullable(systemId == null ? null : territorialControlRuntime.controller(systemId));')
+
+          replace_once(
+              '                List.copyOf(factionStates),\n'
+              '                factionStrategies,',
+              '                List.copyOf(factionStates),\n'
+              '                territorialControlRuntime.snapshots(),')
+
+          replace_once(
+              '                new WorldTradeRouteCostModel(contentCatalog, factionStrategies));',
+              '                new WorldTradeRouteCostModel(contentCatalog, territorialControlRuntime.snapshots()));')
+
+          anchor = '    /** @return текущий immutable world snapshot */\n    public WorldState snapshot() {'
+          methods = '''    /** @return authoritative world tick used by territorial stabilization and legal expiry */
+              public long getAuthoritativeWorldTick() {
+                  return sessionsById.get(activeSystemId).getClock().getTick();
+              }
+
+              /**
+               * Declares a political claim without granting sovereignty.
+               *
+               * @param factionContentId authored or world-defined claimant faction
+               * @param systemId claimed system
+               * @return persistent claim state
+               */
+              public TerritorialClaimState declareTerritorialClaim(
+                      String factionContentId,
+                      StarSystemId systemId) {
+                  return territorialControlRuntime.declareClaim(
+                          factionContentId, systemId, getAuthoritativeWorldTick());
+              }
+
+              /**
+               * Withdraws a non-established political claim.
+               *
+               * @param factionContentId claimant faction
+               * @param systemId claimed system
+               * @return true when a claim was removed
+               */
+              public boolean withdrawTerritorialClaim(String factionContentId, StarSystemId systemId) {
+                  return territorialControlRuntime.withdrawClaim(factionContentId, systemId);
+              }
+
+              /**
+               * Voluntarily relinquishes established control without creating any replacement controller.
+               *
+               * @param factionContentId current controller
+               * @param systemId controlled system
+               * @return true when control was relinquished
+               */
+              public boolean relinquishTerritorialControl(String factionContentId, StarSystemId systemId) {
+                  return territorialControlRuntime.relinquishControl(
+                          factionContentId, systemId, getAuthoritativeWorldTick());
+              }
+
+              /**
+               * Records directed diplomatic recognition of another faction's claim.
+               *
+               * @param recognizingFactionContentId recognizing faction
+               * @param targetFactionContentId recognized claimant
+               * @param systemId claimed system
+               * @return persistent recognition
+               */
+              public TerritorialRecognitionState recognizeTerritorialClaim(
+                      String recognizingFactionContentId,
+                      String targetFactionContentId,
+                      StarSystemId systemId) {
+                  return territorialControlRuntime.recognize(
+                          recognizingFactionContentId,
+                          targetFactionContentId,
+                          systemId,
+                          TerritorialRecognitionState.Kind.CLAIM);
+              }
+
+              /**
+               * Records directed diplomatic recognition of another faction's established control.
+               *
+               * @param recognizingFactionContentId recognizing faction
+               * @param targetFactionContentId recognized controller
+               * @param systemId controlled system
+               * @return persistent recognition
+               */
+              public TerritorialRecognitionState recognizeTerritorialControl(
+                      String recognizingFactionContentId,
+                      String targetFactionContentId,
+                      StarSystemId systemId) {
+                  return territorialControlRuntime.recognize(
+                          recognizingFactionContentId,
+                          targetFactionContentId,
+                          systemId,
+                          TerritorialRecognitionState.Kind.CONTROL);
+              }
+
+              /**
+               * Grants an explicit foreign construction concession in territory controlled by the grantor.
+               *
+               * @param grantorFactionContentId current controller
+               * @param granteeFactionContentId foreign builder
+               * @param systemId controlled system
+               * @param expiresTick exclusive expiry tick or -1 for indefinite
+               * @return persistent construction right
+               */
+              public TerritorialConstructionRightState grantTerritorialConstructionRight(
+                      String grantorFactionContentId,
+                      String granteeFactionContentId,
+                      StarSystemId systemId,
+                      long expiresTick) {
+                  return territorialControlRuntime.grantConstructionRight(
+                          grantorFactionContentId,
+                          granteeFactionContentId,
+                          systemId,
+                          getAuthoritativeWorldTick(),
+                          expiresTick);
+              }
+
+              /**
+               * Revokes a previously granted foreign construction concession.
+               *
+               * @param grantorFactionContentId controller/grantor
+               * @param granteeFactionContentId foreign grantee
+               * @param systemId affected system
+               * @return true when a right was removed
+               */
+              public boolean revokeTerritorialConstructionRight(
+                      String grantorFactionContentId,
+                      String granteeFactionContentId,
+                      StarSystemId systemId) {
+                  return territorialControlRuntime.revokeConstructionRight(
+                          grantorFactionContentId, granteeFactionContentId, systemId);
+              }
+
+              /**
+               * Checks a live explicit construction concession from the current controller.
+               *
+               * @param grantorFactionContentId expected controller/grantor
+               * @param granteeFactionContentId proposed foreign builder
+               * @param systemId target system
+               * @return true only for a current controller and unexpired matching right
+               */
+              public boolean hasTerritorialConstructionRight(
+                      String grantorFactionContentId,
+                      String granteeFactionContentId,
+                      StarSystemId systemId) {
+                  FactionStrategicState grantor = territorialControlRuntime.find(grantorFactionContentId);
+                  return grantor != null
+                          && grantor.controls(systemId)
+                          && grantor.grantsConstructionRightTo(
+                                  granteeFactionContentId, systemId, getAuthoritativeWorldTick());
+              }
+
+          '''
+          if text.count(anchor) != 1:
+              raise SystemExit('Snapshot anchor missing or duplicated')
+          text = text.replace(anchor, methods + anchor, 1)
+          path.write_text(text)
+      - name: Remove temporary workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-runtime-patch.yml
+          git add src/main/java/com/spacesim/world/WorldSimulation.java
+          git commit -m "Integrate Stage 17D territorial runtime"
+          git push origin HEAD:agent/stage17d-territorial-process
