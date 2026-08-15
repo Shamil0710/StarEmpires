@@ -17,13 +17,33 @@ import java.util.Set;
  * @param grievances explicit directed grievances
  * @param treaties treaty directory entries originated by this faction
  * @param embargoes unilateral embargoes imposed by this faction
+ * @param customsTariffBasisPoints ordinary foreign transaction/customs tariff in basis points
  */
 public record FactionDiplomacyState(
         String factionContentId,
         List<DiplomaticStandingState> standings,
         List<DiplomaticGrievanceState> grievances,
         List<DiplomaticTreatyState> treaties,
-        List<DiplomaticEmbargoState> embargoes) implements Comparable<FactionDiplomacyState> {
+        List<DiplomaticEmbargoState> embargoes,
+        int customsTariffBasisPoints) implements Comparable<FactionDiplomacyState> {
+
+    /**
+     * Source-compatible pre-Stage-17E.4 constructor with zero transaction tariff.
+     *
+     * @param factionContentId owner faction stable ID
+     * @param standings directed trust/credibility assessments
+     * @param grievances explicit directed grievances
+     * @param treaties treaty directory entries originated by this faction
+     * @param embargoes unilateral embargoes imposed by this faction
+     */
+    public FactionDiplomacyState(
+            String factionContentId,
+            List<DiplomaticStandingState> standings,
+            List<DiplomaticGrievanceState> grievances,
+            List<DiplomaticTreatyState> treaties,
+            List<DiplomaticEmbargoState> embargoes) {
+        this(factionContentId, standings, grievances, treaties, embargoes, 0);
+    }
 
     /**
      * Creates an empty neutral diplomacy aggregate for one faction.
@@ -43,6 +63,7 @@ public record FactionDiplomacyState(
      * @param grievances explicit directed grievances
      * @param treaties treaty directory entries originated by this faction
      * @param embargoes unilateral embargoes imposed by this faction
+     * @param customsTariffBasisPoints ordinary foreign transaction/customs tariff, 0..10000 bps
      */
     public FactionDiplomacyState {
         factionContentId = requireId(factionContentId, "Diplomacy owner faction ID");
@@ -50,6 +71,9 @@ public record FactionDiplomacyState(
         Objects.requireNonNull(grievances, "Diplomatic grievances not set");
         Objects.requireNonNull(treaties, "Diplomatic treaties not set");
         Objects.requireNonNull(embargoes, "Diplomatic embargoes not set");
+        if (customsTariffBasisPoints < 0 || customsTariffBasisPoints > 10_000) {
+            throw new IllegalArgumentException("Customs tariff must be in range 0..10000 bps");
+        }
 
         List<DiplomaticStandingState> sortedStandings = new ArrayList<>(standings.size());
         Set<String> standingTargets = new HashSet<>();
