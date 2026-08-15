@@ -153,6 +153,35 @@ final class TerritorialControlRuntime {
         return replacementState;
     }
 
+    FactionStrategicState updateStrategicGoals(
+            String factionContentId,
+            List<FactionStrategicGoalState> strategicGoals) {
+        String factionId = requireFaction(factionContentId);
+        List<FactionStrategicGoalState> checked = List.copyOf(Objects.requireNonNull(
+                strategicGoals, "Faction strategic goals not set"));
+        FactionStrategicState current = strategiesById.get(factionId);
+        if (current.strategicGoals().equals(checked)) {
+            return current;
+        }
+        FactionStrategicState replacementState = new FactionStrategicState(
+                current.factionContentId(),
+                current.minimumMarketAccessRelation(),
+                current.relations(),
+                current.controlledSystems(),
+                current.stationTaxBasisPoints(),
+                current.foreignTerritoryTariffBasisPoints(),
+                current.stockPolicies(),
+                current.productionPolicies(),
+                checked,
+                current.territorialClaims(),
+                current.territorialControlStates(),
+                current.territorialRecognitions(),
+                current.constructionRightsGranted(),
+                current.doctrine());
+        replaceStrategy(replacementState);
+        return replacementState;
+    }
+
     String controller(StarSystemId systemId) {
         return systemId == null ? null : controllerBySystem.get(systemId);
     }
