@@ -214,6 +214,7 @@ public final class EntityStateMapper {
             return null;
         }
         List<Integer> target = new ArrayList<>(Constants.MAX_ITEMS);
+        List<Integer> configuredTarget = new ArrayList<>(Constants.MAX_ITEMS);
         List<Float> consumption = new ArrayList<>(Constants.MAX_ITEMS);
         List<Float> sell = new ArrayList<>(Constants.MAX_ITEMS);
         List<Float> buy = new ArrayList<>(Constants.MAX_ITEMS);
@@ -221,6 +222,7 @@ public final class EntityStateMapper {
         List<Boolean> tradable = new ArrayList<>(Constants.MAX_ITEMS);
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
             target.add(component.targetStock[itemId]);
+            configuredTarget.add(component.configuredTargetStock[itemId]);
             consumption.add(component.baseConsumption[itemId]);
             sell.add(component.sellPrices[itemId]);
             buy.add(component.buyPrices[itemId]);
@@ -229,6 +231,7 @@ public final class EntityStateMapper {
         }
         return new EntityState.MarketState(
                 List.copyOf(target),
+                List.copyOf(configuredTarget),
                 List.copyOf(consumption),
                 List.copyOf(sell),
                 List.copyOf(buy),
@@ -239,6 +242,7 @@ public final class EntityStateMapper {
 
     private static MarketComponent restoreMarket(EntityState.MarketState value) {
         requireSize(value.targetStock(), Constants.MAX_ITEMS, "Market.targetStock");
+        requireSize(value.configuredTargetStock(), Constants.MAX_ITEMS, "Market.configuredTargetStock");
         requireSize(value.baseConsumption(), Constants.MAX_ITEMS, "Market.baseConsumption");
         requireSize(value.sellPrices(), Constants.MAX_ITEMS, "Market.sellPrices");
         requireSize(value.buyPrices(), Constants.MAX_ITEMS, "Market.buyPrices");
@@ -247,6 +251,7 @@ public final class EntityStateMapper {
         MarketComponent component = new MarketComponent();
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
             component.targetStock[itemId] = value.targetStock().get(itemId);
+            component.configuredTargetStock[itemId] = value.configuredTargetStock().get(itemId);
             component.baseConsumption[itemId] = value.baseConsumption().get(itemId);
             component.sellPrices[itemId] = value.sellPrices().get(itemId);
             component.buyPrices[itemId] = value.buyPrices().get(itemId);
@@ -263,22 +268,41 @@ public final class EntityStateMapper {
         }
         List<EntityState.RecipeState> recipes = new ArrayList<>(component.recipes.size());
         for (Recipe recipe : component.recipes) {
-            List<Integer> inputs = new ArrayList<>(Constants.MAX_ITEMS);
-            List<Integer> outputs = new ArrayList<>(Constants.MAX_ITEMS);
-            for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-                inputs.add(recipe.getInputAmount(itemId));
-                outputs.add(recipe.getOutputAmount(itemId));
-            }
-            recipes.add(new EntityState.RecipeState(
-                    recipe.name,
-                    recipe.durationSeconds,
-                    List.copyOf(inputs),
-                    List.copyOf(outputs)));
+            recipes.add(captureRecipe(recipe));
         }
         return new EntityState.ProductionState(
-                List.copyOf(recipes),
-                component.activeRecipeIndex,
-                component.progressSeconds);
+                List.copyOf(recipes), component.activeRecipeIndex, component.progressSeconds);
+    }
+
+    private static Recipe captureRecipe(Recipe recipe) {
+        return Objects.requireNonNull(recipe, "Recipe не задан");
+    }
+
+    private static EntityState.RecipeState captureRecipeState(Recipe recipe) {
+        Recipe value = captureRecipe(recipe);
+        List<Integer> inputs = new ArrayList<>(Constants.MAX_ITEMS);
+        List<Integer> outputs = new ArrayList<>(Constants.MAX_ITEMS);
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+            inputs.add(value.getInputAmount(itemId));
+            outputs.add(value.getOutputAmount(itemId));
+        }
+        return new EntityState.RecipeState(
+                value.name,
+                value.durationSeconds,
+                List.copyOf(inputs),
+                List.copyOf(outputs));
+    }
+
+    private static EntityState.ProductionState captureProductionState(ProductionComponent component) {
+        if (component == null) {
+            return null;
+        }
+        List<EntityState.RecipeState> recipes = new ArrayList<>(component.recipes.size());
+        for (Recipe recipe : component.recipes) {
+            recipes.add(captureRecipeState(recipe));
+        }
+        return new EntityState.ProductionState(
+                List.copyOf(recipes), component.activeRecipeIndex, component.progressSeconds);
     }
 
     private static ProductionComponent restoreProduction(EntityState.ProductionState value) {
@@ -290,14 +314,11 @@ public final class EntityStateMapper {
             for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
                 int input = recipeState.inputs().get(itemId);
                 int output = recipeState.outputs().get(itemId);
-                if (input < 0 || output < 0) {
-                    throw new IllegalArgumentException("Количество ресурса рецепта не может быть отрицательным");
+                if (input != 0) {
+                    recipe.setInput(itemId, input);
                 }
-                if (input > 0) {
-                    recipe.input(itemId, input);
-                }
-                if (output > 0) {
-                    recipe.output(itemId, output);
+                if (output != 0) {
+                    recipe.setOutput(itemId, output);
                 }
             }
             component.recipes.add(recipe);
@@ -313,23 +334,16 @@ public final class EntityStateMapper {
         }
         List<List<Float>> history = new ArrayList<>(Constants.MAX_ITEMS);
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-            List<Float> points = new ArrayList<>(component.history[itemId].size);
-            for (int pointIndex = 0; pointIndex < component.history[itemId].size; pointIndex++) {
-                points.add(component.history[itemId].get(pointIndex));
-            }
-            history.add(List.copyOf(points));
+            history.add(List.copyOf(component.priceHistory[itemId]));
         }
         return new EntityState.PriceHistoryState(component.maxPoints, List.copyOf(history));
     }
 
-    private static PriceHistoryComponent restorePriceHistory(EntityState.PriceHistoryState value) {
-        requireSize(value.history(), Constants.MAX_ITEMS, "PriceHistory.history");
-        PriceHistoryComponent component = new PriceHistoryComponent();
-        component.maxPoints = value.maxPoints();
-        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
-            for (Float point : value.history().get(itemId)) {
-                component.history[itemId].add(point);
-            }
+    private static ReputationComponent restoreReputation(EntityState.ReputationState value) {
+        requireSize(value.values(), Constants.FACTION_RUNTIME_CAPACITY, "Reputation.values");
+        ReputationComponent component = new ReputationComponent();
+        for (int factionId = 0; factionId < Constants.FACTION_RUNTIME_CAPACITY; factionId++) {
+            component.values[factionId] = value.values().get(factionId);
         }
         return component;
     }
@@ -340,21 +354,9 @@ public final class EntityStateMapper {
         }
         List<Float> values = new ArrayList<>(Constants.FACTION_RUNTIME_CAPACITY);
         for (int factionId = 0; factionId < Constants.FACTION_RUNTIME_CAPACITY; factionId++) {
-            values.add(component.getReputation(factionId));
+            values.add(component.values[factionId]);
         }
         return new EntityState.ReputationState(List.copyOf(values));
-    }
-
-    private static ReputationComponent restoreReputation(EntityState.ReputationState value) {
-        requireSize(value.values(), Constants.FACTION_RUNTIME_CAPACITY, "Reputation.values");
-        ReputationComponent component = new ReputationComponent();
-        for (int factionId = 0; factionId < Constants.FACTION_RUNTIME_CAPACITY; factionId++) {
-            float reputation = value.values().get(factionId);
-            if (reputation != 0f) {
-                component.addReputation(factionId, reputation);
-            }
-        }
-        return component;
     }
 
     private static EntityState.TradeAiState captureTradeAi(TradeAIComponent component) {
@@ -413,9 +415,8 @@ public final class EntityStateMapper {
     }
 
     private static MiningComponent restoreMining(EntityState.MiningState value) {
-        MiningComponent component = new MiningComponent();
-        component.resourceItem = value.resourceItem();
-        component.extractionPerSecond = value.extractionPerSecond();
+        MiningComponent component = new MiningComponent(
+                value.resourceItem(), value.extractionPerSecond());
         component.movementSpeed = value.movementSpeed();
         component.extractionRange = value.extractionRange();
         component.dockingRange = value.dockingRange();
@@ -445,14 +446,13 @@ public final class EntityStateMapper {
     }
 
     private static CombatComponent restoreCombat(EntityState.CombatState value) {
-        CombatComponent component = new CombatComponent();
-        component.hull = value.hull();
-        component.maxHull = value.maxHull();
-        component.shields = value.shields();
-        component.maxShields = value.maxShields();
-        component.damagePerSecond = value.damagePerSecond();
-        component.weaponRange = value.weaponRange();
-        return component;
+        return new CombatComponent(
+                value.hull(),
+                value.maxHull(),
+                value.shields(),
+                value.maxShields(),
+                value.damagePerSecond(),
+                value.weaponRange());
     }
 
     private static EntityState.AsteroidState captureAsteroid(AsteroidComponent component) {
