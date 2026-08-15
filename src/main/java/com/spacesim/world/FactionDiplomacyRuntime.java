@@ -165,6 +165,11 @@ final class FactionDiplomacyRuntime {
         return nextMarketAccessTransitionTick >= 0L && worldTick >= nextMarketAccessTransitionTick;
     }
 
+    /** Source-compatible name retained for the Stage-17E.1 scheduler acceptance test. */
+    boolean marketAccessExpiryCrossed(long worldTick) {
+        return marketAccessTransitionCrossed(worldTick);
+    }
+
     private DiplomaticTreatyCommandResult offer(
             DiplomaticTreatyCommand.Offer offer,
             long worldTick,

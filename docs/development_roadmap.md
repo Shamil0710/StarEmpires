@@ -561,6 +561,8 @@ player faction owns station in unclaimed system
 
 ### 17E.2 — proposal / response engine
 
+**ACTIVE.** Common player/AI treaty lifecycle реализуется через один authoritative command boundary поверх `FactionDiplomacyRuntime`; lifecycle не создаёт параллельный diplomacy store и после legal transition сразу обновляет ordinary market-access projection.
+
 Общий command/evaluator обрабатывает:
 
 - offer / counteroffer;
