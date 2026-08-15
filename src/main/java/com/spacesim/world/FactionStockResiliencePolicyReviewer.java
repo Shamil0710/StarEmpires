@@ -13,9 +13,9 @@ import java.util.TreeMap;
  * common Stage-17F.4 stock-policy authoring boundary. It may raise a stock floor by one bounded step
  * after a shared review claim, but never moves cargo, money or production output.</p>
  *
- * <p>Automatic downward release is deliberately deferred. The current market executor stores only
+ * <p>Automatic downward adjustment is deliberately blocked. The current market executor stores only
  * one mutable target-stock value and cannot yet distinguish configured baseline demand from an old
- * policy contribution. A lower recommendation is therefore reported as deferred rather than
+ * policy contribution. A lower recommendation is therefore reported as blocked rather than
  * pretending to remove physical demand that the executor cannot safely attribute.</p>
  */
 public final class FactionStockResiliencePolicyReviewer {
@@ -37,21 +37,40 @@ public final class FactionStockResiliencePolicyReviewer {
             FactionStockResilienceReviewProfile profile) {
         WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation not set");
         String factionId = requireFactionId(factionContentId);
-        FactionStockResilienceReviewProfile checkedProfile = Objects.requireNonNull(
-                profile, "Stock resilience review profile not set");
         FactionStockProductionPolicyState previous = checkedWorld.findFactionStockProductionPolicy(factionId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Faction has no stock/production policy state: " + factionId));
         FactionResiliencePlan resilience = FactionResiliencePlanner.analyze(checkedWorld, factionId);
+        return plan(previous, resilience, profile);
+    }
+
+    /**
+     * Pure value-layer planning boundary used by deterministic acceptance tests and the world adapter.
+     *
+     * @param previous current persistent stock/production policy
+     * @param resilience current read-only Stage-17F.5 resilience recommendation
+     * @param profile bounded adjustment profile
+     * @return immutable bounded candidate plan
+     */
+    static Plan plan(
+            FactionStockProductionPolicyState previous,
+            FactionResiliencePlan resilience,
+            FactionStockResilienceReviewProfile profile) {
+        FactionStockProductionPolicyState checkedPrevious = Objects.requireNonNull(
+                previous, "Previous stock/production policy not set");
+        FactionResiliencePlan checkedResilience = Objects.requireNonNull(
+                resilience, "Faction resilience plan not set");
+        FactionStockResilienceReviewProfile checkedProfile = Objects.requireNonNull(
+                profile, "Stock resilience review profile not set");
 
         Map<String, Integer> stockFloors = new TreeMap<>();
-        for (FactionStockPolicyState stock : previous.stockPolicies()) {
+        for (FactionStockPolicyState stock : checkedPrevious.stockPolicies()) {
             stockFloors.put(stock.itemContentId(), stock.targetStockFloor());
         }
 
         int increasedItems = 0;
-        int deferredReleaseItems = 0;
-        for (FactionResilienceItemDecision item : resilience.items()) {
+        int blockedDecreaseItems = 0;
+        for (FactionResilienceItemDecision item : checkedResilience.items()) {
             int currentFloor = stockFloors.getOrDefault(item.itemContentId(), 0);
             int targetFloor = item.recommendedTargetFloorPerMarketUnits();
             if (targetFloor > currentFloor) {
@@ -67,7 +86,7 @@ public final class FactionStockResiliencePolicyReviewer {
                 increasedItems++;
             } else if (currentFloor > targetFloor
                     && (long) currentFloor - targetFloor > checkedProfile.deadbandUnits()) {
-                deferredReleaseItems++;
+                blockedDecreaseItems++;
             }
         }
 
@@ -79,13 +98,13 @@ public final class FactionStockResiliencePolicyReviewer {
         }
         FactionStockProductionPolicyState candidate = new FactionStockProductionPolicyState(
                 candidateStocks,
-                previous.productionPolicies());
+                checkedPrevious.productionPolicies());
         return new Plan(
-                resilience.observationTick(),
-                previous,
+                checkedResilience.observationTick(),
+                checkedPrevious,
                 candidate,
                 increasedItems,
-                deferredReleaseItems);
+                blockedDecreaseItems);
     }
 
     /**
@@ -118,7 +137,7 @@ public final class FactionStockResiliencePolicyReviewer {
                     true,
                     false,
                     checkedPlan.increasedItemCount(),
-                    checkedPlan.deferredReleaseItemCount(),
+                    checkedPlan.blockedDecreaseItemCount(),
                     current,
                     current);
         }
@@ -128,7 +147,7 @@ public final class FactionStockResiliencePolicyReviewer {
                 true,
                 true,
                 checkedPlan.increasedItemCount(),
-                checkedPlan.deferredReleaseItemCount(),
+                checkedPlan.blockedDecreaseItemCount(),
                 current,
                 installed);
     }
@@ -145,7 +164,7 @@ public final class FactionStockResiliencePolicyReviewer {
                 false,
                 false,
                 checked.increasedItemCount(),
-                checked.deferredReleaseItemCount(),
+                checked.blockedDecreaseItemCount(),
                 checked.previousPolicy(),
                 checked.previousPolicy());
     }
@@ -170,14 +189,14 @@ public final class FactionStockResiliencePolicyReviewer {
      * @param previousPolicy stock/production policy observed during planning
      * @param candidatePolicy bounded candidate; production choices are preserved
      * @param increasedItemCount number of item floors proposed upward by one bounded step
-     * @param deferredReleaseItemCount number of lower recommendations deliberately not auto-applied
+     * @param blockedDecreaseItemCount lower recommendations intentionally not auto-applied
      */
     public record Plan(
             long observationTick,
             FactionStockProductionPolicyState previousPolicy,
             FactionStockProductionPolicyState candidatePolicy,
             int increasedItemCount,
-            int deferredReleaseItemCount) {
+            int blockedDecreaseItemCount) {
 
         /**
          * Validates one immutable plan.
@@ -186,10 +205,10 @@ public final class FactionStockResiliencePolicyReviewer {
          * @param previousPolicy policy observed before claim
          * @param candidatePolicy bounded candidate policy
          * @param increasedItemCount proposed upward item adjustments
-         * @param deferredReleaseItemCount deliberately deferred downward adjustments
+         * @param blockedDecreaseItemCount deliberately blocked downward adjustments
          */
         public Plan {
-            if (observationTick < 0L || increasedItemCount < 0 || deferredReleaseItemCount < 0) {
+            if (observationTick < 0L || increasedItemCount < 0 || blockedDecreaseItemCount < 0) {
                 throw new IllegalArgumentException("Stock resilience plan counters/tick cannot be negative");
             }
             Objects.requireNonNull(previousPolicy, "Previous stock policy not set");
@@ -206,7 +225,7 @@ public final class FactionStockResiliencePolicyReviewer {
      * @param reviewClaimed whether the shared review window was claimed
      * @param policyChanged whether persistent stock policy changed
      * @param increasedItemCount number of bounded upward recommendations in the plan
-     * @param deferredReleaseItemCount lower recommendations intentionally awaiting provenance support
+     * @param blockedDecreaseItemCount lower recommendations awaiting provenance-safe execution
      * @param previousPolicy policy before the call
      * @param resultingPolicy policy after the call
      */
@@ -214,7 +233,7 @@ public final class FactionStockResiliencePolicyReviewer {
             boolean reviewClaimed,
             boolean policyChanged,
             int increasedItemCount,
-            int deferredReleaseItemCount,
+            int blockedDecreaseItemCount,
             FactionStockProductionPolicyState previousPolicy,
             FactionStockProductionPolicyState resultingPolicy) {
 
@@ -224,12 +243,12 @@ public final class FactionStockResiliencePolicyReviewer {
          * @param reviewClaimed whether shared cadence was claimed
          * @param policyChanged whether policy changed
          * @param increasedItemCount number of upward item recommendations
-         * @param deferredReleaseItemCount number of deferred release recommendations
+         * @param blockedDecreaseItemCount number of provenance-blocked downward recommendations
          * @param previousPolicy policy before review
          * @param resultingPolicy policy after review
          */
         public Result {
-            if (increasedItemCount < 0 || deferredReleaseItemCount < 0) {
+            if (increasedItemCount < 0 || blockedDecreaseItemCount < 0) {
                 throw new IllegalArgumentException("Stock resilience result counters cannot be negative");
             }
             Objects.requireNonNull(previousPolicy, "Previous stock policy not set");
