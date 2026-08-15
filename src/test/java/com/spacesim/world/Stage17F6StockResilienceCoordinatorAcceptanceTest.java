@@ -105,7 +105,7 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
         assertTrue(firstFaction.stockResilienceReview().policyChanged());
         assertEquals(1, firstFaction.stockResilienceReview().increasedItemCount());
         FactionStockProductionPolicyState afterFirst = world.findFactionStockProductionPolicy(SOURCE).orElseThrow();
-        assertEquals(10, afterFirst.findStockPolicy(item.id()).orElseThrow().targetStockFloor(),
+        assertEquals(10, stockFloor(afterFirst, item.id()),
                 "First review may raise the floor by only the conservative 10-unit step");
         assertEquals(productionBefore, afterFirst.productionPolicies());
         assertEquals(inventoryBefore, totalInventoryUnits(world));
@@ -125,6 +125,14 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
         assertEquals(walletsBefore, totalEntityWallets(world));
         assertEquals(marketTargetsBefore, totalMarketTargets(world));
         assertEquals(treasuryBefore, world.findFactionEconomicState(SOURCE).orElseThrow().treasuryMilliCredits());
+    }
+
+    private static int stockFloor(FactionStockProductionPolicyState policy, String itemContentId) {
+        return policy.stockPolicies().stream()
+                .filter(stock -> stock.itemContentId().equals(itemContentId))
+                .findFirst()
+                .orElseThrow()
+                .targetStockFloor();
     }
 
     private static void clearExistingEconomicSignal(WorldSimulation world) {
