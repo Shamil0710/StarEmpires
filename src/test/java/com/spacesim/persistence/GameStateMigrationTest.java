@@ -159,6 +159,59 @@ class GameStateMigrationTest {
         assertEquals(target, entity.market().configuredTargetStock());
     }
 
+    @Test
+    void valueLayerV2НеМожетИзобрестиНеСуществовавшийConfiguredBaseline() {
+        GameState baseline = SimulationSession.createDemo(0x51A7E6L).snapshot();
+        List<Integer> effectiveTarget = integerSlots(25);
+        List<Integer> syntheticConfiguredTarget = integerSlots(1);
+        EntityState entity = new EntityState(
+                new EntityId(3L),
+                null,
+                null,
+                new EntityState.InventoryState(100, integerSlots(20)),
+                null,
+                new EntityState.MarketState(
+                        effectiveTarget,
+                        syntheticConfiguredTarget,
+                        floatSlots(0f),
+                        floatSlots(10f),
+                        floatSlots(9f),
+                        doubleSlots(0d),
+                        booleanSlots(true),
+                        false),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new EntityState.ArchetypeState("station.agrodome"));
+        GameState version2 = new GameState(
+                GameState.ITEM_CAPACITY_ARCHETYPE_VERSION,
+                baseline.rootSeed(),
+                baseline.clock(),
+                baseline.nextEntityIdValue(),
+                baseline.eventRandomState(),
+                baseline.asteroidRandomState(),
+                baseline.events(),
+                baseline.asteroidSpawner(),
+                baseline.priceRecorder(),
+                baseline.ledger(),
+                List.of(entity));
+
+        GameState migrated = GameStateMigration.toCurrent(version2);
+        EntityState migratedEntity = migrated.entities().get(0);
+
+        assertEquals(GameState.CURRENT_VERSION, migrated.schemaVersion());
+        assertEquals(effectiveTarget, migratedEntity.market().targetStock());
+        assertEquals(effectiveTarget, migratedEntity.market().configuredTargetStock(),
+                "Schema v2 had no provenance field, so only its effective target is historical truth");
+        assertEquals("station.agrodome", migratedEntity.archetype().contentId());
+    }
+
     private static List<Integer> integerSlots(int firstValue) {
         List<Integer> values = new ArrayList<>(Constants.MAX_ITEMS);
         values.add(firstValue);
