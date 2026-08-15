@@ -1,6 +1,7 @@
 package com.spacesim.player;
 
 import com.spacesim.content.ContentCatalog;
+import com.spacesim.world.FactionDiplomacyState;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionIdentityResolver;
 import com.spacesim.world.FactionStrategicState;
@@ -14,11 +15,12 @@ import java.util.Objects;
 /**
  * Pure Stage-17 transition that explicitly founds a player faction in persistent state.
  *
- * <p>Founding creates ordinary {@link FactionEconomicState}, {@link FactionStrategicState} and
- * {@link WorldFactionIdentityState} records, reserves the lowest free bounded runtime faction slot,
- * then changes only the player's explicit faction affiliation. Treasury, territory and fiscal
- * policy start at zero. Existing fleets, stations, construction projects, personal money and all
- * physical world entities remain value-for-value unchanged.</p>
+ * <p>Founding creates ordinary {@link FactionEconomicState}, {@link FactionStrategicState},
+ * {@link FactionDiplomacyState} and {@link WorldFactionIdentityState} records, reserves the lowest
+ * free bounded runtime faction slot, then changes only the player's explicit faction affiliation.
+ * Treasury, territory and fiscal policy start at zero. Existing fleets, stations, construction
+ * projects, personal money, diplomatic history and all physical world entities remain value-for-value
+ * unchanged.</p>
  *
  * <p>The new faction ID and display metadata are world state rather than immutable content. Runtime
  * materialization uses {@link FactionIdentityResolver}; this class never mutates the
@@ -88,13 +90,16 @@ public final class PlayerFactionFoundationService {
         WorldFactionIdentityState identity = resolver.allocatePlayerCreated(id, displayName);
 
         List<FactionEconomicState> economics = new ArrayList<>(world.factions());
-        economics.add(new FactionEconomicState(id, 0L, 0L, 0L));
+        economics.add(new FactionEconomicState(id, 0L, 0L, 0L, 0L, 0L));
 
         List<FactionStrategicState> strategies = new ArrayList<>(world.factionStrategies());
         strategies.add(new FactionStrategicState(id, 0, List.of(), List.of()));
 
         List<WorldFactionIdentityState> identities = new ArrayList<>(world.factionIdentities());
         identities.add(identity);
+
+        List<FactionDiplomacyState> diplomacy = new ArrayList<>(world.factionDiplomacyStates());
+        diplomacy.add(FactionDiplomacyState.neutral(id));
 
         WorldState updatedWorld = new WorldState(
                 WorldState.CURRENT_VERSION,
@@ -108,7 +113,8 @@ public final class PlayerFactionFoundationService {
                 world.nextFleetIdValue(),
                 world.fleets(),
                 world.fleetJumps(),
-                identities);
+                identities,
+                diplomacy);
 
         PlayerState updatedPlayer = new PlayerState(
                 player.walletMilliCredits(),

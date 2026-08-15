@@ -144,7 +144,9 @@ public final class PlayerFactionTreasuryService {
                 previousEconomy.factionContentId(),
                 resultingTreasury,
                 previousEconomy.stationLiquidityReserveMilliCredits(),
-                previousEconomy.maxLiquiditySupportPerDecisionMilliCredits()));
+                previousEconomy.maxLiquiditySupportPerDecisionMilliCredits(),
+                previousEconomy.treasuryReserveFloorMilliCredits(),
+                previousEconomy.maxConstructionInvestmentPerDecisionMilliCredits()));
         return replaceBalances(checked, economics, resultingPersonalWallet);
     }
 
@@ -166,7 +168,8 @@ public final class PlayerFactionTreasuryService {
                 world.nextFleetIdValue(),
                 world.fleets(),
                 world.fleetJumps(),
-                world.factionIdentities());
+                world.factionIdentities(),
+                world.factionDiplomacyStates());
         PlayerState updatedPlayer = new PlayerState(
                 personalWalletMilliCredits,
                 player.factionContentId(),
