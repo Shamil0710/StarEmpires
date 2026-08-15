@@ -1,0 +1,63 @@
+name: Sync Stage 17F roadmap once
+
+on:
+  push:
+    branches:
+      - stage-17f5-aggregate-acceptance
+    paths:
+      - .github/workflows/sync-stage17f-roadmap-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync-roadmap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout closeout branch
+        uses: actions/checkout@v6
+
+      - name: Synchronize Stage 17F roadmap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/development_roadmap.md')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  '> Последняя синхронизация: **2026-08-15 после закрытия Stage 17F.1, Stage 17F.2 + continuity-hardening и Stage 17F.3 fiscal trade-offs; `Ship Mathematics v1.0 Design Baseline` остаётся accepted foundation для 17.5 / 19 / 21. Фактический runtime-статус — Stage 17 ACTIVE, следующий implementation slice — 17F.4 strategic stock / production policy.**',
+                  '> Последняя синхронизация: **2026-08-15 после закрытия Stage 17F.1–17F.5; `Ship Mathematics v1.0 Design Baseline` остаётся accepted foundation для 17.5 / 19 / 21. Фактический runtime-статус — Stage 17 ACTIVE, следующий implementation slice — 17F.6 policy feedback / anti-oscillation.**'
+              ),
+              (
+                  '**ACTIVE — 17F.1 COMPLETE в PR #109; 17F.2 COMPLETE в PR #110 с continuity-hardening в PR #113; 17F.3 COMPLETE в PR #112; 17F.4 strategic stock / production policy — NEXT.**',
+                  '**ACTIVE — 17F.1–17F.5 COMPLETE; 17F.4 — PR #114; resilience implementation — PR #115–#120; aggregate 17F.5 gate — PR #121; 17F.6 policy feedback / anti-oscillation — NEXT.**'
+              ),
+              (
+                  '### 17F.4 — strategic stock / production policy\n\nПереиспользуется текущая философия `FactionStrategicPolicyEngine`:',
+                  '### 17F.4 — strategic stock / production policy\n\n**COMPLETE — PR #114.** Общий player/AI authoring boundary хранит persistent stock floors и production preferences, валидирует semantic content references до mutation и применяет их только через существующий `FactionStrategicPolicyEngine`. Authoring не materialize-ит спрос, cargo, output или деньги; explicit apply меняет только обычные market targets / production configuration.\n\nПереиспользуется текущая философия `FactionStrategicPolicyEngine`:'
+              ),
+              (
+                  '### 17F.5 — resilience policy\n\nFaction может сознательно предпочесть:\n\n- diversified suppliers;\n- minimum strategic buffers;\n- local production despite higher nominal cost;\n- redundant routes/infrastructure;\n- critical-item import limits.\n\nЦена resilience должна проявляться как реальные дополнительные capital/logistics/operating costs.',
+                  '''### 17F.5 — resilience policy\n\n**COMPLETE — implementation PR #115–#120; final aggregate gate PR #121.** Stage-17E structural dependence diagnostics + persistent doctrine materialize-ятся в resilience preferences, но не заменяют ordinary economy.\n\nРеализованы:\n\n- **minimum strategic buffers — PR #115:** uncovered requirement повышает обычный stock floor; cargo должен быть физически доставлен;\n- **diversified suppliers — PR #116:** faction может принять ограниченную реальную потерю expected profit ради менее концентрированного существующего supplier;\n- **local production — PR #117:** используются только canonical recipes реально owned production capacity; отсутствие capability остаётся explicit capacity gap;\n- **capacity-gap construction — PR #118:** gap + own-market deficit может запустить только ordinary treasury-funded, material-bound, timed construction;\n- **redundant routes — PR #119:** допускается только реальный deterministic edge-disjoint jump path; при отсутствии второго пути vulnerability сохраняется;\n- **critical-item import limits — PR #120:** hard autonomous procurement guard использует current structural concentration + doctrine ceiling; он не является embargo/tariff и не выдумывает historical import share.\n\nAggregate contract PR #121:\n\n```text\nphysical stock / targets / legal access / production / topology\n→ Stage-17E structural dependence diagnostics\n→ Stage-17F doctrine\n→ buffer / supplier / local-production / route / critical-import decisions\n→ ordinary market / trade / production / construction execution\n→ physical economic consequences\n```\n\nRead-only resilience analysis и policy assessment byte-for-byte не мутируют world state. Stock/production authoring и explicit apply не создают cargo или money. Цена resilience проявляется как tied-up inventory capital, меньшая route profit, больший ETA/risk, treasury-funded construction + materials/build time или реальный shortage, если acceptable alternative отсутствует.\n\nКанонический closeout: `docs/stage17f5_resilience_completion_record.md`.'''
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one roadmap fragment, found {count}: {old[:100]!r}')
+              text = text.replace(old, new)
+
+          path.write_text(text, encoding='utf-8')
+          Path('.github/workflows/sync-stage17f-roadmap-once.yml').unlink()
+          PY
+
+      - name: Commit roadmap synchronization and remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/development_roadmap.md .github/workflows/sync-stage17f-roadmap-once.yml
+          git commit -m "Sync roadmap after Stage 17F.5 aggregate closeout"
+          git push origin HEAD:stage-17f5-aggregate-acceptance
