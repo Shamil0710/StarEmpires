@@ -112,7 +112,7 @@ final class FactionInvestmentPlanner {
             StarSystemId systemId,
             String itemId) {
         for (ConstructionProjectState project : world.getConstructionProjects()) {
-            if (!project.ownerFactionContentId().equals(factionId)
+            if (!Objects.equals(project.ownerFactionContentId(), factionId)
                     || !project.systemId().equals(systemId)
                     || isTerminal(project.status())) {
                 continue;
