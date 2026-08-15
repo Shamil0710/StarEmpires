@@ -1,0 +1,77 @@
+name: Stage 17E documentation finalizer
+
+on:
+  push:
+    branches:
+      - agent/stage17e-diplomacy-foundation
+
+permissions:
+  contents: write
+
+jobs:
+  finalize-docs:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17e-diplomacy-foundation
+          fetch-depth: 0
+
+      - name: Complete Stage 17E persistence Javadocs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected once, found {count}')
+              return text.replace(old, new, 1)
+
+          path = Path('src/main/java/com/spacesim/world/WorldState.java')
+          text = path.read_text()
+          text = once(
+              text,
+              ' * @param factionIdentities persistent world-defined faction identities в canonical stable-ID порядке\n */',
+              ' * @param factionIdentities persistent world-defined faction identities в canonical stable-ID порядке\n'
+              ' * @param factionDiplomacyStates persistent institutional diplomacy в canonical faction-ID порядке\n'
+              ' */',
+              'WorldState record diplomacy param')
+          text = once(
+              text,
+              '     * @param factionIdentities world-defined faction identity states\n'
+              '     * @throws NullPointerException если обязательное значение не задано',
+              '     * @param factionIdentities world-defined faction identity states\n'
+              '     * @param factionDiplomacyStates persistent institutional diplomacy states\n'
+              '     * @throws NullPointerException если обязательное значение не задано',
+              'WorldState compact-constructor diplomacy param')
+          path.write_text(text)
+
+          path = Path('src/main/java/com/spacesim/persistence/WorldStateCodec.java')
+          text = path.read_text()
+          text = once(
+              text,
+              ' * <p>File-format v3 appends a bounded Stage-17D territorial trailer after the v2 growth payload;\n'
+              ' * v1/v2 remain readable and migrate to empty territorial process state.</p>',
+              ' * <p>File-format v3 appends the bounded Stage-17D territorial trailer after the v2 growth payload.\n'
+              ' * File-format v4 then appends Stage-17E institutional diplomacy. v1-v3 remain readable and\n'
+              ' * deterministically migrate to neutral explicit diplomacy without invented treaties, grievances\n'
+              ' * or embargoes.</p>',
+              'WorldStateCodec v4 documentation')
+          path.write_text(text)
+          PY
+
+      - name: Self-remove finalizer and commit
+        shell: bash
+        run: |
+          rm .github/workflows/stage17e-docfix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/WorldState.java \
+                  src/main/java/com/spacesim/persistence/WorldStateCodec.java \
+                  .github/workflows/stage17e-docfix.yml
+          git diff --cached --check
+          git commit -m "Stage 17E: finalize persistence API documentation"
+          git push origin HEAD:agent/stage17e-diplomacy-foundation
