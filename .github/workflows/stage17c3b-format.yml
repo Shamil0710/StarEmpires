@@ -1,0 +1,47 @@
+name: Stage 17C.3b formatting applicator
+
+on:
+  push:
+    branches:
+      - agent/stage17c-live-treasury-withdrawal
+    paths:
+      - .github/workflows/stage17c3b-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17c-live-treasury-withdrawal
+      - name: Restore WorldSimulation member indentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/main/java/com/spacesim/world/WorldSimulation.java")
+          text = path.read_text(encoding="utf-8")
+          start_marker = "    /**\n * Transfers real money from the ordinary Stage-8 faction treasury"
+          end_marker = "\n\n    /**\n     * Resolves a dense local ECS runtime faction slot back to stable identity."
+          start = text.find(start_marker)
+          if start < 0:
+              raise SystemExit("Unformatted treasury withdrawal method not found")
+          end = text.find(end_marker, start)
+          if end < 0:
+              raise SystemExit("Treasury withdrawal end anchor not found")
+          block = text[start:end]
+          lines = block.splitlines()
+          formatted = lines[0] + "\n" + "\n".join("    " + line for line in lines[1:])
+          path.write_text(text[:start] + formatted + text[end:], encoding="utf-8")
+          PY
+      - name: Remove applicator and commit formatting
+        run: |
+          rm .github/workflows/stage17c3b-format.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/WorldSimulation.java .github/workflows/stage17c3b-format.yml
+          git commit -m "Format live faction treasury withdrawal seam"
+          git push
