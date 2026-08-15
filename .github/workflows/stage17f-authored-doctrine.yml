@@ -1,4 +1,5 @@
 name: Stage 17F authored doctrine
+# exact FactionStrategicState constructor anchor
 
 on:
   push:
@@ -18,11 +19,13 @@ jobs:
         with:
           ref: agent/stage17f-doctrine-profile
           fetch-depth: 0
+      - name: Repair applicator anchor
+        run: python3 scripts/stage17f_authored_doctrine_fix.py
       - name: Apply authored doctrine content
         run: python3 scripts/stage17f_authored_doctrine.py
       - name: Commit authored doctrine content
         run: |
-          git rm .github/workflows/stage17f-authored-doctrine.yml scripts/stage17f_authored_doctrine.py
+          git rm .github/workflows/stage17f-authored-doctrine.yml scripts/stage17f_authored_doctrine.py scripts/stage17f_authored_doctrine_fix.py
           git add src/main/java/com/spacesim/content/ContentCatalog.java
           git add src/main/java/com/spacesim/content/ContentCatalogLoader.java
           git add src/main/java/com/spacesim/world/FactionStrategicState.java
