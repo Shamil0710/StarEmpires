@@ -46,7 +46,13 @@ public final class TerritorialConstructionAuthorization {
             boolean allowed,
             Reason reason,
             String controllingFactionContentId) {
-        /** Validates reason/controller coherence. */
+        /**
+         * Validates reason/controller coherence.
+         *
+         * @param allowed whether ordinary legal construction may proceed
+         * @param reason deterministic reason for the decision
+         * @param controllingFactionContentId current stable controller, or {@code null} when unclaimed
+         */
         public Decision {
             reason = Objects.requireNonNull(reason, "Construction authorization reason not set");
             if (controllingFactionContentId != null) {
