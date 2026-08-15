@@ -36,6 +36,34 @@ final class ConstructionProjectTestFixtures {
         }
     }
 
+    /**
+     * Creates a project after explicitly establishing the legal premise required by a legacy
+     * non-territorial integration test.
+     *
+     * @param world authoritative test world
+     * @param builderFactionContentId faction owning and legally representing the project
+     * @param stationArchetypeContentId target station archetype
+     * @param systemId target system
+     * @param x local X coordinate
+     * @param y local Y coordinate
+     * @return stable construction project ID
+     */
+    static ConstructionProjectId createAuthorizedProject(
+            WorldSimulation world,
+            String builderFactionContentId,
+            String stationArchetypeContentId,
+            StarSystemId systemId,
+            float x,
+            float y) {
+        authorizeConstruction(world, builderFactionContentId, systemId);
+        return world.createConstructionProject(
+                builderFactionContentId,
+                stationArchetypeContentId,
+                systemId,
+                x,
+                y);
+    }
+
     static EntityId createLoadedCargo(
             WorldSimulation world,
             ContentCatalog content,
