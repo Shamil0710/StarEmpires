@@ -147,7 +147,7 @@
       "continuousHeatMarginW": 1979700000.0,
       "minimumRadiatorFraction": 0.3401,
       "fullHotRadiatorAreaM2": 40150.99091613564,
-      "radiatorAreaNeededAtInstalledHeatM2": 13655.856010977632,
+      "radiatorAreaNeededAtInstalledHeatM2": 13655.35201057773,
       "legacyEmergencyThermalCapacityJ": 15000000000000.0,
       "zeroRadiatorEmergencyEnduranceS": 14701.55836518671
     }
