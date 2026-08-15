@@ -11,8 +11,12 @@ def replace_once(path, old, new):
 
 
 # Every production rebuild of a strategic state must preserve the already-installed doctrine.
-for path in [
+replace_once(
     "src/main/java/com/spacesim/world/TerritorialControlRuntime.java",
+    "                recognitions,\n                rights);",
+    "                recognitions,\n                rights,\n                state.doctrine());",
+)
+for path in [
     "src/main/java/com/spacesim/persistence/WorldStrategicGrowthBinary.java",
     "src/main/java/com/spacesim/persistence/WorldTerritoryBinary.java",
     "src/main/java/com/spacesim/world/StrategicGrowthPlanService.java",
