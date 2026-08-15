@@ -8,13 +8,14 @@ import java.util.Optional;
 import java.util.TreeMap;
 
 /**
- * Selects a resilience-aware cross-system route without replacing ordinary economic planning.
+ * Selects a resilience-aware cross-system procurement route without replacing ordinary economic planning.
  *
  * <p>The wrapped {@link TradeRoutePlanner} remains authoritative for route feasibility, physical
  * suppliers, prices, tariffs, risk, travel time and profitability. This selector first obtains the
- * ordinary economic baseline, then considers a less concentrated supplier only when that supplier
- * is physically present in the same bounded opportunity set and the resulting real profit sacrifice
- * is within the faction policy's measured willingness-to-pay.</p>
+ * ordinary economic baseline, then considers a less concentrated supplier only when the route is
+ * inbound procurement into the trading faction's own physical market, the alternative supplier is
+ * present in the same bounded opportunity set for that same consumer, and the resulting real profit
+ * sacrifice is within the faction policy's measured willingness-to-pay.</p>
  */
 public final class FactionResilientGalacticTradePlanner {
     private final TradeRoutePlanner economicPlanner;
@@ -71,6 +72,11 @@ public final class FactionResilientGalacticTradePlanner {
             return Optional.empty();
         }
 
+        int baselineConsumerFaction = consumerFactionId(economicBaseline, checkedOpportunities);
+        if (checkedFleet.factionId() < 0 || baselineConsumerFaction != checkedFleet.factionId()) {
+            return Optional.of(Selection.economicOnly(economicBaseline));
+        }
+
         int baselineSupplierFaction = supplierFactionId(economicBaseline, checkedOpportunities);
         SupplierDiversificationPolicy.Assessment baselineAssessment = assessment(
                 checkedFleet, baselineSupplierFaction, economicBaseline.itemId());
@@ -82,7 +88,8 @@ public final class FactionResilientGalacticTradePlanner {
         for (GalacticTradeOpportunity opportunity : checkedOpportunities) {
             GalacticTradeOpportunity value = Objects.requireNonNull(
                     opportunity, "Galactic opportunity not set");
-            if (value.itemId() != economicBaseline.itemId()) {
+            if (value.itemId() != economicBaseline.itemId()
+                    || !sameConsumer(value, economicBaseline)) {
                 continue;
             }
             int supplierFactionId = value.supplier().market().factionId();
@@ -219,6 +226,26 @@ public final class FactionResilientGalacticTradePlanner {
         return -1;
     }
 
+    private static int consumerFactionId(
+            GalacticTradeRoute route,
+            List<GalacticTradeOpportunity> opportunities) {
+        for (GalacticTradeOpportunity opportunity : opportunities) {
+            if (opportunity.itemId() == route.itemId()
+                    && opportunity.consumer().systemId().equals(route.sellSystemId())
+                    && opportunity.consumer().market().id().equals(route.sellStationId())) {
+                return opportunity.consumer().market().factionId();
+            }
+        }
+        return -1;
+    }
+
+    private static boolean sameConsumer(
+            GalacticTradeOpportunity opportunity,
+            GalacticTradeRoute baseline) {
+        return opportunity.consumer().systemId().equals(baseline.sellSystemId())
+                && opportunity.consumer().market().id().equals(baseline.sellStationId());
+    }
+
     private static boolean sameRoute(GalacticTradeRoute first, GalacticTradeRoute second) {
         return first.itemId() == second.itemId()
                 && first.buySystemId().equals(second.buySystemId())
@@ -270,6 +297,10 @@ public final class FactionResilientGalacticTradePlanner {
                     && diversificationApplied) {
                 throw new IllegalArgumentException("Diversified route exceeds accepted profit sacrifice");
             }
+        }
+
+        private static Selection economicOnly(GalacticTradeRoute economicBaseline) {
+            return new Selection(economicBaseline, economicBaseline, 10_000, 10_000, 0L, 0L, false);
         }
 
         private static void requireBasisPoints(int value, String label) {
