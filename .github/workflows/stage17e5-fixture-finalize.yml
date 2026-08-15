@@ -1,0 +1,35 @@
+name: Stage 17E.5 fixture finalizer
+
+on:
+  push:
+    branches:
+      - agent/stage17e-embargo-commands
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17e-embargo-commands
+          fetch-depth: 0
+      - name: Apply fixture correction
+        shell: bash
+        run: python3 .github/stage17e5/fixture_fix.py
+      - name: Self-remove and commit
+        shell: bash
+        run: |
+          rm -rf .github/stage17e5
+          rm .github/workflows/stage17e5-fixture-finalize.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/test/java/com/spacesim/world/Stage17EEmbargoAcceptanceTest.java \
+                  .github/stage17e5 \
+                  .github/workflows/stage17e5-fixture-finalize.yml
+          git diff --cached --check
+          git commit -m "Stage 17E.5: honor entity lifecycle in embargo fixture"
+          git push origin HEAD:agent/stage17e-embargo-commands
