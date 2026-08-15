@@ -106,13 +106,13 @@ public final class FleetTradeProfile {
         if (specializedItem < -1 || specializedItem >= Constants.MAX_ITEMS) {
             throw new IllegalArgumentException("Некорректная специализация товара");
         }
-        if (factionId < -1 || factionId >= Constants.MAX_FACTIONS) {
+        if (factionId < -1 || factionId >= Constants.FACTION_RUNTIME_CAPACITY) {
             throw new IllegalArgumentException("Некорректный runtime faction ID флота");
         }
         if (stock == null || stock.length != Constants.MAX_ITEMS) {
             throw new IllegalArgumentException("stock должен иметь длину Constants.MAX_ITEMS");
         }
-        if (reputation == null || reputation.length != Constants.MAX_FACTIONS) {
+        if (reputation == null || reputation.length != Constants.FACTION_RUNTIME_CAPACITY) {
             throw new IllegalArgumentException("reputation должен иметь длину Constants.MAX_FACTIONS");
         }
         this.x = x;
