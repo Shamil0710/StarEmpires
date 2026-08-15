@@ -72,7 +72,8 @@ public record EntityState(
     }
 
     /**
-     * @param targetStock целевые остатки
+     * @param targetStock текущие effective целевые остатки
+     * @param configuredTargetStock исходные station-configured baseline targets
      * @param baseConsumption базовое потребление
      * @param sellPrices цены продажи
      * @param buyPrices цены покупки
@@ -82,12 +83,46 @@ public record EntityState(
      */
     public record MarketState(
             List<Integer> targetStock,
+            List<Integer> configuredTargetStock,
             List<Float> baseConsumption,
             List<Float> sellPrices,
             List<Float> buyPrices,
             List<Double> consumptionRemainder,
             List<Boolean> tradableItems,
             boolean dirty) {
+
+        /**
+         * Compatibility constructor for schema v1/v2 values without explicit target provenance.
+         *
+         * <p>The old effective target becomes the configured baseline. This is deliberately
+         * conservative: loading an older save cannot silently reduce an existing market target.</p>
+         *
+         * @param targetStock legacy effective targets
+         * @param baseConsumption base consumption
+         * @param sellPrices sell prices
+         * @param buyPrices buy prices
+         * @param consumptionRemainder consumption remainder
+         * @param tradableItems tradable mask
+         * @param dirty dirty flag
+         */
+        public MarketState(
+                List<Integer> targetStock,
+                List<Float> baseConsumption,
+                List<Float> sellPrices,
+                List<Float> buyPrices,
+                List<Double> consumptionRemainder,
+                List<Boolean> tradableItems,
+                boolean dirty) {
+            this(
+                    targetStock,
+                    targetStock,
+                    baseConsumption,
+                    sellPrices,
+                    buyPrices,
+                    consumptionRemainder,
+                    tradableItems,
+                    dirty);
+        }
     }
 
     /**
@@ -190,12 +225,12 @@ public record EntityState(
     }
 
     /**
-     * @param hull текущий корпус
-     * @param maxHull максимальный корпус
-     * @param shields текущий щит
-     * @param maxShields максимальный щит
-     * @param damagePerSecond урон в секунду
-     * @param weaponRange дальность оружия
+     * @param hull текущее состояние корпуса
+     * @param maxHull максимальная прочность корпуса
+     * @param shields текущие щиты
+     * @param maxShields максимальные щиты
+     * @param damagePerSecond урон
+     * @param weaponRange дальность
      */
     public record CombatState(
             float hull,
@@ -207,10 +242,10 @@ public record EntityState(
     }
 
     /**
-     * @param spawnPointId стабильный ID точки пояса
-     * @param resourceItem товар ресурса
-     * @param initialResource первоначальный запас
-     * @param remainingResource текущий остаток
+     * @param spawnPointId stable ID точки появления
+     * @param resourceItem runtime ID ресурса
+     * @param initialResource исходное количество ресурса
+     * @param remainingResource оставшееся количество ресурса
      */
     public record AsteroidState(
             String spawnPointId,
@@ -219,7 +254,7 @@ public record EntityState(
             long remainingResource) {
     }
 
-    /** @param contentId stable station/ship archetype content ID */
+    /** @param contentId stable archetype content ID */
     public record ArchetypeState(String contentId) {
     }
 }
