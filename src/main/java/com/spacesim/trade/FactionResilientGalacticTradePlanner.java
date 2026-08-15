@@ -1,8 +1,5 @@
 package com.spacesim.trade;
 
-import com.spacesim.persistence.EntityId;
-import com.spacesim.world.StarSystemId;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -250,7 +247,17 @@ public final class FactionResilientGalacticTradePlanner {
             long actualProfitSacrificeMilliCredits,
             boolean diversificationApplied) {
 
-        /** Validates one immutable route-selection diagnostic. */
+        /**
+         * Validates one immutable route-selection diagnostic.
+         *
+         * @param selectedRoute route actually selected for execution
+         * @param economicBaseline ordinary economic best route before resilience preference
+         * @param baselineSupplierShareBasisPoints measured concentration of the economic supplier
+         * @param selectedSupplierShareBasisPoints measured concentration of the selected supplier
+         * @param acceptableProfitSacrificeMilliCredits measured resilience willingness-to-pay
+         * @param actualProfitSacrificeMilliCredits real expected-profit sacrifice versus the economic baseline
+         * @param diversificationApplied whether a different physical supplier route was selected
+         */
         public Selection {
             Objects.requireNonNull(selectedRoute, "Selected galactic route not set");
             Objects.requireNonNull(economicBaseline, "Economic baseline route not set");
