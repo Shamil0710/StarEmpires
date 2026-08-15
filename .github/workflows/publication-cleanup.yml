@@ -2,6 +2,11 @@ name: Publication cleanup
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publication-cleanup.yml
 
 permissions:
   actions: write
@@ -15,7 +20,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Free Actions storage and delete branches already contained in main
+      - name: Delete old Actions artifacts until storage is below target and remove merged branches
         uses: actions/github-script@v7
         with:
           script: |
@@ -42,26 +47,19 @@ jobs:
               repo,
               per_page: 100
             });
-            const targetArtifactBytes = 100 * 1024 * 1024;
-            let retainedArtifactBytes = artifacts.reduce(
-              (total, artifact) => total + artifact.size_in_bytes,
-              0
-            );
+            const activeArtifacts = artifacts.filter(a => !a.expired);
+            let totalBytes = activeArtifacts.reduce((sum, a) => sum + a.size_in_bytes, 0);
+            const targetBytes = 100 * 1024 * 1024;
+            const sortedArtifacts = [...activeArtifacts].sort((a, b) => b.size_in_bytes - a.size_in_bytes);
             let deletedArtifacts = 0;
-
-            // Remove the largest retained artifacts first. We only need to get comfortably below
-            // the free storage ceiling; deleting every small Surefire archive would waste API calls.
-            artifacts.sort((left, right) => right.size_in_bytes - left.size_in_bytes);
-            for (const artifact of artifacts) {
-              if (retainedArtifactBytes <= targetArtifactBytes) {
+            let deletedBytes = 0;
+            for (const artifact of sortedArtifacts) {
+              if (totalBytes <= targetBytes) {
                 break;
               }
-              await github.rest.actions.deleteArtifact({
-                owner,
-                repo,
-                artifact_id: artifact.id
-              });
-              retainedArtifactBytes -= artifact.size_in_bytes;
+              await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id });
+              totalBytes -= artifact.size_in_bytes;
+              deletedBytes += artifact.size_in_bytes;
               deletedArtifacts++;
             }
 
@@ -76,20 +74,14 @@ jobs:
               if (protectedBranches.has(branch.name)) {
                 continue;
               }
-
               const comparison = await github.rest.repos.compareCommits({
                 owner,
                 repo,
                 base: defaultBranch,
                 head: branch.name
               });
-
               if (comparison.data.ahead_by === 0) {
-                await github.rest.git.deleteRef({
-                  owner,
-                  repo,
-                  ref: `heads/${branch.name}`
-                });
+                await github.rest.git.deleteRef({ owner, repo, ref: `heads/${branch.name}` });
                 deletedBranches++;
               } else {
                 preservedUniqueBranches.push(branch.name);
@@ -98,8 +90,9 @@ jobs:
 
             core.summary
               .addHeading('Publication cleanup')
-              .addRaw(`Deleted large artifacts: ${deletedArtifacts}\n`)
-              .addRaw(`Approximate retained artifact storage: ${(retainedArtifactBytes / 1024 / 1024).toFixed(1)} MiB\n`)
+              .addRaw(`Deleted artifacts: ${deletedArtifacts}\n`)
+              .addRaw(`Freed artifact bytes: ${deletedBytes}\n`)
+              .addRaw(`Estimated remaining artifact bytes: ${Math.max(totalBytes, 0)}\n`)
               .addRaw(`Deleted branches already contained in ${defaultBranch}: ${deletedBranches}\n`)
               .addRaw(`Protected/open-PR branches: ${[...protectedBranches].sort().join(', ')}\n`)
               .addRaw(`Branches preserved because they still contain unique commits: ${preservedUniqueBranches.sort().join(', ') || 'none'}\n`)
