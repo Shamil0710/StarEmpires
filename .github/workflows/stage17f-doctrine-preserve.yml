@@ -1,5 +1,5 @@
 name: Stage 17F doctrine preservation
-# corrected anchors
+# corrected anchors v2
 
 on:
   push:
