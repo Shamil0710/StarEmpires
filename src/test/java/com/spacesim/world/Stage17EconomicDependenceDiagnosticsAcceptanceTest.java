@@ -31,40 +31,61 @@ class Stage17EconomicDependenceDiagnosticsAcceptanceTest {
                 DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
                 WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS,
                 WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME);
-        ContentCatalog.ItemDefinition item = content.getItems().get(0);
-        int itemId = item.runtimeId();
+        ContentCatalog.ItemDefinition importItem = content.getItems().get(0);
+        ContentCatalog.ItemDefinition exportItem = content.getItems().get(1);
+        int importItemId = importItem.runtimeId();
+        int exportItemId = exportItem.runtimeId();
         clearExistingEconomicSignal(world);
 
         int sourceRuntime = world.findFactionRuntimeId(SOURCE).orElseThrow();
         int partnerRuntime = world.findFactionRuntimeId(PARTNER).orElseThrow();
         int alternativeRuntime = world.findFactionRuntimeId(ALTERNATIVE).orElseThrow();
+
         addMarketStation(
                 world, DemoGalaxyFactory.FRONTIER_SYSTEM_ID,
-                "Source market", sourceRuntime, itemId, 20, 100, 50f);
+                "Source import market", sourceRuntime, importItemId, 20, 100, 50f);
         addMarketStation(
                 world, DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
-                "Partner supplier", partnerRuntime, itemId, 100, 20, 10f);
+                "Partner supplier", partnerRuntime, importItemId, 100, 20, 10f);
         addMarketStation(
                 world, DemoGalaxyFactory.INNER_SYSTEM_ID,
-                "Alternative supplier", alternativeRuntime, itemId, 60, 20, 20f);
+                "Alternative supplier", alternativeRuntime, importItemId, 60, 20, 20f);
+
+        addMarketStation(
+                world, DemoGalaxyFactory.FRONTIER_SYSTEM_ID,
+                "Source exporter", sourceRuntime, exportItemId, 50, 0, 30f);
+        addMarketStation(
+                world, DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                "Partner buyer", partnerRuntime, exportItemId, 0, 30, 60f);
+        addMarketStation(
+                world, DemoGalaxyFactory.INNER_SYSTEM_ID,
+                "Alternative buyer", alternativeRuntime, exportItemId, 0, 10, 55f);
 
         FactionEconomicDependenceDiagnostics before = world.analyzeEconomicDependence(SOURCE, PARTNER);
-        FactionItemDependenceDiagnostic row = item(before, item.id());
-        assertEquals(80L, row.currentExternalRequirementUnits());
-        assertEquals(80L, row.partnerPhysicalSurplusUnits());
-        assertEquals(80L, row.partnerAccessibleSurplusUnits());
-        assertEquals(40L, row.alternativeAccessibleSurplusUnits());
-        assertEquals(10_000, row.partnerCoverageBasisPoints());
-        assertEquals(6_666, row.partnerSupplyShareBasisPoints());
-        assertEquals(10_000L, row.partnerBestUnitSellPriceMilliCredits());
-        assertEquals(20_000L, row.alternativeBestUnitSellPriceMilliCredits());
-        assertEquals(400_000L, row.estimatedReplacementPremiumMilliCredits());
-        assertEquals(40L, row.uncoveredUnitsAfterPartnerLoss());
-        assertEquals(2, row.bestPartnerRouteHops());
-        assertEquals(1, row.bestAlternativeRouteHops());
-        assertTrue(row.uniquePartnerShortestRoute());
-        assertEquals(1, row.uniquePartnerCorridorIntermediateSystems());
+        FactionItemDependenceDiagnostic importRow = item(before, importItem.id());
+        assertEquals(80L, importRow.currentExternalRequirementUnits());
+        assertEquals(80L, importRow.partnerPhysicalSurplusUnits());
+        assertEquals(80L, importRow.partnerAccessibleSurplusUnits());
+        assertEquals(40L, importRow.alternativeAccessibleSurplusUnits());
+        assertEquals(10_000, importRow.partnerCoverageBasisPoints());
+        assertEquals(6_666, importRow.partnerSupplyShareBasisPoints());
+        assertEquals(10_000L, importRow.partnerBestUnitSellPriceMilliCredits());
+        assertEquals(20_000L, importRow.alternativeBestUnitSellPriceMilliCredits());
+        assertEquals(400_000L, importRow.estimatedReplacementPremiumMilliCredits());
+        assertEquals(40L, importRow.uncoveredUnitsAfterPartnerLoss());
+        assertEquals(2, importRow.bestPartnerRouteHops());
+        assertEquals(1, importRow.bestAlternativeRouteHops());
+        assertTrue(importRow.uniquePartnerShortestRoute());
+        assertEquals(1, importRow.uniquePartnerCorridorIntermediateSystems());
+
+        FactionItemDependenceDiagnostic exportRow = item(before, exportItem.id());
+        assertEquals(50L, exportRow.sourceExportableSurplusUnits());
+        assertEquals(30L, exportRow.partnerAccessibleDemandUnits());
+        assertEquals(10L, exportRow.otherAccessibleForeignDemandUnits());
+        assertEquals(7_500, exportRow.partnerDemandShareBasisPoints());
+
         assertEquals(10_000, before.structuralImportDependenceBasisPoints());
+        assertEquals(7_500, before.structuralExportMarketDependenceBasisPoints());
         assertEquals(400_000L, before.estimatedCurrentAccessLossPremiumMilliCredits());
         assertEquals(40L, before.currentUncoveredUnitsAfterAccessLoss());
         assertEquals(10_000, before.confidenceBasisPoints());
@@ -85,14 +106,22 @@ class Stage17EconomicDependenceDiagnosticsAcceptanceTest {
                 -1L,
                 "stage17e7-test"));
         FactionEconomicDependenceDiagnostics after = restored.analyzeEconomicDependence(SOURCE, PARTNER);
-        FactionItemDependenceDiagnostic blocked = item(after, item.id());
-        assertEquals(80L, blocked.partnerPhysicalSurplusUnits());
-        assertEquals(0L, blocked.partnerAccessibleSurplusUnits());
-        assertEquals(40L, blocked.alternativeAccessibleSurplusUnits());
-        assertEquals(0, blocked.partnerCoverageBasisPoints());
-        assertEquals(0, blocked.partnerSupplyShareBasisPoints());
-        assertEquals(40L, blocked.uncoveredUnitsAfterPartnerLoss());
+        FactionItemDependenceDiagnostic blockedImport = item(after, importItem.id());
+        assertEquals(80L, blockedImport.partnerPhysicalSurplusUnits());
+        assertEquals(0L, blockedImport.partnerAccessibleSurplusUnits());
+        assertEquals(40L, blockedImport.alternativeAccessibleSurplusUnits());
+        assertEquals(0, blockedImport.partnerCoverageBasisPoints());
+        assertEquals(0, blockedImport.partnerSupplyShareBasisPoints());
+        assertEquals(40L, blockedImport.uncoveredUnitsAfterPartnerLoss());
+
+        FactionItemDependenceDiagnostic blockedExport = item(after, exportItem.id());
+        assertEquals(50L, blockedExport.sourceExportableSurplusUnits());
+        assertEquals(0L, blockedExport.partnerAccessibleDemandUnits());
+        assertEquals(10L, blockedExport.otherAccessibleForeignDemandUnits());
+        assertEquals(0, blockedExport.partnerDemandShareBasisPoints());
+
         assertEquals(0, after.structuralImportDependenceBasisPoints());
+        assertEquals(0, after.structuralExportMarketDependenceBasisPoints());
         assertEquals(0L, after.estimatedCurrentAccessLossPremiumMilliCredits());
     }
 
