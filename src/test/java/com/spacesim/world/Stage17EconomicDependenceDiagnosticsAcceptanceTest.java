@@ -10,6 +10,7 @@ import com.spacesim.components.ProductionComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.WorldStateCodec;
 import org.junit.jupiter.api.Test;
 
@@ -37,15 +38,15 @@ class Stage17EconomicDependenceDiagnosticsAcceptanceTest {
         int sourceRuntime = world.findFactionRuntimeId(SOURCE).orElseThrow();
         int partnerRuntime = world.findFactionRuntimeId(PARTNER).orElseThrow();
         int alternativeRuntime = world.findFactionRuntimeId(ALTERNATIVE).orElseThrow();
-        world.createEntity(
-                DemoGalaxyFactory.FRONTIER_SYSTEM_ID,
-                marketStation("Source market", sourceRuntime, itemId, 20, 100, 50f));
-        world.createEntity(
-                DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
-                marketStation("Partner supplier", partnerRuntime, itemId, 100, 20, 10f));
-        world.createEntity(
-                DemoGalaxyFactory.INNER_SYSTEM_ID,
-                marketStation("Alternative supplier", alternativeRuntime, itemId, 60, 20, 20f));
+        addMarketStation(
+                world, DemoGalaxyFactory.FRONTIER_SYSTEM_ID,
+                "Source market", sourceRuntime, itemId, 20, 100, 50f);
+        addMarketStation(
+                world, DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                "Partner supplier", partnerRuntime, itemId, 100, 20, 10f);
+        addMarketStation(
+                world, DemoGalaxyFactory.INNER_SYSTEM_ID,
+                "Alternative supplier", alternativeRuntime, itemId, 60, 20, 20f);
 
         FactionEconomicDependenceDiagnostics before = world.analyzeEconomicDependence(SOURCE, PARTNER);
         FactionItemDependenceDiagnostic row = item(before, item.id());
@@ -114,7 +115,9 @@ class Stage17EconomicDependenceDiagnosticsAcceptanceTest {
         }
     }
 
-    private static Entity marketStation(
+    private static void addMarketStation(
+            WorldSimulation world,
+            StarSystemId systemId,
             String name,
             int factionRuntimeId,
             int itemId,
@@ -123,17 +126,20 @@ class Stage17EconomicDependenceDiagnosticsAcceptanceTest {
             float sellPrice) {
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = 1_000;
-        inventory.stock[itemId] = stock;
         MarketComponent market = new MarketComponent();
         market.configureTradableItem(itemId, target, 0f);
         market.sellPrices[itemId] = sellPrice;
         market.buyPrices[itemId] = Math.max(1f, sellPrice * 0.9f);
-        return new Entity()
+        Entity shell = new Entity()
                 .add(new IdentityComponent(name, IdentityComponent.Kind.STATION))
                 .add(new FactionComponent(factionRuntimeId))
                 .add(inventory)
                 .add(market)
-                .add(new WalletComponent(1_000_000L));
+                .add(new WalletComponent());
+        EntityId id = world.createEntity(systemId, shell);
+        Entity live = world.findSession(systemId).orElseThrow().getEntityRegistry().find(id);
+        live.getComponent(InventoryComponent.class).stock[itemId] = stock;
+        assertTrue(live.getComponent(WalletComponent.class).creditFromSource(1_000_000L));
     }
 
     private static FactionItemDependenceDiagnostic item(
