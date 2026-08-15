@@ -62,6 +62,39 @@ public final class FactionPolicyHysteresis {
         return Math.max(targetBasisPoints, currentBasisPoints - maxStepBasisPoints);
     }
 
+    /**
+     * Moves a non-negative money authorization toward its target by at most one bounded review step.
+     *
+     * <p>This helper changes only an authorization value. It does not move treasury money or create a
+     * second budget account.</p>
+     *
+     * @param currentMilliCredits current non-negative authorization
+     * @param targetMilliCredits target non-negative authorization
+     * @param maxStepMilliCredits positive maximum change per claimed review
+     * @return bounded next authorization
+     */
+    public static long boundedMoneyStep(
+            long currentMilliCredits,
+            long targetMilliCredits,
+            long maxStepMilliCredits) {
+        if (currentMilliCredits < 0L || targetMilliCredits < 0L || maxStepMilliCredits <= 0L) {
+            throw new IllegalArgumentException("Money policy values must be non-negative and step positive");
+        }
+        if (currentMilliCredits == targetMilliCredits) {
+            return currentMilliCredits;
+        }
+        if (currentMilliCredits < targetMilliCredits) {
+            long distance = targetMilliCredits - currentMilliCredits;
+            return distance <= maxStepMilliCredits
+                    ? targetMilliCredits
+                    : Math.addExact(currentMilliCredits, maxStepMilliCredits);
+        }
+        long distance = currentMilliCredits - targetMilliCredits;
+        return distance <= maxStepMilliCredits
+                ? targetMilliCredits
+                : currentMilliCredits - maxStepMilliCredits;
+    }
+
     private static void requireBasisPoints(int value, String label) {
         if (value < 0 || value > 10_000) {
             throw new IllegalArgumentException(label + " must be in range 0..10000 bps");
