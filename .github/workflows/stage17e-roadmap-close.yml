@@ -1,0 +1,29 @@
+name: Stage 17E roadmap closure
+
+on:
+  push:
+    branches:
+      - agent/stage17e-aggregate-acceptance
+    paths:
+      - .github/workflows/stage17e-roadmap-close.yml
+
+permissions:
+  contents: write
+
+jobs:
+  close-roadmap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17e-aggregate-acceptance
+      - name: Apply roadmap closure
+        run: python .github/scripts/stage17e_roadmap_close.py
+      - name: Commit and remove applicator
+        run: |
+          rm .github/scripts/stage17e_roadmap_close.py .github/workflows/stage17e-roadmap-close.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add docs/development_roadmap.md .github/scripts/stage17e_roadmap_close.py .github/workflows/stage17e-roadmap-close.yml
+          git commit -m "Mark Stage 17E complete and advance roadmap to 17F"
+          git push
