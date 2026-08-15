@@ -1,0 +1,108 @@
+name: Stage17D Expansion Regex Patch
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Patch expansion with structural regex
+        shell: python
+        run: |
+          import re
+          from pathlib import Path
+
+          path = Path('src/main/java/com/spacesim/world/StrategicGrowthPlanService.java')
+          text = path.read_text()
+          pattern = re.compile(
+              r'    private static FactionStrategicState copyWithGoals\(.*?\n    \}\n\}',
+              re.DOTALL)
+          replacement = '''    private static FactionStrategicState copyWithGoals(
+                  FactionStrategicState state,
+                  List<FactionStrategicGoalState> goals) {
+              return new FactionStrategicState(
+                      state.factionContentId(),
+                      state.minimumMarketAccessRelation(),
+                      state.relations(),
+                      state.controlledSystems(),
+                      state.stationTaxBasisPoints(),
+                      state.foreignTerritoryTariffBasisPoints(),
+                      state.stockPolicies(),
+                      state.productionPolicies(),
+                      goals,
+                      state.territorialClaims(),
+                      state.territorialControlStates(),
+                      state.territorialRecognitions(),
+                      state.constructionRightsGranted());
+          }
+          }'''
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('copyWithGoals structural match failed')
+          path.write_text(text)
+
+          path = Path('src/main/java/com/spacesim/world/FactionExpansionRuntime.java')
+          text = path.read_text()
+          pattern = re.compile(
+              r'        if \(project\.status\(\) == ConstructionProjectStatus\.COMPLETED\) \{'
+              r'.*?        \}\n        driveMaterials\(plan, project\);',
+              re.DOTALL)
+          replacement = '''        if (project.status() == ConstructionProjectStatus.COMPLETED) {
+              FactionStrategicState current = world.findFactionStrategicState(
+                      strategy.factionContentId()).orElseThrow();
+              if (current.claimFor(plan.targetSystemId()) == null) {
+                  world.declareTerritorialClaim(strategy.factionContentId(), plan.targetSystemId());
+                  current = world.findFactionStrategicState(strategy.factionContentId()).orElseThrow();
+              }
+              if (!strategy.factionContentId().equals(
+                      world.controllingFaction(plan.targetSystemId()).orElse(null))) {
+                  return plan;
+              }
+              StrategicGrowthState.Plan established = StrategicGrowthPlanService.transition(
+                      plan,
+                      StrategicGrowthState.Status.ESTABLISHED,
+                      plan.anchorProjectId(),
+                      authoritativeTick());
+              current = StrategicGrowthPlanService.replacePlan(current, established);
+              releaseAssignedFleet(established);
+              replaceStrategy(current);
+              return established;
+          }
+          driveMaterials(plan, project);'''
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('completed expansion structural match failed')
+
+          pattern = re.compile(
+              r'(                state\.nextFleetIdValue\(\),\s*'
+              r'state\.fleets\(\),\s*state\.fleetJumps\(\))\);')
+          text, count = pattern.subn(r'\1,\n                state.factionIdentities());', text, count=1)
+          if count != 1:
+              raise SystemExit('WorldState identity preservation match failed')
+
+          pattern = re.compile(
+              r'\n    private FactionStrategicState addControlledSystem\(.*?'
+              r'\n    private boolean foreignController\(', re.DOTALL)
+          text, count = pattern.subn('\n    private boolean foreignController(', text, count=1)
+          if count != 1:
+              raise SystemExit('addControlledSystem removal match failed')
+          path.write_text(text)
+      - name: Remove workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-expansion-regex-patch.yml
+          git add src/main/java/com/spacesim/world/StrategicGrowthPlanService.java src/main/java/com/spacesim/world/FactionExpansionRuntime.java
+          git commit -m "Route Stage 11 expansion through territorial claims"
+          git push origin HEAD:agent/stage17d-territorial-process
