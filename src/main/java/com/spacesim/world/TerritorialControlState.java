@@ -21,7 +21,14 @@ public record TerritorialControlState(
         long lastEvaluatedTick,
         long unsupportedTicks) implements Comparable<TerritorialControlState> {
 
-    /** Validates monotonic control-maintenance clocks. */
+    /**
+     * Validates monotonic control-maintenance clocks.
+     *
+     * @param systemId controlled star system
+     * @param establishedTick authoritative world tick when this control period began
+     * @param lastEvaluatedTick last authoritative world tick included in maintenance evaluation
+     * @param unsupportedTicks accumulated time without sufficient uncontested control evidence
+     */
     public TerritorialControlState {
         systemId = Objects.requireNonNull(systemId, "Territorial control StarSystemId not set");
         if (establishedTick < 0L || lastEvaluatedTick < establishedTick || unsupportedTicks < 0L) {
