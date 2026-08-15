@@ -1,0 +1,42 @@
+name: Stage 17E.5 acceptance fixture fix
+
+on:
+  push:
+    branches:
+      - agent/stage17e-embargo-commands
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17e-embargo-commands
+          fetch-depth: 0
+      - name: Fix fixture naming and assertion
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/test/java/com/spacesim/world/Stage17EEmbargoAcceptanceTest.java')
+          t = p.read_text()
+          t = t.replace('IdentityComponent.Kind.SHIP', 'IdentityComponent.Kind.FLEET')
+          t = t.replace(
+              '        assertEquals(start + 31L <= reimposed.embargo().imposedTick(), true);',
+              '        assertTrue(reimposed.embargo().imposedTick() >= start + 31L);')
+          p.write_text(t)
+          PY
+      - name: Self-remove and commit
+        shell: bash
+        run: |
+          rm .github/workflows/stage17e5-testfix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/test/java/com/spacesim/world/Stage17EEmbargoAcceptanceTest.java .github/workflows/stage17e5-testfix.yml
+          git diff --cached --check
+          git commit -m "Stage 17E.5: fix embargo acceptance fixture"
+          git push origin HEAD:agent/stage17e-embargo-commands
