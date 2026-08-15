@@ -25,7 +25,15 @@ public record DiplomaticEmbargoState(
         MARKET_ACCESS
     }
 
-    /** Validates and normalizes one embargo. */
+    /**
+     * Validates and normalizes one embargo.
+     *
+     * @param targetFactionContentId sanctioned faction
+     * @param scope embargo scope
+     * @param imposedTick authoritative non-negative imposition tick
+     * @param expiresTick exclusive expiry tick or -1 for indefinite
+     * @param reasonKey stable diagnostic/political reason key, possibly empty
+     */
     public DiplomaticEmbargoState {
         targetFactionContentId = requireId(targetFactionContentId, "Embargo target faction ID");
         scope = Objects.requireNonNull(scope, "Embargo scope not set");
@@ -38,7 +46,12 @@ public record DiplomaticEmbargoState(
         reasonKey = Objects.requireNonNull(reasonKey, "Embargo reason key not set").strip();
     }
 
-    /** @return true while the embargo is legally active at the supplied tick */
+    /**
+     * Tests whether this legal prohibition is active at a world tick.
+     *
+     * @param worldTick authoritative world tick
+     * @return true while the embargo is active at the supplied tick
+     */
     public boolean activeAt(long worldTick) {
         return worldTick >= imposedTick && (expiresTick < 0L || worldTick < expiresTick);
     }
