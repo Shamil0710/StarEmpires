@@ -14,6 +14,7 @@ import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.economy.Money;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.trade.FleetTradeProfile;
+import com.spacesim.trade.RouteRedundancyPolicy;
 import com.spacesim.trade.SupplierDiversificationPolicy;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,7 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
     private static final String ALTERNATIVE = "faction.miners";
 
     @Test
-    void liveDependenceAndDoctrineProduceBoundedSupplierWillingnessToPay() {
+    void liveDependenceAndDoctrineProduceBoundedSupplierAndRouteWillingnessToPay() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = WorldSimulation.restore(
                 DemoGalaxyFactory.createState(0x17F50022L, content),
@@ -78,13 +79,15 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
                 doctrine.treatyLegalism(),
                 doctrine.interventionism(),
                 80));
-        WorldSupplierDiversificationPolicy policy = new WorldSupplierDiversificationPolicy(world);
+        WorldSupplierDiversificationPolicy supplierPolicy = new WorldSupplierDiversificationPolicy(world);
+        WorldRouteRedundancyPolicy routePolicy = new WorldRouteRedundancyPolicy(world);
         FleetTradeProfile fleet = fleet(sourceRuntime, item.runtimeId());
 
-        SupplierDiversificationPolicy.Assessment concentrated = policy.assess(
+        SupplierDiversificationPolicy.Assessment concentrated = supplierPolicy.assess(
                 fleet, concentratedRuntime, item.runtimeId());
-        SupplierDiversificationPolicy.Assessment alternative = policy.assess(
+        SupplierDiversificationPolicy.Assessment alternative = supplierPolicy.assess(
                 fleet, alternativeRuntime, item.runtimeId());
+        RouteRedundancyPolicy.Assessment route = routePolicy.assess(fleet, item.runtimeId());
 
         assertTrue(concentrated.active());
         assertEquals(6_666, concentrated.supplierShareBasisPoints());
@@ -92,6 +95,8 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
         assertTrue(alternative.active());
         assertEquals(3_333, alternative.supplierShareBasisPoints());
         assertEquals(320_000L, alternative.acceptableProfitSacrificeMilliCredits());
+        assertTrue(route.active());
+        assertEquals(320_000L, route.acceptableProfitSacrificeMilliCredits());
 
         world.updateFactionDoctrine(SOURCE, new FactionDoctrineState(
                 doctrine.tradeOpenness(),
@@ -101,10 +106,13 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
                 doctrine.treatyLegalism(),
                 doctrine.interventionism(),
                 0));
-        SupplierDiversificationPolicy.Assessment zeroPriority = policy.assess(
+        SupplierDiversificationPolicy.Assessment zeroSupplierPriority = supplierPolicy.assess(
                 fleet, concentratedRuntime, item.runtimeId());
-        assertFalse(zeroPriority.active());
-        assertEquals(0L, zeroPriority.acceptableProfitSacrificeMilliCredits());
+        RouteRedundancyPolicy.Assessment zeroRoutePriority = routePolicy.assess(fleet, item.runtimeId());
+        assertFalse(zeroSupplierPriority.active());
+        assertEquals(0L, zeroSupplierPriority.acceptableProfitSacrificeMilliCredits());
+        assertFalse(zeroRoutePriority.active());
+        assertEquals(0L, zeroRoutePriority.acceptableProfitSacrificeMilliCredits());
     }
 
     private static FleetTradeProfile fleet(int factionRuntimeId, int itemRuntimeId) {

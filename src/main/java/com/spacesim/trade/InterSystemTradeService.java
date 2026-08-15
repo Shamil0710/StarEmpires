@@ -13,6 +13,8 @@ import com.spacesim.simulation.SimulationSession;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
+import com.spacesim.world.GalacticPathPlanner;
+import com.spacesim.world.WorldRouteRedundancyPolicy;
 import com.spacesim.world.WorldSimulation;
 import com.spacesim.world.WorldSupplierDiversificationPolicy;
 
@@ -24,9 +26,9 @@ import java.util.Optional;
  *
  * <p>The service owns one shared {@link GalacticMarketIndex}; repeated planning therefore reuses
  * per-system immutable market snapshots and their revisions. It combines bounded discovery with the
- * world's canonical {@link TradeRoutePlanner}, then applies the Stage-17F.5 supplier-diversification
- * selector before returning an {@link InterSystemTradeJob} that performs the physical transactions
- * and jump handoffs.</p>
+ * world's canonical {@link TradeRoutePlanner}, then applies Stage-17F.5 supplier diversification and
+ * physical edge-disjoint route redundancy before returning an {@link InterSystemTradeJob} that
+ * performs the same ordinary transactions and jump handoffs.</p>
  */
 public final class InterSystemTradeService {
     private final WorldSimulation world;
@@ -46,17 +48,22 @@ public final class InterSystemTradeService {
             GalacticMarketDiscoveryPolicy discoveryPolicy,
             TradeRoutePlanner.ScoringMode scoringMode) {
         this.world = Objects.requireNonNull(world, "WorldSimulation не задан");
+        GalacticMarketDiscoveryPolicy checkedDiscoveryPolicy = Objects.requireNonNull(
+                discoveryPolicy, "Discovery policy не задан");
+        GalacticPathPlanner pathPlanner = world.createGalacticPathPlanner();
         this.marketIndex = new GalacticMarketIndex(world);
-        this.discovery = new GalacticMarketDiscovery(
-                world.createGalacticPathPlanner(),
-                Objects.requireNonNull(discoveryPolicy, "Discovery policy не задан"));
+        this.discovery = new GalacticMarketDiscovery(pathPlanner, checkedDiscoveryPolicy);
         TradeRoutePlanner.ScoringMode checkedScoringMode = Objects.requireNonNull(
                 scoringMode, "ScoringMode не задан");
         TradeRoutePlanner economicPlanner = world.createGalacticTradeRoutePlanner(checkedScoringMode);
         this.routePlanner = new FactionResilientGalacticTradePlanner(
                 economicPlanner,
                 checkedScoringMode,
-                new WorldSupplierDiversificationPolicy(world));
+                new WorldSupplierDiversificationPolicy(world),
+                pathPlanner,
+                checkedDiscoveryPolicy.maxJumpHops(),
+                jumpCount -> routeRiskBasisPoints(checkedDiscoveryPolicy, jumpCount),
+                new WorldRouteRedundancyPolicy(world));
     }
 
     /**
@@ -72,8 +79,9 @@ public final class InterSystemTradeService {
      * Plans the best currently valid inter-system cargo job for a local world fleet.
      *
      * <p>Ordinary economics remains the baseline. A faction may choose a less concentrated physical
-     * supplier only when Stage-17F.5 diagnostics recommend diversification and the real expected-profit
-     * sacrifice stays within its measured resilience budget.</p>
+     * supplier and/or an edge-disjoint physical jump path only when Stage-17F.5 diagnostics recommend
+     * the resilience action and the final real expected-profit sacrifice remains within its measured
+     * budget. Execution itself is unchanged.</p>
      *
      * @param fleetId stable fleet identity
      * @return executable job or empty when no bounded profitable candidate exists
@@ -102,6 +110,16 @@ public final class InterSystemTradeService {
     /** @return shared market index and its current aggregate revision */
     public GalacticMarketIndex marketIndex() {
         return marketIndex;
+    }
+
+    private static int routeRiskBasisPoints(
+            GalacticMarketDiscoveryPolicy policy,
+            int jumpCount) {
+        if (jumpCount < 0) {
+            throw new IllegalArgumentException("Jump count cannot be negative");
+        }
+        long risk = (long) policy.riskPerJumpBasisPoints() * jumpCount;
+        return (int) Math.min(10_000L, risk);
     }
 
     private static FleetTradeProfile captureProfile(Entity fleet) {
