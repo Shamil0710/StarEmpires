@@ -32,7 +32,13 @@ public final class CustomsTariffResolver {
      * @param instrumentId treaty ID for an exemption, otherwise empty
      */
     public record Decision(int basisPoints, Reason reason, String instrumentId) {
-        /** Validates one effective tariff decision. */
+        /**
+         * Validates one effective tariff decision.
+         *
+         * @param basisPoints effective transaction tariff in basis points
+         * @param reason legal branch producing the result
+         * @param instrumentId treaty ID for an exemption, otherwise empty
+         */
         public Decision {
             if (basisPoints < 0 || basisPoints > 10_000) {
                 throw new IllegalArgumentException("Customs tariff must be in range 0..10000 bps");
