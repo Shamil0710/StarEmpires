@@ -117,6 +117,46 @@ class Stage17F2FiscalPolicyAcceptanceTest {
         assertEquals(500L, restored.findConstructionProject(projectId).orElseThrow().projectWalletMilliCredits());
     }
 
+    @Test
+    void editedTaxAndTerritorialLevyImmediatelyUseExistingConservedFiscalSettlement() {
+        ContentCatalog content = ContentCatalogLoader.loadDefault();
+        WorldSimulation world = WorldSimulation.restore(
+                DemoGalaxyFactory.createState(17_706L, content),
+                content,
+                DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS,
+                WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME);
+        FactionFiscalPolicyState initial = world.findFactionFiscalPolicy(TRADE_LEAGUE).orElseThrow();
+        long treasuryBefore = world.findFactionEconomicState(TRADE_LEAGUE).orElseThrow().treasuryMilliCredits();
+
+        world.updateFactionFiscalPolicy(new FactionFiscalPolicyState(
+                TRADE_LEAGUE,
+                1_000,
+                500,
+                initial.customsTariffBasisPoints(),
+                0L,
+                0L,
+                initial.maxLiquiditySupportPerDecisionMilliCredits(),
+                initial.maxConstructionInvestmentPerDecisionMilliCredits()));
+        WorldSimulation.FiscalPolicyReport report = world.applyFiscalPolicy(TRADE_LEAGUE);
+
+        assertTrue(report.taxCollectedMilliCredits() > 0L);
+        assertTrue(report.tariffCollectedMilliCredits() > 0L);
+        assertTrue(report.taxedStations() > 0);
+        assertTrue(report.tariffedStations() > 0);
+        assertEquals(
+                treasuryBefore + report.totalCollectedMilliCredits(),
+                world.findFactionEconomicState(TRADE_LEAGUE).orElseThrow().treasuryMilliCredits());
+        assertTrue(world.snapshot().systems().stream()
+                .flatMap(system -> system.simulationState().ledger().stream())
+                .anyMatch(entry -> entry.type() == EconomicTransaction.Type.MONEY_TRANSFER
+                        && "faction-station-tax".equals(entry.reason())));
+        assertTrue(world.snapshot().systems().stream()
+                .flatMap(system -> system.simulationState().ledger().stream())
+                .anyMatch(entry -> entry.type() == EconomicTransaction.Type.MONEY_TRANSFER
+                        && "faction-territory-tariff".equals(entry.reason())));
+    }
+
     private static void assertStrategicStateUnchangedExceptFiscalRates(
             FactionStrategicState before,
             FactionStrategicState after) {
