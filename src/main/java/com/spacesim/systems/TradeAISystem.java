@@ -22,6 +22,7 @@ import com.spacesim.constants.Constants;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.controllers.TradeController;
+import com.spacesim.controllers.TradeTransactionPolicy;
 import com.spacesim.economy.EconomicLedger;
 import com.spacesim.economy.Money;
 import com.spacesim.flight.InertialNavigation;
@@ -30,6 +31,7 @@ import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.trade.FleetTradeProfile;
 import com.spacesim.trade.MarketDirectory;
 import com.spacesim.trade.TradeRoute;
+import com.spacesim.trade.TradeRouteCostModel;
 import com.spacesim.trade.TradeRoutePlanner;
 import com.spacesim.trade.TradeSaleRoute;
 import com.spacesim.util.SpatialHashGrid;
@@ -66,11 +68,12 @@ public class TradeAISystem extends IteratingSystem {
     private static final float ARRIVAL_DISTANCE = 10f;
     private static final float ROUTE_SEARCH_RETRY_SECONDS = 1f;
 
-    private final TradeController tradeController;
+    private TradeController tradeController;
     private final EntityRegistry registry;
     private final ContentCatalog contentCatalog;
     private final MarketDirectory marketDirectory;
-    private final TradeRoutePlanner routePlanner;
+    private TradeRoutePlanner routePlanner;
+    private final TradeRoutePlanner.ScoringMode scoringMode;
     private final Map<EntityId, FailedRouteSearch> failedRouteSearches = new HashMap<>();
     private ImmutableArray<Entity> marketStations;
 
@@ -164,9 +167,27 @@ public class TradeAISystem extends IteratingSystem {
         this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
         this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
         this.marketDirectory = new MarketDirectory(this.contentCatalog);
-        this.routePlanner = new TradeRoutePlanner(
-                this.contentCatalog,
-                Objects.requireNonNull(scoringMode, "ScoringMode не задан"));
+        this.scoringMode = Objects.requireNonNull(scoringMode, "ScoringMode не задан");
+        this.routePlanner = new TradeRoutePlanner(this.contentCatalog, this.scoringMode);
+    }
+
+    /**
+     * Installs world-backed transaction and route-cost policy after this local session joins a world.
+     *
+     * @param transactionPolicy authoritative transaction settlement policy
+     * @param costModel matching pre-route external cost model
+     */
+    public void configureTradePolicies(
+            TradeTransactionPolicy transactionPolicy,
+            TradeRouteCostModel costModel) {
+        tradeController = new TradeController(
+                tradeController.getLedger(),
+                Objects.requireNonNull(transactionPolicy, "TradeTransactionPolicy not set"));
+        routePlanner = new TradeRoutePlanner(
+                contentCatalog,
+                scoringMode,
+                Objects.requireNonNull(costModel, "TradeRouteCostModel not set"));
+        marketDirectory.invalidate();
     }
 
     /** @return ledger, в который система записывает успешные сделки */

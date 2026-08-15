@@ -618,7 +618,8 @@ final class FactionDiplomacyRuntime {
             List<DiplomaticTreatyState> treaties,
             List<DiplomaticEmbargoState> embargoes) {
         return new FactionDiplomacyState(
-                state.factionContentId(), standings, grievances, treaties, embargoes);
+                state.factionContentId(), standings, grievances, treaties, embargoes,
+                state.customsTariffBasisPoints());
     }
 
     private static DiplomaticTreatyState copyTreaty(

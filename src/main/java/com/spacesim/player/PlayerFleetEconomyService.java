@@ -11,6 +11,7 @@ import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
+import com.spacesim.constants.Constants;
 import com.spacesim.controllers.TradeController;
 import com.spacesim.economy.Money;
 import com.spacesim.simulation.SimulationSession;
@@ -155,19 +156,19 @@ public final class PlayerFleetEconomyService {
         proxy.add(proxyWallet);
         proxy.add(new IdentityComponent("Player fleet " + fleetId.value(), IdentityComponent.Kind.FLEET));
         if (player.factionContentId() != null) {
-            ContentCatalog.FactionDefinition faction = content.findFaction(player.factionContentId());
-            if (faction == null) {
+            int runtimeFactionId = runtime.world().findFactionRuntimeId(player.factionContentId()).orElse(-1);
+            if (runtimeFactionId < 0) {
                 return null;
             }
-            proxy.add(new FactionComponent(faction.runtimeId()));
+            proxy.add(new FactionComponent(runtimeFactionId));
         }
         ReputationComponent proxyReputation = new ReputationComponent();
         for (PlayerReputationState reputation : player.reputations()) {
-            ContentCatalog.FactionDefinition faction = content.findFaction(reputation.factionContentId());
-            if (faction == null) {
+            int runtimeFactionId = runtime.world().findFactionRuntimeId(reputation.factionContentId()).orElse(-1);
+            if (runtimeFactionId < 0) {
                 return null;
             }
-            proxyReputation.addReputation(faction.runtimeId(), reputation.value());
+            proxyReputation.addReputation(runtimeFactionId, reputation.value());
         }
         proxy.add(proxyReputation);
         return new Context(
@@ -178,7 +179,7 @@ public final class PlayerFleetEconomyService {
                 physical.stationInventory(),
                 physical.stationWallet(),
                 item,
-                new TradeController(physical.session().getLedger()),
+                runtime.world().createTradeController(physical.session()),
                 proxy,
                 proxyWallet,
                 proxyReputation);
@@ -249,10 +250,11 @@ public final class PlayerFleetEconomyService {
 
     private List<PlayerReputationState> snapshotReputation(ReputationComponent reputation) {
         List<PlayerReputationState> result = new ArrayList<>();
-        for (ContentCatalog.FactionDefinition faction : content.getFactions()) {
-            float value = reputation.getReputation(faction.runtimeId());
-            if (value != 0f) {
-                result.add(new PlayerReputationState(faction.id(), value));
+        for (int runtimeId = 0; runtimeId < Constants.FACTION_RUNTIME_CAPACITY; runtimeId++) {
+            String stableId = runtime.world().findFactionStableId(runtimeId).orElse(null);
+            float value = reputation.getReputation(runtimeId);
+            if (stableId != null && value != 0f) {
+                result.add(new PlayerReputationState(stableId, value));
             }
         }
         return result;
