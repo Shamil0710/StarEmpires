@@ -111,6 +111,15 @@ class PlayerMarketServiceTest {
                             && shipRole.canPurchaseItem(id)
                             && shipInventory.getFreeCapacity() >= 2) {
                         String factionId = content.findFaction(stationFaction.factionId).id();
+                        String controller = world.controllingFaction(
+                                DemoGalaxyFactory.ACTIVE_SYSTEM_ID).orElse(null);
+                        if (controller != null && !controller.equals(factionId)) {
+                            world.grantTerritorialConstructionRight(
+                                    controller,
+                                    factionId,
+                                    DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                                    -1L);
+                        }
                         PlayerState player = new PlayerState(
                                 1_000_000_000L,
                                 factionId,
