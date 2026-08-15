@@ -73,7 +73,7 @@ class ShipMathematicsV07ProtectionAcceptanceTest {
 
         assertTrue(narrow.shipHitFraction() > central.shipHitFraction());
         assertTrue(central.shipHitFraction() > wide.shipHitFraction());
-        assertEquals(0.3766869692494374, narrow.shipHitFraction(), 2.0e-7);
+        assertEquals(0.3766872129155317, narrow.shipHitFraction(), 1.0e-12);
         assertEquals(0.004808902419802274, wide.shipHitFraction(), 1.0e-12);
     }
 
