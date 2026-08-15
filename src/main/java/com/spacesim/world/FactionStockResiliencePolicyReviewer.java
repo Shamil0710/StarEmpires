@@ -15,7 +15,10 @@ import java.util.TreeSet;
  * persistent {@link FactionStrategicGoalState.GoalType#RESILIENCE} demand contribution by bounded
  * steps inside the shared policy-review cadence.</p>
  *
- * <p>Authoring the overlay never moves cargo, money or production output and does not mutate physical
+ * <p>The resilience recommendation is an effective target floor, not an additive reserve. The
+ * automatic overlay is therefore required only when that recommendation exceeds the independent
+ * non-resilience faction demand already provided by base stock policy or other strategic goals.
+ * Authoring the overlay never moves cargo, money or production output and does not mutate physical
  * market targets. The ordinary explicit strategic-policy apply remains responsible for materializing
  * the new effective demand through the reversible configured-baseline boundary.</p>
  */
@@ -39,12 +42,16 @@ public final class FactionStockResiliencePolicyReviewer {
         WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation not set");
         String factionId = requireFactionId(factionContentId);
         List<FactionStockPolicyState> previousOverlay = checkedWorld.findFactionResilienceDemandFloors(factionId);
+        List<FactionStockPolicyState> protectedDemand = nonResilienceDemandFloors(checkedWorld, factionId);
         FactionResiliencePlan resilience = FactionResiliencePlanner.analyze(checkedWorld, factionId);
-        return plan(previousOverlay, resilience, profile);
+        return plan(previousOverlay, protectedDemand, resilience, profile);
     }
 
     /**
-     * Pure value-layer planning boundary used by deterministic acceptance tests and the world adapter.
+     * Pure value-layer planning boundary with no independent non-resilience demand.
+     *
+     * <p>This overload is retained for focused bounded-step tests. World-backed planning uses the
+     * overload that also receives the current base/non-resilience demand floors.</p>
      *
      * @param previousOverlay current automatic resilience demand floors
      * @param resilience current read-only Stage-17F.5 resilience recommendation
@@ -55,24 +62,42 @@ public final class FactionStockResiliencePolicyReviewer {
             List<FactionStockPolicyState> previousOverlay,
             FactionResiliencePlan resilience,
             FactionStockResilienceReviewProfile profile) {
+        return plan(previousOverlay, List.of(), resilience, profile);
+    }
+
+    /**
+     * Pure value-layer planning boundary used by the world adapter and deterministic acceptance tests.
+     *
+     * @param previousOverlay current automatic resilience demand floors
+     * @param nonResilienceDemandFloors independent base/goal floors that must not be duplicated by overlay
+     * @param resilience current read-only Stage-17F.5 resilience recommendation
+     * @param profile bounded adjustment profile
+     * @return immutable bounded candidate plan
+     */
+    static Plan plan(
+            List<FactionStockPolicyState> previousOverlay,
+            List<FactionStockPolicyState> nonResilienceDemandFloors,
+            FactionResiliencePlan resilience,
+            FactionStockResilienceReviewProfile profile) {
         List<FactionStockPolicyState> checkedPrevious = List.copyOf(Objects.requireNonNull(
                 previousOverlay, "Previous resilience overlay not set"));
+        List<FactionStockPolicyState> checkedProtected = List.copyOf(Objects.requireNonNull(
+                nonResilienceDemandFloors, "Non-resilience demand floors not set"));
         FactionResiliencePlan checkedResilience = Objects.requireNonNull(
                 resilience, "Faction resilience plan not set");
         FactionStockResilienceReviewProfile checkedProfile = Objects.requireNonNull(
                 profile, "Stock resilience review profile not set");
 
-        Map<String, Integer> currentFloors = new TreeMap<>();
-        for (FactionStockPolicyState stock : checkedPrevious) {
-            FactionStockPolicyState value = Objects.requireNonNull(stock, "Resilience overlay floor not set");
-            currentFloors.merge(value.itemContentId(), value.targetStockFloor(), Math::max);
-        }
+        Map<String, Integer> currentFloors = floorMap(checkedPrevious, "Resilience overlay floor not set");
+        Map<String, Integer> protectedFloors = floorMap(
+                checkedProtected, "Non-resilience demand floor not set");
         Map<String, Integer> targetFloors = new TreeMap<>();
         for (FactionResilienceItemDecision item : checkedResilience.items()) {
-            targetFloors.merge(
-                    item.itemContentId(),
-                    item.recommendedTargetFloorPerMarketUnits(),
-                    Math::max);
+            int recommended = item.recommendedTargetFloorPerMarketUnits();
+            int protectedFloor = protectedFloors.getOrDefault(item.itemContentId(), 0);
+            if (recommended > protectedFloor) {
+                targetFloors.merge(item.itemContentId(), recommended, Math::max);
+            }
         }
 
         TreeSet<String> items = new TreeSet<>(currentFloors.keySet());
@@ -168,6 +193,42 @@ public final class FactionStockResiliencePolicyReviewer {
                 checked.decreasedItemCount(),
                 checked.previousOverlay(),
                 checked.previousOverlay());
+    }
+
+    private static List<FactionStockPolicyState> nonResilienceDemandFloors(
+            WorldSimulation world,
+            String factionId) {
+        FactionStrategicState strategy = world.findFactionStrategicState(factionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Faction has no strategic state: " + factionId));
+        Map<String, Integer> floors = new TreeMap<>();
+        for (FactionStockPolicyState stock : strategy.stockPolicies()) {
+            floors.merge(stock.itemContentId(), stock.targetStockFloor(), Math::max);
+        }
+        for (FactionStrategicGoalState goal : strategy.strategicGoals()) {
+            if (goal.type() == FactionStrategicGoalState.GoalType.RESILIENCE) {
+                continue;
+            }
+            for (FactionStockPolicyState demand : goal.demandFloors()) {
+                floors.merge(demand.itemContentId(), demand.targetStockFloor(), Math::max);
+            }
+        }
+        List<FactionStockPolicyState> result = new ArrayList<>(floors.size());
+        for (Map.Entry<String, Integer> floor : floors.entrySet()) {
+            result.add(new FactionStockPolicyState(floor.getKey(), floor.getValue()));
+        }
+        return List.copyOf(result);
+    }
+
+    private static Map<String, Integer> floorMap(
+            List<FactionStockPolicyState> floors,
+            String nullMessage) {
+        Map<String, Integer> result = new TreeMap<>();
+        for (FactionStockPolicyState stock : floors) {
+            FactionStockPolicyState value = Objects.requireNonNull(stock, nullMessage);
+            result.merge(value.itemContentId(), value.targetStockFloor(), Math::max);
+        }
+        return result;
     }
 
     private static int boundedIncrease(int current, int target, int maxStep) {
