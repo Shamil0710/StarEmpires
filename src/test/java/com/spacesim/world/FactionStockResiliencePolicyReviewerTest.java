@@ -26,8 +26,9 @@ class FactionStockResiliencePolicyReviewerTest {
 
         assertEquals(1, plan.increasedItemCount());
         assertEquals(0, plan.blockedDecreaseItemCount());
-        assertEquals(30, plan.candidatePolicy().findStockPolicy("item.energy").orElseThrow().targetStockFloor());
-        assertTrue(plan.candidatePolicy().findStockPolicy("item.food").isEmpty(),
+        assertEquals(30, stockFloor(plan.candidatePolicy(), "item.energy"));
+        assertTrue(plan.candidatePolicy().stockPolicies().stream()
+                        .noneMatch(policy -> policy.itemContentId().equals("item.food")),
                 "A one-unit delta inside the deadband must not create a stock policy");
         assertEquals(List.of(production), plan.candidatePolicy().productionPolicies());
     }
@@ -64,6 +65,14 @@ class FactionStockResiliencePolicyReviewerTest {
 
         assertEquals(previous, plan.candidatePolicy());
         assertEquals(0, plan.increasedItemCount());
+    }
+
+    private static int stockFloor(FactionStockProductionPolicyState policy, String itemContentId) {
+        return policy.stockPolicies().stream()
+                .filter(stock -> stock.itemContentId().equals(itemContentId))
+                .findFirst()
+                .orElseThrow()
+                .targetStockFloor();
     }
 
     private static FactionResiliencePlan resiliencePlan(List<FactionResilienceItemDecision> decisions) {
