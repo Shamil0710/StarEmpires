@@ -51,15 +51,15 @@ jobs:
 
           path = Path('src/main/java/com/spacesim/persistence/WorldStateCodec.java')
           text = path.read_text()
-          text = once(
-              text,
-              ' * <p>File-format v3 appends a bounded Stage-17D territorial trailer after the v2 growth payload;\n'
-              ' * v1/v2 remain readable and migrate to empty territorial process state.</p>',
-              ' * <p>File-format v3 appends the bounded Stage-17D territorial trailer after the v2 growth payload.\n'
-              ' * File-format v4 then appends Stage-17E institutional diplomacy. v1-v3 remain readable and\n'
-              ' * deterministically migrate to neutral explicit diplomacy without invented treaties, grievances\n'
-              ' * or embargoes.</p>',
-              'WorldStateCodec v4 documentation')
+          old = (' * File format v2 добавляет bounded Stage-11 strategic-growth trailer, а file format v3 добавляет\n'
+                 ' * Stage-17D territorial claims/control maintenance/recognition/concession trailer. Local entity\n'
+                 ' * payload кодируется {@link GameStateCodec}.</p>')
+          new = (' * File format v2 добавляет bounded Stage-11 strategic-growth trailer, file format v3 —\n'
+                 ' * Stage-17D territorial claims/control maintenance/recognition/concession trailer, а v4 —\n'
+                 ' * Stage-17E institutional diplomacy. v1-v3 детерминированно мигрируют в neutral explicit\n'
+                 ' * diplomacy без выдуманных treaties, grievances или embargoes. Local entity payload\n'
+                 ' * кодируется {@link GameStateCodec}.</p>')
+          text = once(text, old, new, 'WorldStateCodec v4 documentation')
           path.write_text(text)
           PY
 
