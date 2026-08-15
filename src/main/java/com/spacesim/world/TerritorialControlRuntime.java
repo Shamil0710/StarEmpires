@@ -707,7 +707,8 @@ final class TerritorialControlRuntime {
                 claims,
                 controls,
                 recognitions,
-                rights);
+                rights,
+                state.doctrine());
     }
 
     /**

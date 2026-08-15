@@ -281,6 +281,7 @@ public final class StrategicGrowthPlanService {
             state.territorialClaims(),
             state.territorialControlStates(),
             state.territorialRecognitions(),
-            state.constructionRightsGranted());
+            state.constructionRightsGranted(),
+            state.doctrine());
 }
 }

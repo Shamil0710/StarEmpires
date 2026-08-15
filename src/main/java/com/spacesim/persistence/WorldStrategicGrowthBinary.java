@@ -186,6 +186,7 @@ final class WorldStrategicGrowthBinary {
                 state.territorialClaims(),
                 state.territorialControlStates(),
                 state.territorialRecognitions(),
-                state.constructionRightsGranted());
+                state.constructionRightsGranted(),
+                state.doctrine());
     }
 }

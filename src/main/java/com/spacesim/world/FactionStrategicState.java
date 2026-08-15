@@ -142,6 +142,58 @@ public record FactionStrategicState(
     }
 
     /**
+     * Source-compatible pre-Stage-17F canonical constructor.
+     *
+     * <p>Callers using the former complete strategic shape migrate to a neutral institutional
+     * doctrine. Runtime copy paths must use the canonical constructor and explicitly preserve the
+     * existing doctrine.</p>
+     *
+     * @param factionContentId stable owner faction content ID
+     * @param minimumMarketAccessRelation market access relation threshold
+     * @param relations directed relations
+     * @param controlledSystems controlled systems
+     * @param stationTaxBasisPoints own-station tax rate
+     * @param foreignTerritoryTariffBasisPoints foreign-market territorial levy
+     * @param stockPolicies base stock floors
+     * @param productionPolicies production policies
+     * @param strategicGoals active strategic goals
+     * @param territorialClaims political claim states
+     * @param territorialControlStates maintenance state for controlled systems
+     * @param territorialRecognitions directed territorial recognition states
+     * @param constructionRightsGranted foreign construction concessions
+     */
+    public FactionStrategicState(
+            String factionContentId,
+            int minimumMarketAccessRelation,
+            List<FactionRelationState> relations,
+            List<StarSystemId> controlledSystems,
+            int stationTaxBasisPoints,
+            int foreignTerritoryTariffBasisPoints,
+            List<FactionStockPolicyState> stockPolicies,
+            List<FactionProductionPolicyState> productionPolicies,
+            List<FactionStrategicGoalState> strategicGoals,
+            List<TerritorialClaimState> territorialClaims,
+            List<TerritorialControlState> territorialControlStates,
+            List<TerritorialRecognitionState> territorialRecognitions,
+            List<TerritorialConstructionRightState> constructionRightsGranted) {
+        this(
+                factionContentId,
+                minimumMarketAccessRelation,
+                relations,
+                controlledSystems,
+                stationTaxBasisPoints,
+                foreignTerritoryTariffBasisPoints,
+                stockPolicies,
+                productionPolicies,
+                strategicGoals,
+                territorialClaims,
+                territorialControlStates,
+                territorialRecognitions,
+                constructionRightsGranted,
+                FactionDoctrineState.neutral());
+    }
+
+    /**
      * Валидирует state и нормализует canonical ordering.
      *
      * @param factionContentId stable owner faction content ID
