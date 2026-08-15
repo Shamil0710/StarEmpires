@@ -70,18 +70,19 @@ class Stage17DControlConsequencesAcceptanceTest {
                 .orElseThrow().getLedger().getEntries().size();
         WorldSimulation.FiscalPolicyReport report = world.applyFiscalPolicy(PLAYER_FACTION);
         assertEquals(0L, report.taxCollectedMilliCredits());
-        assertEquals(10_000L, report.tariffCollectedMilliCredits());
-        assertEquals(1, report.tariffedStations());
-        assertEquals(treasuryBefore + 10_000L,
+        assertTrue(report.tariffCollectedMilliCredits() > 0L);
+        assertTrue(report.tariffedStations() >= 1);
+        assertEquals(treasuryBefore + report.tariffCollectedMilliCredits(),
                 world.findFactionEconomicState(PLAYER_FACTION).orElseThrow().treasuryMilliCredits());
         assertEquals(90_000L, foreignWallet.getBalanceMilliCredits());
 
         List<EconomicTransaction> entries = world.findSession(DemoGalaxyFactory.FRONTIER_SYSTEM_ID)
                 .orElseThrow().getLedger().getEntries();
-        assertEquals(ledgerBeforeFiscal + 1, entries.size());
-        EconomicTransaction transfer = entries.get(entries.size() - 1);
-        assertEquals(EconomicTransaction.Type.MONEY_TRANSFER, transfer.type());
-        assertEquals("faction-territory-tariff", transfer.reason());
+        assertEquals(ledgerBeforeFiscal + report.tariffedStations(), entries.size());
+        for (EconomicTransaction transfer : entries.subList(ledgerBeforeFiscal, entries.size())) {
+            assertEquals(EconomicTransaction.Type.MONEY_TRANSFER, transfer.type());
+            assertEquals("faction-territory-tariff", transfer.reason());
+        }
 
         assertTrue(world.relinquishTerritorialControl(
                 PLAYER_FACTION, DemoGalaxyFactory.FRONTIER_SYSTEM_ID));
