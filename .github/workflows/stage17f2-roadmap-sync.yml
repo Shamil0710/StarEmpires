@@ -1,0 +1,30 @@
+name: Stage 17F.2 roadmap sync
+
+on:
+  push:
+    branches:
+      - agent/stage17f2-fiscal-policy
+    paths:
+      - .github/workflows/stage17f2-roadmap-sync.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17f2-fiscal-policy
+          fetch-depth: 0
+      - name: Update roadmap
+        run: python3 scripts/stage17f2_roadmap_sync.py
+      - name: Commit roadmap sync
+        run: |
+          git rm .github/workflows/stage17f2-roadmap-sync.yml scripts/stage17f2_roadmap_sync.py
+          git add docs/development_roadmap.md
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git commit -m "Mark Stage 17F.2 complete in roadmap"
+          git push origin HEAD:agent/stage17f2-fiscal-policy
