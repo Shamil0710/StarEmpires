@@ -62,9 +62,19 @@ class Stage17LiveFactionResolverAcceptanceTest {
         Entity station = new Entity()
                 .add(new IdentityComponent("Dynamic Test Market", IdentityComponent.Kind.STATION))
                 .add(new MarketComponent())
-                .add(new WalletComponent(initialStationBalance))
+                .add(new WalletComponent())
                 .add(new FactionComponent(DYNAMIC_RUNTIME_ID));
         EntityId stationId = base.createEntity(DemoGalaxyFactory.ACTIVE_SYSTEM_ID, station);
+
+        // Fixture bootstrap only: lifecycle requires an economically empty entity. Seed the
+        // pre-scenario station wallet explicitly after registration, before taking the world snapshot.
+        Entity liveStation = base.findSession(DemoGalaxyFactory.ACTIVE_SYSTEM_ID)
+                .orElseThrow()
+                .getEntityRegistry()
+                .find(stationId);
+        assertNotNull(liveStation);
+        assertTrue(liveStation.getComponent(WalletComponent.class)
+                .creditFromSource(initialStationBalance));
 
         FactionStrategicState taxPolicy = new FactionStrategicState(
                 DYNAMIC_ID,
