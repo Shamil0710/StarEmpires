@@ -47,9 +47,6 @@ public final class WorldSimulation {
     private final FactionIdentityResolver factionIdentityResolver;
     private final List<String> factionOrder;
     private final Map<String, FactionEconomicAccount> factionAccountsById;
-    private final List<FactionStrategicState> factionStrategies;
-    private final Map<String, FactionStrategicState> factionStrategiesById;
-    private final Map<StarSystemId, String> territoryOwnerBySystem;
     private final ConstructionProjectService constructionProjectService;
     private final TerritorialControlRuntime territorialControlRuntime;
     private final DestructionService destructionService;
@@ -72,8 +69,6 @@ public final class WorldSimulation {
             List<String> factionOrder,
             Map<String, FactionEconomicAccount> factionAccountsById,
             List<FactionStrategicState> factionStrategies,
-            Map<String, FactionStrategicState> factionStrategiesById,
-            Map<StarSystemId, String> territoryOwnerBySystem,
             long nextConstructionProjectIdValue,
             List<ConstructionProjectState> constructionProjects,
             List<FactionEconomicPressureState> factionEconomicPressures,
@@ -91,9 +86,6 @@ public final class WorldSimulation {
                 factionIdentityResolver, "FactionIdentityResolver не задан");
         this.factionOrder = List.copyOf(factionOrder);
         this.factionAccountsById = Map.copyOf(factionAccountsById);
-        this.factionStrategies = List.copyOf(factionStrategies);
-        this.factionStrategiesById = Map.copyOf(factionStrategiesById);
-        this.territoryOwnerBySystem = Map.copyOf(territoryOwnerBySystem);
         this.constructionProjectService = new ConstructionProjectService(
                 contentCatalog,
                 this.factionIdentityResolver,
@@ -186,8 +178,6 @@ public final class WorldSimulation {
             factionIds.add(account.factionContentId());
         }
 
-        Map<String, FactionStrategicState> strategiesById = new HashMap<>();
-        Map<StarSystemId, String> territoryOwners = new HashMap<>();
         for (FactionStrategicState strategy : checked.factionStrategies()) {
             if (!identities.containsStableId(strategy.factionContentId())) {
                 throw new IllegalArgumentException(
@@ -199,10 +189,6 @@ public final class WorldSimulation {
                             "Faction relation содержит неизвестную target faction: "
                                     + relation.targetFactionContentId());
                 }
-            }
-            strategiesById.put(strategy.factionContentId(), strategy);
-            for (StarSystemId controlled : strategy.controlledSystems()) {
-                territoryOwners.put(controlled, strategy.factionContentId());
             }
         }
 
@@ -247,8 +233,6 @@ public final class WorldSimulation {
                 factionIds,
                 factionAccounts,
                 checked.factionStrategies(),
-                strategiesById,
-                territoryOwners,
                 checked.nextConstructionProjectIdValue(),
                 checked.constructionProjects(),
                 checked.factionEconomicPressures(),
