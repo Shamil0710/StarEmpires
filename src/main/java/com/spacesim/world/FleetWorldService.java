@@ -2,6 +2,7 @@ package com.spacesim.world;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.IdentityComponent;
+import com.spacesim.constants.Constants;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityState;
 import com.spacesim.simulation.SimulationSession;
@@ -109,6 +110,53 @@ final class FleetWorldService {
                 new FleetTransitState(current.systemId(), destination, snapshot));
         placementsById.put(current.id(), transit);
         return transit;
+    }
+
+    boolean affiliateTransitFaction(FleetId fleetId, int runtimeFactionId) {
+        if (runtimeFactionId < 0 || runtimeFactionId >= Constants.FACTION_RUNTIME_CAPACITY) {
+            throw new IllegalArgumentException("Transit affiliation runtime faction ID is outside capacity");
+        }
+        FleetPlacementState current = requirePlacement(fleetId);
+        if (current.locationKind() != FleetLocationKind.IN_TRANSIT || current.transitState() == null) {
+            throw new IllegalStateException("Transit affiliation requires IN_TRANSIT fleet: " + fleetId);
+        }
+        FleetTransitState transit = current.transitState();
+        EntityState source = transit.entityState();
+        EntityState.FactionState faction = source.faction();
+        if (faction != null && faction.factionId() == runtimeFactionId) {
+            return false;
+        }
+
+        EntityState updatedEntity = new EntityState(
+                source.id(),
+                source.identity(),
+                source.transform(),
+                source.inventory(),
+                source.wallet(),
+                source.market(),
+                source.production(),
+                source.priceHistory(),
+                new EntityState.FactionState(runtimeFactionId),
+                source.reputation(),
+                source.ship(),
+                source.tradeAi(),
+                source.mining(),
+                source.combat(),
+                source.asteroid(),
+                source.archetype());
+        FleetTransitState updatedTransit = new FleetTransitState(
+                transit.originSystemId(),
+                transit.destinationSystemId(),
+                updatedEntity);
+        placementsById.put(
+                fleetId,
+                new FleetPlacementState(
+                        fleetId,
+                        FleetLocationKind.IN_TRANSIT,
+                        null,
+                        null,
+                        updatedTransit));
+        return true;
     }
 
     FleetPlacementState completeTransfer(FleetId fleetId, float arrivalX, float arrivalY) {
