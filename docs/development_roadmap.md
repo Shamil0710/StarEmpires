@@ -2,7 +2,7 @@
 
 > Канонический документ статуса, зависимостей и переходов между этапами разработки.
 >
-> Последняя синхронизация: **2026-08-15 после принятия `Ship Mathematics v1.0 Design Baseline` (PR #91, CI #1516, merge `3ec2f6cab286dbcd39694c19a055d038c175b59c`) и подробной post-v1 декомпозиции Stage 17.5 / 19 / 21. Фактический runtime-статус остаётся Stage 17 ACTIVE.**
+> Последняя синхронизация: **2026-08-15 после закрытия Stage 17C и подробной фиксации политико-экономической архитектуры Stage 17D–17F / Stage 18; `Ship Mathematics v1.0 Design Baseline` остаётся accepted foundation для 17.5 / 19 / 21. Фактический runtime-статус — Stage 17 ACTIVE, следующий implementation slice — 17D.**
 >
 > Начиная с Stage 16 новая и содержательно изменяемая проектная документация ведётся **на русском языке**. Имена классов, enum, content ID, API, формулы и технические идентификаторы сохраняются в оригинальном виде.
 
@@ -243,7 +243,212 @@ PR #51 распространил shared `FlightDynamics` на generic TradeAI/M
 
 Цель: превратить независимого игрока с owned fleets/stations в обычного faction actor без замены существующих `FleetId`/`EntityId` и без отдельной player-only политико-экономической модели.
 
-Stage 17 переиспользует Stage-8 faction core: treasury, budgets, subsidies, relations, territory, access, tariffs/taxes, policies и persistence.
+Stage 17 переиспользует Stage-8 faction core: treasury, budgets, subsidies, directed relations, territory, market access, fiscal levies, stock/production policy и persistence. Новые political/diplomatic layers расширяют этот core, а не создают отдельную player-only или scripted diplomacy subsystem.
+
+## Политико-экономическая архитектура взаимодействия фракций — общий contract Stage 17–18
+
+Дипломатия не является отдельной шкалой «нравится / не нравится» и не выдаёт абстрактные бонусы. Она должна быть следствием реального положения фракций в мире: ресурсов, рынков, логистики, территории, военной угрозы, договорных обязательств и институциональной доктрины.
+
+Базовая причинная цепочка:
+
+```text
+physical economy / territory / security state
+→ measurable interests and dependencies
+→ institutional doctrine + diplomatic history
+→ proposal / policy / strategic decision
+→ access / tariff / treasury / logistics / production consequences
+→ changed physical world state
+→ changed interests and future diplomacy
+```
+
+### Государственные интересы
+
+Каждая faction оценивает не абстрактную «силу соседа», а конкретные интересы, вычисляемые из authoritative world state:
+
+- **economic security** — доступ к критическим ресурсам, рынкам, производственным цепочкам, shipyard/repair capability и транспортным маршрутам;
+- **logistics security** — длина и уязвимость supply lines, chokepoints, наличие альтернативных маршрутов и запасов;
+- **territorial security** — собственные controlled systems, спорные claims, важность пограничных систем и инфраструктуры;
+- **industrial resilience** — зависимость от одного поставщика, одной системы или одного типа производства;
+- **fiscal health** — treasury, station liquidity, construction/replacement burden и возможность финансировать выбранную policy;
+- **military security** — доступная информация о чужих силах, мобилизации, присутствии возле границы и способности защитить routes/territory;
+- **strategic opportunity** — ресурсы, рынки, незанятые или слабо защищённые системы, союзники, возможность снизить опасную зависимость;
+- **treaty credibility** — соблюдение прошлых соглашений, нарушения, выполненные обязательства и накопленные grievances.
+
+Эти показатели являются diagnostics/inputs для decision engine. Они не дают скрытых `+20% trade` или `-15% combat` бонусов.
+
+### Институциональная доктрина faction
+
+Различия между государствами выражаются не магическими faction modifiers, а весами и порогами общей decision model. Для authored faction и будущей faction игрока предусматривается persistent/data-driven **doctrine profile**.
+
+Минимальные axes:
+
+- `tradeOpenness` — готовность допускать чужие рынки/капитал и зависеть от внешней торговли;
+- `securityPosture` — терпимость к риску и чужому присутствию рядом с критической инфраструктурой;
+- `expansionPreference` — склонность инвестировать в новые territory/infrastructure;
+- `sovereigntySensitivity` — насколько болезненно воспринимаются чужие claims, bases и строительство;
+- `treatyLegalism` — вес договорных обязательств и цена нарушения собственного слова;
+- `interventionism` — готовность нести расходы ради союзника или баланса сил;
+- `economicResiliencePriority` — готовность платить более высокую цену за diversification, reserves и domestic production.
+
+Doctrine меняет **приоритеты решения**, но не физические возможности. Торгово открытая faction всё равно не может импортировать отсутствующий товар; милитаристская faction не получает бесплатный флот; legalist не обязан принимать невыгодный договор.
+
+### Directed diplomatic state: relation недостаточно
+
+Существующий `FactionRelationState[-100..100]` сохраняется как компактная directed summary/compatibility input, но итоговая дипломатическая модель не должна сводиться к одному числу.
+
+Для пары `A → B` планируются отдельные persistent/derived составляющие:
+
+- **relation** — общий текущий политический тон;
+- **trust / credibility** — ожидание, что B выполнит обещание;
+- **perceivedThreat** — оценка военной/территориальной угрозы на основании доступной информации;
+- **grievances / claims** — конкретные причины конфликта: нарушение договора, contested territory, экспроприация, атака, blockade и т.п.;
+- **obligations** — действующие договорные обязательства A перед B;
+- **economicInterdependence** — измеримая зависимость торговли/промышленности A от B;
+- **treaties** — explicit юридические соглашения и их clauses.
+
+Состояние остаётся направленным: A может критически зависеть от B и бояться его, тогда как B почти не зависит от A. Поэтому не вводится правило вида `relation < -50 = война` или `relation > 80 = союз`.
+
+### Общий deterministic decision evaluator
+
+AI faction и counterpart игрока оценивают diplomatic proposal через общую объяснимую utility model:
+
+```text
+utility =
+    expectedEconomicBenefit
+  + securityBenefit
+  + strategicGoalAlignment
+  + treatyAndTrustValue
+  + doctrineFit
+  - fiscalCost
+  - sovereigntyCost
+  - dependencyRisk
+  - escalationRisk
+  - opportunityCost
+```
+
+Каждый член utility должен выводиться из world state, doctrine или diplomatic history и быть доступен diagnostics/debug UI. Stable ordering/tie-breaks обязательны.
+
+Игрок управляет policy собственной faction напрямую в пределах своих полномочий, но **не может принудительно заставить AI принять договор**. Предложение игрока оценивается тем же counterpart evaluator, что proposal одной AI faction другой.
+
+### Economic interdependence
+
+Взаимозависимость строится из реальной экономики, а не из abstract influence points. Минимальные metrics:
+
+- доля critical-item imports от конкретной faction;
+- доля exports/market revenue, зависящая от конкретного партнёра;
+- концентрация поставщиков и покупателей;
+- наличие альтернативного supplier/market и дополнительная стоимость маршрута;
+- зависимость routes от чужих controlled systems/chokepoints;
+- inventory buffer endurance при прекращении импорта;
+- replacement time критической industrial capability;
+- в будущем — зависимость от foreign shipyard/refit/repair capability.
+
+Это позволяет получить естественные политические ситуации: слабая militarily faction может быть экономически незаменима; богатая держава может избегать войны из-за критической зависимости; embargo может ударить и по тому, кто его объявил.
+
+### Treaty contract
+
+Договор — persistent юридический объект, а не временный UI modifier. Он должен иметь stable ID, parties, clauses, дату вступления, optional expiry, notice/cancellation rules и breach semantics.
+
+Планируемые clauses:
+
+- bilateral/unilateral **market access**;
+- **tariff ceiling / reduction / exemption**;
+- **transit rights** через controlled territory;
+- **non-aggression**;
+- **construction / basing rights** в определённой territory;
+- **resource supply agreement**, исполняемый через ordinary markets/orders/logistics, а не virtual delivery;
+- **defense guarantee / mutual defense** — обязательство, военное исполнение которого реализуется Stage 18;
+- **recognition / territorial settlement** для claims и control;
+- **reparations / payments**, исполняемые conserved treasury transfers.
+
+«Alliance» не является отдельным флагом дружбы: это набор explicit obligations и прав.
+
+### Экономическая дипломатия
+
+Политические решения обязаны воздействовать через уже существующую экономику:
+
+```text
+market access
+→ кто физически может торговать
+
+tariff / fiscal levy
+→ реальный wallet transfer
+→ изменение effective trade economics / station liquidity
+
+embargo
+→ закрытие legal access
+→ route replanning
+→ потеря поставщика/рынка
+→ shortage / price / production response
+
+strategic stock policy
+→ targetStock floor
+→ обычный market demand
+→ TradeAI logistics
+→ physical delivery
+
+production policy
+→ ordinary recipe selection
+→ inputs / time / outputs
+
+subsidy
+→ treasury → station wallet
+→ ordinary liquidity
+
+reparations / treaty payment
+→ treasury → treasury/wallet conserved transfer
+```
+
+Запрещены diplomatic effects, которые напрямую создают товары, деньги, production output или «урон экономике» без physical/economic механизма.
+
+### Два разных типа тарифов
+
+Нужно явно различать:
+
+1. существующий Stage-8 **territorial fiscal levy**: surplus foreign station wallet → treasury контролирующей faction внутри её controlled system;
+2. будущий **transaction/customs tariff**: часть конкретной внешнеторговой сделки.
+
+Если вводится transaction tariff, он обязан:
+
+- входить в expected route/trade cost **до** выбора маршрута;
+- взиматься только при реально состоявшейся операции;
+- записываться в ledger как conserved transfer;
+- влиять на route choice и конкурентоспособность, а не существовать как UI percentage, оторванный от торговли.
+
+### Escalation ladder
+
+Политический конфликт развивается ступенчато:
+
+```text
+normal competition
+→ diplomatic friction
+→ tariff / access dispute
+→ sanctions / embargo
+→ formal demand / ultimatum
+→ mobilization
+→ blockade / limited armed coercion
+→ formal war
+→ ceasefire
+→ settlement / peace treaty
+```
+
+Stage 17 реализует институциональные и экономические ступени. Armed coercion, blockade, war goals и formal war/peace принадлежат Stage 18, но используют те же treaties, claims, dependencies и grievances.
+
+### Information boundary
+
+Decision engine не должен навсегда зависеть от omniscient world state. На Stage 17 допустимо использовать authoritative state как временный источник данных, но API разделяет:
+
+- **world truth**;
+- **known/observed diplomatic-economic state**;
+- **confidence/freshness**.
+
+Stage 19 сможет подставить sensor/intelligence/comms latency без переписывания дипломатической логики.
+
+### Граница внутренней политики
+
+Stage 17 моделирует faction как **институционального стратегического актора**, а не симулирует население, парламент, корпорации и элиты фиктивными процентами.
+
+Persistent governors, commanders, elite groups, legitimacy, regional interests и внутриполитическое давление вводятся только вместе с living-NPC layer Stage 20. Они должны модифицировать тот же doctrine/decision/treaty contract, а не создавать вторую параллельную дипломатию.
 
 ## 17A — player faction identity / creation contract
 
@@ -270,15 +475,273 @@ Personal wallet, faction treasury и station operating wallets остаются 
 
 ## 17D — territory / control / construction access
 
-Own station не равна sovereignty без ordinary territorial rule. Player использует те же control/access mechanics, что AI factions.
+**NEXT.** Цель — превратить текущий `controlledSystems` из просто persistent policy list в результат обычного territorial process, одинакового для player и AI.
+
+### 17D.1 — territorial state model
+
+Для StarSystem различаются как минимум:
+
+- **presence** — faction имеет физические assets/traffic, но не получает sovereignty;
+- **claim** — политически заявленная претензия без автоматического контроля;
+- **control** — faction способна реально поддерживать юрисдикцию;
+- **contested** — несколько factions имеют несовместимые control/claim основания;
+- **recognition** — дипломатическое признание control/claim другими factions.
+
+Существующий `controlledSystems` остаётся policy-compatible authoritative результатом control, но приобретение/потеря control проходит через deterministic ordinary rule.
+
+### 17D.2 — основания реального контроля
+
+Control score/evidence строится только из world state:
+
+- persistent station/infrastructure anchors;
+- локальное security/military presence;
+- способность снабжать и поддерживать инфраструктуру;
+- отсутствие или сила rival control presence;
+- непрерывность присутствия / stabilization time;
+- contested deterministic resolution.
+
+Одна owned station не перекрашивает систему мгновенно. Однократный пролёт fleet также не создаёт sovereignty.
+
+### 17D.3 — legal construction access
+
+Construction command проверяет jurisdiction:
+
+- в собственной controlled territory — ordinary domestic construction;
+- в чужой controlled territory — только при explicit construction/basing right или иной concession;
+- в contested territory — возможно только согласно legal state, с созданием grievance/claim consequences;
+- в unclaimed territory — через обычный claim/control process;
+- illegal/military construction как акт принуждения относится к Stage 18.
+
+Player и AI проходят один authorization boundary; UI не обходит его.
+
+### 17D.4 — territorial consequences
+
+Только реально controlled jurisdiction может:
+
+- применять territorial fiscal policy;
+- определять default foreign construction/access regime;
+- быть объектом recognition/claim treaty;
+- участвовать в будущих blockade/front/war goals;
+- давать strategic routing/security context.
+
+Control сам по себе не создаёт деньги, ресурсы или бесплатную инфраструктуру.
+
+### 17D acceptance
+
+```text
+player faction owns station in unclaimed system
+→ presence exists, control absent
+→ ordinary claim/control requirements fulfilled over time
+→ system becomes controlled
+→ foreign construction denied by default
+→ explicit treaty/concession grants construction right
+→ save/load
+→ same control, claim and legal access
+```
 
 ## 17E — diplomacy / market access / tariffs
 
-Ordinary relations/access state и общий policy boundary.
+Цель — перейти от «relation threshold открывает рынок» к explicit, persistent и объяснимой межгосударственной политике, сохранив текущий Stage-8 access core как рабочую основу.
+
+### 17E.1 — diplomatic state hardening
+
+К существующим directed `relations` добавляются bounded persistent structures для:
+
+- trust/credibility history;
+- grievances и territorial claims;
+- treaty directory;
+- obligations/guarantees;
+- embargo/sanction clauses.
+
+`relation[-100..100]` остаётся summary signal и backward-compatible input, но не является единственным источником решений.
+
+### 17E.2 — proposal / response engine
+
+Общий command/evaluator обрабатывает:
+
+- offer / counteroffer;
+- accept / reject;
+- terminate with notice;
+- breach;
+- renew/expire.
+
+AI оценивает proposal через common utility model интересов и doctrine. UI игрока показывает основные причины решения: ожидаемая выгода, зависимость, security/sovereignty concern, trust, fiscal cost.
+
+### 17E.3 — market-access precedence
+
+Effective legal access определяется в явном порядке:
+
+```text
+hard legal prohibition / embargo
+→ explicit treaty right or exemption
+→ ordinary relation-threshold policy
+→ deny / allow
+```
+
+Market access остаётся transient ECS projection persistent diplomacy через общий refresh boundary; persistent state является источником истины.
+
+### 17E.4 — tariffs и fiscal separation
+
+Существующий `foreignTerritoryTariffBasisPoints` фиксируется как **territorial fiscal levy** с реальным station→treasury transfer.
+
+Отдельный transaction/customs tariff вводится только вместе с trade-controller integration:
+
+```text
+quoted buy/sell economics
++ applicable customs tariff
++ route risk/time
+→ route profitability
+→ actual trade
+→ customs wallet transfer
+```
+
+Route planner обязан знать tariff заранее. Никаких невидимых постфактум штрафов или бесплатного treasury income.
+
+### 17E.5 — embargoes / sanctions
+
+Embargo не применяет абстрактный debuff. Он запрещает определённый legal market access, после чего обычные systems:
+
+- перестраивают маршруты;
+- ищут альтернативных suppliers/markets;
+- сталкиваются с увеличением ETA/cost;
+- расходуют buffers;
+- создают shortage/price/production consequences.
+
+Embargo может причинять measurable cost обеим сторонам и поэтому тоже проходит AI utility evaluation.
+
+### 17E.6 — treaties / credibility
+
+Выполнение договора постепенно укрепляет trust; нарушение создаёт explicit breach/grievance и снижает credibility. Эффект не обязан быть симметричным.
+
+Нарушение договора не «ломает игру»: договорный state меняется, access/obligations refresh-ятся, а экономические и будущие военные последствия продолжаются ordinary systems.
+
+### 17E.7 — economic-dependence diagnostics
+
+Для каждой значимой пары factions доступны read-only diagnostics:
+
+- critical imports dependency;
+- export/market dependency;
+- alternative-route/supplier cost;
+- chokepoint exposure;
+- buffer endurance;
+- estimated cost of access loss/embargo.
+
+Эти значения используются AI и позже отображаются в faction-management UI.
+
+### 17E acceptance
+
+```text
+A depends on B for critical input
+→ A proposes trade-access treaty
+→ B evaluates benefit, dependency risk, trust and doctrine
+→ treaty accepted
+→ access projected to real markets
+→ physical trade grows
+→ B imposes transaction tariff / A searches alternatives
+→ breach or embargo removes legal access
+→ routes physically change and shortage emerges
+→ save/load preserves treaty, trust, access and economic consequences
+```
 
 ## 17F — faction policies / strategic economy
 
-Stage-8 budgets/subsidies/strategic demand доступны player UI через command layer, но реальные деньги/resources двигаются ordinary economy.
+Цель — дать player faction и AI factions общий набор государственных economic-policy решений. Policy не заменяет рынок: она изменяет бюджеты, правовые ограничения и strategic demand, после чего реагирует обычная экономика.
+
+### 17F.1 — doctrine profile
+
+Persistent/data-driven doctrine задаёт веса общей decision model, а не performance bonus. Player faction получает editable baseline doctrine в допустимых пределах; authored AI factions получают характерные profiles.
+
+Doctrine влияет на:
+
+- openness vs autarky;
+- reserve vs growth preference;
+- security vs efficiency;
+- expansion willingness;
+- treaty behavior;
+- tolerance of dependency and fiscal stress.
+
+### 17F.2 — fiscal policy
+
+Faction может задавать:
+
+- own-station tax rate;
+- territorial foreign-station levy;
+- treasury reserve floor;
+- station liquidity-support policy;
+- construction/investment budget priorities;
+- после Stage 17.5/18 — military ammunition/repair/replacement reserve priorities.
+
+Все выплаты и сборы являются real wallet transfers. «Budget» — authorization/priority над treasury, а не второй магический источник денег; отдельный sub-account допускается только как conserved persistent account.
+
+### 17F.3 — fiscal trade-offs
+
+Policy должна иметь реальные последствия:
+
+- высокий tax быстрее наполняет treasury, но может ухудшить liquidity собственных stations;
+- низкий reserve ускоряет expansion, но повышает риск неспособности финансировать emergency logistics/repair;
+- subsidy поддерживает critical station, но уменьшает public treasury;
+- protectionism снижает foreign dependence, но может повысить цены и увеличить логистическую дистанцию;
+- open trade повышает efficiency, но может создать supplier/chokepoint dependency.
+
+Ни один trade-off не реализуется flat multiplier, если его можно получить через wallets, markets, logistics и production.
+
+### 17F.4 — strategic stock / production policy
+
+Переиспользуется текущая философия `FactionStrategicPolicyEngine`:
+
+```text
+strategic goal / resilience policy
+→ target stock floor / desired production recipe
+→ ordinary market prices and demand
+→ TradeAI logistics
+→ physical inputs
+→ timed production
+```
+
+Policy не materialize-ит товар и не завершает производство мгновенно.
+
+### 17F.5 — resilience policy
+
+Faction может сознательно предпочесть:
+
+- diversified suppliers;
+- minimum strategic buffers;
+- local production despite higher nominal cost;
+- redundant routes/infrastructure;
+- critical-item import limits.
+
+Цена resilience должна проявляться как реальные дополнительные capital/logistics/operating costs.
+
+### 17F.6 — policy feedback / anti-oscillation
+
+AI пересматривает policy по bounded cadence и hysteresis:
+
+```text
+measure pressure / dependency / treasury / shortage
+→ compare against doctrine thresholds
+→ choose bounded policy adjustment
+→ wait observation window
+→ measure consequences
+```
+
+Запрещены every-tick tariff/tax/recipe oscillations. Decisions deterministic при одинаковом state.
+
+### 17F.7 — player/AI parity
+
+Player UI отправляет те же policy commands, которые может сформировать AI planner. Игрок получает больший уровень прямого контроля, но не отдельные экономические правила и не бесплатное исполнение policy.
+
+### 17F acceptance
+
+```text
+faction has critical import dependency and weak treasury
+→ policy chooses reserve + supplier diversification
+→ strategic stock demand rises
+→ ordinary traders establish more expensive alternative route
+→ tax/subsidy transfers change real wallets
+→ buffers improve while treasury/growth incur measurable cost
+→ policy does not oscillate
+→ save/load preserves doctrine, policy and economic state
+```
 
 ## 17G — faction management UI / global map
 
@@ -393,21 +856,134 @@ Stage 17.5 COMPLETE только когда freighter→battleship работа�
 
 ---
 
-# Stage 18 — strategic warfare + advanced combat behavior
+# Stage 18 — strategic warfare + coercive diplomacy + advanced combat behavior
 
 **PLANNED после Stage 17.5 COMPLETE.**
 
-- formal war/peace/hostility;
-- fronts/blockades/territorial objectives;
-- weapon/range/mobility/sensor-aware tactical AI;
-- escort/screen/intercept/retreat/pursuit;
-- formation doctrine based on physical geometry;
-- replacement/ammunition/repair logistics;
-- shared threat intelligence confidence/freshness/decay;
-- conflict-driven traffic rerouting/economic consequences;
-- strategic map overlays.
+Stage 18 завершает вооружённую половину политической модели. Он не создаёт отдельную diplomacy subsystem, а использует Stage-17 treaties, claims, directed trust/grievances, economic dependencies, territory и treasury вместе с Stage-17.5 physical combat capabilities.
 
-Advanced AI consumes Stage-17.5 capability queries; it не получает omniscience и не дублирует combat physics.
+## 18A — formal conflict state / crisis escalation
+
+War не выводится автоматически из одного `relation` threshold. Persistent conflict state хранит:
+
+- participants;
+- legal state: peace / crisis / war / ceasefire;
+- cause / triggering grievance;
+- start time;
+- explicit war goals;
+- treaty obligations and joined allies;
+- optional escalation/ceasefire constraints.
+
+Переход к войне должен быть отдельным strategic decision с оценкой security gain, expected cost, logistics readiness, treaty credibility и economic dependence.
+
+## 18B — war goals / political objectives
+
+Военные цели имеют world-state meaning:
+
+- obtain/control/recognition of конкретной territory;
+- remove foreign base / construction right;
+- force market/transit concession;
+- end blockade/embargo;
+- impose or remove treaty clause;
+- obtain reparations через real treasury transfer;
+- defend/restore союзника по guarantee;
+- ограниченная punitive goal без обязательного annexation.
+
+Нет победы, которая materialize-ит reward только потому, что заполнилась абстрактная war-score шкала. Progress оценивает реальное possession, blockade, losses, logistics и ability/willingness сторон продолжать войну.
+
+## 18C — mobilization / readiness
+
+Мобилизация проявляется в экономике до выстрелов:
+
+```text
+military goal
+→ ammunition / fuel / repair / replacement stock demand
+→ treasury budget pressure
+→ production and logistics response
+→ fleet readiness
+```
+
+Нельзя получить mobilized fleet через бесплатный spawn. Недостаток ammunition, replacement parts, reaction mass или shipyard capacity ограничивает реальную способность вести войну.
+
+## 18D — blockade / interdiction
+
+Blockade — physical operation fleets/assets на routes, jump chokepoints или возле markets.
+
+Effective blockade зависит от:
+
+- actual fleet presence and combat capability;
+- sensor/track capability;
+- route geometry;
+- ability to intercept;
+- defender/escort presence;
+- alternative routes;
+- resupply/endurance блокирующей стороны.
+
+Кнопка `blockade` сама по себе не удаляет импорт. Traders reroute или прекращают рейс из-за реального legal/risk/access state.
+
+## 18E — fronts / objectives / advanced tactical AI
+
+Strategic objectives строятся из territory, infrastructure, logistics and intelligence. Tactical layer после Stage 17.5 использует общие capabilities:
+
+- escort / screen / intercept;
+- retreat / pursuit;
+- formation doctrine;
+- range / mobility / sensor-aware behavior;
+- ammunition/endurance awareness;
+- protection of logistics assets and chokepoints.
+
+AI не получает omniscience и не дублирует combat physics.
+
+## 18F — war economy / replacement consequences
+
+Conflict обязан менять living economy:
+
+- traffic rerouting;
+- shortage and price shocks;
+- ammo/repair/reaction-mass expenditure;
+- damaged/destroyed physical assets;
+- shipyard replacement backlog;
+- treasury drain;
+- construction delays;
+- temporary loss of markets/routes;
+- salvage/capture where ordinary mechanics permit.
+
+Никакого scripted replacement уничтоженных fleets/stations.
+
+## 18G — ceasefire / settlement / peace treaty
+
+War завершается explicit settlement clauses:
+
+- territorial recognition/control changes;
+- withdrawal deadlines;
+- market/transit/construction rights;
+- tariff/access terms;
+- treaty termination or guarantees;
+- reparations with conserved transfers;
+- demilitarized/basing restrictions, если соответствующие mechanics существуют.
+
+Compliance восстанавливает credibility; breach создаёт новый grievance/crisis. Мир не сбрасывает отношения к фиксированному значению.
+
+## 18H — information / intelligence
+
+Strategic warfare использует confidence/freshness/decay. До Stage 19 допустим authoritative compatibility provider; после Stage 19 тот же decision API получает observed/intelligence state с communication latency.
+
+## 18I — deterministic conflict acceptance
+
+```text
+trade-dependent factions
+→ access/tariff dispute
+→ embargo and measurable economic damage
+→ ultimatum rejected
+→ mobilization creates real stock/logistics demand
+→ formal war
+→ physical blockade reroutes traffic
+→ shortages, losses and replacement backlog
+→ ceasefire
+→ reparations + territorial/access settlement
+→ save/load continuation
+→ no money/resources/fleets created by diplomacy or war state itself
+```
 
 ### v0.4 DoD
 
@@ -495,6 +1071,22 @@ Scale, sensor, economy, tactical/strategic geometry и performance matrices на
 Persistent NPC там, где identity важна. Missions возникают из real world state: haul, mine, escort, bounty, investigate, defend, shortage, expansion, war, discovery.
 
 Persistent commanders могут давать bounded personality/doctrine modifiers, но не omniscience и не нарушение Stage-17.5 physics.
+
+## Internal politics / institutions
+
+Только на этом этапе, когда появляются persistent NPC и living-world actors, допускается разворачивать внутреннюю политику faction:
+
+- governors / admirals / ministers / corporate or regional elites;
+- personal and institutional loyalties;
+- legitimacy / political support;
+- regional economic interests;
+- corruption / patronage, если они имеют реальный resource flow;
+- factions внутри государства и pressure на policy;
+- political appointments / missions / crises.
+
+Эти actors не получают отдельную «внутреннюю экономику». Они создают pressure/constraints для того же Stage-17 doctrine/decision/treaty/policy contract. Например, industrial interest может повышать utility protectionist policy, governor — сопротивляться high station tax, а military leadership — требовать larger strategic reserves; фактическое решение всё равно исполняется через ordinary treasury, markets, logistics и legal state.
+
+Не вводить раньше Stage 20 декоративные `population happiness`, `parliament support` или `elite influence` bars без физических/NPC причин и gameplay consequences.
 
 ---
 
