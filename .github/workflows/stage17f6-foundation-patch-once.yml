@@ -59,56 +59,58 @@ jobs:
 
           world_path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
           world = world_path.read_text(encoding='utf-8')
-          anchor = '''    public Optional<FactionEconomicState> findFactionEconomicState(String factionContentId) {
-        if (factionContentId == null) {
-            return Optional.empty();
-        }
-        FactionEconomicAccount account = factionAccountsById.get(factionContentId);
-        return account == null ? Optional.empty() : Optional.of(account.snapshot());
-    }
-'''
-          addition = '''
-    /**
-     * Returns the common persistent Stage-17F.6 policy-review watermark for one faction.
-     *
-     * @param factionContentId stable faction content ID
-     * @return immutable review state or empty for an unknown faction
-     */
-    public Optional<FactionPolicyReviewState> findFactionPolicyReviewState(String factionContentId) {
-        if (factionContentId == null) {
-            return Optional.empty();
-        }
-        FactionEconomicAccount account = factionAccountsById.get(factionContentId);
-        return account == null ? Optional.empty() : Optional.of(account.policyReviewState());
-    }
-
-    /**
-     * Atomically claims the current common policy-review window for one faction when cadence allows it.
-     *
-     * <p>Claiming a review does not itself change tax rates, stock floors, recipes, wallets, cargo or
-     * other policy values. It only persists the authoritative tick watermark so repeated calls in the
-     * same observation window and save/load continuation cannot apply another bounded policy step.</p>
-     *
-     * @param factionContentId stable faction content ID
-     * @param cadence deterministic authoritative-tick review cadence
-     * @return {@code true} when this call claimed a due review, otherwise {@code false}
-     */
-    public boolean tryBeginFactionPolicyReview(
-            String factionContentId,
-            FactionPolicyReviewCadence cadence) {
-        String factionId = normalizedFactionId(factionContentId);
-        FactionEconomicAccount account = requireFactionAccount(factionId);
-        FactionPolicyReviewCadence checkedCadence = Objects.requireNonNull(
-                cadence, "Faction policy review cadence not set");
-        long tick = getAuthoritativeWorldTick();
-        FactionPolicyReviewState previous = account.policyReviewState();
-        if (!checkedCadence.isDue(previous, tick)) {
-            return false;
-        }
-        account.updatePolicyReviewState(checkedCadence.claim(previous, tick));
-        return true;
-    }
-'''
+          anchor = (
+              '    public Optional<FactionEconomicState> findFactionEconomicState(String factionContentId) {\n'
+              '        if (factionContentId == null) {\n'
+              '            return Optional.empty();\n'
+              '        }\n'
+              '        FactionEconomicAccount account = factionAccountsById.get(factionContentId);\n'
+              '        return account == null ? Optional.empty() : Optional.of(account.snapshot());\n'
+              '    }\n'
+          )
+          addition = (
+              '\n'
+              '    /**\n'
+              '     * Returns the common persistent Stage-17F.6 policy-review watermark for one faction.\n'
+              '     *\n'
+              '     * @param factionContentId stable faction content ID\n'
+              '     * @return immutable review state or empty for an unknown faction\n'
+              '     */\n'
+              '    public Optional<FactionPolicyReviewState> findFactionPolicyReviewState(String factionContentId) {\n'
+              '        if (factionContentId == null) {\n'
+              '            return Optional.empty();\n'
+              '        }\n'
+              '        FactionEconomicAccount account = factionAccountsById.get(factionContentId);\n'
+              '        return account == null ? Optional.empty() : Optional.of(account.policyReviewState());\n'
+              '    }\n'
+              '\n'
+              '    /**\n'
+              '     * Atomically claims the current common policy-review window for one faction when cadence allows it.\n'
+              '     *\n'
+              '     * <p>Claiming a review does not itself change tax rates, stock floors, recipes, wallets, cargo or\n'
+              '     * other policy values. It only persists the authoritative tick watermark so repeated calls in the\n'
+              '     * same observation window and save/load continuation cannot apply another bounded policy step.</p>\n'
+              '     *\n'
+              '     * @param factionContentId stable faction content ID\n'
+              '     * @param cadence deterministic authoritative-tick review cadence\n'
+              '     * @return {@code true} when this call claimed a due review, otherwise {@code false}\n'
+              '     */\n'
+              '    public boolean tryBeginFactionPolicyReview(\n'
+              '            String factionContentId,\n'
+              '            FactionPolicyReviewCadence cadence) {\n'
+              '        String factionId = normalizedFactionId(factionContentId);\n'
+              '        FactionEconomicAccount account = requireFactionAccount(factionId);\n'
+              '        FactionPolicyReviewCadence checkedCadence = Objects.requireNonNull(\n'
+              '                cadence, "Faction policy review cadence not set");\n'
+              '        long tick = getAuthoritativeWorldTick();\n'
+              '        FactionPolicyReviewState previous = account.policyReviewState();\n'
+              '        if (!checkedCadence.isDue(previous, tick)) {\n'
+              '            return false;\n'
+              '        }\n'
+              '        account.updatePolicyReviewState(checkedCadence.claim(previous, tick));\n'
+              '        return true;\n'
+              '    }\n'
+          )
           world = replace_once(world, anchor, anchor + addition, 'world review boundary')
           world_path.write_text(world, encoding='utf-8')
 
