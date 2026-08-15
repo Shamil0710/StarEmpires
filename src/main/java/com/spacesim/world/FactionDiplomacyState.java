@@ -25,12 +25,25 @@ public record FactionDiplomacyState(
         List<DiplomaticTreatyState> treaties,
         List<DiplomaticEmbargoState> embargoes) implements Comparable<FactionDiplomacyState> {
 
-    /** Creates an empty neutral diplomacy aggregate for one faction. */
+    /**
+     * Creates an empty neutral diplomacy aggregate for one faction.
+     *
+     * @param factionContentId stable owner faction ID
+     * @return canonical empty diplomacy aggregate
+     */
     public static FactionDiplomacyState neutral(String factionContentId) {
         return new FactionDiplomacyState(factionContentId, List.of(), List.of(), List.of(), List.of());
     }
 
-    /** Validates self-references, uniqueness and canonical ordering. */
+    /**
+     * Validates self-references, uniqueness and canonical ordering.
+     *
+     * @param factionContentId owner faction stable ID
+     * @param standings directed trust/credibility assessments
+     * @param grievances explicit directed grievances
+     * @param treaties treaty directory entries originated by this faction
+     * @param embargoes unilateral embargoes imposed by this faction
+     */
     public FactionDiplomacyState {
         factionContentId = requireId(factionContentId, "Diplomacy owner faction ID");
         Objects.requireNonNull(standings, "Diplomatic standings not set");
@@ -93,7 +106,12 @@ public record FactionDiplomacyState(
         embargoes = List.copyOf(sortedEmbargoes);
     }
 
-    /** Returns explicit standing or {@code null} when the pair has no history yet. */
+    /**
+     * Finds an explicit directed standing.
+     *
+     * @param targetFactionContentId stable target faction ID
+     * @return explicit standing or {@code null} when the pair has no history yet
+     */
     public DiplomaticStandingState standingToward(String targetFactionContentId) {
         if (targetFactionContentId == null) {
             return null;
@@ -107,19 +125,35 @@ public record FactionDiplomacyState(
         return null;
     }
 
-    /** Returns directed trust, defaulting to neutral zero. */
+    /**
+     * Reads directed trust with a neutral fallback.
+     *
+     * @param targetFactionContentId stable target faction ID
+     * @return directed trust, defaulting to zero
+     */
     public int trustTo(String targetFactionContentId) {
         DiplomaticStandingState standing = standingToward(targetFactionContentId);
         return standing == null ? 0 : standing.trust();
     }
 
-    /** Returns perceived credibility, defaulting to the neutral midpoint. */
+    /**
+     * Reads perceived credibility with a neutral fallback.
+     *
+     * @param targetFactionContentId stable target faction ID
+     * @return perceived credibility, defaulting to the neutral midpoint
+     */
     public int credibilityOf(String targetFactionContentId) {
         DiplomaticStandingState standing = standingToward(targetFactionContentId);
         return standing == null ? DiplomaticStandingState.NEUTRAL_CREDIBILITY : standing.credibility();
     }
 
-    /** Checks an active unilateral market-access embargo against a target faction. */
+    /**
+     * Checks an active unilateral market-access embargo against a target faction.
+     *
+     * @param targetFactionContentId stable target faction ID
+     * @param worldTick authoritative world tick
+     * @return true when an active market-access embargo targets that faction
+     */
     public boolean hasActiveMarketEmbargoAgainst(String targetFactionContentId, long worldTick) {
         if (targetFactionContentId == null || worldTick < 0L) {
             return false;
