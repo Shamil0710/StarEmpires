@@ -133,20 +133,22 @@ public final class PlayerConstructionService {
                     "Construction placement rejected: " + placementView.rejection());
         }
 
+        String assetFactionId = playerAssetFactionId(current);
         ConstructionProjectId projectId = runtime.world().createConstructionProject(
-        null,
-        current.factionContentId(),
-        archetypeId,
-        placement.systemId(),
-        x,
-        y);
+                null,
+                current.factionContentId(),
+                assetFactionId,
+                archetypeId,
+                placement.systemId(),
+                x,
+                y);
         try {
             ConstructionProjectState state = runtime.world().findConstructionProject(projectId).orElseThrow();
             requireExternalContract(state);
-        if (!Objects.equals(current.factionContentId(), state.legalFactionContentId())) {
-            throw new IllegalStateException(
-                    "Player construction legal faction differs from current affiliation");
-        }
+            if (!Objects.equals(assetFactionId, state.legalFactionContentId())) {
+                throw new IllegalStateException(
+                        "Player construction asset faction differs from expected affiliation");
+            }
             List<ConstructionProjectId> ownedProjects = new ArrayList<>(current.ownedConstructionProjectIds());
             ownedProjects.add(projectId);
             runtime.replacePlayerState(PlayerRuntime.copyWithConstructionOwnership(
@@ -312,6 +314,21 @@ public final class PlayerConstructionService {
                 || state.ownerFactionContentId() != null) {
             throw new IllegalStateException("Player project has invalid external settlement contract");
         }
+    }
+
+    private String playerAssetFactionId(PlayerState player) {
+        String affiliation = player.factionContentId();
+        if (affiliation == null) {
+            return null;
+        }
+        for (com.spacesim.world.WorldFactionIdentityState identity
+                : runtime.world().getWorldFactionIdentities()) {
+            if (identity.origin() == com.spacesim.world.WorldFactionIdentityState.Origin.PLAYER_CREATED
+                    && identity.stableFactionId().equals(affiliation)) {
+                return affiliation;
+            }
+        }
+        return null;
     }
 
     private ContentCatalog.StationArchetypeDefinition requireConstructible(String value) {
