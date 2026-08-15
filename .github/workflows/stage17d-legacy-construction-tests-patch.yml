@@ -1,0 +1,49 @@
+name: Stage17D Legacy Construction Tests Patch
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Use explicit authorized-project fixture
+        shell: python
+        run: |
+          from pathlib import Path
+          expected = {
+              'src/test/java/com/spacesim/world/ConstructionProjectIntegrationTest.java': 3,
+              'src/test/java/com/spacesim/world/ConstructionProjectSystemIntegrationTest.java': 5,
+              'src/test/java/com/spacesim/world/DestructionServiceIntegrationTest.java': 2,
+              'src/test/java/com/spacesim/world/ConstructionDurationIntegrationTest.java': 1,
+          }
+          old = 'world.createConstructionProject('
+          new = 'ConstructionProjectTestFixtures.createAuthorizedProject(world,'
+          for filename, wanted in expected.items():
+              path = Path(filename)
+              text = path.read_text()
+              actual = text.count(old)
+              if actual != wanted:
+                  raise SystemExit(f'{filename}: expected {wanted} construction calls, got {actual}')
+              path.write_text(text.replace(old, new))
+      - name: Remove workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-legacy-construction-tests-patch.yml
+          git add src/test/java/com/spacesim/world/ConstructionProjectIntegrationTest.java \
+                  src/test/java/com/spacesim/world/ConstructionProjectSystemIntegrationTest.java \
+                  src/test/java/com/spacesim/world/DestructionServiceIntegrationTest.java \
+                  src/test/java/com/spacesim/world/ConstructionDurationIntegrationTest.java
+          git commit -m "Make legacy construction tests explicit about territorial rights"
+          git push origin HEAD:agent/stage17d-territorial-process
