@@ -1,0 +1,301 @@
+name: Stage17D Authorization Regex Patch
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Patch legal authorization boundaries
+        shell: python
+        run: |
+          import re
+          from pathlib import Path
+
+          path = Path('src/main/java/com/spacesim/world/TerritorialControlRuntime.java')
+          text = path.read_text()
+          pattern = re.compile(r'(    String controller\(StarSystemId systemId\) \{\s*return systemId == null \? null : controllerBySystem\.get\(systemId\);\s*\})')
+          addition = '''
+
+          boolean isContested(StarSystemId systemId) {
+              StarSystemId system = requireSystem(systemId);
+              for (FactionStrategicState strategy : strategies) {
+                  TerritorialClaimState claim = strategy.claimFor(system);
+                  if (claim != null && claim.status() == TerritorialClaimState.Status.CONTESTED) {
+                      return true;
+                  }
+              }
+              return false;
+          }'''
+          text, count = pattern.subn(r'\1' + addition, text, count=1)
+          if count != 1:
+              raise SystemExit('controller method structural match failed')
+          path.write_text(text)
+
+          path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = path.read_text()
+          snapshot_anchor = '    /** @return текущий immutable world snapshot */'
+          method = '''    /**
+           * Reports whether material rival claims currently make the system territorially contested.
+           *
+           * @param systemId target system
+           * @return true when ordinary uncontested jurisdiction does not exist
+           */
+          public boolean isTerritoriallyContested(StarSystemId systemId) {
+              return territorialControlRuntime.isContested(systemId);
+          }
+
+'''
+          if text.count(snapshot_anchor) != 1:
+              raise SystemExit('snapshot anchor missing')
+          text = text.replace(snapshot_anchor, method + snapshot_anchor, 1)
+          start = text.index('    public ConstructionProjectId createConstructionProject(', text.index('Создаёт persistent physical construction project'))
+          end = text.index('    /**\n     * Физически переводит деньги faction treasury', start)
+          section = '''    public ConstructionProjectId createConstructionProject(
+                  String ownerFactionContentId,
+                  String stationArchetypeContentId,
+                  StarSystemId systemId,
+                  float x,
+                  float y) {
+              return createConstructionProject(
+                      ownerFactionContentId,
+                      ownerFactionContentId,
+                      ownerFactionContentId,
+                      stationArchetypeContentId,
+                      systemId,
+                      x,
+                      y);
+          }
+
+          /**
+           * Creates a project whose authorization principal and asset faction are identical.
+           *
+           * @param ownerFactionContentId faction treasury payer, or {@code null} for external settlement
+           * @param legalFactionContentId faction exercising territorial rights and affiliating the asset
+           * @param stationArchetypeContentId constructible station archetype
+           * @param systemId target system
+           * @param x finite X coordinate
+           * @param y finite Y coordinate
+           * @return stable project ID
+           */
+          public ConstructionProjectId createConstructionProject(
+                  String ownerFactionContentId,
+                  String legalFactionContentId,
+                  String stationArchetypeContentId,
+                  StarSystemId systemId,
+                  float x,
+                  float y) {
+              return createConstructionProject(
+                      ownerFactionContentId,
+                      legalFactionContentId,
+                      legalFactionContentId,
+                      stationArchetypeContentId,
+                      systemId,
+                      x,
+                      y);
+          }
+
+          /**
+           * Creates one ordinary project after shared territorial authorization.
+           *
+           * <p>Economic payer, authorization principal and resulting asset affiliation are separate
+           * dimensions. Personal projects can exercise membership rights without becoming assets of
+           * the member faction, while a world-defined player faction can explicitly affiliate them.</p>
+           *
+           * @param ownerFactionContentId faction treasury payer, or {@code null} for external settlement
+           * @param authorizationFactionContentId faction whose territorial right is exercised, or {@code null}
+           * @param legalFactionContentId faction assigned to site/completed asset, or {@code null}
+           * @param stationArchetypeContentId constructible station archetype
+           * @param systemId target system
+           * @param x finite X coordinate
+           * @param y finite Y coordinate
+           * @return stable project ID
+           * @throws IllegalStateException when ordinary construction is not legally authorized
+           */
+          public ConstructionProjectId createConstructionProject(
+                  String ownerFactionContentId,
+                  String authorizationFactionContentId,
+                  String legalFactionContentId,
+                  String stationArchetypeContentId,
+                  StarSystemId systemId,
+                  float x,
+                  float y) {
+              TerritorialConstructionAuthorization.Decision authorization =
+                      TerritorialConstructionAuthorization.evaluate(
+                              this, authorizationFactionContentId, systemId);
+              if (!authorization.allowed()) {
+                  throw new IllegalStateException(
+                          "Construction denied by territorial law: " + authorization.reason()
+                                  + " controller=" + authorization.controllingFactionContentId());
+              }
+              return constructionProjectService.create(
+                      ownerFactionContentId,
+                      legalFactionContentId,
+                      stationArchetypeContentId,
+                      systemId,
+                      x,
+                      y);
+          }
+
+'''
+          path.write_text(text[:start] + section + text[end:])
+
+          path = Path('src/main/java/com/spacesim/world/TerritorialConstructionAuthorization.java')
+          text = path.read_text()
+          text, count = re.subn(
+              r'(\s*/\*\* Foreign faction construction in controlled territory without an explicit right\. \*/\s*FOREIGN_CONTROL_NO_RIGHT)',
+              '\n        /** Ordinary construction is suspended while material claims are contested. */\n        CONTESTED_NO_ORDINARY_RIGHT,\n        /** Foreign faction construction in controlled territory without an explicit right. */\n        FOREIGN_CONTROL_NO_RIGHT',
+              text,
+              count=1)
+          if count != 1:
+              raise SystemExit('authorization enum match failed')
+          pattern = re.compile(r'            if \(allowed == \(reason == Reason\.FOREIGN_CONTROL_NO_RIGHT\)\) \{.*?            \}', re.DOTALL)
+          replacement = '''            boolean deniedReason = reason == Reason.FOREIGN_CONTROL_NO_RIGHT
+                      || reason == Reason.CONTESTED_NO_ORDINARY_RIGHT;
+              if (allowed == deniedReason) {
+                  throw new IllegalArgumentException(
+                          "Construction authorization allowed flag disagrees with reason");
+              }'''
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('authorization validation match failed')
+          pattern = re.compile(
+              r'        if \(legalBuilderFactionContentId == null\) \{.*?        \}\s*'
+              r'        String builder = legalBuilderFactionContentId\.strip\(\);',
+              re.DOTALL)
+          replacement = '''        String controller = checkedWorld.controllingFaction(system).orElse(null);
+          if (checkedWorld.isTerritoriallyContested(system)) {
+              return new Decision(false, Reason.CONTESTED_NO_ORDINARY_RIGHT, controller);
+          }
+          if (legalBuilderFactionContentId == null) {
+              return new Decision(true, Reason.PRIVATE_UNAFFILIATED, controller);
+          }
+          String builder = legalBuilderFactionContentId.strip();'''
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('authorization private path match failed')
+          # Remove the later now-duplicate controller declaration.
+          text, count = re.subn(
+              r'\n        String controller = checkedWorld\.controllingFaction\(system\)\.orElse\(null\);\n        if \(controller == null\)',
+              '\n        if (controller == null)',
+              text,
+              count=1)
+          if count != 1:
+              raise SystemExit('duplicate controller match failed')
+          path.write_text(text)
+
+          path = Path('src/main/java/com/spacesim/player/PlayerConstructionService.java')
+          text = path.read_text()
+          pattern = re.compile(
+              r'        ConstructionProjectId projectId = runtime\.world\(\)\.createConstructionProject\(.*?\);\s*'
+              r'        try \{\s*ConstructionProjectState state = runtime\.world\(\)\.findConstructionProject\(projectId\)\.orElseThrow\(\);\s*'
+              r'requireExternalContract\(state\);\s*if \(!Objects\.equals\(current\.factionContentId\(\), state\.legalFactionContentId\(\)\)\) \{.*?\s*\}',
+              re.DOTALL)
+          replacement = '''        String assetFactionId = playerAssetFactionId(current);
+          ConstructionProjectId projectId = runtime.world().createConstructionProject(
+                  null,
+                  current.factionContentId(),
+                  assetFactionId,
+                  archetypeId,
+                  placement.systemId(),
+                  x,
+                  y);
+          try {
+              ConstructionProjectState state = runtime.world().findConstructionProject(projectId).orElseThrow();
+              requireExternalContract(state);
+              if (!Objects.equals(assetFactionId, state.legalFactionContentId())) {
+                  throw new IllegalStateException(
+                          "Player construction asset faction differs from expected affiliation");
+              }'''
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('player construction create block match failed')
+          anchor = '    private ContentCatalog.StationArchetypeDefinition requireConstructible(String value) {'
+          helper = '''    private String playerAssetFactionId(PlayerState player) {
+              String affiliation = player.factionContentId();
+              if (affiliation == null) {
+                  return null;
+              }
+              for (com.spacesim.world.WorldFactionIdentityState identity
+                      : runtime.world().getWorldFactionIdentities()) {
+                  if (identity.origin() == com.spacesim.world.WorldFactionIdentityState.Origin.PLAYER_CREATED
+                          && identity.stableFactionId().equals(affiliation)) {
+                      return affiliation;
+                  }
+              }
+              return null;
+          }
+
+'''
+          if text.count(anchor) != 1:
+              raise SystemExit('player asset helper anchor missing')
+          path.write_text(text.replace(anchor, helper + anchor, 1))
+
+          path = Path('src/test/java/com/spacesim/player/PlayerMarketServiceTest.java')
+          text = path.read_text()
+          needle = '                        String factionId = content.findFaction(stationFaction.factionId).id();\n'
+          addition = '''                        String controller = world.controllingFaction(
+                                  DemoGalaxyFactory.ACTIVE_SYSTEM_ID).orElse(null);
+                          if (controller != null && !controller.equals(factionId)) {
+                              world.grantTerritorialConstructionRight(
+                                      controller,
+                                      factionId,
+                                      DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                                      -1L);
+                          }
+'''
+          if text.count(needle) != 1:
+              raise SystemExit('player market faction anchor missing')
+          path.write_text(text.replace(needle, needle + addition, 1))
+
+          path = Path('src/test/java/com/spacesim/world/Stage17DControlConsequencesAcceptanceTest.java')
+          text = path.read_text()
+          pattern = re.compile(
+              r'        assertEquals\(0L, report\.taxCollectedMilliCredits\(\)\);\s*'
+              r'assertEquals\(10_000L, report\.tariffCollectedMilliCredits\(\)\);\s*'
+              r'assertEquals\(1, report\.tariffedStations\(\)\);\s*'
+              r'assertEquals\(treasuryBefore \+ 10_000L,\s*world\.findFactionEconomicState\(PLAYER_FACTION\).*?'
+              r'assertEquals\("faction-territory-tariff", transfer\.reason\(\)\);',
+              re.DOTALL)
+          replacement = '''        assertEquals(0L, report.taxCollectedMilliCredits());
+          assertTrue(report.tariffCollectedMilliCredits() > 0L);
+          assertTrue(report.tariffedStations() >= 1);
+          assertEquals(treasuryBefore + report.tariffCollectedMilliCredits(),
+                  world.findFactionEconomicState(PLAYER_FACTION).orElseThrow().treasuryMilliCredits());
+          assertEquals(90_000L, foreignWallet.getBalanceMilliCredits());
+
+          List<EconomicTransaction> entries = world.findSession(DemoGalaxyFactory.FRONTIER_SYSTEM_ID)
+                  .orElseThrow().getLedger().getEntries();
+          assertEquals(ledgerBeforeFiscal + report.tariffedStations(), entries.size());
+          for (EconomicTransaction transfer : entries.subList(ledgerBeforeFiscal, entries.size())) {
+              assertEquals(EconomicTransaction.Type.MONEY_TRANSFER, transfer.type());
+              assertEquals("faction-territory-tariff", transfer.reason());
+          }'''
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('control consequence assertion match failed')
+          path.write_text(text)
+      - name: Remove workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-authorization-regex-patch.yml
+          git add src/main/java/com/spacesim/world/TerritorialControlRuntime.java \
+                  src/main/java/com/spacesim/world/WorldSimulation.java \
+                  src/main/java/com/spacesim/world/TerritorialConstructionAuthorization.java \
+                  src/main/java/com/spacesim/player/PlayerConstructionService.java \
+                  src/test/java/com/spacesim/player/PlayerMarketServiceTest.java \
+                  src/test/java/com/spacesim/world/Stage17DControlConsequencesAcceptanceTest.java
+          git commit -m "Finalize territorial construction authorization"
+          git push origin HEAD:agent/stage17d-territorial-process
