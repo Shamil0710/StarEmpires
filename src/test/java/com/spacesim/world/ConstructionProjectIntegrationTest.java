@@ -35,7 +35,7 @@ class ConstructionProjectIntegrationTest {
         SimulationSession session = world.findSession(DemoGalaxyFactory.ACTIVE_SYSTEM_ID).orElseThrow();
         long treasuryBefore = world.findFactionEconomicState(OWNER).orElseThrow().treasuryMilliCredits();
 
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, TARGET, DemoGalaxyFactory.ACTIVE_SYSTEM_ID, 910f, 640f);
         ConstructionProjectState planned = world.findConstructionProject(projectId).orElseThrow();
         assertEquals(ConstructionProjectStatus.PLANNED, planned.status());
@@ -99,7 +99,7 @@ class ConstructionProjectIntegrationTest {
     void partialProjectRoundTripsThroughWorldCodecAndRestore() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, TARGET, DemoGalaxyFactory.FRONTIER_SYSTEM_ID, 300f, 420f);
         assertEquals(Money.fromCredits(20_000d),
                 world.fundConstructionProject(projectId, Money.fromCredits(20_000d)));
@@ -124,7 +124,7 @@ class ConstructionProjectIntegrationTest {
     void cancelBeforeDeliveryRefundsWalletAndRemovesSite() {
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
         long treasuryBefore = world.findFactionEconomicState(OWNER).orElseThrow().treasuryMilliCredits();
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, "station.mining_base", DemoGalaxyFactory.ACTIVE_SYSTEM_ID, 120f, 140f);
         ConstructionProjectState planned = world.findConstructionProject(projectId).orElseThrow();
         long funding = Money.fromCredits(25_000d);

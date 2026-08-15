@@ -25,7 +25,7 @@ class ConstructionProjectSystemIntegrationTest {
     void fundedConstructionSiteВиденExistingMarketDirectoryКакPhysicalConsumer() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, "station.foundry", DemoGalaxyFactory.ACTIVE_SYSTEM_ID, 820f, 610f);
         world.fundConstructionProject(projectId, Money.fromCredits(40_000d));
         world.advanceFrame(0.1f);
@@ -46,7 +46,7 @@ class ConstructionProjectSystemIntegrationTest {
     @Test
     void constructionSiteНеПолучаетFactionLiquiditySupport() {
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, "station.mining_base", DemoGalaxyFactory.INNER_SYSTEM_ID, 510f, 390f);
 
         assertEquals(0L, world.findConstructionProject(projectId).orElseThrow().projectWalletMilliCredits());
@@ -91,7 +91,7 @@ class ConstructionProjectSystemIntegrationTest {
                 WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS,
                 WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME);
 
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, "station.mining_base", DemoGalaxyFactory.INNER_SYSTEM_ID, 510f, 390f);
         long funding = Money.fromCredits(200_000d);
         world.fundConstructionProject(projectId, funding);
@@ -107,7 +107,7 @@ class ConstructionProjectSystemIntegrationTest {
     void remoteSystemProjectДоходитДоCompletionЧерезCoarseSimulationClock() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, "station.mining_base", DemoGalaxyFactory.FRONTIER_SYSTEM_ID, 330f, 470f);
         world.fundConstructionProject(projectId, Money.fromCredits(25_000d));
         EntityId cargo = ConstructionProjectTestFixtures.createLoadedCargo(
@@ -135,7 +135,7 @@ class ConstructionProjectSystemIntegrationTest {
     void cancellationПослеПервойPhysicalDeliveryЯвноОтклоняется() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, "station.mining_base", DemoGalaxyFactory.ACTIVE_SYSTEM_ID, 120f, 150f);
         world.fundConstructionProject(projectId, Money.fromCredits(25_000d));
         EntityId cargo = ConstructionProjectTestFixtures.createLoadedCargo(

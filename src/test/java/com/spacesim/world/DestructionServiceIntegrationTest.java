@@ -129,7 +129,7 @@ class DestructionServiceIntegrationTest {
     void destroyedConstructionSiteПереходитВFailedСИсториейДоставки() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 MINERS, "station.mining_base", DemoGalaxyFactory.ACTIVE_SYSTEM_ID, 400f, 450f);
         world.fundConstructionProject(projectId, Money.fromCredits(25_000d));
         EntityId cargo = ConstructionProjectTestFixtures.createLoadedCargo(
@@ -157,7 +157,7 @@ class DestructionServiceIntegrationTest {
     void completedConstructionHistoryПереживаетПозднееУничтожениеStation() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(ROOT_SEED);
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 MINERS, "station.mining_base", DemoGalaxyFactory.ACTIVE_SYSTEM_ID, 470f, 520f);
         world.fundConstructionProject(projectId, Money.fromCredits(25_000d));
         EntityId cargo = ConstructionProjectTestFixtures.createLoadedCargo(
