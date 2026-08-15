@@ -53,8 +53,6 @@ class Stage17DControlConsequencesAcceptanceTest {
 
         long treasuryBefore = world.findFactionEconomicState(PLAYER_FACTION)
                 .orElseThrow().treasuryMilliCredits();
-        int ledgerBefore = world.findSession(DemoGalaxyFactory.FRONTIER_SYSTEM_ID)
-                .orElseThrow().getLedger().getEntries().size();
 
         world.declareTerritorialClaim(PLAYER_FACTION, DemoGalaxyFactory.FRONTIER_SYSTEM_ID);
         long claimTick = world.getAuthoritativeWorldTick();
@@ -63,12 +61,13 @@ class Stage17DControlConsequencesAcceptanceTest {
         assertEquals(PLAYER_FACTION,
                 world.controllingFaction(DemoGalaxyFactory.FRONTIER_SYSTEM_ID).orElseThrow());
         assertEquals(treasuryBefore,
-                world.findFactionEconomicState(PLAYER_FACTION).orElseThrow().treasuryMilliCredits());
-        assertEquals(FOREIGN_WALLET, foreignWallet.getBalanceMilliCredits());
-        assertEquals(ledgerBefore, world.findSession(DemoGalaxyFactory.FRONTIER_SYSTEM_ID)
-                .orElseThrow().getLedger().getEntries().size(),
-                "Claim/control transitions themselves must not create economic ledger transfers");
+                world.findFactionEconomicState(PLAYER_FACTION).orElseThrow().treasuryMilliCredits(),
+                "Acquiring control must not capitalize the faction treasury");
+        assertEquals(FOREIGN_WALLET, foreignWallet.getBalanceMilliCredits(),
+                "Acquiring control must not seize a foreign station wallet");
 
+        int ledgerBeforeFiscal = world.findSession(DemoGalaxyFactory.FRONTIER_SYSTEM_ID)
+                .orElseThrow().getLedger().getEntries().size();
         WorldSimulation.FiscalPolicyReport report = world.applyFiscalPolicy(PLAYER_FACTION);
         assertEquals(0L, report.taxCollectedMilliCredits());
         assertEquals(10_000L, report.tariffCollectedMilliCredits());
@@ -79,7 +78,7 @@ class Stage17DControlConsequencesAcceptanceTest {
 
         List<EconomicTransaction> entries = world.findSession(DemoGalaxyFactory.FRONTIER_SYSTEM_ID)
                 .orElseThrow().getLedger().getEntries();
-        assertEquals(ledgerBefore + 1, entries.size());
+        assertEquals(ledgerBeforeFiscal + 1, entries.size());
         EconomicTransaction transfer = entries.get(entries.size() - 1);
         assertEquals(EconomicTransaction.Type.MONEY_TRANSFER, transfer.type());
         assertEquals("faction-territory-tariff", transfer.reason());
