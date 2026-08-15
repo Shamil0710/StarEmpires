@@ -28,6 +28,7 @@ class Stage17F5SupplierDiversificationAcceptanceTest {
     private static final int CONCENTRATED_SUPPLIER = 1;
     private static final int DIVERSE_SUPPLIER = 2;
     private static final int TRADER_FACTION = 3;
+    private static final int FOREIGN_CONSUMER = 4;
 
     private final ContentCatalog content = ContentCatalogLoader.loadDefault();
     private long nextId = 60_000L;
@@ -123,6 +124,32 @@ class Stage17F5SupplierDiversificationAcceptanceTest {
                 .orElseThrow();
 
         assertEquals(id(concentrated), selection.selectedRoute().buyStationId());
+        assertFalse(selection.diversificationApplied());
+    }
+
+    @Test
+    void resilienceDoesNotRewriteOrdinaryTradeToForeignConsumer() {
+        Entity concentrated = station(100, 100, 0f, 8f, CONCENTRATED_SUPPLIER);
+        Entity alternative = station(100, 100, 0f, 10f, DIVERSE_SUPPLIER);
+        Entity foreignConsumer = station(0, 100, 20f, 22f, FOREIGN_CONSUMER);
+        TradeRoutePlanner economic = new TradeRoutePlanner(
+                content,
+                TradeRoutePlanner.ScoringMode.GROSS_PROFIT,
+                TradeRouteCostModel.none());
+        FactionResilientGalacticTradePlanner planner = new FactionResilientGalacticTradePlanner(
+                economic,
+                TradeRoutePlanner.ScoringMode.GROSS_PROFIT,
+                policy(1_000_000L));
+
+        FactionResilientGalacticTradePlanner.Selection selection = planner
+                .selectBestGalacticRoute(
+                        fleet(),
+                        opportunities(concentrated, alternative, foreignConsumer))
+                .orElseThrow();
+
+        assertEquals(id(concentrated), selection.economicBaseline().buyStationId());
+        assertEquals(selection.economicBaseline(), selection.selectedRoute());
+        assertEquals(0L, selection.actualProfitSacrificeMilliCredits());
         assertFalse(selection.diversificationApplied());
     }
 
