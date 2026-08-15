@@ -19,6 +19,10 @@ import java.util.Set;
  * @param stockPolicies базовые target-stock floors faction
  * @param productionPolicies desired recipe по station archetype
  * @param strategicGoals active military/expansion goals, создающие дополнительные demand floors
+ * @param territorialClaims explicit political claims with deterministic stabilization progress
+ * @param territorialControlStates maintenance clocks for systems in {@code controlledSystems}
+ * @param territorialRecognitions directed recognition of other factions' claims/control
+ * @param constructionRightsGranted explicit foreign construction concessions granted by this faction
  */
 public record FactionStrategicState(
         String factionContentId,
@@ -29,7 +33,12 @@ public record FactionStrategicState(
         int foreignTerritoryTariffBasisPoints,
         List<FactionStockPolicyState> stockPolicies,
         List<FactionProductionPolicyState> productionPolicies,
-        List<FactionStrategicGoalState> strategicGoals) implements Comparable<FactionStrategicState> {
+        List<FactionStrategicGoalState> strategicGoals,
+        List<TerritorialClaimState> territorialClaims,
+        List<TerritorialControlState> territorialControlStates,
+        List<TerritorialRecognitionState> territorialRecognitions,
+        List<TerritorialConstructionRightState> constructionRightsGranted)
+        implements Comparable<FactionStrategicState> {
 
     /**
      * Source-compatible diplomacy/territory constructor с нулевой fiscal/economic policy.
@@ -88,6 +97,48 @@ public record FactionStrategicState(
     }
 
     /**
+     * Source-compatible pre-Stage-17D strategic constructor.
+     *
+     * <p>Existing controlled systems receive neutral maintenance clocks. No political claim,
+     * recognition or foreign construction right is invented by this compatibility boundary.</p>
+     *
+     * @param factionContentId stable owner faction content ID
+     * @param minimumMarketAccessRelation threshold
+     * @param relations directed relations
+     * @param controlledSystems controlled systems
+     * @param stationTaxBasisPoints own-station tax rate
+     * @param foreignTerritoryTariffBasisPoints foreign-market tariff rate
+     * @param stockPolicies base stock floors
+     * @param productionPolicies production policies
+     * @param strategicGoals active strategic goals
+     */
+    public FactionStrategicState(
+            String factionContentId,
+            int minimumMarketAccessRelation,
+            List<FactionRelationState> relations,
+            List<StarSystemId> controlledSystems,
+            int stationTaxBasisPoints,
+            int foreignTerritoryTariffBasisPoints,
+            List<FactionStockPolicyState> stockPolicies,
+            List<FactionProductionPolicyState> productionPolicies,
+            List<FactionStrategicGoalState> strategicGoals) {
+        this(
+                factionContentId,
+                minimumMarketAccessRelation,
+                relations,
+                controlledSystems,
+                stationTaxBasisPoints,
+                foreignTerritoryTariffBasisPoints,
+                stockPolicies,
+                productionPolicies,
+                strategicGoals,
+                List.of(),
+                legacyControlStates(controlledSystems),
+                List.of(),
+                List.of());
+    }
+
+    /**
      * Валидирует state и нормализует canonical ordering.
      *
      * @param factionContentId stable owner faction content ID
@@ -99,6 +150,10 @@ public record FactionStrategicState(
      * @param stockPolicies базовые stock floors
      * @param productionPolicies production policies
      * @param strategicGoals active strategic goals
+     * @param territorialClaims political claim states
+     * @param territorialControlStates maintenance state for every controlled system
+     * @param territorialRecognitions directed territorial recognition states
+     * @param constructionRightsGranted foreign construction concessions granted by this faction
      */
     public FactionStrategicState {
         factionContentId = requireId(factionContentId, "Faction content ID");
@@ -112,6 +167,10 @@ public record FactionStrategicState(
         Objects.requireNonNull(stockPolicies, "Faction stock policies не заданы");
         Objects.requireNonNull(productionPolicies, "Faction production policies не заданы");
         Objects.requireNonNull(strategicGoals, "Faction strategic goals не заданы");
+        Objects.requireNonNull(territorialClaims, "Territorial claims not set");
+        Objects.requireNonNull(territorialControlStates, "Territorial control states not set");
+        Objects.requireNonNull(territorialRecognitions, "Territorial recognitions not set");
+        Objects.requireNonNull(constructionRightsGranted, "Construction rights not set");
 
         List<FactionRelationState> sortedRelations = new ArrayList<>(relations.size());
         Set<String> relationTargets = new HashSet<>();
@@ -178,6 +237,68 @@ public record FactionStrategicState(
         }
         sortedGoals.sort(Comparator.naturalOrder());
         strategicGoals = List.copyOf(sortedGoals);
+
+        List<TerritorialClaimState> sortedClaims = new ArrayList<>(territorialClaims.size());
+        Set<StarSystemId> claimedSystems = new HashSet<>();
+        for (TerritorialClaimState claim : territorialClaims) {
+            TerritorialClaimState value = Objects.requireNonNull(claim, "Territorial claim not set");
+            if (!claimedSystems.add(value.systemId())) {
+                throw new IllegalArgumentException("Duplicate territorial claim: " + value.systemId());
+            }
+            sortedClaims.add(value);
+        }
+        sortedClaims.sort(Comparator.naturalOrder());
+        territorialClaims = List.copyOf(sortedClaims);
+
+        List<TerritorialControlState> sortedControl = new ArrayList<>(territorialControlStates.size());
+        Set<StarSystemId> maintainedSystems = new HashSet<>();
+        for (TerritorialControlState control : territorialControlStates) {
+            TerritorialControlState value = Objects.requireNonNull(control, "Territorial control state not set");
+            if (!maintainedSystems.add(value.systemId())) {
+                throw new IllegalArgumentException("Duplicate territorial control state: " + value.systemId());
+            }
+            sortedControl.add(value);
+        }
+        if (!maintainedSystems.equals(seenSystems)) {
+            throw new IllegalArgumentException(
+                    "Territorial control states must exactly cover controlledSystems");
+        }
+        sortedControl.sort(Comparator.naturalOrder());
+        territorialControlStates = List.copyOf(sortedControl);
+
+        List<TerritorialRecognitionState> sortedRecognitions = new ArrayList<>(territorialRecognitions.size());
+        Set<String> recognitionKeys = new HashSet<>();
+        for (TerritorialRecognitionState recognition : territorialRecognitions) {
+            TerritorialRecognitionState value = Objects.requireNonNull(
+                    recognition, "Territorial recognition not set");
+            if (value.targetFactionContentId().equals(factionContentId)) {
+                throw new IllegalArgumentException("Faction cannot recognize its own territorial position");
+            }
+            String key = value.systemId().value() + "\u0000" + value.targetFactionContentId()
+                    + "\u0000" + value.kind();
+            if (!recognitionKeys.add(key)) {
+                throw new IllegalArgumentException("Duplicate territorial recognition: " + key);
+            }
+            sortedRecognitions.add(value);
+        }
+        sortedRecognitions.sort(Comparator.naturalOrder());
+        territorialRecognitions = List.copyOf(sortedRecognitions);
+
+        List<TerritorialConstructionRightState> sortedRights = new ArrayList<>(constructionRightsGranted.size());
+        Set<String> rightKeys = new HashSet<>();
+        for (TerritorialConstructionRightState right : constructionRightsGranted) {
+            TerritorialConstructionRightState value = Objects.requireNonNull(right, "Construction right not set");
+            if (value.granteeFactionContentId().equals(factionContentId)) {
+                throw new IllegalArgumentException("Faction does not need a construction concession from itself");
+            }
+            String key = value.systemId().value() + "\u0000" + value.granteeFactionContentId();
+            if (!rightKeys.add(key)) {
+                throw new IllegalArgumentException("Duplicate territorial construction right: " + key);
+            }
+            sortedRights.add(value);
+        }
+        sortedRights.sort(Comparator.naturalOrder());
+        constructionRightsGranted = List.copyOf(sortedRights);
     }
 
     /**
@@ -210,6 +331,68 @@ public record FactionStrategicState(
      */
     public boolean controls(StarSystemId systemId) {
         return systemId != null && controlledSystems.contains(systemId);
+    }
+
+    /**
+     * Finds this faction's political claim to one system.
+     *
+     * @param systemId system to inspect
+     * @return claim or {@code null}
+     */
+    public TerritorialClaimState claimFor(StarSystemId systemId) {
+        if (systemId == null) {
+            return null;
+        }
+        for (TerritorialClaimState claim : territorialClaims) {
+            if (claim.systemId().equals(systemId)) {
+                return claim;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Finds this faction's maintenance state for established control.
+     *
+     * @param systemId system to inspect
+     * @return control state or {@code null}
+     */
+    public TerritorialControlState controlStateFor(StarSystemId systemId) {
+        if (systemId == null) {
+            return null;
+        }
+        for (TerritorialControlState control : territorialControlStates) {
+            if (control.systemId().equals(systemId)) {
+                return control;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Checks an explicit construction concession granted by this faction.
+     *
+     * @param granteeFactionContentId proposed foreign builder
+     * @param systemId target controlled system
+     * @param worldTick authoritative world tick
+     * @return true when an unexpired matching right exists
+     */
+    public boolean grantsConstructionRightTo(
+            String granteeFactionContentId,
+            StarSystemId systemId,
+            long worldTick) {
+        if (granteeFactionContentId == null || systemId == null || worldTick < 0L) {
+            return false;
+        }
+        String grantee = granteeFactionContentId.strip();
+        for (TerritorialConstructionRightState right : constructionRightsGranted) {
+            if (right.granteeFactionContentId().equals(grantee)
+                    && right.systemId().equals(systemId)
+                    && right.activeAt(worldTick)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -261,6 +444,18 @@ public record FactionStrategicState(
     public int compareTo(FactionStrategicState other) {
         return factionContentId.compareTo(
                 Objects.requireNonNull(other, "FactionStrategicState не задан").factionContentId);
+    }
+
+    private static List<TerritorialControlState> legacyControlStates(List<StarSystemId> controlledSystems) {
+        List<TerritorialControlState> result = new ArrayList<>();
+        for (StarSystemId systemId : Objects.requireNonNull(controlledSystems, "Controlled systems not set")) {
+            result.add(new TerritorialControlState(
+                    Objects.requireNonNull(systemId, "Controlled StarSystemId not set"),
+                    0L,
+                    0L,
+                    0L));
+        }
+        return List.copyOf(result);
     }
 
     private static String requireId(String value, String label) {
