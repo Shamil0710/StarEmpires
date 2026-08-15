@@ -5,7 +5,6 @@ import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
-import com.spacesim.economy.Money;
 import com.spacesim.simulation.SimulationSession;
 
 import java.util.ArrayList;
@@ -58,11 +57,19 @@ final class FactionInvestmentPlanner {
                 0L,
                 economy.treasuryMilliCredits() - economy.treasuryReserveFloorMilliCredits());
         for (FactionEconomicPressureState pressure : pressures) {
-            Optional<Candidate> candidate = bestCandidate(world, content, factionId, pressure);
+            if (hasActiveProducerProject(world, content, factionId, pressure.systemId(), pressure.itemContentId())) {
+                continue;
+            }
+            Optional<FactionProducerConstructionSelector.Candidate> candidate =
+                    FactionProducerConstructionSelector.bestCandidate(
+                            content,
+                            factionId,
+                            pressure.itemContentId(),
+                            pressure.lastUnmetDemandUnits());
             if (candidate.isEmpty()) {
                 continue;
             }
-            Candidate selected = candidate.orElseThrow();
+            FactionProducerConstructionSelector.Candidate selected = candidate.orElseThrow();
             if (selected.fundingMilliCredits() > spendableTreasury
                     || selected.fundingMilliCredits()
                     > economy.maxConstructionInvestmentPerDecisionMilliCredits()) {
@@ -98,37 +105,7 @@ final class FactionInvestmentPlanner {
         return Optional.empty();
     }
 
-    private static Optional<Candidate> bestCandidate(
-            WorldSimulation world,
-            ContentCatalog content,
-            String factionId,
-            FactionEconomicPressureState pressure) {
-        if (hasActiveProducerProject(world, content, factionId, pressure.systemId(), pressure.itemContentId())) {
-            return Optional.empty();
-        }
-        List<Candidate> candidates = new ArrayList<>();
-        for (ContentCatalog.StationArchetypeDefinition station : content.getStationArchetypes()) {
-            if (station.construction() == null || station.recipeId() == null) {
-                continue;
-            }
-            ContentCatalog.RecipeDefinition recipe = content.findRecipe(station.recipeId());
-            Integer output = recipe == null ? null : recipe.outputs().get(pressure.itemContentId());
-            if (output == null || output <= 0) {
-                continue;
-            }
-            long funding = Money.fromCredits(station.construction().fundingCredits());
-            long utility = utilityScore(pressure.lastUnmetDemandUnits(), output, funding);
-            candidates.add(new Candidate(station, funding, utility, station.factionId().equals(factionId)));
-        }
-        Comparator<Candidate> utilityOrder = Comparator.comparingLong(Candidate::expectedUtilityScore).reversed();
-        candidates.sort(Comparator
-                .comparing(Candidate::nativeFaction).reversed()
-                .thenComparing(utilityOrder)
-                .thenComparing(candidate -> candidate.station().id()));
-        return candidates.stream().findFirst();
-    }
-
-    private static boolean hasActiveProducerProject(
+    static boolean hasActiveProducerProject(
             WorldSimulation world,
             ContentCatalog content,
             String factionId,
@@ -177,19 +154,6 @@ final class FactionInvestmentPlanner {
         return new Location(transform.position.x + 60f, transform.position.y + 60f);
     }
 
-    private static long utilityScore(long unmetDemand, int outputPerCycle, long fundingMilliCredits) {
-        if (unmetDemand <= 0L || outputPerCycle <= 0 || fundingMilliCredits <= 0L) {
-            return 0L;
-        }
-        long numerator;
-        try {
-            numerator = Math.multiplyExact(Math.multiplyExact(unmetDemand, outputPerCycle), 1_000_000L);
-        } catch (ArithmeticException exception) {
-            numerator = Long.MAX_VALUE;
-        }
-        return numerator / fundingMilliCredits;
-    }
-
     record InvestmentDecision(
             String factionContentId,
             StarSystemId systemId,
@@ -198,13 +162,6 @@ final class FactionInvestmentPlanner {
             ConstructionProjectId projectId,
             long fundedMilliCredits,
             long expectedUtilityScore) {
-    }
-
-    private record Candidate(
-            ContentCatalog.StationArchetypeDefinition station,
-            long fundingMilliCredits,
-            long expectedUtilityScore,
-            boolean nativeFaction) {
     }
 
     private record Location(float x, float y) {
