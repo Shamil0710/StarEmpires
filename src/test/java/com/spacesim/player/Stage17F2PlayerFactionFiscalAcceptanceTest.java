@@ -6,6 +6,7 @@ import com.spacesim.world.FactionFiscalPolicyState;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage17F2PlayerFactionFiscalAcceptanceTest {
     private static final String PLAYER_FACTION = "faction.player_fiscal";
@@ -51,29 +52,52 @@ class Stage17F2PlayerFactionFiscalAcceptanceTest {
         assertEquals(edited, restored.world().findFactionFiscalPolicy(PLAYER_FACTION).orElseThrow());
 
         PlayableWorldState saved = restored.snapshot();
-        FactionEconomicState savedEconomy = saved.worldState().factions().stream()
-                .filter(state -> state.factionContentId().equals(PLAYER_FACTION))
-                .findFirst()
-                .orElseThrow();
-        assertEquals(1_000L, savedEconomy.treasuryReserveFloorMilliCredits());
-        assertEquals(2_000L, savedEconomy.stationLiquidityReserveMilliCredits());
-        assertEquals(3_000L, savedEconomy.maxLiquiditySupportPerDecisionMilliCredits());
-        assertEquals(4_000L, savedEconomy.maxConstructionInvestmentPerDecisionMilliCredits());
-        assertEquals(125, saved.worldState().factionStrategies().stream()
-                .filter(state -> state.factionContentId().equals(PLAYER_FACTION))
+        assertFiscalPolicyStored(saved, edited);
+
+        assertTrue(saved.playerState().walletMilliCredits() > 0L);
+        PlayableWorldState capitalized = PlayerFactionTreasuryService.capitalize(saved, 1L);
+        assertEquals(1L, factionEconomy(capitalized).treasuryMilliCredits());
+        assertFiscalPolicyStored(capitalized, edited);
+
+        PlayableWorldState returned = PlayerFactionTreasuryService.transferToPersonal(capitalized, 1L);
+        assertEquals(0L, factionEconomy(returned).treasuryMilliCredits());
+        assertFiscalPolicyStored(returned, edited);
+    }
+
+    private static void assertFiscalPolicyStored(
+            PlayableWorldState state,
+            FactionFiscalPolicyState expected) {
+        FactionEconomicState economy = factionEconomy(state);
+        assertEquals(expected.treasuryReserveFloorMilliCredits(), economy.treasuryReserveFloorMilliCredits());
+        assertEquals(expected.stationLiquidityReserveMilliCredits(), economy.stationLiquidityReserveMilliCredits());
+        assertEquals(
+                expected.maxLiquiditySupportPerDecisionMilliCredits(),
+                economy.maxLiquiditySupportPerDecisionMilliCredits());
+        assertEquals(
+                expected.maxConstructionInvestmentPerDecisionMilliCredits(),
+                economy.maxConstructionInvestmentPerDecisionMilliCredits());
+        assertEquals(expected.ownStationTaxBasisPoints(), state.worldState().factionStrategies().stream()
+                .filter(strategy -> strategy.factionContentId().equals(PLAYER_FACTION))
                 .findFirst()
                 .orElseThrow()
                 .stationTaxBasisPoints());
-        assertEquals(250, saved.worldState().factionStrategies().stream()
-                .filter(state -> state.factionContentId().equals(PLAYER_FACTION))
+        assertEquals(expected.territorialForeignStationLevyBasisPoints(), state.worldState().factionStrategies().stream()
+                .filter(strategy -> strategy.factionContentId().equals(PLAYER_FACTION))
                 .findFirst()
                 .orElseThrow()
                 .foreignTerritoryTariffBasisPoints());
-        assertEquals(375, saved.worldState().factionDiplomacyStates().stream()
-                .filter(state -> state.factionContentId().equals(PLAYER_FACTION))
+        assertEquals(expected.customsTariffBasisPoints(), state.worldState().factionDiplomacyStates().stream()
+                .filter(diplomacy -> diplomacy.factionContentId().equals(PLAYER_FACTION))
                 .findFirst()
                 .orElseThrow()
                 .customsTariffBasisPoints());
+    }
+
+    private static FactionEconomicState factionEconomy(PlayableWorldState state) {
+        return state.worldState().factions().stream()
+                .filter(economy -> economy.factionContentId().equals(PLAYER_FACTION))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static PlayableWorldState independentSnapshot(PlayableWorldState source) {
