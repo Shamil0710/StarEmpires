@@ -13,27 +13,53 @@ import java.util.Objects;
  * @param factionContentId stable faction content ID
  * @param treasuryMilliCredits неотрицательный authoritative treasury balance
  * @param stationLiquidityReserveMilliCredits целевой минимальный wallet принадлежащей станции
- * @param maxLiquiditySupportPerDecisionMilliCredits максимальный общий расход одного policy decision
+ * @param maxLiquiditySupportPerDecisionMilliCredits максимальный общий расход liquidity-support decision
+ * @param treasuryReserveFloorMilliCredits protected treasury balance for ordinary policy spending
+ * @param maxConstructionInvestmentPerDecisionMilliCredits construction authorization cap per decision
  */
 public record FactionEconomicState(
         String factionContentId,
         long treasuryMilliCredits,
         long stationLiquidityReserveMilliCredits,
-        long maxLiquiditySupportPerDecisionMilliCredits)
+        long maxLiquiditySupportPerDecisionMilliCredits,
+        long treasuryReserveFloorMilliCredits,
+        long maxConstructionInvestmentPerDecisionMilliCredits)
         implements Comparable<FactionEconomicState> {
+
     /**
-     * Валидирует persistent faction economy.
+     * Source-compatible pre-17F.2 constructor.
+     *
+     * <p>Legacy worlds had no protected treasury floor or construction authorization cap, so they
+     * migrate to zero protected reserve and effectively unlimited per-decision construction funding.
+     * Existing liquidity policy is preserved exactly.</p>
      *
      * @param factionContentId stable faction content ID
-     * @param treasuryMilliCredits неотрицательный treasury balance
-     * @param stationLiquidityReserveMilliCredits неотрицательный целевой station reserve
-     * @param maxLiquiditySupportPerDecisionMilliCredits неотрицательный budget одного решения
+     * @param treasuryMilliCredits authoritative treasury balance
+     * @param stationLiquidityReserveMilliCredits legacy station liquidity target
+     * @param maxLiquiditySupportPerDecisionMilliCredits legacy liquidity-support cap
      */
+    public FactionEconomicState(
+            String factionContentId,
+            long treasuryMilliCredits,
+            long stationLiquidityReserveMilliCredits,
+            long maxLiquiditySupportPerDecisionMilliCredits) {
+        this(
+                factionContentId,
+                treasuryMilliCredits,
+                stationLiquidityReserveMilliCredits,
+                maxLiquiditySupportPerDecisionMilliCredits,
+                0L,
+                Long.MAX_VALUE);
+    }
+
+    /** Validates persistent faction economy and fiscal spending limits. */
     public FactionEconomicState {
         factionContentId = normalizedContentId(factionContentId);
         if (treasuryMilliCredits < 0L
                 || stationLiquidityReserveMilliCredits < 0L
-                || maxLiquiditySupportPerDecisionMilliCredits < 0L) {
+                || maxLiquiditySupportPerDecisionMilliCredits < 0L
+                || treasuryReserveFloorMilliCredits < 0L
+                || maxConstructionInvestmentPerDecisionMilliCredits < 0L) {
             throw new IllegalArgumentException("Faction treasury/policy amounts не могут быть отрицательными");
         }
     }
