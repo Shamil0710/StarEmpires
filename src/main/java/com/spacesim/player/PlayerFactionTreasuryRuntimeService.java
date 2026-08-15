@@ -9,14 +9,15 @@ import java.util.Optional;
  * Live Stage-17C adapter between {@link PlayerState#walletMilliCredits()} and the ordinary
  * Stage-8 faction treasury owned by {@link com.spacesim.world.WorldSimulation}.
  *
- * <p>The adapter exposes only explicit capitalization. It does not merge personal and public money,
- * does not touch station operating wallets and does not provide an unrestricted treasury withdrawal.
- * A successful capitalization produces one world-ledger {@code MONEY_TRANSFER}; no money source or
- * sink is involved.</p>
+ * <p>The adapter exposes only explicit conserved transfers in either direction. It does not merge
+ * personal and public money, does not touch station operating wallets and never turns faction
+ * income into an automatic personal payout. Every successful live transfer produces exactly one
+ * world-ledger {@code MONEY_TRANSFER}; no money source or sink is involved.</p>
  */
 public final class PlayerFactionTreasuryRuntimeService {
     private static final String PLAYER_LEDGER_NAME = "PLAYER";
     private static final String CAPITALIZATION_REASON = "player-faction-capitalization";
+    private static final String PERSONAL_TRANSFER_REASON = "player-faction-treasury-to-personal";
 
     private final PlayerRuntime runtime;
 
@@ -81,6 +82,64 @@ public final class PlayerFactionTreasuryRuntimeService {
                     PLAYER_LEDGER_NAME,
                     amountMilliCredits,
                     CAPITALIZATION_REASON);
+            if (!transferred) {
+                runtime.replacePlayerState(previous);
+                return false;
+            }
+            return true;
+        } catch (RuntimeException exception) {
+            runtime.replacePlayerState(previous);
+            throw exception;
+        }
+    }
+
+    /**
+     * Moves an explicit amount of already existing faction-treasury money to the personal/company wallet.
+     *
+     * <p>This is the live counterpart of {@link PlayerFactionTreasuryService#transferToPersonal(
+     * PlayableWorldState, long)}. It is never invoked automatically for faction revenue. The candidate
+     * personal balance is installed before the world transfer and restored on any rejection or exception;
+     * the world seam independently rolls back the treasury wallet if ledger recording fails.</p>
+     *
+     * @param amountMilliCredits strictly positive full-transfer amount
+     * @return true when the full amount moved and one ledger transfer was recorded; false when the
+     *         player is independent, treasury funds are insufficient or the personal wallet cannot accept it
+     * @throws IllegalArgumentException if amount is not positive or the affiliated world faction has
+     *         no ordinary economic account
+     */
+    public boolean transferToPersonal(long amountMilliCredits) {
+        if (amountMilliCredits <= 0L) {
+            throw new IllegalArgumentException("Faction treasury personal transfer amount must be positive");
+        }
+        PlayerState previous = runtime.player();
+        if (!previous.affiliated()) {
+            return false;
+        }
+
+        WalletComponent personalWallet = new WalletComponent(previous.walletMilliCredits());
+        if (!personalWallet.canCredit(amountMilliCredits)) {
+            return false;
+        }
+        final long resultingPersonalWallet;
+        try {
+            resultingPersonalWallet = Math.addExact(previous.walletMilliCredits(), amountMilliCredits);
+        } catch (ArithmeticException exception) {
+            return false;
+        }
+        PlayerState candidate = PlayerRuntime.copyWithOwnershipAndWallet(
+                previous,
+                resultingPersonalWallet,
+                previous.ownedFleetIds(),
+                previous.activeFleetId());
+
+        runtime.replacePlayerState(candidate);
+        try {
+            boolean transferred = runtime.world().transferFromFactionTreasury(
+                    previous.factionContentId(),
+                    personalWallet,
+                    PLAYER_LEDGER_NAME,
+                    amountMilliCredits,
+                    PERSONAL_TRANSFER_REASON);
             if (!transferred) {
                 runtime.replacePlayerState(previous);
                 return false;
