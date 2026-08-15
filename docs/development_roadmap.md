@@ -2,7 +2,7 @@
 
 > Канонический документ статуса, зависимостей и переходов между этапами разработки.
 >
-> Последняя синхронизация: **2026-08-15 после закрытия Stage 17F.1, Stage 17F.2 + continuity-hardening и Stage 17F.3 fiscal trade-offs; `Ship Mathematics v1.0 Design Baseline` остаётся accepted foundation для 17.5 / 19 / 21. Фактический runtime-статус — Stage 17 ACTIVE, следующий implementation slice — 17F.4 strategic stock / production policy.**
+> Последняя синхронизация: **2026-08-15 после закрытия Stage 17F.1–17F.5; `Ship Mathematics v1.0 Design Baseline` остаётся accepted foundation для 17.5 / 19 / 21. Фактический runtime-статус — Stage 17 ACTIVE, следующий implementation slice — 17F.6 policy feedback / anti-oscillation.**
 >
 > Начиная с Stage 16 новая и содержательно изменяемая проектная документация ведётся **на русском языке**. Имена классов, enum, content ID, API, формулы и технические идентификаторы сохраняются в оригинальном виде.
 
@@ -669,7 +669,7 @@ physical stock gap + partner/alternative supply
 
 ## 17F — faction policies / strategic economy
 
-**ACTIVE — 17F.1 COMPLETE в PR #109; 17F.2 COMPLETE в PR #110 с continuity-hardening в PR #113; 17F.3 COMPLETE в PR #112; 17F.4 strategic stock / production policy — NEXT.**
+**ACTIVE — 17F.1–17F.5 COMPLETE; 17F.4 — PR #114; resilience implementation — PR #115–#120; aggregate 17F.5 gate — PR #121; 17F.6 policy feedback / anti-oscillation — NEXT.**
 
 Цель — дать player faction и AI factions общий набор государственных economic-policy решений. Policy не заменяет рынок: она изменяет бюджеты, правовые ограничения и strategic demand, после чего реагирует обычная экономика.
 
@@ -719,6 +719,8 @@ Policy должна иметь реальные последствия:
 
 ### 17F.4 — strategic stock / production policy
 
+**COMPLETE — PR #114.** Общий player/AI authoring boundary хранит persistent stock floors и production preferences, валидирует semantic content references до mutation и применяет их только через существующий `FactionStrategicPolicyEngine`. Authoring не materialize-ит спрос, cargo, output или деньги; explicit apply меняет только обычные market targets / production configuration.
+
 Переиспользуется текущая философия `FactionStrategicPolicyEngine`:
 
 ```text
@@ -734,15 +736,31 @@ Policy не materialize-ит товар и не завершает произв�
 
 ### 17F.5 — resilience policy
 
-Faction может сознательно предпочесть:
+**COMPLETE — implementation PR #115–#120; final aggregate gate PR #121.** Stage-17E structural dependence diagnostics + persistent doctrine materialize-ятся в resilience preferences, но не заменяют ordinary economy.
 
-- diversified suppliers;
-- minimum strategic buffers;
-- local production despite higher nominal cost;
-- redundant routes/infrastructure;
-- critical-item import limits.
+Реализованы:
 
-Цена resilience должна проявляться как реальные дополнительные capital/logistics/operating costs.
+- **minimum strategic buffers — PR #115:** uncovered requirement повышает обычный stock floor; cargo должен быть физически доставлен;
+- **diversified suppliers — PR #116:** faction может принять ограниченную реальную потерю expected profit ради менее концентрированного существующего supplier;
+- **local production — PR #117:** используются только canonical recipes реально owned production capacity; отсутствие capability остаётся explicit capacity gap;
+- **capacity-gap construction — PR #118:** gap + own-market deficit может запустить только ordinary treasury-funded, material-bound, timed construction;
+- **redundant routes — PR #119:** допускается только реальный deterministic edge-disjoint jump path; при отсутствии второго пути vulnerability сохраняется;
+- **critical-item import limits — PR #120:** hard autonomous procurement guard использует current structural concentration + doctrine ceiling; он не является embargo/tariff и не выдумывает historical import share.
+
+Aggregate contract PR #121:
+
+```text
+physical stock / targets / legal access / production / topology
+→ Stage-17E structural dependence diagnostics
+→ Stage-17F doctrine
+→ buffer / supplier / local-production / route / critical-import decisions
+→ ordinary market / trade / production / construction execution
+→ physical economic consequences
+```
+
+Read-only resilience analysis и policy assessment byte-for-byte не мутируют world state. Stock/production authoring и explicit apply не создают cargo или money. Цена resilience проявляется как tied-up inventory capital, меньшая route profit, больший ETA/risk, treasury-funded construction + materials/build time или реальный shortage, если acceptable alternative отсутствует.
+
+Канонический closeout: `docs/stage17f5_resilience_completion_record.md`.
 
 ### 17F.6 — policy feedback / anti-oscillation
 
