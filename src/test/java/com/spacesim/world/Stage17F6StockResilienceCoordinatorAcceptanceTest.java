@@ -24,7 +24,7 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
     private static final String ALTERNATIVE = "faction.miners";
 
     @Test
-    void oneCommonReviewClaimBoundsStockIncreaseWithoutMaterializingEconomy() {
+    void commonReviewWindowBoundsAutomaticOverlayUpAndDownWithoutErasingBasePolicy() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = WorldSimulation.restore(
                 DemoGalaxyFactory.createState(0x17F60041L, content),
@@ -33,19 +33,21 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
                 WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS,
                 WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME);
         ContentCatalog.ItemDefinition item = content.getItems().get(0);
-        advanceToTick(world, FactionPolicyReviewCadence.defaultForFaction(SOURCE).firstReviewOffsetTicks());
+        FactionPolicyReviewCadence cadence = FactionPolicyReviewCadence.defaultForFaction(SOURCE);
+        advanceToTick(world, cadence.firstReviewOffsetTicks());
         clearExistingEconomicSignal(world);
 
         int sourceRuntime = world.findFactionRuntimeId(SOURCE).orElseThrow();
         int concentratedRuntime = world.findFactionRuntimeId(CONCENTRATED).orElseThrow();
         int alternativeRuntime = world.findFactionRuntimeId(ALTERNATIVE).orElseThrow();
-        addMarketStation(
+        Entity sourceMarket = addMarketStation(
                 world,
                 DemoGalaxyFactory.FRONTIER_SYSTEM_ID,
                 "17F6 source market",
                 sourceRuntime,
                 item.runtimeId(),
                 20,
+                5,
                 100,
                 50f);
         addMarketStation(
@@ -56,6 +58,7 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
                 item.runtimeId(),
                 100,
                 20,
+                20,
                 10f);
         addMarketStation(
                 world,
@@ -64,6 +67,7 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
                 alternativeRuntime,
                 item.runtimeId(),
                 60,
+                20,
                 20,
                 20f);
 
@@ -77,9 +81,11 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
                 doctrine.interventionism(),
                 80));
         FactionStockProductionPolicyState existing = world.findFactionStockProductionPolicy(SOURCE).orElseThrow();
-        world.updateFactionStockProductionPolicy(
-                SOURCE,
-                new FactionStockProductionPolicyState(List.of(), existing.productionPolicies()));
+        FactionStockProductionPolicyState basePolicy = new FactionStockProductionPolicyState(
+                List.of(new FactionStockPolicyState(item.id(), 7)),
+                existing.productionPolicies());
+        world.updateFactionStockProductionPolicy(SOURCE, basePolicy);
+        assertTrue(world.findFactionResilienceDemandFloors(SOURCE).isEmpty());
 
         FactionResilienceItemDecision resilienceDecision = FactionResiliencePlanner.analyze(world, SOURCE)
                 .items().stream()
@@ -87,14 +93,12 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
                 .findFirst()
                 .orElseThrow();
         assertTrue(resilienceDecision.recommendedTargetFloorPerMarketUnits() > 10,
-                "Fixture must require more than one bounded stock-review step");
+                "Fixture must require more than one bounded resilience-overlay step");
 
         long inventoryBefore = totalInventoryUnits(world);
         long walletsBefore = totalEntityWallets(world);
         long marketTargetsBefore = totalMarketTargets(world);
         long treasuryBefore = world.findFactionEconomicState(SOURCE).orElseThrow().treasuryMilliCredits();
-        List<FactionProductionPolicyState> productionBefore = world.findFactionStockProductionPolicy(SOURCE)
-                .orElseThrow().productionPolicies();
 
         FactionPolicyReviewCoordinator.Report first = FactionPolicyReviewCoordinator.reviewPolicies(
                 world, List.of(SOURCE));
@@ -104,31 +108,75 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
         assertTrue(firstFaction.reviewClaimed());
         assertTrue(firstFaction.stockResilienceReview().policyChanged());
         assertEquals(1, firstFaction.stockResilienceReview().increasedItemCount());
-        FactionStockProductionPolicyState afterFirst = world.findFactionStockProductionPolicy(SOURCE).orElseThrow();
-        assertEquals(10, stockFloor(afterFirst, item.id()),
-                "First review may raise the floor by only the conservative 10-unit step");
-        assertEquals(productionBefore, afterFirst.productionPolicies());
+        assertEquals(0, firstFaction.stockResilienceReview().decreasedItemCount());
+        assertEquals(10, overlayFloor(world, item.id()),
+                "First review may raise only the automatic overlay by the conservative 10-unit step");
+        assertEquals(basePolicy, world.findFactionStockProductionPolicy(SOURCE).orElseThrow(),
+                "Automatic resilience review must not rewrite the base player/AI stock policy");
         assertEquals(inventoryBefore, totalInventoryUnits(world));
         assertEquals(walletsBefore, totalEntityWallets(world));
         assertEquals(marketTargetsBefore, totalMarketTargets(world),
-                "Authoring a stock policy must not materialize target demand before explicit apply");
+                "Authoring the overlay must not materialize physical demand before explicit apply");
         assertEquals(treasuryBefore, world.findFactionEconomicState(SOURCE).orElseThrow().treasuryMilliCredits());
 
         FactionPolicyReviewCoordinator.Report repeated = FactionPolicyReviewCoordinator.reviewPolicies(
                 world, List.of(SOURCE));
-
         assertEquals(0L, repeated.claimedReviewCount());
         assertEquals(0L, repeated.changedStockResiliencePolicyCount());
-        assertEquals(afterFirst, world.findFactionStockProductionPolicy(SOURCE).orElseThrow(),
-                "Same-window retry must not apply the second bounded step");
-        assertEquals(inventoryBefore, totalInventoryUnits(world));
-        assertEquals(walletsBefore, totalEntityWallets(world));
-        assertEquals(marketTargetsBefore, totalMarketTargets(world));
-        assertEquals(treasuryBefore, world.findFactionEconomicState(SOURCE).orElseThrow().treasuryMilliCredits());
+        assertEquals(10, overlayFloor(world, item.id()),
+                "Same-window retry must not apply a second bounded overlay step");
+
+        world.applyFactionStrategicPolicy(SOURCE);
+        MarketComponent sourceMarketComponent = sourceMarket.getComponent(MarketComponent.class);
+        assertEquals(5, sourceMarketComponent.configuredTargetStock[item.runtimeId()]);
+        assertEquals(10, sourceMarketComponent.targetStock[item.runtimeId()],
+                "Physical apply must combine baseline 5, base policy 7 and resilience overlay 10");
+
+        satisfyOwnedMarketDemand(world, sourceRuntime, item.runtimeId());
+        long secondReviewTick = world.findFactionPolicyReviewState(SOURCE).orElseThrow().lastPolicyReviewTick()
+                + cadence.intervalTicks();
+        advanceToTick(world, secondReviewTick);
+        long secondInventoryBefore = totalInventoryUnits(world);
+        long secondWalletsBefore = totalEntityWallets(world);
+        long secondTargetsBefore = totalMarketTargets(world);
+
+        FactionPolicyReviewCoordinator.Report second = FactionPolicyReviewCoordinator.reviewPolicies(
+                world, List.of(SOURCE));
+
+        assertEquals(1L, second.claimedReviewCount());
+        assertEquals(1L, second.decreasedStockResilienceItemCount());
+        assertEquals(5, overlayFloor(world, item.id()),
+                "Recovery may reduce the automatic overlay by only five units per review");
+        assertEquals(basePolicy, world.findFactionStockProductionPolicy(SOURCE).orElseThrow());
+        assertEquals(secondInventoryBefore, totalInventoryUnits(world));
+        assertEquals(secondWalletsBefore, totalEntityWallets(world));
+        assertEquals(secondTargetsBefore, totalMarketTargets(world),
+                "Downward overlay authoring must also remain physically pure until explicit apply");
+
+        world.applyFactionStrategicPolicy(SOURCE);
+        assertEquals(7, sourceMarketComponent.targetStock[item.runtimeId()],
+                "Once overlay falls below base policy, the intentional base reserve must dominate");
+        satisfyOwnedMarketDemand(world, sourceRuntime, item.runtimeId());
+
+        long thirdReviewTick = world.findFactionPolicyReviewState(SOURCE).orElseThrow().lastPolicyReviewTick()
+                + cadence.intervalTicks();
+        advanceToTick(world, thirdReviewTick);
+        FactionPolicyReviewCoordinator.Report third = FactionPolicyReviewCoordinator.reviewPolicies(
+                world, List.of(SOURCE));
+
+        assertEquals(1L, third.claimedReviewCount());
+        assertEquals(1L, third.decreasedStockResilienceItemCount());
+        assertTrue(world.findFactionResilienceDemandFloors(SOURCE).isEmpty(),
+                "A disappeared resilience risk must eventually release its automatic overlay fully");
+        assertEquals(basePolicy, world.findFactionStockProductionPolicy(SOURCE).orElseThrow());
+
+        world.applyFactionStrategicPolicy(SOURCE);
+        assertEquals(7, sourceMarketComponent.targetStock[item.runtimeId()],
+                "Removing automatic overlay must leave the independent base stock policy intact");
     }
 
-    private static int stockFloor(FactionStockProductionPolicyState policy, String itemContentId) {
-        return policy.stockPolicies().stream()
+    private static int overlayFloor(WorldSimulation world, String itemContentId) {
+        return world.findFactionResilienceDemandFloors(SOURCE).stream()
                 .filter(stock -> stock.itemContentId().equals(itemContentId))
                 .findFirst()
                 .orElseThrow()
@@ -143,6 +191,7 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
                 if (market != null && inventory != null) {
                     for (int itemId = 0; itemId < inventory.stock.length; itemId++) {
                         inventory.stock[itemId] = 0;
+                        market.configuredTargetStock[itemId] = 0;
                         market.targetStock[itemId] = 0;
                     }
                 }
@@ -154,20 +203,21 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
         }
     }
 
-    private static void addMarketStation(
+    private static Entity addMarketStation(
             WorldSimulation world,
             StarSystemId systemId,
             String name,
             int factionRuntimeId,
             int itemId,
             int stock,
-            int target,
+            int configuredTarget,
+            int effectiveTarget,
             float sellPrice) {
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = 1_000;
         MarketComponent market = new MarketComponent();
-        market.configureTradableItem(itemId, Math.max(1, target), 0f);
-        market.targetStock[itemId] = target;
+        market.configureTradableItem(itemId, configuredTarget, 0f);
+        market.targetStock[itemId] = effectiveTarget;
         market.sellPrices[itemId] = sellPrice;
         market.buyPrices[itemId] = Math.max(1f, sellPrice * 0.9f);
         Entity shell = new Entity()
@@ -180,6 +230,23 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
         Entity live = world.findSession(systemId).orElseThrow().getEntityRegistry().find(id);
         live.getComponent(InventoryComponent.class).stock[itemId] = stock;
         assertTrue(live.getComponent(WalletComponent.class).creditFromSource(1_000_000L));
+        return live;
+    }
+
+    private static void satisfyOwnedMarketDemand(WorldSimulation world, int factionRuntimeId, int itemId) {
+        for (StarSystemNode system : world.getTopology().systems()) {
+            for (Entity entity : world.findSession(system.id()).orElseThrow().getEngine().getEntities()) {
+                FactionComponent faction = entity.getComponent(FactionComponent.class);
+                MarketComponent market = entity.getComponent(MarketComponent.class);
+                InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
+                if (faction == null || faction.factionId != factionRuntimeId || market == null || inventory == null) {
+                    continue;
+                }
+                inventory.stock[itemId] = Math.min(
+                        Math.max(0, inventory.capacity),
+                        Math.max(0, market.targetStock[itemId]));
+            }
+        }
     }
 
     private static long totalInventoryUnits(WorldSimulation world) {
@@ -229,7 +296,7 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
         float fixedStep = world.findSession(world.getActiveSystemId()).orElseThrow()
                 .getClock().getFixedStepSeconds();
         int guard = 0;
-        while (world.getAuthoritativeWorldTick() < targetTick && guard++ < 20_000) {
+        while (world.getAuthoritativeWorldTick() < targetTick && guard++ < 50_000) {
             world.advanceFrame(fixedStep);
         }
         assertTrue(world.getAuthoritativeWorldTick() >= targetTick, "World did not reach requested review tick");
