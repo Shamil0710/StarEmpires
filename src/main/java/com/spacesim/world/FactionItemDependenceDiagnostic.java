@@ -60,7 +60,33 @@ public record FactionItemDependenceDiagnostic(
         int uniquePartnerCorridorIntermediateSystems)
         implements Comparable<FactionItemDependenceDiagnostic> {
 
-    /** Validates one deterministic diagnostic row. */
+    /**
+     * Validates one deterministic diagnostic row.
+     *
+     * @param itemContentId stable commodity content ID
+     * @param sourceRequiredStockUnits current faction-wide required/target stock signal
+     * @param sourceOnHandUnits physical stock at source-faction market stations
+     * @param sourceProductionInputPerCycleUnits current active production input per cycle
+     * @param bufferEnduranceCycles observable whole-cycle stock endurance, or -1
+     * @param currentExternalRequirementUnits current required-stock gap
+     * @param partnerPhysicalSurplusUnits partner physical market surplus
+     * @param partnerAccessibleSurplusUnits legally accessible partner surplus
+     * @param alternativeAccessibleSurplusUnits legally accessible non-partner foreign surplus
+     * @param partnerSupplyShareBasisPoints partner share of accessible foreign surplus
+     * @param partnerCoverageBasisPoints current requirement coverable by partner
+     * @param partnerBestUnitSellPriceMilliCredits best accessible partner quote, or -1
+     * @param alternativeBestUnitSellPriceMilliCredits best accessible alternative quote, or -1
+     * @param estimatedReplacementPremiumMilliCredits current replacement price premium
+     * @param uncoveredUnitsAfterPartnerLoss units still uncovered after partner loss
+     * @param sourceExportableSurplusUnits source physical exportable surplus
+     * @param partnerAccessibleDemandUnits accessible current partner demand
+     * @param otherAccessibleForeignDemandUnits accessible current other foreign demand
+     * @param partnerDemandShareBasisPoints partner share of accessible foreign demand
+     * @param bestPartnerRouteHops best topology route to partner supply, or -1
+     * @param bestAlternativeRouteHops best topology route to alternative supply, or -1
+     * @param uniquePartnerShortestRoute whether the best partner route is unique
+     * @param uniquePartnerCorridorIntermediateSystems intermediate systems on that unique route
+     */
     public FactionItemDependenceDiagnostic {
         itemContentId = requireId(itemContentId);
         requireNonNegative(sourceRequiredStockUnits, "sourceRequiredStockUnits");
