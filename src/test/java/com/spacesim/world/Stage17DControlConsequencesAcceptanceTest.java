@@ -8,7 +8,7 @@ import com.spacesim.components.MarketComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.content.ContentCatalogLoader;
-import com.spacesim.economy.EconomicLedgerEntry;
+import com.spacesim.economy.EconomicTransaction;
 import com.spacesim.persistence.EntityId;
 import org.junit.jupiter.api.Test;
 
@@ -77,11 +77,11 @@ class Stage17DControlConsequencesAcceptanceTest {
                 world.findFactionEconomicState(PLAYER_FACTION).orElseThrow().treasuryMilliCredits());
         assertEquals(90_000L, foreignWallet.getBalanceMilliCredits());
 
-        List<EconomicLedgerEntry> entries = world.findSession(DemoGalaxyFactory.FRONTIER_SYSTEM_ID)
+        List<EconomicTransaction> entries = world.findSession(DemoGalaxyFactory.FRONTIER_SYSTEM_ID)
                 .orElseThrow().getLedger().getEntries();
         assertEquals(ledgerBefore + 1, entries.size());
-        EconomicLedgerEntry transfer = entries.get(entries.size() - 1);
-        assertEquals(EconomicLedgerEntry.Type.MONEY_TRANSFER, transfer.type());
+        EconomicTransaction transfer = entries.get(entries.size() - 1);
+        assertEquals(EconomicTransaction.Type.MONEY_TRANSFER, transfer.type());
         assertEquals("faction-territory-tariff", transfer.reason());
 
         assertTrue(world.relinquishTerritorialControl(
