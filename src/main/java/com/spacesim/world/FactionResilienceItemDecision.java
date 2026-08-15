@@ -31,7 +31,21 @@ public record FactionResilienceItemDecision(
         boolean routeRedundancyRecommended)
         implements Comparable<FactionResilienceItemDecision> {
 
-    /** Validates one immutable item-level resilience decision. */
+    /**
+     * Validates one immutable item-level resilience decision.
+     *
+     * @param itemContentId stable commodity ID
+     * @param sourceRequiredStockUnits current aggregate source stock requirement
+     * @param worstPartnerSupplyShareBasisPoints highest observed single-partner supply share
+     * @param worstUncoveredUnitsAfterPartnerLoss largest current access-loss shortfall
+     * @param worstReplacementPremiumMilliCredits largest measured replacement premium
+     * @param uniqueCorridorExposure whether an important supply path has unique-corridor exposure
+     * @param preferredMaximumPartnerShareBasisPoints doctrine-derived preferred concentration ceiling
+     * @param recommendedTargetFloorPerMarketUnits recommended ordinary per-market stock floor
+     * @param diversifySuppliersRecommended whether supplier diversification is recommended
+     * @param localProductionRecommended whether local production is recommended
+     * @param routeRedundancyRecommended whether route redundancy is recommended
+     */
     public FactionResilienceItemDecision {
         itemContentId = Objects.requireNonNull(itemContentId, "Item content ID not set").strip();
         if (itemContentId.isEmpty()) {
