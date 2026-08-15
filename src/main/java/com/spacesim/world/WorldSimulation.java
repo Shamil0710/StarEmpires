@@ -49,6 +49,7 @@ public final class WorldSimulation {
     private final Map<String, FactionEconomicAccount> factionAccountsById;
     private final ConstructionProjectService constructionProjectService;
     private final TerritorialControlRuntime territorialControlRuntime;
+    private final FactionDiplomacyRuntime diplomacyRuntime;
     private final DestructionService destructionService;
     private final FactionEconomicPressureTracker economicPressureTracker;
     private final FleetWorldService fleetWorldService;
@@ -69,6 +70,7 @@ public final class WorldSimulation {
             List<String> factionOrder,
             Map<String, FactionEconomicAccount> factionAccountsById,
             List<FactionStrategicState> factionStrategies,
+            List<FactionDiplomacyState> factionDiplomacyStates,
             long nextConstructionProjectIdValue,
             List<ConstructionProjectState> constructionProjects,
             List<FactionEconomicPressureState> factionEconomicPressures,
@@ -99,6 +101,8 @@ public final class WorldSimulation {
                 this.factionIdentityResolver,
                 this.constructionProjectService,
                 factionStrategies);
+        this.diplomacyRuntime = new FactionDiplomacyRuntime(
+                this.factionIdentityResolver, factionDiplomacyStates);
         this.destructionService = new DestructionService(
                 contentCatalog,
                 this.sessionsById,
@@ -113,6 +117,7 @@ public final class WorldSimulation {
         this.activeSystemId = activeSystemId;
         this.strategicStepTicks = strategicStepTicks;
         this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;
+        refreshFactionMarketAccess();
     }
 
     /**
@@ -233,6 +238,7 @@ public final class WorldSimulation {
                 factionIds,
                 factionAccounts,
                 checked.factionStrategies(),
+                checked.factionDiplomacyStates(),
                 checked.nextConstructionProjectIdValue(),
                 checked.constructionProjects(),
                 checked.factionEconomicPressures(),
@@ -268,6 +274,9 @@ public final class WorldSimulation {
         }
         constructionProjectService.advance();
         territorialControlRuntime.advance(activeTick);
+        if (diplomacyRuntime.marketAccessExpiryCrossed(activeTick)) {
+            refreshFactionMarketAccess();
+        }
         return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));
     }
 
@@ -594,6 +603,39 @@ public final class WorldSimulation {
         return factionIdentityResolver.dynamicIdentities();
     }
 
+    /** @return canonical immutable Stage-17E faction diplomacy aggregates */
+    public List<FactionDiplomacyState> getFactionDiplomacyStates() {
+        return diplomacyRuntime.snapshots();
+    }
+
+    /**
+     * Finds persistent institutional diplomacy for one authored or world-defined faction.
+     *
+     * @param factionContentId stable faction ID
+     * @return diplomacy aggregate or empty
+     */
+    public Optional<FactionDiplomacyState> findFactionDiplomacyState(String factionContentId) {
+        return Optional.ofNullable(diplomacyRuntime.find(factionContentId));
+    }
+
+    /**
+     * Evaluates explainable effective legal market access at the authoritative world tick.
+     *
+     * @param marketOwnerFactionContentId faction owning the market
+     * @param participantFactionContentId participant faction, or null for unfactioned
+     * @return precedence decision: embargo, treaty right, or relation threshold
+     */
+    public DiplomaticMarketAccessResolver.Decision evaluateFactionMarketAccess(
+            String marketOwnerFactionContentId,
+            String participantFactionContentId) {
+        return DiplomaticMarketAccessResolver.evaluate(
+                territorialControlRuntime.snapshots(),
+                diplomacyRuntime.snapshots(),
+                marketOwnerFactionContentId,
+                participantFactionContentId,
+                getAuthoritativeWorldTick());
+    }
+
     /**
      * Возвращает strategic владельца StarSystem.
      *
@@ -776,7 +818,8 @@ public final class WorldSimulation {
                 fleetWorldService.nextIdValue(),
                 fleetWorldService.snapshots(),
                 fleetJumpService.snapshots(),
-                factionIdentityResolver.dynamicIdentities());
+                factionIdentityResolver.dynamicIdentities(),
+                diplomacyRuntime.snapshots());
     }
 
     /**
@@ -1149,7 +1192,8 @@ public final class WorldSimulation {
         return new TradeRoutePlanner(
                 contentCatalog,
                 Objects.requireNonNull(scoringMode, "Trade route scoring mode не задан"),
-                new WorldTradeRouteCostModel(contentCatalog, territorialControlRuntime.snapshots()));
+                new WorldTradeRouteCostModel(
+                        factionIdentityResolver, territorialControlRuntime.snapshots()));
     }
 
     /** @return path planner whose edge timing matches Stage-10B jump execution */
@@ -1471,4 +1515,17 @@ public final class WorldSimulation {
             return Math.addExact(taxCollectedMilliCredits, tariffCollectedMilliCredits);
         }
     }
+    private void refreshFactionMarketAccess() {
+        long worldTick = getAuthoritativeWorldTick();
+        for (SimulationSession session : sessionsById.values()) {
+            FactionPolicyRuntime.install(
+                    session,
+                    factionIdentityResolver,
+                    territorialControlRuntime.snapshots(),
+                    diplomacyRuntime.snapshots(),
+                    worldTick);
+        }
+        diplomacyRuntime.noteMarketAccessPolicyRefreshed(worldTick);
+    }
+
 }

@@ -46,7 +46,53 @@ public record WorldState(
         long nextFleetIdValue,
         List<FleetPlacementState> fleets,
         List<FleetJumpState> fleetJumps,
-        List<WorldFactionIdentityState> factionIdentities) {
+        List<WorldFactionIdentityState> factionIdentities,
+        List<FactionDiplomacyState> factionDiplomacyStates) {
+    /**
+     * Source-compatible pre-Stage-17E constructor with neutral explicit diplomacy.
+     *
+     * @param schemaVersion world schema version
+     * @param topology galaxy topology
+     * @param systems local simulation snapshots
+     * @param factions faction economic states
+     * @param factionStrategies faction strategic states
+     * @param nextConstructionProjectIdValue construction allocator watermark
+     * @param constructionProjects persistent construction projects
+     * @param factionEconomicPressures persistent economic-pressure states
+     * @param nextFleetIdValue fleet allocator watermark
+     * @param fleets fleet placements
+     * @param fleetJumps active jump states
+     * @param factionIdentities world-defined faction identities
+     */
+    public WorldState(
+            int schemaVersion,
+            GalaxyTopology topology,
+            List<StarSystemSimulationState> systems,
+            List<FactionEconomicState> factions,
+            List<FactionStrategicState> factionStrategies,
+            long nextConstructionProjectIdValue,
+            List<ConstructionProjectState> constructionProjects,
+            List<FactionEconomicPressureState> factionEconomicPressures,
+            long nextFleetIdValue,
+            List<FleetPlacementState> fleets,
+            List<FleetJumpState> fleetJumps,
+            List<WorldFactionIdentityState> factionIdentities) {
+        this(
+                schemaVersion,
+                topology,
+                systems,
+                factions,
+                factionStrategies,
+                nextConstructionProjectIdValue,
+                constructionProjects,
+                factionEconomicPressures,
+                nextFleetIdValue,
+                fleets,
+                fleetJumps,
+                factionIdentities,
+                neutralDiplomacy(factionStrategies));
+    }
+
     /** Текущая Stage-17 версия world-level persistent schema. */
     public static final int CURRENT_VERSION = 9;
     /** Stage-16 schema с external-owner construction settlement, без dynamic faction directory. */
@@ -276,6 +322,7 @@ public record WorldState(
         Objects.requireNonNull(fleets, "Fleet placement states WorldState не заданы");
         Objects.requireNonNull(fleetJumps, "Fleet jump states WorldState не заданы");
         Objects.requireNonNull(factionIdentities, "World faction identities WorldState не заданы");
+        Objects.requireNonNull(factionDiplomacyStates, "Faction diplomacy states WorldState not set");
         if (nextConstructionProjectIdValue <= 0L) {
             throw new IllegalArgumentException("Следующий ConstructionProjectId должен быть положительным");
         }
@@ -346,6 +393,47 @@ public record WorldState(
         }
         sortedStrategies.sort(Comparator.naturalOrder());
         factionStrategies = List.copyOf(sortedStrategies);
+
+        List<FactionDiplomacyState> sortedDiplomacy = new ArrayList<>(factionDiplomacyStates.size());
+        Set<String> diplomacyFactionIds = new HashSet<>();
+        Set<String> treatyIds = new HashSet<>();
+        for (FactionDiplomacyState diplomacy : factionDiplomacyStates) {
+            FactionDiplomacyState value = Objects.requireNonNull(diplomacy, "FactionDiplomacyState not set");
+            if (!strategicFactionIds.contains(value.factionContentId())) {
+                throw new IllegalArgumentException("Diplomacy state references unknown strategic faction: "
+                        + value.factionContentId());
+            }
+            if (!diplomacyFactionIds.add(value.factionContentId())) {
+                throw new IllegalArgumentException("Duplicate faction diplomacy state: " + value.factionContentId());
+            }
+            for (DiplomaticStandingState standing : value.standings()) {
+                requireDiplomaticTarget(strategicFactionIds, standing.targetFactionContentId());
+            }
+            for (DiplomaticGrievanceState grievance : value.grievances()) {
+                requireDiplomaticTarget(strategicFactionIds, grievance.targetFactionContentId());
+            }
+            for (DiplomaticTreatyState treaty : value.treaties()) {
+                requireDiplomaticTarget(strategicFactionIds, treaty.counterpartyFactionContentId());
+                if (!treatyIds.add(treaty.treatyId())) {
+                    throw new IllegalArgumentException("Duplicate world treaty ID: " + treaty.treatyId());
+                }
+                for (DiplomaticTreatyClauseState clause : treaty.clauses()) {
+                    if (clause.systemId() != null && topology.findSystem(clause.systemId()).isEmpty()) {
+                        throw new IllegalArgumentException("Treaty clause references unknown StarSystem: "
+                                + clause.systemId());
+                    }
+                }
+            }
+            for (DiplomaticEmbargoState embargo : value.embargoes()) {
+                requireDiplomaticTarget(strategicFactionIds, embargo.targetFactionContentId());
+            }
+            sortedDiplomacy.add(value);
+        }
+        if (!diplomacyFactionIds.equals(strategicFactionIds)) {
+            throw new IllegalArgumentException("Faction diplomacy states must exactly cover strategic factions");
+        }
+        sortedDiplomacy.sort(Comparator.naturalOrder());
+        factionDiplomacyStates = List.copyOf(sortedDiplomacy);
 
         List<WorldFactionIdentityState> sortedIdentities = new ArrayList<>(factionIdentities.size());
         Set<String> identityStableIds = new HashSet<>();
@@ -782,4 +870,22 @@ public record WorldState(
     private static String localFleetKey(StarSystemId systemId, long entityId) {
         return systemId.value() + ":" + entityId;
     }
+    private static List<FactionDiplomacyState> neutralDiplomacy(List<FactionStrategicState> strategies) {
+        Objects.requireNonNull(strategies, "Faction strategic states not set");
+        List<FactionDiplomacyState> result = new ArrayList<>(strategies.size());
+        for (FactionStrategicState strategy : strategies) {
+            result.add(FactionDiplomacyState.neutral(
+                    Objects.requireNonNull(strategy, "FactionStrategicState not set").factionContentId()));
+        }
+        result.sort(Comparator.naturalOrder());
+        return List.copyOf(result);
+    }
+
+    private static void requireDiplomaticTarget(Set<String> knownFactionIds, String targetFactionContentId) {
+        if (!knownFactionIds.contains(targetFactionContentId)) {
+            throw new IllegalArgumentException("Diplomacy state references unknown target faction: "
+                    + targetFactionContentId);
+        }
+    }
+
 }
