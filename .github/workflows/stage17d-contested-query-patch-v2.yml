@@ -1,0 +1,51 @@
+name: Stage17D Contested Query Patch V2
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Add contested query
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/main/java/com/spacesim/world/TerritorialControlRuntime.java')
+          text = path.read_text()
+          marker = '    TerritorialClaimState declareClaim('
+          method = '\n'.join([
+              '    boolean isContested(StarSystemId systemId) {',
+              '        StarSystemId system = requireSystem(systemId);',
+              '        for (FactionStrategicState strategy : strategies) {',
+              '            TerritorialClaimState claim = strategy.claimFor(system);',
+              '            if (claim != null && claim.status() == TerritorialClaimState.Status.CONTESTED) {',
+              '                return true;',
+              '            }',
+              '        }',
+              '        return false;',
+              '    }',
+              '',
+              ''
+          ])
+          if text.count(marker) != 1:
+              raise SystemExit('declareClaim marker mismatch')
+          path.write_text(text.replace(marker, method + marker, 1))
+      - name: Remove workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-contested-query-patch-v2.yml
+          git add src/main/java/com/spacesim/world/TerritorialControlRuntime.java
+          git commit -m "Expose contested territorial state"
+          git push origin HEAD:agent/stage17d-territorial-process
