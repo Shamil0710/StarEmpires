@@ -6,14 +6,13 @@ import java.util.Objects;
  * Shared Stage-17D legal authorization boundary for ordinary station construction.
  *
  * <p>The decision is independent from who pays for the project. A personally funded project may be
- * built on behalf of a faction, while a faction treasury project is normally built on behalf of
- * that same faction. This boundary therefore accepts the legal builder identity explicitly.
- * Relationship/market-access thresholds never grant construction rights.</p>
+ * authorized through a faction without necessarily becoming that faction's asset. Relationship and
+ * market-access thresholds never grant construction rights.</p>
  *
- * <p>Unfactioned private construction remains legal and politically neutral; it cannot create a
- * territorial claim or control. Factional construction is legal in unclaimed space, in the
- * faction's own territory, or under an explicit unexpired concession from the current controller.
- * Coercive/illegal construction is intentionally outside this ordinary path and belongs to Stage 18.</p>
+ * <p>Unfactioned private construction remains politically neutral. Factional construction is legal
+ * in ordinary unclaimed space, in the faction's own territory, or under an explicit unexpired
+ * concession from the current controller. Materially contested territory suspends this ordinary
+ * legal path; negotiated or coercive mechanisms belong to later diplomacy/warfare stages.</p>
  */
 public final class TerritorialConstructionAuthorization {
     private TerritorialConstructionAuthorization() {
@@ -24,12 +23,14 @@ public final class TerritorialConstructionAuthorization {
     public enum Reason {
         /** Unfactioned private project; it has no territorial political identity. */
         PRIVATE_UNAFFILIATED,
-        /** Factional construction in a system with no established controller. */
+        /** Factional construction in a system with no established controller or material dispute. */
         UNCLAIMED_FRONTIER,
         /** Factional construction inside the builder's own established territory. */
         DOMESTIC_CONTROL,
         /** Foreign faction construction explicitly authorized by the current controller. */
         EXPLICIT_CONCESSION,
+        /** Ordinary construction is suspended while material territorial claims are contested. */
+        CONTESTED_NO_ORDINARY_RIGHT,
         /** Foreign faction construction in controlled territory without an explicit right. */
         FOREIGN_CONTROL_NO_RIGHT
     }
@@ -63,17 +64,20 @@ public final class TerritorialConstructionAuthorization {
                     && controllingFactionContentId == null) {
                 throw new IllegalArgumentException("Controlled-territory decision requires a controller");
             }
-            if (allowed == (reason == Reason.FOREIGN_CONTROL_NO_RIGHT)) {
-                throw new IllegalArgumentException("Construction authorization allowed flag disagrees with reason");
+            boolean deniedReason = reason == Reason.FOREIGN_CONTROL_NO_RIGHT
+                    || reason == Reason.CONTESTED_NO_ORDINARY_RIGHT;
+            if (allowed == deniedReason) {
+                throw new IllegalArgumentException(
+                        "Construction authorization allowed flag disagrees with reason");
             }
         }
     }
 
     /**
-     * Evaluates ordinary legal construction using the current authoritative territorial state.
+     * Evaluates ordinary legal construction using current authoritative territorial state.
      *
      * @param world authoritative world
-     * @param legalBuilderFactionContentId faction represented by the project, or {@code null} for private unaffiliated construction
+     * @param authorizationFactionContentId faction whose territorial rights are exercised, or {@code null} for private unaffiliated construction
      * @param systemId target star system
      * @return immutable deterministic decision
      * @throws NullPointerException when world/system is missing
@@ -81,7 +85,7 @@ public final class TerritorialConstructionAuthorization {
      */
     public static Decision evaluate(
             WorldSimulation world,
-            String legalBuilderFactionContentId,
+            String authorizationFactionContentId,
             StarSystemId systemId) {
         WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation not set");
         StarSystemId system = Objects.requireNonNull(systemId, "Construction StarSystemId not set");
@@ -89,18 +93,18 @@ public final class TerritorialConstructionAuthorization {
             throw new IllegalArgumentException("Unknown construction StarSystem: " + system);
         }
 
-        if (legalBuilderFactionContentId == null) {
-            return new Decision(
-                    true,
-                    Reason.PRIVATE_UNAFFILIATED,
-                    checkedWorld.controllingFaction(system).orElse(null));
+        String controller = checkedWorld.controllingFaction(system).orElse(null);
+        if (checkedWorld.isTerritoriallyContested(system)) {
+            return new Decision(false, Reason.CONTESTED_NO_ORDINARY_RIGHT, controller);
         }
-        String builder = legalBuilderFactionContentId.strip();
+        if (authorizationFactionContentId == null) {
+            return new Decision(true, Reason.PRIVATE_UNAFFILIATED, controller);
+        }
+        String builder = authorizationFactionContentId.strip();
         if (builder.isEmpty() || checkedWorld.findFactionRuntimeId(builder).isEmpty()) {
-            throw new IllegalArgumentException("Unknown construction legal faction: " + builder);
+            throw new IllegalArgumentException("Unknown construction authorization faction: " + builder);
         }
 
-        String controller = checkedWorld.controllingFaction(system).orElse(null);
         if (controller == null) {
             return new Decision(true, Reason.UNCLAIMED_FRONTIER, null);
         }
