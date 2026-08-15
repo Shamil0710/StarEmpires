@@ -26,7 +26,9 @@ public record FactionStrategicGoalState(
         /** Военный спрос на вооружение/материалы/энергию. */
         MILITARY,
         /** Спрос расширения и optional physical Stage-11 expansion plan. */
-        EXPANSION
+        EXPANSION,
+        /** Автоматическая resilience надбавка, отдельная от base stock policy. */
+        RESILIENCE
     }
 
     /**

@@ -598,6 +598,85 @@ public final class WorldSimulation {
     }
 
     /**
+     * Returns the persistent automatic resilience stock-demand overlay for one faction.
+     *
+     * <p>Resilience demand is stored separately from operator-authored base stock policy.
+     * Multiple malformed resilience goals are defensively aggregated by item maximum; the
+     * update boundary canonicalizes them back to one goal.</p>
+     *
+     * @param factionContentId stable authored or world-defined faction ID
+     * @return canonical item-sorted resilience demand floors
+     */
+    public List<FactionStockPolicyState> findFactionResilienceDemandFloors(
+            String factionContentId) {
+        FactionStrategicState strategy = factionContentId == null
+                ? null
+                : territorialControlRuntime.find(factionContentId);
+        if (strategy == null) {
+            return List.of();
+        }
+        Map<String, Integer> floors = new java.util.TreeMap<>();
+        for (FactionStrategicGoalState goal : strategy.strategicGoals()) {
+            if (goal.type() != FactionStrategicGoalState.GoalType.RESILIENCE) {
+                continue;
+            }
+            for (FactionStockPolicyState floor : goal.demandFloors()) {
+                floors.merge(floor.itemContentId(), floor.targetStockFloor(), Math::max);
+            }
+        }
+        List<FactionStockPolicyState> result = new ArrayList<>(floors.size());
+        for (Map.Entry<String, Integer> floor : floors.entrySet()) {
+            result.add(new FactionStockPolicyState(floor.getKey(), floor.getValue()));
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Replaces only the automatic resilience stock-demand overlay.
+     *
+     * <p>Base stock policy and all non-resilience strategic goals are preserved. Item
+     * references are validated before mutation. An empty list removes the automatic
+     * overlay. This operation authors persistent demand only and does not change cargo,
+     * wallets, production output or physical market targets until ordinary strategic
+     * policy application is explicitly requested.</p>
+     *
+     * @param factionContentId stable authored or world-defined faction ID
+     * @param demandFloors canonical automatic resilience floors; empty removes overlay
+     * @return installed canonical resilience floors
+     */
+    public List<FactionStockPolicyState> updateFactionResilienceDemandFloors(
+            String factionContentId,
+            List<FactionStockPolicyState> demandFloors) {
+        String factionId = normalizedFactionId(factionContentId);
+        if (factionIdentityResolver.runtimeId(factionId).isEmpty()) {
+            throw new IllegalArgumentException("Unknown faction identity: " + factionId);
+        }
+        List<FactionStockPolicyState> checked = List.copyOf(Objects.requireNonNull(
+                demandFloors, "Faction resilience demand floors not set"));
+        FactionStrategicPolicyEngine.validatePolicy(
+                contentCatalog,
+                new FactionStockProductionPolicyState(checked, List.of()));
+        FactionStrategicState current = territorialControlRuntime.find(factionId);
+        if (current == null) {
+            throw new IllegalArgumentException("Faction has no strategic state: " + factionId);
+        }
+        List<FactionStrategicGoalState> goals = new ArrayList<>();
+        for (FactionStrategicGoalState goal : current.strategicGoals()) {
+            if (goal.type() != FactionStrategicGoalState.GoalType.RESILIENCE) {
+                goals.add(goal);
+            }
+        }
+        if (!checked.isEmpty()) {
+            goals.add(new FactionStrategicGoalState(
+                    "policy.resilience",
+                    FactionStrategicGoalState.GoalType.RESILIENCE,
+                    checked));
+        }
+        territorialControlRuntime.updateStrategicGoals(factionId, goals);
+        return findFactionResilienceDemandFloors(factionId);
+    }
+
+    /**
      * Applies the currently authored strategic stock/production policy to ordinary ECS configuration.
      *
      * <p>The executor only adjusts existing market target floors and production recipes. It does not

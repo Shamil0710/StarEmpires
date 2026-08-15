@@ -4,7 +4,7 @@
 
 Implementation slice for Stage 17F.6 policy feedback / anti-oscillation.
 
-This slice joins resilience-driven strategic stock review to the same persistent common review window already used by fiscal policy. It does **not** complete Stage 17F.6.
+This slice joins resilience-driven strategic stock review to the same persistent common review window already used by fiscal policy and upgrades the earlier upward-only guard to a separate reversible automatic demand overlay. It does **not** complete Stage 17F.6.
 
 ## Causal contract
 
@@ -13,101 +13,139 @@ physical stock / market targets / legal access / suppliers / topology
 → Stage-17E/17F.5 structural dependence diagnostics
 → FactionResiliencePlanner recommendation
 → common Stage-17F.6 cadence claim
-→ bounded stock-policy authoring step
+→ bounded automatic RESILIENCE overlay adjustment
 → explicit ordinary strategic-policy apply later
+→ effective market target recomputed from all current demand sources
 → market prices / traders / logistics react physically
 ```
 
-The reviewer does not create cargo, money, production output or market demand directly.
+The reviewer does not create cargo, money, production output or market demand directly. Authoring changes only persistent policy state until `applyFactionStrategicPolicy(...)` is explicitly invoked.
 
 ## Shared cadence
 
-`FactionPolicyReviewCoordinator` now builds both fiscal and stock/resilience plans before mutation.
+`FactionPolicyReviewCoordinator` builds both fiscal and stock/resilience plans before mutation.
 
 For each explicitly authorized autonomous faction:
 
 1. derive the doctrine-backed fiscal profile;
 2. build the read-only fiscal plan;
-3. build the read-only resilience stock plan;
+3. build the read-only resilience-overlay plan;
 4. test and claim the persistent common review window once;
-5. apply at most one bounded fiscal step and one bounded stock step inside that claim.
+5. apply at most one bounded fiscal step and one bounded resilience-overlay step inside that claim.
 
-Fiscal and stock reviewers therefore cannot consume independent review windows or oscillate according to caller order.
+Fiscal and resilience reviewers therefore cannot consume independent review windows or oscillate according to caller order.
 
-## Stock adjustment semantics
+## Separate automatic resilience overlay
 
-`FactionStockResilienceReviewProfile` currently defines:
+Automatic resilience demand is no longer written into the common operator/player/AI base `FactionStockProductionPolicyState.stockPolicies()`.
 
-- a small absolute deadband in units;
-- a maximum upward stock-floor change per review.
-
-A resilience recommendation above the current persistent stock floor changes the floor only when the delta exceeds the deadband, and then by no more than one bounded step.
-
-Production-policy choices are preserved exactly.
-
-## Why downward adjustment is blocked for now
-
-Automatic stock-floor reduction is deliberately **not** implemented in this slice.
-
-The current economic core has two provenance gaps:
-
-1. `FactionStockProductionPolicyState.stockPolicies()` does not distinguish an operator-authored/base strategic floor from a temporary resilience contribution.
-2. `FactionStrategicPolicyEngine` applies demand to `MarketComponent.targetStock` by taking a maximum. `MarketComponent` stores only one mutable target value and does not retain a separate configured baseline or policy contribution.
-
-Therefore simply lowering the persistent faction stock floor would not reliably lower physical market demand, and it could also overwrite an intentional player/AI base reserve.
-
-When the current floor is materially above the newly recommended resilience target, the reviewer reports `blockedDecreaseItemCount` and preserves the existing floor.
-
-This is an explicit correctness guard, not a completed recovery path.
-
-## Required follow-up prerequisite
-
-Before bounded downward recovery is enabled, market target provenance must become reversible and persistent. The intended invariant is conceptually:
+It is stored as one canonical persistent strategic goal:
 
 ```text
-effective market target
+goalId = policy.resilience
+type   = RESILIENCE
+demandFloors = item-sorted automatic stock-demand contribution
+```
+
+`WorldSimulation.findFactionResilienceDemandFloors(...)` reads the contribution. `updateFactionResilienceDemandFloors(...)` replaces only this contribution while preserving:
+
+- base faction stock policy;
+- production preferences;
+- military goals;
+- expansion goals;
+- doctrine, relations, claims and other strategic state.
+
+An empty resilience list removes the automatic goal. Content references are validated before mutation.
+
+## Symmetric bounded adjustment
+
+`FactionStockResilienceReviewProfile` defines:
+
+- an absolute deadband in units;
+- a maximum upward overlay step per review;
+- a maximum downward overlay step per review.
+
+The conservative default is:
+
+```text
+deadband = 2 units
+max increase = 10 units / review
+max decrease = 5 units / review
+```
+
+A nonzero recommendation inside the deadband is held stable. When Stage-17F.5 diagnostics no longer contain an item at all, its target is interpreted as exactly zero; the overlay is then reduced by bounded steps until it is fully removed. Exact zero is allowed to cross the deadband so a stale automatic demand tail cannot survive indefinitely.
+
+Base stock policy is never modified by this automatic reviewer.
+
+## Reversible physical market demand
+
+PR #128 added persistent market-demand provenance:
+
+```text
+configuredTargetStock = station-configured baseline
+targetStock           = current effective target
+```
+
+`FactionStrategicPolicyEngine` now recomputes physical demand on explicit apply as:
+
+```text
+effective target
 = max(
     configured station baseline,
     base faction stock policy,
-    active strategic-goal / resilience contribution
+    automatic resilience overlay,
+    other active strategic goals
   )
 ```
 
-The implementation may use an equivalent source-attribution model, but it must satisfy all of the following:
+Therefore reducing or removing the resilience overlay can physically lower market demand without erasing the station baseline, an intentional base reserve, or another military/expansion demand source.
 
-- base/configured station demand remains distinguishable from policy demand;
-- player-authored base stock policy remains distinguishable from automatic resilience overlay;
-- removing/reducing one contribution cannot erase another;
-- save/load preserves the attribution required for deterministic continuation;
-- old saves migrate conservatively and never silently reduce an existing physical target;
-- applying/removing policy still creates no goods or money;
-- ordinary Market/TradeAI/logistics remain responsible for the physical consequence.
+## Persistence
 
-Only after this prerequisite exists should Stage 17F.6 add bounded downward resilience recovery.
+The resilience overlay uses the existing persistent `FactionStrategicGoalState` collection. `RESILIENCE` is a new goal type and survives ordinary `WorldStateCodec` save/load without a separate world-state source of truth.
 
-## Acceptance in this slice
+Market baseline/effective provenance is separately persistent through local `GameState` schema v3 introduced by PR #128. Older v1/v2 saves migrate conservatively: their old effective target becomes the configured baseline, so migration cannot silently reduce historical demand.
+
+## Acceptance
 
 `FactionStockResiliencePolicyReviewerTest` verifies:
 
-- an upward recommendation moves by at most one configured step;
-- a small delta inside the deadband is stable;
-- production policy is preserved;
-- a lower recommendation is reported as blocked and never auto-applied without provenance.
+- bounded upward adjustment;
+- bounded downward adjustment;
+- nonzero deadband stability;
+- disappeared risk releasing an overlay fully to zero across bounded reviews.
 
-`Stage17F6StockResilienceCoordinatorAcceptanceTest` verifies on a live physical dependence scenario that:
+`Stage17F6ResilienceOverlayAcceptanceTest` verifies:
 
-- the first due common review claims exactly one window;
-- resilience raises the stock policy by only one bounded step;
-- fiscal and stock review share the same persistent claim;
-- policy authoring does not change inventory, entity wallets, treasury, production policy or physical market targets;
-- a repeated call in the same window claims nothing and cannot apply a second stock step.
+- the automatic overlay is independent from base stock policy;
+- one canonical `policy.resilience` goal is installed;
+- invalid item references are rejected before mutation;
+- military/other goals survive overlay replacement and removal;
+- base policy and overlay survive `WorldStateCodec` save/load independently.
+
+`Stage17F6StockResilienceCoordinatorAcceptanceTest` verifies a live physical cycle:
+
+```text
+supplier/dependency shock
+→ first due common review
+→ resilience overlay increases by one bounded step
+→ same-window retry cannot apply a second step
+→ explicit strategic-policy apply raises physical target
+→ risk is physically removed
+→ later common review lowers only the automatic overlay
+→ explicit apply falls back to the independent base stock floor
+→ later review removes the overlay entirely
+→ base stock floor remains active
+```
+
+Around review authoring, inventory, entity wallets, treasury and physical market targets remain unchanged. Physical target changes occur only at the explicit ordinary strategic-policy apply boundary.
 
 ## Remaining Stage 17F.6 work
 
 After this slice:
 
-1. add reversible persistent market-policy provenance;
-2. enable bounded downward stock recovery through that provenance-safe path;
-3. review whether production-policy switching needs an equivalent dwell/deadband rule;
-4. run an aggregate long-horizon anti-oscillation acceptance covering fiscal + stock/resilience decisions across repeated shocks and recoveries;
-5. only then mark Stage 17F.6 complete and proceed to Stage 17F.7 player/AI parity.
+1. review production-policy switching and add dwell/deadband semantics if automatic recipe selection can oscillate;
+2. run a long-horizon aggregate anti-oscillation acceptance covering repeated fiscal and resilience shocks/recoveries across save/load continuation;
+3. verify deterministic policy decisions for identical state and explicit autonomous-faction sets;
+4. update the canonical roadmap / completion record only after the aggregate gate is green;
+5. then proceed to Stage 17F.7 player/AI parity.
