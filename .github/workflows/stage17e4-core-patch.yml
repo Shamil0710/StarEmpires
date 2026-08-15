@@ -1,0 +1,85 @@
+name: Stage 17E.4 core patch
+
+on:
+  push:
+    branches:
+      - agent/stage17e-customs-tariffs
+    paths:
+      - .github/workflows/stage17e4-core-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17e-customs-tariffs
+      - name: Apply customs persistence patches
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: expected one anchor, found {text.count(old)}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          path = 'src/main/java/com/spacesim/world/FactionDiplomacyState.java'
+          replace_once(path,
+              ' * @param embargoes unilateral embargoes imposed by this faction\n */\npublic record FactionDiplomacyState(\n        String factionContentId,\n        List<DiplomaticStandingState> standings,\n        List<DiplomaticGrievanceState> grievances,\n        List<DiplomaticTreatyState> treaties,\n        List<DiplomaticEmbargoState> embargoes) implements Comparable<FactionDiplomacyState> {',
+              ' * @param embargoes unilateral embargoes imposed by this faction\n * @param customsTariffBasisPoints ordinary foreign transaction/customs tariff in basis points\n */\npublic record FactionDiplomacyState(\n        String factionContentId,\n        List<DiplomaticStandingState> standings,\n        List<DiplomaticGrievanceState> grievances,\n        List<DiplomaticTreatyState> treaties,\n        List<DiplomaticEmbargoState> embargoes,\n        int customsTariffBasisPoints) implements Comparable<FactionDiplomacyState> {',
+              'diplomacy record tail')
+          replace_once(path,
+              '    /**\n     * Creates an empty neutral diplomacy aggregate for one faction.',
+              '    /**\n     * Source-compatible pre-Stage-17E.4 constructor with zero transaction tariff.\n     *\n     * @param factionContentId owner faction stable ID\n     * @param standings directed trust/credibility assessments\n     * @param grievances explicit directed grievances\n     * @param treaties treaty directory entries originated by this faction\n     * @param embargoes unilateral embargoes imposed by this faction\n     */\n    public FactionDiplomacyState(\n            String factionContentId,\n            List<DiplomaticStandingState> standings,\n            List<DiplomaticGrievanceState> grievances,\n            List<DiplomaticTreatyState> treaties,\n            List<DiplomaticEmbargoState> embargoes) {\n        this(factionContentId, standings, grievances, treaties, embargoes, 0);\n    }\n\n    /**\n     * Creates an empty neutral diplomacy aggregate for one faction.',
+              'diplomacy compatibility ctor')
+          replace_once(path,
+              '     * @param embargoes unilateral embargoes imposed by this faction\n     */\n    public FactionDiplomacyState {',
+              '     * @param embargoes unilateral embargoes imposed by this faction\n     * @param customsTariffBasisPoints ordinary foreign transaction/customs tariff, 0..10000 bps\n     */\n    public FactionDiplomacyState {',
+              'compact javadoc')
+          replace_once(path,
+              '        Objects.requireNonNull(embargoes, "Diplomatic embargoes not set");\n',
+              '        Objects.requireNonNull(embargoes, "Diplomatic embargoes not set");\n        if (customsTariffBasisPoints < 0 || customsTariffBasisPoints > 10_000) {\n            throw new IllegalArgumentException("Customs tariff must be in range 0..10000 bps");\n        }\n',
+              'customs validation')
+
+          replace_once(
+              'src/main/java/com/spacesim/world/FactionDiplomacyRuntime.java',
+              '        return new FactionDiplomacyState(\n                state.factionContentId(), standings, grievances, treaties, embargoes);',
+              '        return new FactionDiplomacyState(\n                state.factionContentId(), standings, grievances, treaties, embargoes,\n                state.customsTariffBasisPoints());',
+              'diplomacy copy preserves customs')
+
+          path = 'src/main/java/com/spacesim/persistence/WorldStateCodec.java'
+          replace_once(path,
+              ' * Stage-17E institutional diplomacy. v1-v3 детерминированно мигрируют в neutral explicit\n * diplomacy без выдуманных treaties, grievances или embargoes. Local entity payload',
+              ' * Stage-17E institutional diplomacy, а v5 — отдельную transaction/customs tariff policy.\n * v1-v3 детерминированно мигрируют в neutral explicit diplomacy без выдуманных treaties,\n * grievances или embargoes; v1-v4 получают нулевой customs tariff. Local entity payload',
+              'codec javadoc')
+          replace_once(path,
+              '    private static final int TERRITORY_FILE_FORMAT_VERSION = 3;\n    private static final int FILE_FORMAT_VERSION = 4;',
+              '    private static final int TERRITORY_FILE_FORMAT_VERSION = 3;\n    private static final int DIPLOMACY_FILE_FORMAT_VERSION = 4;\n    private static final int FILE_FORMAT_VERSION = 5;',
+              'codec versions')
+          replace_once(path,
+              '                WorldDiplomacyBinary.write(output, checked.factionDiplomacyStates());\n',
+              '                WorldDiplomacyBinary.write(output, checked.factionDiplomacyStates());\n                WorldCustomsBinary.write(output, checked.factionDiplomacyStates());\n',
+              'codec customs write')
+          replace_once(path,
+              '            if (fileVersion != FILE_FORMAT_VERSION\n                    && fileVersion != TERRITORY_FILE_FORMAT_VERSION',
+              '            if (fileVersion != FILE_FORMAT_VERSION\n                    && fileVersion != DIPLOMACY_FILE_FORMAT_VERSION\n                    && fileVersion != TERRITORY_FILE_FORMAT_VERSION',
+              'codec accept v4')
+          replace_once(path,
+              '            if (fileVersion >= FILE_FORMAT_VERSION) {\n                state = withDiplomacy(state, WorldDiplomacyBinary.read(input));\n            }\n',
+              '            if (fileVersion >= DIPLOMACY_FILE_FORMAT_VERSION) {\n                state = withDiplomacy(state, WorldDiplomacyBinary.read(input));\n            }\n            if (fileVersion >= FILE_FORMAT_VERSION) {\n                state = withDiplomacy(\n                        state,\n                        WorldCustomsBinary.readAndAttach(input, state.factionDiplomacyStates()));\n            }\n',
+              'codec customs read')
+          PY
+      - name: Remove applicator and commit
+        run: |
+          rm .github/workflows/stage17e4-core-patch.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/FactionDiplomacyState.java src/main/java/com/spacesim/world/FactionDiplomacyRuntime.java src/main/java/com/spacesim/persistence/WorldStateCodec.java .github/workflows/stage17e4-core-patch.yml
+          git commit -m "Stage 17E.4: persist customs tariff rates"
+          git push
