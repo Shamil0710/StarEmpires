@@ -1,0 +1,338 @@
+from pathlib import Path
+
+
+def replace_once(path, old, new):
+    target = Path(path)
+    text = target.read_text()
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"Expected exactly one anchor in {path}, found {count}")
+    target.write_text(text.replace(old, new, 1))
+
+
+Path("src/main/java/com/spacesim/world/FactionDoctrineState.java").write_text("""package com.spacesim.world;
+
+/**
+ * Persistent bounded institutional preferences of one faction.
+ *
+ * <p>Doctrine changes how shared strategic/diplomatic evaluators weigh observed choices. It never
+ * grants money, cargo, production output, combat power or legal rights by itself. Each axis uses the
+ * common {@code [0,100]} scale so authored AI factions and a player-created faction share the same
+ * representation.</p>
+ *
+ * @param tradeOpenness willingness to prefer external trade and market integration
+ * @param securityPosture priority given to security exposure and strategic risk
+ * @param expansionPreference willingness to pursue territorial/infrastructure expansion
+ * @param sovereigntySensitivity aversion to foreign jurisdiction, claims and concessions
+ * @param treatyLegalism importance assigned to trust, credibility and contractual continuity
+ * @param interventionism willingness to bear costs for external security commitments
+ * @param economicResiliencePriority willingness to pay for diversification and lower dependency
+ */
+public record FactionDoctrineState(
+        int tradeOpenness,
+        int securityPosture,
+        int expansionPreference,
+        int sovereigntySensitivity,
+        int treatyLegalism,
+        int interventionism,
+        int economicResiliencePriority) {
+    private static final int NEUTRAL_AXIS = 50;
+
+    /**
+     * Validates every institutional preference against the common bounded scale.
+     *
+     * @param tradeOpenness willingness to prefer external trade and market integration
+     * @param securityPosture priority given to security exposure and strategic risk
+     * @param expansionPreference willingness to pursue territorial/infrastructure expansion
+     * @param sovereigntySensitivity aversion to foreign jurisdiction, claims and concessions
+     * @param treatyLegalism importance assigned to trust, credibility and contractual continuity
+     * @param interventionism willingness to bear costs for external security commitments
+     * @param economicResiliencePriority willingness to pay for diversification and lower dependency
+     */
+    public FactionDoctrineState {
+        requireAxis(tradeOpenness, "Trade openness");
+        requireAxis(securityPosture, "Security posture");
+        requireAxis(expansionPreference, "Expansion preference");
+        requireAxis(sovereigntySensitivity, "Sovereignty sensitivity");
+        requireAxis(treatyLegalism, "Treaty legalism");
+        requireAxis(interventionism, "Interventionism");
+        requireAxis(economicResiliencePriority, "Economic resilience priority");
+    }
+
+    /**
+     * Returns the migration/default doctrine with no directional institutional preference.
+     *
+     * @return immutable profile with all seven axes at the midpoint value 50
+     */
+    public static FactionDoctrineState neutral() {
+        return new FactionDoctrineState(
+                NEUTRAL_AXIS,
+                NEUTRAL_AXIS,
+                NEUTRAL_AXIS,
+                NEUTRAL_AXIS,
+                NEUTRAL_AXIS,
+                NEUTRAL_AXIS,
+                NEUTRAL_AXIS);
+    }
+
+    private static void requireAxis(int value, String label) {
+        if (value < 0 || value > 100) {
+            throw new IllegalArgumentException(label + " must be in [0,100]");
+        }
+    }
+}
+""")
+
+Path("src/main/java/com/spacesim/world/FactionDoctrineDecisionPolicy.java").write_text("""package com.spacesim.world;
+
+import java.util.Objects;
+
+/**
+ * Deterministic conversion from persistent institutional doctrine to common decision weights.
+ *
+ * <p>The conversion only changes priorities used by an evaluator. It is deliberately incapable of
+ * changing wallets, inventories, production, combat statistics, territorial control or legal
+ * access. Stage 21 may tune these baseline integer mappings without changing the persistence
+ * contract.</p>
+ */
+public final class FactionDoctrineDecisionPolicy {
+    private static final long MILLI_CREDITS_PER_ECONOMIC_POINT = 1_000L;
+    private static final long INFORMATION_DECAY_TICKS = 3_600L;
+    private static final int MINIMUM_DECISION_CONFIDENCE_BASIS_POINTS = 5_000;
+    private static final int ACCEPT_UTILITY_THRESHOLD = 20;
+    private static final int REJECT_UTILITY_THRESHOLD = -20;
+
+    private FactionDoctrineDecisionPolicy() {
+        throw new AssertionError("Utility class");
+    }
+
+    /**
+     * Builds the Stage-17F baseline diplomatic policy from one persistent doctrine profile.
+     *
+     * <p>Trade openness raises the value placed on economic benefit and lowers dependency aversion;
+     * resilience priority raises dependency aversion; security, sovereignty and legalism weight the
+     * matching diagnostic/history components. Expansion preference and interventionism intentionally
+     * remain persisted but are not forced into ordinary treaty scoring before their dedicated
+     * expansion/security evaluators consume them.</p>
+     *
+     * @param doctrine persistent faction doctrine
+     * @return deterministic common treaty-evaluation policy
+     */
+    public static DiplomaticDecisionDoctrine diplomatic(FactionDoctrineState doctrine) {
+        FactionDoctrineState value = Objects.requireNonNull(doctrine, "Faction doctrine not set");
+        int economicWeight = 25 + scale(value.tradeOpenness(), 75);
+        int dependencyWeight = Math.min(
+                100,
+                20
+                        + scale(value.economicResiliencePriority(), 55)
+                        + scale(100 - value.tradeOpenness(), 25));
+        int securityWeight = 25 + scale(value.securityPosture(), 75);
+        int sovereigntyWeight = 25 + scale(value.sovereigntySensitivity(), 75);
+        int trustWeight = 20 + scale(value.treatyLegalism(), 80);
+        int credibilityWeight = 30 + scale(value.treatyLegalism(), 70);
+        int fiscalWeight = 60;
+        return new DiplomaticDecisionDoctrine(
+                economicWeight,
+                dependencyWeight,
+                securityWeight,
+                sovereigntyWeight,
+                trustWeight,
+                credibilityWeight,
+                fiscalWeight,
+                MILLI_CREDITS_PER_ECONOMIC_POINT,
+                INFORMATION_DECAY_TICKS,
+                MINIMUM_DECISION_CONFIDENCE_BASIS_POINTS,
+                ACCEPT_UTILITY_THRESHOLD,
+                REJECT_UTILITY_THRESHOLD);
+    }
+
+    private static int scale(int axis, int range) {
+        return (axis * range) / 100;
+    }
+}
+""")
+
+Path("src/main/java/com/spacesim/persistence/WorldDoctrineBinary.java").write_text("""package com.spacesim.persistence;
+
+import com.spacesim.world.FactionDoctrineState;
+import com.spacesim.world.FactionStrategicState;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Stage-17F.1 bounded file-format trailer for persistent faction doctrine profiles. */
+final class WorldDoctrineBinary {
+    private static final int MAX_FACTIONS = 10_000;
+
+    private WorldDoctrineBinary() {
+        throw new AssertionError("Utility class");
+    }
+
+    static void write(DataOutputStream out, List<FactionStrategicState> strategies) throws IOException {
+        WorldIoSupport.writeCount(out, strategies.size(), MAX_FACTIONS, "doctrineFactions");
+        for (FactionStrategicState strategy : strategies) {
+            WorldIoSupport.writeString(out, strategy.factionContentId());
+            FactionDoctrineState doctrine = strategy.doctrine();
+            out.writeInt(doctrine.tradeOpenness());
+            out.writeInt(doctrine.securityPosture());
+            out.writeInt(doctrine.expansionPreference());
+            out.writeInt(doctrine.sovereigntySensitivity());
+            out.writeInt(doctrine.treatyLegalism());
+            out.writeInt(doctrine.interventionism());
+            out.writeInt(doctrine.economicResiliencePriority());
+        }
+    }
+
+    static List<FactionStrategicState> readAndAttach(
+            DataInputStream in,
+            List<FactionStrategicState> strategies) throws IOException {
+        int count = WorldIoSupport.readCount(in, MAX_FACTIONS, "doctrineFactions");
+        Map<String, FactionDoctrineState> profiles = new HashMap<>();
+        for (int index = 0; index < count; index++) {
+            String factionId = WorldIoSupport.readString(in);
+            FactionDoctrineState doctrine = new FactionDoctrineState(
+                    in.readInt(),
+                    in.readInt(),
+                    in.readInt(),
+                    in.readInt(),
+                    in.readInt(),
+                    in.readInt(),
+                    in.readInt());
+            if (profiles.putIfAbsent(factionId, doctrine) != null) {
+                throw new IllegalArgumentException("Duplicate doctrine faction trailer: " + factionId);
+            }
+        }
+        if (profiles.size() != strategies.size()) {
+            throw new IllegalArgumentException("Doctrine trailer does not cover every faction strategy");
+        }
+        List<FactionStrategicState> result = new ArrayList<>(strategies.size());
+        for (FactionStrategicState strategy : strategies) {
+            FactionDoctrineState doctrine = profiles.remove(strategy.factionContentId());
+            if (doctrine == null) {
+                throw new IllegalArgumentException(
+                        "Doctrine trailer missing faction strategy: " + strategy.factionContentId());
+            }
+            result.add(new FactionStrategicState(
+                    strategy.factionContentId(),
+                    strategy.minimumMarketAccessRelation(),
+                    strategy.relations(),
+                    strategy.controlledSystems(),
+                    strategy.stationTaxBasisPoints(),
+                    strategy.foreignTerritoryTariffBasisPoints(),
+                    strategy.stockPolicies(),
+                    strategy.productionPolicies(),
+                    strategy.strategicGoals(),
+                    strategy.territorialClaims(),
+                    strategy.territorialControlStates(),
+                    strategy.territorialRecognitions(),
+                    strategy.constructionRightsGranted(),
+                    doctrine));
+        }
+        if (!profiles.isEmpty()) {
+            throw new IllegalArgumentException("Doctrine trailer references unknown factions");
+        }
+        result.sort(null);
+        return List.copyOf(result);
+    }
+}
+""")
+
+strategic = "src/main/java/com/spacesim/world/FactionStrategicState.java"
+replace_once(
+    strategic,
+    " * @param constructionRightsGranted explicit foreign construction concessions granted by this faction\n */",
+    " * @param constructionRightsGranted explicit foreign construction concessions granted by this faction\n * @param doctrine persistent institutional decision preferences; never a direct performance modifier\n */",
+)
+replace_once(
+    strategic,
+    "        List<TerritorialRecognitionState> territorialRecognitions,\n        List<TerritorialConstructionRightState> constructionRightsGranted)\n        implements Comparable<FactionStrategicState> {",
+    "        List<TerritorialRecognitionState> territorialRecognitions,\n        List<TerritorialConstructionRightState> constructionRightsGranted,\n        FactionDoctrineState doctrine)\n        implements Comparable<FactionStrategicState> {",
+)
+replace_once(
+    strategic,
+    "                legacyControlStates(controlledSystems),\n                List.of(),\n                List.of());",
+    "                legacyControlStates(controlledSystems),\n                List.of(),\n                List.of(),\n                FactionDoctrineState.neutral());",
+)
+replace_once(
+    strategic,
+    "     * @param constructionRightsGranted foreign construction concessions granted by this faction\n     */",
+    "     * @param constructionRightsGranted foreign construction concessions granted by this faction\n     * @param doctrine persistent institutional decision preferences\n     */",
+)
+replace_once(
+    strategic,
+    '        Objects.requireNonNull(constructionRightsGranted, "Construction rights not set");\n',
+    '        Objects.requireNonNull(constructionRightsGranted, "Construction rights not set");\n        Objects.requireNonNull(doctrine, "Faction doctrine not set");\n',
+)
+
+codec = "src/main/java/com/spacesim/persistence/WorldStateCodec.java"
+replace_once(
+    codec,
+    " * Stage-17E institutional diplomacy, а v5 — отдельную transaction/customs tariff policy.\n * v1-v3 детерминированно мигрируют в neutral explicit diplomacy без выдуманных treaties,\n * grievances или embargoes; v1-v4 получают нулевой customs tariff. Local entity payload",
+    " * Stage-17E institutional diplomacy, v5 — отдельную transaction/customs tariff policy, а v6 —\n * Stage-17F persistent institutional doctrine profiles. v1-v3 детерминированно мигрируют в\n * neutral explicit diplomacy без выдуманных treaties, grievances или embargoes; v1-v4 получают\n * нулевой customs tariff, а v1-v5 — neutral doctrine с midpoint 50 по каждой оси. Local entity payload",
+)
+replace_once(
+    codec,
+    "    private static final int DIPLOMACY_FILE_FORMAT_VERSION = 4;\n    private static final int FILE_FORMAT_VERSION = 5;",
+    "    private static final int DIPLOMACY_FILE_FORMAT_VERSION = 4;\n    private static final int CUSTOMS_FILE_FORMAT_VERSION = 5;\n    private static final int FILE_FORMAT_VERSION = 6;",
+)
+replace_once(
+    codec,
+    "                WorldDiplomacyBinary.write(output, checked.factionDiplomacyStates());\n                WorldCustomsBinary.write(output, checked.factionDiplomacyStates());",
+    "                WorldDiplomacyBinary.write(output, checked.factionDiplomacyStates());\n                WorldCustomsBinary.write(output, checked.factionDiplomacyStates());\n                WorldDoctrineBinary.write(output, checked.factionStrategies());",
+)
+replace_once(
+    codec,
+    "            if (fileVersion != FILE_FORMAT_VERSION\n                    && fileVersion != DIPLOMACY_FILE_FORMAT_VERSION",
+    "            if (fileVersion != FILE_FORMAT_VERSION\n                    && fileVersion != CUSTOMS_FILE_FORMAT_VERSION\n                    && fileVersion != DIPLOMACY_FILE_FORMAT_VERSION",
+)
+replace_once(
+    codec,
+    "            if (fileVersion >= FILE_FORMAT_VERSION) {\n                state = withDiplomacy(\n                        state,\n                        WorldCustomsBinary.readAndAttach(input, state.factionDiplomacyStates()));\n            }\n\n            if (input.read() != -1) {",
+    "            if (fileVersion >= CUSTOMS_FILE_FORMAT_VERSION) {\n                state = withDiplomacy(\n                        state,\n                        WorldCustomsBinary.readAndAttach(input, state.factionDiplomacyStates()));\n            }\n            if (fileVersion >= FILE_FORMAT_VERSION) {\n                state = withStrategies(\n                        state,\n                        WorldDoctrineBinary.readAndAttach(input, state.factionStrategies()));\n            }\n\n            if (input.read() != -1) {",
+)
+
+evaluator = "src/main/java/com/spacesim/world/DiplomaticTreatyEvaluator.java"
+anchor = """    /**
+     * Evaluates one incoming persistent treaty proposal for its receiving counterparty.
+     *
+     * @param world authoritative world containing the proposal and directed diplomacy
+     * @param treatyId globally unique proposed treaty ID
+     * @param evaluatingFactionContentId receiving faction making the decision
+     * @param doctrine deterministic decision weights and thresholds
+"""
+overload = """    /**
+     * Evaluates one incoming proposal using the receiving faction's persistent Stage-17F doctrine.
+     *
+     * <p>This is the ordinary player/AI policy path. The doctrine changes only evaluator weights;
+     * world capabilities and physical state remain untouched.</p>
+     *
+     * @param world authoritative world containing the proposal and strategic doctrine
+     * @param treatyId globally unique proposed treaty ID
+     * @param evaluatingFactionContentId receiving faction making the decision
+     * @param inputs observed/estimated economic-security diagnostics
+     * @return explainable deterministic recommendation and component utilities
+     */
+    public static DiplomaticTreatyEvaluation evaluate(
+            WorldSimulation world,
+            String treatyId,
+            String evaluatingFactionContentId,
+            DiplomaticTreatyEvaluationInputs inputs) {
+        WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation not set");
+        String evaluatorId = requireId(evaluatingFactionContentId, "Evaluating faction ID");
+        FactionStrategicState strategy = checkedWorld.findFactionStrategicState(evaluatorId).orElseThrow(
+                () -> new IllegalArgumentException("Evaluating faction has no strategic state: " + evaluatorId));
+        return evaluate(
+                checkedWorld,
+                treatyId,
+                evaluatorId,
+                FactionDoctrineDecisionPolicy.diplomatic(strategy.doctrine()),
+                inputs);
+    }
+
+""" + anchor
+replace_once(evaluator, anchor, overload)
