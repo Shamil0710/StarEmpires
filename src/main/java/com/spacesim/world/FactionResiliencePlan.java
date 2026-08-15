@@ -24,7 +24,15 @@ public record FactionResiliencePlan(
         int ownedMarketStations,
         List<FactionResilienceItemDecision> items) {
 
-    /** Validates and canonicalizes one immutable resilience plan. */
+    /**
+     * Validates and canonicalizes one immutable resilience plan.
+     *
+     * @param factionContentId stable faction ID
+     * @param observationTick authoritative observation tick
+     * @param economicResiliencePriority doctrine resilience priority in range 0..100
+     * @param ownedMarketStations completed owned markets used for per-market recommendations
+     * @param items item-level resilience decisions
+     */
     public FactionResiliencePlan {
         factionContentId = Objects.requireNonNull(factionContentId, "Faction content ID not set").strip();
         if (factionContentId.isEmpty()) {
