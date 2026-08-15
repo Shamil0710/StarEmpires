@@ -1,8 +1,8 @@
 # Stage 17F.5 — resilience policy completion record
 
-**Статус:** aggregate acceptance candidate  
+**Статус:** COMPLETE — final aggregate gate PR #121  
 **Implementation PRs:** #115–#120  
-**Следующий roadmap slice после aggregate gate:** Stage 17F.6 policy feedback / anti-oscillation
+**Следующий roadmap slice:** Stage 17F.6 policy feedback / anti-oscillation
 
 ## Цель
 
