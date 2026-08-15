@@ -1,0 +1,77 @@
+name: Stage17D Player Asset Affiliation
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Patch player construction identity
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/main/java/com/spacesim/player/PlayerConstructionService.java')
+          text = path.read_text()
+          start = text.index('        ConstructionProjectId projectId = runtime.world().createConstructionProject(')
+          end = text.index('            List<ConstructionProjectId> ownedProjects', start)
+          section = '\n'.join([
+              '        String assetFactionId = playerAssetFactionId(current);',
+              '        ConstructionProjectId projectId = runtime.world().createConstructionProject(',
+              '                null,',
+              '                current.factionContentId(),',
+              '                assetFactionId,',
+              '                archetypeId,',
+              '                placement.systemId(),',
+              '                x,',
+              '                y);',
+              '        try {',
+              '            ConstructionProjectState state = runtime.world().findConstructionProject(projectId).orElseThrow();',
+              '            requireExternalContract(state);',
+              '            if (!Objects.equals(assetFactionId, state.legalFactionContentId())) {',
+              '                throw new IllegalStateException(',
+              '                        "Player construction asset faction differs from expected affiliation");',
+              '            }',
+              ''
+          ])
+          text = text[:start] + section + text[end:]
+          marker = '    private ContentCatalog.StationArchetypeDefinition requireConstructible(String value) {'
+          helper = '\n'.join([
+              '    private String playerAssetFactionId(PlayerState player) {',
+              '        String affiliation = player.factionContentId();',
+              '        if (affiliation == null) {',
+              '            return null;',
+              '        }',
+              '        for (com.spacesim.world.WorldFactionIdentityState identity',
+              '                : runtime.world().getWorldFactionIdentities()) {',
+              '            if (identity.origin() == com.spacesim.world.WorldFactionIdentityState.Origin.PLAYER_CREATED',
+              '                    && identity.stableFactionId().equals(affiliation)) {',
+              '                return affiliation;',
+              '            }',
+              '        }',
+              '        return null;',
+              '    }',
+              '',
+              ''
+          ])
+          if text.count(marker) != 1:
+              raise SystemExit('requireConstructible marker mismatch')
+          path.write_text(text.replace(marker, helper + marker, 1))
+      - name: Remove workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-player-asset-affiliation.yml
+          git add src/main/java/com/spacesim/player/PlayerConstructionService.java
+          git commit -m "Separate player construction rights from asset faction"
+          git push origin HEAD:agent/stage17d-territorial-process
