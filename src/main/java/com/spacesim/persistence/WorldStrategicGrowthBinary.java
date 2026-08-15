@@ -182,6 +182,10 @@ final class WorldStrategicGrowthBinary {
                 state.foreignTerritoryTariffBasisPoints(),
                 state.stockPolicies(),
                 state.productionPolicies(),
-                goals);
+                goals,
+                state.territorialClaims(),
+                state.territorialControlStates(),
+                state.territorialRecognitions(),
+                state.constructionRightsGranted());
     }
 }
