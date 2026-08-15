@@ -28,12 +28,11 @@ jobs:
       - name: Test, check coverage, build Javadoc and package desktop JAR
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
 
-      # Artifact storage is a publication convenience, not a correctness gate. The mandatory
-      # Maven verify step above already fails the job on tests, JaCoCo, strict Javadoc or package
-      # errors. Do not let temporary GitHub artifact-storage failures turn a green verification
-      # into a false code regression.
+      # Artifact publication is deliberately restricted to main. Pull requests still execute the
+      # exact same mandatory Maven verification gate, but routine branch/PR runs no longer retain a
+      # large shaded JAR, JaCoCo report and Javadocs on every commit.
       - name: Upload desktop application and reports
-        if: success()
+        if: success() && github.ref == 'refs/heads/main'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -43,14 +42,17 @@ jobs:
             target/site/jacoco/
             target/site/apidocs/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
 
-      - name: Upload test reports
-        if: always()
+      # Failed-run diagnostics are useful, but keeping successful Surefire output from every PR is
+      # unnecessary. A short retention window prevents diagnostic reports from filling the free
+      # Actions storage quota again.
+      - name: Upload failed test reports
+        if: failure()
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ github.sha }}
           path: target/surefire-reports/
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 3
