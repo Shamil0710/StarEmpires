@@ -41,7 +41,7 @@ class Stage17PlayerRuntimeAffiliationAcceptanceTest {
         assertEquals(3, restored.world().findFactionRuntimeId(PLAYER_FACTION_ID).orElseThrow());
         assertTrue(restored.player().reputations().stream()
                 .anyMatch(reputation -> reputation.factionContentId().equals(PLAYER_FACTION_ID)
-                        && Float.compare(reputation.reputation(), 7.5f) == 0));
+                        && Float.compare(reputation.value(), 7.5f) == 0));
 
         PlayableWorldState snapshot = restored.snapshot();
         assertEquals(PLAYER_FACTION_ID, snapshot.playerState().factionContentId());
