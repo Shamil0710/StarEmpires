@@ -35,7 +35,20 @@ public record FactionEconomicDependenceDiagnostics(
         int uniqueShortestCorridorCriticalItems,
         List<FactionItemDependenceDiagnostic> items) {
 
-    /** Validates and canonicalizes one pair-level diagnostics snapshot. */
+    /**
+     * Validates and canonicalizes one pair-level diagnostics snapshot.
+     *
+     * @param sourceFactionContentId faction whose dependence is measured
+     * @param partnerFactionContentId supplier/market partner being evaluated
+     * @param observationTick authoritative observation tick
+     * @param confidenceBasisPoints observation confidence, 0..10000
+     * @param structuralImportDependenceBasisPoints current structural import dependence, 0..10000
+     * @param structuralExportMarketDependenceBasisPoints current structural export-market dependence, 0..10000
+     * @param estimatedCurrentAccessLossPremiumMilliCredits current replacement price premium
+     * @param currentUncoveredUnitsAfterAccessLoss units left uncovered after partner loss
+     * @param uniqueShortestCorridorCriticalItems critical items exposed to a unique shortest corridor
+     * @param items canonical per-item evidence rows
+     */
     public FactionEconomicDependenceDiagnostics {
         sourceFactionContentId = requireId(sourceFactionContentId, "Source faction ID");
         partnerFactionContentId = requireId(partnerFactionContentId, "Partner faction ID");
