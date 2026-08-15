@@ -3,12 +3,13 @@ package com.spacesim.world;
 import java.util.Objects;
 
 /**
- * Immutable persistent economic state одной strategic faction.
+ * Immutable persistent economic/governance state одной strategic faction.
  *
  * <p>Faction адресуется stable content ID, а не dense runtime ID. Treasury является реальным
  * денежным пулом world-layer: обычная policy-операция может только переводить эти деньги другим
  * economic actors либо получать переводы обратно; создание/уничтожение денег остаётся отдельным
- * source/sink контрактом.</p>
+ * source/sink контрактом. Stage 17F.6 дополнительно хранит только общий anti-oscillation review
+ * watermark; сами policy values остаются в своих authoritative state objects.</p>
  *
  * @param factionContentId stable faction content ID
  * @param treasuryMilliCredits неотрицательный authoritative treasury balance
@@ -16,6 +17,7 @@ import java.util.Objects;
  * @param maxLiquiditySupportPerDecisionMilliCredits максимальный общий расход liquidity-support decision
  * @param treasuryReserveFloorMilliCredits protected treasury balance for ordinary policy spending
  * @param maxConstructionInvestmentPerDecisionMilliCredits construction authorization cap per decision
+ * @param policyReviewState persistent common policy-review watermark
  */
 public record FactionEconomicState(
         String factionContentId,
@@ -23,15 +25,16 @@ public record FactionEconomicState(
         long stationLiquidityReserveMilliCredits,
         long maxLiquiditySupportPerDecisionMilliCredits,
         long treasuryReserveFloorMilliCredits,
-        long maxConstructionInvestmentPerDecisionMilliCredits)
+        long maxConstructionInvestmentPerDecisionMilliCredits,
+        FactionPolicyReviewState policyReviewState)
         implements Comparable<FactionEconomicState> {
 
     /**
      * Source-compatible pre-17F.2 constructor.
      *
-     * <p>Legacy worlds had no protected treasury floor or construction authorization cap, so they
-     * migrate to zero protected reserve and effectively unlimited per-decision construction funding.
-     * Existing liquidity policy is preserved exactly.</p>
+     * <p>Legacy worlds had no protected treasury floor, construction authorization cap or policy-review
+     * watermark, so they migrate to zero protected reserve, effectively unlimited per-decision
+     * construction funding and a never-reviewed governance state.</p>
      *
      * @param factionContentId stable faction content ID
      * @param treasuryMilliCredits authoritative treasury balance
@@ -49,11 +52,39 @@ public record FactionEconomicState(
                 stationLiquidityReserveMilliCredits,
                 maxLiquiditySupportPerDecisionMilliCredits,
                 0L,
-                Long.MAX_VALUE);
+                Long.MAX_VALUE,
+                FactionPolicyReviewState.INITIAL);
     }
 
     /**
-     * Validates persistent faction economy and fiscal spending limits.
+     * Source-compatible pre-17F.6 fiscal constructor.
+     *
+     * @param factionContentId stable faction content ID
+     * @param treasuryMilliCredits authoritative treasury balance
+     * @param stationLiquidityReserveMilliCredits station liquidity target
+     * @param maxLiquiditySupportPerDecisionMilliCredits liquidity-support cap
+     * @param treasuryReserveFloorMilliCredits protected treasury floor
+     * @param maxConstructionInvestmentPerDecisionMilliCredits construction authorization cap
+     */
+    public FactionEconomicState(
+            String factionContentId,
+            long treasuryMilliCredits,
+            long stationLiquidityReserveMilliCredits,
+            long maxLiquiditySupportPerDecisionMilliCredits,
+            long treasuryReserveFloorMilliCredits,
+            long maxConstructionInvestmentPerDecisionMilliCredits) {
+        this(
+                factionContentId,
+                treasuryMilliCredits,
+                stationLiquidityReserveMilliCredits,
+                maxLiquiditySupportPerDecisionMilliCredits,
+                treasuryReserveFloorMilliCredits,
+                maxConstructionInvestmentPerDecisionMilliCredits,
+                FactionPolicyReviewState.INITIAL);
+    }
+
+    /**
+     * Validates persistent faction economy, fiscal spending limits and governance watermark.
      *
      * @param factionContentId stable faction content ID
      * @param treasuryMilliCredits non-negative authoritative treasury balance
@@ -61,6 +92,7 @@ public record FactionEconomicState(
      * @param maxLiquiditySupportPerDecisionMilliCredits non-negative liquidity-support cap
      * @param treasuryReserveFloorMilliCredits non-negative protected treasury balance
      * @param maxConstructionInvestmentPerDecisionMilliCredits non-negative construction funding cap
+     * @param policyReviewState persistent common policy-review watermark
      */
     public FactionEconomicState {
         factionContentId = normalizedContentId(factionContentId);
@@ -71,6 +103,7 @@ public record FactionEconomicState(
                 || maxConstructionInvestmentPerDecisionMilliCredits < 0L) {
             throw new IllegalArgumentException("Faction treasury/policy amounts не могут быть отрицательными");
         }
+        policyReviewState = Objects.requireNonNull(policyReviewState, "Faction policy review state not set");
     }
 
     @Override

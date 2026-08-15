@@ -458,6 +458,47 @@ public final class WorldSimulation {
     }
 
     /**
+     * Returns the common persistent Stage-17F.6 policy-review watermark for one faction.
+     *
+     * @param factionContentId stable faction content ID
+     * @return immutable review state or empty for an unknown faction
+     */
+    public Optional<FactionPolicyReviewState> findFactionPolicyReviewState(String factionContentId) {
+        if (factionContentId == null) {
+            return Optional.empty();
+        }
+        FactionEconomicAccount account = factionAccountsById.get(factionContentId);
+        return account == null ? Optional.empty() : Optional.of(account.policyReviewState());
+    }
+
+    /**
+     * Atomically claims the current common policy-review window for one faction when cadence allows it.
+     *
+     * <p>Claiming a review does not itself change tax rates, stock floors, recipes, wallets, cargo or
+     * other policy values. It only persists the authoritative tick watermark so repeated calls in the
+     * same observation window and save/load continuation cannot apply another bounded policy step.</p>
+     *
+     * @param factionContentId stable faction content ID
+     * @param cadence deterministic authoritative-tick review cadence
+     * @return {@code true} when this call claimed a due review, otherwise {@code false}
+     */
+    public boolean tryBeginFactionPolicyReview(
+            String factionContentId,
+            FactionPolicyReviewCadence cadence) {
+        String factionId = normalizedFactionId(factionContentId);
+        FactionEconomicAccount account = requireFactionAccount(factionId);
+        FactionPolicyReviewCadence checkedCadence = Objects.requireNonNull(
+                cadence, "Faction policy review cadence not set");
+        long tick = getAuthoritativeWorldTick();
+        FactionPolicyReviewState previous = account.policyReviewState();
+        if (!checkedCadence.isDue(previous, tick)) {
+            return false;
+        }
+        account.updatePolicyReviewState(checkedCadence.claim(previous, tick));
+        return true;
+    }
+
+    /**
      * Returns the unified live fiscal policy for one authored or world-defined faction.
      *
      * @param factionContentId stable faction ID
