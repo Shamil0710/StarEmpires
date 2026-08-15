@@ -193,6 +193,8 @@ class Stage17F6StockResilienceCoordinatorAcceptanceTest {
                         inventory.stock[itemId] = 0;
                         market.configuredTargetStock[itemId] = 0;
                         market.targetStock[itemId] = 0;
+                        market.baseConsumption[itemId] = 0f;
+                        market.consumptionRemainder[itemId] = 0d;
                     }
                 }
                 ProductionComponent production = entity.getComponent(ProductionComponent.class);
