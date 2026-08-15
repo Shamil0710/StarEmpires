@@ -9,9 +9,9 @@ import java.util.Objects;
 /**
  * Shared read boundary for Stage-17D territorial state.
  *
- * <p>Physical presence is derived from real local ECS entities. Sovereignty is read from the
- * existing persistent strategic control map. This intentionally prevents an owned station or a
- * passing fleet from silently becoming territorial control.</p>
+ * <p>Physical presence is derived from real local ECS entities. Claims, recognition and control are
+ * read from persistent strategic state. This prevents stations, fleets or diplomatic acknowledgement
+ * from silently becoming sovereignty.</p>
  */
 public final class FactionTerritoryService {
     private FactionTerritoryService() {
@@ -44,18 +44,28 @@ public final class FactionTerritoryService {
         }
         int factionRuntimeId = checkedWorld.findFactionRuntimeId(factionId)
                 .orElseThrow(() -> new IllegalArgumentException("Неизвестная faction: " + factionId));
+        FactionStrategicState strategy = checkedWorld.findFactionStrategicState(factionId)
+                .orElseThrow(() -> new IllegalArgumentException("Faction has no strategic state: " + factionId));
 
         SimulationSession session = checkedWorld.findSession(checkedSystem)
                 .orElseThrow(() -> new IllegalStateException(
                         "StarSystem не имеет runtime SimulationSession: " + checkedSystem));
         boolean physicalPresence = hasPhysicalPresence(session, factionRuntimeId);
         String controller = checkedWorld.controllingFaction(checkedSystem).orElse(null);
+        TerritorialClaimState claim = strategy.claimFor(checkedSystem);
+        int recognitionCount = recognitionCount(checkedWorld, factionId, checkedSystem, controller, claim);
 
         FactionTerritoryView.Jurisdiction jurisdiction;
         if (factionId.equals(controller)) {
             jurisdiction = FactionTerritoryView.Jurisdiction.SELF_CONTROLLED;
+        } else if (claim != null && claim.status() == TerritorialClaimState.Status.CONTESTED) {
+            jurisdiction = FactionTerritoryView.Jurisdiction.CONTESTED;
         } else if (controller != null) {
             jurisdiction = FactionTerritoryView.Jurisdiction.FOREIGN_CONTROLLED;
+        } else if (claim != null && claim.status() == TerritorialClaimState.Status.STABILIZING) {
+            jurisdiction = FactionTerritoryView.Jurisdiction.STABILIZING;
+        } else if (claim != null) {
+            jurisdiction = FactionTerritoryView.Jurisdiction.CLAIMED;
         } else if (physicalPresence) {
             jurisdiction = FactionTerritoryView.Jurisdiction.PRESENT;
         } else {
@@ -66,7 +76,12 @@ public final class FactionTerritoryService {
                 factionId,
                 jurisdiction,
                 physicalPresence,
-                controller);
+                controller,
+                claim != null,
+                claim == null ? null : claim.status(),
+                claim == null ? 0L : claim.stabilizationTicks(),
+                claim != null && claim.status() == TerritorialClaimState.Status.CONTESTED,
+                recognitionCount);
     }
 
     private static boolean hasPhysicalPresence(SimulationSession session, int factionRuntimeId) {
@@ -77,5 +92,30 @@ public final class FactionTerritoryService {
             }
         }
         return false;
+    }
+
+    private static int recognitionCount(
+            WorldSimulation world,
+            String factionId,
+            StarSystemId systemId,
+            String controller,
+            TerritorialClaimState claim) {
+        TerritorialRecognitionState.Kind relevantKind = factionId.equals(controller)
+                ? TerritorialRecognitionState.Kind.CONTROL
+                : claim == null ? null : TerritorialRecognitionState.Kind.CLAIM;
+        if (relevantKind == null) {
+            return 0;
+        }
+        int count = 0;
+        for (FactionStrategicState strategy : world.snapshot().factionStrategies()) {
+            for (TerritorialRecognitionState recognition : strategy.territorialRecognitions()) {
+                if (recognition.targetFactionContentId().equals(factionId)
+                        && recognition.systemId().equals(systemId)
+                        && recognition.kind() == relevantKind) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 }
