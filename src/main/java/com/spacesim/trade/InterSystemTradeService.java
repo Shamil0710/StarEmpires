@@ -14,6 +14,7 @@ import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.GalacticPathPlanner;
+import com.spacesim.world.WorldCriticalImportLimitPolicy;
 import com.spacesim.world.WorldRouteRedundancyPolicy;
 import com.spacesim.world.WorldSimulation;
 import com.spacesim.world.WorldSupplierDiversificationPolicy;
@@ -26,9 +27,9 @@ import java.util.Optional;
  *
  * <p>The service owns one shared {@link GalacticMarketIndex}; repeated planning therefore reuses
  * per-system immutable market snapshots and their revisions. It combines bounded discovery with the
- * world's canonical {@link TradeRoutePlanner}, then applies Stage-17F.5 supplier diversification and
- * physical edge-disjoint route redundancy before returning an {@link InterSystemTradeJob} that
- * performs the same ordinary transactions and jump handoffs.</p>
+ * world's canonical {@link TradeRoutePlanner}, then applies Stage-17F.5 hard critical-import limits,
+ * supplier diversification and physical edge-disjoint route redundancy before returning an
+ * {@link InterSystemTradeJob} that performs the same ordinary transactions and jump handoffs.</p>
  */
 public final class InterSystemTradeService {
     private final WorldSimulation world;
@@ -60,6 +61,7 @@ public final class InterSystemTradeService {
                 economicPlanner,
                 checkedScoringMode,
                 new WorldSupplierDiversificationPolicy(world),
+                new WorldCriticalImportLimitPolicy(world),
                 pathPlanner,
                 checkedDiscoveryPolicy.maxJumpHops(),
                 jumpCount -> routeRiskBasisPoints(checkedDiscoveryPolicy, jumpCount),
@@ -78,13 +80,13 @@ public final class InterSystemTradeService {
     /**
      * Plans the best currently valid inter-system cargo job for a local world fleet.
      *
-     * <p>Ordinary economics remains the baseline. A faction may choose a less concentrated physical
-     * supplier and/or an edge-disjoint physical jump path only when Stage-17F.5 diagnostics recommend
-     * the resilience action and the final real expected-profit sacrifice remains within its measured
-     * budget. Execution itself is unchanged.</p>
+     * <p>Hard critical-import limits first remove structurally unacceptable foreign suppliers from
+     * inbound procurement into the faction's own markets. Ordinary economics then chooses among the
+     * remaining real opportunities. Soft supplier diversification and route redundancy may accept a
+     * bounded real expected-profit sacrifice. Execution itself is unchanged.</p>
      *
      * @param fleetId stable fleet identity
-     * @return executable job or empty when no bounded profitable candidate exists
+     * @return executable job or empty when no bounded policy-authorized profitable candidate exists
      */
     public Optional<InterSystemTradeJob> plan(FleetId fleetId) {
         FleetId checkedFleetId = Objects.requireNonNull(fleetId, "FleetId не задан");
