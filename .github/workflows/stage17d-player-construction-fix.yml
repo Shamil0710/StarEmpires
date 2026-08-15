@@ -1,0 +1,59 @@
+name: Stage17D Player Construction Fix
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Restore adapter and patch legal identity
+        shell: python
+        run: |
+          import subprocess
+          from pathlib import Path
+          path = Path('src/main/java/com/spacesim/player/PlayerConstructionService.java')
+          original = subprocess.check_output(
+              ['git', 'show', 'origin/main:src/main/java/com/spacesim/player/PlayerConstructionService.java'],
+              text=True)
+          old = '''        ConstructionProjectId projectId = runtime.world().createConstructionProject(
+                      null, archetypeId, placement.systemId(), x, y);'''
+          new = '''        ConstructionProjectId projectId = runtime.world().createConstructionProject(
+                      null,
+                      current.factionContentId(),
+                      archetypeId,
+                      placement.systemId(),
+                      x,
+                      y);'''
+          if original.count(old) != 1:
+              raise SystemExit(f'createProject anchor mismatch: {original.count(old)}')
+          text = original.replace(old, new, 1)
+          old = '''            ConstructionProjectState state = runtime.world().findConstructionProject(projectId).orElseThrow();
+                  requireExternalContract(state);'''
+          new = '''            ConstructionProjectState state = runtime.world().findConstructionProject(projectId).orElseThrow();
+                  requireExternalContract(state);
+                  if (!Objects.equals(current.factionContentId(), state.legalFactionContentId())) {
+                      throw new IllegalStateException(
+                              "Player construction legal faction differs from current affiliation");
+                  }'''
+          if text.count(old) != 1:
+              raise SystemExit(f'external contract anchor mismatch: {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+      - name: Remove workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-player-construction-fix.yml
+          git add src/main/java/com/spacesim/player/PlayerConstructionService.java
+          git commit -m "Use faction legal identity for player construction"
+          git push origin HEAD:agent/stage17d-territorial-process
