@@ -1,0 +1,129 @@
+name: Stage 17E.4 world integration patch
+
+on:
+  push:
+    branches:
+      - agent/stage17e-customs-tariffs
+    paths:
+      - .github/workflows/stage17e4-world-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17e-customs-tariffs
+      - name: Patch WorldSimulation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          t=p.read_text(encoding='utf-8')
+          def r(old,new,label):
+              global t
+              if t.count(old)!=1:
+                  raise SystemExit(f'{label}: {t.count(old)} anchors')
+              t=t.replace(old,new,1)
+          r('import com.spacesim.content.ContentCatalogLoader;\n',
+            'import com.spacesim.content.ContentCatalogLoader;\nimport com.spacesim.controllers.TradeController;\n', 'controller import')
+          r('import com.spacesim.trade.TradeRoutePlanner;\n',
+            'import com.spacesim.trade.TradeRouteCostModel;\nimport com.spacesim.trade.TradeRoutePlanner;\nimport com.spacesim.systems.TradeAISystem;\n', 'trade imports')
+          r('        this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;\n        refreshFactionMarketAccess();',
+            '        this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;\n        configureTradePolicies();\n        refreshFactionMarketAccess();', 'constructor configure')
+          r('''    public TradeRoutePlanner createGalacticTradeRoutePlanner(TradeRoutePlanner.ScoringMode scoringMode) {
+        return new TradeRoutePlanner(
+                contentCatalog,
+                Objects.requireNonNull(scoringMode, "Trade route scoring mode не задан"),
+                new WorldTradeRouteCostModel(
+                        factionIdentityResolver, territorialControlRuntime.snapshots()));
+    }
+''',
+            '''    public TradeRoutePlanner createGalacticTradeRoutePlanner(TradeRoutePlanner.ScoringMode scoringMode) {
+        return new TradeRoutePlanner(
+                contentCatalog,
+                Objects.requireNonNull(scoringMode, "Trade route scoring mode не задан"),
+                liveTradeRouteCostModel());
+    }
+
+    /**
+     * Creates the ordinary TradeController configured with this world's live customs settlement policy.
+     *
+     * @param session local session whose ledger records the physical transaction
+     * @return controller sharing the same tariff law as autonomous trade AI
+     */
+    public TradeController createTradeController(SimulationSession session) {
+        SimulationSession checked = Objects.requireNonNull(session, "SimulationSession not set");
+        if (!sessionsById.containsValue(checked)) {
+            throw new IllegalArgumentException("SimulationSession does not belong to this world");
+        }
+        return new TradeController(checked.getLedger(), liveTradeTransactionPolicy());
+    }
+''', 'galactic planner')
+          r('    private void refreshFactionMarketAccess() {\n',
+            '''    private TradeTransactionPolicyAdapter liveTradeTransactionPolicy() {
+        return new TradeTransactionPolicyAdapter(new WorldTradeTransactionPolicy(
+                factionIdentityResolver,
+                factionAccountsById,
+                diplomacyRuntime::snapshots,
+                this::getAuthoritativeWorldTick));
+    }
+
+    private TradeRouteCostModel liveTradeRouteCostModel() {
+        return new WorldTradeRouteCostModel(
+                factionIdentityResolver,
+                territorialControlRuntime::snapshots,
+                diplomacyRuntime::snapshots,
+                this::getAuthoritativeWorldTick);
+    }
+
+    private void configureTradePolicies() {
+        TradeTransactionPolicyAdapter transactionPolicy = liveTradeTransactionPolicy();
+        TradeRouteCostModel costModel = liveTradeRouteCostModel();
+        for (SimulationSession session : sessionsById.values()) {
+            TradeAISystem tradeAI = session.getEngine().getSystem(TradeAISystem.class);
+            if (tradeAI != null) {
+                tradeAI.configureTradePolicies(transactionPolicy, costModel);
+            }
+        }
+    }
+
+    private void refreshFactionMarketAccess() {
+''', 'private trade config')
+          p.write_text(t,encoding='utf-8')
+
+          # Small adapter avoids exposing package-private world policy class in public signatures.
+          p=Path('src/main/java/com/spacesim/world/TradeTransactionPolicyAdapter.java')
+          p.write_text('''package com.spacesim.world;
+
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.controllers.TradeTransactionPolicy;
+
+import java.util.Objects;
+
+/** Package boundary adapter for the live world trade settlement policy. */
+final class TradeTransactionPolicyAdapter implements TradeTransactionPolicy {
+    private final TradeTransactionPolicy delegate;
+
+    TradeTransactionPolicyAdapter(TradeTransactionPolicy delegate) {
+        this.delegate = Objects.requireNonNull(delegate, "TradeTransactionPolicy delegate not set");
+    }
+
+    @Override
+    public Charge quote(Entity station, Entity participant, Direction direction, long tradeValueMilliCredits) {
+        return delegate.quote(station, participant, direction, tradeValueMilliCredits);
+    }
+}
+''', encoding='utf-8')
+          PY
+      - name: Remove applicator and commit
+        run: |
+          rm .github/workflows/stage17e4-world-patch.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/WorldSimulation.java src/main/java/com/spacesim/world/TradeTransactionPolicyAdapter.java .github/workflows/stage17e4-world-patch.yml
+          git commit -m "Stage 17E.4: wire customs into world trade boundaries"
+          git push
