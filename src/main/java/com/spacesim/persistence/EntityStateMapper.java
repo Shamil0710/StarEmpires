@@ -214,6 +214,7 @@ public final class EntityStateMapper {
             return null;
         }
         List<Integer> target = new ArrayList<>(Constants.MAX_ITEMS);
+        List<Integer> configuredTarget = new ArrayList<>(Constants.MAX_ITEMS);
         List<Float> consumption = new ArrayList<>(Constants.MAX_ITEMS);
         List<Float> sell = new ArrayList<>(Constants.MAX_ITEMS);
         List<Float> buy = new ArrayList<>(Constants.MAX_ITEMS);
@@ -221,6 +222,7 @@ public final class EntityStateMapper {
         List<Boolean> tradable = new ArrayList<>(Constants.MAX_ITEMS);
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
             target.add(component.targetStock[itemId]);
+            configuredTarget.add(component.configuredTargetStock[itemId]);
             consumption.add(component.baseConsumption[itemId]);
             sell.add(component.sellPrices[itemId]);
             buy.add(component.buyPrices[itemId]);
@@ -229,6 +231,7 @@ public final class EntityStateMapper {
         }
         return new EntityState.MarketState(
                 List.copyOf(target),
+                List.copyOf(configuredTarget),
                 List.copyOf(consumption),
                 List.copyOf(sell),
                 List.copyOf(buy),
@@ -239,6 +242,7 @@ public final class EntityStateMapper {
 
     private static MarketComponent restoreMarket(EntityState.MarketState value) {
         requireSize(value.targetStock(), Constants.MAX_ITEMS, "Market.targetStock");
+        requireSize(value.configuredTargetStock(), Constants.MAX_ITEMS, "Market.configuredTargetStock");
         requireSize(value.baseConsumption(), Constants.MAX_ITEMS, "Market.baseConsumption");
         requireSize(value.sellPrices(), Constants.MAX_ITEMS, "Market.sellPrices");
         requireSize(value.buyPrices(), Constants.MAX_ITEMS, "Market.buyPrices");
@@ -247,6 +251,7 @@ public final class EntityStateMapper {
         MarketComponent component = new MarketComponent();
         for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
             component.targetStock[itemId] = value.targetStock().get(itemId);
+            component.configuredTargetStock[itemId] = value.configuredTargetStock().get(itemId);
             component.baseConsumption[itemId] = value.baseConsumption().get(itemId);
             component.sellPrices[itemId] = value.sellPrices().get(itemId);
             component.buyPrices[itemId] = value.buyPrices().get(itemId);

@@ -64,7 +64,11 @@ class FactionStrategicPolicyEngineTest {
         int energyId = content.findItem("item.energy").runtimeId();
         int weaponsId = content.findItem("item.weapons").runtimeId();
         int foodId = content.findItem("item.food").runtimeId();
-        float weaponsPriceBefore = arsenal.getComponent(MarketComponent.class).buyPrices[weaponsId];
+        MarketComponent arsenalMarket = arsenal.getComponent(MarketComponent.class);
+        MarketComponent agrodomeMarket = agrodome.getComponent(MarketComponent.class);
+        int arsenalEnergyBaseline = arsenalMarket.configuredTargetStock[energyId];
+        int agrodomeEnergyBaseline = agrodomeMarket.configuredTargetStock[energyId];
+        float weaponsPriceBefore = arsenalMarket.buyPrices[weaponsId];
 
         ProductionComponent production = arsenal.getComponent(ProductionComponent.class);
         production.recipes.clear();
@@ -78,21 +82,43 @@ class FactionStrategicPolicyEngineTest {
         assertTrue(report.marketsAdjusted() >= 2);
         assertEquals(1, report.productionStationsRetooled());
         assertEquals(2, report.activeStrategicGoals());
-        assertEquals(500, arsenal.getComponent(MarketComponent.class).targetStock[energyId]);
-        assertEquals(600, arsenal.getComponent(MarketComponent.class).targetStock[weaponsId]);
-        assertEquals(500, agrodome.getComponent(MarketComponent.class).targetStock[energyId]);
-        assertEquals(700, agrodome.getComponent(MarketComponent.class).targetStock[foodId]);
+        assertEquals(500, arsenalMarket.targetStock[energyId]);
+        assertEquals(600, arsenalMarket.targetStock[weaponsId]);
+        assertEquals(500, agrodomeMarket.targetStock[energyId]);
+        assertEquals(700, agrodomeMarket.targetStock[foodId]);
         assertEquals("Сборка вооружения", production.getActiveRecipe().name);
         assertEquals(0f, production.progressSeconds);
 
         world.advanceFrame(0.1f);
-        assertTrue(arsenal.getComponent(MarketComponent.class).buyPrices[weaponsId] > weaponsPriceBefore);
+        assertTrue(arsenalMarket.buyPrices[weaponsId] > weaponsPriceBefore);
 
         FactionStrategicPolicyEngine.ApplicationReport repeated =
                 FactionStrategicPolicyEngine.apply(world, content, TRADE_LEAGUE);
         assertEquals(0, repeated.marketsAdjusted());
         assertEquals(0, repeated.productionStationsRetooled());
         assertEquals(2, repeated.activeStrategicGoals());
+
+        FactionStockProductionPolicyState authored = world.findFactionStockProductionPolicy(TRADE_LEAGUE)
+                .orElseThrow();
+        world.updateFactionStockProductionPolicy(
+                TRADE_LEAGUE,
+                new FactionStockProductionPolicyState(List.of(), authored.productionPolicies()));
+        assertEquals(500, arsenalMarket.targetStock[energyId],
+                "Authoring alone must not mutate physical market demand");
+        assertEquals(500, agrodomeMarket.targetStock[energyId]);
+
+        FactionStrategicPolicyEngine.ApplicationReport removedBaseDemand =
+                FactionStrategicPolicyEngine.apply(world, content, TRADE_LEAGUE);
+
+        assertTrue(removedBaseDemand.marketsAdjusted() >= 2);
+        assertEquals(arsenalEnergyBaseline, arsenalMarket.targetStock[energyId],
+                "Removing base policy must restore this station's configured baseline");
+        assertEquals(agrodomeEnergyBaseline, agrodomeMarket.targetStock[energyId]);
+        assertEquals(600, arsenalMarket.targetStock[weaponsId],
+                "Independent military goal must remain active");
+        assertEquals(700, agrodomeMarket.targetStock[foodId],
+                "Independent expansion goal must remain active");
+        assertEquals(2, removedBaseDemand.activeStrategicGoals());
     }
 
     private static WorldState replaceStrategy(WorldState base, FactionStrategicState replacement) {

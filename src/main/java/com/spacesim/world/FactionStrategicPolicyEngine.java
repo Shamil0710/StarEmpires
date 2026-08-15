@@ -7,6 +7,7 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.ProductionComponent;
+import com.spacesim.constants.Constants;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.model.Recipe;
 import com.spacesim.simulation.SimulationSession;
@@ -21,8 +22,9 @@ import java.util.Objects;
 /**
  * Применяет persistent faction production/stock goals к существующему authoritative economic core.
  *
- * <p>Engine не создаёт виртуальный спрос и не производит ресурсы напрямую. Он только меняет обычный
- * {@link MarketComponent#targetStock} и data-driven recipe существующего
+ * <p>Engine не создаёт виртуальный спрос и не производит ресурсы напрямую. Он только пересчитывает
+ * обычный {@link MarketComponent#targetStock} из persistent configured baseline и текущих strategic
+ * demand contributions, а также меняет data-driven recipe существующего
  * {@link ProductionComponent}. После этого цены, логистика и физическое производство продолжают
  * работать штатными Market/TradeAI/Production systems.</p>
  */
@@ -55,8 +57,10 @@ public final class FactionStrategicPolicyEngine {
      * Применяет одно deterministic strategic policy decision.
      *
      * <p>Все semantic content references валидируются до первой mutation. StarSystems обходятся по
-     * stable ID, entities — по persistent EntityId. Demand floor является идемпотентным максимумом:
-     * повторный вызов не наращивает targetStock. Production progress сбрасывается только при
+     * stable ID, entities — по persistent EntityId. Для каждого уже торгуемого item effective target
+     * пересчитывается как максимум configured station baseline и текущего aggregate strategic demand.
+     * Поэтому добавление policy может повысить target, а удаление policy безопасно возвращает его к
+     * baseline либо к оставшемуся более высокому demand. Production progress сбрасывается только при
      * фактической смене recipe.</p>
      *
      * @param world runtime multi-system world
@@ -96,14 +100,16 @@ public final class FactionStrategicPolicyEngine {
                 InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
                 if (market != null && inventory != null) {
                     boolean changed = false;
-                    for (Map.Entry<Integer, Integer> demand : demandFloorByRuntimeItem.entrySet()) {
-                        int itemId = demand.getKey();
-                        if (!market.isTradable(itemId)) {
+                    for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
+                        if (!market.tradableItems[itemId]) {
                             continue;
                         }
-                        int feasibleFloor = Math.min(demand.getValue(), Math.max(0, inventory.capacity));
-                        if (feasibleFloor > market.targetStock[itemId]) {
-                            market.targetStock[itemId] = feasibleFloor;
+                        int configuredBaseline = Math.max(0, market.configuredTargetStock[itemId]);
+                        int requestedFloor = demandFloorByRuntimeItem.getOrDefault(itemId, 0);
+                        int feasiblePolicyFloor = Math.min(requestedFloor, Math.max(0, inventory.capacity));
+                        int desiredTarget = Math.max(configuredBaseline, feasiblePolicyFloor);
+                        if (market.targetStock[itemId] != desiredTarget) {
+                            market.targetStock[itemId] = desiredTarget;
                             changed = true;
                         }
                     }
@@ -214,7 +220,7 @@ public final class FactionStrategicPolicyEngine {
                 || Float.floatToIntBits(current.durationSeconds) != Float.floatToIntBits(desired.durationSeconds)) {
             return false;
         }
-        for (int itemId = 0; itemId < com.spacesim.constants.Constants.MAX_ITEMS; itemId++) {
+        for (int itemId = 0; itemId < Constants.MAX_ITEMS; itemId++) {
             if (current.getInputAmount(itemId) != desired.getInputAmount(itemId)
                     || current.getOutputAmount(itemId) != desired.getOutputAmount(itemId)) {
                 return false;
@@ -224,9 +230,9 @@ public final class FactionStrategicPolicyEngine {
     }
 
     /**
-     * @param marketsAdjusted число market entities, где увеличен хотя бы один targetStock
+     * @param marketsAdjusted число market entities, где изменён хотя бы один effective targetStock
      * @param productionStationsRetooled число production entities с фактически заменённым recipe
-     * @param activeStrategicGoals число active military/expansion goals в policy
+     * @param activeStrategicGoals число active strategic goals в policy
      */
     public record ApplicationReport(
             int marketsAdjusted,
