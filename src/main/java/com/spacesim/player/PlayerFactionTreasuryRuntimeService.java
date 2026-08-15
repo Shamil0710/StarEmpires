@@ -85,10 +85,6 @@ public final class PlayerFactionTreasuryRuntimeService {
                 runtime.replacePlayerState(previous);
                 return false;
             }
-            if (personalWallet.getBalanceMilliCredits() != resultingPersonalWallet) {
-                runtime.replacePlayerState(previous);
-                throw new IllegalStateException("Treasury transfer source balance diverged from PlayerState");
-            }
             return true;
         } catch (RuntimeException exception) {
             runtime.replacePlayerState(previous);
