@@ -22,25 +22,29 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-      - name: Capture verify failure summary
+      - name: Capture exact source and targeted stack
         shell: bash
         run: |
           set +e
-          ./mvnw --batch-mode --no-transfer-progress clean verify > /tmp/stage17b-verify.log 2>&1
+          ./mvnw --batch-mode --no-transfer-progress \
+            -Dtest=Stage17TransitFleetAffiliationAcceptanceTest#transitAffiliationSurvivesMidJumpSaveLoadAndOrdinaryArrival \
+            -DtrimStackTrace=false test > /tmp/stage17b-target.log 2>&1
           status=$?
           {
-            echo "verify_exit_code=$status"
-            echo "--- ERROR / FAILURE SUMMARY ---"
-            grep -E '^\[ERROR\]|Failures:|Errors:|BUILD FAILURE|COMPILATION ERROR|Javadoc|coverage|Coverage' /tmp/stage17b-verify.log | tail -n 240
-            echo "--- LOG TAIL ---"
-            tail -n 160 /tmp/stage17b-verify.log
-          } > stage17b-diagnostic.log
+            echo "target_test_exit_code=$status"
+            echo "--- SOURCE MATCHES ---"
+            grep -R -n -F "Некорректный runtime faction ID флота" src || true
+            echo "--- STACK / ERROR ---"
+            grep -n -E "Stage17TransitFleetAffiliationAcceptanceTest|Некорректный runtime faction|IllegalArgumentException|at com\.spacesim|Caused by|Failures:|Errors:" /tmp/stage17b-target.log | tail -n 260
+            echo "--- TARGET LOG TAIL ---"
+            tail -n 220 /tmp/stage17b-target.log
+          } > stage17b-source-diagnostic.log
           exit 0
       - name: Commit diagnostic summary
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add stage17b-diagnostic.log
-          git commit -m "[stage17b-diagnostic] capture verify failure"
+          git add stage17b-source-diagnostic.log
+          git commit -m "[stage17b-diagnostic] capture source and targeted stack"
           git push origin HEAD:agent/stage17b-transit-fleet-affiliation
