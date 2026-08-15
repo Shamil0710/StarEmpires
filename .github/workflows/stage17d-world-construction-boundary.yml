@@ -1,0 +1,144 @@
+name: Stage17D World Construction Boundary
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Patch WorldSimulation construction boundary
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = path.read_text()
+          snapshot = '    /** @return текущий immutable world snapshot */'
+          method = '\n'.join([
+              '    /**',
+              '     * Reports whether material rival claims currently make the system territorially contested.',
+              '     *',
+              '     * @param systemId target system',
+              '     * @return true when ordinary uncontested jurisdiction does not exist',
+              '     */',
+              '    public boolean isTerritoriallyContested(StarSystemId systemId) {',
+              '        return territorialControlRuntime.isContested(systemId);',
+              '    }',
+              '',
+              ''
+          ])
+          if text.count(snapshot) != 1:
+              raise SystemExit('snapshot marker mismatch')
+          text = text.replace(snapshot, method + snapshot, 1)
+
+          anchor = text.index('Создаёт persistent physical construction project')
+          start = text.index('    public ConstructionProjectId createConstructionProject(', anchor)
+          end = text.index('    /**\n     * Физически переводит деньги faction treasury', start)
+          section = '\n'.join([
+              '    public ConstructionProjectId createConstructionProject(',
+              '            String ownerFactionContentId,',
+              '            String stationArchetypeContentId,',
+              '            StarSystemId systemId,',
+              '            float x,',
+              '            float y) {',
+              '        return createConstructionProject(',
+              '                ownerFactionContentId,',
+              '                ownerFactionContentId,',
+              '                ownerFactionContentId,',
+              '                stationArchetypeContentId,',
+              '                systemId,',
+              '                x,',
+              '                y);',
+              '    }',
+              '',
+              '    /**',
+              '     * Creates a project whose authorization principal and asset faction are identical.',
+              '     *',
+              '     * @param ownerFactionContentId faction treasury payer, or {@code null} for external settlement',
+              '     * @param legalFactionContentId faction exercising territorial rights and affiliating the asset',
+              '     * @param stationArchetypeContentId constructible station archetype',
+              '     * @param systemId target system',
+              '     * @param x finite X coordinate',
+              '     * @param y finite Y coordinate',
+              '     * @return stable project ID',
+              '     */',
+              '    public ConstructionProjectId createConstructionProject(',
+              '            String ownerFactionContentId,',
+              '            String legalFactionContentId,',
+              '            String stationArchetypeContentId,',
+              '            StarSystemId systemId,',
+              '            float x,',
+              '            float y) {',
+              '        return createConstructionProject(',
+              '                ownerFactionContentId,',
+              '                legalFactionContentId,',
+              '                legalFactionContentId,',
+              '                stationArchetypeContentId,',
+              '                systemId,',
+              '                x,',
+              '                y);',
+              '    }',
+              '',
+              '    /**',
+              '     * Creates one ordinary project after shared territorial authorization.',
+              '     *',
+              '     * <p>Economic payer, authorization principal and resulting asset affiliation are separate',
+              '     * dimensions. Personal projects can exercise membership rights without becoming assets of',
+              '     * the member faction, while a world-defined player faction can explicitly affiliate them.</p>',
+              '     *',
+              '     * @param ownerFactionContentId faction treasury payer, or {@code null} for external settlement',
+              '     * @param authorizationFactionContentId faction whose territorial right is exercised, or {@code null}',
+              '     * @param legalFactionContentId faction assigned to site/completed asset, or {@code null}',
+              '     * @param stationArchetypeContentId constructible station archetype',
+              '     * @param systemId target system',
+              '     * @param x finite X coordinate',
+              '     * @param y finite Y coordinate',
+              '     * @return stable project ID',
+              '     * @throws IllegalStateException when ordinary construction is not legally authorized',
+              '     */',
+              '    public ConstructionProjectId createConstructionProject(',
+              '            String ownerFactionContentId,',
+              '            String authorizationFactionContentId,',
+              '            String legalFactionContentId,',
+              '            String stationArchetypeContentId,',
+              '            StarSystemId systemId,',
+              '            float x,',
+              '            float y) {',
+              '        TerritorialConstructionAuthorization.Decision authorization =',
+              '                TerritorialConstructionAuthorization.evaluate(',
+              '                        this, authorizationFactionContentId, systemId);',
+              '        if (!authorization.allowed()) {',
+              '            throw new IllegalStateException(',
+              '                    "Construction denied by territorial law: " + authorization.reason()',
+              '                            + " controller=" + authorization.controllingFactionContentId());',
+              '        }',
+              '        return constructionProjectService.create(',
+              '                ownerFactionContentId,',
+              '                legalFactionContentId,',
+              '                stationArchetypeContentId,',
+              '                systemId,',
+              '                x,',
+              '                y);',
+              '    }',
+              '',
+              ''
+          ])
+          path.write_text(text[:start] + section + text[end:])
+      - name: Remove workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-world-construction-boundary.yml
+          git add src/main/java/com/spacesim/world/WorldSimulation.java
+          git commit -m "Separate construction authorization from asset affiliation"
+          git push origin HEAD:agent/stage17d-territorial-process
