@@ -15,8 +15,9 @@ import java.util.Optional;
  * <p>Both directions conserve money exactly. Capitalization moves existing personal money into
  * public faction funds; an explicit reverse transfer moves existing treasury money back to the
  * personal/company wallet. Neither direction touches station wallets, physical entities, ownership,
- * territory or policies. No automatic dividend or money source/sink is introduced. Live runtime
- * adapters must execute the same transitions as ledgered {@code MONEY_TRANSFER} operations.</p>
+ * territory, fiscal authorizations or institutional diplomacy. No automatic dividend or money
+ * source/sink is introduced. Live runtime adapters must execute the same transitions as ledgered
+ * {@code MONEY_TRANSFER} operations.</p>
  */
 public final class PlayerFactionTreasuryService {
     private PlayerFactionTreasuryService() {
@@ -144,7 +145,9 @@ public final class PlayerFactionTreasuryService {
                 previousEconomy.factionContentId(),
                 resultingTreasury,
                 previousEconomy.stationLiquidityReserveMilliCredits(),
-                previousEconomy.maxLiquiditySupportPerDecisionMilliCredits()));
+                previousEconomy.maxLiquiditySupportPerDecisionMilliCredits(),
+                previousEconomy.treasuryReserveFloorMilliCredits(),
+                previousEconomy.maxConstructionInvestmentPerDecisionMilliCredits()));
         return replaceBalances(checked, economics, resultingPersonalWallet);
     }
 
@@ -166,7 +169,8 @@ public final class PlayerFactionTreasuryService {
                 world.nextFleetIdValue(),
                 world.fleets(),
                 world.fleetJumps(),
-                world.factionIdentities());
+                world.factionIdentities(),
+                world.factionDiplomacyStates());
         PlayerState updatedPlayer = new PlayerState(
                 personalWalletMilliCredits,
                 player.factionContentId(),
