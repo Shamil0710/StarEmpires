@@ -1,5 +1,7 @@
 package com.spacesim.world;
 
+import com.spacesim.constants.Constants;
+
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -35,14 +37,14 @@ public record WorldFactionIdentityState(
      * Validates and normalizes world-defined faction identity metadata.
      *
      * @param stableFactionId stable world faction ID
-     * @param runtimeFactionId non-negative dense runtime slot
+     * @param runtimeFactionId dense runtime slot in the Stage-17 bounded capacity
      * @param displayName public display name
      * @param origin identity origin
      */
     public WorldFactionIdentityState {
         stableFactionId = normalizeStableId(stableFactionId);
-        if (runtimeFactionId < 0) {
-            throw new IllegalArgumentException("Runtime faction ID cannot be negative");
+        if (runtimeFactionId < 0 || runtimeFactionId >= Constants.FACTION_RUNTIME_CAPACITY) {
+            throw new IllegalArgumentException("Runtime faction ID is outside bounded capacity");
         }
         displayName = Objects.requireNonNull(displayName, "Faction display name not set").strip();
         if (displayName.isEmpty() || displayName.length() > MAX_DISPLAY_NAME_LENGTH) {

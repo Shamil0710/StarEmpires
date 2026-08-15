@@ -6,6 +6,7 @@ import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.StarSystemSimulationState;
+import com.spacesim.world.WorldFactionIdentityState;
 import com.spacesim.world.WorldState;
 
 import java.io.ByteArrayInputStream;
@@ -26,10 +27,12 @@ import java.util.Objects;
  *
  * <p>World schema v1 хранит topology + local sessions, v2 добавляет faction treasury, v3 strategic
  * state, v4 construction projects, v5 economic pressure/hysteresis, v6 world-level fleet
- * placement/transit state, v7 active jump FSM, а Stage-16 schema v8 разделяет construction
- * settlement и legal/faction identity. Save v4-v7 продолжает читать старый faction-only layout и
- * мигрирует проекты в {@code FACTION_TREASURY}. File format v2 сохраняет bounded Stage-11
- * strategic-growth trailer. Local entity payload кодируется {@link GameStateCodec}.</p>
+ * placement/transit state, v7 active jump FSM, Stage-16 schema v8 разделяет construction
+ * settlement и legal/faction identity, а Stage-17 schema v9 добавляет persistent world-defined
+ * faction identity directory. Save v4-v7 продолжает читать старый faction-only construction
+ * layout, v8 читает Stage-16 external-owner layout и мигрирует с пустым dynamic directory.
+ * File format v2 сохраняет bounded Stage-11 strategic-growth trailer. Local entity payload
+ * кодируется {@link GameStateCodec}.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
@@ -73,6 +76,7 @@ public final class WorldStateCodec {
                 output.writeLong(checked.nextFleetIdValue());
                 WorldFleetBinary.write(output, checked.fleets());
                 WorldFleetBinary.writeJumps(output, checked.fleetJumps());
+                WorldFactionIdentityBinary.write(output, checked.factionIdentities());
                 WorldStrategicGrowthBinary.write(output, checked.factionStrategies());
             }
 
@@ -200,6 +204,7 @@ public final class WorldStateCodec {
 
     private static void requireSupportedSchema(int schemaVersion) {
         if (schemaVersion != WorldState.CURRENT_VERSION
+                && schemaVersion != WorldState.LEGACY_STAGE16_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE10_JUMP_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE10A_VERSION
                 && schemaVersion != WorldState.LEGACY_STAGE9_PRESSURE_VERSION
@@ -232,7 +237,7 @@ public final class WorldStateCodec {
         }
 
         long nextProjectId = input.readLong();
-        List<ConstructionProjectState> projects = schemaVersion == WorldState.CURRENT_VERSION
+        List<ConstructionProjectState> projects = schemaVersion >= WorldState.LEGACY_STAGE16_VERSION
                 ? WorldConstructionBinary.read(input)
                 : WorldConstructionBinary.readLegacy(input);
         if (schemaVersion == WorldState.LEGACY_STAGE9_CONSTRUCTION_VERSION) {
@@ -281,7 +286,21 @@ public final class WorldStateCodec {
                     fleets,
                     jumps);
         }
+        if (schemaVersion == WorldState.LEGACY_STAGE16_VERSION) {
+            return WorldState.fromLegacyStage16(
+                    topology,
+                    systems,
+                    factions,
+                    strategies,
+                    nextProjectId,
+                    projects,
+                    pressures,
+                    nextFleetId,
+                    fleets,
+                    jumps);
+        }
 
+        List<WorldFactionIdentityState> identities = WorldFactionIdentityBinary.read(input);
         return new WorldState(
                 WorldState.CURRENT_VERSION,
                 topology,
@@ -293,7 +312,8 @@ public final class WorldStateCodec {
                 pressures,
                 nextFleetId,
                 fleets,
-                jumps);
+                jumps,
+                identities);
     }
 
     private static WorldState withStrategies(
@@ -310,6 +330,7 @@ public final class WorldStateCodec {
                 state.factionEconomicPressures(),
                 state.nextFleetIdValue(),
                 state.fleets(),
-                state.fleetJumps());
+                state.fleetJumps(),
+                state.factionIdentities());
     }
 }
