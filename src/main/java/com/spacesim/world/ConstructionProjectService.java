@@ -1,6 +1,7 @@
 package com.spacesim.world;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
 import com.spacesim.components.WalletComponent;
@@ -44,6 +45,7 @@ import java.util.Optional;
  */
 final class ConstructionProjectService {
     private final ContentCatalog catalog;
+    private final FactionIdentityResolver factionIdentityResolver;
     private final Map<StarSystemId, SimulationSession> sessionsById;
     private final Map<String, FactionEconomicAccount> factionAccountsById;
     private final ConstructionProjectIdAllocator idAllocator;
@@ -51,11 +53,14 @@ final class ConstructionProjectService {
 
     ConstructionProjectService(
             ContentCatalog catalog,
+            FactionIdentityResolver factionIdentityResolver,
             Map<StarSystemId, SimulationSession> sessionsById,
             Map<String, FactionEconomicAccount> factionAccountsById,
             long nextProjectIdValue,
             List<ConstructionProjectState> restoredProjects) {
         this.catalog = Objects.requireNonNull(catalog, "ContentCatalog construction не задан");
+        this.factionIdentityResolver = Objects.requireNonNull(
+                factionIdentityResolver, "FactionIdentityResolver construction not set");
         this.sessionsById = Objects.requireNonNull(sessionsById, "Construction sessions не заданы");
         this.factionAccountsById = Objects.requireNonNull(
                 factionAccountsById, "Construction faction accounts не заданы");
@@ -69,67 +74,63 @@ final class ConstructionProjectService {
     }
 
     ConstructionProjectId create(
-            String ownerFactionContentId,
-            String stationArchetypeContentId,
-            StarSystemId systemId,
-            float x,
-            float y) {
-        final ConstructionSettlementKind settlementKind;
-        final String ownerId;
-        final String legalFactionId;
-        if (ownerFactionContentId == null) {
-            settlementKind = ConstructionSettlementKind.EXTERNAL_OWNER;
-            ownerId = null;
-            legalFactionId = null;
-        } else {
-            ownerId = normalizedId(ownerFactionContentId, "Construction owner faction");
-            FactionEconomicAccount owner = requireFactionAccount(ownerId);
-            settlementKind = ConstructionSettlementKind.FACTION_TREASURY;
-            legalFactionId = owner.factionContentId();
-        }
+        String ownerFactionContentId,
+        String stationArchetypeContentId,
+        StarSystemId systemId,
+        float x,
+        float y) {
+    return create(ownerFactionContentId, ownerFactionContentId,
+            stationArchetypeContentId, systemId, x, y);
+}
 
-        ContentCatalog.StationArchetypeDefinition target = requireConstructible(stationArchetypeContentId);
-        SimulationSession session = requireSession(systemId);
-        if (!Float.isFinite(x) || !Float.isFinite(y)) {
-            throw new IllegalArgumentException("Construction coordinates должны быть конечными");
-        }
-
-        ConstructionProjectId projectId = idAllocator.allocate();
-        Entity site = ConstructionSiteFactory.create(catalog, projectId, target, legalFactionId, x, y);
-        EntityId siteId = session.createEntity(site);
-        long tick = session.getClock().getTick();
-        long minimumFunding = Money.fromCredits(target.construction().fundingCredits());
-        ConstructionDurationPolicy.Estimate duration = ConstructionDurationPolicy.estimate(catalog, target);
-        long buildDurationTicks = buildDurationTicks(duration.totalSeconds(), session);
-        List<ConstructionMaterialState> materials = new ArrayList<>();
-        for (Map.Entry<String, Integer> requirement : target.construction().materials().entrySet()) {
-            materials.add(new ConstructionMaterialState(requirement.getKey(), requirement.getValue(), 0));
-        }
-        materials.sort(ConstructionMaterialState::compareTo);
-
-        ConstructionProjectState state = new ConstructionProjectState(
-                projectId,
-                ownerId,
-                target.id(),
-                systemId,
-                x,
-                y,
-                siteId,
-                materials,
-                minimumFunding,
-                0L,
-                buildDurationTicks,
-                ConstructionProjectStatus.PLANNED,
-                tick,
-                tick,
-                -1L,
-                -1L,
-                null,
-                settlementKind,
-                legalFactionId);
-        projects.put(projectId, state);
-        return projectId;
+ConstructionProjectId create(
+        String ownerFactionContentId,
+        String legalFactionContentId,
+        String stationArchetypeContentId,
+        StarSystemId systemId,
+        float x,
+        float y) {
+    final ConstructionSettlementKind settlementKind;
+    final String ownerId;
+    if (ownerFactionContentId == null) {
+        settlementKind = ConstructionSettlementKind.EXTERNAL_OWNER;
+        ownerId = null;
+    } else {
+        ownerId = normalizedId(ownerFactionContentId, "Construction owner faction");
+        requireFactionAccount(ownerId);
+        settlementKind = ConstructionSettlementKind.FACTION_TREASURY;
     }
+    final String legalFactionId = legalFactionContentId == null
+            ? null : normalizedId(legalFactionContentId, "Construction legal faction");
+    final Integer legalFactionRuntimeId = requireLegalFaction(legalFactionId);
+
+    ContentCatalog.StationArchetypeDefinition target = requireConstructible(stationArchetypeContentId);
+    SimulationSession session = requireSession(systemId);
+    if (!Float.isFinite(x) || !Float.isFinite(y)) {
+        throw new IllegalArgumentException("Construction coordinates должны быть конечными");
+    }
+
+    ConstructionProjectId projectId = idAllocator.allocate();
+    Entity site = ConstructionSiteFactory.create(
+            catalog, projectId, target, legalFactionRuntimeId, x, y);
+    EntityId siteId = session.createEntity(site);
+    long tick = session.getClock().getTick();
+    long minimumFunding = Money.fromCredits(target.construction().fundingCredits());
+    ConstructionDurationPolicy.Estimate duration = ConstructionDurationPolicy.estimate(catalog, target);
+    long buildDurationTicks = buildDurationTicks(duration.totalSeconds(), session);
+    List<ConstructionMaterialState> materials = new ArrayList<>();
+    for (Map.Entry<String, Integer> requirement : target.construction().materials().entrySet()) {
+        materials.add(new ConstructionMaterialState(requirement.getKey(), requirement.getValue(), 0));
+    }
+    materials.sort(ConstructionMaterialState::compareTo);
+
+    ConstructionProjectState state = new ConstructionProjectState(
+            projectId, ownerId, target.id(), systemId, x, y, siteId, materials,
+            minimumFunding, 0L, buildDurationTicks, ConstructionProjectStatus.PLANNED,
+            tick, tick, -1L, -1L, null, settlementKind, legalFactionId);
+    projects.put(projectId, state);
+    return projectId;
+}
 
     long fund(ConstructionProjectId projectId, long amountMilliCredits) {
         if (amountMilliCredits <= 0L) {
@@ -395,14 +396,18 @@ final class ConstructionProjectService {
 
         ContentCatalog.StationArchetypeDefinition target = requireConstructible(
                 refreshed.stationArchetypeContentId());
-        Entity station = ArchetypeEntityFactory.createConstructedStation(
-                catalog,
-                target.id(),
-                target.displayName() + " #" + refreshed.id().value(),
-                refreshed.x(),
-                refreshed.y(),
-                refreshed.legalFactionContentId());
-        EntityId stationId = session.createEntity(station);
+        Integer legalFactionRuntimeId = requireLegalFaction(refreshed.legalFactionContentId());
+    Entity station = ArchetypeEntityFactory.createConstructedStation(
+            catalog,
+            target.id(),
+            target.displayName() + " #" + refreshed.id().value(),
+            refreshed.x(),
+            refreshed.y(),
+            null);
+    if (legalFactionRuntimeId != null) {
+        station.add(new FactionComponent(legalFactionRuntimeId));
+    }
+    EntityId stationId = session.createEntity(station);
 
         WalletComponent projectWallet = requireComponent(site, WalletComponent.class, "construction wallet");
         long remainingLiquidity = projectWallet.getBalanceMilliCredits();
@@ -518,11 +523,13 @@ final class ConstructionProjectService {
         return account;
     }
 
-    private void requireLegalFaction(String factionId) {
-        if (factionId != null && catalog.findFaction(factionId) == null) {
-            throw new IllegalArgumentException("Construction legal faction неизвестна: " + factionId);
-        }
+    private Integer requireLegalFaction(String factionId) {
+    if (factionId == null) {
+        return null;
     }
+    return factionIdentityResolver.runtimeId(factionId).orElseThrow(
+            () -> new IllegalArgumentException("Construction legal faction неизвестна: " + factionId));
+}
 
     private static void requireFactionSettlement(ConstructionProjectState state, String operation) {
         if (state.settlementKind() != ConstructionSettlementKind.FACTION_TREASURY) {

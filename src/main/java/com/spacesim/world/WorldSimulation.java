@@ -96,6 +96,7 @@ public final class WorldSimulation {
         this.territoryOwnerBySystem = Map.copyOf(territoryOwnerBySystem);
         this.constructionProjectService = new ConstructionProjectService(
                 contentCatalog,
+                this.factionIdentityResolver,
                 this.sessionsById,
                 this.factionAccountsById,
                 nextConstructionProjectIdValue,
@@ -795,14 +796,47 @@ public final class WorldSimulation {
      * @return stable world-level project ID
      */
     public ConstructionProjectId createConstructionProject(
-            String ownerFactionContentId,
-            String stationArchetypeContentId,
-            StarSystemId systemId,
-            float x,
-            float y) {
-        return constructionProjectService.create(
-                ownerFactionContentId, stationArchetypeContentId, systemId, x, y);
+        String ownerFactionContentId,
+        String stationArchetypeContentId,
+        StarSystemId systemId,
+        float x,
+        float y) {
+    return createConstructionProject(ownerFactionContentId, ownerFactionContentId,
+            stationArchetypeContentId, systemId, x, y);
+}
+
+/**
+ * Creates an ordinary project after the shared territorial legal check.
+ *
+ * <p>Economic settlement and legal faction identity are separate. A personally funded
+ * project can therefore represent the player's faction without using faction treasury.</p>
+ *
+ * @param ownerFactionContentId faction treasury payer, or {@code null} for external settlement
+ * @param legalFactionContentId represented faction, or {@code null} for private unaffiliated construction
+ * @param stationArchetypeContentId constructible station archetype
+ * @param systemId target system
+ * @param x finite X coordinate
+ * @param y finite Y coordinate
+ * @return stable project ID
+ * @throws IllegalStateException when ordinary construction is not legally authorized
+ */
+public ConstructionProjectId createConstructionProject(
+        String ownerFactionContentId,
+        String legalFactionContentId,
+        String stationArchetypeContentId,
+        StarSystemId systemId,
+        float x,
+        float y) {
+    TerritorialConstructionAuthorization.Decision authorization =
+            TerritorialConstructionAuthorization.evaluate(this, legalFactionContentId, systemId);
+    if (!authorization.allowed()) {
+        throw new IllegalStateException(
+                "Construction denied by territorial law: " + authorization.reason()
+                        + " controller=" + authorization.controllingFactionContentId());
     }
+    return constructionProjectService.create(ownerFactionContentId, legalFactionContentId,
+            stationArchetypeContentId, systemId, x, y);
+}
 
     /**
      * Физически переводит деньги faction treasury в project-site wallet.
