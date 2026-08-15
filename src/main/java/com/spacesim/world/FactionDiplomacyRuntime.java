@@ -10,14 +10,15 @@ import java.util.Objects;
 /**
  * Authoritative runtime projection of persistent institutional diplomacy.
  *
- * <p>The runtime currently owns immutable snapshots and expiry scheduling. Stage 17E.2 command
- * transitions mutate this same aggregate rather than introducing a parallel diplomacy store.</p>
+ * <p>The runtime currently owns immutable snapshots and access-transition scheduling. Stage 17E.2
+ * command transitions mutate this same aggregate rather than introducing a parallel diplomacy
+ * store.</p>
  */
 final class FactionDiplomacyRuntime {
     private final FactionIdentityResolver identities;
     private final List<FactionDiplomacyState> states;
     private final Map<String, FactionDiplomacyState> byId;
-    private long nextMarketAccessExpiryTick = -1L;
+    private long nextMarketAccessTransitionTick = -1L;
 
     FactionDiplomacyRuntime(
             FactionIdentityResolver identities,
@@ -48,7 +49,7 @@ final class FactionDiplomacyRuntime {
         return factionContentId == null ? null : byId.get(factionContentId.strip());
     }
 
-    /** Recomputes the next tick where an access-affecting treaty or embargo can expire. */
+    /** Recomputes the next tick where market-access law can activate or expire. */
     void noteMarketAccessPolicyRefreshed(long worldTick) {
         if (worldTick < 0L) {
             throw new IllegalArgumentException("Authoritative world tick cannot be negative");
@@ -56,29 +57,39 @@ final class FactionDiplomacyRuntime {
         long next = -1L;
         for (FactionDiplomacyState state : states) {
             for (DiplomaticEmbargoState embargo : state.embargoes()) {
-                if (embargo.scope() == DiplomaticEmbargoState.Scope.MARKET_ACCESS
-                        && embargo.expiresTick() > worldTick) {
+                if (embargo.scope() != DiplomaticEmbargoState.Scope.MARKET_ACCESS) {
+                    continue;
+                }
+                if (embargo.imposedTick() > worldTick) {
+                    next = earlier(next, embargo.imposedTick());
+                }
+                if (embargo.expiresTick() > worldTick) {
                     next = earlier(next, embargo.expiresTick());
                 }
             }
             for (DiplomaticTreatyState treaty : state.treaties()) {
-                if (treaty.containsMarketAccessClause()
-                        && (treaty.status() == DiplomaticTreatyState.Status.ACTIVE
-                        || treaty.status() == DiplomaticTreatyState.Status.TERMINATING)
-                        && treaty.expiresTick() > worldTick) {
+                if (!treaty.containsMarketAccessClause()
+                        || (treaty.status() != DiplomaticTreatyState.Status.ACTIVE
+                        && treaty.status() != DiplomaticTreatyState.Status.TERMINATING)) {
+                    continue;
+                }
+                if (treaty.effectiveTick() > worldTick) {
+                    next = earlier(next, treaty.effectiveTick());
+                }
+                if (treaty.expiresTick() > worldTick) {
                     next = earlier(next, treaty.expiresTick());
                 }
             }
         }
-        nextMarketAccessExpiryTick = next;
+        nextMarketAccessTransitionTick = next;
     }
 
-    /** @return true when the cached ECS market-access projection must be rebuilt for expiry */
+    /** @return true when the cached ECS access projection crossed an activation/expiry boundary */
     boolean marketAccessExpiryCrossed(long worldTick) {
         if (worldTick < 0L) {
             throw new IllegalArgumentException("Authoritative world tick cannot be negative");
         }
-        return nextMarketAccessExpiryTick >= 0L && worldTick >= nextMarketAccessExpiryTick;
+        return nextMarketAccessTransitionTick >= 0L && worldTick >= nextMarketAccessTransitionTick;
     }
 
     private void validateReferences(FactionDiplomacyState state) {
