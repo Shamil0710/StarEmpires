@@ -148,11 +148,11 @@ class Stage17F2FiscalPolicyAcceptanceTest {
                 treasuryBefore + report.totalCollectedMilliCredits(),
                 world.findFactionEconomicState(TRADE_LEAGUE).orElseThrow().treasuryMilliCredits());
         assertTrue(world.snapshot().systems().stream()
-                .flatMap(system -> system.simulationState().ledger().stream())
+                .flatMap(system -> system.simulationState().ledger().entries().stream())
                 .anyMatch(entry -> entry.type() == EconomicTransaction.Type.MONEY_TRANSFER
                         && "faction-station-tax".equals(entry.reason())));
         assertTrue(world.snapshot().systems().stream()
-                .flatMap(system -> system.simulationState().ledger().stream())
+                .flatMap(system -> system.simulationState().ledger().entries().stream())
                 .anyMatch(entry -> entry.type() == EconomicTransaction.Type.MONEY_TRANSFER
                         && "faction-territory-tariff".equals(entry.reason())));
     }
