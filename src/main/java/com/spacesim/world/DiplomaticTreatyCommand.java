@@ -35,7 +35,14 @@ public sealed interface DiplomaticTreatyCommand permits
             String counterpartyFactionContentId,
             List<DiplomaticTreatyClauseState> clauses,
             long expiresTick) implements DiplomaticTreatyCommand {
-        /** Validates immutable offer input. */
+        /**
+         * Validates immutable offer input.
+         *
+         * @param actorFactionContentId proposing faction
+         * @param counterpartyFactionContentId receiving faction
+         * @param clauses explicit proposed rights/obligations
+         * @param expiresTick treaty expiry after acceptance, or -1 for indefinite
+         */
         public Offer {
             actorFactionContentId = requireId(actorFactionContentId, "Treaty proposer faction ID");
             counterpartyFactionContentId = requireId(counterpartyFactionContentId, "Treaty counterparty faction ID");
@@ -60,7 +67,14 @@ public sealed interface DiplomaticTreatyCommand permits
             String treatyId,
             List<DiplomaticTreatyClauseState> clauses,
             long expiresTick) implements DiplomaticTreatyCommand {
-        /** Validates immutable counteroffer input. */
+        /**
+         * Validates immutable counteroffer input.
+         *
+         * @param actorFactionContentId responding faction
+         * @param treatyId incoming proposed treaty ID
+         * @param clauses replacement proposed rights/obligations
+         * @param expiresTick replacement treaty expiry after acceptance, or -1 for indefinite
+         */
         public CounterOffer {
             actorFactionContentId = requireId(actorFactionContentId, "Counteroffer actor faction ID");
             treatyId = requireId(treatyId, "Countered treaty ID");
@@ -76,7 +90,12 @@ public sealed interface DiplomaticTreatyCommand permits
      * @param treatyId proposed treaty ID
      */
     record Accept(String actorFactionContentId, String treatyId) implements DiplomaticTreatyCommand {
-        /** Validates immutable acceptance input. */
+        /**
+         * Validates immutable acceptance input.
+         *
+         * @param actorFactionContentId accepting faction
+         * @param treatyId proposed treaty ID
+         */
         public Accept {
             actorFactionContentId = requireId(actorFactionContentId, "Treaty acceptance actor faction ID");
             treatyId = requireId(treatyId, "Accepted treaty ID");
@@ -90,7 +109,12 @@ public sealed interface DiplomaticTreatyCommand permits
      * @param treatyId proposed treaty ID
      */
     record Reject(String actorFactionContentId, String treatyId) implements DiplomaticTreatyCommand {
-        /** Validates immutable rejection input. */
+        /**
+         * Validates immutable rejection input.
+         *
+         * @param actorFactionContentId rejecting faction
+         * @param treatyId proposed treaty ID
+         */
         public Reject {
             actorFactionContentId = requireId(actorFactionContentId, "Treaty rejection actor faction ID");
             treatyId = requireId(treatyId, "Rejected treaty ID");
@@ -108,7 +132,13 @@ public sealed interface DiplomaticTreatyCommand permits
             String actorFactionContentId,
             String treatyId,
             long noticeTicks) implements DiplomaticTreatyCommand {
-        /** Validates immutable termination input. */
+        /**
+         * Validates immutable termination input.
+         *
+         * @param actorFactionContentId terminating treaty party
+         * @param treatyId active treaty ID
+         * @param noticeTicks strictly positive notice duration in authoritative ticks
+         */
         public TerminateWithNotice {
             actorFactionContentId = requireId(actorFactionContentId, "Treaty termination actor faction ID");
             treatyId = requireId(treatyId, "Terminated treaty ID");
@@ -129,7 +159,13 @@ public sealed interface DiplomaticTreatyCommand permits
             String actorFactionContentId,
             String treatyId,
             String reasonKey) implements DiplomaticTreatyCommand {
-        /** Validates immutable breach input. */
+        /**
+         * Validates immutable breach input.
+         *
+         * @param actorFactionContentId breaching faction
+         * @param treatyId active treaty ID
+         * @param reasonKey stable diagnostic reason key, possibly empty
+         */
         public Breach {
             actorFactionContentId = requireId(actorFactionContentId, "Treaty breach actor faction ID");
             treatyId = requireId(treatyId, "Breached treaty ID");
@@ -152,7 +188,13 @@ public sealed interface DiplomaticTreatyCommand permits
             String actorFactionContentId,
             String treatyId,
             long expiresTick) implements DiplomaticTreatyCommand {
-        /** Validates immutable renewal input. */
+        /**
+         * Validates immutable renewal input.
+         *
+         * @param actorFactionContentId party proposing renewal
+         * @param treatyId existing treaty ID whose clauses are copied
+         * @param expiresTick new treaty expiry after acceptance, or -1 for indefinite
+         */
         public Renew {
             actorFactionContentId = requireId(actorFactionContentId, "Treaty renewal actor faction ID");
             treatyId = requireId(treatyId, "Renewed treaty ID");
