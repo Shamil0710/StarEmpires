@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "status": "design-baseline-candidate",
+  "unitSystem": "SI",
+  "sourceDocument": "docs/ship_mathematics_v1_0_design_baseline.md",
+  "baselineIntent": "Freeze the fundamental ship/combat/world-scale data model before Stage 17.5 runtime promotion. Numeric authoring calibration remains tunable inside this architecture.",
+  "externalEngineeringBasis": [
+    {"source": "NASA NTRS 19920073979", "topic": "projectile shape and material change hypervelocity damage"},
+    {"source": "NASA NTRS 20240000104", "topic": "ballistic-limit response is empirical and impact-condition/material dependent"},
+    {"source": "NASA NTRS 19890011875", "topic": "obliquity changes hypervelocity penetration/ricochet response"},
+    {"source": "NASA NTRS 20000024801 / 19680053086", "topic": "rocket exhaust has measurable spectral radiance"},
+    {"source": "NASA NTRS 20070008237", "topic": "plume emission spectroscopy carries engine-state/material information"},
+    {"source": "NASA NTRS 20250002268 / 19790008003", "topic": "radar cross section depends on frequency and aspect"},
+    {"source": "NASA NTRS 20230000548", "topic": "state estimate and covariance are coupled navigation products"}
+  ],
+  "frozenArchitecturalPrinciples": [
+    "player and AI use the same physical/economic capability model",
+    "roles emerge from geometry, budgets, technology and logistics rather than class-name bonuses",
+    "all authoritative physical values use SI units",
+    "modules share one integration contract and contribute to common ship budgets",
+    "detection, classification, tracking and fire-control are distinct information states",
+    "damage changes real subsystem capabilities instead of applying generic debuffs",
+    "world scale, combat scale, sensor scale and logistics cadence use one physical coordinate/time meaning",
+    "fictional shields and FTL remain explicit energy/mass/power/heat/time systems rather than free magic ratings"
+  ],
+  "commonModuleContract": {
+    "requiredFieldsWhereApplicable": [
+      "stableId",
+      "integrationCategory",
+      "compatibleSlotOrHardpoint",
+      "dimensionsM",
+      "massKg",
+      "occupiedVolumeM3",
+      "structuralMountingRequirements",
+      "continuousPowerSupplyW",
+      "continuousPowerDemandW",
+      "peakPowerDemandW",
+      "storedEnergyCapacityJ",
+      "wasteHeatW",
+      "localThermalCapacityJ",
+      "coolantTransferDemandW",
+      "heatRejectionW",
+      "crewAutomation",
+      "ammunitionOrConsumableInterfaces",
+      "reactionMassInterfaces",
+      "signatureContributions",
+      "maintenanceDamageState",
+      "constructionInputs",
+      "capabilitySpecificParameters"
+    ],
+    "moduleFamilies": [
+      "REACTOR_POWER",
+      "ENERGY_STORAGE",
+      "MAIN_DRIVE",
+      "MANEUVER_THRUSTERS",
+      "FTL_JUMP",
+      "THERMAL_CONTROL",
+      "SENSOR_EW_FIRE_CONTROL",
+      "COMMUNICATION_DATALINK",
+      "SHIELD_FIELD",
+      "ARMOR_PROTECTION",
+      "WEAPON_AMMUNITION",
+      "CREW_LIFE_SUPPORT_AUTOMATION",
+      "CARGO_TANK_STORES",
+      "HANGAR_SMALL_CRAFT",
+      "MINING_SALVAGE_REPAIR_INDUSTRIAL_SCIENCE"
+    ],
+    "shipBudgets": [
+      "massKg",
+      "volumeAndGeometry",
+      "centerOfMassAndFutureInertia",
+      "powerW",
+      "storedEnergyJ",
+      "heatWAndThermalCapacityJ",
+      "crewAutomation",
+      "ammunitionStoresReactionMass",
+      "thrustAccelerationDeltaV",
+      "signatureByChannelAndAspect",
+      "sensorTrackCapability",
+      "damageRedundancyCompartmentExposure",
+      "maintenanceLogisticsOperatingCost"
+    ]
+  },
+  "integratedFitDemonstrator": {
+    "status": "synthetic-schema-proof-not-final-destroyer-content",
+    "moduleMassEnvelopeKg": 4500000.0,
+    "integrationVolumeEnvelopeM3": 20000.0,
+    "supportedCrew": 220,
+    "derived": {
+      "massKg": 4330000.0,
+      "volumeM3": 18900.0,
+      "continuousPowerSupplyW": 1000000000.0,
+      "continuousPowerDemandW": 297000000.0,
+      "continuousPowerMarginW": 703000000.0,
+      "peakPowerDemandW": 2515000000.0,
+      "storedEnergyCapacityJ": 230000000000.0,
+      "wasteHeatW": 197000000.0,
+      "heatRejectionW": 300000000.0,
+      "continuousHeatMarginW": 103000000.0,
+      "crewRequired": 216
+    }
+  },
+  "baselineMaterialCatalog": {
+    "status": "rounded-authoring-material-seeds-not-certified-engineering-data",
+    "materials": [
+      {"id": "material.structural_aluminum_v1", "densityKgPerM3": 2700.0, "role": "STRUCTURE"},
+      {"id": "material.high_strength_steel_v1", "densityKgPerM3": 7850.0, "role": "CITADEL"},
+      {"id": "material.ceramic_strike_face_v1", "densityKgPerM3": 3600.0, "role": "ARMOR_FACE"},
+      {"id": "material.carbon_composite_v1", "densityKgPerM3": 1600.0, "role": "STRUCTURE"},
+      {"id": "material.high_density_penetrator_v1", "densityKgPerM3": 19000.0, "role": "PENETRATOR"}
+    ],
+    "heavyImpactRule": "Static material strength is not used as a universal HVI penetration equation. Heavy impacts select a material/geometry/configuration response surface and reject extrapolation outside its calibration domain."
+  },
+  "heavyImpactResponseSurfaceSeed": {
+    "id": "response.m_dart_vs_citadel_v1",
+    "projectileMaterialId": "material.high_density_penetrator_v1",
+    "targetStackId": "stack.ceramic_spaced_steel_citadel_v1",
+    "calibrationStatus": "AUTHORING_CALIBRATION_NOT_REAL_MATERIAL_TRUTH",
+    "domain": {
+      "velocityMps": [10000.0, 20000.0],
+      "diameterM": [0.04, 0.07],
+      "lengthM": [0.50, 0.90],
+      "incidenceAngleRad": [0.0, 1.0471975511965976]
+    },
+    "requiredProductionAxes": [
+      "projectileMaterial",
+      "projectileDensityKgPerM3",
+      "projectileShape",
+      "projectileLengthM",
+      "projectileDiameterM",
+      "impactVelocityMps",
+      "incidenceAngleRad",
+      "targetLayerMaterials",
+      "targetLayerThicknessesM",
+      "layerSpacingM"
+    ],
+    "requiredOutputs": [
+      "perforationOrRicochetOrStop",
+      "residualMassFraction",
+      "residualVelocityVector",
+      "depositedEnergyJ",
+      "ejectaOrSpallMassKg",
+      "fragmentDistribution",
+      "structuralDamageGeometry",
+      "nextLayerDamagePackets"
+    ]
+  },
+  "shieldFieldBaseline": {
+    "technologyStatus": "FICTIONAL_EXOTIC_AUTHORING_SEED",
+    "rule": "Shield capability is local field energy plus interaction power, coupling, recharge and heat; it is not generic hull HP.",
+    "fieldEnergyCapacityJ": 120000000000.0,
+    "fieldEnergyCostPerDeflectedIncidentJ": 0.25,
+    "maxInteractionPowerW": 5000000000000.0,
+    "thermalizedIncidentFraction": 0.05,
+    "rechargeInputPowerW": 600000000.0,
+    "rechargeEfficiency": 0.85,
+    "restartDelayS": 20.0,
+    "requiredContentParameters": [
+      "coverageGeometryOrArcs",
+      "damageTypeCoupling",
+      "fieldEnergyCapacityJ",
+      "fieldEnergyCostPerIncidentJ",
+      "maxInteractionPowerW",
+      "idlePowerW",
+      "rechargePowerW",
+      "rechargeEfficiency",
+      "wasteHeatW",
+      "localThermalCapacityJ",
+      "emitterDamageState",
+      "collapseRestartPolicy"
+    ]
+  },
+  "ftlJumpBaseline": {
+    "technologyStatus": "FICTIONAL_EXOTIC_AUTHORING_SEED",
+    "rule": "Inter-system jump remains topology-mediated. Drive capability pays translated mass, energy, charge power, heat, spool and cooldown; edge transit time is explicit world data rather than an instantaneous teleport or class rating.",
+    "referenceDrive": {
+      "maxTranslatedMassKg": 100000000.0,
+      "translationEnergyPerKgJ": 25000.0,
+      "chargePowerW": 5000000000.0,
+      "chargeEfficiency": 0.80,
+      "cooldownS": 90.0
+    },
+    "referenceDestroyer": {
+      "translatedMassKg": 21927000.0,
+      "requiredTranslationEnergyJ": 548175000000.0,
+      "spoolTimeS": 137.04375,
+      "exampleEdgeTransitTimeS": 30.0
+    },
+    "note": "Current Stage-10 1.3-s test-topology transit remains a compatibility fixture, not the frozen Stage-19 world-scale distribution."
+  },
+  "signatureBaseline": {
+    "thermal": "temperature/emissivity/visible projected area by orientation",
+    "enginePlume": "jet-power-derived spectral band source with explicit setting-calibrated radiative fraction and aspect function",
+    "radar": "frequency x aspect RCS table/function",
+    "reflectedOptical": "illumination geometry + phase angle + BRDF/reflectance",
+    "informationStates": ["DETECTED", "CLASSIFIED", "TRACKED", "FIRE_CONTROL"],
+    "noScalarStealthRating": true
+  },
+  "representativeReferenceDesigns": [
+    {"id": "TORPEDO_CORVETTE", "departureMassKg": 2140000.0, "maxAccelerationMps2": 1.02803738317757, "nominalDeltaVMps": 32902.34126082223},
+    {"id": "ESCORT_DESTROYER", "departureMassKg": 21927000.0, "maxAccelerationMps2": 0.601997537282802, "nominalDeltaVMps": 38454.71005152617},
+    {"id": "BATTLESHIP", "departureMassKg": 545765000.0, "maxAccelerationMps2": 0.2519399375188955, "nominalDeltaVMps": 45642.912661282484},
+    {"id": "BULK_FREIGHTER_LOADED", "departureMassKg": 143000000.0, "maxAccelerationMps2": 0.08391608391608392, "nominalDeltaVMps": 15372.800463539408},
+    {"id": "FLEET_TANKER_LOADED", "departureMassKg": 170000000.0, "maxAccelerationMps2": 0.14705882352941177, "nominalDeltaVMps": 19415.60144409574}
+  ],
+  "worldScaleCoupling": {
+    "canonicalLocalDistanceUnit": "m",
+    "canonicalTimeUnit": "s",
+    "representativeHeavyWeaponEnvelopeM": 3000000.0,
+    "referenceLocalLogisticsLegM": 100000000.0,
+    "loadedFreighterReferenceTravelTimeS": 69041.05059069325,
+    "destroyerCentralPlumeDetectionRangeM": 30148963649.987473,
+    "requiredStage19Calibration": [
+      "station-to-station travel",
+      "station-to-resource-zone travel",
+      "inner-to-outer-system travel",
+      "jump-arrival-to-hub travel",
+      "inter-system edge energy/spool/transit/cooldown",
+      "regional multi-hop logistics",
+      "sensor visibility against generated object spacing",
+      "combat and formation scale against navigation scale",
+      "production/consumption/construction cadence against real delivery time"
+    ]
+  },
+  "closureDomains": [
+    {"id": "hull-slot-geometry", "architectureClosed": true},
+    {"id": "mass-volume-propulsion-delta-v", "architectureClosed": true},
+    {"id": "power-energy", "architectureClosed": true},
+    {"id": "thermal-local-and-ship", "architectureClosed": true},
+    {"id": "sensors-signatures-tracks", "architectureClosed": true},
+    {"id": "ecm-eccm-decoys", "architectureClosed": true},
+    {"id": "kinetic-beam-guided-point-defense", "architectureClosed": true},
+    {"id": "ammunition-magazines-layered-defense", "architectureClosed": true},
+    {"id": "armor-debris-heavy-impact", "architectureClosed": true},
+    {"id": "compartments-subsystem-damage", "architectureClosed": true},
+    {"id": "shield-field", "architectureClosed": true},
+    {"id": "ftl-jump-integration", "architectureClosed": true},
+    {"id": "crew-automation-mission-modules", "architectureClosed": true},
+    {"id": "civilian-logistics-reference-designs", "architectureClosed": true},
+    {"id": "world-scale-coupling", "architectureClosed": true},
+    {"id": "economy-construction-maintenance-seam", "architectureClosed": true},
+    {"id": "shared-player-ai-capability-contract", "architectureClosed": true}
+  ],
+  "allowedPostV1ChangesWithoutArchitectureReopen": [
+    "balance coefficients",
+    "additional material and response-surface datasets",
+    "additional hulls/modules/variants",
+    "technology ladder values",
+    "faction doctrine content",
+    "world-generation distributions calibrated through the frozen physical interfaces",
+    "economy/maintenance/repair coefficients that use existing budgets"
+  ],
+  "requiresArchitectureChangeRequest": [
+    "new fundamental ship budget/stat outside the common contract",
+    "player-only or AI-only physical capability formula",
+    "new distance/time system without SI mapping",
+    "class-name combat bonus not derivable from physical/system inputs",
+    "damage model that bypasses subsystem/compartment state",
+    "module family requiring an incompatible parallel resource model"
+  ]
+}
