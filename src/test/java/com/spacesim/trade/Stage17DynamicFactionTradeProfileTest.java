@@ -30,4 +30,12 @@ class Stage17DynamicFactionTradeProfileTest {
                 0f, 0f, 10f, 1_000L, 10, 0, 10, -1, false, null,
                 Constants.FACTION_RUNTIME_CAPACITY, new int[Constants.MAX_ITEMS], reputation));
     }
+
+    @Test
+    void rejectsLegacySizedReputationVectorForDynamicPlanning() {
+        assertThrows(IllegalArgumentException.class, () -> new FleetTradeProfile(
+                0f, 0f, 10f, 1_000L, 10, 0, 10, -1, false, null,
+                Constants.LEGACY_FACTION_COUNT, new int[Constants.MAX_ITEMS],
+                new float[Constants.LEGACY_FACTION_COUNT]));
+    }
 }
