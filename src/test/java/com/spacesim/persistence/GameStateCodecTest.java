@@ -1,5 +1,7 @@
 package com.spacesim.persistence;
 
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.MarketComponent;
 import com.spacesim.simulation.SimulationSession;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,6 +26,9 @@ class GameStateCodecTest {
     @Test
     void binaryEncodeDecodeДаётExactGameStateRoundTrip() {
         SimulationSession session = progressedSession();
+        MarketComponent market = firstMarket(session);
+        market.configuredTargetStock[0] = 17;
+        market.targetStock[0] = 33;
         GameState state = session.snapshot();
 
         byte[] first = GameStateCodec.encode(state);
@@ -33,6 +38,12 @@ class GameStateCodecTest {
         assertArrayEquals(first, second);
         assertEquals(state, decoded);
         assertArrayEquals(first, GameStateCodec.encode(decoded));
+        EntityState decodedMarket = decoded.entities().stream()
+                .filter(entity -> entity.market() != null)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(17, decodedMarket.market().configuredTargetStock().get(0));
+        assertEquals(33, decodedMarket.market().targetStock().get(0));
     }
 
     @Test
@@ -127,6 +138,16 @@ class GameStateCodecTest {
                 state.ledger(),
                 state.entities());
         assertThrows(IllegalArgumentException.class, () -> GameStateCodec.encode(unsupported));
+    }
+
+    private static MarketComponent firstMarket(SimulationSession session) {
+        for (Entity entity : session.getEngine().getEntities()) {
+            MarketComponent market = entity.getComponent(MarketComponent.class);
+            if (market != null) {
+                return market;
+            }
+        }
+        throw new AssertionError("Demo session has no market entity");
     }
 
     private SimulationSession progressedSession() {
