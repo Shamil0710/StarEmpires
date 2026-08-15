@@ -39,7 +39,13 @@ public record DiplomaticTreatyClauseState(
         MUTUAL
     }
 
-    /** Validates scope semantics and canonical values. */
+    /**
+     * Validates scope semantics and canonical values.
+     *
+     * @param kind semantic clause kind
+     * @param direction grant/obligation direction relative to treaty owner and counterparty
+     * @param systemId optional territorial scope; required only for construction rights
+     */
     public DiplomaticTreatyClauseState {
         kind = Objects.requireNonNull(kind, "Treaty clause kind not set");
         direction = Objects.requireNonNull(direction, "Treaty clause direction not set");
