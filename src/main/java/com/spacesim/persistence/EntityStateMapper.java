@@ -173,7 +173,7 @@ public final class EntityStateMapper {
             entity.add(component);
         }
         if (state.archetype() != null) {
-            entity.add(new ArchetypeComponent(state.archetype().contentId));
+            entity.add(new ArchetypeComponent(state.archetype().contentId()));
         }
         return entity;
     }
