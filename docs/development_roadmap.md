@@ -669,13 +669,15 @@ physical stock gap + partner/alternative supply
 
 ## 17F — faction policies / strategic economy
 
-**NEXT — следующий Stage-17 implementation block после закрытия 17E.**
+**ACTIVE — 17F.1 COMPLETE в PR #109; 17F.2 fiscal policy — NEXT.**
 
 Цель — дать player faction и AI factions общий набор государственных economic-policy решений. Policy не заменяет рынок: она изменяет бюджеты, правовые ограничения и strategic demand, после чего реагирует обычная экономика.
 
 ### 17F.1 — doctrine profile
 
-Persistent/data-driven doctrine задаёт веса общей decision model, а не performance bonus. Player faction получает editable baseline doctrine в допустимых пределах; authored AI factions получают характерные profiles.
+**COMPLETE — PR #109.** Persistent `FactionDoctrineState` хранит семь bounded `[0,100]` institutional axes и входит в versioned world persistence v6. v1-v5 saves мигрируют в neutral midpoint doctrine без выдумывания исторически отсутствовавшей faction personality. Authored AI factions получают разные data-driven profiles из content catalog; профиль входит в semantic content fingerprint и materialize-ится при создании нового мира. Dynamic player-created faction стартует neutral и редактируется через тот же `WorldSimulation.updateFactionDoctrine(...)` boundary.
+
+Doctrine задаёт веса общей decision model, а не performance bonus. Уже подключённый common treaty evaluator читает live persistent doctrine receiving faction; изменение профиля не переносит деньги/товары, не меняет production/combat/territory/legal access и не переписывает diplomatic history.
 
 Doctrine влияет на:
 
@@ -688,7 +690,7 @@ Doctrine влияет на:
 
 ### 17F.2 — fiscal policy
 
-Faction может задавать:
+**NEXT.** Faction может задавать:
 
 - own-station tax rate;
 - territorial foreign-station levy;

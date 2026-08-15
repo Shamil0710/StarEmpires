@@ -160,7 +160,8 @@ final class WorldTerritoryBinary {
                     payload.claims,
                     payload.controls,
                     payload.recognitions,
-                    payload.rights));
+                    payload.rights,
+                    strategy.doctrine()));
         }
         if (!payloads.isEmpty()) {
             throw new IllegalArgumentException("Territorial trailer references unknown factions");

@@ -68,6 +68,32 @@ final class TerritorialControlRuntime {
         return factionContentId == null ? null : strategiesById.get(factionContentId);
     }
 
+    FactionStrategicState updateDoctrine(String factionContentId, FactionDoctrineState doctrine) {
+        String factionId = requireFaction(factionContentId);
+        FactionDoctrineState checked = Objects.requireNonNull(doctrine, "Faction doctrine not set");
+        FactionStrategicState current = strategiesById.get(factionId);
+        if (current.doctrine().equals(checked)) {
+            return current;
+        }
+        FactionStrategicState replacementState = new FactionStrategicState(
+                current.factionContentId(),
+                current.minimumMarketAccessRelation(),
+                current.relations(),
+                current.controlledSystems(),
+                current.stationTaxBasisPoints(),
+                current.foreignTerritoryTariffBasisPoints(),
+                current.stockPolicies(),
+                current.productionPolicies(),
+                current.strategicGoals(),
+                current.territorialClaims(),
+                current.territorialControlStates(),
+                current.territorialRecognitions(),
+                current.constructionRightsGranted(),
+                checked);
+        replaceStrategy(replacementState);
+        return replacementState;
+    }
+
     String controller(StarSystemId systemId) {
         return systemId == null ? null : controllerBySystem.get(systemId);
     }
@@ -707,7 +733,8 @@ final class TerritorialControlRuntime {
                 claims,
                 controls,
                 recognitions,
-                rights);
+                rights,
+                state.doctrine());
     }
 
     /**

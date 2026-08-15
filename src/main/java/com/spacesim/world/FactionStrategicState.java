@@ -23,6 +23,7 @@ import java.util.Set;
  * @param territorialControlStates maintenance clocks for systems in {@code controlledSystems}
  * @param territorialRecognitions directed recognition of other factions' claims/control
  * @param constructionRightsGranted explicit foreign construction concessions granted by this faction
+ * @param doctrine persistent institutional decision preferences; never a direct performance modifier
  */
 public record FactionStrategicState(
         String factionContentId,
@@ -37,8 +38,41 @@ public record FactionStrategicState(
         List<TerritorialClaimState> territorialClaims,
         List<TerritorialControlState> territorialControlStates,
         List<TerritorialRecognitionState> territorialRecognitions,
-        List<TerritorialConstructionRightState> constructionRightsGranted)
+        List<TerritorialConstructionRightState> constructionRightsGranted,
+        FactionDoctrineState doctrine)
         implements Comparable<FactionStrategicState> {
+
+    /**
+     * Compact bootstrap constructor with an explicit Stage-17F doctrine profile.
+     *
+     * @param factionContentId stable faction ID
+     * @param minimumMarketAccessRelation relation threshold for ordinary market access
+     * @param relations directed strategic relations
+     * @param controlledSystems initially controlled systems
+     * @param doctrine institutional decision profile
+     */
+    public FactionStrategicState(
+            String factionContentId,
+            int minimumMarketAccessRelation,
+            List<FactionRelationState> relations,
+            List<StarSystemId> controlledSystems,
+            FactionDoctrineState doctrine) {
+        this(
+                factionContentId,
+                minimumMarketAccessRelation,
+                relations,
+                controlledSystems,
+                0,
+                0,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                legacyControlStates(controlledSystems),
+                List.of(),
+                List.of(),
+                doctrine);
+    }
 
     /**
      * Source-compatible diplomacy/territory constructor с нулевой fiscal/economic policy.
@@ -135,7 +169,60 @@ public record FactionStrategicState(
                 List.of(),
                 legacyControlStates(controlledSystems),
                 List.of(),
-                List.of());
+                List.of(),
+                FactionDoctrineState.neutral());
+    }
+
+    /**
+     * Source-compatible pre-Stage-17F canonical constructor.
+     *
+     * <p>Callers using the former complete strategic shape migrate to a neutral institutional
+     * doctrine. Runtime copy paths must use the canonical constructor and explicitly preserve the
+     * existing doctrine.</p>
+     *
+     * @param factionContentId stable owner faction content ID
+     * @param minimumMarketAccessRelation market access relation threshold
+     * @param relations directed relations
+     * @param controlledSystems controlled systems
+     * @param stationTaxBasisPoints own-station tax rate
+     * @param foreignTerritoryTariffBasisPoints foreign-market territorial levy
+     * @param stockPolicies base stock floors
+     * @param productionPolicies production policies
+     * @param strategicGoals active strategic goals
+     * @param territorialClaims political claim states
+     * @param territorialControlStates maintenance state for controlled systems
+     * @param territorialRecognitions directed territorial recognition states
+     * @param constructionRightsGranted foreign construction concessions
+     */
+    public FactionStrategicState(
+            String factionContentId,
+            int minimumMarketAccessRelation,
+            List<FactionRelationState> relations,
+            List<StarSystemId> controlledSystems,
+            int stationTaxBasisPoints,
+            int foreignTerritoryTariffBasisPoints,
+            List<FactionStockPolicyState> stockPolicies,
+            List<FactionProductionPolicyState> productionPolicies,
+            List<FactionStrategicGoalState> strategicGoals,
+            List<TerritorialClaimState> territorialClaims,
+            List<TerritorialControlState> territorialControlStates,
+            List<TerritorialRecognitionState> territorialRecognitions,
+            List<TerritorialConstructionRightState> constructionRightsGranted) {
+        this(
+                factionContentId,
+                minimumMarketAccessRelation,
+                relations,
+                controlledSystems,
+                stationTaxBasisPoints,
+                foreignTerritoryTariffBasisPoints,
+                stockPolicies,
+                productionPolicies,
+                strategicGoals,
+                territorialClaims,
+                territorialControlStates,
+                territorialRecognitions,
+                constructionRightsGranted,
+                FactionDoctrineState.neutral());
     }
 
     /**
@@ -154,6 +241,7 @@ public record FactionStrategicState(
      * @param territorialControlStates maintenance state for every controlled system
      * @param territorialRecognitions directed territorial recognition states
      * @param constructionRightsGranted foreign construction concessions granted by this faction
+     * @param doctrine persistent institutional decision preferences
      */
     public FactionStrategicState {
         factionContentId = requireId(factionContentId, "Faction content ID");
@@ -171,6 +259,7 @@ public record FactionStrategicState(
         Objects.requireNonNull(territorialControlStates, "Territorial control states not set");
         Objects.requireNonNull(territorialRecognitions, "Territorial recognitions not set");
         Objects.requireNonNull(constructionRightsGranted, "Construction rights not set");
+        Objects.requireNonNull(doctrine, "Faction doctrine not set");
 
         List<FactionRelationState> sortedRelations = new ArrayList<>(relations.size());
         Set<String> relationTargets = new HashSet<>();

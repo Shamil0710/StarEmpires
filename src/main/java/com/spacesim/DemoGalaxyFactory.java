@@ -6,6 +6,7 @@ import com.spacesim.economy.Money;
 import com.spacesim.simulation.SimulationSession;
 import com.spacesim.world.AsteroidFieldId;
 import com.spacesim.world.AsteroidFieldNode;
+import com.spacesim.world.FactionDoctrineState;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionRelationState;
 import com.spacesim.world.FactionStrategicState;
@@ -134,21 +135,39 @@ public final class DemoGalaxyFactory {
                                 List.of(
                                         new FactionRelationState("faction.miners", 10),
                                         new FactionRelationState("faction.trade_league", 10)),
-                                List.of(FRONTIER_SYSTEM_ID)),
+                                List.of(FRONTIER_SYSTEM_ID),
+                                doctrineState(content, "faction.neutral")),
                         new FactionStrategicState(
                                 "faction.trade_league",
                                 -25,
                                 List.of(
                                         new FactionRelationState("faction.miners", 5),
                                         new FactionRelationState("faction.neutral", 20)),
-                                List.of(ACTIVE_SYSTEM_ID)),
+                                List.of(ACTIVE_SYSTEM_ID),
+                                doctrineState(content, "faction.trade_league")),
                         new FactionStrategicState(
                                 "faction.miners",
                                 -25,
                                 List.of(
                                         new FactionRelationState("faction.neutral", 10),
                                         new FactionRelationState("faction.trade_league", 5)),
-                                List.of(INNER_SYSTEM_ID))));
+                                List.of(INNER_SYSTEM_ID),
+                                doctrineState(content, "faction.miners"))));
+    }
+
+    private static FactionDoctrineState doctrineState(ContentCatalog content, String factionContentId) {
+        ContentCatalog.FactionDefinition faction = Objects.requireNonNull(
+                content.findFaction(factionContentId),
+                "Authored faction missing from content catalog: " + factionContentId);
+        ContentCatalog.FactionDoctrineDefinition doctrine = faction.doctrine();
+        return new FactionDoctrineState(
+                doctrine.tradeOpenness(),
+                doctrine.securityPosture(),
+                doctrine.expansionPreference(),
+                doctrine.sovereigntySensitivity(),
+                doctrine.treatyLegalism(),
+                doctrine.interventionism(),
+                doctrine.economicResiliencePriority());
     }
 
     private static FactionEconomicState factionState(String contentId, double treasuryCredits) {

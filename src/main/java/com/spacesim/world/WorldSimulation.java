@@ -468,6 +468,23 @@ public final class WorldSimulation {
     }
 
     /**
+     * Replaces one faction's persistent institutional doctrine through the common player/AI boundary.
+     *
+     * <p>This operation changes decision preferences only. It does not refresh legal market access,
+     * transfer money, move cargo, alter territory, create assets or rewrite diplomatic history.
+     * Subsequent common evaluators read the new profile directly from strategic state.</p>
+     *
+     * @param factionContentId authored or world-defined stable faction ID
+     * @param doctrine new bounded institutional profile
+     * @return installed canonical strategic state
+     */
+    public FactionStrategicState updateFactionDoctrine(
+            String factionContentId,
+            FactionDoctrineState doctrine) {
+        return territorialControlRuntime.updateDoctrine(factionContentId, doctrine);
+    }
+
+    /**
      * Resolves authored or world-defined stable faction ID to its local ECS runtime slot.
      *
      * @param stableFactionId stable faction ID or {@code null}

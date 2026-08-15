@@ -20,6 +20,35 @@ public final class DiplomaticTreatyEvaluator {
     }
 
     /**
+     * Evaluates one incoming proposal using the receiving faction's persistent Stage-17F doctrine.
+     *
+     * <p>This is the ordinary player/AI policy path. The doctrine changes only evaluator weights;
+     * world capabilities and physical state remain untouched.</p>
+     *
+     * @param world authoritative world containing the proposal and strategic doctrine
+     * @param treatyId globally unique proposed treaty ID
+     * @param evaluatingFactionContentId receiving faction making the decision
+     * @param inputs observed/estimated economic-security diagnostics
+     * @return explainable deterministic recommendation and component utilities
+     */
+    public static DiplomaticTreatyEvaluation evaluate(
+            WorldSimulation world,
+            String treatyId,
+            String evaluatingFactionContentId,
+            DiplomaticTreatyEvaluationInputs inputs) {
+        WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation not set");
+        String evaluatorId = requireId(evaluatingFactionContentId, "Evaluating faction ID");
+        FactionStrategicState strategy = checkedWorld.findFactionStrategicState(evaluatorId).orElseThrow(
+                () -> new IllegalArgumentException("Evaluating faction has no strategic state: " + evaluatorId));
+        return evaluate(
+                checkedWorld,
+                treatyId,
+                evaluatorId,
+                FactionDoctrineDecisionPolicy.diplomatic(strategy.doctrine()),
+                inputs);
+    }
+
+    /**
      * Evaluates one incoming persistent treaty proposal for its receiving counterparty.
      *
      * @param world authoritative world containing the proposal and directed diplomacy

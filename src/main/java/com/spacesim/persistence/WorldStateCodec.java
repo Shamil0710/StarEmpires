@@ -34,9 +34,10 @@ import java.util.Objects;
  * layout, v8 читает Stage-16 external-owner layout и мигрирует с пустым dynamic directory.
  * File format v2 добавляет bounded Stage-11 strategic-growth trailer, file format v3 —
  * Stage-17D territorial claims/control maintenance/recognition/concession trailer, а v4 —
- * Stage-17E institutional diplomacy, а v5 — отдельную transaction/customs tariff policy.
- * v1-v3 детерминированно мигрируют в neutral explicit diplomacy без выдуманных treaties,
- * grievances или embargoes; v1-v4 получают нулевой customs tariff. Local entity payload
+ * Stage-17E institutional diplomacy, v5 — отдельную transaction/customs tariff policy, а v6 —
+ * Stage-17F persistent institutional doctrine profiles. v1-v3 детерминированно мигрируют в
+ * neutral explicit diplomacy без выдуманных treaties, grievances или embargoes; v1-v4 получают
+ * нулевой customs tariff, а v1-v5 — neutral doctrine с midpoint 50 по каждой оси. Local entity payload
  * кодируется {@link GameStateCodec}.</p>
  */
 public final class WorldStateCodec {
@@ -45,7 +46,8 @@ public final class WorldStateCodec {
     private static final int GROWTH_FILE_FORMAT_VERSION = 2;
     private static final int TERRITORY_FILE_FORMAT_VERSION = 3;
     private static final int DIPLOMACY_FILE_FORMAT_VERSION = 4;
-    private static final int FILE_FORMAT_VERSION = 5;
+    private static final int CUSTOMS_FILE_FORMAT_VERSION = 5;
+    private static final int FILE_FORMAT_VERSION = 6;
     private static final int MAX_SAVE_BYTES = 256 * 1024 * 1024;
 
     private WorldStateCodec() {
@@ -89,6 +91,7 @@ public final class WorldStateCodec {
                 WorldTerritoryBinary.write(output, checked.factionStrategies());
                 WorldDiplomacyBinary.write(output, checked.factionDiplomacyStates());
                 WorldCustomsBinary.write(output, checked.factionDiplomacyStates());
+                WorldDoctrineBinary.write(output, checked.factionStrategies());
             }
 
             byte[] bytes = buffer.toByteArray();
@@ -123,6 +126,7 @@ public final class WorldStateCodec {
             }
             int fileVersion = input.readInt();
             if (fileVersion != FILE_FORMAT_VERSION
+                    && fileVersion != CUSTOMS_FILE_FORMAT_VERSION
                     && fileVersion != DIPLOMACY_FILE_FORMAT_VERSION
                     && fileVersion != TERRITORY_FILE_FORMAT_VERSION
                     && fileVersion != GROWTH_FILE_FORMAT_VERSION
@@ -150,10 +154,15 @@ public final class WorldStateCodec {
             if (fileVersion >= DIPLOMACY_FILE_FORMAT_VERSION) {
                 state = withDiplomacy(state, WorldDiplomacyBinary.read(input));
             }
-            if (fileVersion >= FILE_FORMAT_VERSION) {
+            if (fileVersion >= CUSTOMS_FILE_FORMAT_VERSION) {
                 state = withDiplomacy(
                         state,
                         WorldCustomsBinary.readAndAttach(input, state.factionDiplomacyStates()));
+            }
+            if (fileVersion >= FILE_FORMAT_VERSION) {
+                state = withStrategies(
+                        state,
+                        WorldDoctrineBinary.readAndAttach(input, state.factionStrategies()));
             }
 
             if (input.read() != -1) {

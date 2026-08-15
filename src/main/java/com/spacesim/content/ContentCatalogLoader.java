@@ -242,10 +242,26 @@ public final class ContentCatalogLoader {
     }
 
     private static ContentCatalog.FactionDefinition parseFaction(JsonValue node) {
+        JsonValue doctrineNode = node.get("doctrine");
+        ContentCatalog.FactionDoctrineDefinition doctrine = doctrineNode == null
+                ? ContentCatalog.FactionDoctrineDefinition.neutral()
+                : parseFactionDoctrine(requireObject(doctrineNode, "faction doctrine"));
         return new ContentCatalog.FactionDefinition(
                 requireString(node, "id"),
                 requireInt(node, "runtimeId"),
-                requireNonBlank(node, "displayName"));
+                requireNonBlank(node, "displayName"),
+                doctrine);
+    }
+
+    private static ContentCatalog.FactionDoctrineDefinition parseFactionDoctrine(JsonValue node) {
+        return new ContentCatalog.FactionDoctrineDefinition(
+                requireInt(node, "tradeOpenness"),
+                requireInt(node, "securityPosture"),
+                requireInt(node, "expansionPreference"),
+                requireInt(node, "sovereigntySensitivity"),
+                requireInt(node, "treatyLegalism"),
+                requireInt(node, "interventionism"),
+                requireInt(node, "economicResiliencePriority"));
     }
 
     private static ContentCatalog.WeaponDefinition parseWeapon(JsonValue node) {
