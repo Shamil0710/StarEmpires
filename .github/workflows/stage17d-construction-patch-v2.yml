@@ -1,0 +1,194 @@
+name: Stage17D Construction Patch V2
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+      - name: Patch service and world
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('src/main/java/com/spacesim/world/ConstructionProjectService.java')
+          s = p.read_text()
+          def r(old, new, label):
+              global s
+              n = s.count(old)
+              if n != 1:
+                  raise SystemExit(f'{label}: {n}')
+              s = s.replace(old, new, 1)
+
+          r('import com.spacesim.components.InventoryComponent;\n',
+            'import com.spacesim.components.FactionComponent;\nimport com.spacesim.components.InventoryComponent;\n', 'import')
+          r('    private final ContentCatalog catalog;\n    private final Map<StarSystemId, SimulationSession> sessionsById;',
+            '    private final ContentCatalog catalog;\n    private final FactionIdentityResolver factionIdentityResolver;\n    private final Map<StarSystemId, SimulationSession> sessionsById;', 'field')
+          r('            ContentCatalog catalog,\n            Map<StarSystemId, SimulationSession> sessionsById,',
+            '            ContentCatalog catalog,\n            FactionIdentityResolver factionIdentityResolver,\n            Map<StarSystemId, SimulationSession> sessionsById,', 'ctor signature')
+          r('        this.catalog = Objects.requireNonNull(catalog, "ContentCatalog construction не задан");\n        this.sessionsById = Objects.requireNonNull(sessionsById, "Construction sessions не заданы");',
+            '        this.catalog = Objects.requireNonNull(catalog, "ContentCatalog construction не задан");\n        this.factionIdentityResolver = Objects.requireNonNull(\n                factionIdentityResolver, "FactionIdentityResolver construction not set");\n        this.sessionsById = Objects.requireNonNull(sessionsById, "Construction sessions не заданы");', 'ctor init')
+
+          a = s.index('    ConstructionProjectId create(\n')
+          b = s.index('\n    long fund(', a)
+          s = s[:a] + '''    ConstructionProjectId create(
+                  String ownerFactionContentId,
+                  String stationArchetypeContentId,
+                  StarSystemId systemId,
+                  float x,
+                  float y) {
+              return create(ownerFactionContentId, ownerFactionContentId,
+                      stationArchetypeContentId, systemId, x, y);
+          }
+
+          ConstructionProjectId create(
+                  String ownerFactionContentId,
+                  String legalFactionContentId,
+                  String stationArchetypeContentId,
+                  StarSystemId systemId,
+                  float x,
+                  float y) {
+              final ConstructionSettlementKind settlementKind;
+              final String ownerId;
+              if (ownerFactionContentId == null) {
+                  settlementKind = ConstructionSettlementKind.EXTERNAL_OWNER;
+                  ownerId = null;
+              } else {
+                  ownerId = normalizedId(ownerFactionContentId, "Construction owner faction");
+                  requireFactionAccount(ownerId);
+                  settlementKind = ConstructionSettlementKind.FACTION_TREASURY;
+              }
+              final String legalFactionId = legalFactionContentId == null
+                      ? null : normalizedId(legalFactionContentId, "Construction legal faction");
+              final Integer legalFactionRuntimeId = requireLegalFaction(legalFactionId);
+
+              ContentCatalog.StationArchetypeDefinition target = requireConstructible(stationArchetypeContentId);
+              SimulationSession session = requireSession(systemId);
+              if (!Float.isFinite(x) || !Float.isFinite(y)) {
+                  throw new IllegalArgumentException("Construction coordinates должны быть конечными");
+              }
+
+              ConstructionProjectId projectId = idAllocator.allocate();
+              Entity site = ConstructionSiteFactory.create(
+                      catalog, projectId, target, legalFactionRuntimeId, x, y);
+              EntityId siteId = session.createEntity(site);
+              long tick = session.getClock().getTick();
+              long minimumFunding = Money.fromCredits(target.construction().fundingCredits());
+              ConstructionDurationPolicy.Estimate duration = ConstructionDurationPolicy.estimate(catalog, target);
+              long buildDurationTicks = buildDurationTicks(duration.totalSeconds(), session);
+              List<ConstructionMaterialState> materials = new ArrayList<>();
+              for (Map.Entry<String, Integer> requirement : target.construction().materials().entrySet()) {
+                  materials.add(new ConstructionMaterialState(requirement.getKey(), requirement.getValue(), 0));
+              }
+              materials.sort(ConstructionMaterialState::compareTo);
+
+              ConstructionProjectState state = new ConstructionProjectState(
+                      projectId, ownerId, target.id(), systemId, x, y, siteId, materials,
+                      minimumFunding, 0L, buildDurationTicks, ConstructionProjectStatus.PLANNED,
+                      tick, tick, -1L, -1L, null, settlementKind, legalFactionId);
+              projects.put(projectId, state);
+              return projectId;
+          }
+          ''' + s[b:]
+
+          marker = '        Entity station = ArchetypeEntityFactory.createConstructedStation('
+          a = s.index(marker)
+          end_marker = '        EntityId stationId = session.createEntity(station);'
+          b = s.index(end_marker, a) + len(end_marker)
+          s = s[:a] + '''        Integer legalFactionRuntimeId = requireLegalFaction(refreshed.legalFactionContentId());
+              Entity station = ArchetypeEntityFactory.createConstructedStation(
+                      catalog,
+                      target.id(),
+                      target.displayName() + " #" + refreshed.id().value(),
+                      refreshed.x(),
+                      refreshed.y(),
+                      null);
+              if (legalFactionRuntimeId != null) {
+                  station.add(new FactionComponent(legalFactionRuntimeId));
+              }
+              EntityId stationId = session.createEntity(station);''' + s[b:]
+
+          a = s.index('    private void requireLegalFaction(String factionId) {')
+          b = s.index('\n    private static void requireFactionSettlement', a)
+          s = s[:a] + '''    private Integer requireLegalFaction(String factionId) {
+              if (factionId == null) {
+                  return null;
+              }
+              return factionIdentityResolver.runtimeId(factionId).orElseThrow(
+                      () -> new IllegalArgumentException("Construction legal faction неизвестна: " + factionId));
+          }
+          ''' + s[b:]
+          p.write_text(s)
+
+          p = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          s = p.read_text()
+          old = '        this.constructionProjectService = new ConstructionProjectService(\n                contentCatalog,\n                this.sessionsById,'
+          new = '        this.constructionProjectService = new ConstructionProjectService(\n                contentCatalog,\n                this.factionIdentityResolver,\n                this.sessionsById,'
+          if s.count(old) != 1:
+              raise SystemExit(f'world ctor: {s.count(old)}')
+          s = s.replace(old, new, 1)
+          a = s.index('    public ConstructionProjectId createConstructionProject(\n')
+          b = s.index('\n    /**\n     * Физически переводит деньги faction treasury', a)
+          s = s[:a] + '''    public ConstructionProjectId createConstructionProject(
+                  String ownerFactionContentId,
+                  String stationArchetypeContentId,
+                  StarSystemId systemId,
+                  float x,
+                  float y) {
+              return createConstructionProject(ownerFactionContentId, ownerFactionContentId,
+                      stationArchetypeContentId, systemId, x, y);
+          }
+
+          /**
+           * Creates an ordinary project after the shared territorial legal check.
+           *
+           * <p>Economic settlement and legal faction identity are separate. A personally funded
+           * project can therefore represent the player's faction without using faction treasury.</p>
+           *
+           * @param ownerFactionContentId faction treasury payer, or {@code null} for external settlement
+           * @param legalFactionContentId represented faction, or {@code null} for private unaffiliated construction
+           * @param stationArchetypeContentId constructible station archetype
+           * @param systemId target system
+           * @param x finite X coordinate
+           * @param y finite Y coordinate
+           * @return stable project ID
+           * @throws IllegalStateException when ordinary construction is not legally authorized
+           */
+          public ConstructionProjectId createConstructionProject(
+                  String ownerFactionContentId,
+                  String legalFactionContentId,
+                  String stationArchetypeContentId,
+                  StarSystemId systemId,
+                  float x,
+                  float y) {
+              TerritorialConstructionAuthorization.Decision authorization =
+                      TerritorialConstructionAuthorization.evaluate(this, legalFactionContentId, systemId);
+              if (!authorization.allowed()) {
+                  throw new IllegalStateException(
+                          "Construction denied by territorial law: " + authorization.reason()
+                                  + " controller=" + authorization.controllingFactionContentId());
+              }
+              return constructionProjectService.create(ownerFactionContentId, legalFactionContentId,
+                      stationArchetypeContentId, systemId, x, y);
+          }
+          ''' + s[b:]
+          p.write_text(s)
+      - name: Remove workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/stage17d-construction-patch-v2.yml
+          git add src/main/java/com/spacesim/world/ConstructionProjectService.java src/main/java/com/spacesim/world/WorldSimulation.java
+          git commit -m "Enforce territorial construction authorization"
+          git push origin HEAD:agent/stage17d-territorial-process
