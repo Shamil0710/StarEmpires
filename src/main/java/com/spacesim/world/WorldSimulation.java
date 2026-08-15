@@ -27,6 +27,10 @@ import java.util.Optional;
  * updates. Faction treasury использует только реальные wallet transfers. Persistent diplomacy,
  * territory и market access материализуются поверх локальных economic sessions, а fiscal policy
  * переносит деньги между station wallets и тем же authoritative treasury без source/sink.</p>
+ *
+ * <p>Stage 17 resolves authored and world-defined factions through one immutable
+ * {@link FactionIdentityResolver}. Stable string IDs remain authoritative at the strategic layer;
+ * dense runtime IDs are used only at the local ECS boundary.</p>
  */
 public final class WorldSimulation {
     /** По умолчанию remote Engine обновляется раз на десять эквивалентных local ticks. */
@@ -40,6 +44,7 @@ public final class WorldSimulation {
     private final List<StarSystemId> systemOrder;
     private final Map<StarSystemId, SimulationSession> sessionsById;
     private final ContentCatalog contentCatalog;
+    private final FactionIdentityResolver factionIdentityResolver;
     private final List<String> factionOrder;
     private final Map<String, FactionEconomicAccount> factionAccountsById;
     private final List<FactionStrategicState> factionStrategies;
@@ -62,6 +67,7 @@ public final class WorldSimulation {
             List<StarSystemId> systemOrder,
             Map<StarSystemId, SimulationSession> sessionsById,
             ContentCatalog contentCatalog,
+            FactionIdentityResolver factionIdentityResolver,
             List<String> factionOrder,
             Map<String, FactionEconomicAccount> factionAccountsById,
             List<FactionStrategicState> factionStrategies,
@@ -80,6 +86,8 @@ public final class WorldSimulation {
         this.systemOrder = List.copyOf(systemOrder);
         this.sessionsById = Map.copyOf(sessionsById);
         this.contentCatalog = contentCatalog;
+        this.factionIdentityResolver = Objects.requireNonNull(
+                factionIdentityResolver, "FactionIdentityResolver не задан");
         this.factionOrder = List.copyOf(factionOrder);
         this.factionAccountsById = Map.copyOf(factionAccountsById);
         this.factionStrategies = List.copyOf(factionStrategies);
@@ -154,17 +162,16 @@ public final class WorldSimulation {
             throw new IllegalArgumentException("Active StarSystem отсутствует в topology: " + activeId);
         }
 
-        Map<String, ContentCatalog.FactionDefinition> contentFactions = new HashMap<>();
-        for (ContentCatalog.FactionDefinition faction : content.getFactions()) {
-            contentFactions.put(faction.id(), faction);
-        }
+        FactionIdentityResolver identities = FactionIdentityResolver.createDefault(
+                content,
+                checked.factionIdentities());
 
         Map<String, FactionEconomicAccount> factionAccounts = new HashMap<>();
         List<String> factionIds = new ArrayList<>(checked.factions().size());
         for (FactionEconomicState factionState : checked.factions()) {
-            if (!contentFactions.containsKey(factionState.factionContentId())) {
+            if (!identities.containsStableId(factionState.factionContentId())) {
                 throw new IllegalArgumentException(
-                        "WorldState содержит неизвестную content faction: " + factionState.factionContentId());
+                        "WorldState содержит неизвестную faction: " + factionState.factionContentId());
             }
             FactionEconomicAccount account = new FactionEconomicAccount(factionState);
             factionAccounts.put(account.factionContentId(), account);
@@ -174,12 +181,12 @@ public final class WorldSimulation {
         Map<String, FactionStrategicState> strategiesById = new HashMap<>();
         Map<StarSystemId, String> territoryOwners = new HashMap<>();
         for (FactionStrategicState strategy : checked.factionStrategies()) {
-            if (!contentFactions.containsKey(strategy.factionContentId())) {
+            if (!identities.containsStableId(strategy.factionContentId())) {
                 throw new IllegalArgumentException(
-                        "Strategic state содержит неизвестную content faction: " + strategy.factionContentId());
+                        "Strategic state содержит неизвестную faction: " + strategy.factionContentId());
             }
             for (FactionRelationState relation : strategy.relations()) {
-                if (!contentFactions.containsKey(relation.targetFactionContentId())) {
+                if (!identities.containsStableId(relation.targetFactionContentId())) {
                     throw new IllegalArgumentException(
                             "Faction relation содержит неизвестную target faction: "
                                     + relation.targetFactionContentId());
@@ -195,7 +202,7 @@ public final class WorldSimulation {
         List<StarSystemId> order = new ArrayList<>(checked.systems().size());
         for (StarSystemSimulationState systemState : checked.systems()) {
             SimulationSession session = SimulationSession.restore(systemState.simulationState(), content);
-            FactionPolicyRuntime.install(session, content, checked.factionStrategies());
+            FactionPolicyRuntime.install(session, identities, checked.factionStrategies());
             sessions.put(systemState.systemId(), session);
             order.add(systemState.systemId());
         }
@@ -228,6 +235,7 @@ public final class WorldSimulation {
                 order,
                 sessions,
                 content,
+                identities,
                 factionIds,
                 factionAccounts,
                 checked.factionStrategies(),
@@ -306,7 +314,7 @@ public final class WorldSimulation {
     public LiquiditySupportReport applyLiquiditySupport(String factionContentId) {
         String factionId = normalizedFactionId(factionContentId);
         FactionEconomicAccount account = requireFactionAccount(factionId);
-        ContentCatalog.FactionDefinition faction = requireContentFaction(factionId);
+        int runtimeFactionId = requireRuntimeFactionId(factionId);
 
         long remainingBudget = Math.min(
                 account.maxLiquiditySupportPerDecisionMilliCredits(),
@@ -322,7 +330,7 @@ public final class WorldSimulation {
                 break;
             }
             SimulationSession session = sessionsById.get(systemId);
-            for (Entity station : ownedMarketStations(systemId, session, faction.runtimeId())) {
+            for (Entity station : ownedMarketStations(systemId, session, runtimeFactionId)) {
                 if (remainingBudget <= 0L) {
                     break;
                 }
@@ -364,7 +372,7 @@ public final class WorldSimulation {
     public FiscalPolicyReport applyFiscalPolicy(String factionContentId) {
         String factionId = normalizedFactionId(factionContentId);
         FactionEconomicAccount account = requireFactionAccount(factionId);
-        ContentCatalog.FactionDefinition faction = requireContentFaction(factionId);
+        int runtimeFactionId = requireRuntimeFactionId(factionId);
         FactionStrategicState strategy = factionStrategiesById.get(factionId);
         if (strategy == null
                 || (strategy.stationTaxBasisPoints() == 0
@@ -387,7 +395,7 @@ public final class WorldSimulation {
                 final int basisPoints;
                 final boolean tax;
                 final String reason;
-                if (owner.factionId == faction.runtimeId()) {
+                if (owner.factionId == runtimeFactionId) {
                     basisPoints = strategy.stationTaxBasisPoints();
                     tax = true;
                     reason = "faction-station-tax";
@@ -452,6 +460,31 @@ public final class WorldSimulation {
     }
 
     /**
+     * Resolves authored or world-defined stable faction ID to its local ECS runtime slot.
+     *
+     * @param stableFactionId stable faction ID or {@code null}
+     * @return dense runtime ID or empty
+     */
+    public Optional<Integer> findFactionRuntimeId(String stableFactionId) {
+        return factionIdentityResolver.runtimeId(stableFactionId);
+    }
+
+    /**
+     * Resolves a dense local ECS runtime faction slot back to stable identity.
+     *
+     * @param runtimeFactionId dense runtime faction ID
+     * @return stable faction ID or empty
+     */
+    public Optional<String> findFactionStableId(int runtimeFactionId) {
+        return factionIdentityResolver.stableId(runtimeFactionId);
+    }
+
+    /** @return canonical immutable world-defined faction identities */
+    public List<WorldFactionIdentityState> getWorldFactionIdentities() {
+        return factionIdentityResolver.dynamicIdentities();
+    }
+
+    /**
      * Возвращает strategic владельца StarSystem.
      *
      * @param systemId stable system ID
@@ -485,7 +518,8 @@ public final class WorldSimulation {
                 economicPressureTracker.snapshots(),
                 fleetWorldService.nextIdValue(),
                 fleetWorldService.snapshots(),
-                fleetJumpService.snapshots());
+                fleetJumpService.snapshots(),
+                factionIdentityResolver.dynamicIdentities());
     }
 
     /**
@@ -894,12 +928,10 @@ public final class WorldSimulation {
         return account;
     }
 
-    private ContentCatalog.FactionDefinition requireContentFaction(String factionId) {
-        ContentCatalog.FactionDefinition faction = contentCatalog.findFaction(factionId);
-        if (faction == null) {
-            throw new IllegalStateException("Economic faction отсутствует в content catalog: " + factionId);
-        }
-        return faction;
+    private int requireRuntimeFactionId(String factionId) {
+        return factionIdentityResolver.runtimeId(factionId).orElseThrow(
+                () -> new IllegalStateException("Economic faction отсутствует в faction identity directory: "
+                        + factionId));
     }
 
     private static String normalizedFactionId(String value) {
