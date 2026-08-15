@@ -51,7 +51,15 @@ public final class DiplomaticMarketAccessResolver {
             int relation,
             int threshold,
             String instrumentId) {
-        /** Validates one explainable access result. */
+        /**
+         * Validates one explainable access result.
+         *
+         * @param allowed final legal access result
+         * @param reason precedence branch that decided the result
+         * @param relation owner-to-participant summary relation used by threshold fallback
+         * @param threshold owner's configured relation threshold
+         * @param instrumentId treaty ID or embargo diagnostic ID when applicable, otherwise empty
+         */
         public Decision {
             reason = Objects.requireNonNull(reason, "Market-access reason not set");
             instrumentId = Objects.requireNonNull(instrumentId, "Market-access instrument ID not set");
