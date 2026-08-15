@@ -1,0 +1,34 @@
+name: Stage 17F doctrine preservation
+
+on:
+  push:
+    branches:
+      - agent/stage17f-doctrine-profile
+    paths:
+      - .github/workflows/stage17f-doctrine-preserve.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17f-doctrine-profile
+          fetch-depth: 0
+      - name: Preserve doctrine across strategic rebuilds
+        run: python3 scripts/stage17f_doctrine_preserve.py
+      - name: Commit preservation changes
+        run: |
+          git rm .github/workflows/stage17f-doctrine-preserve.yml scripts/stage17f_doctrine_preserve.py
+          git add src/main/java/com/spacesim/world/FactionStrategicState.java
+          git add src/main/java/com/spacesim/world/TerritorialControlRuntime.java
+          git add src/main/java/com/spacesim/world/StrategicGrowthPlanService.java
+          git add src/main/java/com/spacesim/persistence/WorldStrategicGrowthBinary.java
+          git add src/main/java/com/spacesim/persistence/WorldTerritoryBinary.java
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git commit -m "Preserve doctrine across strategic state rebuilds"
+          git push origin HEAD:agent/stage17f-doctrine-profile
