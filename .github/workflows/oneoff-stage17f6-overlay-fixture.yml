@@ -1,0 +1,48 @@
+name: One-off Stage17F6 recovery fixture patch
+
+on:
+  push:
+    branches:
+      - stage-17f6-resilience-demand-overlay
+    paths:
+      - .github/workflows/oneoff-stage17f6-overlay-fixture.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: stage-17f6-resilience-demand-overlay
+          fetch-depth: 0
+      - name: Remove background consumption from recovery fixture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/test/java/com/spacesim/world/Stage17F6StockResilienceCoordinatorAcceptanceTest.java')
+          text = path.read_text()
+          old = (
+              '                        market.configuredTargetStock[itemId] = 0;\n'
+              '                        market.targetStock[itemId] = 0;\n'
+          )
+          new = (
+              '                        market.configuredTargetStock[itemId] = 0;\n'
+              '                        market.targetStock[itemId] = 0;\n'
+              '                        market.baseConsumption[itemId] = 0f;\n'
+              '                        market.consumptionRemainder[itemId] = 0d;\n'
+          )
+          if old not in text:
+              raise SystemExit('Target fixture snippet not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Remove one-off workflow and commit result
+        run: |
+          rm .github/workflows/oneoff-stage17f6-overlay-fixture.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/test/java/com/spacesim/world/Stage17F6StockResilienceCoordinatorAcceptanceTest.java .github/workflows/oneoff-stage17f6-overlay-fixture.yml
+          git commit -m "Stabilize resilience recovery acceptance fixture"
+          git push origin HEAD:stage-17f6-resilience-demand-overlay
