@@ -21,8 +21,7 @@ class Stage16WorldConstructionMigrationTest {
     @Test
     void schemaV7FactionProjectMigratesToExplicitTreasurySettlement() throws IOException {
         WorldSimulation world = DemoGalaxyFactory.create(16_203L);
-        WorldState before = world.snapshot();
-        String factionId = before.factions().get(0).factionContentId();
+        String factionId = world.controllingFaction(world.getActiveSystemId()).orElseThrow();
         ConstructionProjectId projectId = world.createConstructionProject(
                 factionId,
                 "station.mining_base",
