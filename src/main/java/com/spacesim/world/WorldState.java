@@ -33,6 +33,7 @@ import java.util.Set;
  * @param fleets persistent fleet placement states в canonical FleetId порядке
  * @param fleetJumps persistent active jump states в canonical FleetId порядке
  * @param factionIdentities persistent world-defined faction identities в canonical stable-ID порядке
+ * @param factionDiplomacyStates persistent institutional diplomacy в canonical faction-ID порядке
  */
 public record WorldState(
         int schemaVersion,
@@ -305,6 +306,7 @@ public record WorldState(
      * @param fleets world-level fleet placement states
      * @param fleetJumps active persistent jump states
      * @param factionIdentities world-defined faction identity states
+     * @param factionDiplomacyStates persistent institutional diplomacy states
      * @throws NullPointerException если обязательное значение не задано
      * @throws IllegalArgumentException при неизвестной версии, duplicate/unknown IDs,
      *         неполном topology/fleet coverage или несовместимом fleet location state

@@ -32,9 +32,11 @@ import java.util.Objects;
  * settlement и legal/faction identity, а Stage-17 schema v9 добавляет persistent world-defined
  * faction identity directory. Save v4-v7 продолжает читать старый faction-only construction
  * layout, v8 читает Stage-16 external-owner layout и мигрирует с пустым dynamic directory.
- * File format v2 добавляет bounded Stage-11 strategic-growth trailer, а file format v3 добавляет
- * Stage-17D territorial claims/control maintenance/recognition/concession trailer. Local entity
- * payload кодируется {@link GameStateCodec}.</p>
+ * File format v2 добавляет bounded Stage-11 strategic-growth trailer, file format v3 —
+ * Stage-17D territorial claims/control maintenance/recognition/concession trailer, а v4 —
+ * Stage-17E institutional diplomacy. v1-v3 детерминированно мигрируют в neutral explicit
+ * diplomacy без выдуманных treaties, grievances или embargoes. Local entity payload
+ * кодируется {@link GameStateCodec}.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
