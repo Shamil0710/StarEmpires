@@ -690,12 +690,12 @@ public final class PlayerRuntime {
     }
 
     private static void validateReferences(WorldSimulation world, ContentCatalog content, PlayerState player) {
-        if (player.factionContentId() != null && content.findFaction(player.factionContentId()) == null) {
+        if (player.factionContentId() != null && world.findFactionRuntimeId(player.factionContentId()).isEmpty()) {
             throw new IllegalArgumentException("Player affiliation references unknown faction: "
                     + player.factionContentId());
         }
         for (PlayerReputationState reputation : player.reputations()) {
-            if (content.findFaction(reputation.factionContentId()) == null) {
+            if (world.findFactionRuntimeId(reputation.factionContentId()).isEmpty()) {
                 throw new IllegalArgumentException("Player reputation references unknown faction: "
                         + reputation.factionContentId());
             }
