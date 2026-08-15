@@ -2,7 +2,7 @@
 
 > Канонический документ статуса и переходов между этапами разработки.
 >
-> Последняя синхронизация: **2026-08-15 после завершения Stage 16, merge PR #70 и финального CI #1337 / run `31849675260`**.
+> Последняя синхронизация: **2026-08-15 после явной фиксации обязательного `Ship Mathematics v1.0 Design Baseline` gate перед активацией Stage 17.5; фактический runtime-статус остаётся Stage 17 ACTIVE**.
 >
 > Начиная с Stage 16 вся новая и содержательно изменяемая проектная документация ведётся **на русском языке**. Имена классов, enum, content ID, API, формулы и другие технические идентификаторы сохраняются в оригинальном виде, чтобы документация однозначно сопоставлялась с кодом.
 >
@@ -564,7 +564,47 @@ independent player with existing Stage-16 assets
 
 # Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-**PLANNED prerequisite перед advanced tactical AI.**
+**PLANNED prerequisite перед advanced tactical AI. Активация Stage 17.5 запрещена до принятого `Ship Mathematics v1.0 Design Baseline`.**
+
+## Обязательный activation gate: Ship Mathematics v1.0 Design Baseline
+
+Stage 17.5 можно перевести из `PLANNED` в `ACTIVE` **только после того, как параллельный ship-mathematics research track завершён и принят в `main` как `Ship Mathematics v1.0 Design Baseline`**.
+
+`v1.0 Design Baseline` — это freeze фундаментальной механики, а не freeze всех конкретных balance numbers и не требование заранее создать весь будущий каталог кораблей.
+
+Минимальный scope v1.0 должен закрывать и согласовывать как единое целое:
+
+- hull size / hull architecture / doctrine-role hierarchy;
+- физическую topology hardpoints и `CORE / WEAPON / UTILITY / INTERNAL / MISSION` slots;
+- authoritative SI-модель массы, объёма, тяги, ускорения, reaction mass и delta-v;
+- power generation/distribution, peak power и energy storage;
+- heat generation, thermal storage, radiator/rejection limits и combat endurance;
+- armor/protection, penetration, fragmentation/debris и локальный путь повреждения к compartments/subsystems;
+- sensor detection, signature, track quality/covariance, fire-control solution и внешнее целеуказание;
+- ECM/ECCM/decoys как часть общей sensor/guidance модели;
+- несколько materially different weapon families, включая kinetic/beam/guided/point-defense envelopes;
+- missile/interceptor guidance, ammunition/magazine ограничения и layered defense;
+- fitting validation одновременно по geometry/slot compatibility, mass, volume, power, heat, crew, ammunition и stores;
+- representative combat/civilian hull designs, доказывающие, что роли возникают из физических ограничений, а не из class-name bonuses;
+- deterministic executable benchmarks / acceptance scenarios, достаточные для проверки ключевых balance invariants и regression после runtime promotion.
+
+К моменту acceptance v1.0 не должно оставаться открытых **архитектурных** вопросов, способных потребовать смены основной runtime data model во время Stage 17.5. Допускаются дальнейшая калибровка коэффициентов, уточнение конкретных материалов, рост каталога модулей и балансные изменения, если они укладываются в уже принятую модель.
+
+Gate считается пройденным только если:
+
+```text
+Ship Mathematics v1.0 Design Baseline
++ versioned/machine-readable benchmark seeds
++ deterministic executable acceptance
++ green repository CI
++ explicit acceptance in main
+=
+Stage 17.5 may become ACTIVE
+```
+
+Если `v1.0 Design Baseline` не готов или не принят, **Stage 17.5 остаётся PLANNED независимо от завершения Stage 17**.
+
+Назначение Stage 17.5 после прохождения gate — **runtime promotion, integration и validation уже принятой фундаментальной модели**, а не повторное изобретение core ship/combat architecture.
 
 Необходимая runtime база:
 
@@ -587,8 +627,13 @@ independent player with existing Stage-16 assets
 - `docs/ship_mathematics_v0_1.md`;
 - `docs/ship_mathematics_v0_2.md`;
 - `docs/ship_mathematics_v0_3.md`;
+- `docs/ship_mathematics_v0_4.md`;
+- `docs/ship_mathematics_v0_5.md`;
 - `docs/benchmarks/ship_reference_designs_v0_2.json`;
-- weapon-interaction benchmark v0.3.
+- `docs/benchmarks/weapon_interaction_reference_v0_3.json`;
+- `docs/benchmarks/combat_salvo_reference_v0_4.json`;
+- `docs/benchmarks/combat_saturation_sweep_v0_5.json`;
+- будущий accepted `Ship Mathematics v1.0 Design Baseline`, закрывающий activation gate Stage 17.5.
 
 Authoritative design direction:
 
@@ -604,7 +649,7 @@ Hull Size
 
 SI используется как canonical engineering unit system. Роль корабля должна по возможности возникать из массы, объёма, тяги, энергии, тепла, hardpoints, сенсоров, экипажа и установленных модулей, а не из магических class bonuses.
 
-Weapon mathematics v0.3 проектирует будущую цепочку:
+Weapon mathematics проектирует будущую цепочку:
 
 ```text
 sensor measurement
@@ -617,7 +662,7 @@ sensor measurement
 → subsystem / compartment damage
 ```
 
-Эти документы являются engineering/balance seeds и **не означают**, что новый combat resolver уже внедрён в runtime.
+Эти документы являются engineering/balance seeds и **не означают**, что новый combat resolver уже внедрён в runtime. До accepted v1.0 они остаются research/authoring evidence; после accepted v1.0 Stage 17.5 переносит доказанную модель в authoritative runtime.
 
 ---
 
@@ -665,6 +710,8 @@ Persistent commanders могут давать bounded personality/doctrine modif
 Расширить resources, components, ships, stations и faction differentiation после стабилизации mechanics.
 
 Это основной этап расширения technology ladder после стабилизации tier/capability mechanics.
+
+К этому моменту `Ship Mathematics v1.0 Design Baseline` уже является принятой механической основой. Stage 21 предназначен для расширения каталога и долговременной балансировки внутри этой модели; фундаментальная ship/combat architecture не должна переоткрываться без нового измеренного противоречия или explicit design decision.
 
 Long-run soak/benchmark matrix должна выявлять:
 
@@ -805,6 +852,7 @@ HUD/minimap/global-map/construction/faction UI читают authoritative state 
 18. Новая/обновляемая документация с Stage 16 ведётся на русском.
 19. Artifact publication failure из-за внешней quota не отменяет green core gate, если `clean verify`/tests/Javadoc/JaCoCo/package успешно завершены согласно `docs/ci_artifact_publication_policy.md`.
 20. Этот roadmap меняется только после фактически подтверждённых implementation/merge evidence либо при явном изменении будущего плана пользователем.
+21. **Stage 17.5 нельзя переводить в `ACTIVE` и нельзя начинать его production/runtime implementation, пока `Ship Mathematics v1.0 Design Baseline` не принят в `main` вместе с machine-readable seeds, deterministic acceptance и green CI.** Завершение Stage 17 само по себе этот gate не отменяет.
 
 ---
 
@@ -832,4 +880,8 @@ Immediate Stage-17 order:
 7. **17G:** authoritative faction management/global-map UI;
 8. **17H:** migration, conservation, save/load и full Stage-17 end-to-end acceptance.
 
-Не начинать advanced tactical AI до Stage 17.5. Не превращать параллельные ship-mathematics documents в production constants без отдельной runtime implementation/validation. Не создавать hidden player faction, duplicate assets или passive treasury income shortcuts.
+Параллельно Stage 17 разрешено и желательно продолжать ship-mathematics research track до принятого `Ship Mathematics v1.0 Design Baseline`.
+
+**После Stage 17 переход в Stage 17.5 не автоматический:** если `v1.0 Design Baseline` ещё не принят, Stage 17.5 остаётся `PLANNED`, а следующая работа направляется на закрытие design baseline, а не на production Combat Depth implementation.
+
+Не начинать advanced tactical AI до завершённого Stage 17.5. Не превращать pre-v1.0 ship-mathematics documents в production constants без отдельной runtime implementation/validation. Не создавать hidden player faction, duplicate assets или passive treasury income shortcuts.
