@@ -34,7 +34,15 @@ public record TerritorialClaimState(
         ESTABLISHED
     }
 
-    /** Validates monotonic authoritative ticks and non-negative progress. */
+    /**
+     * Validates monotonic authoritative ticks and non-negative progress.
+     *
+     * @param systemId claimed star system
+     * @param declaredTick authoritative world tick when the claim was declared
+     * @param lastEvaluatedTick last authoritative world tick included in stabilization
+     * @param stabilizationTicks accumulated qualifying stabilization time
+     * @param status current deterministic claim state
+     */
     public TerritorialClaimState {
         systemId = Objects.requireNonNull(systemId, "Territorial claim StarSystemId not set");
         status = Objects.requireNonNull(status, "Territorial claim status not set");
