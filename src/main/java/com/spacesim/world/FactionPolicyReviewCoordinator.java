@@ -121,7 +121,7 @@ public final class FactionPolicyReviewCoordinator {
      * @param factionContentId stable faction content ID
      * @param reviewClaimed whether this coordinator call claimed the common review window
      * @param fiscalReview fiscal plan/result observed during this coordinator call
-     * @param stockResilienceReview resilience stock-floor result from the same common review window
+     * @param stockResilienceReview automatic resilience-overlay result from the same common review window
      */
     public record FactionReview(
             String factionContentId,
@@ -185,17 +185,24 @@ public final class FactionPolicyReviewCoordinator {
                     .count();
         }
 
-        /** @return number of stock policies changed after the same successful review claim */
+        /** @return number of resilience overlays changed after the same successful review claim */
         public long changedStockResiliencePolicyCount() {
             return factionReviews.stream()
                     .filter(review -> review.stockResilienceReview().policyChanged())
                     .count();
         }
 
-        /** @return number of item-level downward adjustments blocked until provenance is available */
-        public long blockedStockDecreaseItemCount() {
+        /** @return item-level resilience overlay increases proposed in claimed reviews */
+        public long increasedStockResilienceItemCount() {
             return factionReviews.stream()
-                    .mapToLong(review -> review.stockResilienceReview().blockedDecreaseItemCount())
+                    .mapToLong(review -> review.stockResilienceReview().increasedItemCount())
+                    .sum();
+        }
+
+        /** @return item-level resilience overlay decreases proposed in claimed reviews */
+        public long decreasedStockResilienceItemCount() {
+            return factionReviews.stream()
+                    .mapToLong(review -> review.stockResilienceReview().decreasedItemCount())
                     .sum();
         }
     }
