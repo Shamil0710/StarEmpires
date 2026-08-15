@@ -63,8 +63,24 @@ public class Constants {
         return ItemType.fromId(itemId);
     }
 
-    /** Число legacy-фракций и текущая длина массива репутации. */
-    public static final int MAX_FACTIONS = 3;
+    /** Число authored core-фракций в legacy presentation/content model. */
+    public static final int LEGACY_FACTION_COUNT = 3;
+
+    /**
+     * Legacy alias числа authored core-фракций.
+     *
+     * <p>Новый код, которому нужен размер dense faction storage, должен использовать
+     * {@link #FACTION_RUNTIME_CAPACITY}, а не этот исторический count.</p>
+     */
+    public static final int MAX_FACTIONS = LEGACY_FACTION_COUNT;
+
+    /**
+     * Bounded capacity плотных runtime faction slots Stage-17 simulation layer.
+     *
+     * <p>Stable faction IDs остаются строковыми world/content identifiers. Эта capacity существует
+     * только для горячих ECS-массивов: reputation, market-access и runtime faction affiliation.</p>
+     */
+    public static final int FACTION_RUNTIME_CAPACITY = 32;
 
     /** Идентификатор нейтральной фракции. */
     public static final int FACTION_NEUTRAL = 0;
@@ -75,7 +91,7 @@ public class Constants {
     /** Идентификатор фракции шахтёров. */
     public static final int FACTION_MINERS = 2;
 
-    /** Legacy-имена фракций; будут перенесены в content catalog в Stage 4. */
+    /** Legacy-имена трёх authored core-фракций; dynamic factions разрешаются через world directory. */
     public static final String[] FACTION_NAMES = {"Нейтралы", "Торговая лига", "Шахтёры"};
 
     /** Минимальная репутация у одной фракции, в пунктах репутации. */

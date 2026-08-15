@@ -11,9 +11,12 @@ import java.util.Arrays;
  * <p>Компонент материализуется из persistent faction diplomacy при восстановлении WorldSimulation
  * и намеренно не входит в EntityState: source of truth остаётся world-level strategic policy.
  * Отсутствие компонента означает unrestricted legacy market.</p>
+ *
+ * <p>Маска использует bounded {@link Constants#FACTION_RUNTIME_CAPACITY} dense slots. Это capacity
+ * materialized factions, а не число authored/существующих factions.</p>
  */
 public final class FactionMarketAccessComponent implements Component {
-    private final boolean[] allowedFactionIds = new boolean[Constants.MAX_FACTIONS];
+    private final boolean[] allowedFactionIds = new boolean[Constants.FACTION_RUNTIME_CAPACITY];
     private boolean allowUnfactioned = true;
 
     /** Создаёт policy, изначально запрещающую все named factions. */
@@ -64,7 +67,7 @@ public final class FactionMarketAccessComponent implements Component {
     }
 
     private static void requireFactionId(int factionId) {
-        if (factionId < 0 || factionId >= Constants.MAX_FACTIONS) {
+        if (factionId < 0 || factionId >= Constants.FACTION_RUNTIME_CAPACITY) {
             throw new IllegalArgumentException("Некорректный runtime faction ID market access");
         }
     }

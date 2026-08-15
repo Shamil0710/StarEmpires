@@ -1,5 +1,6 @@
 package com.spacesim.world;
 
+import com.spacesim.constants.Constants;
 import com.spacesim.content.ContentCatalog;
 
 import java.util.ArrayList;
@@ -19,13 +20,14 @@ import java.util.Set;
  * {@link WorldFactionIdentityState}. Allocation always chooses the lowest free slot, making the
  * result deterministic for the same authored catalog, persisted identities and slot capacity.</p>
  *
- * <p>This resolver does not mutate local ECS arrays. Stage-17 persistence/capacity migration must
- * make the configured capacity available to {@code ReputationComponent} and market-access storage
- * before dynamic runtime IDs are materialized into {@code FactionComponent}.</p>
+ * <p>This resolver does not mutate local ECS arrays. Stage-17 uses
+ * {@link Constants#FACTION_RUNTIME_CAPACITY} as the bounded dense capacity for reputation,
+ * market-access and local faction affiliation. The smaller {@link Constants#MAX_FACTIONS} remains
+ * a legacy authored-faction count for old presentation/content code.</p>
  */
 public final class FactionIdentityResolver {
-    /** Target bounded faction capacity for the Stage-17 dynamic-identity design. */
-    public static final int DEFAULT_RUNTIME_SLOT_CAPACITY = 32;
+    /** Default bounded faction capacity shared with local ECS hot-path arrays. */
+    public static final int DEFAULT_RUNTIME_SLOT_CAPACITY = Constants.FACTION_RUNTIME_CAPACITY;
 
     private final ContentCatalog content;
     private final int runtimeSlotCapacity;
