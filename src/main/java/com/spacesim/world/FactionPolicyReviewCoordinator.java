@@ -14,11 +14,9 @@ import java.util.TreeSet;
  * normalized, deduplicated and sorted before planning so identical world state and command input
  * produce the same review order.</p>
  *
- * <p>For each faction the coordinator derives the current doctrine-backed fiscal response profile,
- * builds a read-only fiscal plan, and then claims the shared persistent review window at most once.
- * Policy mutation happens only after a successful common claim. This establishes the orchestration
- * seam that later stock/resilience reviewers can join without independently consuming the same
- * review window.</p>
+ * <p>Fiscal and stock/resilience plans are both built read-only before the common persistent review
+ * window is claimed. A successful claim then authorizes at most one bounded adjustment from each
+ * policy family. No reviewer can independently consume another cadence window for the same faction.</p>
  */
 public final class FactionPolicyReviewCoordinator {
     private FactionPolicyReviewCoordinator() {
@@ -26,13 +24,13 @@ public final class FactionPolicyReviewCoordinator {
     }
 
     /**
-     * Reviews the explicitly authorized autonomous factions using their stable staggered default cadence.
+     * Reviews the explicitly authorized autonomous factions using all currently coordinated policy families.
      *
      * @param world authoritative world runtime
      * @param autonomousFactionContentIds stable IDs explicitly authorized for autonomous review
      * @return deterministic immutable report in stable faction-ID order
      */
-    public static Report reviewFiscalPolicies(
+    public static Report reviewPolicies(
             WorldSimulation world,
             Collection<String> autonomousFactionContentIds) {
         WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation not set");
@@ -45,26 +43,51 @@ public final class FactionPolicyReviewCoordinator {
             FactionPolicyReviewState reviewState = checkedWorld.findFactionPolicyReviewState(factionId)
                     .orElseThrow(() -> new IllegalArgumentException(
                             "Faction has no policy-review state: " + factionId));
-            FactionFiscalReviewProfile profile = WorldFactionFiscalReviewProfileSelector.select(
+            FactionFiscalReviewProfile fiscalProfile = WorldFactionFiscalReviewProfileSelector.select(
                     checkedWorld, factionId);
             FactionFiscalPolicyReviewer.Plan fiscalPlan = FactionFiscalPolicyReviewer.plan(
-                    checkedWorld, factionId, profile);
+                    checkedWorld, factionId, fiscalProfile);
+            FactionStockResiliencePolicyReviewer.Plan stockPlan = FactionStockResiliencePolicyReviewer.plan(
+                    checkedWorld,
+                    factionId,
+                    FactionStockResilienceReviewProfile.conservativeDefault());
 
             if (!cadence.isDue(reviewState, observationTick)
                     || !checkedWorld.tryBeginFactionPolicyReview(factionId, cadence)) {
                 reviews.add(new FactionReview(
                         factionId,
                         false,
-                        unclaimedFiscalResult(fiscalPlan)));
+                        unclaimedFiscalResult(fiscalPlan),
+                        FactionStockResiliencePolicyReviewer.unclaimed(stockPlan)));
                 continue;
             }
 
             FactionFiscalPolicyReviewer.Result fiscalResult = FactionFiscalPolicyReviewer.applyClaimed(
                     checkedWorld, factionId, fiscalPlan);
-            reviews.add(new FactionReview(factionId, true, fiscalResult));
+            FactionStockResiliencePolicyReviewer.Result stockResult =
+                    FactionStockResiliencePolicyReviewer.applyClaimed(
+                            checkedWorld, factionId, stockPlan);
+            reviews.add(new FactionReview(factionId, true, fiscalResult, stockResult));
         }
 
         return new Report(observationTick, List.copyOf(reviews));
+    }
+
+    /**
+     * Source-compatible entry point retained from the first coordinator slice.
+     *
+     * <p>The common coordinator now includes stock/resilience planning as well as fiscal planning,
+     * so callers automatically receive the complete currently coordinated review rather than a
+     * second independent cadence claim.</p>
+     *
+     * @param world authoritative world runtime
+     * @param autonomousFactionContentIds stable IDs explicitly authorized for autonomous review
+     * @return deterministic immutable report
+     */
+    public static Report reviewFiscalPolicies(
+            WorldSimulation world,
+            Collection<String> autonomousFactionContentIds) {
+        return reviewPolicies(world, autonomousFactionContentIds);
     }
 
     private static FactionFiscalPolicyReviewer.Result unclaimedFiscalResult(
@@ -98,11 +121,13 @@ public final class FactionPolicyReviewCoordinator {
      * @param factionContentId stable faction content ID
      * @param reviewClaimed whether this coordinator call claimed the common review window
      * @param fiscalReview fiscal plan/result observed during this coordinator call
+     * @param stockResilienceReview resilience stock-floor result from the same common review window
      */
     public record FactionReview(
             String factionContentId,
             boolean reviewClaimed,
-            FactionFiscalPolicyReviewer.Result fiscalReview) {
+            FactionFiscalPolicyReviewer.Result fiscalReview,
+            FactionStockResiliencePolicyReviewer.Result stockResilienceReview) {
 
         /**
          * Validates one immutable faction review result.
@@ -110,6 +135,7 @@ public final class FactionPolicyReviewCoordinator {
          * @param factionContentId stable faction content ID
          * @param reviewClaimed whether the common window was claimed
          * @param fiscalReview fiscal result
+         * @param stockResilienceReview stock/resilience result
          */
         public FactionReview {
             factionContentId = Objects.requireNonNull(factionContentId, "Faction content ID not set").strip();
@@ -117,8 +143,10 @@ public final class FactionPolicyReviewCoordinator {
                 throw new IllegalArgumentException("Faction content ID cannot be blank");
             }
             Objects.requireNonNull(fiscalReview, "Fiscal review result not set");
-            if (reviewClaimed != fiscalReview.reviewClaimed()) {
-                throw new IllegalArgumentException("Coordinator and fiscal claim flags must agree");
+            Objects.requireNonNull(stockResilienceReview, "Stock resilience review result not set");
+            if (reviewClaimed != fiscalReview.reviewClaimed()
+                    || reviewClaimed != stockResilienceReview.reviewClaimed()) {
+                throw new IllegalArgumentException("Coordinator and policy-family claim flags must agree");
             }
         }
     }
@@ -155,6 +183,20 @@ public final class FactionPolicyReviewCoordinator {
             return factionReviews.stream()
                     .filter(review -> review.fiscalReview().policyChanged())
                     .count();
+        }
+
+        /** @return number of stock policies changed after the same successful review claim */
+        public long changedStockResiliencePolicyCount() {
+            return factionReviews.stream()
+                    .filter(review -> review.stockResilienceReview().policyChanged())
+                    .count();
+        }
+
+        /** @return number of item-level downward releases explicitly deferred for provenance safety */
+        public long deferredStockReleaseItemCount() {
+            return factionReviews.stream()
+                    .mapToLong(review -> review.stockResilienceReview().deferredReleaseItemCount())
+                    .sum();
         }
     }
 }
