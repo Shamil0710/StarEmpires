@@ -118,7 +118,16 @@ public final class PlayerFactionAssetAffiliationService {
             int deferredTransitFleets,
             String stableFactionId,
             int runtimeFactionId) {
-        /** Validates non-negative counters and faction identity metadata. */
+        /**
+         * Validates non-negative counters and faction identity metadata.
+         *
+         * @param inspectedOwnedFleets number of owned FleetIds inspected
+         * @param newlyAffiliatedLocalFleets number of local physical fleets whose faction changed
+         * @param alreadyAffiliatedLocalFleets number of local owned fleets already in the target faction
+         * @param deferredTransitFleets number of owned transit payloads deliberately deferred
+         * @param stableFactionId player's stable faction identity
+         * @param runtimeFactionId resolved dense local ECS faction slot
+         */
         public AffiliationReport {
             if (inspectedOwnedFleets < 0
                     || newlyAffiliatedLocalFleets < 0
