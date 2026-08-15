@@ -10,24 +10,27 @@ def replace_once(path, old, new):
     target.write_text(text.replace(old, new, 1))
 
 
-# Every production rebuild of a strategic state must preserve the already-installed doctrine.
 replace_once(
     "src/main/java/com/spacesim/world/TerritorialControlRuntime.java",
-    "                recognitions,\n                rights);",
-    "                recognitions,\n                rights,\n                state.doctrine());",
+    "                controls,\n                recognitions,\n                rights);",
+    "                controls,\n                recognitions,\n                rights,\n                state.doctrine());",
 )
-for path in [
+replace_once(
     "src/main/java/com/spacesim/persistence/WorldStrategicGrowthBinary.java",
+    "                state.territorialControlStates(),\n                state.territorialRecognitions(),\n                state.constructionRightsGranted());",
+    "                state.territorialControlStates(),\n                state.territorialRecognitions(),\n                state.constructionRightsGranted(),\n                state.doctrine());",
+)
+replace_once(
     "src/main/java/com/spacesim/persistence/WorldTerritoryBinary.java",
+    "                    payload.controls,\n                    payload.recognitions,\n                    payload.rights));",
+    "                    payload.controls,\n                    payload.recognitions,\n                    payload.rights,\n                    strategy.doctrine()));",
+)
+replace_once(
     "src/main/java/com/spacesim/world/StrategicGrowthPlanService.java",
-]:
-    replace_once(
-        path,
-        "                state.constructionRightsGranted());",
-        "                state.constructionRightsGranted(),\n                state.doctrine());",
-    )
+    "            state.territorialControlStates(),\n            state.territorialRecognitions(),\n            state.constructionRightsGranted());",
+    "            state.territorialControlStates(),\n            state.territorialRecognitions(),\n            state.constructionRightsGranted(),\n            state.doctrine());",
+)
 
-# Restore source compatibility only after production copies are doctrine-safe.
 path = "src/main/java/com/spacesim/world/FactionStrategicState.java"
 anchor = """    /**
      * Валидирует state и нормализует canonical ordering.
