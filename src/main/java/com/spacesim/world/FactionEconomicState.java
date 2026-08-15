@@ -51,7 +51,16 @@ public record FactionEconomicState(
                 LEGACY_UNBOUNDED_CONSTRUCTION_INVESTMENT);
     }
 
-    /** Validates stable identity and non-negative balances/authorizations. */
+    /**
+     * Validates stable identity and non-negative balances/authorizations.
+     *
+     * @param factionContentId stable faction content ID
+     * @param treasuryMilliCredits current real treasury balance
+     * @param stationLiquidityReserveMilliCredits desired station liquidity floor
+     * @param maxLiquiditySupportPerDecisionMilliCredits maximum subsidy transfer per decision
+     * @param treasuryReserveFloorMilliCredits protected treasury floor for discretionary spending
+     * @param maxConstructionInvestmentPerDecisionMilliCredits maximum construction funding per decision
+     */
     public FactionEconomicState {
         factionContentId = Objects.requireNonNull(factionContentId, "Faction content ID не задан").strip();
         if (factionContentId.isEmpty()) {
