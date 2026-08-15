@@ -199,7 +199,7 @@ helpers = '''    private FactionDiplomacyState withHonoredTreatyStanding(
 '''
 replace_once(anchor, helpers + anchor, 'compliance helpers')
 
-record_anchor = '''    private record TreatyLocation(
+record_anchor = '''    private record TreatyLocation(String ownerFactionContentId, DiplomaticTreatyState treaty) {
 '''
 record_text = '''    private record HonoredTreatyCompletion(
             String ownerFactionContentId,
