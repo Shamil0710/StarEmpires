@@ -42,7 +42,17 @@ public record DiplomaticTreatyState(
         REJECTED
     }
 
-    /** Validates timing and canonical clause ordering. */
+    /**
+     * Validates timing and canonical clause ordering.
+     *
+     * @param treatyId stable treaty identity unique in the world
+     * @param counterpartyFactionContentId second treaty party
+     * @param status lifecycle state
+     * @param createdTick authoritative non-negative creation tick
+     * @param effectiveTick first effective tick, or -1 before activation
+     * @param expiresTick exclusive expiry tick or -1 for indefinite
+     * @param clauses explicit non-empty rights/obligations
+     */
     public DiplomaticTreatyState {
         treatyId = requireId(treatyId, "Treaty ID");
         counterpartyFactionContentId = requireId(counterpartyFactionContentId, "Treaty counterparty faction ID");
@@ -81,7 +91,12 @@ public record DiplomaticTreatyState(
         clauses = List.copyOf(sorted);
     }
 
-    /** @return true while the treaty remains legally in force at the supplied tick */
+    /**
+     * Tests whether the treaty is legally in force at one world tick.
+     *
+     * @param worldTick authoritative world tick
+     * @return true while the treaty remains legally in force at the supplied tick
+     */
     public boolean activeAt(long worldTick) {
         return (status == Status.ACTIVE || status == Status.TERMINATING)
                 && worldTick >= effectiveTick
