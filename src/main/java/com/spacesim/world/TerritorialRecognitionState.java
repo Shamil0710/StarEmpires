@@ -25,7 +25,13 @@ public record TerritorialRecognitionState(
         CONTROL
     }
 
-    /** Canonicalizes the target stable ID. */
+    /**
+     * Canonicalizes the target stable ID.
+     *
+     * @param targetFactionContentId stable faction whose position is recognized
+     * @param systemId affected star system
+     * @param kind whether a claim or established control is recognized
+     */
     public TerritorialRecognitionState {
         String target = Objects.requireNonNull(
                 targetFactionContentId, "Territorial recognition target faction not set").strip();
