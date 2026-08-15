@@ -9,7 +9,11 @@ import java.util.Objects;
  * Pure legal resolver for effective faction market access.
  *
  * <p>Precedence is intentionally explicit: hard embargo first, then an active treaty right, then
- * the legacy directed relation threshold. No branch transfers money or materializes economic harm.</p>
+ * the legacy directed relation threshold. No branch transfers money or materializes economic harm.
+ * A full persisted world supplies complete diplomacy coverage, while source-compatible isolated
+ * policy projections may omit the participant's own strategic/diplomatic state. In that narrow
+ * compatibility case only owner-side explicit instruments and the owner's relation fallback are
+ * available; absence of participant state never manufactures a permission or prohibition.</p>
  */
 public final class DiplomaticMarketAccessResolver {
     private DiplomaticMarketAccessResolver() {
@@ -102,9 +106,6 @@ public final class DiplomaticMarketAccessResolver {
                     threshold,
                     "");
         }
-        if (!strategyById.containsKey(participantId) || !diplomacyById.containsKey(participantId)) {
-            throw new IllegalArgumentException("Unknown market participant faction: " + participantId);
-        }
         if (ownerId.equals(participantId)) {
             return new Decision(true, Reason.SELF, 100, threshold, "");
         }
@@ -139,7 +140,7 @@ public final class DiplomaticMarketAccessResolver {
             return "embargo:" + ownerId + "->" + participantId;
         }
         FactionDiplomacyState participant = diplomacyById.get(participantId);
-        if (participant.hasActiveMarketEmbargoAgainst(ownerId, worldTick)) {
+        if (participant != null && participant.hasActiveMarketEmbargoAgainst(ownerId, worldTick)) {
             return "embargo:" + participantId + "->" + ownerId;
         }
         return null;
