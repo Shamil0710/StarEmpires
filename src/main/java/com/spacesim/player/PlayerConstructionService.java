@@ -28,13 +28,12 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Authoritative Stage-16/17 player adapter for physical construction projects.
+ * Authoritative Stage-16 player adapter for physical construction projects.
  *
  * <p>This service does not spawn a completed station. It creates the same world-level construction
- * project/site used by the simulation core and records only human ownership in {@link PlayerState}.
- * Economic settlement remains external/personal, while the project's legal faction identity is
- * the player's current faction when affiliated. Thus joining/founding a faction does not silently
- * merge the personal wallet with faction treasury.</p>
+ * project/site used by the Stage-9 simulation core and records only human ownership in
+ * {@link PlayerState}. The world project uses {@link ConstructionSettlementKind#EXTERNAL_OWNER},
+ * so an independent player does not need a hidden faction treasury before Stage 17.</p>
  *
  * <p>Project authoring is guarded by {@link ConstructionPlacementPolicy}; UI code may preview the
  * same authoritative result but cannot bypass bounds, permanent-object clearance, jump-arrival or
@@ -111,11 +110,7 @@ public final class PlayerConstructionService {
     }
 
     /**
-     * Creates one personally funded player-owned construction project in the active fleet's system.
-     *
-     * <p>If the player is affiliated with a faction, that faction is the project's legal identity
-     * for territorial authorization and resulting station affiliation. Payment nevertheless remains
-     * {@link ConstructionSettlementKind#EXTERNAL_OWNER} and therefore comes from the personal wallet.</p>
+     * Creates one independent player-owned construction project in the active fleet's system.
      *
      * @param stationArchetypeContentId constructible station archetype content ID
      * @param x finite local-system X coordinate
@@ -139,18 +134,19 @@ public final class PlayerConstructionService {
         }
 
         ConstructionProjectId projectId = runtime.world().createConstructionProject(
-                null,
-                current.factionContentId(),
-                archetypeId,
-                placement.systemId(),
-                x,
-                y);
+        null,
+        current.factionContentId(),
+        archetypeId,
+        placement.systemId(),
+        x,
+        y);
         try {
             ConstructionProjectState state = runtime.world().findConstructionProject(projectId).orElseThrow();
             requireExternalContract(state);
-            if (!Objects.equals(current.factionContentId(), state.legalFactionContentId())) {
-                throw new IllegalStateException("Player construction legal faction differs from current affiliation");
-            }
+        if (!Objects.equals(current.factionContentId(), state.legalFactionContentId())) {
+            throw new IllegalStateException(
+                    "Player construction legal faction differs from current affiliation");
+        }
             List<ConstructionProjectId> ownedProjects = new ArrayList<>(current.ownedConstructionProjectIds());
             ownedProjects.add(projectId);
             runtime.replacePlayerState(PlayerRuntime.copyWithConstructionOwnership(
@@ -271,125 +267,89 @@ public final class PlayerConstructionService {
         if (shipTransform == null || siteTransform == null || shipInventory == null) {
             return 0;
         }
-        MiningComponent mining = ship.getComponent(MiningComponent.class);
-        float speed = mining == null ? 0f : mining.movementVelocity.len();
-        if (speed > MAX_TRANSFER_SPEED) {
+        float range = transferRange(ship);
+        if (shipTransform.velocity.len2() > MAX_TRANSFER_SPEED * MAX_TRANSFER_SPEED
+                || shipTransform.position.dst2(siteTransform.position) > range * range) {
             return 0;
         }
-        if (shipTransform.position.dst(siteTransform.position) > DEFAULT_TRANSFER_RANGE) {
-            return 0;
-        }
-        int available = shipInventory.stock[item.runtimeId()];
-        if (available <= 0) {
+        if (shipInventory.stock[item.runtimeId()] <= 0) {
             return 0;
         }
         return runtime.world().deliverConstructionMaterial(
-                projectId, placement.localEntityId(), item.id(), Math.min(amount, available));
-    }
-
-    /**
-     * Cancels an empty player-owned external construction project.
-     *
-     * @param projectId player-owned project to cancel
-     * @return true when cancelled
-     */
-    public boolean cancelProject(ConstructionProjectId projectId) {
-        ConstructionProjectState state = requireOwnedExternalProject(projectId);
-        if (state.totalDeliveredUnits() != 0L) {
-            throw new IllegalStateException("Cannot cancel player project after material delivery");
-        }
-        if (state.projectWalletMilliCredits() != 0L) {
-            throw new IllegalStateException("Funded external project requires an explicit player refund operation");
-        }
-        boolean cancelled = runtime.world().cancelConstructionProject(projectId);
-        if (cancelled) {
-            PlayerState current = runtime.player();
-            List<ConstructionProjectId> owned = new ArrayList<>(current.ownedConstructionProjectIds());
-            owned.remove(projectId);
-            runtime.replacePlayerState(PlayerRuntime.copyWithConstructionOwnership(
-                    current, owned, current.ownedStations()));
-        }
-        return cancelled;
-    }
-
-    private ContentCatalog.StationArchetypeDefinition requireConstructible(String value) {
-        String id = Objects.requireNonNull(value, "Construction archetype not set").strip();
-        ContentCatalog.StationArchetypeDefinition station = runtime.content().findStationArchetype(id);
-        if (station == null || station.construction() == null) {
-            throw new IllegalArgumentException("Unknown/non-constructible station archetype: " + id);
-        }
-        return station;
+                projectId,
+                placement.localEntityId(),
+                item.id(),
+                amount);
     }
 
     private FleetPlacementState authoringPlacement(PlayerState player) {
-        FleetId activeFleetId = player.activeFleetId();
-        if (activeFleetId == null || !player.ownedFleetIds().contains(activeFleetId)) {
-            throw new IllegalStateException("Player has no active owned fleet for construction authoring");
+        FleetPlacementState placement = player.activeFleetId() == null
+                ? null : runtime.world().findFleet(player.activeFleetId()).orElse(null);
+        if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+            throw new IllegalStateException("Active player fleet must be physically present to author construction");
         }
-        FleetPlacementState placement = runtime.world().findFleet(activeFleetId).orElseThrow(
-                () -> new IllegalStateException("Active FleetId is missing from world placements"));
-        if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
-                || runtime.world().findFleetJump(activeFleetId).isPresent()) {
-            throw new IllegalStateException("Active fleet must be physically present in a StarSystem");
-        }
-        if (!player.discoveredSystemIds().contains(placement.systemId())) {
-            throw new IllegalStateException("Construction requires a discovered target system");
+        StarSystemId systemId = placement.systemId();
+        if (!player.discoveredSystemIds().contains(systemId)) {
+            throw new IllegalStateException("Construction system must be discovered by the player");
         }
         return placement;
     }
 
     private ConstructionProjectState requireOwnedExternalProject(ConstructionProjectId projectId) {
-        ConstructionProjectId id = Objects.requireNonNull(projectId, "ConstructionProjectId not set");
-        if (!runtime.player().ownedConstructionProjectIds().contains(id)) {
-            throw new IllegalArgumentException("Construction project is not owned by player: " + id);
+        ConstructionProjectId checkedId = Objects.requireNonNull(projectId, "ConstructionProjectId not set");
+        PlayerState player = runtime.player();
+        if (!player.ownedConstructionProjectIds().contains(checkedId)) {
+            throw new IllegalArgumentException("Construction project is not owned by the player: " + checkedId);
         }
-        ConstructionProjectState state = runtime.world().findConstructionProject(id).orElseThrow(
-                () -> new IllegalStateException("Owned construction project missing from world: " + id));
-        requireExternalContract(state);
-        return state;
+        ConstructionProjectState project = runtime.world().findConstructionProject(checkedId)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown construction project: " + checkedId));
+        requireExternalContract(project);
+        return project;
     }
 
     private static void requireExternalContract(ConstructionProjectState state) {
         if (state.settlementKind() != ConstructionSettlementKind.EXTERNAL_OWNER
                 || state.ownerFactionContentId() != null) {
-            throw new IllegalStateException("Player construction project must use external settlement");
+            throw new IllegalStateException("Player project has invalid external settlement contract");
         }
     }
 
-    private static boolean requiresItem(ConstructionProjectState project, String itemId) {
+    private ContentCatalog.StationArchetypeDefinition requireConstructible(String value) {
+        String id = Objects.requireNonNull(value, "Station archetype ID not set").strip();
+        if (id.isEmpty()) {
+            throw new IllegalArgumentException("Station archetype ID cannot be blank");
+        }
+        ContentCatalog.StationArchetypeDefinition station = runtime.content().findStationArchetype(id);
+        if (station == null || station.construction() == null) {
+            throw new IllegalArgumentException("Station archetype is not constructible: " + id);
+        }
+        return station;
+    }
+
+    private static boolean requiresItem(ConstructionProjectState project, String itemContentId) {
         for (ConstructionMaterialState material : project.materials()) {
-            if (material.itemContentId().equals(itemId) && material.remainingAmount() > 0) {
+            if (material.itemContentId().equals(itemContentId) && material.remainingAmount() > 0) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean isTerminal(ConstructionProjectStatus status) {
-        return status == ConstructionProjectStatus.COMPLETED
-                || status == ConstructionProjectStatus.CANCELLED
-                || status == ConstructionProjectStatus.FAILED;
+    private static float transferRange(Entity ship) {
+        MiningComponent mining = ship.getComponent(MiningComponent.class);
+        return mining != null && Float.isFinite(mining.dockingRange) && mining.dockingRange > 0f
+                ? mining.dockingRange : DEFAULT_TRANSFER_RANGE;
     }
 
     private static String normalizedItemId(String value) {
-        String id = Objects.requireNonNull(value, "Construction item not set").strip();
-        if (id.isEmpty()) {
-            throw new IllegalArgumentException("Construction item cannot be blank");
-        }
-        return id;
+        return value == null ? "" : value.strip();
     }
 
-    private void rollbackEmptyProject(ConstructionProjectId projectId, RuntimeException original) {
+    private void rollbackEmptyProject(ConstructionProjectId projectId, RuntimeException cause) {
         try {
-            ConstructionProjectState state = runtime.world().findConstructionProject(projectId).orElse(null);
-            if (state != null
-                    && !isTerminal(state.status())
-                    && state.projectWalletMilliCredits() == 0L
-                    && state.totalDeliveredUnits() == 0L) {
-                runtime.world().cancelConstructionProject(projectId);
-            }
+            runtime.world().cancelConstructionProject(projectId);
         } catch (RuntimeException rollbackFailure) {
-            original.addSuppressed(rollbackFailure);
+            cause.addSuppressed(rollbackFailure);
         }
     }
 
@@ -397,16 +357,19 @@ public final class PlayerConstructionService {
             PlayerState previous,
             WalletComponent playerWallet,
             WalletComponent siteWallet,
-            long amountMilliCredits,
-            RuntimeException original) {
-        try {
-            if (!siteWallet.transferTo(playerWallet, amountMilliCredits)) {
-                throw new IllegalStateException("Could not reverse construction funding wallet transfer");
-            }
-            runtime.replacePlayerState(previous);
-        } catch (RuntimeException rollbackFailure) {
-            original.addSuppressed(rollbackFailure);
+            long amount,
+            RuntimeException cause) {
+        runtime.replacePlayerState(previous);
+        if (!siteWallet.transferTo(playerWallet, amount)) {
+            cause.addSuppressed(new IllegalStateException(
+                    "Construction funding rollback could not restore money"));
         }
+    }
+
+    private static boolean isTerminal(ConstructionProjectStatus status) {
+        return status == ConstructionProjectStatus.COMPLETED
+                || status == ConstructionProjectStatus.CANCELLED
+                || status == ConstructionProjectStatus.FAILED;
     }
 
     private static String siteLedgerName(ConstructionProjectId projectId) {
