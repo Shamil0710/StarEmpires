@@ -17,9 +17,9 @@ import java.util.Set;
  * {@link StarSystemSimulationState} хранит обычный {@link GameState} локального economic core,
  * faction layers хранят treasury/strategy/pressure, construction layer — реальные проекты,
  * Stage-10 fleet layer отделяет устойчивый {@link FleetId} от system-local EntityId, а
- * Stage-10B jump layer сохраняет активную фазу межсистемного перехода. Stage 16 schema v8
- * разделяет faction-treasury settlement и внешнее владение construction project без добавления
- * human-player identity в WorldState.</p>
+ * Stage-10B jump layer сохраняет активную фазу межсистемного перехода. Stage 17 schema v9
+ * дополнительно сохраняет world-defined faction identities отдельно от immutable authored
+ * content catalog.</p>
  *
  * @param schemaVersion версия world-level persistent schema
  * @param topology immutable topology галактики
@@ -32,6 +32,7 @@ import java.util.Set;
  * @param nextFleetIdValue следующий неиспользованный world-level FleetId
  * @param fleets persistent fleet placement states в canonical FleetId порядке
  * @param fleetJumps persistent active jump states в canonical FleetId порядке
+ * @param factionIdentities persistent world-defined faction identities в canonical stable-ID порядке
  */
 public record WorldState(
         int schemaVersion,
@@ -44,9 +45,12 @@ public record WorldState(
         List<FactionEconomicPressureState> factionEconomicPressures,
         long nextFleetIdValue,
         List<FleetPlacementState> fleets,
-        List<FleetJumpState> fleetJumps) {
-    /** Текущая Stage-16 версия world-level persistent schema. */
-    public static final int CURRENT_VERSION = 8;
+        List<FleetJumpState> fleetJumps,
+        List<WorldFactionIdentityState> factionIdentities) {
+    /** Текущая Stage-17 версия world-level persistent schema. */
+    public static final int CURRENT_VERSION = 9;
+    /** Stage-16 schema с external-owner construction settlement, без dynamic faction directory. */
+    public static final int LEGACY_STAGE16_VERSION = 8;
     /** Stage-10B/Stage-15 schema с active jump FSM и faction-only construction settlement. */
     public static final int LEGACY_STAGE10_JUMP_VERSION = 7;
     /** Stage-10A schema с FleetId/placement layer, но без active jump FSM. */
@@ -193,6 +197,38 @@ public record WorldState(
                 nextFleetIdValue, fleets, List.of());
     }
 
+    /**
+     * Source-compatible Stage-16 constructor без world-defined faction identities.
+     *
+     * @param schemaVersion текущая world schema
+     * @param topology topology галактики
+     * @param systems snapshots систем
+     * @param factions faction economic states
+     * @param factionStrategies diplomacy/territory states
+     * @param nextConstructionProjectIdValue construction allocator watermark
+     * @param constructionProjects persistent construction projects
+     * @param factionEconomicPressures persistent faction pressure states
+     * @param nextFleetIdValue world FleetId allocator watermark
+     * @param fleets persistent fleet placements
+     * @param fleetJumps persistent active jump states
+     */
+    public WorldState(
+            int schemaVersion,
+            GalaxyTopology topology,
+            List<StarSystemSimulationState> systems,
+            List<FactionEconomicState> factions,
+            List<FactionStrategicState> factionStrategies,
+            long nextConstructionProjectIdValue,
+            List<ConstructionProjectState> constructionProjects,
+            List<FactionEconomicPressureState> factionEconomicPressures,
+            long nextFleetIdValue,
+            List<FleetPlacementState> fleets,
+            List<FleetJumpState> fleetJumps) {
+        this(schemaVersion, topology, systems, factions, factionStrategies,
+                nextConstructionProjectIdValue, constructionProjects, factionEconomicPressures,
+                nextFleetIdValue, fleets, fleetJumps, List.of());
+    }
+
     private WorldState(
             int schemaVersion,
             GalaxyTopology topology,
@@ -222,6 +258,7 @@ public record WorldState(
      * @param nextFleetIdValue следующий world FleetId allocator watermark
      * @param fleets world-level fleet placement states
      * @param fleetJumps active persistent jump states
+     * @param factionIdentities world-defined faction identity states
      * @throws NullPointerException если обязательное значение не задано
      * @throws IllegalArgumentException при неизвестной версии, duplicate/unknown IDs,
      *         неполном topology/fleet coverage или несовместимом fleet location state
@@ -238,6 +275,7 @@ public record WorldState(
         Objects.requireNonNull(factionEconomicPressures, "Economic pressure states WorldState не заданы");
         Objects.requireNonNull(fleets, "Fleet placement states WorldState не заданы");
         Objects.requireNonNull(fleetJumps, "Fleet jump states WorldState не заданы");
+        Objects.requireNonNull(factionIdentities, "World faction identities WorldState не заданы");
         if (nextConstructionProjectIdValue <= 0L) {
             throw new IllegalArgumentException("Следующий ConstructionProjectId должен быть положительным");
         }
@@ -308,6 +346,24 @@ public record WorldState(
         }
         sortedStrategies.sort(Comparator.naturalOrder());
         factionStrategies = List.copyOf(sortedStrategies);
+
+        List<WorldFactionIdentityState> sortedIdentities = new ArrayList<>(factionIdentities.size());
+        Set<String> identityStableIds = new HashSet<>();
+        Set<Integer> identityRuntimeIds = new HashSet<>();
+        for (WorldFactionIdentityState identity : factionIdentities) {
+            WorldFactionIdentityState value = Objects.requireNonNull(identity, "WorldFactionIdentityState не задан");
+            if (!identityStableIds.add(value.stableFactionId())) {
+                throw new IllegalArgumentException(
+                        "Дублирующий world faction stable ID: " + value.stableFactionId());
+            }
+            if (!identityRuntimeIds.add(value.runtimeFactionId())) {
+                throw new IllegalArgumentException(
+                        "Дублирующий world faction runtime ID: " + value.runtimeFactionId());
+            }
+            sortedIdentities.add(value);
+        }
+        sortedIdentities.sort(Comparator.naturalOrder());
+        factionIdentities = List.copyOf(sortedIdentities);
 
         List<ConstructionProjectState> sortedProjects = new ArrayList<>(constructionProjects.size());
         Set<ConstructionProjectId> projectIds = new HashSet<>();
@@ -625,7 +681,7 @@ public record WorldState(
      * @param nextFleetIdValue decoded FleetId allocator watermark
      * @param fleets decoded fleet placements
      * @param jumps decoded active jump states
-     * @return current Stage-16 WorldState
+     * @return current Stage-17 WorldState
      */
     public static WorldState fromLegacyStage10Jump(
             GalaxyTopology topology,
@@ -641,6 +697,37 @@ public record WorldState(
         return new WorldState(CURRENT_VERSION, topology, systems, factions, strategies,
                 nextConstructionProjectIdValue, projects, pressures,
                 nextFleetIdValue, fleets, jumps);
+    }
+
+    /**
+     * Мигрирует Stage-16 schema v8, сохраняя весь физический мир и создавая пустой dynamic directory.
+     *
+     * @param topology decoded topology
+     * @param systems decoded local sessions
+     * @param factions decoded faction economy
+     * @param strategies decoded strategic faction state
+     * @param nextConstructionProjectIdValue decoded construction allocator watermark
+     * @param projects decoded construction projects
+     * @param pressures decoded economic pressure states
+     * @param nextFleetIdValue decoded FleetId allocator watermark
+     * @param fleets decoded fleet placements
+     * @param jumps decoded active jump states
+     * @return current Stage-17 WorldState with no invented dynamic factions
+     */
+    public static WorldState fromLegacyStage16(
+            GalaxyTopology topology,
+            List<StarSystemSimulationState> systems,
+            List<FactionEconomicState> factions,
+            List<FactionStrategicState> strategies,
+            long nextConstructionProjectIdValue,
+            List<ConstructionProjectState> projects,
+            List<FactionEconomicPressureState> pressures,
+            long nextFleetIdValue,
+            List<FleetPlacementState> fleets,
+            List<FleetJumpState> jumps) {
+        return new WorldState(CURRENT_VERSION, topology, systems, factions, strategies,
+                nextConstructionProjectIdValue, projects, pressures,
+                nextFleetIdValue, fleets, jumps, List.of());
     }
 
     private static FleetPlacementState findFleetPlacement(
