@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "status": "authoring-benchmark-only",
+  "unitSystem": "SI",
+  "sourceDocument": "docs/ship_mathematics_v0_8.md",
+  "harness": "com.spacesim.combat.benchmark.ShipMathematicsV08SensorTrackHarness",
+  "externalEngineeringBasis": [
+    {"source": "NASA-RP-1241 / NTRS 19900014464", "topic": "electro-optical sensor performance, Planck radiance and SNR"},
+    {"source": "NASA NTRS 19880025010", "topic": "precise optical point-source centroiding"},
+    {"source": "NASA NTRS 20230000548", "topic": "state estimate and covariance in an operational EKF"},
+    {"source": "NASA NTRS 19840029651", "topic": "rendezvous radar range/range-rate/LOS measurement fusion and improbable-measurement rejection"},
+    {"source": "NASA NTRS 19940031050", "topic": "spacecraft-spacecraft radiometric acquisition as received signal power versus noise-density/integration problem"},
+    {"source": "NASA-TM-82092 / NTRS 19820015505", "topic": "radar equation and scattering cross-section formulation"},
+    {"source": "NASA NTRS 20210026612", "topic": "residual-based optical-navigation outlier rejection"}
+  ],
+  "thermalSpectrumSeeds": {
+    "hotRadiatorTemperatureK": 1100.0,
+    "hot3To5UmPowerFraction": 0.3507950859212762,
+    "hot8To12UmPowerFraction": 0.07267041590214815,
+    "hotColorRatio8To12Over3To5": 0.20715916162650155,
+    "warmDecoyTemperatureK": 600.0,
+    "warm3To5UmPowerFraction": 0.2340305210454334,
+    "warm8To12UmPowerFraction": 0.21175286026029627,
+    "warmColorRatio8To12Over3To5": 0.9048087374004852,
+    "note": "Band fractions are Planck-spectrum benchmark integrals. Decoy temperature is a sensitivity seed, not a canonical decoy design."
+  },
+  "passiveIrSensor": {
+    "apertureM": 1.5,
+    "band": "3-5 um",
+    "effectivePhotonWavelengthM": 0.000004,
+    "throughput": 0.35,
+    "quantumEfficiency": 0.7,
+    "backgroundElectronsPerS": 1000000.0,
+    "readNoiseElectronsRms": 100.0,
+    "integrationS": 1.0,
+    "detectionSnr": 5.0,
+    "systematicAngularFloorRad": 5e-8,
+    "diffractionScaleRad": 0.0000032533333333333332,
+    "backgroundStatus": "benchmark-sensor-seed-not-universal-deep-space-background"
+  },
+  "passiveDetectionBenchmarks": [
+    {
+      "design": "TORPEDO_CORVETTE",
+      "radiatedPowerWSeed": 11000000.0,
+      "snr5RangeM": 23052791028.245937
+    },
+    {
+      "design": "RECON_EW_FRIGATE",
+      "radiatedPowerWSeed": 76500000.0,
+      "snr5RangeM": 60793603749.74133
+    },
+    {
+      "design": "ESCORT_DESTROYER",
+      "radiatedPowerWSeed": 60800000.0,
+      "snr5RangeM": 54197463368.07501
+    },
+    {
+      "design": "BATTLESHIP",
+      "radiatedPowerWSeed": 1387300000.0,
+      "snr5RangeM": 258888264412.64874
+    }
+  ],
+  "strongPassiveTrackBenchmark": {
+    "target": "BATTLESHIP",
+    "rangeM": 10000000000.0,
+    "snr": 1612.0875559189344,
+    "angularSigmaRad": 5e-8,
+    "singleBearingProvidesDirectRange": false,
+    "triangulation": [
+      {
+        "observerBaselineM": 100000000.0,
+        "rangeSigmaM": 70710.67811865476,
+        "crossTrackSigmaM": 353.5533905932737
+      },
+      {
+        "observerBaselineM": 1000000000.0,
+        "rangeSigmaM": 7071.067811865476,
+        "crossTrackSigmaM": 353.5533905932737
+      }
+    ]
+  },
+  "activeRadar": {
+    "wavelengthM": 0.03,
+    "frequencyClass": "10 GHz class",
+    "apertureM": 10.0,
+    "apertureEfficiency": 0.6,
+    "antennaGainLinear": 657973.6267392905,
+    "antennaGainDbi": 58.18208486332586,
+    "transmitPowerW": 20000000.0,
+    "systemNoiseTemperatureK": 500.0,
+    "coherentDwellS": 1.0,
+    "waveformBandwidthHz": 20000000.0,
+    "rangeResolutionM": 7.49481145,
+    "detectionSnr": 5.0,
+    "rcsStatus": "aspect-and-frequency-dependent-sensitivity-seeds"
+  },
+  "activeRadarBenchmarks": [
+    {
+      "target": "CORVETTE_RCS_SEED",
+      "radarCrossSectionM2": 100.0,
+      "snr5RangeM": 326594711.94887054
+    },
+    {
+      "target": "BATTLESHIP_RCS_SEED",
+      "radarCrossSectionM2": 10000.0,
+      "snr5RangeM": 1032783161.5250403
+    },
+    {
+      "target": "CORVETTE_RCS_SEED",
+      "rangeM": 300000000.0,
+      "snr": 7.022982396098298,
+      "rangeSigmaM": 1.9997924474576743
+    }
+  ],
+  "activeEmissionDisclosure": {
+    "rangeM": 1000000000.0,
+    "receiverApertureM": 1.0,
+    "mainBeamScaleRad": 0.00366,
+    "directIlluminationSnr": 71485253682068.06,
+    "battleshipEchoSnrAtSameRange": 5.688615740839622,
+    "directToEchoSnrRatioGreaterThan": 1000000000000.0,
+    "scope": "main-beam-only; side lobes and off-axis interception not modeled"
+  },
+  "electronicWarfare": {
+    "jammerEirpSpectralDensityWPerHz": 0.1,
+    "jammerStatus": "future-tech-balance-seed",
+    "referenceGeometry": {
+      "rangeM": 300000000.0,
+      "targetRcsM2": 100.0
+    },
+    "outcomes": [
+      {
+        "mode": "NO_JAMMER",
+        "effectiveOverlapFraction": 0.0,
+        "coherentDwellS": 1.0,
+        "radarSnr": 7.022982396098298,
+        "detected": true
+      },
+      {
+        "mode": "FULL_OVERLAP_JAMMER",
+        "effectiveOverlapFraction": 1.0,
+        "coherentDwellS": 1.0,
+        "radarSnr": 0.01161628273565762,
+        "detected": false
+      },
+      {
+        "mode": "ECCM_REDUCED_OVERLAP",
+        "effectiveOverlapFraction": 0.001,
+        "coherentDwellS": 1.0,
+        "radarSnr": 4.379562328120378,
+        "detected": false
+      },
+      {
+        "mode": "ECCM_REDUCED_OVERLAP_LONGER_DWELL",
+        "effectiveOverlapFraction": 0.001,
+        "coherentDwellS": 2.0,
+        "radarSnr": 8.759124656240756,
+        "detected": true
+      }
+    ]
+  },
+  "measurementHypothesisGate": {
+    "normalizedInnovationSquaredThreshold": 9.0,
+    "predictedSigmaRad": 5e-8,
+    "measurementSigmaRad": 5e-8,
+    "examples": [
+      {"residualRad": 5e-8, "nis": 0.5, "passesGate": true},
+      {"residualRad": 2e-7, "nis": 8.0, "passesGate": true},
+      {"residualRad": 5e-7, "nis": 50.0, "passesGate": false}
+    ],
+    "policy": "Multiple plausible measurements create ambiguity / track hypotheses; do not replace with a random decoy success roll."
+  },
+  "trackAgingBenchmark": {
+    "initialCrossTrackSigmaM": 15.0,
+    "initialVelocitySigmaMps": 0.03,
+    "unmodeledAccelerationSigmaMps2": 0.05,
+    "samples": [
+      {"ageS": 0.0, "crossTrackSigmaM": 15.0},
+      {"ageS": 30.0, "crossTrackSigmaM": 27.056607326122762},
+      {"ageS": 60.0, "crossTrackSigmaM": 91.25919131791602},
+      {"ageS": 120.0, "crossTrackSigmaM": 360.3303484304368}
+    ],
+    "note": "Deterministic maneuver-aware surrogate for acceptance. Production TrackState retains the v0.3 full covariance form P = F P F^T + Q."
+  },
+  "dataModelDirection": {
+    "sensorDefinition": [
+      "sensorFamily",
+      "passiveOrActive",
+      "spectralBandOrWavelength",
+      "apertureOrAntennaGeometry",
+      "throughputOrEfficiency",
+      "noiseModel",
+      "integrationPolicies",
+      "waveformBandwidth",
+      "fieldOfView",
+      "scanRate",
+      "power",
+      "wasteHeat",
+      "measurementTypes"
+    ],
+    "signatureState": [
+      "thermalRadiatedPowerByBand",
+      "radiatorTemperatureAndOrientation",
+      "enginePlumeState",
+      "activeEmissions",
+      "radarCrossSectionByAspectAndFrequency",
+      "transientSignatureEvents"
+    ],
+    "measurement": ["z", "R covariance", "snr", "timestamp", "sourceChannel"],
+    "track": ["estimatedState", "P covariance", "trackAge", "classificationConfidence", "identityConfidence", "hypotheses"]
+  },
+  "canonicalFindings": [
+    "Detection range is not weapon range.",
+    "Hot capital ships are strategically visible far beyond active-radar fire-control ranges under the explicit v0.8 sensor seed.",
+    "A single passive bearing does not provide exact range; observer baseline creates real reconnaissance value.",
+    "Active radar buys precise range/range-rate measurements while revealing its direction to illuminated receivers.",
+    "ECM is received interference power and ECCM is a processing/geometry/time trade rather than a percentage resistance.",
+    "Decoys create competing measurement hypotheses; multi-band and multi-sensor consistency can reject simplistic decoys.",
+    "Track covariance and age are authoritative combat information state.",
+    "Engine plume, reflected light, full RCS aspect tables and multi-hypothesis tracking remain v1.0 closure items."
+  ]
+}
