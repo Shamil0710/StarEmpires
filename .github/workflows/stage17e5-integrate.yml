@@ -1,0 +1,39 @@
+name: Stage 17E.5 embargo integration
+
+on:
+  push:
+    branches:
+      - agent/stage17e-embargo-commands
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17e-embargo-commands
+          fetch-depth: 0
+
+      - name: Integrate embargo command boundary
+        shell: bash
+        run: python3 .github/stage17e5/apply.py
+
+      - name: Self-remove integrator and commit
+        shell: bash
+        run: |
+          rm -rf .github/stage17e5
+          rm .github/workflows/stage17e5-integrate.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/FactionDiplomacyRuntime.java \
+                  src/main/java/com/spacesim/world/WorldSimulation.java \
+                  docs/development_roadmap.md \
+                  .github/stage17e5 \
+                  .github/workflows/stage17e5-integrate.yml
+          git diff --cached --check
+          git commit -m "Stage 17E.5: integrate embargo command effects"
+          git push origin HEAD:agent/stage17e-embargo-commands
