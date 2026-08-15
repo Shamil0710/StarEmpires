@@ -39,7 +39,13 @@ public interface SupplierDiversificationPolicy {
             int supplierShareBasisPoints,
             long acceptableProfitSacrificeMilliCredits) {
 
-        /** Validates one bounded immutable assessment. */
+        /**
+         * Validates one bounded immutable assessment.
+         *
+         * @param active whether diversification is active for the assessed commodity
+         * @param supplierShareBasisPoints measured supplier concentration, 0..10000
+         * @param acceptableProfitSacrificeMilliCredits maximum accepted expected-profit sacrifice
+         */
         public Assessment {
             if (supplierShareBasisPoints < 0 || supplierShareBasisPoints > 10_000) {
                 throw new IllegalArgumentException("Supplier share must be in range 0..10000 bps");
