@@ -67,6 +67,32 @@ class FactionStockResiliencePolicyReviewerTest {
     }
 
     @Test
+    void protectedBaseDemandReleasesRedundantOverlayByBoundedStep() {
+        FactionStockResilienceReviewProfile profile = new FactionStockResilienceReviewProfile(2, 10, 5);
+        FactionResiliencePlan resilience = resiliencePlan(List.of(decision("item.energy", 10)));
+        List<FactionStockPolicyState> protectedDemand = List.of(
+                new FactionStockPolicyState("item.energy", 10));
+
+        FactionStockResiliencePolicyReviewer.Plan first = FactionStockResiliencePolicyReviewer.plan(
+                List.of(new FactionStockPolicyState("item.energy", 8)),
+                protectedDemand,
+                resilience,
+                profile);
+        assertEquals(0, first.increasedItemCount());
+        assertEquals(1, first.decreasedItemCount());
+        assertEquals(3, stockFloor(first.candidateOverlay(), "item.energy"));
+
+        FactionStockResiliencePolicyReviewer.Plan second = FactionStockResiliencePolicyReviewer.plan(
+                first.candidateOverlay(),
+                protectedDemand,
+                resilience,
+                profile);
+        assertEquals(1, second.decreasedItemCount());
+        assertTrue(second.candidateOverlay().isEmpty(),
+                "Base/non-resilience demand that already covers the recommendation must make overlay redundant");
+    }
+
+    @Test
     void nonzeroDeltaInsideDeadbandIsStable() {
         List<FactionStockPolicyState> previous = List.of(
                 new FactionStockPolicyState("item.energy", 20));
