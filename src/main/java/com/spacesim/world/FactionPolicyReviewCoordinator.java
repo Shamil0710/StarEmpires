@@ -192,10 +192,10 @@ public final class FactionPolicyReviewCoordinator {
                     .count();
         }
 
-        /** @return number of item-level downward releases explicitly deferred for provenance safety */
-        public long deferredStockReleaseItemCount() {
+        /** @return number of item-level downward adjustments blocked until provenance is available */
+        public long blockedStockDecreaseItemCount() {
             return factionReviews.stream()
-                    .mapToLong(review -> review.stockResilienceReview().deferredReleaseItemCount())
+                    .mapToLong(review -> review.stockResilienceReview().blockedDecreaseItemCount())
                     .sum();
         }
     }
