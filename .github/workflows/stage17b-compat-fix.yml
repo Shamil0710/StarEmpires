@@ -1,0 +1,52 @@
+name: Stage17B Compat Fix
+
+on:
+  push:
+    branches:
+      - agent/stage17b-transit-fleet-affiliation
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17b-transit-fleet-affiliation
+          fetch-depth: 0
+      - name: Normalize legacy planner reputation vectors
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/main/java/com/spacesim/trade/FleetTradeProfile.java')
+          text = p.read_text()
+          old = '''        if (reputation == null || reputation.length != Constants.FACTION_RUNTIME_CAPACITY) {
+            throw new IllegalArgumentException("reputation должен иметь длину Constants.MAX_FACTIONS");
+        }
+'''
+          new = '''        if (reputation == null
+                || (reputation.length != Constants.LEGACY_FACTION_COUNT
+                && reputation.length != Constants.FACTION_RUNTIME_CAPACITY)) {
+            throw new IllegalArgumentException(
+                    "reputation должен иметь legacy authored count или runtime faction capacity");
+        }
+'''
+          if old not in text:
+              raise SystemExit('expected reputation validation block not found')
+          text = text.replace(old, new, 1)
+          old = '        this.reputation = Arrays.copyOf(reputation, reputation.length);\n'
+          new = '        this.reputation = Arrays.copyOf(reputation, Constants.FACTION_RUNTIME_CAPACITY);\n'
+          if old not in text:
+              raise SystemExit('expected reputation copy not found')
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+          PY
+          rm -f .github/workflows/stage17b-compat-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Preserve legacy planner profile compatibility"
+          git push origin HEAD:agent/stage17b-transit-fleet-affiliation
