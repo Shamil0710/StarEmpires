@@ -326,7 +326,7 @@ public final class WorldSimulation {
 
         long remainingBudget = Math.min(
                 account.maxLiquiditySupportPerDecisionMilliCredits(),
-                account.treasury().getBalanceMilliCredits());
+                account.spendableTreasuryMilliCredits());
         if (remainingBudget <= 0L || account.stationLiquidityReserveMilliCredits() <= 0L) {
             return new LiquiditySupportReport(0L, 0);
         }
@@ -349,7 +349,7 @@ public final class WorldSimulation {
                     continue;
                 }
                 long amount = Math.min(reserve - balance, remainingBudget);
-                amount = Math.min(amount, account.treasury().getBalanceMilliCredits());
+                amount = Math.min(amount, account.spendableTreasuryMilliCredits());
                 if (amount <= 0L || !account.treasury().transferTo(wallet, amount)) {
                     continue;
                 }
@@ -455,6 +455,53 @@ public final class WorldSimulation {
         }
         FactionEconomicAccount account = factionAccountsById.get(factionContentId);
         return account == null ? Optional.empty() : Optional.of(account.snapshot());
+    }
+
+    /**
+     * Returns the unified live fiscal policy for one authored or world-defined faction.
+     *
+     * @param factionContentId stable faction ID
+     * @return current policy or empty when the faction lacks economic/strategic state
+     */
+    public Optional<FactionFiscalPolicyState> findFactionFiscalPolicy(String factionContentId) {
+        if (factionContentId == null) {
+            return Optional.empty();
+        }
+        FactionEconomicAccount account = factionAccountsById.get(factionContentId);
+        FactionStrategicState strategy = territorialControlRuntime.find(factionContentId);
+        if (account == null || strategy == null) {
+            return Optional.empty();
+        }
+        return Optional.of(account.fiscalPolicy(
+                strategy.stationTaxBasisPoints(),
+                strategy.foreignTerritoryTariffBasisPoints()));
+    }
+
+    /**
+     * Applies one common player/AI fiscal-policy update without moving money or assets.
+     *
+     * <p>The update changes future tax/levy rates and treasury spending authorization only. Existing
+     * balances, station wallets, construction projects and ledger history remain untouched.</p>
+     *
+     * @param factionContentId stable authored or world-defined faction ID
+     * @param policy bounded fiscal policy
+     * @return installed canonical policy
+     */
+    public FactionFiscalPolicyState updateFactionFiscalPolicy(
+            String factionContentId,
+            FactionFiscalPolicyState policy) {
+        String factionId = normalizedFactionId(factionContentId);
+        FactionFiscalPolicyState checked = Objects.requireNonNull(policy, "Faction fiscal policy not set");
+        FactionEconomicAccount account = requireFactionAccount(factionId);
+        if (territorialControlRuntime.find(factionId) == null) {
+            throw new IllegalArgumentException("Faction has no strategic state: " + factionId);
+        }
+        territorialControlRuntime.updateFiscalRates(
+                factionId,
+                checked.stationTaxBasisPoints(),
+                checked.foreignTerritoryLevyBasisPoints());
+        account.updateFiscalPolicy(checked);
+        return findFactionFiscalPolicy(factionId).orElseThrow();
     }
 
     /**
@@ -1022,14 +1069,22 @@ public FactionEconomicDependenceDiagnostics analyzeEconomicDependence(
     }
 
     /**
-     * Физически переводит деньги faction treasury в project-site wallet.
+     * Physically transfers faction treasury money into a project-site wallet after fiscal authorization.
      *
      * @param projectId target construction project
      * @param amountMilliCredits positive transfer amount
-     * @return transferred amount or zero when treasury cannot fund it atomically
+     * @return transferred amount or zero when treasury/fiscal policy cannot fund it atomically
      */
     public long fundConstructionProject(
             ConstructionProjectId projectId, long amountMilliCredits) {
+        ConstructionProjectState project = constructionProjectService.find(projectId).orElse(null);
+        if (project != null && project.settlementKind() == ConstructionSettlementKind.FACTION_TREASURY) {
+            FactionEconomicAccount account = requireFactionAccount(project.ownerFactionContentId());
+            if (amountMilliCredits > account.maxConstructionInvestmentPerDecisionMilliCredits()
+                    || amountMilliCredits > account.spendableTreasuryMilliCredits()) {
+                return 0L;
+            }
+        }
         return constructionProjectService.fund(projectId, amountMilliCredits);
     }
 
