@@ -39,13 +39,13 @@ final class FactionPolicyRuntime {
     }
 
     /**
-     * Устанавливает station access components и post-planner safety system через unified faction
-     * identity directory.
+     * Устанавливает или refresh-ит station access components через unified faction identity
+     * directory.
      *
-     * <p>Пустой strategic layer сохраняет Stage-7 runtime буквально: никакие компоненты и системы
-     * не добавляются. Отсутствующая strategy у владельца конкретного рынка означает unrestricted
-     * market. Explicit strategy materializes полный allowed-set для всех authored и world-defined
-     * factions, имеющих dense runtime slot; missing relation считается нейтральным значением 0.</p>
+     * <p>Каждый вызов сначала удаляет старые transient access components со всех рынков, затем
+     * материализует policy заново из persistent strategy. Поэтому live affiliation/diplomacy
+     * changes не зависят от save/load. Post-planner safety system устанавливается не более одного
+     * раза на SimulationSession.</p>
      *
      * @param session локальная simulation session
      * @param resolver unified authored + world-defined faction identity resolver
@@ -58,6 +58,12 @@ final class FactionPolicyRuntime {
         SimulationSession checkedSession = Objects.requireNonNull(session, "SimulationSession не задана");
         FactionIdentityResolver identities = Objects.requireNonNull(resolver, "FactionIdentityResolver не задан");
         Objects.requireNonNull(strategies, "Faction strategic states не заданы");
+
+        for (Entity entity : checkedSession.getEngine().getEntities()) {
+            if (entity.getComponent(MarketComponent.class) != null) {
+                entity.remove(FactionMarketAccessComponent.class);
+            }
+        }
         if (strategies.isEmpty()) {
             return;
         }
@@ -104,6 +110,9 @@ final class FactionPolicyRuntime {
             }
             entity.add(access);
         }
-        checkedSession.getEngine().addSystem(new FactionMarketAccessSystem(checkedSession.getEntityRegistry()));
+        if (checkedSession.getEngine().getSystem(FactionMarketAccessSystem.class) == null) {
+            checkedSession.getEngine().addSystem(
+                    new FactionMarketAccessSystem(checkedSession.getEntityRegistry()));
+        }
     }
 }
