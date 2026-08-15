@@ -515,6 +515,64 @@ public final class WorldSimulation {
     }
 
     /**
+     * Returns the common persistent strategic stock/production policy for one live faction.
+     *
+     * @param factionContentId authored or world-defined stable faction ID
+     * @return current stock/production policy or empty when strategic state is absent
+     */
+    public Optional<FactionStockProductionPolicyState> findFactionStockProductionPolicy(String factionContentId) {
+        FactionStrategicState strategy = factionContentId == null
+                ? null
+                : territorialControlRuntime.find(factionContentId);
+        return strategy == null
+                ? Optional.empty()
+                : Optional.of(new FactionStockProductionPolicyState(
+                        strategy.stockPolicies(), strategy.productionPolicies()));
+    }
+
+    /**
+     * Replaces strategic stock floors and production recipe preferences without physical mutation.
+     *
+     * <p>All semantic content references are validated before persistent state changes. Installing
+     * policy does not alter wallets, inventories, market targets, production progress or output.
+     * Player/UI and AI therefore author the same persistent contract and may explicitly apply it
+     * through {@link #applyFactionStrategicPolicy(String)}.</p>
+     *
+     * @param factionContentId authored or world-defined stable faction ID
+     * @param policy canonical stock/production policy
+     * @return installed canonical policy
+     */
+    public FactionStockProductionPolicyState updateFactionStockProductionPolicy(
+            String factionContentId,
+            FactionStockProductionPolicyState policy) {
+        String factionId = normalizedFactionId(factionContentId);
+        if (factionIdentityResolver.runtimeId(factionId).isEmpty()) {
+            throw new IllegalArgumentException("Unknown faction identity: " + factionId);
+        }
+        FactionStockProductionPolicyState checked = Objects.requireNonNull(
+                policy, "Faction stock/production policy not set");
+        FactionStrategicPolicyEngine.validatePolicy(contentCatalog, checked);
+        territorialControlRuntime.updateStockProductionPolicies(factionId, checked);
+        return findFactionStockProductionPolicy(factionId).orElseThrow();
+    }
+
+    /**
+     * Applies the currently authored strategic stock/production policy to ordinary ECS configuration.
+     *
+     * <p>The executor only adjusts existing market target floors and production recipes. It does not
+     * create goods, money, demand orders or assets; ordinary market/logistics/production systems own
+     * all subsequent physical consequences.</p>
+     *
+     * @param factionContentId authored or world-defined stable faction ID
+     * @return report of physical configuration changes
+     */
+    public FactionStrategicPolicyEngine.ApplicationReport applyFactionStrategicPolicy(
+            String factionContentId) {
+        return FactionStrategicPolicyEngine.apply(
+                this, contentCatalog, normalizedFactionId(factionContentId));
+    }
+
+    /**
      * Replaces one faction's persistent institutional doctrine through the common player/AI boundary.
      *
      * <p>This operation changes decision preferences only. It does not refresh legal market access,
