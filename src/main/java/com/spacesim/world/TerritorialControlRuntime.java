@@ -94,6 +94,35 @@ final class TerritorialControlRuntime {
         return replacementState;
     }
 
+    FactionStrategicState updateFiscalRates(
+            String factionContentId,
+            int stationTaxBasisPoints,
+            int foreignTerritoryLevyBasisPoints) {
+        String factionId = requireFaction(factionContentId);
+        FactionStrategicState current = strategiesById.get(factionId);
+        if (current.stationTaxBasisPoints() == stationTaxBasisPoints
+                && current.foreignTerritoryTariffBasisPoints() == foreignTerritoryLevyBasisPoints) {
+            return current;
+        }
+        FactionStrategicState replacementState = new FactionStrategicState(
+                current.factionContentId(),
+                current.minimumMarketAccessRelation(),
+                current.relations(),
+                current.controlledSystems(),
+                stationTaxBasisPoints,
+                foreignTerritoryLevyBasisPoints,
+                current.stockPolicies(),
+                current.productionPolicies(),
+                current.strategicGoals(),
+                current.territorialClaims(),
+                current.territorialControlStates(),
+                current.territorialRecognitions(),
+                current.constructionRightsGranted(),
+                current.doctrine());
+        replaceStrategy(replacementState);
+        return replacementState;
+    }
+
     String controller(StarSystemId systemId) {
         return systemId == null ? null : controllerBySystem.get(systemId);
     }

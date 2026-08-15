@@ -33,11 +33,13 @@ import java.util.Objects;
  * faction identity directory. Save v4-v7 продолжает читать старый faction-only construction
  * layout, v8 читает Stage-16 external-owner layout и мигрирует с пустым dynamic directory.
  * File format v2 добавляет bounded Stage-11 strategic-growth trailer, file format v3 —
- * Stage-17D territorial claims/control maintenance/recognition/concession trailer, а v4 —
- * Stage-17E institutional diplomacy, v5 — отдельную transaction/customs tariff policy, а v6 —
- * Stage-17F persistent institutional doctrine profiles. v1-v3 детерминированно мигрируют в
- * neutral explicit diplomacy без выдуманных treaties, grievances или embargoes; v1-v4 получают
- * нулевой customs tariff, а v1-v5 — neutral doctrine с midpoint 50 по каждой оси. Local entity payload
+ * Stage-17D territorial claims/control maintenance/recognition/concession trailer, v4 —
+ * Stage-17E institutional diplomacy, v5 — отдельную transaction/customs tariff policy, v6 —
+ * Stage-17F persistent institutional doctrine profiles, а v7 — treasury reserve floor и
+ * construction-investment authorization cap. v1-v3 детерминированно мигрируют в neutral explicit
+ * diplomacy без выдуманных treaties, grievances или embargoes; v1-v4 получают нулевой customs
+ * tariff, v1-v5 — neutral doctrine с midpoint 50 по каждой оси, а v1-v6 сохраняют прежнее fiscal
+ * поведение: treasury reserve 0 и отсутствие дополнительного construction cap. Local entity payload
  * кодируется {@link GameStateCodec}.</p>
  */
 public final class WorldStateCodec {
@@ -47,7 +49,8 @@ public final class WorldStateCodec {
     private static final int TERRITORY_FILE_FORMAT_VERSION = 3;
     private static final int DIPLOMACY_FILE_FORMAT_VERSION = 4;
     private static final int CUSTOMS_FILE_FORMAT_VERSION = 5;
-    private static final int FILE_FORMAT_VERSION = 6;
+    private static final int DOCTRINE_FILE_FORMAT_VERSION = 6;
+    private static final int FILE_FORMAT_VERSION = 7;
     private static final int MAX_SAVE_BYTES = 256 * 1024 * 1024;
 
     private WorldStateCodec() {
@@ -92,6 +95,7 @@ public final class WorldStateCodec {
                 WorldDiplomacyBinary.write(output, checked.factionDiplomacyStates());
                 WorldCustomsBinary.write(output, checked.factionDiplomacyStates());
                 WorldDoctrineBinary.write(output, checked.factionStrategies());
+                WorldFiscalPolicyBinary.write(output, checked.factions());
             }
 
             byte[] bytes = buffer.toByteArray();
@@ -126,6 +130,7 @@ public final class WorldStateCodec {
             }
             int fileVersion = input.readInt();
             if (fileVersion != FILE_FORMAT_VERSION
+                    && fileVersion != DOCTRINE_FILE_FORMAT_VERSION
                     && fileVersion != CUSTOMS_FILE_FORMAT_VERSION
                     && fileVersion != DIPLOMACY_FILE_FORMAT_VERSION
                     && fileVersion != TERRITORY_FILE_FORMAT_VERSION
@@ -159,10 +164,15 @@ public final class WorldStateCodec {
                         state,
                         WorldCustomsBinary.readAndAttach(input, state.factionDiplomacyStates()));
             }
-            if (fileVersion >= FILE_FORMAT_VERSION) {
+            if (fileVersion >= DOCTRINE_FILE_FORMAT_VERSION) {
                 state = withStrategies(
                         state,
                         WorldDoctrineBinary.readAndAttach(input, state.factionStrategies()));
+            }
+            if (fileVersion >= FILE_FORMAT_VERSION) {
+                state = withFactions(
+                        state,
+                        WorldFiscalPolicyBinary.readAndAttach(input, state.factions()));
             }
 
             if (input.read() != -1) {
@@ -351,6 +361,25 @@ public final class WorldStateCodec {
                 fleets,
                 jumps,
                 identities);
+    }
+
+    private static WorldState withFactions(
+            WorldState state,
+            List<FactionEconomicState> factions) {
+        return new WorldState(
+                state.schemaVersion(),
+                state.topology(),
+                state.systems(),
+                factions,
+                state.factionStrategies(),
+                state.nextConstructionProjectIdValue(),
+                state.constructionProjects(),
+                state.factionEconomicPressures(),
+                state.nextFleetIdValue(),
+                state.fleets(),
+                state.fleetJumps(),
+                state.factionIdentities(),
+                state.factionDiplomacyStates());
     }
 
     private static WorldState withStrategies(

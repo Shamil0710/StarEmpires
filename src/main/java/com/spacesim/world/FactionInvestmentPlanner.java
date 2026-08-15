@@ -54,13 +54,18 @@ final class FactionInvestmentPlanner {
                 .thenComparing(FactionEconomicPressureState::systemId)
                 .thenComparing(FactionEconomicPressureState::itemContentId));
 
+        long spendableTreasury = Math.max(
+                0L,
+                economy.treasuryMilliCredits() - economy.treasuryReserveFloorMilliCredits());
         for (FactionEconomicPressureState pressure : pressures) {
             Optional<Candidate> candidate = bestCandidate(world, content, factionId, pressure);
             if (candidate.isEmpty()) {
                 continue;
             }
             Candidate selected = candidate.orElseThrow();
-            if (economy.treasuryMilliCredits() < selected.fundingMilliCredits()) {
+            if (selected.fundingMilliCredits() > spendableTreasury
+                    || selected.fundingMilliCredits()
+                    > economy.maxConstructionInvestmentPerDecisionMilliCredits()) {
                 continue;
             }
             Location location = chooseLocation(world, pressure.systemId());
