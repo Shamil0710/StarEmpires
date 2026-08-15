@@ -1,0 +1,34 @@
+name: Stage 17F authored doctrine
+
+on:
+  push:
+    branches:
+      - agent/stage17f-doctrine-profile
+    paths:
+      - .github/workflows/stage17f-authored-doctrine.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17f-doctrine-profile
+          fetch-depth: 0
+      - name: Apply authored doctrine content
+        run: python3 scripts/stage17f_authored_doctrine.py
+      - name: Commit authored doctrine content
+        run: |
+          git rm .github/workflows/stage17f-authored-doctrine.yml scripts/stage17f_authored_doctrine.py
+          git add src/main/java/com/spacesim/content/ContentCatalog.java
+          git add src/main/java/com/spacesim/content/ContentCatalogLoader.java
+          git add src/main/java/com/spacesim/world/FactionStrategicState.java
+          git add src/main/java/com/spacesim/DemoGalaxyFactory.java
+          git add src/main/resources/data/content/catalog-v1.json
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git commit -m "Stage 17F.1: add authored data-driven doctrine defaults"
+          git push origin HEAD:agent/stage17f-doctrine-profile
