@@ -1,5 +1,5 @@
 name: Stage 17F authored doctrine
-# exact FactionStrategicState constructor anchor
+# exact FactionStrategicState constructor anchor; force-clean repaired script
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
         run: python3 scripts/stage17f_authored_doctrine.py
       - name: Commit authored doctrine content
         run: |
-          git rm .github/workflows/stage17f-authored-doctrine.yml scripts/stage17f_authored_doctrine.py scripts/stage17f_authored_doctrine_fix.py
+          git rm -f .github/workflows/stage17f-authored-doctrine.yml scripts/stage17f_authored_doctrine.py scripts/stage17f_authored_doctrine_fix.py
           git add src/main/java/com/spacesim/content/ContentCatalog.java
           git add src/main/java/com/spacesim/content/ContentCatalogLoader.java
           git add src/main/java/com/spacesim/world/FactionStrategicState.java
