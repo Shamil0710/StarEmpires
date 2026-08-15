@@ -10,11 +10,9 @@ import java.util.Objects;
  * Pure value-layer migrations старых {@link GameState} к текущей persistent schema.
  *
  * <p>Stage 3 schema v1 имела ровно пять item slots и не содержала stable content archetype ID.
- * Stage 4 превращает item-массивы в фиксированную capacity. Stage 17 сохраняет binary schema v2,
- * потому что reputation vector уже length-prefixed, но нормализует историческую длину трёх
- * authored factions до bounded {@link Constants#FACTION_RUNTIME_CAPACITY} runtime slots. Старые
- * значения сохраняются без изменения, новые faction slots получают нейтральную нулевую
- * репутацию.</p>
+ * Schema v2 расширила item arrays и добавила stable archetype IDs. Schema v3 сохраняет configured
+ * market target отдельно от effective target. Для v1/v2 текущий effective target консервативно
+ * становится configured baseline, поэтому миграция никогда не уменьшает существующий спрос.</p>
  */
 public final class GameStateMigration {
     /** Число товарных slots в Stage 3 schema v1. */
@@ -41,6 +39,9 @@ public final class GameStateMigration {
         if (state.schemaVersion() == GameState.CURRENT_VERSION) {
             return normalizeCurrentFactionCapacity(state);
         }
+        if (state.schemaVersion() == GameState.ITEM_CAPACITY_ARCHETYPE_VERSION) {
+            return normalizeCurrentFactionCapacity(withCurrentVersion(state));
+        }
         if (state.schemaVersion() != GameState.LEGACY_STAGE3_VERSION) {
             throw new IllegalArgumentException(
                     "Нет миграции persistent schema version: " + state.schemaVersion());
@@ -50,6 +51,21 @@ public final class GameStateMigration {
         for (EntityState entity : state.entities()) {
             migratedEntities.add(migrateLegacyStage3Entity(entity));
         }
+        return normalizeCurrentFactionCapacity(new GameState(
+                GameState.CURRENT_VERSION,
+                state.rootSeed(),
+                state.clock(),
+                state.nextEntityIdValue(),
+                state.eventRandomState(),
+                state.asteroidRandomState(),
+                state.events(),
+                state.asteroidSpawner(),
+                state.priceRecorder(),
+                state.ledger(),
+                List.copyOf(migratedEntities)));
+    }
+
+    private static GameState withCurrentVersion(GameState state) {
         return new GameState(
                 GameState.CURRENT_VERSION,
                 state.rootSeed(),
@@ -61,7 +77,7 @@ public final class GameStateMigration {
                 state.asteroidSpawner(),
                 state.priceRecorder(),
                 state.ledger(),
-                List.copyOf(migratedEntities));
+                state.entities());
     }
 
     private static GameState normalizeCurrentFactionCapacity(GameState state) {
@@ -122,16 +138,19 @@ public final class GameStateMigration {
                         entity.inventory().capacity(),
                         padIntegers(entity.inventory().stock(), "inventory.stock"));
 
-        EntityState.MarketState market = entity.market() == null
-                ? null
-                : new EntityState.MarketState(
-                        padIntegers(entity.market().targetStock(), "market.targetStock"),
-                        padFloats(entity.market().baseConsumption(), "market.baseConsumption"),
-                        padFloats(entity.market().sellPrices(), "market.sellPrices"),
-                        padFloats(entity.market().buyPrices(), "market.buyPrices"),
-                        padDoubles(entity.market().consumptionRemainder(), "market.consumptionRemainder"),
-                        padBooleans(entity.market().tradableItems(), "market.tradableItems"),
-                        entity.market().dirty());
+        EntityState.MarketState market = null;
+        if (entity.market() != null) {
+            List<Integer> target = padIntegers(entity.market().targetStock(), "market.targetStock");
+            market = new EntityState.MarketState(
+                    target,
+                    target,
+                    padFloats(entity.market().baseConsumption(), "market.baseConsumption"),
+                    padFloats(entity.market().sellPrices(), "market.sellPrices"),
+                    padFloats(entity.market().buyPrices(), "market.buyPrices"),
+                    padDoubles(entity.market().consumptionRemainder(), "market.consumptionRemainder"),
+                    padBooleans(entity.market().tradableItems(), "market.tradableItems"),
+                    entity.market().dirty());
+        }
 
         EntityState.ProductionState production = null;
         if (entity.production() != null) {
