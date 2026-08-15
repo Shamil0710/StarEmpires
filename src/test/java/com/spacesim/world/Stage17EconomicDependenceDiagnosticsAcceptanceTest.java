@@ -156,7 +156,8 @@ class Stage17EconomicDependenceDiagnosticsAcceptanceTest {
         InventoryComponent inventory = new InventoryComponent();
         inventory.capacity = 1_000;
         MarketComponent market = new MarketComponent();
-        market.configureTradableItem(itemId, target, 0f);
+        market.configureTradableItem(itemId, Math.max(1, target), 0f);
+        market.targetStock[itemId] = target;
         market.sellPrices[itemId] = sellPrice;
         market.buyPrices[itemId] = Math.max(1f, sellPrice * 0.9f);
         Entity shell = new Entity()
