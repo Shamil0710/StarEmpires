@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "status": "authoring-benchmark-only",
+  "unitSystem": "SI",
+  "sourceDocument": "docs/ship_mathematics_v0_7.md",
+  "harness": "com.spacesim.combat.benchmark.ShipMathematicsV07ProtectionHarness",
+  "calibrationGuardrail": {
+    "meaning": "Order-of-magnitude research guardrail only; not a NASA BLE validity boundary.",
+    "nasaReference": {
+      "documentId": "20140006462",
+      "projectileMassKg": 0.598,
+      "projectileVelocityMps": 6905.0,
+      "reportedApproximateEnergyJ": 15000000.0
+    },
+    "shipWeaponImpacts": [
+      {
+        "id": "M_ANTI_SHIP_MISSILE",
+        "massKg": 12000.0,
+        "velocityMps": 18000.0,
+        "kineticEnergyJ": 1944000000000.0,
+        "momentumNs": 216000000.0,
+        "energyRatioToReference": 129600.0,
+        "massRatioToReference": 20066.889632107024,
+        "status": "EXTRAPOLATION_FORBIDDEN"
+      },
+      {
+        "id": "XL_CAPITAL_KINETIC",
+        "massKg": 1000.0,
+        "velocityMps": 30000.0,
+        "kineticEnergyJ": 450000000000.0,
+        "momentumNs": 30000000.0,
+        "energyRatioToReference": 30000.0,
+        "massRatioToReference": 1672.2408026755854,
+        "status": "EXTRAPOLATION_FORBIDDEN"
+      },
+      {
+        "id": "M_COILGUN_PROJECTILE",
+        "massKg": 25.0,
+        "velocityMps": 15000.0,
+        "kineticEnergyJ": 2812500000.0,
+        "momentumNs": 375000.0,
+        "energyRatioToReference": 187.5,
+        "massRatioToReference": 41.80602006688964,
+        "status": "EXTRAPOLATION_FORBIDDEN"
+      }
+    ]
+  },
+  "debrisFieldModel": {
+    "sourceThreat": "M_ANTI_SHIP_MISSILE",
+    "sourceMassKg": 12000.0,
+    "sourceAxialVelocityMps": 18000.0,
+    "sourceKineticEnergyJ": 1944000000000.0,
+    "projectedTarget": {
+      "id": "REFERENCE_BATTLESHIP_NOSE_ON",
+      "widthM": 110.0,
+      "heightM": 85.0,
+      "areaM2": 9350.0
+    },
+    "assumption": "Centered separable 2D Gaussian mass/momentum field; sigmaSpace = standOff * lateralVelocitySigma / axialVelocity. This is a sensitivity model, not a universal physical fragment distribution.",
+    "lateralDispersionSigmaMps": [50.0, 200.0, 500.0],
+    "standOffM": [10000.0, 20000.0, 50000.0, 100000.0]
+  },
+  "sensitivitySweep": [
+    {"lateralSigmaMps":50.0,"standOffM":10000.0,"cloudSigmaM":27.77777777777778,"shipHitFraction":0.8322912662272479,"intersectingMassKg":9987.495194726975,"intersectingEnergyJ":1617974221545.77,"intersectingMomentumNs":179774913.50508556},
+    {"lateralSigmaMps":50.0,"standOffM":20000.0,"cloudSigmaM":55.55555555555556,"shipHitFraction":0.3766872129155317,"intersectingMassKg":4520.24655498638,"intersectingEnergyJ":732279941907.7936,"intersectingMomentumNs":81364437.98975484},
+    {"lateralSigmaMps":50.0,"standOffM":50000.0,"cloudSigmaM":138.88888888888889,"shipHitFraction":0.07401645401990709,"intersectingMassKg":888.197448238885,"intersectingEnergyJ":143887986614.69937,"intersectingMomentumNs":15987554.06829993},
+    {"lateralSigmaMps":50.0,"standOffM":100000.0,"cloudSigmaM":277.77777777777777,"shipHitFraction":0.01908598986265913,"intersectingMassKg":229.03187835190954,"intersectingEnergyJ":37103164293.009346,"intersectingMomentumNs":4122573.810334372},
+    {"lateralSigmaMps":200.0,"standOffM":10000.0,"cloudSigmaM":111.11111111111111,"shipHitFraction":0.1130267742080761,"intersectingMassKg":1356.3212904969132,"intersectingEnergyJ":219724049060.49994,"intersectingMomentumNs":24413783.228944436},
+    {"lateralSigmaMps":200.0,"standOffM":20000.0,"cloudSigmaM":222.22222222222223,"shipHitFraction":0.029648284673255892,"intersectingMassKg":355.7794160790707,"intersectingEnergyJ":57636265404.809456,"intersectingMomentumNs":6404029.489423273},
+    {"lateralSigmaMps":200.0,"standOffM":50000.0,"cloudSigmaM":555.5555555555555,"shipHitFraction":0.004808902419802274,"intersectingMassKg":57.70682903762729,"intersectingEnergyJ":9348506304.095621,"intersectingMomentumNs":1038722.9226772912},
+    {"lateralSigmaMps":200.0,"standOffM":100000.0,"cloudSigmaM":1111.111111111111,"shipHitFraction":0.0012045830508669343,"intersectingMassKg":14.454996610403212,"intersectingEnergyJ":2341709450.88532,"intersectingMomentumNs":260189.9389872578},
+    {"lateralSigmaMps":500.0,"standOffM":10000.0,"cloudSigmaM":277.77777777777777,"shipHitFraction":0.01908598986265913,"intersectingMassKg":229.03187835190954,"intersectingEnergyJ":37103164293.009346,"intersectingMomentumNs":4122573.810334372},
+    {"lateralSigmaMps":500.0,"standOffM":20000.0,"cloudSigmaM":555.5555555555555,"shipHitFraction":0.004808902419802274,"intersectingMassKg":57.70682903762729,"intersectingEnergyJ":9348506304.095621,"intersectingMomentumNs":1038722.9226772912},
+    {"lateralSigmaMps":500.0,"standOffM":50000.0,"cloudSigmaM":1388.888888888889,"shipHitFraction":0.000771114872763064,"intersectingMassKg":9.253378473156769,"intersectingEnergyJ":1499047312.6513965,"intersectingMomentumNs":166560.81251682184},
+    {"lateralSigmaMps":500.0,"standOffM":100000.0,"cloudSigmaM":2777.777777777778,"shipHitFraction":0.00019283948893820203,"intersectingMassKg":2.3140738672584242,"intersectingEnergyJ":374879966.49586475,"intersectingMomentumNs":41653.32961065164}
+  ],
+  "compartmentProjection20km200mps": {
+    "totalShipHitFraction": 0.029648284673255892,
+    "totalIntersectingEnergyJ": 57636265404.809456,
+    "zones": [
+      {"id":"PORT_COOLANT","fractionOfSource":0.00938578545364199,"intersectingEnergyJ":18245966921.88003},
+      {"id":"STARBOARD_POWER","fractionOfSource":0.00938578545364199,"intersectingEnergyJ":18245966921.88003},
+      {"id":"CENTRAL_CITADEL","fractionOfSource":0.004501323290637162,"intersectingEnergyJ":8750572476.998642},
+      {"id":"DORSAL_WEAPONS","fractionOfSource":0.0031876952376673736,"intersectingEnergyJ":6196879542.025375},
+      {"id":"VENTRAL_SERVICE","fractionOfSource":0.003187695237667378,"intersectingEnergyJ":6196879542.025383}
+    ]
+  },
+  "canonicalDecisions": [
+    "Do not use MMOD/Whipple ballistic-limit equations directly for intact ship weapons.",
+    "A successful intercept changes fragmentation and spatial momentum distribution; it does not delete kinetic energy.",
+    "Stand-off distance and debris dispersion are first-class defense parameters.",
+    "Protection solvers exchange SI impact/residual packets rather than global HP damage.",
+    "Different impact domains require different calibrated response models.",
+    "The v1.0 baseline must eliminate UNCALIBRATED_HEAVY_IMPACT for all production weapon families through a later projectile/material response closure pass."
+  ]
+}
