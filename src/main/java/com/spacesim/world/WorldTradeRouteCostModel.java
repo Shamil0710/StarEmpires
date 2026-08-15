@@ -12,25 +12,34 @@ import java.util.Objects;
 /**
  * Stage-10C world-policy adapter for the existing trade-route cost seam.
  *
- * <p>Route risk is modeled as expected loss against purchased cargo value. Tariff exposure follows
- * the existing Stage-8 fiscal semantics instead of inventing a per-transaction tax: purchasing from
- * a foreign-owned market inside another faction's controlled territory increases that supplier's
- * wallet and therefore its future foreign-territory levy base. The adapter estimates that marginal
- * exposure as a route cost; it does not transfer money or change authoritative fiscal accounting.</p>
+ * <p>Route risk is modeled as expected loss against purchased cargo value. Tariff exposure still
+ * follows the Stage-8 territorial fiscal levy semantics: it estimates future station-wallet levy
+ * exposure and does not invent a transaction tax or transfer money. Stage 17E resolves faction
+ * ownership through the unified authored + world-defined identity directory.</p>
  */
 final class WorldTradeRouteCostModel implements TradeRouteCostModel {
     private static final long BASIS_POINTS_DENOMINATOR = 10_000L;
 
-    private final ContentCatalog contentCatalog;
+    private final FactionIdentityResolver identities;
     private final Map<StarSystemId, FactionStrategicState> controllerBySystem;
 
+    /** Source-compatible authored-only constructor. */
     WorldTradeRouteCostModel(ContentCatalog contentCatalog, List<FactionStrategicState> strategies) {
-        this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
-        Objects.requireNonNull(strategies, "Faction strategies не заданы");
-        Map<StarSystemId, FactionStrategicState> controllers = new HashMap();
+        this(
+                FactionIdentityResolver.createDefault(
+                        Objects.requireNonNull(contentCatalog, "ContentCatalog not set"),
+                        List.of()),
+                strategies);
+    }
+
+    /** Unified identity constructor used by the world runtime. */
+    WorldTradeRouteCostModel(FactionIdentityResolver identities, List<FactionStrategicState> strategies) {
+        this.identities = Objects.requireNonNull(identities, "FactionIdentityResolver not set");
+        Objects.requireNonNull(strategies, "Faction strategies not set");
+        Map<StarSystemId, FactionStrategicState> controllers = new HashMap<>();
         for (FactionStrategicState strategy : strategies) {
-            FactionStrategicState value = Objects.requireNonNull(strategy, "FactionStrategicState не задан");
-            if (contentCatalog.findFaction(value.factionContentId()) == null) {
+            FactionStrategicState value = Objects.requireNonNull(strategy, "FactionStrategicState not set");
+            if (identities.runtimeId(value.factionContentId()).isEmpty()) {
                 throw new IllegalArgumentException("Unknown strategic faction: " + value.factionContentId());
             }
             for (StarSystemId systemId : value.controlledSystems()) {
@@ -44,8 +53,8 @@ final class WorldTradeRouteCostModel implements TradeRouteCostModel {
 
     @Override
     public long estimateCostMilliCredits(FleetTradeProfile fleet, Context context) {
-        Objects.requireNonNull(fleet, "FleetTradeProfile не задан");
-        Context route = Objects.requireNonNull(context, "TradeRouteCostModel.Context не задан");
+        Objects.requireNonNull(fleet, "FleetTradeProfile not set");
+        Context route = Objects.requireNonNull(context, "TradeRouteCostModel.Context not set");
         long riskExposure = basisPointCeil(
                 route.purchaseCostMilliCredits(), route.routeRiskBasisPoints());
         if (!route.isGalactic() || route.buyFactionId() < 0) {
@@ -56,11 +65,9 @@ final class WorldTradeRouteCostModel implements TradeRouteCostModel {
         if (controller == null || controller.foreignTerritoryTariffBasisPoints() <= 0) {
             return riskExposure;
         }
-        ContentCatalog.FactionDefinition marketFaction = contentCatalog.findFaction(route.buyFactionId());
-        if (marketFaction == null) {
-            throw new IllegalArgumentException("Unknown supplier runtime faction: " + route.buyFactionId());
-        }
-        if (marketFaction.id().equals(controller.factionContentId())) {
+        String marketFactionId = identities.stableId(route.buyFactionId()).orElseThrow(
+                () -> new IllegalArgumentException("Unknown supplier runtime faction: " + route.buyFactionId()));
+        if (marketFactionId.equals(controller.factionContentId())) {
             return riskExposure;
         }
         long tariffExposure = basisPointCeil(

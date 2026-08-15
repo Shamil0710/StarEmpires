@@ -10,12 +10,11 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Re-materializes transient local market-access components from persistent faction strategy.
+ * Re-materializes transient local market-access components from persistent faction policy.
  *
  * <p>This is a presentation/runtime boundary operation, not an economic transaction. It changes no
- * wallet, inventory, ownership, territory or persistent faction strategy. Stage 17B uses it after
- * a station receives a new legal faction affiliation so live behavior immediately matches the
- * behavior that the same world would have after save/load.</p>
+ * wallet, inventory, ownership, territory or persistent diplomacy. Live affiliation/diplomacy
+ * changes therefore receive the same access projection that save/load restoration would produce.</p>
  */
 public final class FactionPolicyRefreshService {
     private FactionPolicyRefreshService() {
@@ -54,7 +53,12 @@ public final class FactionPolicyRefreshService {
         for (StarSystemNode node : checkedWorld.getTopology().systems()) {
             SimulationSession session = checkedWorld.findSession(node.id()).orElseThrow(
                     () -> new IllegalStateException("World topology lost SimulationSession: " + node.id()));
-            FactionPolicyRuntime.install(session, resolver, strategies);
+            FactionPolicyRuntime.install(
+                    session,
+                    resolver,
+                    strategies,
+                    checkedWorld.getFactionDiplomacyStates(),
+                    checkedWorld.getAuthoritativeWorldTick());
             refreshed++;
         }
         return refreshed;

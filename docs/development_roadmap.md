@@ -543,6 +543,8 @@ player faction owns station in unclaimed system
 
 ## 17E — diplomacy / market access / tariffs
 
+**ACTIVE.** 17E.1 persistent institutional diplomacy и 17E.3 market-access precedence реализуются первым production slice: explicit trust/credibility, grievances, treaty directory, embargo state и единый `embargo → treaty right → relation threshold` resolver поверх authored + world-defined faction identities.
+
 Цель — перейти от «relation threshold открывает рынок» к explicit, persistent и объяснимой межгосударственной политике, сохранив текущий Stage-8 access core как рабочую основу.
 
 ### 17E.1 — diplomatic state hardening
