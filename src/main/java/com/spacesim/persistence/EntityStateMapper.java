@@ -338,17 +338,17 @@ public final class EntityStateMapper {
         if (component == null) {
             return null;
         }
-        List<Float> values = new ArrayList<>(Constants.MAX_FACTIONS);
-        for (int factionId = 0; factionId < Constants.MAX_FACTIONS; factionId++) {
+        List<Float> values = new ArrayList<>(Constants.FACTION_RUNTIME_CAPACITY);
+        for (int factionId = 0; factionId < Constants.FACTION_RUNTIME_CAPACITY; factionId++) {
             values.add(component.getReputation(factionId));
         }
         return new EntityState.ReputationState(List.copyOf(values));
     }
 
     private static ReputationComponent restoreReputation(EntityState.ReputationState value) {
-        requireSize(value.values(), Constants.MAX_FACTIONS, "Reputation.values");
+        requireSize(value.values(), Constants.FACTION_RUNTIME_CAPACITY, "Reputation.values");
         ReputationComponent component = new ReputationComponent();
-        for (int factionId = 0; factionId < Constants.MAX_FACTIONS; factionId++) {
+        for (int factionId = 0; factionId < Constants.FACTION_RUNTIME_CAPACITY; factionId++) {
             float reputation = value.values().get(factionId);
             if (reputation != 0f) {
                 component.addReputation(factionId, reputation);
