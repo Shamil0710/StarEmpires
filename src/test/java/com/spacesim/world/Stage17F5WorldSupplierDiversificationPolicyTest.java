@@ -13,6 +13,7 @@ import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.economy.Money;
 import com.spacesim.persistence.EntityId;
+import com.spacesim.trade.CriticalImportLimitPolicy;
 import com.spacesim.trade.FleetTradeProfile;
 import com.spacesim.trade.RouteRedundancyPolicy;
 import com.spacesim.trade.SupplierDiversificationPolicy;
@@ -28,7 +29,7 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
     private static final String ALTERNATIVE = "faction.miners";
 
     @Test
-    void liveDependenceAndDoctrineProduceBoundedSupplierAndRouteWillingnessToPay() {
+    void liveDependenceAndDoctrineProduceSupplierRouteAndCriticalImportPolicy() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = WorldSimulation.restore(
                 DemoGalaxyFactory.createState(0x17F50022L, content),
@@ -81,6 +82,7 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
                 80));
         WorldSupplierDiversificationPolicy supplierPolicy = new WorldSupplierDiversificationPolicy(world);
         WorldRouteRedundancyPolicy routePolicy = new WorldRouteRedundancyPolicy(world);
+        WorldCriticalImportLimitPolicy importPolicy = new WorldCriticalImportLimitPolicy(world);
         FleetTradeProfile fleet = fleet(sourceRuntime, item.runtimeId());
 
         SupplierDiversificationPolicy.Assessment concentrated = supplierPolicy.assess(
@@ -88,6 +90,12 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
         SupplierDiversificationPolicy.Assessment alternative = supplierPolicy.assess(
                 fleet, alternativeRuntime, item.runtimeId());
         RouteRedundancyPolicy.Assessment route = routePolicy.assess(fleet, item.runtimeId());
+        CriticalImportLimitPolicy.Assessment concentratedImport = importPolicy.assess(
+                fleet, concentratedRuntime, item.runtimeId());
+        CriticalImportLimitPolicy.Assessment alternativeImport = importPolicy.assess(
+                fleet, alternativeRuntime, item.runtimeId());
+        CriticalImportLimitPolicy.Assessment domesticImport = importPolicy.assess(
+                fleet, sourceRuntime, item.runtimeId());
 
         assertTrue(concentrated.active());
         assertEquals(6_666, concentrated.supplierShareBasisPoints());
@@ -97,6 +105,17 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
         assertEquals(320_000L, alternative.acceptableProfitSacrificeMilliCredits());
         assertTrue(route.active());
         assertEquals(320_000L, route.acceptableProfitSacrificeMilliCredits());
+
+        assertTrue(concentratedImport.active());
+        assertEquals(6_666, concentratedImport.supplierShareBasisPoints());
+        assertEquals(6_000, concentratedImport.maximumSupplierShareBasisPoints());
+        assertFalse(concentratedImport.authorized());
+        assertTrue(alternativeImport.active());
+        assertEquals(3_333, alternativeImport.supplierShareBasisPoints());
+        assertEquals(6_000, alternativeImport.maximumSupplierShareBasisPoints());
+        assertTrue(alternativeImport.authorized());
+        assertFalse(domesticImport.active());
+        assertTrue(domesticImport.authorized());
 
         world.updateFactionDoctrine(SOURCE, new FactionDoctrineState(
                 doctrine.tradeOpenness(),
@@ -109,10 +128,14 @@ class Stage17F5WorldSupplierDiversificationPolicyTest {
         SupplierDiversificationPolicy.Assessment zeroSupplierPriority = supplierPolicy.assess(
                 fleet, concentratedRuntime, item.runtimeId());
         RouteRedundancyPolicy.Assessment zeroRoutePriority = routePolicy.assess(fleet, item.runtimeId());
+        CriticalImportLimitPolicy.Assessment zeroImportPriority = importPolicy.assess(
+                fleet, concentratedRuntime, item.runtimeId());
         assertFalse(zeroSupplierPriority.active());
         assertEquals(0L, zeroSupplierPriority.acceptableProfitSacrificeMilliCredits());
         assertFalse(zeroRoutePriority.active());
         assertEquals(0L, zeroRoutePriority.acceptableProfitSacrificeMilliCredits());
+        assertFalse(zeroImportPriority.active());
+        assertTrue(zeroImportPriority.authorized());
     }
 
     private static FleetTradeProfile fleet(int factionRuntimeId, int itemRuntimeId) {
