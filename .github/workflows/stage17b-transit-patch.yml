@@ -1,0 +1,44 @@
+name: Stage17B Transit Patch Helper
+
+on:
+  push:
+    branches:
+      - agent/stage17b-transit-fleet-affiliation
+
+permissions:
+  contents: write
+
+jobs:
+  patch-world-simulation:
+    if: ${{ !contains(github.event.head_commit.message, '[stage17b-world-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17b-transit-fleet-affiliation
+          fetch-depth: 0
+      - name: Apply narrow WorldSimulation patch
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = path.read_text(encoding='utf-8')
+          signature = '    public boolean affiliateTransitFleetFaction('
+          if signature in text:
+              raise SystemExit(0)
+          marker = '''    /**\n     * Передаёт fleet из local SimulationSession во world-owned transit state.\n'''
+          addition = '''    /**\n     * Changes only the detached persistent faction affiliation of an in-transit fleet.\n     *\n     * <p>The fleet remains detached under the same FleetId, origin/destination and jump FSM state.\n     * No local entity is materialized and cargo, wallet, transform and all other payload fields are\n     * preserved. The stable faction ID is resolved through the unified Stage-17 directory.</p>\n     *\n     * @param fleetId stable world FleetId currently in transit\n     * @param stableFactionId authored or world-defined stable faction ID\n     * @return true when the detached payload faction changed; false when already affiliated\n     * @throws IllegalArgumentException if faction identity is unknown\n     * @throws IllegalStateException if fleet is not in transit\n     */\n    public boolean affiliateTransitFleetFaction(FleetId fleetId, String stableFactionId) {\n        String factionId = normalizedFactionId(stableFactionId);\n        int runtimeFactionId = factionIdentityResolver.runtimeId(factionId).orElseThrow(\n                () -> new IllegalArgumentException(\n                        "Unknown faction for transit affiliation: " + factionId));\n        return fleetWorldService.affiliateTransitFaction(\n                Objects.requireNonNull(fleetId, "FleetId transit affiliation not set"),\n                runtimeFactionId);\n    }\n\n'''
+          if marker not in text:
+              raise SystemExit('WorldSimulation insertion marker not found')
+          path.write_text(text.replace(marker, addition + marker, 1), encoding='utf-8')
+      - name: Commit generated patch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/WorldSimulation.java
+          git commit -m "[stage17b-world-patched] expose transit faction affiliation"
+          git push origin HEAD:agent/stage17b-transit-fleet-affiliation
