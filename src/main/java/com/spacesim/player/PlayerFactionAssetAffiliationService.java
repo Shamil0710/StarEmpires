@@ -16,13 +16,9 @@ import java.util.Objects;
  * Stage-17B legal-affiliation bridge for physical assets already owned by the player.
  *
  * <p>Ownership remains authoritative in {@link PlayerState}. This service changes only legal
- * {@link FactionComponent} affiliation of already existing owned assets. It never respawns an
- * entity, changes {@link FleetId}, moves assets, touches cargo/wallets or creates faction
- * resources.</p>
- *
- * <p>Local fleets and completed owned stations are handled as separate explicit commands. Transit
- * payload affiliation remains a separate world-level mutation because an in-transit fleet is
- * detached from every local Ashley engine.</p>
+ * {@link FactionComponent} affiliation of already existing owned assets, or the equivalent
+ * persistent faction field while a fleet is detached in transit. It never respawns an entity,
+ * changes {@link FleetId}, moves assets, touches cargo/wallets or creates faction resources.</p>
  */
 public final class PlayerFactionAssetAffiliationService {
     private final PlayerRuntime runtime;
@@ -88,6 +84,52 @@ public final class PlayerFactionAssetAffiliationService {
                 affiliated,
                 alreadyAffiliated,
                 deferredTransit,
+                target.stableFactionId(),
+                target.runtimeFactionId());
+    }
+
+    /**
+     * Affiliates every in-transit player-owned fleet without materializing it in a StarSystem.
+     *
+     * <p>The authoritative world mutation replaces only the detached payload faction field. The
+     * same FleetId, transit origin/destination, jump phase/timing and every other EntityState field
+     * remain unchanged. Local owned fleets are reported as deferred for the explicit local command.</p>
+     *
+     * @return immutable transit affiliation report
+     * @throws IllegalStateException if the player is independent, faction identity is unresolved,
+     *         or an owned FleetId disappears during the pass
+     */
+    public TransitAffiliationReport affiliateTransitOwnedFleets() {
+        PlayerState player = runtime.player();
+        ResolvedFaction target = requirePlayerFaction(player);
+        WorldSimulation world = runtime.world();
+
+        int inspected = 0;
+        int affiliated = 0;
+        int alreadyAffiliated = 0;
+        int deferredLocal = 0;
+        for (FleetId fleetId : player.ownedFleetIds()) {
+            inspected++;
+            FleetPlacementState placement = world.findFleet(fleetId).orElseThrow(
+                    () -> new IllegalStateException("Owned FleetId disappeared during affiliation: " + fleetId));
+            if (placement.locationKind() == FleetLocationKind.IN_SYSTEM) {
+                deferredLocal++;
+                continue;
+            }
+            if (placement.locationKind() != FleetLocationKind.IN_TRANSIT) {
+                throw new IllegalStateException("Owned fleet has unsupported placement: " + fleetId);
+            }
+            if (world.affiliateTransitFleetFaction(fleetId, target.stableFactionId())) {
+                affiliated++;
+            } else {
+                alreadyAffiliated++;
+            }
+        }
+        return new TransitAffiliationReport(
+                inspected,
+                affiliated,
+                alreadyAffiliated,
+                deferredLocal,
                 target.stableFactionId(),
                 target.runtimeFactionId());
     }
@@ -171,7 +213,7 @@ public final class PlayerFactionAssetAffiliationService {
      * @param inspectedOwnedFleets number of owned FleetIds inspected
      * @param newlyAffiliatedLocalFleets number of local physical fleets whose faction changed
      * @param alreadyAffiliatedLocalFleets number of local owned fleets already in the target faction
-     * @param deferredTransitFleets number of owned transit payloads deliberately left for 17B.3
+     * @param deferredTransitFleets number of owned transit payloads deliberately left for transit command
      * @param stableFactionId player's stable faction identity
      * @param runtimeFactionId resolved dense local ECS faction slot
      */
@@ -207,6 +249,53 @@ public final class PlayerFactionAssetAffiliationService {
                     + alreadyAffiliatedLocalFleets
                     + deferredTransitFleets != inspectedOwnedFleets) {
                 throw new IllegalArgumentException("Affiliation report counters do not cover inspected fleets");
+            }
+        }
+    }
+
+    /**
+     * Result of one in-transit-owned-fleet affiliation pass.
+     *
+     * @param inspectedOwnedFleets number of owned FleetIds inspected
+     * @param newlyAffiliatedTransitFleets number of detached transit payloads whose faction changed
+     * @param alreadyAffiliatedTransitFleets number of transit payloads already in target faction
+     * @param deferredLocalFleets number of local owned fleets left to the local affiliation command
+     * @param stableFactionId player's stable faction identity
+     * @param runtimeFactionId resolved dense runtime faction slot
+     */
+    public record TransitAffiliationReport(
+            int inspectedOwnedFleets,
+            int newlyAffiliatedTransitFleets,
+            int alreadyAffiliatedTransitFleets,
+            int deferredLocalFleets,
+            String stableFactionId,
+            int runtimeFactionId) {
+        /**
+         * Validates transit report counters and faction metadata.
+         *
+         * @param inspectedOwnedFleets number of owned FleetIds inspected
+         * @param newlyAffiliatedTransitFleets number of changed transit payloads
+         * @param alreadyAffiliatedTransitFleets number of unchanged target-affiliated transit payloads
+         * @param deferredLocalFleets number of local owned fleets deliberately deferred
+         * @param stableFactionId player's stable faction identity
+         * @param runtimeFactionId resolved dense runtime faction slot
+         */
+        public TransitAffiliationReport {
+            if (inspectedOwnedFleets < 0
+                    || newlyAffiliatedTransitFleets < 0
+                    || alreadyAffiliatedTransitFleets < 0
+                    || deferredLocalFleets < 0) {
+                throw new IllegalArgumentException("Transit affiliation counters cannot be negative");
+            }
+            stableFactionId = Objects.requireNonNull(stableFactionId, "Stable faction ID not set");
+            if (runtimeFactionId < 0) {
+                throw new IllegalArgumentException("Runtime faction ID cannot be negative");
+            }
+            if (newlyAffiliatedTransitFleets
+                    + alreadyAffiliatedTransitFleets
+                    + deferredLocalFleets != inspectedOwnedFleets) {
+                throw new IllegalArgumentException(
+                        "Transit affiliation report counters do not cover inspected fleets");
             }
         }
     }

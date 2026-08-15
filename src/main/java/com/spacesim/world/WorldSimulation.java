@@ -671,6 +671,29 @@ public final class WorldSimulation {
     }
 
     /**
+     * Changes only the detached persistent faction affiliation of an in-transit fleet.
+     *
+     * <p>The fleet remains detached under the same FleetId, origin/destination and jump FSM state.
+     * No local entity is materialized and cargo, wallet, transform and all other payload fields are
+     * preserved. The stable faction ID is resolved through the unified Stage-17 directory.</p>
+     *
+     * @param fleetId stable world FleetId currently in transit
+     * @param stableFactionId authored or world-defined stable faction ID
+     * @return true when the detached payload faction changed; false when already affiliated
+     * @throws IllegalArgumentException if faction identity is unknown
+     * @throws IllegalStateException if fleet is not in transit
+     */
+    public boolean affiliateTransitFleetFaction(FleetId fleetId, String stableFactionId) {
+        String factionId = normalizedFactionId(stableFactionId);
+        int runtimeFactionId = factionIdentityResolver.runtimeId(factionId).orElseThrow(
+                () -> new IllegalArgumentException(
+                        "Unknown faction for transit affiliation: " + factionId));
+        return fleetWorldService.affiliateTransitFaction(
+                Objects.requireNonNull(fleetId, "FleetId transit affiliation not set"),
+                runtimeFactionId);
+    }
+
+    /**
      * Передаёт fleet из local SimulationSession во world-owned transit state.
      *
      * <p>Stage 10A выполняет только identity/location handoff без travel clock. Stage 10B will

@@ -75,7 +75,7 @@ public final class FleetTradeProfile {
      * @param shipType cargo policy or null
      * @param factionId runtime faction ID or -1
      * @param stock copied stock array
-     * @param reputation copied reputation array
+     * @param reputation copied reputation array; either legacy authored-faction count or full runtime capacity
      */
     public FleetTradeProfile(
             float x,
@@ -106,14 +106,17 @@ public final class FleetTradeProfile {
         if (specializedItem < -1 || specializedItem >= Constants.MAX_ITEMS) {
             throw new IllegalArgumentException("Некорректная специализация товара");
         }
-        if (factionId < -1 || factionId >= Constants.MAX_FACTIONS) {
+        if (factionId < -1 || factionId >= Constants.FACTION_RUNTIME_CAPACITY) {
             throw new IllegalArgumentException("Некорректный runtime faction ID флота");
         }
         if (stock == null || stock.length != Constants.MAX_ITEMS) {
             throw new IllegalArgumentException("stock должен иметь длину Constants.MAX_ITEMS");
         }
-        if (reputation == null || reputation.length != Constants.MAX_FACTIONS) {
-            throw new IllegalArgumentException("reputation должен иметь длину Constants.MAX_FACTIONS");
+        if (reputation == null
+                || (reputation.length != Constants.LEGACY_FACTION_COUNT
+                && reputation.length != Constants.FACTION_RUNTIME_CAPACITY)) {
+            throw new IllegalArgumentException(
+                    "reputation должен иметь legacy authored count или runtime faction capacity");
         }
         this.x = x;
         this.y = y;
@@ -127,7 +130,7 @@ public final class FleetTradeProfile {
         this.shipType = shipType;
         this.factionId = factionId;
         this.stock = Arrays.copyOf(stock, stock.length);
-        this.reputation = Arrays.copyOf(reputation, reputation.length);
+        this.reputation = Arrays.copyOf(reputation, Constants.FACTION_RUNTIME_CAPACITY);
     }
 
     /** @return текущая X-координата */

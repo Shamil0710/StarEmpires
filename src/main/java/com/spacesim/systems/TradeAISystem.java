@@ -361,9 +361,9 @@ public class TradeAISystem extends IteratingSystem {
         InventoryComponent inventory = im.get(fleet);
         WalletComponent wallet = wm.get(fleet);
         ReputationComponent reputationComponent = rm.get(fleet);
-        float[] reputation = new float[Constants.MAX_FACTIONS];
+        float[] reputation = new float[Constants.FACTION_RUNTIME_CAPACITY];
         if (reputationComponent != null) {
-            for (int factionId = 0; factionId < Constants.MAX_FACTIONS; factionId++) {
+            for (int factionId = 0; factionId < Constants.FACTION_RUNTIME_CAPACITY; factionId++) {
                 reputation[factionId] = reputationComponent.getReputation(factionId);
             }
         }
