@@ -8,9 +8,13 @@ import com.spacesim.components.MarketComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.controllers.TradeController;
+import com.spacesim.controllers.TradeTransactionPolicy;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.trade.TradeRouteCostModel;
 import com.spacesim.trade.TradeRoutePlanner;
+import com.spacesim.systems.TradeAISystem;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -117,6 +121,7 @@ public final class WorldSimulation {
         this.activeSystemId = activeSystemId;
         this.strategicStepTicks = strategicStepTicks;
         this.remoteUpdateBudgetPerFrame = remoteUpdateBudgetPerFrame;
+        configureTradePolicies();
         refreshFactionMarketAccess();
     }
 
@@ -1255,8 +1260,21 @@ public final class WorldSimulation {
         return new TradeRoutePlanner(
                 contentCatalog,
                 Objects.requireNonNull(scoringMode, "Trade route scoring mode не задан"),
-                new WorldTradeRouteCostModel(
-                        factionIdentityResolver, territorialControlRuntime.snapshots()));
+                liveTradeRouteCostModel());
+    }
+
+    /**
+     * Creates the ordinary TradeController configured with this world's live customs settlement policy.
+     *
+     * @param session local session whose ledger records the physical transaction
+     * @return controller sharing the same tariff law as autonomous trade AI
+     */
+    public TradeController createTradeController(SimulationSession session) {
+        SimulationSession checked = Objects.requireNonNull(session, "SimulationSession not set");
+        if (!sessionsById.containsValue(checked)) {
+            throw new IllegalArgumentException("SimulationSession does not belong to this world");
+        }
+        return new TradeController(checked.getLedger(), liveTradeTransactionPolicy());
     }
 
     /** @return path planner whose edge timing matches Stage-10B jump execution */
@@ -1578,6 +1596,33 @@ public final class WorldSimulation {
             return Math.addExact(taxCollectedMilliCredits, tariffCollectedMilliCredits);
         }
     }
+    private TradeTransactionPolicy liveTradeTransactionPolicy() {
+        return new WorldTradeTransactionPolicy(
+                factionIdentityResolver,
+                factionAccountsById,
+                diplomacyRuntime::snapshots,
+                this::getAuthoritativeWorldTick);
+    }
+
+    private TradeRouteCostModel liveTradeRouteCostModel() {
+        return new WorldTradeRouteCostModel(
+                factionIdentityResolver,
+                territorialControlRuntime::snapshots,
+                diplomacyRuntime::snapshots,
+                this::getAuthoritativeWorldTick);
+    }
+
+    private void configureTradePolicies() {
+        TradeTransactionPolicy transactionPolicy = liveTradeTransactionPolicy();
+        TradeRouteCostModel costModel = liveTradeRouteCostModel();
+        for (SimulationSession session : sessionsById.values()) {
+            TradeAISystem tradeAI = session.getEngine().getSystem(TradeAISystem.class);
+            if (tradeAI != null) {
+                tradeAI.configureTradePolicies(transactionPolicy, costModel);
+            }
+        }
+    }
+
     private void refreshFactionMarketAccess() {
         long worldTick = getAuthoritativeWorldTick();
         for (SimulationSession session : sessionsById.values()) {

@@ -33,10 +33,11 @@ public class TradeController {
     private final ComponentMapper<IdentityComponent> identityMapper =
             ComponentMapper.getFor(IdentityComponent.class);
     private final EconomicLedger ledger;
+    private final TradeTransactionPolicy transactionPolicy;
 
     /** Создаёт контроллер с собственным диагностическим ledger. */
     public TradeController() {
-        this(new EconomicLedger());
+        this(new EconomicLedger(), TradeTransactionPolicy.none());
     }
 
     /**
@@ -46,7 +47,18 @@ public class TradeController {
      * @throws NullPointerException если журнал не задан
      */
     public TradeController(EconomicLedger ledger) {
+        this(ledger, TradeTransactionPolicy.none());
+    }
+
+    /**
+     * Creates a controller with an explicit non-mutating extra settlement policy.
+     *
+     * @param ledger shared economic ledger
+     * @param transactionPolicy customs/settlement quote policy
+     */
+    public TradeController(EconomicLedger ledger, TradeTransactionPolicy transactionPolicy) {
         this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");
+        this.transactionPolicy = Objects.requireNonNull(transactionPolicy, "TradeTransactionPolicy not set");
     }
 
     /** @return журнал, используемый этим контроллером */
@@ -81,12 +93,23 @@ public class TradeController {
         WalletComponent buyerWallet = wm.get(buyer);
         float unitPrice = getEffectiveSellPrice(station, itemId, buyerReputation);
         long cost = safeTradeValue(unitPrice, amount);
+        if (cost <= 0L) {
+            return false;
+        }
+        TradeTransactionPolicy.Charge charge = transactionPolicy.quote(
+                station, buyer, TradeTransactionPolicy.Direction.BUY_FROM_STATION, cost);
+        long duty = charge.amountMilliCredits();
+        long totalDebit = safeAdd(cost, duty);
+        WalletComponent collector = charge.collectorWallet();
 
-        if (cost <= 0L
+        if (totalDebit <= 0L
                 || stationInventory.stock[itemId] < amount
                 || getFreeCapacity(buyerInventory) < amount
-                || !buyerWallet.canDebit(cost)
+                || !buyerWallet.canDebit(totalDebit)
                 || !stationWallet.canCredit(cost)
+                || (duty > 0L && (collector == buyerWallet
+                || collector == stationWallet
+                || !collector.canCredit(duty)))
                 || buyerInventory.stock[itemId] > Integer.MAX_VALUE - amount) {
             return false;
         }
@@ -94,11 +117,19 @@ public class TradeController {
         if (!buyerWallet.transferTo(stationWallet, cost)) {
             return false;
         }
+        if (duty > 0L && !buyerWallet.transferTo(collector, duty)) {
+            stationWallet.transferTo(buyerWallet, cost);
+            return false;
+        }
         stationInventory.stock[itemId] -= amount;
         buyerInventory.stock[itemId] += amount;
         mm.get(station).isDirty = true;
         increaseReputation(station, buyerReputation);
-        ledger.recordTrade(entityName(buyer), entityName(station), itemId, amount, cost);
+        String buyerName = entityName(buyer);
+        ledger.recordTrade(buyerName, entityName(station), itemId, amount, cost);
+        if (duty > 0L) {
+            ledger.recordMoneyTransfer(buyerName, charge.collectorLedgerName(), duty, charge.reason());
+        }
         return true;
     }
 
@@ -142,24 +173,44 @@ public class TradeController {
         WalletComponent sellerWallet = wm.get(seller);
         float unitPrice = getEffectiveBuyPrice(station, itemId, sellerReputation);
         long revenue = safeTradeValue(unitPrice, amount);
+        if (revenue <= 0L) {
+            return false;
+        }
+        TradeTransactionPolicy.Charge charge = transactionPolicy.quote(
+                station, seller, TradeTransactionPolicy.Direction.SELL_TO_STATION, revenue);
+        long duty = charge.amountMilliCredits();
+        long netRevenue = revenue - duty;
+        WalletComponent collector = charge.collectorWallet();
 
-        if (revenue <= 0L
+        if (netRevenue <= 0L
                 || sellerInventory.stock[itemId] < amount
                 || getFreeCapacity(stationInventory) < amount
                 || !stationWallet.canDebit(revenue)
-                || !sellerWallet.canCredit(revenue)
+                || !sellerWallet.canCredit(netRevenue)
+                || (duty > 0L && (collector == sellerWallet
+                || collector == stationWallet
+                || !collector.canCredit(duty)))
                 || stationInventory.stock[itemId] > Integer.MAX_VALUE - amount) {
             return false;
         }
 
-        if (!stationWallet.transferTo(sellerWallet, revenue)) {
+        if (!stationWallet.transferTo(sellerWallet, netRevenue)) {
+            return false;
+        }
+        if (duty > 0L && !stationWallet.transferTo(collector, duty)) {
+            sellerWallet.transferTo(stationWallet, netRevenue);
             return false;
         }
         sellerInventory.stock[itemId] -= amount;
         stationInventory.stock[itemId] += amount;
         mm.get(station).isDirty = true;
         increaseReputation(station, sellerReputation);
-        ledger.recordTrade(entityName(station), entityName(seller), itemId, amount, revenue);
+        String stationName = entityName(station);
+        String sellerName = entityName(seller);
+        ledger.recordTrade(stationName, sellerName, itemId, amount, netRevenue);
+        if (duty > 0L) {
+            ledger.recordMoneyTransfer(stationName, charge.collectorLedgerName(), duty, charge.reason());
+        }
         return true;
     }
 
@@ -321,6 +372,14 @@ public class TradeController {
                 && market.targetStock.length >= Constants.MAX_ITEMS
                 && market.tradableItems != null
                 && market.tradableItems.length >= Constants.MAX_ITEMS;
+    }
+
+    private long safeAdd(long first, long second) {
+        try {
+            return Math.addExact(first, second);
+        } catch (ArithmeticException exception) {
+            return -1L;
+        }
     }
 
     private long safeTradeValue(float unitPrice, int amount) {
