@@ -31,7 +31,7 @@ final class TerritorialControlRuntime {
     /** Required uninterrupted qualifying evidence before an unclaimed system can become controlled. */
     static final long REQUIRED_STABILIZATION_TICKS = 600L;
     /** Unsupported interval tolerated before established control is relinquished. */
-    static final long CONTROL_LOSS_GRACE_TICKS = 300L;
+    static final long CONTROL_LOSS_GRACE_TICKS = 3_600L;
 
     private static final int STATION_ANCHOR_SCORE = 100;
     private static final int OPERATIONAL_ANCHOR_SCORE = 25;
@@ -539,7 +539,8 @@ final class TerritorialControlRuntime {
             Evidence controllerEvidence,
             Map<EvidenceKey, Evidence> evidence) {
         for (FactionStrategicState rival : strategies) {
-            if (rival.factionContentId().equals(controllerFactionId)) {
+            if (rival.factionContentId().equals(controllerFactionId)
+                    || rival.claimFor(systemId) == null) {
                 continue;
             }
             Evidence rivalEvidence = evidence.getOrDefault(
