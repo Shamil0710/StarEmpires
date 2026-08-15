@@ -1,6 +1,7 @@
 package com.spacesim.player;
 
 import com.spacesim.content.ContentCatalog;
+import com.spacesim.world.FactionDiplomacyState;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionIdentityResolver;
 import com.spacesim.world.FactionStrategicState;
@@ -51,6 +52,10 @@ public final class PlayerFactionFoundationService {
     /**
      * Founds one explicit player-controlled world faction without granting money, assets or land.
      *
+     * <p>All pre-existing diplomacy is preserved exactly. The newly founded faction receives a
+     * neutral empty diplomacy aggregate and explicit zero fiscal spending authorizations rather than
+     * inheriting the legacy unlimited-construction compatibility default.</p>
+     *
      * @param source current playable snapshot with an initialized independent player
      * @param content immutable content catalog used by the world
      * @param factionId requested stable world faction ID
@@ -88,13 +93,16 @@ public final class PlayerFactionFoundationService {
         WorldFactionIdentityState identity = resolver.allocatePlayerCreated(id, displayName);
 
         List<FactionEconomicState> economics = new ArrayList<>(world.factions());
-        economics.add(new FactionEconomicState(id, 0L, 0L, 0L));
+        economics.add(new FactionEconomicState(id, 0L, 0L, 0L, 0L, 0L));
 
         List<FactionStrategicState> strategies = new ArrayList<>(world.factionStrategies());
         strategies.add(new FactionStrategicState(id, 0, List.of(), List.of()));
 
         List<WorldFactionIdentityState> identities = new ArrayList<>(world.factionIdentities());
         identities.add(identity);
+
+        List<FactionDiplomacyState> diplomacy = new ArrayList<>(world.factionDiplomacyStates());
+        diplomacy.add(FactionDiplomacyState.neutral(id));
 
         WorldState updatedWorld = new WorldState(
                 WorldState.CURRENT_VERSION,
@@ -108,7 +116,8 @@ public final class PlayerFactionFoundationService {
                 world.nextFleetIdValue(),
                 world.fleets(),
                 world.fleetJumps(),
-                identities);
+                identities,
+                diplomacy);
 
         PlayerState updatedPlayer = new PlayerState(
                 player.walletMilliCredits(),
