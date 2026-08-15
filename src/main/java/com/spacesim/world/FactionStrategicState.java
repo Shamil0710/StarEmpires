@@ -23,6 +23,7 @@ import java.util.Set;
  * @param territorialControlStates maintenance clocks for systems in {@code controlledSystems}
  * @param territorialRecognitions directed recognition of other factions' claims/control
  * @param constructionRightsGranted explicit foreign construction concessions granted by this faction
+ * @param doctrine persistent institutional decision preferences; never a direct performance modifier
  */
 public record FactionStrategicState(
         String factionContentId,
@@ -37,7 +38,8 @@ public record FactionStrategicState(
         List<TerritorialClaimState> territorialClaims,
         List<TerritorialControlState> territorialControlStates,
         List<TerritorialRecognitionState> territorialRecognitions,
-        List<TerritorialConstructionRightState> constructionRightsGranted)
+        List<TerritorialConstructionRightState> constructionRightsGranted,
+        FactionDoctrineState doctrine)
         implements Comparable<FactionStrategicState> {
 
     /**
@@ -135,7 +137,8 @@ public record FactionStrategicState(
                 List.of(),
                 legacyControlStates(controlledSystems),
                 List.of(),
-                List.of());
+                List.of(),
+                FactionDoctrineState.neutral());
     }
 
     /**
@@ -154,6 +157,7 @@ public record FactionStrategicState(
      * @param territorialControlStates maintenance state for every controlled system
      * @param territorialRecognitions directed territorial recognition states
      * @param constructionRightsGranted foreign construction concessions granted by this faction
+     * @param doctrine persistent institutional decision preferences
      */
     public FactionStrategicState {
         factionContentId = requireId(factionContentId, "Faction content ID");
@@ -171,6 +175,7 @@ public record FactionStrategicState(
         Objects.requireNonNull(territorialControlStates, "Territorial control states not set");
         Objects.requireNonNull(territorialRecognitions, "Territorial recognitions not set");
         Objects.requireNonNull(constructionRightsGranted, "Construction rights not set");
+        Objects.requireNonNull(doctrine, "Faction doctrine not set");
 
         List<FactionRelationState> sortedRelations = new ArrayList<>(relations.size());
         Set<String> relationTargets = new HashSet<>();
