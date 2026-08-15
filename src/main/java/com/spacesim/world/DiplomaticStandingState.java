@@ -19,7 +19,14 @@ public record DiplomaticStandingState(
     /** Neutral credibility used when no explicit directed assessment exists. */
     public static final int NEUTRAL_CREDIBILITY = 50;
 
-    /** Validates and normalizes one directed diplomatic assessment. */
+    /**
+     * Validates and normalizes one directed diplomatic assessment.
+     *
+     * @param targetFactionContentId stable target faction ID
+     * @param trust bounded trust in range [-100, 100]
+     * @param credibility bounded credibility in range [0, 100]
+     * @param lastUpdatedTick authoritative non-negative update tick
+     */
     public DiplomaticStandingState {
         targetFactionContentId = requireId(targetFactionContentId, "Target faction content ID");
         if (trust < -100 || trust > 100) {
