@@ -32,9 +32,8 @@ import java.util.Objects;
  *
  * <p>{@link #write(Path, GameState)} сначала создаёт временный файл рядом с целевым, затем заменяет
  * сохранение atomic move, если файловая система его поддерживает. {@link #decode(byte[])} принимает
- * текущую schema и Stage-3 schema v1, которую сразу переводит через {@link GameStateMigration}.
- * Entity archetype появился только в schema v2 и читается условно, поэтому byte layout v1 остаётся
- * полностью совместимым.</p>
+ * current schema, schema v2 и Stage-3 schema v1, которые переводятся через {@link GameStateMigration}.
+ * Entity archetype появился в schema v2; configured market target provenance — в schema v3.</p>
  */
 public final class GameStateCodec {
     private static final int MAGIC = 0x5354454D; // STEM — Star Empires save magic.
@@ -193,6 +192,7 @@ public final class GameStateCodec {
     private static GameState readGameState(DataInputStream input) throws IOException {
         int schemaVersion = input.readInt();
         if (schemaVersion != GameState.CURRENT_VERSION
+                && schemaVersion != GameState.ITEM_CAPACITY_ARCHETYPE_VERSION
                 && schemaVersion != GameState.LEGACY_STAGE3_VERSION) {
             throw new IllegalArgumentException("Неподдерживаемая schema version: " + schemaVersion);
         }
@@ -383,6 +383,7 @@ public final class GameStateCodec {
         writeOptional(output, entity.wallet(), value -> output.writeLong(value.balanceMilliCredits()));
         writeOptional(output, entity.market(), value -> {
             writeIntegerList(output, value.targetStock());
+            writeIntegerList(output, value.configuredTargetStock());
             writeFloatList(output, value.baseConsumption());
             writeFloatList(output, value.sellPrices());
             writeFloatList(output, value.buyPrices());
@@ -466,15 +467,7 @@ public final class GameStateCodec {
                 () -> new EntityState.InventoryState(input.readInt(), readIntegerList(input)));
         EntityState.WalletState wallet = readOptional(input,
                 () -> new EntityState.WalletState(input.readLong()));
-        EntityState.MarketState market = readOptional(input,
-                () -> new EntityState.MarketState(
-                        readIntegerList(input),
-                        readFloatList(input),
-                        readFloatList(input),
-                        readFloatList(input),
-                        readDoubleList(input),
-                        readBooleanList(input),
-                        input.readBoolean()));
+        EntityState.MarketState market = readOptional(input, () -> readMarket(input, schemaVersion));
         EntityState.ProductionState production = readOptional(input, () -> {
             int count = readCount(input, MAX_LIST_ENTRIES, "recipes");
             List<EntityState.RecipeState> recipes = new ArrayList<>(count);
@@ -541,12 +534,30 @@ public final class GameStateCodec {
         EntityState.AsteroidState asteroid = readOptional(input,
                 () -> new EntityState.AsteroidState(
                         readString(input), input.readInt(), input.readLong(), input.readLong()));
-        EntityState.ArchetypeState archetype = schemaVersion >= GameState.CURRENT_VERSION
+        EntityState.ArchetypeState archetype = schemaVersion >= GameState.ITEM_CAPACITY_ARCHETYPE_VERSION
                 ? readOptional(input, () -> new EntityState.ArchetypeState(readString(input)))
                 : null;
         return new EntityState(
                 id, identity, transform, inventory, wallet, market, production, history,
                 faction, reputation, ship, tradeAi, mining, combat, asteroid, archetype);
+    }
+
+    private static EntityState.MarketState readMarket(
+            DataInputStream input,
+            int schemaVersion) throws IOException {
+        List<Integer> target = readIntegerList(input);
+        List<Integer> configuredTarget = schemaVersion >= GameState.CURRENT_VERSION
+                ? readIntegerList(input)
+                : target;
+        return new EntityState.MarketState(
+                target,
+                configuredTarget,
+                readFloatList(input),
+                readFloatList(input),
+                readFloatList(input),
+                readDoubleList(input),
+                readBooleanList(input),
+                input.readBoolean());
     }
 
     private static void writeEntityId(DataOutputStream output, EntityId id) throws IOException {
