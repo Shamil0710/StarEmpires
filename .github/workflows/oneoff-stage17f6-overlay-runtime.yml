@@ -1,0 +1,72 @@
+name: One-off Stage17F6 strategic goal seam
+
+on:
+  push:
+    branches:
+      - stage-17f6-resilience-demand-overlay
+    paths:
+      - .github/workflows/oneoff-stage17f6-overlay-runtime.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: stage-17f6-resilience-demand-overlay
+          fetch-depth: 0
+      - name: Insert strategic-goal update seam
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/main/java/com/spacesim/world/TerritorialControlRuntime.java')
+          text = path.read_text()
+          if 'FactionStrategicState updateStrategicGoals(' not in text:
+              marker = '''    String controller(StarSystemId systemId) {
+'''
+              insert = '''    FactionStrategicState updateStrategicGoals(
+            String factionContentId,
+            List<FactionStrategicGoalState> strategicGoals) {
+        String factionId = requireFaction(factionContentId);
+        List<FactionStrategicGoalState> checked = List.copyOf(Objects.requireNonNull(
+                strategicGoals, "Faction strategic goals not set"));
+        FactionStrategicState current = strategiesById.get(factionId);
+        if (current.strategicGoals().equals(checked)) {
+            return current;
+        }
+        FactionStrategicState replacementState = new FactionStrategicState(
+                current.factionContentId(),
+                current.minimumMarketAccessRelation(),
+                current.relations(),
+                current.controlledSystems(),
+                current.stationTaxBasisPoints(),
+                current.foreignTerritoryTariffBasisPoints(),
+                current.stockPolicies(),
+                current.productionPolicies(),
+                checked,
+                current.territorialClaims(),
+                current.territorialControlStates(),
+                current.territorialRecognitions(),
+                current.constructionRightsGranted(),
+                current.doctrine());
+        replaceStrategy(replacementState);
+        return replacementState;
+    }
+
+'''
+              if marker not in text:
+                  raise SystemExit('Target marker not found')
+              text = text.replace(marker, insert + marker, 1)
+              path.write_text(text)
+          PY
+      - name: Remove one-off workflow and commit result
+        run: |
+          rm .github/workflows/oneoff-stage17f6-overlay-runtime.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/TerritorialControlRuntime.java .github/workflows/oneoff-stage17f6-overlay-runtime.yml
+          git commit -m "Add strategic goal update runtime seam"
+          git push origin HEAD:stage-17f6-resilience-demand-overlay
