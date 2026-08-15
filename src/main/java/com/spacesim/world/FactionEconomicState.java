@@ -52,7 +52,16 @@ public record FactionEconomicState(
                 Long.MAX_VALUE);
     }
 
-    /** Validates persistent faction economy and fiscal spending limits. */
+    /**
+     * Validates persistent faction economy and fiscal spending limits.
+     *
+     * @param factionContentId stable faction content ID
+     * @param treasuryMilliCredits non-negative authoritative treasury balance
+     * @param stationLiquidityReserveMilliCredits non-negative station liquidity target
+     * @param maxLiquiditySupportPerDecisionMilliCredits non-negative liquidity-support cap
+     * @param treasuryReserveFloorMilliCredits non-negative protected treasury balance
+     * @param maxConstructionInvestmentPerDecisionMilliCredits non-negative construction funding cap
+     */
     public FactionEconomicState {
         factionContentId = normalizedContentId(factionContentId);
         if (treasuryMilliCredits < 0L
