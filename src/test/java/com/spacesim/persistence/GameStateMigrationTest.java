@@ -5,6 +5,7 @@ import com.spacesim.simulation.SimulationSession;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -69,11 +70,6 @@ class GameStateMigrationTest {
                 List.of(legacyEntity));
 
         byte[] currentBytes = GameStateCodec.encode(currentWithLegacyShape);
-        // Schema v3 writes configuredTargetStock immediately after targetStock. For this fixture the
-        // compatibility MarketState constructor makes both lists identical, so the two encoded list
-        // blocks are adjacent and byte-identical. Remove the second block to recover the v1/v2 market
-        // layout. Then remove the final null-archetype presence byte introduced by schema v2 and
-        // rewrite the logical schema version to v1.
         byte[] withoutV3MarketBaseline = removeSecondConsecutiveBlock(
                 currentBytes,
                 encodedIntegerList(List.of(1, 2, 3, 4, 5)));
@@ -107,6 +103,96 @@ class GameStateMigrationTest {
         assertEquals(List.of(2f, 3f), entity.priceHistory().history().get(1));
         assertEquals(List.of(), entity.priceHistory().history().get(5));
         assertNull(entity.archetype());
+    }
+
+    @Test
+    void binaryV2СохраняетArchetypeИМигрируетEffectiveTargetВBaseline() {
+        GameState baseline = SimulationSession.createDemo(0x51A7E5L).snapshot();
+        List<Integer> target = integerSlots(12);
+        EntityState v2EntityShape = new EntityState(
+                new EntityId(2L),
+                null,
+                null,
+                new EntityState.InventoryState(100, integerSlots(20)),
+                null,
+                new EntityState.MarketState(
+                        target,
+                        floatSlots(0f),
+                        floatSlots(10f),
+                        floatSlots(9f),
+                        doubleSlots(0d),
+                        booleanSlots(true),
+                        false),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new EntityState.ArchetypeState("station.agrodome"));
+        GameState current = new GameState(
+                GameState.CURRENT_VERSION,
+                baseline.rootSeed(),
+                baseline.clock(),
+                baseline.nextEntityIdValue(),
+                baseline.eventRandomState(),
+                baseline.asteroidRandomState(),
+                baseline.events(),
+                baseline.asteroidSpawner(),
+                baseline.priceRecorder(),
+                baseline.ledger(),
+                List.of(v2EntityShape));
+
+        byte[] currentBytes = GameStateCodec.encode(current);
+        byte[] v2Bytes = removeSecondConsecutiveBlock(currentBytes, encodedIntegerList(target));
+        ByteBuffer.wrap(v2Bytes).putInt(8, GameState.ITEM_CAPACITY_ARCHETYPE_VERSION);
+
+        GameState migrated = GameStateCodec.decode(v2Bytes);
+        EntityState entity = migrated.entities().get(0);
+
+        assertEquals(GameState.CURRENT_VERSION, migrated.schemaVersion());
+        assertEquals("station.agrodome", entity.archetype().contentId());
+        assertEquals(target, entity.market().targetStock());
+        assertEquals(target, entity.market().configuredTargetStock());
+    }
+
+    private static List<Integer> integerSlots(int firstValue) {
+        List<Integer> values = new ArrayList<>(Constants.MAX_ITEMS);
+        values.add(firstValue);
+        while (values.size() < Constants.MAX_ITEMS) {
+            values.add(0);
+        }
+        return List.copyOf(values);
+    }
+
+    private static List<Float> floatSlots(float firstValue) {
+        List<Float> values = new ArrayList<>(Constants.MAX_ITEMS);
+        values.add(firstValue);
+        while (values.size() < Constants.MAX_ITEMS) {
+            values.add(0f);
+        }
+        return List.copyOf(values);
+    }
+
+    private static List<Double> doubleSlots(double firstValue) {
+        List<Double> values = new ArrayList<>(Constants.MAX_ITEMS);
+        values.add(firstValue);
+        while (values.size() < Constants.MAX_ITEMS) {
+            values.add(0d);
+        }
+        return List.copyOf(values);
+    }
+
+    private static List<Boolean> booleanSlots(boolean firstValue) {
+        List<Boolean> values = new ArrayList<>(Constants.MAX_ITEMS);
+        values.add(firstValue);
+        while (values.size() < Constants.MAX_ITEMS) {
+            values.add(false);
+        }
+        return List.copyOf(values);
     }
 
     private static byte[] encodedIntegerList(List<Integer> values) {
