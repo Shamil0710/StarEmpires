@@ -675,6 +675,31 @@ public final class WorldSimulation {
     }
 
     /**
+     * Applies one common player/AI unilateral market-access embargo command.
+     *
+     * <p>The command mutates only persistent diplomacy and immediately re-materializes ordinary
+     * market-access policy. It performs no wallet transfer, cargo mutation, price mutation or
+     * abstract economic damage.</p>
+     *
+     * @param command embargo impose/revoke command
+     * @return immutable successful legal transition result
+     */
+    public DiplomaticEmbargoCommandResult applyDiplomaticEmbargoCommand(DiplomaticEmbargoCommand command) {
+        long worldTick = getAuthoritativeWorldTick();
+        boolean lifecycleChanged = diplomacyRuntime.advanceTime(worldTick);
+        try {
+            DiplomaticEmbargoCommandResult result = diplomacyRuntime.apply(command, worldTick);
+            refreshFactionMarketAccess();
+            return result;
+        } catch (RuntimeException exception) {
+            if (lifecycleChanged) {
+                refreshFactionMarketAccess();
+            }
+            throw exception;
+        }
+    }
+
+    /**
      * Возвращает strategic владельца StarSystem.
      *
      * @param systemId stable system ID

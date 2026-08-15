@@ -605,6 +605,8 @@ Route planner обязан знать tariff заранее. Никаких не
 
 ### 17E.5 — embargoes / sanctions
 
+**ACTIVE.** Unilateral market embargo использует общий player/AI command boundary и persistent `FactionDiplomacyState`; impose/revoke немедленно rematerialize-ят ordinary market access, а затронутая faction получает explicit `EMBARGO` grievance. Сам embargo не создаёт экономический урон вне ordinary trade/logistics consequences.
+
 Embargo не применяет абстрактный debuff. Он запрещает определённый legal market access, после чего обычные systems:
 
 - перестраивают маршруты;
