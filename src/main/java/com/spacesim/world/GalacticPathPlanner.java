@@ -3,11 +3,13 @@ package com.spacesim.world;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 /** Pure deterministic shortest-time planner over immutable jump topology. */
 public final class GalacticPathPlanner {
@@ -40,10 +42,64 @@ public final class GalacticPathPlanner {
     public Optional<GalacticPath> findPath(StarSystemId origin, StarSystemId destination) {
         StarSystemId from = requireKnown(origin, "Path origin");
         StarSystemId to = requireKnown(destination, "Path destination");
+        return findPath(from, to, Set.of());
+    }
+
+    /**
+     * Finds the minimum-time route that shares no jump connection with the supplied primary path.
+     *
+     * <p>The primary route itself is never mutated and topology is not rewritten. Every consecutive
+     * primary-system pair becomes a canonical excluded {@link JumpConnection}; the ordinary
+     * deterministic shortest-path search then runs against the remaining physical topology. A result
+     * therefore represents actual link redundancy rather than merely a different presentation of the
+     * same chokepoint. If the topology has no such route, the vulnerability remains explicit.</p>
+     *
+     * @param primary existing physical primary route whose jump connections must all be avoided
+     * @return best edge-disjoint physical route, or empty when none exists
+     */
+    public Optional<GalacticPath> findEdgeDisjointAlternative(GalacticPath primary) {
+        GalacticPath checked = Objects.requireNonNull(primary, "Primary galactic path not set");
+        StarSystemId from = requireKnown(checked.origin(), "Primary path origin");
+        StarSystemId to = requireKnown(checked.destination(), "Primary path destination");
+        if (checked.jumpCount() <= 0) {
+            return Optional.empty();
+        }
+        Set<JumpConnection> excluded = new HashSet<>();
+        List<StarSystemId> systems = checked.systems();
+        for (int index = 1; index < systems.size(); index++) {
+            StarSystemId previous = requireKnown(systems.get(index - 1), "Primary path system");
+            StarSystemId current = requireKnown(systems.get(index), "Primary path system");
+            JumpConnection connection = new JumpConnection(previous, current);
+            if (!topology.connections().contains(connection)) {
+                throw new IllegalArgumentException(
+                        "Primary path uses a jump connection absent from topology: " + connection);
+            }
+            excluded.add(connection);
+        }
+        return findPath(from, to, Set.copyOf(excluded));
+    }
+
+    /**
+     * @param origin directly connected origin
+     * @param destination directly connected destination
+     * @return approach + pending + detached transit + arrival ticks
+     */
+    public long directEdgeTicks(StarSystemId origin, StarSystemId destination) {
+        long ticks = timing.transitTicks(topology, origin, destination, fixedStepSeconds);
+        ticks = safeAdd(ticks, timing.approachTicks());
+        ticks = safeAdd(ticks, timing.pendingTicks());
+        return safeAdd(ticks, timing.arrivalTicks());
+    }
+
+    private Optional<GalacticPath> findPath(
+            StarSystemId from,
+            StarSystemId to,
+            Set<JumpConnection> excludedConnections) {
         if (from.equals(to)) {
             return Optional.of(new GalacticPath(List.of(from), 0L, 0d, 0d));
         }
-
+        Set<JumpConnection> excluded = Objects.requireNonNull(
+                excludedConnections, "Excluded jump connections not set");
         PriorityQueue<State> frontier = new PriorityQueue<>(ORDER);
         Map<StarSystemId, State> best = new HashMap<>();
         State start = new State(from, 0L, 0d, List.of(from));
@@ -63,6 +119,9 @@ public final class GalacticPathPlanner {
                         current.path(), current.ticks(), seconds, current.distance()));
             }
             for (StarSystemId neighbor : topology.neighbors(current.systemId())) {
+                if (excluded.contains(new JumpConnection(current.systemId(), neighbor))) {
+                    continue;
+                }
                 State candidate = extend(current, neighbor);
                 State previous = best.get(neighbor);
                 if (previous == null || ORDER.compare(candidate, previous) < 0) {
@@ -72,18 +131,6 @@ public final class GalacticPathPlanner {
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * @param origin directly connected origin
-     * @param destination directly connected destination
-     * @return approach + pending + detached transit + arrival ticks
-     */
-    public long directEdgeTicks(StarSystemId origin, StarSystemId destination) {
-        long ticks = timing.transitTicks(topology, origin, destination, fixedStepSeconds);
-        ticks = safeAdd(ticks, timing.approachTicks());
-        ticks = safeAdd(ticks, timing.pendingTicks());
-        return safeAdd(ticks, timing.arrivalTicks());
     }
 
     private State extend(State current, StarSystemId next) {
