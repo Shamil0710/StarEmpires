@@ -55,7 +55,7 @@ class GameStateMigrationTest {
                 null,
                 null);
 
-        GameState v2WithLegacyShape = new GameState(
+        GameState currentWithLegacyShape = new GameState(
                 GameState.CURRENT_VERSION,
                 baseline.rootSeed(),
                 baseline.clock(),
@@ -68,11 +68,16 @@ class GameStateMigrationTest {
                 baseline.ledger(),
                 List.of(legacyEntity));
 
-        byte[] v2Bytes = GameStateCodec.encode(v2WithLegacyShape);
-        // Schema v2 appends one optional-archetype presence byte to every Entity. With exactly one
-        // entity and a null archetype this is the final byte. Remove it to obtain the exact v1
-        // entity layout, then rewrite the logical schema version in the header.
-        byte[] legacyBytes = Arrays.copyOf(v2Bytes, v2Bytes.length - 1);
+        byte[] currentBytes = GameStateCodec.encode(currentWithLegacyShape);
+        // Schema v3 writes configuredTargetStock immediately after targetStock. For this fixture the
+        // compatibility MarketState constructor makes both lists identical, so the two encoded list
+        // blocks are adjacent and byte-identical. Remove the second block to recover the v1/v2 market
+        // layout. Then remove the final null-archetype presence byte introduced by schema v2 and
+        // rewrite the logical schema version to v1.
+        byte[] withoutV3MarketBaseline = removeSecondConsecutiveBlock(
+                currentBytes,
+                encodedIntegerList(List.of(1, 2, 3, 4, 5)));
+        byte[] legacyBytes = Arrays.copyOf(withoutV3MarketBaseline, withoutV3MarketBaseline.length - 1);
         ByteBuffer.wrap(legacyBytes).putInt(8, GameState.LEGACY_STAGE3_VERSION);
 
         GameState migrated = GameStateCodec.decode(legacyBytes);
@@ -89,6 +94,8 @@ class GameStateMigrationTest {
         assertFalse(entity.market().tradableItems().get(5));
         assertEquals(0f, entity.market().sellPrices().get(5), 0f);
         assertEquals(0d, entity.market().consumptionRemainder().get(5), 0d);
+        assertEquals(entity.market().targetStock(), entity.market().configuredTargetStock(),
+                "Legacy effective target must migrate conservatively into the configured baseline");
 
         EntityState.RecipeState recipe = entity.production().recipes().get(0);
         assertEquals(Constants.MAX_ITEMS, recipe.inputs().size());
@@ -100,5 +107,45 @@ class GameStateMigrationTest {
         assertEquals(List.of(2f, 3f), entity.priceHistory().history().get(1));
         assertEquals(List.of(), entity.priceHistory().history().get(5));
         assertNull(entity.archetype());
+    }
+
+    private static byte[] encodedIntegerList(List<Integer> values) {
+        ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES * (values.size() + 1));
+        buffer.putInt(values.size());
+        for (Integer value : values) {
+            buffer.putInt(value);
+        }
+        return buffer.array();
+    }
+
+    private static byte[] removeSecondConsecutiveBlock(byte[] source, byte[] block) {
+        int first = indexOf(source, block, 0);
+        if (first < 0) {
+            throw new AssertionError("First market target block not found in fixture binary");
+        }
+        int second = indexOf(source, block, first + block.length);
+        if (second != first + block.length) {
+            throw new AssertionError("Configured market baseline is not adjacent to effective target block");
+        }
+        byte[] result = new byte[source.length - block.length];
+        System.arraycopy(source, 0, result, 0, second);
+        System.arraycopy(source, second + block.length, result, second, source.length - second - block.length);
+        return result;
+    }
+
+    private static int indexOf(byte[] source, byte[] block, int fromIndex) {
+        for (int index = Math.max(0, fromIndex); index <= source.length - block.length; index++) {
+            boolean matches = true;
+            for (int offset = 0; offset < block.length; offset++) {
+                if (source[index + offset] != block[offset]) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                return index;
+            }
+        }
+        return -1;
     }
 }
