@@ -14,6 +14,7 @@ import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.WorldSimulation;
+import com.spacesim.world.WorldSupplierDiversificationPolicy;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -23,14 +24,15 @@ import java.util.Optional;
  *
  * <p>The service owns one shared {@link GalacticMarketIndex}; repeated planning therefore reuses
  * per-system immutable market snapshots and their revisions. It combines bounded discovery with the
- * world's canonical {@link TradeRoutePlanner}, then returns an {@link InterSystemTradeJob} that
- * performs the physical transactions and jump handoffs.</p>
+ * world's canonical {@link TradeRoutePlanner}, then applies the Stage-17F.5 supplier-diversification
+ * selector before returning an {@link InterSystemTradeJob} that performs the physical transactions
+ * and jump handoffs.</p>
  */
 public final class InterSystemTradeService {
     private final WorldSimulation world;
     private final GalacticMarketIndex marketIndex;
     private final GalacticMarketDiscovery discovery;
-    private final TradeRoutePlanner routePlanner;
+    private final FactionResilientGalacticTradePlanner routePlanner;
 
     /**
      * Creates a service using explicit discovery and scoring policies.
@@ -48,8 +50,13 @@ public final class InterSystemTradeService {
         this.discovery = new GalacticMarketDiscovery(
                 world.createGalacticPathPlanner(),
                 Objects.requireNonNull(discoveryPolicy, "Discovery policy не задан"));
-        this.routePlanner = world.createGalacticTradeRoutePlanner(
-                Objects.requireNonNull(scoringMode, "ScoringMode не задан"));
+        TradeRoutePlanner.ScoringMode checkedScoringMode = Objects.requireNonNull(
+                scoringMode, "ScoringMode не задан");
+        TradeRoutePlanner economicPlanner = world.createGalacticTradeRoutePlanner(checkedScoringMode);
+        this.routePlanner = new FactionResilientGalacticTradePlanner(
+                economicPlanner,
+                checkedScoringMode,
+                new WorldSupplierDiversificationPolicy(world));
     }
 
     /**
@@ -63,6 +70,10 @@ public final class InterSystemTradeService {
 
     /**
      * Plans the best currently valid inter-system cargo job for a local world fleet.
+     *
+     * <p>Ordinary economics remains the baseline. A faction may choose a less concentrated physical
+     * supplier only when Stage-17F.5 diagnostics recommend diversification and the real expected-profit
+     * sacrifice stays within its measured resilience budget.</p>
      *
      * @param fleetId stable fleet identity
      * @return executable job or empty when no bounded profitable candidate exists
