@@ -1,29 +1,36 @@
 package com.spacesim.trade;
 
+import com.spacesim.world.GalacticPath;
+import com.spacesim.world.GalacticPathPlanner;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.IntUnaryOperator;
 
 /**
- * Selects a resilience-aware cross-system procurement route without replacing ordinary economic planning.
+ * Selects resilience-aware cross-system procurement without replacing ordinary economic planning.
  *
  * <p>The wrapped {@link TradeRoutePlanner} remains authoritative for route feasibility, physical
- * suppliers, prices, tariffs, risk, travel time and profitability. This selector first obtains the
- * ordinary economic baseline, then considers a less concentrated supplier only when the route is
- * inbound procurement into the trading faction's own physical market, the alternative supplier is
- * present in the same bounded opportunity set for that same consumer, and the resulting real profit
- * sacrifice is within the faction policy's measured willingness-to-pay.</p>
+ * suppliers, prices, tariffs, risk, travel time and profitability. Resilience may first choose a less
+ * concentrated real supplier and may then choose a real edge-disjoint jump path. Both choices are
+ * restricted to inbound procurement into the trading faction's own physical market and must remain
+ * within measured expected-profit willingness-to-pay. No supplier or topology link is invented.</p>
  */
 public final class FactionResilientGalacticTradePlanner {
     private final TradeRoutePlanner economicPlanner;
     private final TradeRoutePlanner.ScoringMode scoringMode;
     private final SupplierDiversificationPolicy diversificationPolicy;
+    private final GalacticPathPlanner redundancyPathPlanner;
+    private final int maxRedundantJumpHops;
+    private final IntUnaryOperator routeRiskByJumpCount;
+    private final RouteRedundancyPolicy routeRedundancyPolicy;
 
     /**
-     * Creates one pure resilience selector over the common galactic route planner.
+     * Creates a supplier-diversification selector with route redundancy disabled.
      *
      * @param economicPlanner ordinary economic route planner
      * @param scoringMode same scoring mode used by the wrapped planner
@@ -33,14 +40,52 @@ public final class FactionResilientGalacticTradePlanner {
             TradeRoutePlanner economicPlanner,
             TradeRoutePlanner.ScoringMode scoringMode,
             SupplierDiversificationPolicy diversificationPolicy) {
+        this(
+                economicPlanner,
+                scoringMode,
+                diversificationPolicy,
+                null,
+                Integer.MAX_VALUE,
+                ignored -> 0,
+                RouteRedundancyPolicy.none());
+    }
+
+    /**
+     * Creates a full Stage-17F.5 physical procurement selector.
+     *
+     * @param economicPlanner ordinary economic route planner
+     * @param scoringMode same scoring mode used by the wrapped planner
+     * @param diversificationPolicy measured strategic supplier policy
+     * @param redundancyPathPlanner physical topology planner used to find edge-disjoint alternatives
+     * @param maxRedundantJumpHops maximum allowed hops for a redundant path
+     * @param routeRiskByJumpCount deterministic route-risk function for an alternative path
+     * @param routeRedundancyPolicy measured strategic route policy
+     */
+    public FactionResilientGalacticTradePlanner(
+            TradeRoutePlanner economicPlanner,
+            TradeRoutePlanner.ScoringMode scoringMode,
+            SupplierDiversificationPolicy diversificationPolicy,
+            GalacticPathPlanner redundancyPathPlanner,
+            int maxRedundantJumpHops,
+            IntUnaryOperator routeRiskByJumpCount,
+            RouteRedundancyPolicy routeRedundancyPolicy) {
         this.economicPlanner = Objects.requireNonNull(economicPlanner, "Economic trade planner not set");
         this.scoringMode = Objects.requireNonNull(scoringMode, "Trade scoring mode not set");
         this.diversificationPolicy = Objects.requireNonNull(
                 diversificationPolicy, "Supplier diversification policy not set");
+        this.redundancyPathPlanner = redundancyPathPlanner;
+        if (maxRedundantJumpHops <= 0) {
+            throw new IllegalArgumentException("Maximum redundant jump hops must be positive");
+        }
+        this.maxRedundantJumpHops = maxRedundantJumpHops;
+        this.routeRiskByJumpCount = Objects.requireNonNull(
+                routeRiskByJumpCount, "Route risk function not set");
+        this.routeRedundancyPolicy = Objects.requireNonNull(
+                routeRedundancyPolicy, "Route redundancy policy not set");
     }
 
     /**
-     * Returns the selected real route after the bounded resilience comparison.
+     * Returns the selected real route after bounded resilience comparison.
      *
      * @param fleet immutable fleet planning profile
      * @param opportunities bounded real galactic market opportunities
@@ -53,7 +98,7 @@ public final class FactionResilientGalacticTradePlanner {
     }
 
     /**
-     * Returns the selected route together with explainable diversification diagnostics.
+     * Returns the selected route together with explainable resilience diagnostics.
      *
      * @param fleet immutable fleet planning profile
      * @param opportunities bounded real galactic market opportunities
@@ -78,7 +123,7 @@ public final class FactionResilientGalacticTradePlanner {
         }
 
         int baselineSupplierFaction = supplierFactionId(economicBaseline, checkedOpportunities);
-        SupplierDiversificationPolicy.Assessment baselineAssessment = assessment(
+        SupplierDiversificationPolicy.Assessment baselineAssessment = supplierAssessment(
                 checkedFleet, baselineSupplierFaction, economicBaseline.itemId());
         int baselineShare = baselineAssessment.active()
                 ? baselineAssessment.supplierShareBasisPoints()
@@ -106,7 +151,7 @@ public final class FactionResilientGalacticTradePlanner {
         boolean diversified = false;
 
         for (Map.Entry<Integer, List<GalacticTradeOpportunity>> entry : opportunitiesBySupplier.entrySet()) {
-            SupplierDiversificationPolicy.Assessment candidateAssessment = assessment(
+            SupplierDiversificationPolicy.Assessment candidateAssessment = supplierAssessment(
                     checkedFleet, entry.getKey(), economicBaseline.itemId());
             if (!candidateAssessment.active()
                     || candidateAssessment.supplierShareBasisPoints() >= baselineShare) {
@@ -130,7 +175,49 @@ public final class FactionResilientGalacticTradePlanner {
                 selectedShare = candidateAssessment.supplierShareBasisPoints();
                 selectedSacrifice = sacrifice;
                 selectedBudget = candidateAssessment.acceptableProfitSacrificeMilliCredits();
-                diversified = !sameRoute(candidate, economicBaseline);
+                diversified = !sameMarketPair(candidate, economicBaseline);
+            }
+        }
+
+        RouteRedundancyPolicy.Assessment routeAssessment = RouteRedundancyPolicy.Assessment.require(
+                routeRedundancyPolicy.assess(checkedFleet, economicBaseline.itemId()));
+        boolean redundantRoute = false;
+        if (routeAssessment.active() && redundancyPathPlanner != null) {
+            GalacticTradeOpportunity selectedOpportunity = findOpportunity(selected, checkedOpportunities);
+            GalacticPath alternative = redundancyPathPlanner
+                    .findEdgeDisjointAlternative(selected.jumpPath())
+                    .orElse(null);
+            if (selectedOpportunity != null
+                    && alternative != null
+                    && alternative.jumpCount() <= maxRedundantJumpHops) {
+                int alternativeRisk = routeRiskByJumpCount.applyAsInt(alternative.jumpCount());
+                if (alternativeRisk < 0 || alternativeRisk > 10_000) {
+                    throw new IllegalStateException("Route risk function returned value outside 0..10000 bps");
+                }
+                GalacticTradeOpportunity alternativeOpportunity = new GalacticTradeOpportunity(
+                        selectedOpportunity.supplier(),
+                        selectedOpportunity.consumer(),
+                        selectedOpportunity.itemId(),
+                        alternative,
+                        selectedOpportunity.localTravelDistance(),
+                        selectedOpportunity.localTravelSeconds(),
+                        alternativeRisk);
+                GalacticTradeRoute candidate = economicPlanner
+                        .findBestGalacticRoute(checkedFleet, List.of(alternativeOpportunity))
+                        .orElse(null);
+                if (candidate != null) {
+                    long routeBudget = routeAssessment.acceptableProfitSacrificeMilliCredits();
+                    long effectiveBudget = diversified
+                            ? Math.min(selectedBudget, routeBudget)
+                            : routeBudget;
+                    long totalSacrifice = profitSacrificeMilliCredits(economicBaseline, candidate);
+                    if (totalSacrifice <= effectiveBudget) {
+                        selected = candidate;
+                        selectedSacrifice = totalSacrifice;
+                        selectedBudget = effectiveBudget;
+                        redundantRoute = true;
+                    }
+                }
             }
         }
 
@@ -141,10 +228,11 @@ public final class FactionResilientGalacticTradePlanner {
                 selectedShare,
                 selectedBudget,
                 selectedSacrifice,
-                diversified));
+                diversified,
+                redundantRoute));
     }
 
-    private SupplierDiversificationPolicy.Assessment assessment(
+    private SupplierDiversificationPolicy.Assessment supplierAssessment(
             FleetTradeProfile fleet,
             int supplierFactionId,
             int itemId) {
@@ -213,30 +301,33 @@ public final class FactionResilientGalacticTradePlanner {
         return candidate.amount() > current.amount();
     }
 
-    private static int supplierFactionId(
+    private static GalacticTradeOpportunity findOpportunity(
             GalacticTradeRoute route,
             List<GalacticTradeOpportunity> opportunities) {
         for (GalacticTradeOpportunity opportunity : opportunities) {
             if (opportunity.itemId() == route.itemId()
                     && opportunity.supplier().systemId().equals(route.buySystemId())
-                    && opportunity.supplier().market().id().equals(route.buyStationId())) {
-                return opportunity.supplier().market().factionId();
+                    && opportunity.supplier().market().id().equals(route.buyStationId())
+                    && opportunity.consumer().systemId().equals(route.sellSystemId())
+                    && opportunity.consumer().market().id().equals(route.sellStationId())) {
+                return opportunity;
             }
         }
-        return -1;
+        return null;
+    }
+
+    private static int supplierFactionId(
+            GalacticTradeRoute route,
+            List<GalacticTradeOpportunity> opportunities) {
+        GalacticTradeOpportunity opportunity = findOpportunity(route, opportunities);
+        return opportunity == null ? -1 : opportunity.supplier().market().factionId();
     }
 
     private static int consumerFactionId(
             GalacticTradeRoute route,
             List<GalacticTradeOpportunity> opportunities) {
-        for (GalacticTradeOpportunity opportunity : opportunities) {
-            if (opportunity.itemId() == route.itemId()
-                    && opportunity.consumer().systemId().equals(route.sellSystemId())
-                    && opportunity.consumer().market().id().equals(route.sellStationId())) {
-                return opportunity.consumer().market().factionId();
-            }
-        }
-        return -1;
+        GalacticTradeOpportunity opportunity = findOpportunity(route, opportunities);
+        return opportunity == null ? -1 : opportunity.consumer().market().factionId();
     }
 
     private static boolean sameConsumer(
@@ -246,7 +337,7 @@ public final class FactionResilientGalacticTradePlanner {
                 && opportunity.consumer().market().id().equals(baseline.sellStationId());
     }
 
-    private static boolean sameRoute(GalacticTradeRoute first, GalacticTradeRoute second) {
+    private static boolean sameMarketPair(GalacticTradeRoute first, GalacticTradeRoute second) {
         return first.itemId() == second.itemId()
                 && first.buySystemId().equals(second.buySystemId())
                 && first.buyStationId().equals(second.buyStationId())
@@ -255,15 +346,16 @@ public final class FactionResilientGalacticTradePlanner {
     }
 
     /**
-     * Explainable result of one resilience-aware route selection.
+     * Explainable result of one resilience-aware procurement selection.
      *
      * @param selectedRoute route actually selected for execution
      * @param economicBaseline ordinary economic best route before resilience preference
      * @param baselineSupplierShareBasisPoints measured concentration of the economic supplier
      * @param selectedSupplierShareBasisPoints measured concentration of the selected supplier
-     * @param acceptableProfitSacrificeMilliCredits measured resilience willingness-to-pay
-     * @param actualProfitSacrificeMilliCredits real expected-profit sacrifice versus the economic baseline
-     * @param diversificationApplied whether a different physical supplier route was selected
+     * @param acceptableProfitSacrificeMilliCredits effective total resilience willingness-to-pay
+     * @param actualProfitSacrificeMilliCredits real final expected-profit sacrifice versus baseline
+     * @param diversificationApplied whether a different physical supplier market was selected
+     * @param routeRedundancyApplied whether an edge-disjoint physical jump path was selected
      */
     public record Selection(
             GalacticTradeRoute selectedRoute,
@@ -272,18 +364,20 @@ public final class FactionResilientGalacticTradePlanner {
             int selectedSupplierShareBasisPoints,
             long acceptableProfitSacrificeMilliCredits,
             long actualProfitSacrificeMilliCredits,
-            boolean diversificationApplied) {
+            boolean diversificationApplied,
+            boolean routeRedundancyApplied) {
 
         /**
-         * Validates one immutable route-selection diagnostic.
+         * Validates one immutable selection diagnostic.
          *
          * @param selectedRoute route actually selected for execution
          * @param economicBaseline ordinary economic best route before resilience preference
          * @param baselineSupplierShareBasisPoints measured concentration of the economic supplier
          * @param selectedSupplierShareBasisPoints measured concentration of the selected supplier
-         * @param acceptableProfitSacrificeMilliCredits measured resilience willingness-to-pay
-         * @param actualProfitSacrificeMilliCredits real expected-profit sacrifice versus the economic baseline
-         * @param diversificationApplied whether a different physical supplier route was selected
+         * @param acceptableProfitSacrificeMilliCredits effective total resilience willingness-to-pay
+         * @param actualProfitSacrificeMilliCredits real final expected-profit sacrifice versus baseline
+         * @param diversificationApplied whether a different physical supplier market was selected
+         * @param routeRedundancyApplied whether an edge-disjoint physical jump path was selected
          */
         public Selection {
             Objects.requireNonNull(selectedRoute, "Selected galactic route not set");
@@ -291,16 +385,24 @@ public final class FactionResilientGalacticTradePlanner {
             requireBasisPoints(baselineSupplierShareBasisPoints, "baselineSupplierShareBasisPoints");
             requireBasisPoints(selectedSupplierShareBasisPoints, "selectedSupplierShareBasisPoints");
             if (acceptableProfitSacrificeMilliCredits < 0L || actualProfitSacrificeMilliCredits < 0L) {
-                throw new IllegalArgumentException("Diversification profit values cannot be negative");
+                throw new IllegalArgumentException("Resilience profit values cannot be negative");
             }
             if (actualProfitSacrificeMilliCredits > acceptableProfitSacrificeMilliCredits
-                    && diversificationApplied) {
-                throw new IllegalArgumentException("Diversified route exceeds accepted profit sacrifice");
+                    && (diversificationApplied || routeRedundancyApplied)) {
+                throw new IllegalArgumentException("Resilience selection exceeds accepted profit sacrifice");
             }
         }
 
         private static Selection economicOnly(GalacticTradeRoute economicBaseline) {
-            return new Selection(economicBaseline, economicBaseline, 10_000, 10_000, 0L, 0L, false);
+            return new Selection(
+                    economicBaseline,
+                    economicBaseline,
+                    10_000,
+                    10_000,
+                    0L,
+                    0L,
+                    false,
+                    false);
         }
 
         private static void requireBasisPoints(int value, String label) {
