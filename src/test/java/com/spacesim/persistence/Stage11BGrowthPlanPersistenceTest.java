@@ -4,6 +4,7 @@ import com.spacesim.DemoGalaxyFactory;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.world.ExpansionOpportunity;
+import com.spacesim.world.FactionDoctrineState;
 import com.spacesim.world.FactionExpansionOpportunityAnalyzer;
 import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.StrategicGrowthPlanService;
@@ -56,10 +57,32 @@ class Stage11BGrowthPlanPersistenceTest {
 
         WorldState migrated = WorldStateCodec.decode(v1);
 
-        assertEquals(base.factionStrategies(), migrated.factionStrategies());
+        assertEquals(withNeutralDoctrine(base.factionStrategies()), migrated.factionStrategies());
         assertFalse(migrated.factionStrategies().stream()
                 .flatMap(value -> value.strategicGoals().stream())
                 .anyMatch(goal -> goal.growthPlan() != null));
+    }
+
+    private static List<FactionStrategicState> withNeutralDoctrine(List<FactionStrategicState> source) {
+        List<FactionStrategicState> result = new ArrayList<>(source.size());
+        for (FactionStrategicState strategy : source) {
+            result.add(new FactionStrategicState(
+                    strategy.factionContentId(),
+                    strategy.minimumMarketAccessRelation(),
+                    strategy.relations(),
+                    strategy.controlledSystems(),
+                    strategy.stationTaxBasisPoints(),
+                    strategy.foreignTerritoryTariffBasisPoints(),
+                    strategy.stockPolicies(),
+                    strategy.productionPolicies(),
+                    strategy.strategicGoals(),
+                    strategy.territorialClaims(),
+                    strategy.territorialControlStates(),
+                    strategy.territorialRecognitions(),
+                    strategy.constructionRightsGranted(),
+                    FactionDoctrineState.neutral()));
+        }
+        return List.copyOf(result);
     }
 
     private static WorldState replaceStrategy(WorldState state, FactionStrategicState replacement) {
