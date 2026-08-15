@@ -1,0 +1,72 @@
+name: Stage 17D finalizer
+
+on:
+  push:
+    branches:
+      - agent/stage17d-territorial-process
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stage17d-territorial-process
+          fetch-depth: 0
+
+      - name: Remove legacy territorial authority caches and close roadmap
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          world_path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = world_path.read_text()
+
+          replacements = [
+              ('    private final List<FactionStrategicState> factionStrategies;\n', ''),
+              ('    private final Map<String, FactionStrategicState> factionStrategiesById;\n', ''),
+              ('    private final Map<StarSystemId, String> territoryOwnerBySystem;\n', ''),
+              ('            List<FactionStrategicState> factionStrategies,\n            Map<String, FactionStrategicState> factionStrategiesById,\n            Map<StarSystemId, String> territoryOwnerBySystem,\n',
+               '            List<FactionStrategicState> factionStrategies,\n'),
+              ('        this.factionStrategies = List.copyOf(factionStrategies);\n        this.factionStrategiesById = Map.copyOf(factionStrategiesById);\n        this.territoryOwnerBySystem = Map.copyOf(territoryOwnerBySystem);\n', ''),
+              ('        Map<String, FactionStrategicState> strategiesById = new HashMap<>();\n        Map<StarSystemId, String> territoryOwners = new HashMap<>();\n', ''),
+              ('            strategiesById.put(strategy.factionContentId(), strategy);\n            for (StarSystemId controlled : strategy.controlledSystems()) {\n                territoryOwners.put(controlled, strategy.factionContentId());\n            }\n', ''),
+              ('                checked.factionStrategies(),\n                strategiesById,\n                territoryOwners,\n',
+               '                checked.factionStrategies(),\n'),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'WorldSimulation replacement expected once, found {count}: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          world_path.write_text(text)
+
+          roadmap_path = Path('docs/development_roadmap.md')
+          roadmap = roadmap_path.read_text()
+          old = ('## 17D — territory / control / construction access\n\n'
+                 '**NEXT.** Цель — превратить текущий `controlledSystems` из просто persistent policy list в результат обычного territorial process, одинакового для player и AI.\n')
+          new = ('## 17D — territory / control / construction access\n\n'
+                 '**COMPLETE — PR #100.** `controlledSystems` теперь является persistent compatibility projection реального deterministic territorial process, одинакового для player и AI. Authoritative runtime различает presence, claim, stabilization, contested state, established control, recognition и explicit construction concessions; physical presence сама по себе sovereignty не создаёт.\n\n'
+                 'Stage-17D construction authorization находится на authoritative world boundary: domestic construction разрешается в собственной jurisdiction, foreign construction в controlled territory требует explicit concession, а globally contested territory закрыто для ordinary construction до разрешения спора. Stage-11 autonomous expansion после физического anchor больше не получает мгновенный sovereignty: AI объявляет claim и проходит тот же stabilization/control lifecycle. Territorial state и construction rights входят в versioned binary persistence с backward migration.\n')
+          count = roadmap.count(old)
+          if count != 1:
+              raise SystemExit(f'Roadmap Stage17D status replacement expected once, found {count}')
+          roadmap_path.write_text(roadmap.replace(old, new, 1))
+          PY
+
+      - name: Self-remove finalizer and commit
+        shell: bash
+        run: |
+          rm .github/workflows/stage17d-finalize.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/WorldSimulation.java docs/development_roadmap.md .github/workflows/stage17d-finalize.yml
+          git diff --cached --check
+          git commit -m "Stage 17D: finalize authoritative territorial boundary"
+          git push origin HEAD:agent/stage17d-territorial-process
