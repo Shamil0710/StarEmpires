@@ -87,7 +87,7 @@ jobs:
               }
           }
 
-'''
+          '''
           path.write_text(text.replace(marker, method + marker, 1), encoding="utf-8")
           PY
       - name: Remove applicator and commit patch
