@@ -2,34 +2,50 @@ package com.spacesim.player;
 
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.world.FactionEconomicState;
+import com.spacesim.world.FactionIdentityResolver;
 import com.spacesim.world.FactionStrategicState;
+import com.spacesim.world.WorldFactionIdentityState;
 import com.spacesim.world.WorldState;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 /**
- * Pure Stage-17 foundation transition that explicitly founds a player faction in persistent state.
+ * Pure Stage-17 transition that explicitly founds a player faction in persistent state.
  *
- * <p>This first slice deliberately stops before local ECS affiliation. It creates ordinary
- * {@link FactionEconomicState} and {@link FactionStrategicState} records with zero treasury,
- * zero territory and zero fiscal policy, then changes only the player's explicit faction
- * affiliation. Existing fleets, stations, construction projects, personal money and all physical
- * world entities remain byte-for-byte/value-for-value unchanged.</p>
+ * <p>Founding creates ordinary {@link FactionEconomicState}, {@link FactionStrategicState} and
+ * {@link WorldFactionIdentityState} records, reserves the lowest free bounded runtime faction slot,
+ * then changes only the player's explicit faction affiliation. Treasury, territory and fiscal
+ * policy start at zero. Existing fleets, stations, construction projects, personal money and all
+ * physical world entities remain value-for-value unchanged.</p>
  *
- * <p>The new faction ID is world state rather than immutable content. Runtime materialization of a
- * world-defined faction into dense local {@code FactionComponent} IDs is the following Stage-17
- * identity-bridge slice; this class therefore does not mutate a {@link ContentCatalog} or its
- * semantic fingerprint.</p>
+ * <p>The new faction ID and display metadata are world state rather than immutable content. Runtime
+ * materialization uses {@link FactionIdentityResolver}; this class never mutates the
+ * {@link ContentCatalog} or its semantic fingerprint.</p>
  */
 public final class PlayerFactionFoundationService {
-    private static final Pattern FACTION_ID = Pattern.compile(
-            "faction\\.[a-z0-9]+(?:[._-][a-z0-9]+)*");
-
     private PlayerFactionFoundationService() {
         throw new AssertionError("PlayerFactionFoundationService does not create instances");
+    }
+
+    /**
+     * Source-compatible founding path using the stable ID as the initial public display name.
+     *
+     * <p>Gameplay/UI code that has an explicit faction name should use
+     * {@link #foundFaction(PlayableWorldState, ContentCatalog, String, String)}.</p>
+     *
+     * @param source current playable snapshot with an initialized independent player
+     * @param content immutable content catalog used by the world
+     * @param factionId requested stable world faction ID, for example {@code faction.star_empire}
+     * @return a new current-schema playable snapshot containing the founded faction
+     */
+    public static PlayableWorldState foundFaction(
+            PlayableWorldState source,
+            ContentCatalog content,
+            String factionId) {
+        String id = WorldFactionIdentityState.normalizeStableId(factionId);
+        return foundFaction(source, content, id, id);
     }
 
     /**
@@ -37,16 +53,18 @@ public final class PlayerFactionFoundationService {
      *
      * @param source current playable snapshot with an initialized independent player
      * @param content immutable content catalog used by the world
-     * @param factionId requested stable world faction ID, for example {@code faction.star_empire}
+     * @param factionId requested stable world faction ID
+     * @param displayName public non-empty faction name stored in world identity metadata
      * @return a new current-schema playable snapshot containing the founded faction
      * @throws NullPointerException if an argument is missing
-     * @throws IllegalArgumentException if the ID is invalid/collides or the player is affiliated
+     * @throws IllegalArgumentException if the ID/name is invalid, collides or player is affiliated
      * @throws IllegalStateException if the playable snapshot has no initialized player
      */
     public static PlayableWorldState foundFaction(
             PlayableWorldState source,
             ContentCatalog content,
-            String factionId) {
+            String factionId,
+            String displayName) {
         PlayableWorldState checked = Objects.requireNonNull(source, "PlayableWorldState not set");
         ContentCatalog checkedContent = Objects.requireNonNull(content, "ContentCatalog not set");
         PlayerState player = checked.playerState();
@@ -58,19 +76,25 @@ public final class PlayerFactionFoundationService {
                     + player.factionContentId());
         }
 
-        String id = normalizeFactionId(factionId);
+        String id = WorldFactionIdentityState.normalizeStableId(factionId);
         WorldState world = checked.worldState();
-        if (checkedContent.findFaction(id) != null
-                || containsEconomicFaction(world, id)
-                || containsStrategicFaction(world, id)) {
+        if (containsEconomicFaction(world, id) || containsStrategicFaction(world, id)) {
             throw new IllegalArgumentException("Faction ID already exists: " + id);
         }
+
+        FactionIdentityResolver resolver = FactionIdentityResolver.createDefault(
+                checkedContent,
+                world.factionIdentities());
+        WorldFactionIdentityState identity = resolver.allocatePlayerCreated(id, displayName);
 
         List<FactionEconomicState> economics = new ArrayList<>(world.factions());
         economics.add(new FactionEconomicState(id, 0L, 0L, 0L));
 
         List<FactionStrategicState> strategies = new ArrayList<>(world.factionStrategies());
         strategies.add(new FactionStrategicState(id, 0, List.of(), List.of()));
+
+        List<WorldFactionIdentityState> identities = new ArrayList<>(world.factionIdentities());
+        identities.add(identity);
 
         WorldState updatedWorld = new WorldState(
                 WorldState.CURRENT_VERSION,
@@ -83,7 +107,8 @@ public final class PlayerFactionFoundationService {
                 world.factionEconomicPressures(),
                 world.nextFleetIdValue(),
                 world.fleets(),
-                world.fleetJumps());
+                world.fleetJumps(),
+                identities);
 
         PlayerState updatedPlayer = new PlayerState(
                 player.walletMilliCredits(),
@@ -114,14 +139,5 @@ public final class PlayerFactionFoundationService {
     private static boolean containsStrategicFaction(WorldState world, String factionId) {
         return world.factionStrategies().stream()
                 .anyMatch(state -> state.factionContentId().equals(factionId));
-    }
-
-    private static String normalizeFactionId(String factionId) {
-        String id = Objects.requireNonNull(factionId, "Faction ID not set").strip();
-        if (!FACTION_ID.matcher(id).matches()) {
-            throw new IllegalArgumentException(
-                    "Player faction ID must use stable lower-case faction.* syntax");
-        }
-        return id;
     }
 }
