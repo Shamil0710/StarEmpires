@@ -264,7 +264,9 @@ Owned fleets/stations меняют legal/faction affiliation без respawn, ID 
 
 ## 17C — personal wallet ↔ faction treasury
 
-Два разных economic accounts. Любой transfer atomic и ledger-visible; faction income не становится автоматически личными деньгами игрока.
+**COMPLETE — PR #94/#95/#96, финальный aggregate gate PR #97.**
+
+Personal wallet, faction treasury и station operating wallets остаются разными authoritative accounts. Explicit transfers `personal ↔ treasury` выполняются атомарно и ledger-visible в обоих направлениях. Ordinary station→treasury faction income не меняет personal wallet автоматически. Aggregate acceptance доказывает conservation трёх счетов, physical-state invariants и binary save/load.
 
 ## 17D — territory / control / construction access
 
@@ -754,7 +756,7 @@ UI reads authoritative state/derived queries and submits commands; direct mutati
 - Stage 15 COMPLETE — multiple owned fleets + persistent orders;
 - Stage 16 COMPLETE — physical construction + owned ordinary stations;
 - Stage-8 faction treasury/territory/relations/access/policies exists;
-- Stage-17 identity/asset-affiliation implementation уже движется на `main`;
+- Stage-17 identity/asset-affiliation и conserved treasury boundary уже находятся на `main`;
 - `WorldState` остаётся player-agnostic;
 - **Ship Mathematics research COMPLETE at v1.0 Design Baseline**;
 - v1.0 PR #91 / CI #1516 / merge `3ec2f6cab286dbcd39694c19a055d038c175b59c`;
@@ -764,8 +766,8 @@ Immediate Stage-17 order остаётся:
 
 1. 17A identity/creation/persistence contract;
 2. 17B complete asset affiliation including all lifecycle/transit seams;
-3. 17C personal wallet ↔ faction treasury;
-4. 17D territory/control/construction access;
+3. 17C personal wallet ↔ faction treasury — COMPLETE (PR #97);
+4. 17D territory/control/construction access — NEXT;
 5. 17E diplomacy/market access/tariffs;
 6. 17F faction policies;
 7. 17G management/global-map UI;
