@@ -22,7 +22,16 @@ public record FactionFiscalPolicyState(
         long maxLiquiditySupportPerDecisionMilliCredits,
         long maxConstructionInvestmentPerDecisionMilliCredits) {
 
-    /** Validates the bounded fiscal policy without applying any economic mutation. */
+    /**
+     * Validates the bounded fiscal policy without applying any economic mutation.
+     *
+     * @param stationTaxBasisPoints own-station fiscal levy in basis points [0,10000]
+     * @param foreignTerritoryLevyBasisPoints foreign-station territorial levy in basis points [0,10000]
+     * @param treasuryReserveFloorMilliCredits protected treasury balance
+     * @param stationLiquidityReserveMilliCredits target minimum owned-station wallet balance
+     * @param maxLiquiditySupportPerDecisionMilliCredits maximum support spending in one decision
+     * @param maxConstructionInvestmentPerDecisionMilliCredits maximum construction funding in one decision
+     */
     public FactionFiscalPolicyState {
         requireBasisPoints(stationTaxBasisPoints, "Station tax");
         requireBasisPoints(foreignTerritoryLevyBasisPoints, "Foreign territory levy");
