@@ -40,10 +40,12 @@ class Stage17F6ResilienceOverlayAcceptanceTest {
                 List.of(
                         new FactionStockPolicyState(resilienceItem.id(), 30),
                         new FactionStockPolicyState(baseItem.id(), 20)));
+        List<FactionStockPolicyState> expectedOverlay = new ArrayList<>(List.of(
+                new FactionStockPolicyState(resilienceItem.id(), 30),
+                new FactionStockPolicyState(baseItem.id(), 20)));
+        expectedOverlay.sort(null);
 
-        assertEquals(List.of(
-                new FactionStockPolicyState(baseItem.id(), 20),
-                new FactionStockPolicyState(resilienceItem.id(), 30)), installed);
+        assertEquals(expectedOverlay, installed);
         assertEquals(List.of(baseStock), world.findFactionStockProductionPolicy(SOURCE).orElseThrow().stockPolicies(),
                 "Automatic resilience overlay must not rewrite base stock policy");
         assertEquals(2, world.findFactionStrategicState(SOURCE).orElseThrow().strategicGoals().size());
