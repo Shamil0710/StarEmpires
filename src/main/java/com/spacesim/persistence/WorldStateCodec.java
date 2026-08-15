@@ -31,13 +31,15 @@ import java.util.Objects;
  * settlement и legal/faction identity, а Stage-17 schema v9 добавляет persistent world-defined
  * faction identity directory. Save v4-v7 продолжает читать старый faction-only construction
  * layout, v8 читает Stage-16 external-owner layout и мигрирует с пустым dynamic directory.
- * File format v2 сохраняет bounded Stage-11 strategic-growth trailer. Local entity payload
- * кодируется {@link GameStateCodec}.</p>
+ * File format v2 добавляет bounded Stage-11 strategic-growth trailer, а file format v3 добавляет
+ * Stage-17D territorial claims/control maintenance/recognition/concession trailer. Local entity
+ * payload кодируется {@link GameStateCodec}.</p>
  */
 public final class WorldStateCodec {
     private static final int MAGIC = 0x53544757;
     private static final int LEGACY_FILE_FORMAT_VERSION = 1;
-    private static final int FILE_FORMAT_VERSION = 2;
+    private static final int GROWTH_FILE_FORMAT_VERSION = 2;
+    private static final int FILE_FORMAT_VERSION = 3;
     private static final int MAX_SAVE_BYTES = 256 * 1024 * 1024;
 
     private WorldStateCodec() {
@@ -78,6 +80,7 @@ public final class WorldStateCodec {
                 WorldFleetBinary.writeJumps(output, checked.fleetJumps());
                 WorldFactionIdentityBinary.write(output, checked.factionIdentities());
                 WorldStrategicGrowthBinary.write(output, checked.factionStrategies());
+                WorldTerritoryBinary.write(output, checked.factionStrategies());
             }
 
             byte[] bytes = buffer.toByteArray();
@@ -111,7 +114,9 @@ public final class WorldStateCodec {
                 throw new IllegalArgumentException("Некорректный magic WorldState");
             }
             int fileVersion = input.readInt();
-            if (fileVersion != FILE_FORMAT_VERSION && fileVersion != LEGACY_FILE_FORMAT_VERSION) {
+            if (fileVersion != FILE_FORMAT_VERSION
+                    && fileVersion != GROWTH_FILE_FORMAT_VERSION
+                    && fileVersion != LEGACY_FILE_FORMAT_VERSION) {
                 throw new IllegalArgumentException(
                         "Неподдерживаемая версия world-файла: " + fileVersion);
             }
@@ -122,9 +127,14 @@ public final class WorldStateCodec {
             GalaxyTopology topology = WorldTopologyBinary.read(input);
             List<StarSystemSimulationState> systems = WorldSystemBinary.read(input);
             WorldState state = readSchema(input, schemaVersion, topology, systems);
-            if (fileVersion == FILE_FORMAT_VERSION) {
+            if (fileVersion >= GROWTH_FILE_FORMAT_VERSION) {
                 List<FactionStrategicState> strategies =
                         WorldStrategicGrowthBinary.readAndAttach(input, state.factionStrategies());
+                state = withStrategies(state, strategies);
+            }
+            if (fileVersion >= FILE_FORMAT_VERSION) {
+                List<FactionStrategicState> strategies =
+                        WorldTerritoryBinary.readAndAttach(input, state.factionStrategies());
                 state = withStrategies(state, strategies);
             }
 

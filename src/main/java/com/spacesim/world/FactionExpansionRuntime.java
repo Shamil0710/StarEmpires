@@ -217,18 +217,27 @@ public final class FactionExpansionRuntime {
             return failPlan(strategy, plan);
         }
         if (project.status() == ConstructionProjectStatus.COMPLETED) {
-            FactionStrategicState claimed = addControlledSystem(strategy, plan.targetSystemId());
-            StrategicGrowthState.Plan established = StrategicGrowthPlanService.transition(
-                    plan,
-                    StrategicGrowthState.Status.ESTABLISHED,
-                    plan.anchorProjectId(),
-                    authoritativeTick());
-            claimed = StrategicGrowthPlanService.replacePlan(claimed, established);
-            releaseAssignedFleet(established);
-            replaceStrategy(claimed);
-            return established;
-        }
-        driveMaterials(plan, project);
+    FactionStrategicState current = world.findFactionStrategicState(
+            strategy.factionContentId()).orElseThrow();
+    if (current.claimFor(plan.targetSystemId()) == null) {
+        world.declareTerritorialClaim(strategy.factionContentId(), plan.targetSystemId());
+        current = world.findFactionStrategicState(strategy.factionContentId()).orElseThrow();
+    }
+    if (!strategy.factionContentId().equals(
+            world.controllingFaction(plan.targetSystemId()).orElse(null))) {
+        return plan;
+    }
+    StrategicGrowthState.Plan established = StrategicGrowthPlanService.transition(
+            plan,
+            StrategicGrowthState.Status.ESTABLISHED,
+            plan.anchorProjectId(),
+            authoritativeTick());
+    current = StrategicGrowthPlanService.replacePlan(current, established);
+    releaseAssignedFleet(established);
+    replaceStrategy(current);
+    return established;
+}
+driveMaterials(plan, project);
         return plan;
     }
 
@@ -541,35 +550,12 @@ public final class FactionExpansionRuntime {
                 state.factionEconomicPressures(),
                 state.nextFleetIdValue(),
                 state.fleets(),
-                state.fleetJumps());
+                state.fleetJumps(),
+                state.factionIdentities());
         StarSystemId active = world.getActiveSystemId();
         int step = world.getStrategicStepTicks();
         int budget = world.getRemoteUpdateBudgetPerFrame();
         world = WorldSimulation.restore(updated, content, active, step, budget);
-    }
-
-    private FactionStrategicState addControlledSystem(
-            FactionStrategicState strategy,
-            StarSystemId systemId) {
-        if (strategy.controls(systemId)) {
-            return strategy;
-        }
-        if (foreignController(systemId, strategy.factionContentId())) {
-            throw new IllegalStateException("Cannot claim foreign-controlled system without combat");
-        }
-        List<StarSystemId> systems = new ArrayList<>(strategy.controlledSystems());
-        systems.add(systemId);
-        systems.sort(Comparator.naturalOrder());
-        return new FactionStrategicState(
-                strategy.factionContentId(),
-                strategy.minimumMarketAccessRelation(),
-                strategy.relations(),
-                systems,
-                strategy.stationTaxBasisPoints(),
-                strategy.foreignTerritoryTariffBasisPoints(),
-                strategy.stockPolicies(),
-                strategy.productionPolicies(),
-                strategy.strategicGoals());
     }
 
     private boolean foreignController(StarSystemId systemId, String factionContentId) {

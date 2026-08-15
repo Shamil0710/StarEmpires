@@ -23,7 +23,7 @@ final class ConstructionSiteFactory {
             ContentCatalog catalog,
             ConstructionProjectId projectId,
             ContentCatalog.StationArchetypeDefinition target,
-            String legalFactionContentId,
+            Integer legalFactionRuntimeId,
             float x,
             float y) {
         ContentCatalog checked = Objects.requireNonNull(catalog, "ContentCatalog construction site не задан");
@@ -34,12 +34,8 @@ final class ConstructionSiteFactory {
         if (construction == null) {
             throw new IllegalArgumentException("Station archetype не имеет construction definition: " + station.id());
         }
-        ContentCatalog.FactionDefinition legalFaction = null;
-        if (legalFactionContentId != null) {
-            legalFaction = checked.findFaction(legalFactionContentId);
-            if (legalFaction == null) {
-                throw new IllegalArgumentException("Неизвестная legal faction: " + legalFactionContentId);
-            }
+        if (legalFactionRuntimeId != null && legalFactionRuntimeId < 0) {
+            throw new IllegalArgumentException("Legal faction runtime ID cannot be negative");
         }
         if (!Float.isFinite(x) || !Float.isFinite(y)) {
             throw new IllegalArgumentException("Construction site coordinates должны быть конечными");
@@ -76,8 +72,8 @@ final class ConstructionSiteFactory {
                 .add(market)
                 .add(ConstructionBidPolicy.create(checked, station))
                 .add(new PriceHistoryComponent());
-        if (legalFaction != null) {
-            result.add(new FactionComponent(legalFaction.runtimeId()));
+        if (legalFactionRuntimeId != null) {
+            result.add(new FactionComponent(legalFactionRuntimeId));
         }
         return result;
     }

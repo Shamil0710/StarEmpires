@@ -47,10 +47,8 @@ public final class WorldSimulation {
     private final FactionIdentityResolver factionIdentityResolver;
     private final List<String> factionOrder;
     private final Map<String, FactionEconomicAccount> factionAccountsById;
-    private final List<FactionStrategicState> factionStrategies;
-    private final Map<String, FactionStrategicState> factionStrategiesById;
-    private final Map<StarSystemId, String> territoryOwnerBySystem;
     private final ConstructionProjectService constructionProjectService;
+    private final TerritorialControlRuntime territorialControlRuntime;
     private final DestructionService destructionService;
     private final FactionEconomicPressureTracker economicPressureTracker;
     private final FleetWorldService fleetWorldService;
@@ -71,8 +69,6 @@ public final class WorldSimulation {
             List<String> factionOrder,
             Map<String, FactionEconomicAccount> factionAccountsById,
             List<FactionStrategicState> factionStrategies,
-            Map<String, FactionStrategicState> factionStrategiesById,
-            Map<StarSystemId, String> territoryOwnerBySystem,
             long nextConstructionProjectIdValue,
             List<ConstructionProjectState> constructionProjects,
             List<FactionEconomicPressureState> factionEconomicPressures,
@@ -90,15 +86,19 @@ public final class WorldSimulation {
                 factionIdentityResolver, "FactionIdentityResolver не задан");
         this.factionOrder = List.copyOf(factionOrder);
         this.factionAccountsById = Map.copyOf(factionAccountsById);
-        this.factionStrategies = List.copyOf(factionStrategies);
-        this.factionStrategiesById = Map.copyOf(factionStrategiesById);
-        this.territoryOwnerBySystem = Map.copyOf(territoryOwnerBySystem);
         this.constructionProjectService = new ConstructionProjectService(
                 contentCatalog,
+                this.factionIdentityResolver,
                 this.sessionsById,
                 this.factionAccountsById,
                 nextConstructionProjectIdValue,
                 constructionProjects);
+        this.territorialControlRuntime = new TerritorialControlRuntime(
+                topology,
+                this.sessionsById,
+                this.factionIdentityResolver,
+                this.constructionProjectService,
+                factionStrategies);
         this.destructionService = new DestructionService(
                 contentCatalog,
                 this.sessionsById,
@@ -178,8 +178,6 @@ public final class WorldSimulation {
             factionIds.add(account.factionContentId());
         }
 
-        Map<String, FactionStrategicState> strategiesById = new HashMap<>();
-        Map<StarSystemId, String> territoryOwners = new HashMap<>();
         for (FactionStrategicState strategy : checked.factionStrategies()) {
             if (!identities.containsStableId(strategy.factionContentId())) {
                 throw new IllegalArgumentException(
@@ -191,10 +189,6 @@ public final class WorldSimulation {
                             "Faction relation содержит неизвестную target faction: "
                                     + relation.targetFactionContentId());
                 }
-            }
-            strategiesById.put(strategy.factionContentId(), strategy);
-            for (StarSystemId controlled : strategy.controlledSystems()) {
-                territoryOwners.put(controlled, strategy.factionContentId());
             }
         }
 
@@ -239,8 +233,6 @@ public final class WorldSimulation {
                 factionIds,
                 factionAccounts,
                 checked.factionStrategies(),
-                strategiesById,
-                territoryOwners,
                 checked.nextConstructionProjectIdValue(),
                 checked.constructionProjects(),
                 checked.factionEconomicPressures(),
@@ -275,6 +267,7 @@ public final class WorldSimulation {
             totalStrategicUpdatesExecuted = safeAdd(totalStrategicUpdatesExecuted, 1L);
         }
         constructionProjectService.advance();
+        territorialControlRuntime.advance(activeTick);
         return new AdvanceReport(localTicks, strategicUpdates, maximumRemoteLagTicks(activeTick));
     }
 
@@ -289,7 +282,7 @@ public final class WorldSimulation {
     public int applyEconomicInvestmentDecision() {
         EconomicBottleneckReport report = EconomicBottleneckAnalyzer.analyze(this, contentCatalog);
         long tick = sessionsById.get(activeSystemId).getClock().getTick();
-        economicPressureTracker.observe(factionStrategies, report, tick);
+        economicPressureTracker.observe(territorialControlRuntime.snapshots(), report, tick);
         int createdProjects = 0;
         for (String factionId : factionOrder) {
             if (FactionInvestmentPlanner.evaluateFaction(this, contentCatalog, economicPressureTracker, factionId)
@@ -373,7 +366,7 @@ public final class WorldSimulation {
         String factionId = normalizedFactionId(factionContentId);
         FactionEconomicAccount account = requireFactionAccount(factionId);
         int runtimeFactionId = requireRuntimeFactionId(factionId);
-        FactionStrategicState strategy = factionStrategiesById.get(factionId);
+        FactionStrategicState strategy = territorialControlRuntime.find(factionId);
         if (strategy == null
                 || (strategy.stationTaxBasisPoints() == 0
                 && strategy.foreignTerritoryTariffBasisPoints() == 0)) {
@@ -386,7 +379,7 @@ public final class WorldSimulation {
         int tariffedStations = 0;
         for (StarSystemId systemId : systemOrder) {
             SimulationSession session = sessionsById.get(systemId);
-            boolean controlled = factionId.equals(territoryOwnerBySystem.get(systemId));
+            boolean controlled = factionId.equals(territorialControlRuntime.controller(systemId));
             for (Entity station : completedMarketStations(systemId, session)) {
                 FactionComponent owner = station.getComponent(FactionComponent.class);
                 if (owner == null) {
@@ -456,7 +449,7 @@ public final class WorldSimulation {
      * @return strategic state либо empty
      */
     public Optional<FactionStrategicState> findFactionStrategicState(String factionContentId) {
-        return Optional.ofNullable(factionContentId == null ? null : factionStrategiesById.get(factionContentId));
+        return Optional.ofNullable(factionContentId == null ? null : territorialControlRuntime.find(factionContentId));
     }
 
     /**
@@ -611,7 +604,154 @@ public final class WorldSimulation {
         if (systemId != null && topology.findSystem(systemId).isEmpty()) {
             throw new IllegalArgumentException("Неизвестная StarSystem: " + systemId);
         }
-        return Optional.ofNullable(systemId == null ? null : territoryOwnerBySystem.get(systemId));
+        return Optional.ofNullable(systemId == null ? null : territorialControlRuntime.controller(systemId));
+    }
+
+    /** @return authoritative world tick used by territorial stabilization and legal expiry */
+    public long getAuthoritativeWorldTick() {
+        return sessionsById.get(activeSystemId).getClock().getTick();
+    }
+
+    /**
+     * Declares a political claim without granting sovereignty.
+     *
+     * @param factionContentId authored or world-defined claimant faction
+     * @param systemId claimed system
+     * @return persistent claim state
+     */
+    public TerritorialClaimState declareTerritorialClaim(
+            String factionContentId,
+            StarSystemId systemId) {
+        return territorialControlRuntime.declareClaim(
+                factionContentId, systemId, getAuthoritativeWorldTick());
+    }
+
+    /**
+     * Withdraws a non-established political claim.
+     *
+     * @param factionContentId claimant faction
+     * @param systemId claimed system
+     * @return true when a claim was removed
+     */
+    public boolean withdrawTerritorialClaim(String factionContentId, StarSystemId systemId) {
+        return territorialControlRuntime.withdrawClaim(factionContentId, systemId);
+    }
+
+    /**
+     * Voluntarily relinquishes established control without creating any replacement controller.
+     *
+     * @param factionContentId current controller
+     * @param systemId controlled system
+     * @return true when control was relinquished
+     */
+    public boolean relinquishTerritorialControl(String factionContentId, StarSystemId systemId) {
+        return territorialControlRuntime.relinquishControl(
+                factionContentId, systemId, getAuthoritativeWorldTick());
+    }
+
+    /**
+     * Records directed diplomatic recognition of another faction's claim.
+     *
+     * @param recognizingFactionContentId recognizing faction
+     * @param targetFactionContentId recognized claimant
+     * @param systemId claimed system
+     * @return persistent recognition
+     */
+    public TerritorialRecognitionState recognizeTerritorialClaim(
+            String recognizingFactionContentId,
+            String targetFactionContentId,
+            StarSystemId systemId) {
+        return territorialControlRuntime.recognize(
+                recognizingFactionContentId,
+                targetFactionContentId,
+                systemId,
+                TerritorialRecognitionState.Kind.CLAIM);
+    }
+
+    /**
+     * Records directed diplomatic recognition of another faction's established control.
+     *
+     * @param recognizingFactionContentId recognizing faction
+     * @param targetFactionContentId recognized controller
+     * @param systemId controlled system
+     * @return persistent recognition
+     */
+    public TerritorialRecognitionState recognizeTerritorialControl(
+            String recognizingFactionContentId,
+            String targetFactionContentId,
+            StarSystemId systemId) {
+        return territorialControlRuntime.recognize(
+                recognizingFactionContentId,
+                targetFactionContentId,
+                systemId,
+                TerritorialRecognitionState.Kind.CONTROL);
+    }
+
+    /**
+     * Grants an explicit foreign construction concession in territory controlled by the grantor.
+     *
+     * @param grantorFactionContentId current controller
+     * @param granteeFactionContentId foreign builder
+     * @param systemId controlled system
+     * @param expiresTick exclusive expiry tick or -1 for indefinite
+     * @return persistent construction right
+     */
+    public TerritorialConstructionRightState grantTerritorialConstructionRight(
+            String grantorFactionContentId,
+            String granteeFactionContentId,
+            StarSystemId systemId,
+            long expiresTick) {
+        return territorialControlRuntime.grantConstructionRight(
+                grantorFactionContentId,
+                granteeFactionContentId,
+                systemId,
+                getAuthoritativeWorldTick(),
+                expiresTick);
+    }
+
+    /**
+     * Revokes a previously granted foreign construction concession.
+     *
+     * @param grantorFactionContentId controller/grantor
+     * @param granteeFactionContentId foreign grantee
+     * @param systemId affected system
+     * @return true when a right was removed
+     */
+    public boolean revokeTerritorialConstructionRight(
+            String grantorFactionContentId,
+            String granteeFactionContentId,
+            StarSystemId systemId) {
+        return territorialControlRuntime.revokeConstructionRight(
+                grantorFactionContentId, granteeFactionContentId, systemId);
+    }
+
+    /**
+     * Checks a live explicit construction concession from the current controller.
+     *
+     * @param grantorFactionContentId expected controller/grantor
+     * @param granteeFactionContentId proposed foreign builder
+     * @param systemId target system
+     * @return true only for a current controller and unexpired matching right
+     */
+    public boolean hasTerritorialConstructionRight(
+            String grantorFactionContentId,
+            String granteeFactionContentId,
+            StarSystemId systemId) {
+        FactionStrategicState grantor = territorialControlRuntime.find(grantorFactionContentId);
+        return grantor != null
+                && grantor.controls(systemId)
+                && grantor.grantsConstructionRightTo(
+                        granteeFactionContentId, systemId, getAuthoritativeWorldTick());
+    }
+
+    /**
+     * Reports whether material rival claims currently make the system territorially contested.
+     *
+     * @param systemId target system
+     * @return true when ordinary uncontested jurisdiction does not exist
+     */
+    public boolean isTerritoriallyContested(StarSystemId systemId) {
+        return territorialControlRuntime.isContested(systemId);
     }
 
     /** @return текущий immutable world snapshot */
@@ -629,7 +769,7 @@ public final class WorldSimulation {
                 topology,
                 List.copyOf(systemStates),
                 List.copyOf(factionStates),
-                factionStrategies,
+                territorialControlRuntime.snapshots(),
                 constructionProjectService.nextIdValue(),
                 constructionProjectService.snapshots(),
                 economicPressureTracker.snapshots(),
@@ -655,8 +795,84 @@ public final class WorldSimulation {
             StarSystemId systemId,
             float x,
             float y) {
+        return createConstructionProject(
+                ownerFactionContentId,
+                ownerFactionContentId,
+                ownerFactionContentId,
+                stationArchetypeContentId,
+                systemId,
+                x,
+                y);
+    }
+
+    /**
+     * Creates a project whose authorization principal and asset faction are identical.
+     *
+     * @param ownerFactionContentId faction treasury payer, or {@code null} for external settlement
+     * @param legalFactionContentId faction exercising territorial rights and affiliating the asset
+     * @param stationArchetypeContentId constructible station archetype
+     * @param systemId target system
+     * @param x finite X coordinate
+     * @param y finite Y coordinate
+     * @return stable project ID
+     */
+    public ConstructionProjectId createConstructionProject(
+            String ownerFactionContentId,
+            String legalFactionContentId,
+            String stationArchetypeContentId,
+            StarSystemId systemId,
+            float x,
+            float y) {
+        return createConstructionProject(
+                ownerFactionContentId,
+                legalFactionContentId,
+                legalFactionContentId,
+                stationArchetypeContentId,
+                systemId,
+                x,
+                y);
+    }
+
+    /**
+     * Creates one ordinary project after shared territorial authorization.
+     *
+     * <p>Economic payer, authorization principal and resulting asset affiliation are separate
+     * dimensions. Personal projects can exercise membership rights without becoming assets of
+     * the member faction, while a world-defined player faction can explicitly affiliate them.</p>
+     *
+     * @param ownerFactionContentId faction treasury payer, or {@code null} for external settlement
+     * @param authorizationFactionContentId faction whose territorial right is exercised, or {@code null}
+     * @param legalFactionContentId faction assigned to site/completed asset, or {@code null}
+     * @param stationArchetypeContentId constructible station archetype
+     * @param systemId target system
+     * @param x finite X coordinate
+     * @param y finite Y coordinate
+     * @return stable project ID
+     * @throws IllegalStateException when ordinary construction is not legally authorized
+     */
+    public ConstructionProjectId createConstructionProject(
+            String ownerFactionContentId,
+            String authorizationFactionContentId,
+            String legalFactionContentId,
+            String stationArchetypeContentId,
+            StarSystemId systemId,
+            float x,
+            float y) {
+        TerritorialConstructionAuthorization.Decision authorization =
+                TerritorialConstructionAuthorization.evaluate(
+                        this, authorizationFactionContentId, systemId);
+        if (!authorization.allowed()) {
+            throw new IllegalStateException(
+                    "Construction denied by territorial law: " + authorization.reason()
+                            + " controller=" + authorization.controllingFactionContentId());
+        }
         return constructionProjectService.create(
-                ownerFactionContentId, stationArchetypeContentId, systemId, x, y);
+                ownerFactionContentId,
+                legalFactionContentId,
+                stationArchetypeContentId,
+                systemId,
+                x,
+                y);
     }
 
     /**
@@ -933,7 +1149,7 @@ public final class WorldSimulation {
         return new TradeRoutePlanner(
                 contentCatalog,
                 Objects.requireNonNull(scoringMode, "Trade route scoring mode не задан"),
-                new WorldTradeRouteCostModel(contentCatalog, factionStrategies));
+                new WorldTradeRouteCostModel(contentCatalog, territorialControlRuntime.snapshots()));
     }
 
     /** @return path planner whose edge timing matches Stage-10B jump execution */

@@ -23,7 +23,7 @@ class ConstructionDurationIntegrationTest {
                 .orElseThrow().getClock().getFixedStepSeconds();
         long expectedTicks = Math.max(1L, (long) Math.ceil(estimate.totalSeconds() / fixedStep));
 
-        ConstructionProjectId projectId = world.createConstructionProject(
+        ConstructionProjectId projectId = ConstructionProjectTestFixtures.createAuthorizedProject(world,
                 OWNER, TARGET, DemoGalaxyFactory.ACTIVE_SYSTEM_ID, 900f, 650f);
         ConstructionProjectState project = world.findConstructionProject(projectId).orElseThrow();
 

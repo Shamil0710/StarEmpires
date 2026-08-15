@@ -17,6 +17,7 @@ import com.spacesim.simulation.SimulationSession;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.StarSystemId;
+import com.spacesim.world.StarSystemNode;
 import com.spacesim.world.WorldSimulation;
 
 import java.util.List;
@@ -30,6 +31,11 @@ import java.util.Objects;
  * shortage as an initial condition, and places the chosen ship near a compatible source market.
  * Once gameplay starts, all movement, docking, travel and trade use the same Stage-10/12 APIs as
  * the rest of the simulation.</p>
+ *
+ * <p>Stage 17D represents the curated scenario's historical build freedom as explicit indefinite
+ * territorial construction concessions from each foreign controller to the starting faction. This
+ * is test-scenario legal state, not a relation-based shortcut: ordinary runtime authorization still
+ * denies foreign faction construction when no concession exists.</p>
  */
 public final class PlayableTestWorldFactory {
     /** Stable seed used by the downloadable/manual test build. */
@@ -54,6 +60,7 @@ public final class PlayableTestWorldFactory {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(rootSeed);
         Setup setup = findSetup(world, content);
+        grantCuratedConstructionConcessions(world, setup.factionContentId());
         prepareDestinationShortage(world, setup);
 
         // Ten normal local ticks also trigger the ordinary bounded remote strategic update.
@@ -153,6 +160,21 @@ public final class PlayableTestWorldFactory {
             }
         }
         throw new IllegalStateException("Demo galaxy has no compatible curated Stage-12 trade route");
+    }
+
+    private static void grantCuratedConstructionConcessions(
+            WorldSimulation world,
+            String startingFactionContentId) {
+        for (StarSystemNode system : world.getTopology().systems()) {
+            String controller = world.controllingFaction(system.id()).orElse(null);
+            if (controller != null && !controller.equals(startingFactionContentId)) {
+                world.grantTerritorialConstructionRight(
+                        controller,
+                        startingFactionContentId,
+                        system.id(),
+                        -1L);
+            }
+        }
     }
 
     private static void prepareDestinationShortage(WorldSimulation world, Setup setup) {

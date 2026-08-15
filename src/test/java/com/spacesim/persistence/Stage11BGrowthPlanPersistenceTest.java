@@ -12,9 +12,7 @@ import com.spacesim.world.WorldSimulation;
 import com.spacesim.world.WorldState;
 import org.junit.jupiter.api.Test;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,9 +52,7 @@ class Stage11BGrowthPlanPersistenceTest {
     @Test
     void legacyFileFormatV1MigratesWithNoPhysicalGrowthPlans() {
         WorldState base = DemoGalaxyFactory.createState(0x11B4L, ContentCatalogLoader.loadDefault());
-        byte[] v2 = WorldStateCodec.encode(base);
-        byte[] v1 = Arrays.copyOf(v2, v2.length - Integer.BYTES);
-        ByteBuffer.wrap(v1).putInt(Integer.BYTES, 1);
+        byte[] v1 = LegacyWorldFileTestSupport.encodeV1(base);
 
         WorldState migrated = WorldStateCodec.decode(v1);
 

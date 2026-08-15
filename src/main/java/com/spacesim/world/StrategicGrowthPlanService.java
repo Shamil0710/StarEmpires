@@ -266,17 +266,21 @@ public final class StrategicGrowthPlanService {
     }
 
     private static FactionStrategicState copyWithGoals(
-            FactionStrategicState state,
-            List<FactionStrategicGoalState> goals) {
-        return new FactionStrategicState(
-                state.factionContentId(),
-                state.minimumMarketAccessRelation(),
-                state.relations(),
-                state.controlledSystems(),
-                state.stationTaxBasisPoints(),
-                state.foreignTerritoryTariffBasisPoints(),
-                state.stockPolicies(),
-                state.productionPolicies(),
-                goals);
-    }
+        FactionStrategicState state,
+        List<FactionStrategicGoalState> goals) {
+    return new FactionStrategicState(
+            state.factionContentId(),
+            state.minimumMarketAccessRelation(),
+            state.relations(),
+            state.controlledSystems(),
+            state.stationTaxBasisPoints(),
+            state.foreignTerritoryTariffBasisPoints(),
+            state.stockPolicies(),
+            state.productionPolicies(),
+            goals,
+            state.territorialClaims(),
+            state.territorialControlStates(),
+            state.territorialRecognitions(),
+            state.constructionRightsGranted());
+}
 }

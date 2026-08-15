@@ -21,7 +21,7 @@ class Stage11CPhysicalExpansionAcceptanceTest {
     private static final String TRADE_LEAGUE = "faction.trade_league";
 
     @Test
-    void factionPhysicallyBuildsAndClaimsUnclaimedNeighborAcrossSaveLoad() {
+    void factionPhysicallyBuildsClaimsAndStabilizesUnclaimedNeighborAcrossSaveLoad() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldState base = DemoGalaxyFactory.createState(0x11C0L, content);
         WorldState unclaimed = withoutController(base, DemoGalaxyFactory.INNER_SYSTEM_ID);
@@ -42,9 +42,10 @@ class Stage11CPhysicalExpansionAcceptanceTest {
         com.spacesim.persistence.EntityId originalLocalFleetId = null;
         long supportWalletBefore = -1L;
         boolean savedMidTransit = false;
+        boolean observedClaimBeforeControl = false;
 
         StrategicGrowthState.Plan current = created;
-        for (int iteration = 0; iteration < 20_000 && !current.status().terminal(); iteration++) {
+        for (int iteration = 0; iteration < 30_000 && !current.status().terminal(); iteration++) {
             current = runtime.advancePlan(planId);
             if (supportFleet == null && !current.assignedSupportFleetIds().isEmpty()) {
                 supportFleet = current.assignedSupportFleetIds().get(0);
@@ -71,10 +72,30 @@ class Stage11CPhysicalExpansionAcceptanceTest {
                         .orElseThrow();
                 savedMidTransit = true;
             }
+
+            if (current.anchorProjectId() != null) {
+                ConstructionProjectState anchor = runtime.world()
+                        .findConstructionProject(current.anchorProjectId()).orElse(null);
+                if (anchor != null && anchor.status() == ConstructionProjectStatus.COMPLETED
+                        && runtime.world().controllingFaction(DemoGalaxyFactory.INNER_SYSTEM_ID).isEmpty()) {
+                    TerritorialClaimState claim = runtime.world()
+                            .findFactionStrategicState(TRADE_LEAGUE)
+                            .orElseThrow()
+                            .claimFor(DemoGalaxyFactory.INNER_SYSTEM_ID);
+                    if (claim != null) {
+                        observedClaimBeforeControl = true;
+                        assertFalse(runtime.world().findFactionStrategicState(TRADE_LEAGUE)
+                                .orElseThrow()
+                                .controls(DemoGalaxyFactory.INNER_SYSTEM_ID));
+                    }
+                }
+            }
             runtime.advanceFrame(1f);
         }
 
         assertTrue(savedMidTransit, "Acceptance must cross save/load during physical fleet transit");
+        assertTrue(observedClaimBeforeControl,
+                "Completed expansion anchor must create a claim before sovereignty is established");
         assertEquals(StrategicGrowthState.Status.ESTABLISHED, current.status());
         assertNotNull(supportFleet);
         ConstructionProjectState project = runtime.world()
@@ -83,8 +104,13 @@ class Stage11CPhysicalExpansionAcceptanceTest {
         assertTrue(project.materials().stream().allMatch(ConstructionMaterialState::fulfilled));
         assertEquals(TRADE_LEAGUE,
                 runtime.world().controllingFaction(DemoGalaxyFactory.INNER_SYSTEM_ID).orElseThrow());
-        assertTrue(runtime.world().findFactionStrategicState(TRADE_LEAGUE).orElseThrow()
-                .controls(DemoGalaxyFactory.INNER_SYSTEM_ID));
+        FactionStrategicState establishedStrategy = runtime.world()
+                .findFactionStrategicState(TRADE_LEAGUE).orElseThrow();
+        assertTrue(establishedStrategy.controls(DemoGalaxyFactory.INNER_SYSTEM_ID));
+        TerritorialClaimState establishedClaim = establishedStrategy.claimFor(DemoGalaxyFactory.INNER_SYSTEM_ID);
+        assertNotNull(establishedClaim);
+        assertEquals(TerritorialClaimState.Status.ESTABLISHED, establishedClaim.status());
+        assertTrue(establishedClaim.stabilizationTicks() >= TerritorialControlRuntime.REQUIRED_STABILIZATION_TICKS);
 
         FleetPlacementState finalPlacement = runtime.world().findFleet(supportFleet).orElseThrow();
         assertEquals(FleetLocationKind.IN_SYSTEM, finalPlacement.locationKind());
@@ -143,6 +169,7 @@ class Stage11CPhysicalExpansionAcceptanceTest {
                 state.factionEconomicPressures(),
                 state.nextFleetIdValue(),
                 state.fleets(),
-                state.fleetJumps());
+                state.fleetJumps(),
+                state.factionIdentities());
     }
 }

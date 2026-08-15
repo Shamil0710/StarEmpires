@@ -7,10 +7,61 @@ import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.persistence.EntityId;
 
-/** Shared test-only helpers for physical construction deliveries. */
+/** Shared test-only helpers for physical construction deliveries and explicit legal setup. */
 final class ConstructionProjectTestFixtures {
     private ConstructionProjectTestFixtures() {
         throw new AssertionError("ConstructionProjectTestFixtures не создаёт экземпляров");
+    }
+
+    /**
+     * Grants the tested builder an indefinite explicit construction concession when the target is
+     * controlled by another faction. This keeps non-territorial construction tests focused on their
+     * original economic/lifecycle concern without bypassing the Stage-17D world authorization.
+     *
+     * @param world authoritative test world
+     * @param builderFactionContentId faction creating the project
+     * @param systemId project target system
+     */
+    static void authorizeConstruction(
+            WorldSimulation world,
+            String builderFactionContentId,
+            StarSystemId systemId) {
+        String controller = world.controllingFaction(systemId).orElse(null);
+        if (controller != null && !controller.equals(builderFactionContentId)) {
+            world.grantTerritorialConstructionRight(
+                    controller,
+                    builderFactionContentId,
+                    systemId,
+                    -1L);
+        }
+    }
+
+    /**
+     * Creates a project after explicitly establishing the legal premise required by a legacy
+     * non-territorial integration test.
+     *
+     * @param world authoritative test world
+     * @param builderFactionContentId faction owning and legally representing the project
+     * @param stationArchetypeContentId target station archetype
+     * @param systemId target system
+     * @param x local X coordinate
+     * @param y local Y coordinate
+     * @return stable construction project ID
+     */
+    static ConstructionProjectId createAuthorizedProject(
+            WorldSimulation world,
+            String builderFactionContentId,
+            String stationArchetypeContentId,
+            StarSystemId systemId,
+            float x,
+            float y) {
+        authorizeConstruction(world, builderFactionContentId, systemId);
+        return world.createConstructionProject(
+                builderFactionContentId,
+                stationArchetypeContentId,
+                systemId,
+                x,
+                y);
     }
 
     static EntityId createLoadedCargo(

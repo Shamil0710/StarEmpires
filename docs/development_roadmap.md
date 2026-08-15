@@ -475,7 +475,9 @@ Personal wallet, faction treasury и station operating wallets остаются 
 
 ## 17D — territory / control / construction access
 
-**NEXT.** Цель — превратить текущий `controlledSystems` из просто persistent policy list в результат обычного territorial process, одинакового для player и AI.
+**COMPLETE — PR #100.** `controlledSystems` теперь является persistent compatibility projection реального deterministic territorial process, одинакового для player и AI. Authoritative runtime различает presence, claim, stabilization, contested state, established control, recognition и explicit construction concessions; physical presence сама по себе sovereignty не создаёт.
+
+Stage-17D construction authorization находится на authoritative world boundary: domestic construction разрешается в собственной jurisdiction, foreign construction в controlled territory требует explicit concession, а globally contested territory закрыто для ordinary construction до разрешения спора. Stage-11 autonomous expansion после физического anchor больше не получает мгновенный sovereignty: AI объявляет claim и проходит тот же stabilization/control lifecycle. Territorial state и construction rights входят в versioned binary persistence с backward migration.
 
 ### 17D.1 — territorial state model
 
