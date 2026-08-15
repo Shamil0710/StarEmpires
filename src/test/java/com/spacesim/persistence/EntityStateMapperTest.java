@@ -50,6 +50,7 @@ class EntityStateMapperTest {
         InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
         inventory.stock[Constants.ITEM_FOOD] = 7;
         MarketComponent market = new MarketComponent();
+        market.configuredTargetStock[Constants.ITEM_FOOD] = 17;
         market.targetStock[Constants.ITEM_FOOD] = 33;
         market.baseConsumption[Constants.ITEM_FOOD] = 0.75f;
         market.sellPrices[Constants.ITEM_FOOD] = 12.5f;
@@ -73,6 +74,9 @@ class EntityStateMapperTest {
         trade.routeSearchCooldown = 0.37f;
 
         EntityState captured = EntityStateMapper.capture(entity);
+        EntityState.MarketState capturedMarket = captured.market();
+        assertEquals(17, capturedMarket.configuredTargetStock().get(Constants.ITEM_FOOD));
+        assertEquals(33, capturedMarket.targetStock().get(Constants.ITEM_FOOD));
         assertEquals(captured, EntityStateMapper.capture(EntityStateMapper.restore(captured)));
     }
 
