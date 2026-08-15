@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "status": "authoring-benchmark-only",
+  "unitSystem": "SI",
+  "sourceDocument": "docs/ship_mathematics_v0_9.md",
+  "integrationPrinciple": "All module families consume one common physical/resource contract; specialized capabilities are derived from shared budgets, geometry and measurements.",
+  "externalEngineeringBasis": [
+    {"source": "NASA NTRS 20230003669 / 20230014238", "topic": "hypervelocity testing plus hydrocode assessments for calibrated shield response"},
+    {"source": "NASA NTRS 20040071073", "topic": "hydrocode results compared with penetration equations and other codes"},
+    {"source": "NASA NTRS 19720022272", "topic": "projectile shape materially changes hypervelocity penetration"},
+    {"source": "NASA NTRS 20090024823", "topic": "material equation-of-state affects simulated hypervelocity response"},
+    {"source": "NASA NTRS 20000024801 / 19680053086", "topic": "rocket exhaust plume spectral radiance"},
+    {"source": "NASA NTRS 20250002268 / 19790008003", "topic": "radar cross section depends on frequency and aspect"},
+    {"source": "NASA NTRS 20120007406 / 20250000768", "topic": "optical signature depends on attitude and phase geometry"}
+  ],
+  "commonModuleContractFields": [
+    "stableId",
+    "integrationCategory",
+    "compatibleSlotOrHardpoint",
+    "dimensionsM",
+    "massKg",
+    "occupiedVolumeM3",
+    "structuralMountingRequirements",
+    "continuousPowerSupplyW",
+    "continuousPowerDemandW",
+    "peakPowerDemandW",
+    "storedEnergyCapacityJ",
+    "wasteHeatW",
+    "localThermalCapacityJ",
+    "coolantTransferDemandW",
+    "heatRejectionW",
+    "crewAutomation",
+    "ammunitionOrConsumableInterfaces",
+    "reactionMassInterfaces",
+    "signatureContributions",
+    "maintenanceDamageState",
+    "constructionInputs",
+    "capabilitySpecificParameters"
+  ],
+  "moduleIntegrationDemonstrator": {
+    "status": "synthetic-schema-demonstrator-not-content",
+    "derived": {
+      "massKg": 450000.0,
+      "volumeM3": 910.0,
+      "continuousPowerSupplyW": 300000000.0,
+      "continuousPowerDemandW": 106000000.0,
+      "continuousPowerMarginW": 194000000.0,
+      "peakPowerDemandW": 146000000.0,
+      "storedEnergyCapacityJ": 20000000000.0,
+      "wasteHeatW": 142500000.0,
+      "heatRejectionW": 180000000.0,
+      "continuousHeatMarginW": 37500000.0,
+      "localThermalCapacityJ": 600000000.0,
+      "coolantTransferDemandW": 30000000.0,
+      "crewRequired": 24
+    }
+  },
+  "heavyImpact": {
+    "runtimePolicy": "CALIBRATED_RESPONSE_SURFACE_REQUIRED",
+    "forbidden": [
+      "direct MMOD BLE extrapolation to intact ship weapons",
+      "kineticEnergy/armorValue",
+      "global hull HP as penetration substitute"
+    ],
+    "requiredCalibrationAxes": [
+      "projectileMaterial",
+      "projectileDensityKgPerM3",
+      "projectileShape",
+      "projectileLengthM",
+      "projectileDiameterM",
+      "impactVelocityMps",
+      "incidenceAngleRad",
+      "targetLayerMaterials",
+      "targetLayerThicknessesM",
+      "layerSpacingM"
+    ],
+    "requiredResponseOutputs": [
+      "perforationOrNoPerforation",
+      "residualMassFraction",
+      "residualVelocityVector",
+      "depositedEnergyJ",
+      "ejectaOrSpallMassKg",
+      "fragmentConeOrDistribution",
+      "structuralHoleOrCraterGeometry",
+      "nextLayerDamagePacket"
+    ],
+    "penetratorMaterialDensityKgPerM3Seed": 19000.0,
+    "penetratorGeometrySeeds": [
+      {
+        "id": "M_COILGUN_DART",
+        "massKg": 25.0,
+        "diameterM": 0.05,
+        "lengthM": 0.6701260761764014,
+        "finenessRatio": 13.402521523528028,
+        "velocityMps": 15000.0,
+        "kineticEnergyJ": 2812500000.0,
+        "kineticEnergyPerFrontalAreaJPerM2": 1432394487827.0579
+      },
+      {
+        "id": "L_COILGUN_DART",
+        "massKg": 150.0,
+        "diameterM": 0.10,
+        "lengthM": 1.0051891142646021,
+        "finenessRatio": 10.05189114264602,
+        "velocityMps": 20000.0,
+        "kineticEnergyJ": 30000000000.0,
+        "kineticEnergyPerFrontalAreaJPerM2": 3819718634205.488
+      },
+      {
+        "id": "XL_CAPITAL_DART",
+        "massKg": 1000.0,
+        "diameterM": 0.20,
+        "lengthM": 1.6753151904410035,
+        "finenessRatio": 8.376575952205018,
+        "velocityMps": 30000.0,
+        "kineticEnergyJ": 450000000000.0,
+        "kineticEnergyPerFrontalAreaJPerM2": 14323944878270.58
+      }
+    ]
+  },
+  "plumeSignature": {
+    "model": "minimumJetPowerW=0.5*thrustN*exhaustVelocityMps; 3-5um radiative fraction and line-of-sight aspect remain explicit sensitivity axes",
+    "radiativeFractionSensitivity": [0.000001, 0.00001, 0.0001],
+    "aspectSensitivity": {"forward": 0.25, "broadside": 1.0, "aft": 4.0},
+    "note": "Radiative fractions and aspect gains are Star Empires fusion-plume sensitivity seeds, not NASA measurements.",
+    "ships": [
+      {
+        "id": "TORPEDO_CORVETTE",
+        "thrustN": 2200000.0,
+        "exhaustVelocityMps": 100000.0,
+        "minimumJetPowerW": 110000000000.0,
+        "centralBroadside3To5UmBandPowerW": 1100000.0,
+        "centralDetectionRangeM": {
+          "forward": 6154131434.682267,
+          "broadside": 12308262869.364532,
+          "aft": 24616525738.729065
+        }
+      },
+      {
+        "id": "ESCORT_DESTROYER",
+        "thrustN": 13200000.0,
+        "exhaustVelocityMps": 100000.0,
+        "minimumJetPowerW": 660000000000.0,
+        "centralBroadside3To5UmBandPowerW": 6600000.0,
+        "centralDetectionRangeM": {
+          "forward": 15074481824.993736,
+          "broadside": 30148963649.987473,
+          "aft": 60297927299.974945
+        },
+        "broadsideRadiativeSensitivityDetectionRangeM": {
+          "fraction1e-6": 9533939422.75839,
+          "fraction1e-5": 30148963649.987473,
+          "fraction1e-4": 95339394227.5839
+        }
+      },
+      {
+        "id": "BATTLESHIP",
+        "thrustN": 137500000.0,
+        "exhaustVelocityMps": 100000.0,
+        "minimumJetPowerW": 6875000000000.0,
+        "centralBroadside3To5UmBandPowerW": 68750000.0,
+        "centralDetectionRangeM": {
+          "forward": 48652680884.08927,
+          "broadside": 97305361768.17854,
+          "aft": 194610723536.3571
+        }
+      }
+    ]
+  },
+  "aspectSignaturePolicy": {
+    "thermalRadiator": "surface temperature, emissivity and visible projected area by orientation",
+    "enginePlume": "spectral band radiance and line-of-sight aspect table/function",
+    "radar": "frequency x aspect RCS table/function; v0.8 scalar RCS remains midpoint sensitivity only",
+    "reflectedOptical": "illumination geometry + phase angle + surface BRDF/reflectance; specular glints distinct from diffuse reflection"
+  },
+  "worldScalePreCalibration": {
+    "meaning": "Physical lower-bound rest-to-rest travel envelopes only. Operational routes must reserve delta-v/stores and add docking, jump and logistics overhead.",
+    "distancesM": [10000000.0, 100000000.0, 1000000000.0, 10000000000.0],
+    "bulkFreighterLoaded": {
+      "accelerationMps2": 0.08391608391608392,
+      "nominalDeltaVMps": 15372.800463539408,
+      "totalTimeS": [21832.69719175042, 69041.05059069325, 221696.18224171107, 1392595.39755981],
+      "regimes": ["ACCEL_BRAKE", "ACCEL_BRAKE", "ACCEL_COAST_BRAKE", "ACCEL_COAST_BRAKE"]
+    },
+    "escortDestroyerSustained": {
+      "accelerationMps2": 0.1504993843207005,
+      "nominalDeltaVMps": 38454.71005152617,
+      "totalTimeS": [16302.816265351768, 51554.03167375159, 163028.16265351768, 647849.3709360299],
+      "regimes": ["ACCEL_BRAKE", "ACCEL_BRAKE", "ACCEL_BRAKE", "ACCEL_COAST_BRAKE"]
+    }
+  },
+  "v1ClosureMatrix": [
+    {"domain": "module contract and derived budgets", "status": "ARCHITECTURE_CLOSED_V0_9"},
+    {"domain": "heavy impact response architecture", "status": "ARCHITECTURE_CLOSED_V0_9_DATA_CALIBRATION_REQUIRED"},
+    {"domain": "kinetic penetrator geometry", "status": "AUTHORING_SEEDS_ADDED"},
+    {"domain": "engine plume signature architecture", "status": "ARCHITECTURE_CLOSED_V0_9_FUSION_PLUME_CALIBRATION_REQUIRED"},
+    {"domain": "optical/RCS aspect signature", "status": "ARCHITECTURE_CLOSED_V0_9_CONTENT_TABLES_REQUIRED"},
+    {"domain": "world-scale travel coupling", "status": "PRECALIBRATION_EXECUTABLE"},
+    {"domain": "integrated fitting and representative design validation", "status": "V1_0_CLOSURE_REQUIRED"},
+    {"domain": "production material catalog/response surfaces", "status": "V1_0_CLOSURE_REQUIRED"},
+    {"domain": "production world-generation distributions", "status": "STAGE_19_AFTER_V1_0"}
+  ]
+}
