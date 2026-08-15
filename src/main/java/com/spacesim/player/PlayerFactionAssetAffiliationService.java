@@ -2,7 +2,9 @@ package com.spacesim.player;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.FactionComponent;
+import com.spacesim.components.IdentityComponent;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.world.FactionPolicyRefreshService;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
@@ -13,13 +15,14 @@ import java.util.Objects;
 /**
  * Stage-17B legal-affiliation bridge for physical assets already owned by the player.
  *
- * <p>Ownership remains authoritative in {@link PlayerState}. This service changes only the local
- * ECS {@link FactionComponent} of an already existing owned fleet. It never respawns an entity,
- * changes {@link FleetId}, moves the fleet, touches cargo/wallets or creates faction resources.</p>
+ * <p>Ownership remains authoritative in {@link PlayerState}. This service changes only legal
+ * {@link FactionComponent} affiliation of already existing owned assets. It never respawns an
+ * entity, changes {@link FleetId}, moves assets, touches cargo/wallets or creates faction
+ * resources.</p>
  *
- * <p>The first Stage-17B slice deliberately handles only {@link FleetLocationKind#IN_SYSTEM}
- * fleets. Transit payload affiliation is a separate world-level mutation because an in-transit
- * fleet is detached from every local Ashley engine.</p>
+ * <p>Local fleets and completed owned stations are handled as separate explicit commands. Transit
+ * payload affiliation remains a separate world-level mutation because an in-transit fleet is
+ * detached from every local Ashley engine.</p>
  */
 public final class PlayerFactionAssetAffiliationService {
     private final PlayerRuntime runtime;
@@ -46,14 +49,8 @@ public final class PlayerFactionAssetAffiliationService {
      */
     public AffiliationReport affiliateLocalOwnedFleets() {
         PlayerState player = runtime.player();
-        String stableFactionId = player.factionContentId();
-        if (stableFactionId == null) {
-            throw new IllegalStateException("Independent player has no faction for asset affiliation");
-        }
+        ResolvedFaction target = requirePlayerFaction(player);
         WorldSimulation world = runtime.world();
-        int runtimeFactionId = world.findFactionRuntimeId(stableFactionId).orElseThrow(
-                () -> new IllegalStateException(
-                        "Player faction is missing from world faction identity directory: " + stableFactionId));
 
         int inspected = 0;
         int affiliated = 0;
@@ -80,25 +77,92 @@ public final class PlayerFactionAssetAffiliationService {
                 throw new IllegalStateException("Owned local fleet entity is missing: " + fleetId);
             }
 
-            FactionComponent faction = entity.getComponent(FactionComponent.class);
-            if (faction != null && faction.factionId == runtimeFactionId) {
-                alreadyAffiliated++;
-                continue;
-            }
-            if (faction == null) {
-                entity.add(new FactionComponent(runtimeFactionId));
+            if (affiliateEntity(entity, target.runtimeFactionId())) {
+                affiliated++;
             } else {
-                faction.factionId = runtimeFactionId;
+                alreadyAffiliated++;
             }
-            affiliated++;
         }
         return new AffiliationReport(
                 inspected,
                 affiliated,
                 alreadyAffiliated,
                 deferredTransit,
-                stableFactionId,
-                runtimeFactionId);
+                target.stableFactionId(),
+                target.runtimeFactionId());
+    }
+
+    /**
+     * Affiliates every live player-owned completed station with the player's current faction.
+     *
+     * <p>Each {@link OwnedStationRef} continues to point to the same system-local EntityId. No
+     * wallet, market inventory, archetype, transform or ownership state changes. After the legal
+     * affiliation pass, transient market-access components are rebuilt from persistent diplomacy so
+     * live behavior immediately matches save/load behavior.</p>
+     *
+     * @return immutable station affiliation report
+     * @throws IllegalStateException if player is independent, faction identity is unresolved, or an
+     *         owned station reference no longer points to a live station entity
+     */
+    public StationAffiliationReport affiliateOwnedStations() {
+        PlayerState player = runtime.player();
+        ResolvedFaction target = requirePlayerFaction(player);
+        WorldSimulation world = runtime.world();
+
+        int inspected = 0;
+        int affiliated = 0;
+        int alreadyAffiliated = 0;
+        for (OwnedStationRef reference : player.ownedStations()) {
+            inspected++;
+            SimulationSession session = world.findSession(reference.systemId()).orElseThrow(
+                    () -> new IllegalStateException(
+                            "Owned station system has no live SimulationSession: " + reference.systemId()));
+            Entity station = session.getEntityRegistry().find(reference.stationEntityId());
+            IdentityComponent identity = station == null ? null : station.getComponent(IdentityComponent.class);
+            if (station == null || identity == null || identity.kind != IdentityComponent.Kind.STATION) {
+                throw new IllegalStateException("OwnedStationRef no longer points to a live station: " + reference);
+            }
+            if (affiliateEntity(station, target.runtimeFactionId())) {
+                affiliated++;
+            } else {
+                alreadyAffiliated++;
+            }
+        }
+
+        int refreshedSessions = inspected == 0
+                ? 0
+                : FactionPolicyRefreshService.refresh(world, runtime.content());
+        return new StationAffiliationReport(
+                inspected,
+                affiliated,
+                alreadyAffiliated,
+                refreshedSessions,
+                target.stableFactionId(),
+                target.runtimeFactionId());
+    }
+
+    private ResolvedFaction requirePlayerFaction(PlayerState player) {
+        String stableFactionId = player.factionContentId();
+        if (stableFactionId == null) {
+            throw new IllegalStateException("Independent player has no faction for asset affiliation");
+        }
+        int runtimeFactionId = runtime.world().findFactionRuntimeId(stableFactionId).orElseThrow(
+                () -> new IllegalStateException(
+                        "Player faction is missing from world faction identity directory: " + stableFactionId));
+        return new ResolvedFaction(stableFactionId, runtimeFactionId);
+    }
+
+    private static boolean affiliateEntity(Entity entity, int runtimeFactionId) {
+        FactionComponent faction = entity.getComponent(FactionComponent.class);
+        if (faction != null && faction.factionId == runtimeFactionId) {
+            return false;
+        }
+        if (faction == null) {
+            entity.add(new FactionComponent(runtimeFactionId));
+        } else {
+            faction.factionId = runtimeFactionId;
+        }
+        return true;
     }
 
     /**
@@ -145,5 +209,53 @@ public final class PlayerFactionAssetAffiliationService {
                 throw new IllegalArgumentException("Affiliation report counters do not cover inspected fleets");
             }
         }
+    }
+
+    /**
+     * Result of one completed-owned-station affiliation pass.
+     *
+     * @param inspectedOwnedStations number of persistent OwnedStationRefs inspected
+     * @param newlyAffiliatedStations number of station entities whose faction changed
+     * @param alreadyAffiliatedStations number of station entities already in the target faction
+     * @param refreshedPolicySessions number of local sessions whose transient access policy rebuilt
+     * @param stableFactionId player's stable faction identity
+     * @param runtimeFactionId resolved dense local ECS faction slot
+     */
+    public record StationAffiliationReport(
+            int inspectedOwnedStations,
+            int newlyAffiliatedStations,
+            int alreadyAffiliatedStations,
+            int refreshedPolicySessions,
+            String stableFactionId,
+            int runtimeFactionId) {
+        /**
+         * Validates report counters and identity metadata.
+         *
+         * @param inspectedOwnedStations number of persistent OwnedStationRefs inspected
+         * @param newlyAffiliatedStations number of station entities whose faction changed
+         * @param alreadyAffiliatedStations number of station entities already in the target faction
+         * @param refreshedPolicySessions number of local sessions whose transient access policy rebuilt
+         * @param stableFactionId player's stable faction identity
+         * @param runtimeFactionId resolved dense local ECS faction slot
+         */
+        public StationAffiliationReport {
+            if (inspectedOwnedStations < 0
+                    || newlyAffiliatedStations < 0
+                    || alreadyAffiliatedStations < 0
+                    || refreshedPolicySessions < 0) {
+                throw new IllegalArgumentException("Station affiliation counters cannot be negative");
+            }
+            stableFactionId = Objects.requireNonNull(stableFactionId, "Stable faction ID not set");
+            if (runtimeFactionId < 0) {
+                throw new IllegalArgumentException("Runtime faction ID cannot be negative");
+            }
+            if (newlyAffiliatedStations + alreadyAffiliatedStations != inspectedOwnedStations) {
+                throw new IllegalArgumentException(
+                        "Station affiliation report counters do not cover inspected stations");
+            }
+        }
+    }
+
+    private record ResolvedFaction(String stableFactionId, int runtimeFactionId) {
     }
 }
