@@ -1,0 +1,85 @@
+name: Stage 17E.4 AI policy patch
+
+on:
+  push:
+    branches:
+      - agent/stage17e-customs-tariffs
+    paths:
+      - .github/workflows/stage17e4-ai-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17e-customs-tariffs
+      - name: Patch TradeAISystem
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/main/java/com/spacesim/systems/TradeAISystem.java')
+          t = p.read_text(encoding='utf-8')
+          def r(old,new,label):
+              global t
+              if t.count(old) != 1:
+                  raise SystemExit(f'{label}: {t.count(old)} anchors')
+              t=t.replace(old,new,1)
+          r('import com.spacesim.controllers.TradeController;\n',
+            'import com.spacesim.controllers.TradeController;\nimport com.spacesim.controllers.TradeTransactionPolicy;\n', 'policy import')
+          r('import com.spacesim.trade.TradeRoute;\n',
+            'import com.spacesim.trade.TradeRoute;\nimport com.spacesim.trade.TradeRouteCostModel;\n', 'cost import')
+          r('    private final TradeController tradeController;\n',
+            '    private TradeController tradeController;\n', 'controller mutable')
+          r('    private final TradeRoutePlanner routePlanner;\n',
+            '    private TradeRoutePlanner routePlanner;\n    private final TradeRoutePlanner.ScoringMode scoringMode;\n', 'planner mutable')
+          r('''        this.tradeController = new TradeController(
+                Objects.requireNonNull(ledger, "EconomicLedger не задан"));
+        this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
+        this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
+        this.marketDirectory = new MarketDirectory(this.contentCatalog);
+        this.routePlanner = new TradeRoutePlanner(
+                this.contentCatalog,
+                Objects.requireNonNull(scoringMode, "ScoringMode не задан"));''',
+            '''        this.tradeController = new TradeController(
+                Objects.requireNonNull(ledger, "EconomicLedger не задан"));
+        this.registry = Objects.requireNonNull(registry, "EntityRegistry не задан");
+        this.contentCatalog = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
+        this.marketDirectory = new MarketDirectory(this.contentCatalog);
+        this.scoringMode = Objects.requireNonNull(scoringMode, "ScoringMode не задан");
+        this.routePlanner = new TradeRoutePlanner(this.contentCatalog, this.scoringMode);''', 'constructor scoring')
+          r('    /** @return ledger, в который система записывает успешные сделки */\n',
+            '''    /**
+     * Installs world-backed transaction and route-cost policy after a local session joins a world.
+     *
+     * @param transactionPolicy authoritative transaction settlement policy
+     * @param costModel matching pre-route external cost model
+     */
+    public void configureTradePolicies(
+            TradeTransactionPolicy transactionPolicy,
+            TradeRouteCostModel costModel) {
+        tradeController = new TradeController(
+                tradeController.getLedger(),
+                Objects.requireNonNull(transactionPolicy, "TradeTransactionPolicy not set"));
+        routePlanner = new TradeRoutePlanner(
+                contentCatalog,
+                scoringMode,
+                Objects.requireNonNull(costModel, "TradeRouteCostModel not set"));
+        marketDirectory.invalidate();
+    }
+
+    /** @return ledger, в который система записывает успешные сделки */
+''', 'configure method')
+          p.write_text(t, encoding='utf-8')
+          PY
+      - name: Remove applicator and commit
+        run: |
+          rm .github/workflows/stage17e4-ai-patch.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/main/java/com/spacesim/systems/TradeAISystem.java .github/workflows/stage17e4-ai-patch.yml
+          git commit -m "Stage 17E.4: make trade AI tariff-aware"
+          git push
