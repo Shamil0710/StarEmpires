@@ -1,0 +1,126 @@
+name: Apply Stage 17F.6 foundation patch once
+
+on:
+  push:
+    branches:
+      - stage-17f6-policy-review-foundation
+    paths:
+      - .github/workflows/stage17f6-foundation-patch-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+
+      - name: Patch codec and world lifecycle boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              return text.replace(old, new)
+
+          codec_path = Path('src/main/java/com/spacesim/persistence/WorldStateCodec.java')
+          codec = codec_path.read_text(encoding='utf-8')
+          codec = replace_once(
+              codec,
+              'Stage-17F persistent institutional doctrine profiles, а v7 — treasury reserve floor и\n * construction-investment authorization cap. v1-v3 детерминированно мигрируют в neutral explicit\n * diplomacy без выдуманных treaties, grievances или embargoes; v1-v4 получают нулевой customs\n * tariff, v1-v5 — neutral doctrine с midpoint 50 по каждой оси, а v1-v6 сохраняют прежнее fiscal\n * поведение: treasury reserve 0 и отсутствие дополнительного construction cap. Local entity payload',
+              'Stage-17F persistent institutional doctrine profiles, v7 — treasury reserve floor и\n * construction-investment authorization cap, а v8 — общий Stage-17F.6 policy-review watermark.\n * v1-v3 детерминированно мигрируют в neutral explicit diplomacy без выдуманных treaties, grievances\n * или embargoes; v1-v4 получают нулевой customs tariff, v1-v5 — neutral doctrine с midpoint 50 по\n * каждой оси, v1-v6 сохраняют прежнее fiscal поведение: treasury reserve 0 и отсутствие дополнительного\n * construction cap, а v1-v7 получают never-reviewed policy lifecycle. Local entity payload',
+              'codec javadoc')
+          codec = replace_once(
+              codec,
+              '    private static final int DOCTRINE_FILE_FORMAT_VERSION = 6;\n    private static final int FILE_FORMAT_VERSION = 7;',
+              '    private static final int DOCTRINE_FILE_FORMAT_VERSION = 6;\n    private static final int FISCAL_FILE_FORMAT_VERSION = 7;\n    private static final int FILE_FORMAT_VERSION = 8;',
+              'codec constants')
+          codec = replace_once(
+              codec,
+              '                WorldDoctrineBinary.write(output, checked.factionStrategies());\n                WorldFiscalPolicyBinary.write(output, checked.factions());',
+              '                WorldDoctrineBinary.write(output, checked.factionStrategies());\n                WorldFiscalPolicyBinary.write(output, checked.factions());\n                WorldPolicyReviewBinary.write(output, checked.factions());',
+              'codec write trailer')
+          codec = replace_once(
+              codec,
+              '            if (fileVersion != FILE_FORMAT_VERSION\n                    && fileVersion != DOCTRINE_FILE_FORMAT_VERSION',
+              '            if (fileVersion != FILE_FORMAT_VERSION\n                    && fileVersion != FISCAL_FILE_FORMAT_VERSION\n                    && fileVersion != DOCTRINE_FILE_FORMAT_VERSION',
+              'codec supported versions')
+          codec = replace_once(
+              codec,
+              '            if (fileVersion >= FILE_FORMAT_VERSION) {\n                state = withFactions(\n                        state,\n                        WorldFiscalPolicyBinary.readAndAttach(input, state.factions()));\n            }',
+              '            if (fileVersion >= FISCAL_FILE_FORMAT_VERSION) {\n                state = withFactions(\n                        state,\n                        WorldFiscalPolicyBinary.readAndAttach(input, state.factions()));\n            }\n            if (fileVersion >= FILE_FORMAT_VERSION) {\n                state = withFactions(\n                        state,\n                        WorldPolicyReviewBinary.readAndAttach(input, state.factions()));\n            }',
+              'codec read trailers')
+          codec_path.write_text(codec, encoding='utf-8')
+
+          world_path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          world = world_path.read_text(encoding='utf-8')
+          anchor = '''    public Optional<FactionEconomicState> findFactionEconomicState(String factionContentId) {
+        if (factionContentId == null) {
+            return Optional.empty();
+        }
+        FactionEconomicAccount account = factionAccountsById.get(factionContentId);
+        return account == null ? Optional.empty() : Optional.of(account.snapshot());
+    }
+'''
+          addition = '''
+    /**
+     * Returns the common persistent Stage-17F.6 policy-review watermark for one faction.
+     *
+     * @param factionContentId stable faction content ID
+     * @return immutable review state or empty for an unknown faction
+     */
+    public Optional<FactionPolicyReviewState> findFactionPolicyReviewState(String factionContentId) {
+        if (factionContentId == null) {
+            return Optional.empty();
+        }
+        FactionEconomicAccount account = factionAccountsById.get(factionContentId);
+        return account == null ? Optional.empty() : Optional.of(account.policyReviewState());
+    }
+
+    /**
+     * Atomically claims the current common policy-review window for one faction when cadence allows it.
+     *
+     * <p>Claiming a review does not itself change tax rates, stock floors, recipes, wallets, cargo or
+     * other policy values. It only persists the authoritative tick watermark so repeated calls in the
+     * same observation window and save/load continuation cannot apply another bounded policy step.</p>
+     *
+     * @param factionContentId stable faction content ID
+     * @param cadence deterministic authoritative-tick review cadence
+     * @return {@code true} when this call claimed a due review, otherwise {@code false}
+     */
+    public boolean tryBeginFactionPolicyReview(
+            String factionContentId,
+            FactionPolicyReviewCadence cadence) {
+        String factionId = normalizedFactionId(factionContentId);
+        FactionEconomicAccount account = requireFactionAccount(factionId);
+        FactionPolicyReviewCadence checkedCadence = Objects.requireNonNull(
+                cadence, "Faction policy review cadence not set");
+        long tick = getAuthoritativeWorldTick();
+        FactionPolicyReviewState previous = account.policyReviewState();
+        if (!checkedCadence.isDue(previous, tick)) {
+            return false;
+        }
+        account.updatePolicyReviewState(checkedCadence.claim(previous, tick));
+        return true;
+    }
+'''
+          world = replace_once(world, anchor, anchor + addition, 'world review boundary')
+          world_path.write_text(world, encoding='utf-8')
+
+          Path('.github/workflows/stage17f6-foundation-patch-once.yml').unlink()
+          PY
+
+      - name: Commit integration and remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/com/spacesim/persistence/WorldStateCodec.java \
+                  src/main/java/com/spacesim/world/WorldSimulation.java \
+                  .github/workflows/stage17f6-foundation-patch-once.yml
+          git commit -m "Integrate persistent Stage 17F.6 review lifecycle"
+          git push origin HEAD:stage-17f6-policy-review-foundation
