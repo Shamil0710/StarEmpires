@@ -51,6 +51,11 @@ public final class CustomsTariffResolver {
     /**
      * Resolves the tariff without mutating diplomacy or economic state.
      *
+     * <p>Compatibility worlds created through pre-17E source constructors can intentionally have
+     * no explicit diplomacy aggregate. Such an absent market-owner entry means neutral legacy
+     * policy ({@code 0 bps}), never a hidden tariff. Current persisted worlds still enforce normal
+     * diplomacy coverage at their world-state validation boundary.</p>
+     *
      * @param diplomacyStates persistent diplomacy aggregates
      * @param marketOwnerFactionContentId faction owning the market and collecting customs
      * @param participantFactionContentId trader faction, or {@code null} for an independent actor
@@ -72,11 +77,11 @@ public final class CustomsTariffResolver {
             participantId = null;
         }
         FactionDiplomacyState owner = find(diplomacyStates, ownerId);
-        if (owner == null) {
-            throw new IllegalArgumentException("Market owner has no diplomacy state: " + ownerId);
-        }
         if (ownerId.equals(participantId)) {
             return new Decision(0, Reason.DOMESTIC, "");
+        }
+        if (owner == null) {
+            return new Decision(0, Reason.STANDARD_RATE, "");
         }
         if (participantId != null) {
             String exemption = exemptionTreaty(diplomacyStates, ownerId, participantId, worldTick);
