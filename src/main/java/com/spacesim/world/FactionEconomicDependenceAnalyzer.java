@@ -51,8 +51,6 @@ final class FactionEconomicDependenceAnalyzer {
         int sourceRuntimeId = checkedWorld.findFactionRuntimeId(sourceId).orElseThrow();
         FactionStrategicState sourceStrategy = checkedWorld.findFactionStrategicState(sourceId).orElse(null);
         List<ObservedMarket> markets = observeMarkets(checkedWorld);
-        Set<StarSystemId> sourceFootprint = sourceFootprint(
-                checkedWorld, markets, sourceId, sourceStrategy);
 
         List<FactionItemDependenceDiagnostic> rows = new ArrayList<>();
         long aggregateRequirement = 0L;
@@ -77,6 +75,8 @@ final class FactionEconomicDependenceAnalyzer {
             long alternativeBestPrice = -1L;
             Set<StarSystemId> partnerSupplierSystems = new HashSet<>();
             Set<StarSystemId> alternativeSupplierSystems = new HashSet<>();
+            Set<StarSystemId> sourceDemandSystems = new HashSet<>();
+            Set<StarSystemId> sourceMarketSystems = new HashSet<>();
 
             for (ObservedMarket observed : markets) {
                 int stock = observed.inventory().stock[itemId];
@@ -91,6 +91,10 @@ final class FactionEconomicDependenceAnalyzer {
                     sourceTarget = safeAdd(sourceTarget, target);
                     sourceOnHand = safeAdd(sourceOnHand, stock);
                     sourceExportable = safeAdd(sourceExportable, surplus);
+                    sourceMarketSystems.add(observed.systemId());
+                    if (deficit > 0L) {
+                        sourceDemandSystems.add(observed.systemId());
+                    }
                     continue;
                 }
                 if (partnerOwned) {
@@ -122,6 +126,13 @@ final class FactionEconomicDependenceAnalyzer {
                     : sourceStrategy.effectiveTargetStockFloor(item.id());
             long requiredStock = Math.max(sourceTarget, strategicFloor);
             long externalRequirement = Math.max(0L, requiredStock - sourceOnHand);
+            if (externalRequirement > 0L && sourceDemandSystems.isEmpty()) {
+                if (sourceStrategy != null && !sourceStrategy.controlledSystems().isEmpty()) {
+                    sourceDemandSystems.addAll(sourceStrategy.controlledSystems());
+                } else {
+                    sourceDemandSystems.addAll(sourceMarketSystems);
+                }
+            }
             long productionInputPerCycle = observeSourceProductionInputPerCycle(
                     checkedWorld, sourceRuntimeId, itemId);
             long bufferEndurance = productionInputPerCycle == 0L
@@ -144,9 +155,9 @@ final class FactionEconomicDependenceAnalyzer {
                     safeAdd(partnerAccessibleDemand, otherAccessibleForeignDemand));
 
             RouteMetric partnerRoute = routeMetric(
-                    checkedWorld.getTopology(), sourceFootprint, partnerSupplierSystems);
+                    checkedWorld.getTopology(), sourceDemandSystems, partnerSupplierSystems);
             RouteMetric alternativeRoute = routeMetric(
-                    checkedWorld.getTopology(), sourceFootprint, alternativeSupplierSystems);
+                    checkedWorld.getTopology(), sourceDemandSystems, alternativeSupplierSystems);
             if (externalRequirement > 0L
                     && partnerAccessibleSurplus > 0L
                     && partnerRoute.uniqueShortestRoute()
@@ -248,23 +259,6 @@ final class FactionEconomicDependenceAnalyzer {
             }
         }
         return result;
-    }
-
-    private static Set<StarSystemId> sourceFootprint(
-            WorldSimulation world,
-            List<ObservedMarket> markets,
-            String sourceId,
-            FactionStrategicState strategy) {
-        Set<StarSystemId> result = new HashSet<>();
-        for (ObservedMarket market : markets) {
-            if (sourceId.equals(market.ownerFactionContentId())) {
-                result.add(market.systemId());
-            }
-        }
-        if (strategy != null) {
-            result.addAll(strategy.controlledSystems());
-        }
-        return Set.copyOf(result);
     }
 
     private static RouteMetric routeMetric(
