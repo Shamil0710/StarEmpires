@@ -40,7 +40,7 @@ public final class GameStateMigration {
             return normalizeCurrentFactionCapacity(state);
         }
         if (state.schemaVersion() == GameState.ITEM_CAPACITY_ARCHETYPE_VERSION) {
-            return normalizeCurrentFactionCapacity(withCurrentVersion(state));
+            return normalizeCurrentFactionCapacity(migrateVersion2(state));
         }
         if (state.schemaVersion() != GameState.LEGACY_STAGE3_VERSION) {
             throw new IllegalArgumentException(
@@ -65,7 +65,11 @@ public final class GameStateMigration {
                 List.copyOf(migratedEntities)));
     }
 
-    private static GameState withCurrentVersion(GameState state) {
+    private static GameState migrateVersion2(GameState state) {
+        List<EntityState> migratedEntities = new ArrayList<>(state.entities().size());
+        for (EntityState entity : state.entities()) {
+            migratedEntities.add(migrateVersion2Entity(entity));
+        }
         return new GameState(
                 GameState.CURRENT_VERSION,
                 state.rootSeed(),
@@ -77,7 +81,43 @@ public final class GameStateMigration {
                 state.asteroidSpawner(),
                 state.priceRecorder(),
                 state.ledger(),
-                state.entities());
+                List.copyOf(migratedEntities));
+    }
+
+    private static EntityState migrateVersion2Entity(EntityState entity) {
+        EntityState value = Objects.requireNonNull(entity, "Schema-v2 EntityState не задан");
+        EntityState.MarketState market = value.market();
+        if (market == null) {
+            return value;
+        }
+        List<Integer> effectiveTarget = List.copyOf(
+                Objects.requireNonNull(market.targetStock(), "Schema-v2 market.targetStock не задан"));
+        EntityState.MarketState migratedMarket = new EntityState.MarketState(
+                effectiveTarget,
+                effectiveTarget,
+                market.baseConsumption(),
+                market.sellPrices(),
+                market.buyPrices(),
+                market.consumptionRemainder(),
+                market.tradableItems(),
+                market.dirty());
+        return new EntityState(
+                value.id(),
+                value.identity(),
+                value.transform(),
+                value.inventory(),
+                value.wallet(),
+                migratedMarket,
+                value.production(),
+                value.priceHistory(),
+                value.faction(),
+                value.reputation(),
+                value.ship(),
+                value.tradeAi(),
+                value.mining(),
+                value.combat(),
+                value.asteroid(),
+                value.archetype());
     }
 
     private static GameState normalizeCurrentFactionCapacity(GameState state) {
