@@ -28,7 +28,18 @@ public record FactionFiscalPolicyState(
         long maxLiquiditySupportPerDecisionMilliCredits,
         long maxConstructionInvestmentPerDecisionMilliCredits) {
 
-    /** Validates bounded rates and non-negative spending authorizations. */
+    /**
+     * Validates bounded rates and non-negative spending authorizations.
+     *
+     * @param factionContentId authored or world-defined stable faction ID
+     * @param ownStationTaxBasisPoints own-station fiscal levy, 0..10000
+     * @param territorialForeignStationLevyBasisPoints foreign-station territorial levy, 0..10000
+     * @param customsTariffBasisPoints transaction/customs tariff, 0..10000
+     * @param treasuryReserveFloorMilliCredits protected treasury floor for discretionary spending
+     * @param stationLiquidityReserveMilliCredits desired station operating-liquidity floor
+     * @param maxLiquiditySupportPerDecisionMilliCredits maximum treasury subsidy per decision
+     * @param maxConstructionInvestmentPerDecisionMilliCredits maximum construction funding per decision
+     */
     public FactionFiscalPolicyState {
         factionContentId = Objects.requireNonNull(factionContentId, "Fiscal policy faction ID not set").strip();
         if (factionContentId.isEmpty()) {
