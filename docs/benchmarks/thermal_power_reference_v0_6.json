@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "status": "authoring-benchmark-only",
+  "unitSystem": "SI",
+  "sourceDocument": "docs/ship_mathematics_v0_6.md",
+  "harness": "com.spacesim.combat.benchmark.ShipMathematicsV06ThermalHarness",
+  "radiatorReference": {
+    "emissivity": 0.9,
+    "temperatureK": 1100.0,
+    "stefanBoltzmannWPerM2K4": 5.670374419e-8,
+    "heatFluxWPerM2": 74717.9566817211,
+    "materialStatus": "technology-seed-not-production-material"
+  },
+  "pointDefenseEmitter": {
+    "electricalInputW": 8000000.0,
+    "beamPowerW": 5000000.0,
+    "wasteHeatW": 3000000.0,
+    "localCoolantTransferW": 1200000.0,
+    "localThermalCapacityJ": 36000000.0,
+    "restartHeatJ": 18000000.0,
+    "coldFullPowerBurstS": 20.0,
+    "sustainableDutyFraction": 0.4
+  },
+  "terminalTrain": {
+    "pointDefenseRangeM": 300000.0,
+    "incomingSpeedMps": 18000.0,
+    "initialWaveRangeM": 800000.0,
+    "terminalWindowS": 16.666666666666668,
+    "nonOverlappingWavePeriodS": 44.44444444444444,
+    "requestedDutyFraction": 0.375,
+    "waves": 13,
+    "integrationStepS": 0.02,
+    "healthyCooling": {
+      "coolantTransferW": 1200000.0,
+      "wave1DeliveredBeamS": 16.66,
+      "wave1ThrottledS": 0.0,
+      "wave13DeliveredBeamS": 16.66,
+      "wave13ThrottledS": 0.0,
+      "peakHeatJ": 29988000.0,
+      "thermalInhibitObserved": false
+    },
+    "degradedCooling": {
+      "coolantTransferW": 1000000.0,
+      "sustainableDutyFraction": 0.3333333333333333,
+      "wave1DeliveredBeamS": 16.66,
+      "wave1ThrottledS": 0.0,
+      "wave2DeliveredBeamS": 15.24,
+      "wave2ThrottledS": 1.42,
+      "wave13DeliveredBeamS": 14.82,
+      "wave13ThrottledS": 1.84,
+      "peakHeatJ": 36000000.0,
+      "thermalInhibitObserved": true
+    }
+  },
+  "referenceShipThermals": [
+    {
+      "id": "CORVETTE",
+      "ratedElectricalPowerW": 150000000.0,
+      "installedContinuousPowerW": 34000000.0,
+      "electricalPowerMarginW": 116000000.0,
+      "installedContinuousWasteHeatW": 11000000.0,
+      "sustainedHeatRejectionW": 30000000.0,
+      "continuousHeatMarginW": 19000000.0,
+      "minimumRadiatorFraction": 0.36666666666666664,
+      "fullHotRadiatorAreaM2": 401.50990916135635,
+      "radiatorAreaNeededAtInstalledHeatM2": 147.22030002583068,
+      "legacyEmergencyThermalCapacityJ": 60000000000.0,
+      "zeroRadiatorEmergencyEnduranceS": 5454.545454545455
+    },
+    {
+      "id": "RECON_FRIGATE",
+      "ratedElectricalPowerW": 400000000.0,
+      "installedContinuousPowerW": 194000000.0,
+      "electricalPowerMarginW": 206000000.0,
+      "installedContinuousWasteHeatW": 76500000.0,
+      "sustainedHeatRejectionW": 80000000.0,
+      "continuousHeatMarginW": 3500000.0,
+      "minimumRadiatorFraction": 0.95625,
+      "fullHotRadiatorAreaM2": 1070.6930910969504,
+      "radiatorAreaNeededAtInstalledHeatM2": 1023.8502683614588,
+      "legacyEmergencyThermalCapacityJ": 200000000000.0,
+      "zeroRadiatorEmergencyEnduranceS": 2614.37908496732
+    },
+    {
+      "id": "ESCORT_DESTROYER",
+      "ratedElectricalPowerW": 1000000000.0,
+      "installedContinuousPowerW": 191000000.0,
+      "electricalPowerMarginW": 809000000.0,
+      "installedContinuousWasteHeatW": 60800000.0,
+      "sustainedHeatRejectionW": 200000000.0,
+      "continuousHeatMarginW": 139200000.0,
+      "minimumRadiatorFraction": 0.304,
+      "fullHotRadiatorAreaM2": 2676.732727742376,
+      "radiatorAreaNeededAtInstalledHeatM2": 813.7267492336822,
+      "legacyEmergencyThermalCapacityJ": 600000000000.0,
+      "zeroRadiatorEmergencyEnduranceS": 9868.421052631578
+    },
+    {
+      "id": "GENERAL_CRUISER",
+      "ratedElectricalPowerW": 3000000000.0,
+      "installedContinuousPowerW": 1328000000.0,
+      "electricalPowerMarginW": 1672000000.0,
+      "installedContinuousWasteHeatW": 402300000.0,
+      "sustainedHeatRejectionW": 600000000.0,
+      "continuousHeatMarginW": 197700000.0,
+      "minimumRadiatorFraction": 0.6705,
+      "fullHotRadiatorAreaM2": 8030.198183227128,
+      "radiatorAreaNeededAtInstalledHeatM2": 5384.247881853789,
+      "legacyEmergencyThermalCapacityJ": 2000000000000.0,
+      "zeroRadiatorEmergencyEnduranceS": 4971.414367387521
+    },
+    {
+      "id": "BATTLECRUISER",
+      "ratedElectricalPowerW": 8000000000.0,
+      "installedContinuousPowerW": 3435000000.0,
+      "electricalPowerMarginW": 4565000000.0,
+      "installedContinuousWasteHeatW": 840800000.0,
+      "sustainedHeatRejectionW": 1500000000.0,
+      "continuousHeatMarginW": 659200000.0,
+      "minimumRadiatorFraction": 0.5605333333333333,
+      "fullHotRadiatorAreaM2": 20075.49545806782,
+      "radiatorAreaNeededAtInstalledHeatM2": 11252.984387428947,
+      "legacyEmergencyThermalCapacityJ": 6000000000000.0,
+      "zeroRadiatorEmergencyEnduranceS": 7136.060894386299
+    },
+    {
+      "id": "BATTLESHIP",
+      "ratedElectricalPowerW": 20000000000.0,
+      "installedContinuousPowerW": 5909000000.0,
+      "electricalPowerMarginW": 14091000000.0,
+      "installedContinuousWasteHeatW": 1387300000.0,
+      "sustainedHeatRejectionW": 4000000000.0,
+      "continuousHeatMarginW": 2612700000.0,
+      "minimumRadiatorFraction": 0.346825,
+      "fullHotRadiatorAreaM2": 53534.65455484752,
+      "radiatorAreaNeededAtInstalledHeatM2": 18567.15656598499,
+      "legacyEmergencyThermalCapacityJ": 20000000000000.0,
+      "zeroRadiatorEmergencyEnduranceS": 14416.492467382686
+    },
+    {
+      "id": "FLEET_CARRIER",
+      "ratedElectricalPowerW": 15000000000.0,
+      "installedContinuousPowerW": 3171000000.0,
+      "electricalPowerMarginW": 11829000000.0,
+      "installedContinuousWasteHeatW": 1020300000.0,
+      "sustainedHeatRejectionW": 3000000000.0,
+      "continuousHeatMarginW": 1979700000.0,
+      "minimumRadiatorFraction": 0.3401,
+      "fullHotRadiatorAreaM2": 40150.99091613564,
+      "radiatorAreaNeededAtInstalledHeatM2": 13655.856010977632,
+      "legacyEmergencyThermalCapacityJ": 15000000000000.0,
+      "zeroRadiatorEmergencyEnduranceS": 14701.55836518671
+    }
+  ],
+  "canonicalFindings": [
+    "Healthy v0.2 battleship/destroyer point defense is not ship-level power or radiator limited.",
+    "Local emitter/coolant throughput is the first thermal bottleneck for the current PD model.",
+    "The healthy 1.2 MW coolant seed sustains the complete current non-overlapping 300 km terminal envelope for 13 waves.",
+    "Reduced coolant throughput creates deterministic thermal inhibition without a class-specific combat penalty.",
+    "Recon/EW frigate remains intentionally close to its sustained radiator limit.",
+    "Legacy class thermal-buffer joules must become physically mass/material-derived before Ship Mathematics v1.0 acceptance."
+  ]
+}
