@@ -5,6 +5,7 @@ import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.MarketComponent;
+import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
 import com.spacesim.content.ContentCatalog;
@@ -239,6 +240,7 @@ class Stage17F5RouteRedundancyAcceptanceTest {
         market.isDirty = false;
         return new Entity()
                 .add(new EntityIdComponent(new EntityId(entityId)))
+                .add(new TransformComponent())
                 .add(inventory)
                 .add(market)
                 .add(new WalletComponent(Money.fromCredits(100_000d)))
