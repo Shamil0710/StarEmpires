@@ -4,7 +4,7 @@ import com.spacesim.components.WalletComponent;
 
 import java.util.Objects;
 
-/** Runtime mutable treasury одного persistent {@link FactionEconomicState}. */
+/** Runtime mutable treasury/governance account for one persistent {@link FactionEconomicState}. */
 final class FactionEconomicAccount {
     private final String factionContentId;
     private final WalletComponent treasury;
@@ -12,6 +12,7 @@ final class FactionEconomicAccount {
     private long maxLiquiditySupportPerDecisionMilliCredits;
     private long treasuryReserveFloorMilliCredits;
     private long maxConstructionInvestmentPerDecisionMilliCredits;
+    private FactionPolicyReviewState policyReviewState;
 
     FactionEconomicAccount(FactionEconomicState state) {
         FactionEconomicState checked = Objects.requireNonNull(state, "FactionEconomicState не задан");
@@ -22,6 +23,7 @@ final class FactionEconomicAccount {
         treasuryReserveFloorMilliCredits = checked.treasuryReserveFloorMilliCredits();
         maxConstructionInvestmentPerDecisionMilliCredits =
                 checked.maxConstructionInvestmentPerDecisionMilliCredits();
+        policyReviewState = checked.policyReviewState();
     }
 
     String factionContentId() {
@@ -46,6 +48,14 @@ final class FactionEconomicAccount {
 
     long maxConstructionInvestmentPerDecisionMilliCredits() {
         return maxConstructionInvestmentPerDecisionMilliCredits;
+    }
+
+    FactionPolicyReviewState policyReviewState() {
+        return policyReviewState;
+    }
+
+    void updatePolicyReviewState(FactionPolicyReviewState state) {
+        policyReviewState = Objects.requireNonNull(state, "Faction policy review state not set");
     }
 
     long spendableTreasuryMilliCredits() {
@@ -78,6 +88,7 @@ final class FactionEconomicAccount {
                 stationLiquidityReserveMilliCredits,
                 maxLiquiditySupportPerDecisionMilliCredits,
                 treasuryReserveFloorMilliCredits,
-                maxConstructionInvestmentPerDecisionMilliCredits);
+                maxConstructionInvestmentPerDecisionMilliCredits,
+                policyReviewState);
     }
 }
