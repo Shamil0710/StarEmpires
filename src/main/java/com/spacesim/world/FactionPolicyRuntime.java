@@ -20,12 +20,7 @@ final class FactionPolicyRuntime {
     }
 
     /**
-     * Устанавливает station access components и post-planner safety system.
-     *
-     * <p>Пустой strategic layer сохраняет Stage-7 runtime буквально: никакие компоненты и системы
-     * не добавляются. Отсутствующая strategy у владельца конкретного рынка означает unrestricted
-     * market. Explicit strategy materializes полный allowed-set для текущего content catalog;
-     * missing relation считается нейтральным значением 0.</p>
+     * Legacy/source-compatible install path для authored-only мира.
      *
      * @param session локальная simulation session
      * @param contentCatalog semantic faction catalog
@@ -35,33 +30,58 @@ final class FactionPolicyRuntime {
             SimulationSession session,
             ContentCatalog contentCatalog,
             List<FactionStrategicState> strategies) {
+        install(
+                session,
+                FactionIdentityResolver.createDefault(
+                        Objects.requireNonNull(contentCatalog, "ContentCatalog не задан"),
+                        List.of()),
+                strategies);
+    }
+
+    /**
+     * Устанавливает station access components и post-planner safety system через unified faction
+     * identity directory.
+     *
+     * <p>Пустой strategic layer сохраняет Stage-7 runtime буквально: никакие компоненты и системы
+     * не добавляются. Отсутствующая strategy у владельца конкретного рынка означает unrestricted
+     * market. Explicit strategy materializes полный allowed-set для всех authored и world-defined
+     * factions, имеющих dense runtime slot; missing relation считается нейтральным значением 0.</p>
+     *
+     * @param session локальная simulation session
+     * @param resolver unified authored + world-defined faction identity resolver
+     * @param strategies persistent strategic policies мира
+     */
+    static void install(
+            SimulationSession session,
+            FactionIdentityResolver resolver,
+            List<FactionStrategicState> strategies) {
         SimulationSession checkedSession = Objects.requireNonNull(session, "SimulationSession не задана");
-        ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
+        FactionIdentityResolver identities = Objects.requireNonNull(resolver, "FactionIdentityResolver не задан");
         Objects.requireNonNull(strategies, "Faction strategic states не заданы");
         if (strategies.isEmpty()) {
             return;
         }
 
-        Map<String, ContentCatalog.FactionDefinition> factionsByContentId = new HashMap<>();
-        for (ContentCatalog.FactionDefinition faction : content.getFactions()) {
-            factionsByContentId.put(faction.id(), faction);
-        }
         Map<Integer, FactionMarketAccessComponent> ruleByOwnerRuntimeId = new HashMap<>();
         for (FactionStrategicState strategy : strategies) {
             FactionStrategicState value = Objects.requireNonNull(strategy, "FactionStrategicState не задан");
-            ContentCatalog.FactionDefinition owner = factionsByContentId.get(value.factionContentId());
-            if (owner == null) {
-                throw new IllegalArgumentException(
-                        "Strategic policy содержит неизвестную faction: " + value.factionContentId());
-            }
+            int ownerRuntimeId = identities.runtimeId(value.factionContentId()).orElseThrow(
+                    () -> new IllegalArgumentException(
+                            "Strategic policy содержит неизвестную faction: " + value.factionContentId()));
             FactionMarketAccessComponent rule = new FactionMarketAccessComponent()
                     .allowUnfactioned(value.relationTo("") >= value.minimumMarketAccessRelation());
-            for (ContentCatalog.FactionDefinition participant : content.getFactions()) {
-                boolean allowed = participant.runtimeId() == owner.runtimeId()
-                        || value.relationTo(participant.id()) >= value.minimumMarketAccessRelation();
-                rule.setFactionAllowed(participant.runtimeId(), allowed);
+            for (int participantRuntimeId = 0;
+                    participantRuntimeId < identities.runtimeSlotCapacity();
+                    participantRuntimeId++) {
+                String participantStableId = identities.stableId(participantRuntimeId).orElse(null);
+                if (participantStableId == null) {
+                    continue;
+                }
+                boolean allowed = participantRuntimeId == ownerRuntimeId
+                        || value.relationTo(participantStableId) >= value.minimumMarketAccessRelation();
+                rule.setFactionAllowed(participantRuntimeId, allowed);
             }
-            ruleByOwnerRuntimeId.put(owner.runtimeId(), rule);
+            ruleByOwnerRuntimeId.put(ownerRuntimeId, rule);
         }
 
         for (Entity entity : checkedSession.getEngine().getEntities()) {
