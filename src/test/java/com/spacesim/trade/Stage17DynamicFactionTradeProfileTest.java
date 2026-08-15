@@ -32,10 +32,16 @@ class Stage17DynamicFactionTradeProfileTest {
     }
 
     @Test
-    void rejectsLegacySizedReputationVectorForDynamicPlanning() {
-        assertThrows(IllegalArgumentException.class, () -> new FleetTradeProfile(
+    void normalizesLegacySizedReputationVectorToRuntimeCapacity() {
+        float[] legacy = new float[Constants.LEGACY_FACTION_COUNT];
+        legacy[Constants.FACTION_TRADE_LEAGUE] = 8.5f;
+
+        FleetTradeProfile profile = new FleetTradeProfile(
                 0f, 0f, 10f, 1_000L, 10, 0, 10, -1, false, null,
-                Constants.LEGACY_FACTION_COUNT, new int[Constants.MAX_ITEMS],
-                new float[Constants.LEGACY_FACTION_COUNT]));
+                Constants.LEGACY_FACTION_COUNT, new int[Constants.MAX_ITEMS], legacy);
+
+        assertEquals(8.5f, profile.reputation(Constants.FACTION_TRADE_LEAGUE));
+        assertEquals(0f, profile.reputation(Constants.LEGACY_FACTION_COUNT));
+        assertEquals(0f, profile.reputation(Constants.FACTION_RUNTIME_CAPACITY - 1));
     }
 }
