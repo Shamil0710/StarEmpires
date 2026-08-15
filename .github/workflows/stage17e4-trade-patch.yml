@@ -1,0 +1,198 @@
+name: Stage 17E.4 trade settlement patch
+
+on:
+  push:
+    branches:
+      - agent/stage17e-customs-tariffs
+    paths:
+      - .github/workflows/stage17e4-trade-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/stage17e-customs-tariffs
+      - name: Patch TradeController
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/main/java/com/spacesim/controllers/TradeController.java')
+          t = p.read_text(encoding='utf-8')
+          def r(old,new,label):
+              global t
+              if t.count(old) != 1:
+                  raise SystemExit(f'{label}: {t.count(old)} anchors')
+              t = t.replace(old,new,1)
+
+          r('    private final EconomicLedger ledger;\n',
+            '    private final EconomicLedger ledger;\n    private final TradeTransactionPolicy transactionPolicy;\n', 'policy field')
+          r('    public TradeController() {\n        this(new EconomicLedger());\n    }',
+            '    public TradeController() {\n        this(new EconomicLedger(), TradeTransactionPolicy.none());\n    }', 'default ctor')
+          r('    public TradeController(EconomicLedger ledger) {\n        this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");\n    }',
+            '''    public TradeController(EconomicLedger ledger) {
+        this(ledger, TradeTransactionPolicy.none());
+    }
+
+    /**
+     * Creates a controller with an explicit non-mutating extra settlement policy.
+     *
+     * @param ledger shared economic ledger
+     * @param transactionPolicy customs/settlement quote policy
+     */
+    public TradeController(EconomicLedger ledger, TradeTransactionPolicy transactionPolicy) {
+        this.ledger = Objects.requireNonNull(ledger, "EconomicLedger не задан");
+        this.transactionPolicy = Objects.requireNonNull(transactionPolicy, "TradeTransactionPolicy not set");
+    }''', 'policy ctor')
+
+          old_buy = '''        float unitPrice = getEffectiveSellPrice(station, itemId, buyerReputation);
+        long cost = safeTradeValue(unitPrice, amount);
+
+        if (cost <= 0L
+                || stationInventory.stock[itemId] < amount
+                || getFreeCapacity(buyerInventory) < amount
+                || !buyerWallet.canDebit(cost)
+                || !stationWallet.canCredit(cost)
+                || buyerInventory.stock[itemId] > Integer.MAX_VALUE - amount) {
+            return false;
+        }
+
+        if (!buyerWallet.transferTo(stationWallet, cost)) {
+            return false;
+        }
+        stationInventory.stock[itemId] -= amount;
+        buyerInventory.stock[itemId] += amount;
+        mm.get(station).isDirty = true;
+        increaseReputation(station, buyerReputation);
+        ledger.recordTrade(entityName(buyer), entityName(station), itemId, amount, cost);
+        return true;'''
+          new_buy = '''        float unitPrice = getEffectiveSellPrice(station, itemId, buyerReputation);
+        long cost = safeTradeValue(unitPrice, amount);
+        if (cost <= 0L) {
+            return false;
+        }
+        TradeTransactionPolicy.Charge charge = transactionPolicy.quote(
+                station, buyer, TradeTransactionPolicy.Direction.BUY_FROM_STATION, cost);
+        long duty = charge.amountMilliCredits();
+        long totalDebit = safeAdd(cost, duty);
+        WalletComponent collector = charge.collectorWallet();
+
+        if (totalDebit <= 0L
+                || stationInventory.stock[itemId] < amount
+                || getFreeCapacity(buyerInventory) < amount
+                || !buyerWallet.canDebit(totalDebit)
+                || !stationWallet.canCredit(cost)
+                || (duty > 0L && (collector == buyerWallet
+                || collector == stationWallet
+                || !collector.canCredit(duty)))
+                || buyerInventory.stock[itemId] > Integer.MAX_VALUE - amount) {
+            return false;
+        }
+
+        if (!buyerWallet.transferTo(stationWallet, cost)) {
+            return false;
+        }
+        if (duty > 0L && !buyerWallet.transferTo(collector, duty)) {
+            stationWallet.transferTo(buyerWallet, cost);
+            return false;
+        }
+        stationInventory.stock[itemId] -= amount;
+        buyerInventory.stock[itemId] += amount;
+        mm.get(station).isDirty = true;
+        increaseReputation(station, buyerReputation);
+        String buyerName = entityName(buyer);
+        ledger.recordTrade(buyerName, entityName(station), itemId, amount, cost);
+        if (duty > 0L) {
+            ledger.recordMoneyTransfer(buyerName, charge.collectorLedgerName(), duty, charge.reason());
+        }
+        return true;'''
+          r(old_buy,new_buy,'buy settlement')
+
+          old_sell = '''        float unitPrice = getEffectiveBuyPrice(station, itemId, sellerReputation);
+        long revenue = safeTradeValue(unitPrice, amount);
+
+        if (revenue <= 0L
+                || sellerInventory.stock[itemId] < amount
+                || getFreeCapacity(stationInventory) < amount
+                || !stationWallet.canDebit(revenue)
+                || !sellerWallet.canCredit(revenue)
+                || stationInventory.stock[itemId] > Integer.MAX_VALUE - amount) {
+            return false;
+        }
+
+        if (!stationWallet.transferTo(sellerWallet, revenue)) {
+            return false;
+        }
+        sellerInventory.stock[itemId] -= amount;
+        stationInventory.stock[itemId] += amount;
+        mm.get(station).isDirty = true;
+        increaseReputation(station, sellerReputation);
+        ledger.recordTrade(entityName(station), entityName(seller), itemId, amount, revenue);
+        return true;'''
+          new_sell = '''        float unitPrice = getEffectiveBuyPrice(station, itemId, sellerReputation);
+        long revenue = safeTradeValue(unitPrice, amount);
+        if (revenue <= 0L) {
+            return false;
+        }
+        TradeTransactionPolicy.Charge charge = transactionPolicy.quote(
+                station, seller, TradeTransactionPolicy.Direction.SELL_TO_STATION, revenue);
+        long duty = charge.amountMilliCredits();
+        long netRevenue = revenue - duty;
+        WalletComponent collector = charge.collectorWallet();
+
+        if (netRevenue <= 0L
+                || sellerInventory.stock[itemId] < amount
+                || getFreeCapacity(stationInventory) < amount
+                || !stationWallet.canDebit(revenue)
+                || !sellerWallet.canCredit(netRevenue)
+                || (duty > 0L && (collector == sellerWallet
+                || collector == stationWallet
+                || !collector.canCredit(duty)))
+                || stationInventory.stock[itemId] > Integer.MAX_VALUE - amount) {
+            return false;
+        }
+
+        if (!stationWallet.transferTo(sellerWallet, netRevenue)) {
+            return false;
+        }
+        if (duty > 0L && !stationWallet.transferTo(collector, duty)) {
+            sellerWallet.transferTo(stationWallet, netRevenue);
+            return false;
+        }
+        sellerInventory.stock[itemId] -= amount;
+        stationInventory.stock[itemId] += amount;
+        mm.get(station).isDirty = true;
+        increaseReputation(station, sellerReputation);
+        String stationName = entityName(station);
+        String sellerName = entityName(seller);
+        ledger.recordTrade(stationName, sellerName, itemId, amount, netRevenue);
+        if (duty > 0L) {
+            ledger.recordMoneyTransfer(stationName, charge.collectorLedgerName(), duty, charge.reason());
+        }
+        return true;'''
+          r(old_sell,new_sell,'sell settlement')
+          r('    private long safeTradeValue(float unitPrice, int amount) {\n',
+            '''    private long safeAdd(long first, long second) {
+        try {
+            return Math.addExact(first, second);
+        } catch (ArithmeticException exception) {
+            return -1L;
+        }
+    }
+
+    private long safeTradeValue(float unitPrice, int amount) {
+''', 'safe add')
+          p.write_text(t, encoding='utf-8')
+          PY
+      - name: Remove applicator and commit
+        run: |
+          rm .github/workflows/stage17e4-trade-patch.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/main/java/com/spacesim/controllers/TradeController.java .github/workflows/stage17e4-trade-patch.yml
+          git commit -m "Stage 17E.4: settle customs on physical trades"
+          git push
