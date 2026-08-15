@@ -1,7 +1,25 @@
+# Build output
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials.json
+secrets.json
+application-local.properties
+application-local.yml
+application-local.yaml
+settings-local.xml
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
