@@ -7,10 +7,33 @@ import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.persistence.EntityId;
 
-/** Shared test-only helpers for physical construction deliveries. */
+/** Shared test-only helpers for physical construction deliveries and explicit legal setup. */
 final class ConstructionProjectTestFixtures {
     private ConstructionProjectTestFixtures() {
         throw new AssertionError("ConstructionProjectTestFixtures не создаёт экземпляров");
+    }
+
+    /**
+     * Grants the tested builder an indefinite explicit construction concession when the target is
+     * controlled by another faction. This keeps non-territorial construction tests focused on their
+     * original economic/lifecycle concern without bypassing the Stage-17D world authorization.
+     *
+     * @param world authoritative test world
+     * @param builderFactionContentId faction creating the project
+     * @param systemId project target system
+     */
+    static void authorizeConstruction(
+            WorldSimulation world,
+            String builderFactionContentId,
+            StarSystemId systemId) {
+        String controller = world.controllingFaction(systemId).orElse(null);
+        if (controller != null && !controller.equals(builderFactionContentId)) {
+            world.grantTerritorialConstructionRight(
+                    controller,
+                    builderFactionContentId,
+                    systemId,
+                    -1L);
+        }
     }
 
     static EntityId createLoadedCargo(
