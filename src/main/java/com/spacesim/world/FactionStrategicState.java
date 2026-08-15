@@ -43,6 +43,38 @@ public record FactionStrategicState(
         implements Comparable<FactionStrategicState> {
 
     /**
+     * Compact bootstrap constructor with an explicit Stage-17F doctrine profile.
+     *
+     * @param factionContentId stable faction ID
+     * @param minimumMarketAccessRelation relation threshold for ordinary market access
+     * @param relations directed strategic relations
+     * @param controlledSystems initially controlled systems
+     * @param doctrine institutional decision profile
+     */
+    public FactionStrategicState(
+            String factionContentId,
+            int minimumMarketAccessRelation,
+            List<FactionRelationState> relations,
+            List<StarSystemId> controlledSystems,
+            FactionDoctrineState doctrine) {
+        this(
+                factionContentId,
+                minimumMarketAccessRelation,
+                relations,
+                controlledSystems,
+                0,
+                0,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                legacyControlStates(controlledSystems),
+                List.of(),
+                List.of(),
+                doctrine);
+    }
+
+    /**
      * Source-compatible diplomacy/territory constructor с нулевой fiscal/economic policy.
      *
      * @param factionContentId stable owner faction content ID

@@ -97,17 +97,44 @@
     {
       "id": "faction.neutral",
       "runtimeId": 0,
-      "displayName": "Нейтралы"
+      "displayName": "Нейтралы",
+      "doctrine": {
+        "tradeOpenness": 45,
+        "securityPosture": 50,
+        "expansionPreference": 35,
+        "sovereigntySensitivity": 65,
+        "treatyLegalism": 55,
+        "interventionism": 25,
+        "economicResiliencePriority": 60
+      }
     },
     {
       "id": "faction.trade_league",
       "runtimeId": 1,
-      "displayName": "Торговая лига"
+      "displayName": "Торговая лига",
+      "doctrine": {
+        "tradeOpenness": 90,
+        "securityPosture": 40,
+        "expansionPreference": 65,
+        "sovereigntySensitivity": 35,
+        "treatyLegalism": 75,
+        "interventionism": 55,
+        "economicResiliencePriority": 40
+      }
     },
     {
       "id": "faction.miners",
       "runtimeId": 2,
-      "displayName": "Шахтёры"
+      "displayName": "Шахтёры",
+      "doctrine": {
+        "tradeOpenness": 55,
+        "securityPosture": 60,
+        "expansionPreference": 55,
+        "sovereigntySensitivity": 70,
+        "treatyLegalism": 60,
+        "interventionism": 30,
+        "economicResiliencePriority": 75
+      }
     }
   ],
   "weapons": [

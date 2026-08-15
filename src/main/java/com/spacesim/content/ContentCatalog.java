@@ -258,8 +258,16 @@ public final class ContentCatalog {
         List<FactionDefinition> orderedFactions = new ArrayList<>(factions);
         orderedFactions.sort(Comparator.comparingInt(FactionDefinition::runtimeId));
         for (FactionDefinition faction : orderedFactions) {
+            FactionDoctrineDefinition doctrine = faction.doctrine();
             canonical.append("faction|").append(faction.runtimeId()).append('|')
-                    .append(faction.id()).append('|').append(faction.displayName()).append('\n');
+                    .append(faction.id()).append('|').append(faction.displayName()).append('|')
+                    .append(doctrine.tradeOpenness()).append('|')
+                    .append(doctrine.securityPosture()).append('|')
+                    .append(doctrine.expansionPreference()).append('|')
+                    .append(doctrine.sovereigntySensitivity()).append('|')
+                    .append(doctrine.treatyLegalism()).append('|')
+                    .append(doctrine.interventionism()).append('|')
+                    .append(doctrine.economicResiliencePriority()).append('\n');
         }
         List<WeaponDefinition> orderedWeapons = new ArrayList<>(weapons);
         orderedWeapons.sort(Comparator.comparing(WeaponDefinition::id));
@@ -390,19 +398,89 @@ public final class ContentCatalog {
     }
 
     /**
+     * Data-driven institutional doctrine defaults for one authored faction.
+     *
+     * @param tradeOpenness willingness to prefer external trade and market integration [0,100]
+     * @param securityPosture priority given to security exposure and strategic risk [0,100]
+     * @param expansionPreference willingness to pursue territorial/infrastructure expansion [0,100]
+     * @param sovereigntySensitivity aversion to foreign jurisdiction and concessions [0,100]
+     * @param treatyLegalism importance assigned to trust and contractual continuity [0,100]
+     * @param interventionism willingness to bear costs for external commitments [0,100]
+     * @param economicResiliencePriority willingness to pay for diversification [0,100]
+     */
+    public record FactionDoctrineDefinition(
+            int tradeOpenness,
+            int securityPosture,
+            int expansionPreference,
+            int sovereigntySensitivity,
+            int treatyLegalism,
+            int interventionism,
+            int economicResiliencePriority) {
+        /**
+         * Validates bounded content-authored institutional preferences.
+         *
+         * @param tradeOpenness trade openness [0,100]
+         * @param securityPosture security posture [0,100]
+         * @param expansionPreference expansion preference [0,100]
+         * @param sovereigntySensitivity sovereignty sensitivity [0,100]
+         * @param treatyLegalism treaty legalism [0,100]
+         * @param interventionism interventionism [0,100]
+         * @param economicResiliencePriority resilience priority [0,100]
+         */
+        public FactionDoctrineDefinition {
+            requireDoctrineAxis(tradeOpenness, "Trade openness");
+            requireDoctrineAxis(securityPosture, "Security posture");
+            requireDoctrineAxis(expansionPreference, "Expansion preference");
+            requireDoctrineAxis(sovereigntySensitivity, "Sovereignty sensitivity");
+            requireDoctrineAxis(treatyLegalism, "Treaty legalism");
+            requireDoctrineAxis(interventionism, "Interventionism");
+            requireDoctrineAxis(economicResiliencePriority, "Economic resilience priority");
+        }
+
+        /** @return neutral midpoint doctrine for source-compatible catalogs without explicit doctrine */
+        public static FactionDoctrineDefinition neutral() {
+            return new FactionDoctrineDefinition(50, 50, 50, 50, 50, 50, 50);
+        }
+
+        private static void requireDoctrineAxis(int value, String label) {
+            if (value < 0 || value > 100) {
+                throw new IllegalArgumentException(label + " must be in [0,100]");
+            }
+        }
+    }
+
+    /**
      * @param id стабильный persistent faction ID
      * @param runtimeId плотный ID массива репутации
      * @param displayName отображаемое имя
+     * @param doctrine data-driven institutional decision defaults
      */
-    public record FactionDefinition(String id, int runtimeId, String displayName) {
+    public record FactionDefinition(
+            String id,
+            int runtimeId,
+            String displayName,
+            FactionDoctrineDefinition doctrine) {
+        /**
+         * Source-compatible definition for narrow catalogs predating Stage 17F.
+         *
+         * @param id persistent faction ID
+         * @param runtimeId dense runtime ID
+         * @param displayName display name
+         */
+        public FactionDefinition(String id, int runtimeId, String displayName) {
+            this(id, runtimeId, displayName, FactionDoctrineDefinition.neutral());
+        }
+
         /**
          * @param id стабильный persistent faction ID
          * @param runtimeId плотный ID массива репутации
          * @param displayName отображаемое имя
+         * @param doctrine data-driven institutional decision defaults
          */
         public FactionDefinition {
             Objects.requireNonNull(id, "Faction ID не задан");
             Objects.requireNonNull(displayName, "Faction displayName не задан");
+            Objects.requireNonNull(doctrine, "Faction doctrine не задана");
         }
     }
 
