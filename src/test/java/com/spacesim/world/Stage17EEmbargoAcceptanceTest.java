@@ -134,7 +134,7 @@ class Stage17EEmbargoAcceptanceTest {
                         MINERS,
                         -1L,
                         "renewed-sanction"));
-        assertEquals(start + 31L <= reimposed.embargo().imposedTick(), true);
+        assertTrue(reimposed.embargo().imposedTick() >= start + 31L);
         assertEquals(DiplomaticMarketAccessResolver.Reason.EMBARGO,
                 world.evaluateFactionMarketAccess(TRADE_LEAGUE, MINERS).reason());
     }
@@ -164,7 +164,7 @@ class Stage17EEmbargoAcceptanceTest {
         return world.createEntity(
                 DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
                 new Entity()
-                        .add(new IdentityComponent("Embargo Buyer", IdentityComponent.Kind.SHIP))
+                        .add(new IdentityComponent("Embargo Buyer", IdentityComponent.Kind.FLEET))
                         .add(new FactionComponent(factionRuntimeId))
                         .add(inventory)
                         .add(new WalletComponent(1_000_000L)));
