@@ -63,8 +63,17 @@ public class Constants {
         return ItemType.fromId(itemId);
     }
 
-    /** Число legacy-фракций и текущая длина массива репутации. */
-    public static final int MAX_FACTIONS = 3;
+    /** Число authored core-фракций в legacy schema до Stage 17. */
+    public static final int LEGACY_FACTION_COUNT = 3;
+
+    /**
+     * Максимальное число плотных runtime faction slots Stage-17 simulation schema.
+     *
+     * <p>Фактическое число authored и world-defined factions может быть меньше. Stable faction ID
+     * остаются строковыми world/content identifiers; это только bounded hot-path capacity для
+     * {@code FactionComponent}, reputation и market-access masks.</p>
+     */
+    public static final int MAX_FACTIONS = 32;
 
     /** Идентификатор нейтральной фракции. */
     public static final int FACTION_NEUTRAL = 0;
@@ -75,7 +84,7 @@ public class Constants {
     /** Идентификатор фракции шахтёров. */
     public static final int FACTION_MINERS = 2;
 
-    /** Legacy-имена фракций; будут перенесены в content catalog в Stage 4. */
+    /** Legacy-имена трёх authored core-фракций; dynamic factions разрешаются через world directory. */
     public static final String[] FACTION_NAMES = {"Нейтралы", "Торговая лига", "Шахтёры"};
 
     /** Минимальная репутация у одной фракции, в пунктах репутации. */
