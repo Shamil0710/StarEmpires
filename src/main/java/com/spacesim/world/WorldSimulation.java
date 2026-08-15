@@ -470,6 +470,64 @@ public final class WorldSimulation {
     }
 
     /**
+     * Transfers real money from a caller-owned authoritative wallet into the ordinary Stage-8 faction treasury.
+     *
+     * <p>The operation is a pure money transfer: no source/sink is recorded. Both wallets are validated
+     * before mutation and one {@code MONEY_TRANSFER} is appended to the active-system ledger. If ledger
+     * recording unexpectedly fails after the wallet move, the wallet move is reversed before the exception
+     * escapes.</p>
+     *
+     * @param factionContentId stable destination faction identity
+     * @param sourceWallet authoritative source wallet owned by the caller
+     * @param sourceLedgerName non-empty diagnostic source name
+     * @param amountMilliCredits strictly positive full-transfer amount
+     * @param reason non-empty ledger reason
+     * @return true when the full amount was transferred; false when either wallet rejects it
+     */
+    public boolean transferToFactionTreasury(
+            String factionContentId,
+            WalletComponent sourceWallet,
+            String sourceLedgerName,
+            long amountMilliCredits,
+            String reason) {
+        String factionId = normalizedFactionId(factionContentId);
+        FactionEconomicAccount account = requireFactionAccount(factionId);
+        WalletComponent source = Objects.requireNonNull(sourceWallet, "Treasury source wallet not set");
+        String sourceName = Objects.requireNonNull(
+                sourceLedgerName, "Treasury source ledger name not set").strip();
+        String transferReason = Objects.requireNonNull(
+                reason, "Treasury transfer reason not set").strip();
+        if (sourceName.isEmpty() || transferReason.isEmpty()) {
+            throw new IllegalArgumentException("Treasury transfer ledger labels cannot be blank");
+        }
+        if (amountMilliCredits <= 0L) {
+            throw new IllegalArgumentException("Treasury transfer amount must be positive");
+        }
+
+        WalletComponent treasury = account.treasury();
+        if (!source.canDebit(amountMilliCredits) || !treasury.canCredit(amountMilliCredits)) {
+            return false;
+        }
+        if (!source.transferTo(treasury, amountMilliCredits)) {
+            return false;
+        }
+        try {
+            sessionsById.get(activeSystemId).getLedger().recordMoneyTransfer(
+                    sourceName,
+                    treasuryName(factionId),
+                    amountMilliCredits,
+                    transferReason);
+            return true;
+        } catch (RuntimeException exception) {
+            if (!treasury.transferTo(source, amountMilliCredits)) {
+                exception.addSuppressed(new IllegalStateException(
+                        "Faction treasury transfer rollback could not restore money"));
+            }
+            throw exception;
+        }
+    }
+
+    /**
      * Resolves a dense local ECS runtime faction slot back to stable identity.
      *
      * @param runtimeFactionId dense runtime faction ID
