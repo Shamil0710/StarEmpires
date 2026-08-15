@@ -4,7 +4,7 @@ import com.badlogic.ashley.core.Component;
 import com.spacesim.constants.Constants;
 
 /**
- * Репутация одной ECS-сущности у каждой известной фракции.
+ * Репутация одной ECS-сущности у materialized runtime factions.
  *
  * <p>Значения хранятся в пунктах репутации и ограничены диапазоном
  * [{@link Constants#MIN_REPUTATION}, {@link Constants#MAX_REPUTATION}].
@@ -12,22 +12,24 @@ import com.spacesim.constants.Constants;
  * поправки торговой цены и увеличивает её после успешных операций; интерфейс
  * использует компонент только для отображения. Массив закрыт, поэтому менять
  * значения следует через {@link #addReputation(int, float)}.</p>
+ *
+ * <p>Размер storage определяется {@link Constants#FACTION_RUNTIME_CAPACITY}; это не число
+ * фактически существующих factions. Stable identity и display metadata разрешаются отдельно через
+ * world/content faction directory.</p>
  */
 public class ReputationComponent implements Component {
-    private final float[] reputation = new float[Constants.MAX_FACTIONS];
+    private final float[] reputation = new float[Constants.FACTION_RUNTIME_CAPACITY];
 
-    /**
-     * Создаёт компонент с нейтральной нулевой репутацией у всех фракций.
-     */
+    /** Создаёт компонент с нейтральной нулевой репутацией во всех runtime slots. */
     public ReputationComponent() {
     }
 
     /**
-     * Возвращает репутацию у выбранной фракции.
+     * Возвращает репутацию у выбранного runtime faction slot.
      *
-     * @param factionId идентификатор фракции
+     * @param factionId dense runtime faction ID
      * @return значение в установленном диапазоне; {@code 0}, если
-     *         идентификатор не входит в {@code [0, Constants.MAX_FACTIONS)}
+     *         идентификатор не входит в runtime capacity
      */
     public float getReputation(int factionId) {
         if (!isValidFaction(factionId)) {
@@ -44,12 +46,10 @@ public class ReputationComponent implements Component {
      * состояние не меняется. Это позволяет безопасно работать с сущностью,
      * фракция которой ещё не зарегистрирована.</p>
      *
-     * @param factionId идентификатор изменяемой фракции
-     * @param amount конечное положительное или отрицательное изменение в
-     *               пунктах репутации
-     * @throws IllegalArgumentException если идентификатор фракции допустим, а
-     *                                  {@code amount} равен {@code NaN} или бесконечности;
-     *                                  при недопустимом идентификаторе значение не проверяется
+     * @param factionId dense runtime faction ID
+     * @param amount конечное положительное или отрицательное изменение в пунктах репутации
+     * @throws IllegalArgumentException если идентификатор фракции допустим, а {@code amount}
+     *         равен {@code NaN} или бесконечности
      */
     public void addReputation(int factionId, float amount) {
         if (!isValidFaction(factionId)) {
@@ -63,6 +63,6 @@ public class ReputationComponent implements Component {
     }
 
     private boolean isValidFaction(int factionId) {
-        return factionId >= 0 && factionId < Constants.MAX_FACTIONS;
+        return factionId >= 0 && factionId < Constants.FACTION_RUNTIME_CAPACITY;
     }
 }
