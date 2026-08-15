@@ -34,12 +34,24 @@ public class MarketComponent implements Component {
     public float[] buyPrices = new float[Constants.MAX_ITEMS];
 
     /**
-     * Целевой запас станции по каждому товару, в целых единицах.
-     * Для торгуемого товара значение строго положительно и определяет дефицит,
-     * используемый при расчёте цены и выборе маршрута торговым ИИ; ноль
-     * обозначает отключённый рынок.
+     * Текущий эффективный целевой запас станции по каждому товару.
+     *
+     * <p>Значение может быть выше исходной конфигурации из-за faction strategic
+     * policy. Policy engine обязан пересчитывать его из
+     * {@link #configuredTargetStock} и текущих persistent demand contributions,
+     * а не использовать прошлое effective значение как новый baseline.</p>
      */
     public int[] targetStock = new int[Constants.MAX_ITEMS];
+
+    /**
+     * Исходный persistent целевой запас, заданный самой конфигурацией станции.
+     *
+     * <p>Этот массив является provenance baseline для обратимого strategic
+     * demand. Он не изменяется при обычном применении faction policy. Для
+     * торгуемого товара значение положительно; отключение торговли обнуляет и
+     * baseline, и effective target.</p>
+     */
+    public int[] configuredTargetStock = new int[Constants.MAX_ITEMS];
 
     /**
      * Базовая непрерывная скорость потребления по товарам, в единицах в
@@ -84,9 +96,10 @@ public class MarketComponent implements Component {
     /**
      * Включает рынок одного товара и задаёт его экономические параметры.
      *
-     * <p>Метод устанавливает флаг торговли, целевой запас, базовое потребление
-     * и помечает цены устаревшими. Уже накопленный дробный остаток и текущие
-     * цены не очищаются: они будут обработаны соответствующими системами.</p>
+     * <p>Метод устанавливает флаг торговли, configured baseline и initial
+     * effective target, базовое потребление и помечает цены устаревшими. Уже
+     * накопленный дробный остаток и текущие цены не очищаются: они будут
+     * обработаны соответствующими системами.</p>
      *
      * @param itemId идентификатор товара в диапазоне
      *               {@code [0, Constants.MAX_ITEMS)}
@@ -107,6 +120,7 @@ public class MarketComponent implements Component {
         }
 
         tradableItems[itemId] = true;
+        configuredTargetStock[itemId] = desiredStock;
         targetStock[itemId] = desiredStock;
         baseConsumption[itemId] = consumptionPerSecond;
         isDirty = true;
@@ -115,9 +129,9 @@ public class MarketComponent implements Component {
     /**
      * Полностью отключает торговлю и потребление одного товара.
      *
-     * <p>Целевой запас, скорость потребления, дробный остаток и обе цены
-     * обнуляются, после чего компонент помечается для пересчёта остальных
-     * рыночных данных.</p>
+     * <p>Configured baseline, effective target, скорость потребления, дробный
+     * остаток и обе цены обнуляются, после чего компонент помечается для
+     * пересчёта остальных рыночных данных.</p>
      *
      * @param itemId идентификатор товара в диапазоне
      *               {@code [0, Constants.MAX_ITEMS)}
@@ -126,6 +140,7 @@ public class MarketComponent implements Component {
     public void disableItemTrading(int itemId) {
         validateItemId(itemId);
         tradableItems[itemId] = false;
+        configuredTargetStock[itemId] = 0;
         targetStock[itemId] = 0;
         baseConsumption[itemId] = 0f;
         consumptionRemainder[itemId] = 0d;
