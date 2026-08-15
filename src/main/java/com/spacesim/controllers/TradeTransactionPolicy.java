@@ -36,7 +36,14 @@ public interface TradeTransactionPolicy {
             WalletComponent collectorWallet,
             String collectorLedgerName,
             String reason) {
-        /** Validates one non-mutating settlement quote. */
+        /**
+         * Validates one non-mutating settlement quote.
+         *
+         * @param amountMilliCredits non-negative customs amount
+         * @param collectorWallet receiving authoritative wallet, required when amount is positive
+         * @param collectorLedgerName non-empty ledger destination when amount is positive
+         * @param reason non-empty ledger reason when amount is positive
+         */
         public Charge {
             if (amountMilliCredits < 0L) {
                 throw new IllegalArgumentException("Trade policy charge cannot be negative");
