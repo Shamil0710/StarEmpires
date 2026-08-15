@@ -32,6 +32,26 @@ public final class FactionStrategicPolicyEngine {
     }
 
     /**
+     * Validates semantic references in one common stock/production authoring value without mutation.
+     *
+     * @param contentCatalog authoritative semantic catalog
+     * @param policy common player/AI stock-production policy
+     * @throws NullPointerException when a required value is absent
+     * @throws IllegalArgumentException when an item, station archetype or recipe reference is unknown
+     */
+    public static void validatePolicy(
+            ContentCatalog contentCatalog,
+            FactionStockProductionPolicyState policy) {
+        ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
+        FactionStockProductionPolicyState checked = Objects.requireNonNull(
+                policy, "Faction stock/production policy not set");
+        for (FactionStockPolicyState stock : checked.stockPolicies()) {
+            requireItem(content, stock);
+        }
+        validateProduction(checked.productionPolicies(), content);
+    }
+
+    /**
      * Применяет одно deterministic strategic policy decision.
      *
      * <p>Все semantic content references валидируются до первой mutation. StarSystems обходятся по
@@ -53,15 +73,16 @@ public final class FactionStrategicPolicyEngine {
         WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation не задан");
         ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
         String factionId = Objects.requireNonNull(factionContentId, "Faction content ID не задан").strip();
-        ContentCatalog.FactionDefinition faction = content.findFaction(factionId);
-        if (faction == null) {
-            throw new IllegalArgumentException("Неизвестная faction: " + factionId);
+        if (factionId.isEmpty()) {
+            throw new IllegalArgumentException("Faction content ID не может быть пустым");
         }
+        int factionRuntimeId = checkedWorld.findFactionRuntimeId(factionId).orElseThrow(
+                () -> new IllegalArgumentException("Неизвестная faction: " + factionId));
         FactionStrategicState strategy = checkedWorld.findFactionStrategicState(factionId)
                 .orElseThrow(() -> new IllegalArgumentException("Faction не имеет strategic state: " + factionId));
 
         Map<Integer, Integer> demandFloorByRuntimeItem = validateAndBuildDemand(strategy, content);
-        Map<String, String> productionByArchetype = validateProduction(strategy, content);
+        Map<String, String> productionByArchetype = validateProduction(strategy.productionPolicies(), content);
 
         int marketsAdjusted = 0;
         int productionRetooled = 0;
@@ -69,7 +90,7 @@ public final class FactionStrategicPolicyEngine {
         systems.sort(Comparator.comparing(StarSystemNode::id));
         for (StarSystemNode system : systems) {
             SimulationSession session = checkedWorld.findSession(system.id()).orElseThrow();
-            List<Entity> owned = ownedEntities(session, faction.runtimeId());
+            List<Entity> owned = ownedEntities(session, factionRuntimeId);
             for (Entity entity : owned) {
                 MarketComponent market = entity.getComponent(MarketComponent.class);
                 InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
@@ -136,19 +157,26 @@ public final class FactionStrategicPolicyEngine {
             Map<Integer, Integer> result,
             ContentCatalog content,
             FactionStockPolicyState demand) {
+        ContentCatalog.ItemDefinition item = requireItem(content, demand);
+        result.merge(item.runtimeId(), demand.targetStockFloor(), Math::max);
+    }
+
+    private static ContentCatalog.ItemDefinition requireItem(
+            ContentCatalog content,
+            FactionStockPolicyState demand) {
         ContentCatalog.ItemDefinition item = content.findItem(demand.itemContentId());
         if (item == null) {
             throw new IllegalArgumentException("Strategic demand ссылается на неизвестный item: "
                     + demand.itemContentId());
         }
-        result.merge(item.runtimeId(), demand.targetStockFloor(), Math::max);
+        return item;
     }
 
     private static Map<String, String> validateProduction(
-            FactionStrategicState strategy,
+            List<FactionProductionPolicyState> policies,
             ContentCatalog content) {
         Map<String, String> result = new LinkedHashMap<>();
-        for (FactionProductionPolicyState policy : strategy.productionPolicies()) {
+        for (FactionProductionPolicyState policy : policies) {
             if (content.findStationArchetype(policy.stationArchetypeContentId()) == null) {
                 throw new IllegalArgumentException("Production policy ссылается на неизвестный station archetype: "
                         + policy.stationArchetypeContentId());
