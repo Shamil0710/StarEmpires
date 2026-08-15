@@ -36,7 +36,17 @@ public record DiplomaticGrievanceState(
         OTHER
     }
 
-    /** Validates and normalizes one grievance. */
+    /**
+     * Validates and normalizes one grievance.
+     *
+     * @param grievanceId stable grievance ID unique within the owning faction
+     * @param targetFactionContentId faction blamed by the owner
+     * @param kind semantic grievance category
+     * @param severity bounded severity in range [1, 100]
+     * @param createdTick authoritative non-negative creation tick
+     * @param expiresTick exclusive expiry tick or -1 for indefinite
+     * @param subjectKey optional stable subject/context key
+     */
     public DiplomaticGrievanceState {
         grievanceId = requireId(grievanceId, "Grievance ID");
         targetFactionContentId = requireId(targetFactionContentId, "Target faction content ID");
@@ -53,7 +63,12 @@ public record DiplomaticGrievanceState(
         subjectKey = Objects.requireNonNull(subjectKey, "Grievance subject key not set").strip();
     }
 
-    /** @return true when the grievance is legally/currently active at the supplied tick */
+    /**
+     * Tests whether this grievance still contributes to current diplomatic history.
+     *
+     * @param worldTick authoritative world tick
+     * @return true when the grievance is active at the supplied tick
+     */
     public boolean activeAt(long worldTick) {
         return worldTick >= createdTick && (expiresTick < 0L || worldTick < expiresTick);
     }
