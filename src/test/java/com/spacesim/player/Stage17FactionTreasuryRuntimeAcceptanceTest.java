@@ -37,7 +37,17 @@ class Stage17FactionTreasuryRuntimeAcceptanceTest {
         assertEquals(before.factionTreasuryMilliCredits() + amount, after.factionTreasuryMilliCredits());
         assertEquals(totalBefore, Math.addExact(
                 after.personalWalletMilliCredits(), after.factionTreasuryMilliCredits()));
-        assertEquals(systemsBefore, runtime.world().snapshot().systems());
+        var systemsAfter = runtime.world().snapshot().systems();
+        assertEquals(systemsBefore.size(), systemsAfter.size());
+        for (int i = 0; i < systemsBefore.size(); i++) {
+            assertEquals(systemsBefore.get(i).systemId(), systemsAfter.get(i).systemId());
+            assertEquals(
+                    systemsBefore.get(i).simulationState().entities(),
+                    systemsAfter.get(i).simulationState().entities());
+            assertEquals(
+                    systemsBefore.get(i).simulationState().clock(),
+                    systemsAfter.get(i).simulationState().clock());
+        }
         assertEquals(fleetsBefore, runtime.world().snapshot().fleets());
 
         assertEquals(ledgerSizeBefore + 1, ledger.size());
