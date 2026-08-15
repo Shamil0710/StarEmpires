@@ -1,0 +1,119 @@
+name: One-off Stage17F6 resilience world boundary
+
+on:
+  push:
+    branches:
+      - stage-17f6-resilience-demand-overlay
+    paths:
+      - .github/workflows/oneoff-stage17f6-overlay-world.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: stage-17f6-resilience-demand-overlay
+          fetch-depth: 0
+      - name: Insert resilience overlay world boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/main/java/com/spacesim/world/WorldSimulation.java')
+          text = path.read_text()
+          marker = "    /**\n     * Applies the currently authored strategic stock/production policy to ordinary ECS configuration.\n"
+          insert = (
+              "    /**\n"
+              "     * Returns the persistent automatic resilience stock-demand overlay for one faction.\n"
+              "     *\n"
+              "     * <p>Resilience demand is stored separately from operator-authored base stock policy.\n"
+              "     * Multiple malformed resilience goals are defensively aggregated by item maximum; the\n"
+              "     * update boundary canonicalizes them back to one goal.</p>\n"
+              "     *\n"
+              "     * @param factionContentId stable authored or world-defined faction ID\n"
+              "     * @return canonical item-sorted resilience demand floors\n"
+              "     */\n"
+              "    public List<FactionStockPolicyState> findFactionResilienceDemandFloors(\n"
+              "            String factionContentId) {\n"
+              "        FactionStrategicState strategy = factionContentId == null\n"
+              "                ? null\n"
+              "                : territorialControlRuntime.find(factionContentId);\n"
+              "        if (strategy == null) {\n"
+              "            return List.of();\n"
+              "        }\n"
+              "        Map<String, Integer> floors = new java.util.TreeMap<>();\n"
+              "        for (FactionStrategicGoalState goal : strategy.strategicGoals()) {\n"
+              "            if (goal.type() != FactionStrategicGoalState.GoalType.RESILIENCE) {\n"
+              "                continue;\n"
+              "            }\n"
+              "            for (FactionStockPolicyState floor : goal.demandFloors()) {\n"
+              "                floors.merge(floor.itemContentId(), floor.targetStockFloor(), Math::max);\n"
+              "            }\n"
+              "        }\n"
+              "        List<FactionStockPolicyState> result = new ArrayList<>(floors.size());\n"
+              "        for (Map.Entry<String, Integer> floor : floors.entrySet()) {\n"
+              "            result.add(new FactionStockPolicyState(floor.getKey(), floor.getValue()));\n"
+              "        }\n"
+              "        return List.copyOf(result);\n"
+              "    }\n\n"
+              "    /**\n"
+              "     * Replaces only the automatic resilience stock-demand overlay.\n"
+              "     *\n"
+              "     * <p>Base stock policy and all non-resilience strategic goals are preserved. Item\n"
+              "     * references are validated before mutation. An empty list removes the automatic\n"
+              "     * overlay. This operation authors persistent demand only and does not change cargo,\n"
+              "     * wallets, production output or physical market targets until ordinary strategic\n"
+              "     * policy application is explicitly requested.</p>\n"
+              "     *\n"
+              "     * @param factionContentId stable authored or world-defined faction ID\n"
+              "     * @param demandFloors canonical automatic resilience floors; empty removes overlay\n"
+              "     * @return installed canonical resilience floors\n"
+              "     */\n"
+              "    public List<FactionStockPolicyState> updateFactionResilienceDemandFloors(\n"
+              "            String factionContentId,\n"
+              "            List<FactionStockPolicyState> demandFloors) {\n"
+              "        String factionId = normalizedFactionId(factionContentId);\n"
+              "        if (factionIdentityResolver.runtimeId(factionId).isEmpty()) {\n"
+              "            throw new IllegalArgumentException(\"Unknown faction identity: \" + factionId);\n"
+              "        }\n"
+              "        List<FactionStockPolicyState> checked = List.copyOf(Objects.requireNonNull(\n"
+              "                demandFloors, \"Faction resilience demand floors not set\"));\n"
+              "        FactionStrategicPolicyEngine.validatePolicy(\n"
+              "                contentCatalog,\n"
+              "                new FactionStockProductionPolicyState(checked, List.of()));\n"
+              "        FactionStrategicState current = territorialControlRuntime.find(factionId);\n"
+              "        if (current == null) {\n"
+              "            throw new IllegalArgumentException(\"Faction has no strategic state: \" + factionId);\n"
+              "        }\n"
+              "        List<FactionStrategicGoalState> goals = new ArrayList<>();\n"
+              "        for (FactionStrategicGoalState goal : current.strategicGoals()) {\n"
+              "            if (goal.type() != FactionStrategicGoalState.GoalType.RESILIENCE) {\n"
+              "                goals.add(goal);\n"
+              "            }\n"
+              "        }\n"
+              "        if (!checked.isEmpty()) {\n"
+              "            goals.add(new FactionStrategicGoalState(\n"
+              "                    \"policy.resilience\",\n"
+              "                    FactionStrategicGoalState.GoalType.RESILIENCE,\n"
+              "                    checked));\n"
+              "        }\n"
+              "        territorialControlRuntime.updateStrategicGoals(factionId, goals);\n"
+              "        return findFactionResilienceDemandFloors(factionId);\n"
+              "    }\n\n"
+          )
+          if 'updateFactionResilienceDemandFloors(' not in text:
+              if marker not in text:
+                  raise SystemExit('Target marker not found')
+              path.write_text(text.replace(marker, insert + marker, 1))
+          PY
+      - name: Remove one-off workflow and commit result
+        run: |
+          rm .github/workflows/oneoff-stage17f6-overlay-world.yml
+          git config user.name "Shamil0710"
+          git config user.email "69683579+Shamil0710@users.noreply.github.com"
+          git add src/main/java/com/spacesim/world/WorldSimulation.java .github/workflows/oneoff-stage17f6-overlay-world.yml
+          git commit -m "Add resilience demand overlay world boundary"
+          git push origin HEAD:stage-17f6-resilience-demand-overlay
