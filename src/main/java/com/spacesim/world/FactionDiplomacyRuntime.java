@@ -45,6 +45,27 @@ final class FactionDiplomacyRuntime {
         return factionContentId == null ? null : byId.get(factionContentId.strip());
     }
 
+    FactionDiplomacyState updateCustomsTariff(String factionContentId, int customsTariffBasisPoints) {
+        String factionId = requireFaction(factionContentId);
+        FactionDiplomacyState current = byId.get(factionId);
+        if (current.customsTariffBasisPoints() == customsTariffBasisPoints) {
+            return current;
+        }
+        FactionDiplomacyState replacement = new FactionDiplomacyState(
+                current.factionContentId(),
+                current.standings(),
+                current.grievances(),
+                current.treaties(),
+                current.embargoes(),
+                customsTariffBasisPoints);
+        List<FactionDiplomacyState> updated = new ArrayList<>(states.size());
+        for (FactionDiplomacyState state : states) {
+            updated.add(state.factionContentId().equals(factionId) ? replacement : state);
+        }
+        install(updated);
+        return replacement;
+    }
+
     DiplomaticTreatyState findTreaty(String treatyId) {
         TreatyLocation location = locateTreaty(treatyId);
         return location == null ? null : location.treaty();

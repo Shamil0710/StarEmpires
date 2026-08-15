@@ -60,7 +60,10 @@ final class FactionInvestmentPlanner {
                 continue;
             }
             Candidate selected = candidate.orElseThrow();
-            if (economy.treasuryMilliCredits() < selected.fundingMilliCredits()) {
+            long investmentAuthorization = Math.min(
+                    economy.discretionaryTreasuryMilliCredits(),
+                    economy.maxConstructionInvestmentPerDecisionMilliCredits());
+            if (investmentAuthorization < selected.fundingMilliCredits()) {
                 continue;
             }
             Location location = chooseLocation(world, pressure.systemId());

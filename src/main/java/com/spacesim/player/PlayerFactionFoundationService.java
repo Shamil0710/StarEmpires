@@ -88,7 +88,7 @@ public final class PlayerFactionFoundationService {
         WorldFactionIdentityState identity = resolver.allocatePlayerCreated(id, displayName);
 
         List<FactionEconomicState> economics = new ArrayList<>(world.factions());
-        economics.add(new FactionEconomicState(id, 0L, 0L, 0L));
+        economics.add(new FactionEconomicState(id, 0L, 0L, 0L, 0L, 0L));
 
         List<FactionStrategicState> strategies = new ArrayList<>(world.factionStrategies());
         strategies.add(new FactionStrategicState(id, 0, List.of(), List.of()));
