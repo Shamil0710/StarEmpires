@@ -625,6 +625,24 @@ public final class WorldSimulation {
     }
 
     /**
+ * Computes current read-only structural economic dependence of one faction on another.
+ *
+ * <p>The result is derived from physical inventories, market targets/quotes, active production,
+ * legal access and topology at the authoritative world tick. It does not mutate world state and
+ * does not pretend that current structural exposure is historical import/export share.</p>
+ *
+ * @param sourceFactionContentId faction whose exposure is measured
+ * @param partnerFactionContentId supplier/market partner being tested
+ * @return immutable authoritative diagnostics snapshot
+ */
+public FactionEconomicDependenceDiagnostics analyzeEconomicDependence(
+        String sourceFactionContentId,
+        String partnerFactionContentId) {
+    return FactionEconomicDependenceAnalyzer.analyze(
+            this, contentCatalog, sourceFactionContentId, partnerFactionContentId);
+}
+
+    /**
      * Evaluates explainable effective legal market access at the authoritative world tick.
      *
      * @param marketOwnerFactionContentId faction owning the market
