@@ -63,17 +63,24 @@ public class Constants {
         return ItemType.fromId(itemId);
     }
 
-    /** Число authored core-фракций в legacy schema до Stage 17. */
+    /** Число authored core-фракций в legacy presentation/content model. */
     public static final int LEGACY_FACTION_COUNT = 3;
 
     /**
-     * Максимальное число плотных runtime faction slots Stage-17 simulation schema.
+     * Legacy alias числа authored core-фракций.
      *
-     * <p>Фактическое число authored и world-defined factions может быть меньше. Stable faction ID
-     * остаются строковыми world/content identifiers; это только bounded hot-path capacity для
-     * {@code FactionComponent}, reputation и market-access masks.</p>
+     * <p>Новый код, которому нужен размер dense faction storage, должен использовать
+     * {@link #FACTION_RUNTIME_CAPACITY}, а не этот исторический count.</p>
      */
-    public static final int MAX_FACTIONS = 32;
+    public static final int MAX_FACTIONS = LEGACY_FACTION_COUNT;
+
+    /**
+     * Bounded capacity плотных runtime faction slots Stage-17 simulation layer.
+     *
+     * <p>Stable faction IDs остаются строковыми world/content identifiers. Эта capacity существует
+     * только для горячих ECS-массивов: reputation, market-access и runtime faction affiliation.</p>
+     */
+    public static final int FACTION_RUNTIME_CAPACITY = 32;
 
     /** Идентификатор нейтральной фракции. */
     public static final int FACTION_NEUTRAL = 0;
