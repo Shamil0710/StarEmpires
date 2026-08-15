@@ -20,7 +20,14 @@ public record TerritorialConstructionRightState(
         long grantedTick,
         long expiresTick) implements Comparable<TerritorialConstructionRightState> {
 
-    /** Canonicalizes IDs and validates the bounded/indefinite lifetime. */
+    /**
+     * Canonicalizes IDs and validates the bounded/indefinite lifetime.
+     *
+     * @param granteeFactionContentId stable faction receiving the right
+     * @param systemId controlled system where construction is permitted
+     * @param grantedTick authoritative world tick when the right was granted
+     * @param expiresTick exclusive expiry tick, or {@code -1} for an indefinite right
+     */
     public TerritorialConstructionRightState {
         String grantee = Objects.requireNonNull(
                 granteeFactionContentId, "Construction-right grantee faction not set").strip();
