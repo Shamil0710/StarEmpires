@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-16 / Stage 17.5B derived-ship calculator + fitting validator implementation.**  
+> **Последняя синхронизация: 2026-08-16 / Stage 17.5C propulsion / reaction mass / power / thermal / FTL implementation.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -40,7 +40,7 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5C NEXT** |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5D NEXT** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | PLANNED |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
@@ -179,11 +179,11 @@ Migration preserves local physical `GameState`, money, FleetIds, construction/fl
 
 Persistence inventory is now synchronized in `docs/persistence_model.md`:
 
-- `GameState` schema v3;
+- `GameState` schema v4 with fitted Stage-17.5 engineering state;
 - `WorldState` schema v9 / file format v8;
 - `PlayableWorldState` schema v5 / file format v1.
 
-`PlayableWorldState` remains v5 intentionally because Stage 17 adds no new serialized PlayerState field; Stage-17 institutional state is correctly versioned inside `WorldState`.
+`PlayableWorldState` remains v5 intentionally because Stage 17.5C adds no new serialized PlayerState field; fitted engineering belongs to local `GameState`, while Stage-17 institutional state remains inside `WorldState`.
 
 ## 5. Stage 17 → 17.5 transition gate
 
@@ -208,20 +208,24 @@ Canonical 17.5A closeout: `docs/stage17_5a_production_ship_content_schema.md`.
 
 Canonical 17.5B closeout: `docs/stage17_5b_derived_ship_calculator_and_fitting_validator.md`.
 
+> **Stage 17.5C — COMPLETE: persistent reaction mass, thrust/jet-power closure, shared power/storage/load shedding, local/coolant/ship/radiator thermal runtime, fitted mass/energy/power/heat/time FTL and composition with the single neighbor-only FleetJumpService FSM.**
+
+Canonical 17.5C closeout: `docs/stage17_5c_propulsion_power_thermal_ftl.md`.
+
 ## 6. Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-**ACTIVE — 17.5A–17.5B COMPLETE; 17.5C NEXT.**
+**ACTIVE — 17.5A–17.5C COMPLETE; 17.5D NEXT.**
 
 Implementation sequence:
 
 - **17.5A — COMPLETE:** production `MaterialDefinition` / `HullDefinition` / `ModuleDefinition` / protection/slots/hardpoints/compartments + versioned loader/fingerprint;
 - **17.5B — COMPLETE:** central deterministic derived-ship calculator + fitting validator + physical-load movement bridge + ID-preserving compatibility seam;
-- **17.5C — NEXT:** propulsion/reaction mass/power/thermal/FTL;
-- **17.5D:** sensors/signatures/track/datalink/EW;
+- **17.5C — COMPLETE:** propulsion/reaction mass/power/thermal/FTL runtime + persistent engineering state + single-FSM fitted jump integration;
+- **17.5D — NEXT:** sensors/signatures/track/datalink/EW;
 - **17.5E:** kinetic/beam/guided/PD/ammunition;
 - **17.5F:** shields/armor/compartments/subsystem damage;
 - **17.5G:** shipyard/refit/repair/maintenance economy seam;
-- **17.5H:** capability APIs/UI/persistence;
+- **17.5H:** capability APIs/UI/full migration surfaces;
 - **17.5I:** deterministic aggregate acceptance.
 
 Hard invariants:
@@ -236,7 +240,8 @@ Hard invariants:
 
 Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.  
 17.5A implementation record: `docs/stage17_5a_production_ship_content_schema.md`.  
-17.5B implementation record: `docs/stage17_5b_derived_ship_calculator_and_fitting_validator.md`.
+17.5B implementation record: `docs/stage17_5b_derived_ship_calculator_and_fitting_validator.md`.  
+17.5C implementation record: `docs/stage17_5c_propulsion_power_thermal_ftl.md`.
 
 ## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
 
@@ -462,8 +467,9 @@ No world-wide tactical/render-rate tick.
 Stage 17 COMPLETE
 → Stage 17.5A production ship engineering schema COMPLETE
 → Stage 17.5B derived-ship calculator + fitting validator COMPLETE
-→ Stage 17.5C propulsion / reaction mass / power / thermal / FTL
-→ Stage 17.5D–17.5I remaining Ship Fitting / Combat Depth
+→ Stage 17.5C propulsion / reaction mass / power / thermal / FTL COMPLETE
+→ Stage 17.5D signatures / sensors / tracks / datalink / EW NEXT
+→ Stage 17.5E–17.5I remaining Ship Fitting / Combat Depth
 → Stage 18 Resources / Industry / Infrastructure
 → Stage 19 Strategic Warfare
 → Stage 20 Physical World Generation
@@ -472,4 +478,4 @@ Stage 17 COMPLETE
 → Stage 23 RC
 ```
 
-**Immediate implementation priority after the Stage-17.5B merge gate is Stage 17.5C.**
+**Immediate implementation priority after the Stage-17.5C merge gate is Stage 17.5D.**
