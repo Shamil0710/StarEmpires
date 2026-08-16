@@ -6,16 +6,17 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Persistent identity metadata for a faction created by world state rather than authored content.
+ * Persistent identity metadata for a faction defined by world state rather than authored content.
  *
  * <p>Authored factions remain definitions in the immutable content catalog. This record covers
- * dynamic political actors such as the player's Stage-17 faction and reserves one dense runtime
- * faction slot without changing the content fingerprint.</p>
+ * dynamic political actors such as the player's Stage-17 faction as well as deterministic
+ * world-bootstrap actors used by large manual-test worlds. Both reserve one dense runtime faction
+ * slot without changing the content fingerprint.</p>
  *
  * @param stableFactionId stable world faction ID using canonical {@code faction.*} syntax
  * @param runtimeFactionId bounded dense runtime ID used at the local ECS boundary
  * @param displayName public non-empty faction name
- * @param origin origin of the dynamic faction identity
+ * @param origin origin of the world-defined faction identity
  */
 public record WorldFactionIdentityState(
         String stableFactionId,
@@ -30,7 +31,9 @@ public record WorldFactionIdentityState(
     /** Supported origins for world-defined faction identities. */
     public enum Origin {
         /** Faction founded explicitly by the playable actor. */
-        PLAYER_CREATED
+        PLAYER_CREATED,
+        /** Deterministic NPC/political actor materialized as part of an authored world bootstrap. */
+        WORLD_BOOTSTRAP
     }
 
     /**
