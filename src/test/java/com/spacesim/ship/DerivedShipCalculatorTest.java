@@ -126,7 +126,7 @@ class DerivedShipCalculatorTest {
     }
 
     @Test
-    void invalidPhysicalLoadsAndDamageRejectDeterministically() {
+    void invalidPhysicalLoadsRejectDeterministicallyAndDamageDegradesCapabilities() {
         ShipEngineeringCatalog catalog = ShipEngineeringCatalogLoader.loadDefault();
         ShipEngineeringCatalog.DemonstratorFitDefinition definition = catalog.findDemonstratorFit(DEMO_FIT);
         ShipEngineeringCatalog.HullDefinition hull = catalog.findHull(definition.hullId());
@@ -157,11 +157,14 @@ class DerivedShipCalculatorTest {
         assertEquals(first, capacityFailure.getValidation());
 
         DamageState damaged = new DamageState(Map.of("core_drive", 0.5d));
-        InvalidShipFitException damageFailure = assertThrows(
-                InvalidShipFitException.class,
-                () -> new DerivedShipCalculator(catalog).derive(hull, fit, ConsumableState.empty(), damaged));
-        assertTrue(damageFailure.getValidation().issues().stream()
-                .anyMatch(issue -> issue.code() == ValidationCode.DAMAGE_MODEL_NOT_ACTIVE));
+        ValidationResult damageValidation = validator.validate(hull, fit, ConsumableState.empty(), damaged);
+        assertTrue(damageValidation.isValid());
+        DerivedShipCalculator calculator = new DerivedShipCalculator(catalog);
+        DerivedShipState pristineState = calculator.derive(hull, fit, ConsumableState.empty(), DamageState.pristine());
+        DerivedShipState damagedState = calculator.derive(hull, fit, ConsumableState.empty(), damaged);
+        assertEquals(pristineState.totalMassKg(), damagedState.totalMassKg(), 0d);
+        assertEquals(pristineState.availableThrustN() * 0.5d, damagedState.availableThrustN(), 1e-9d);
+        assertEquals(pristineState.accelerationMps2() * 0.5d, damagedState.accelerationMps2(), 1e-12d);
     }
 
     @Test
