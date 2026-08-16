@@ -107,7 +107,7 @@ public final class ShipProtectionCatalog {
             double spallEnergyFraction,
             double ricochetCriticalAngleRad,
             double ricochetRetainedEnergyFraction) {
-        /** Validates a bounded response model. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public HeavyImpactModel {
             requireNonBlank(responseSurfaceId, "responseSurfaceId");
             requirePositiveFinite(specificAbsorptionJPerKg, "specificAbsorptionJPerKg");
@@ -132,7 +132,7 @@ public final class ShipProtectionCatalog {
             String hullId,
             List<CompartmentDamageDefinition> compartments,
             List<MountDamageDefinition> mounts) {
-        /** Freezes deterministic damage-layout data. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public HullDamageLayout {
             requireNonBlank(hullId, "hullId");
             Objects.requireNonNull(compartments, "compartments");
@@ -175,7 +175,7 @@ public final class ShipProtectionCatalog {
             String compartmentId,
             double structuralDamageCapacityJ,
             double subsystemCouplingFraction) {
-        /** Validates compartment damage parameters. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public CompartmentDamageDefinition {
             requireNonBlank(compartmentId, "compartmentId");
             requirePositiveFinite(structuralDamageCapacityJ, "structuralDamageCapacityJ");
@@ -194,7 +194,7 @@ public final class ShipProtectionCatalog {
             String mountId,
             String compartmentId,
             double subsystemDamageCapacityJ) {
-        /** Validates mount location/capacity. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public MountDamageDefinition {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(compartmentId, "compartmentId");
