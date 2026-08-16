@@ -1,5 +1,11 @@
 package com.spacesim.world;
 
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EngineeringComponent;
+import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
+import com.spacesim.ship.ShipEngineeringRuntime;
+import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
+import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 import com.spacesim.simulation.SimulationSession;
 
 import java.util.ArrayList;
@@ -10,11 +16,18 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Authoritative Stage-10B controller for direct jump phase transitions.
+ * Authoritative Stage-10B/17.5C controller for direct jump phase transitions.
  *
- * <p>The service owns only active jump state. Physical fleet ownership remains in
- * {@link FleetWorldService}; entering {@link FleetJumpPhase#IN_TRANSIT} delegates to the Stage-10A
- * detach boundary and leaving it delegates to the matching attach boundary.</p>
+ * <p>The service remains the single ordinary inter-system jump FSM. Fleets without a fitted
+ * {@link EngineeringComponent} keep the historical Stage-10 timing path strictly as a migration
+ * seam. Once a fleet has authoritative engineering state, FTL availability, spool time, translated
+ * mass, shared-bus energy, jump heat, cooldown and edge-transit time come only from the fitted
+ * Stage-17.5 capability.</p>
+ *
+ * <p>Physical fleet ownership remains in {@link FleetWorldService}; entering
+ * {@link FleetJumpPhase#IN_TRANSIT} delegates to the Stage-10A detach boundary and leaving it
+ * delegates to the matching attach boundary. Physical FTL consequences are committed exactly once,
+ * immediately before detach. Cancelling or failing before that boundary spends no jump energy.</p>
  *
  * <p>Stage-10 callers historically used {@code (0,0)} as a placeholder arrival coordinate. The
  * current bounded local map treats that point as a viewport corner, so that legacy placeholder is
@@ -26,6 +39,7 @@ final class FleetJumpService {
     private final Map<StarSystemId, SimulationSession> sessionsById;
     private final FleetWorldService fleetWorldService;
     private final JumpTransitTiming timing;
+    private final ShipEngineeringRuntime engineeringRuntime;
     private final Map<FleetId, FleetJumpState> jumpsByFleetId = new HashMap<>();
 
     FleetJumpService(
@@ -34,10 +48,27 @@ final class FleetJumpService {
             FleetWorldService fleetWorldService,
             JumpTransitTiming timing,
             List<FleetJumpState> initialStates) {
+        this(
+                topology,
+                sessionsById,
+                fleetWorldService,
+                timing,
+                new ShipEngineeringRuntime(ShipEngineeringCatalogLoader.loadDefault()),
+                initialStates);
+    }
+
+    FleetJumpService(
+            GalaxyTopology topology,
+            Map<StarSystemId, SimulationSession> sessionsById,
+            FleetWorldService fleetWorldService,
+            JumpTransitTiming timing,
+            ShipEngineeringRuntime engineeringRuntime,
+            List<FleetJumpState> initialStates) {
         this.topology = Objects.requireNonNull(topology, "GalaxyTopology не задан");
         this.sessionsById = Map.copyOf(Objects.requireNonNull(sessionsById, "Simulation sessions не заданы"));
         this.fleetWorldService = Objects.requireNonNull(fleetWorldService, "FleetWorldService не задан");
         this.timing = Objects.requireNonNull(timing, "JumpTransitTiming не задан");
+        this.engineeringRuntime = Objects.requireNonNull(engineeringRuntime, "ShipEngineeringRuntime не задан");
         for (FleetJumpState state : Objects.requireNonNull(initialStates, "Jump states не заданы")) {
             FleetJumpState checked = Objects.requireNonNull(state, "FleetJumpState не задан");
             if (jumpsByFleetId.putIfAbsent(checked.fleetId(), checked) != null) {
@@ -71,6 +102,11 @@ final class FleetJumpService {
         }
         StarSystemId origin = placement.systemId();
         requireDirectConnection(origin, destination);
+
+        Optional<FittedJump> fitted = fittedJump(id);
+        if (fitted.isPresent() && !fitted.orElseThrow().plan().allowed()) {
+            throw fittedJumpUnavailable(id, fitted.orElseThrow().plan());
+        }
 
         float resolvedArrivalX = LocalSystemCoordinates.resolveArrivalX(arrivalX, arrivalY);
         float resolvedArrivalY = LocalSystemCoordinates.resolveArrivalY(arrivalX, arrivalY);
@@ -119,23 +155,64 @@ final class FleetJumpService {
     private FleetJumpState transition(FleetJumpState state) {
         long boundary = state.phaseEndsTick();
         return switch (state.phase()) {
-            case MOVING_TO_JUMP -> replace(
-                    state,
-                    state.next(
-                            FleetJumpPhase.JUMP_PENDING,
-                            boundary,
-                            addTicks(boundary, timing.pendingTicks())));
+            case MOVING_TO_JUMP -> {
+                Optional<FittedJump> fitted = fittedJump(state.fleetId());
+                if (fitted.isPresent() && !fitted.orElseThrow().plan().allowed()) {
+                    yield cancel(state);
+                }
+                long pendingTicks = fitted.isPresent()
+                        ? secondsToTicks(
+                                fitted.orElseThrow().plan().spoolSeconds(),
+                                fitted.orElseThrow().fixedStepSeconds())
+                        : timing.pendingTicks();
+                yield replace(
+                        state,
+                        state.next(
+                                FleetJumpPhase.JUMP_PENDING,
+                                boundary,
+                                addTicks(boundary, pendingTicks)));
+            }
             case JUMP_PENDING -> {
-                FleetPlacementState transit = fleetWorldService.beginTransfer(
-                        state.fleetId(), state.destinationSystemId());
+                Optional<FittedJump> fitted = fittedJump(state.fleetId());
+                if (fitted.isPresent() && !fitted.orElseThrow().plan().allowed()) {
+                    yield cancel(state);
+                }
+
+                RuntimeState previousEngineeringState = null;
+                if (fitted.isPresent()) {
+                    FittedJump context = fitted.orElseThrow();
+                    previousEngineeringState = context.component().runtimeState;
+                    context.component().setRuntimeState(
+                            engineeringRuntime.commitJump(previousEngineeringState, context.plan()));
+                }
+
+                FleetPlacementState transit;
+                try {
+                    transit = fleetWorldService.beginTransfer(
+                            state.fleetId(), state.destinationSystemId());
+                } catch (RuntimeException | Error exception) {
+                    if (fitted.isPresent()) {
+                        fitted.orElseThrow().component().setRuntimeState(previousEngineeringState);
+                    }
+                    throw exception;
+                }
                 if (transit.locationKind() != FleetLocationKind.IN_TRANSIT) {
                     throw new IllegalStateException("Fleet detach не создал IN_TRANSIT placement");
                 }
-                long transitTicks = timing.transitTicks(
-                        topology,
-                        state.originSystemId(),
-                        state.destinationSystemId(),
-                        requireSession(state.originSystemId()).getClock().getFixedStepSeconds());
+
+                long transitTicks;
+                if (fitted.isPresent()) {
+                    FittedJump context = fitted.orElseThrow();
+                    transitTicks = secondsToTicks(
+                            context.plan().edgeTransitSeconds(),
+                            context.fixedStepSeconds());
+                } else {
+                    transitTicks = timing.transitTicks(
+                            topology,
+                            state.originSystemId(),
+                            state.destinationSystemId(),
+                            requireSession(state.originSystemId()).getClock().getFixedStepSeconds());
+                }
                 yield replace(
                         state,
                         state.next(
@@ -164,11 +241,43 @@ final class FleetJumpService {
         };
     }
 
+    private Optional<FittedJump> fittedJump(FleetId fleetId) {
+        FleetPlacementState placement = fleetWorldService.find(fleetId).orElseThrow(
+                () -> new IllegalArgumentException("Unknown FleetId: " + fleetId));
+        if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+            return Optional.empty();
+        }
+        SimulationSession session = requireSession(placement.systemId());
+        Entity entity = session.getEntityRegistry().find(placement.localEntityId());
+        if (entity == null) {
+            throw new IllegalStateException("Fleet placement references missing local entity: " + fleetId);
+        }
+        EngineeringComponent component = entity.getComponent(EngineeringComponent.class);
+        if (component == null) {
+            return Optional.empty();
+        }
+        if (component.fit == null || component.runtimeState == null) {
+            throw new IllegalStateException("Fleet EngineeringComponent is incomplete: " + fleetId);
+        }
+        JumpPlan plan = engineeringRuntime.planJump(component.fit, component.runtimeState);
+        return Optional.of(new FittedJump(
+                component,
+                plan,
+                session.getClock().getFixedStepSeconds()));
+    }
+
     private FleetJumpState replace(FleetJumpState previous, FleetJumpState next) {
         if (!jumpsByFleetId.replace(previous.fleetId(), previous, next)) {
             throw new IllegalStateException("Jump state changed during deterministic transition: " + previous.fleetId());
         }
         return next;
+    }
+
+    private FleetJumpState cancel(FleetJumpState state) {
+        if (!jumpsByFleetId.remove(state.fleetId(), state)) {
+            throw new IllegalStateException("Jump state changed during deterministic cancellation: " + state.fleetId());
+        }
+        return null;
     }
 
     private void validateStateAgainstPlacement(FleetJumpState state) {
@@ -216,11 +325,43 @@ final class FleetJumpService {
         return session;
     }
 
+    private static IllegalStateException fittedJumpUnavailable(FleetId fleetId, JumpPlan plan) {
+        return new IllegalStateException(
+                "Fitted FTL jump unavailable for " + fleetId + ": " + plan.failure());
+    }
+
+    private static long secondsToTicks(double seconds, float fixedStepSeconds) {
+        if (!Double.isFinite(seconds) || seconds <= 0d) {
+            throw new IllegalArgumentException("Fitted jump duration должна быть положительной и конечной");
+        }
+        if (!Float.isFinite(fixedStepSeconds) || fixedStepSeconds <= 0f) {
+            throw new IllegalArgumentException("Fixed step должен быть положительным и конечным");
+        }
+        double ticks = StrictMath.ceil(seconds / fixedStepSeconds);
+        if (!Double.isFinite(ticks) || ticks > Long.MAX_VALUE) {
+            throw new IllegalArgumentException("Fitted jump duration не представима в long ticks");
+        }
+        return Math.max(1L, (long) ticks);
+    }
+
     private static long addTicks(long start, long duration) {
         try {
             return Math.addExact(start, duration);
         } catch (ArithmeticException exception) {
             throw new IllegalStateException("Jump phase tick overflow", exception);
+        }
+    }
+
+    private record FittedJump(
+            EngineeringComponent component,
+            JumpPlan plan,
+            float fixedStepSeconds) {
+        private FittedJump {
+            Objects.requireNonNull(component, "component");
+            Objects.requireNonNull(plan, "plan");
+            if (!Float.isFinite(fixedStepSeconds) || fixedStepSeconds <= 0f) {
+                throw new IllegalArgumentException("fixedStepSeconds must be positive and finite");
+            }
         }
     }
 }
