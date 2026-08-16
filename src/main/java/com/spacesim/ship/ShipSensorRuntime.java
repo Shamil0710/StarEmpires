@@ -22,6 +22,7 @@ import java.util.Set;
  * covariance from resulting SNR. Bearing-only measurements remain range-unknown until ranging or
  * multi-observer geometry supplies a position solution.</p>
  */
+@SuppressWarnings("doclint:missing")
 public final class ShipSensorRuntime {
     private static final double FOUR_PI = 4d * StrictMath.PI;
     private static final double FOUR_PI_SQUARED = FOUR_PI * FOUR_PI;
