@@ -105,7 +105,9 @@ public final class ShipProtectionCatalogLoader {
                     responseId,
                     positive(node, "specificAbsorptionJPerKg"),
                     unitInterval(node, "spallMassFraction"),
-                    unitInterval(node, "spallEnergyFraction")));
+                    unitInterval(node, "spallEnergyFraction"),
+                    boundedAngle(node, "ricochetCriticalAngleRad"),
+                    unitInterval(node, "ricochetRetainedEnergyFraction")));
         }
         return result;
     }
@@ -240,6 +242,18 @@ public final class ShipProtectionCatalogLoader {
         double result = value.asDouble();
         if (!Double.isFinite(result) || result < 0d || result > 1d) {
             throw new IllegalArgumentException(name + " must be in [0,1]");
+        }
+        return result;
+    }
+
+    private static double boundedAngle(JsonValue node, String name) {
+        JsonValue value = node.get(name);
+        if (value == null || !value.isNumber()) {
+            throw new IllegalArgumentException(name + " must be numeric");
+        }
+        double result = value.asDouble();
+        if (!Double.isFinite(result) || result <= 0d || result > Math.PI / 2d) {
+            throw new IllegalArgumentException(name + " must be in (0,pi/2]");
         }
         return result;
     }
