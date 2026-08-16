@@ -180,10 +180,19 @@ public final class WeaponDefinition {
             requirePositiveFinite(burnTimeSeconds, "burnTimeSeconds");
             requireNonNegativeFinite(seekerAngularSigmaRad, "seekerAngularSigmaRad");
             requireNonNegativeFinite(terminalReserveMps, "terminalReserveMps");
-            if (massFlowKgPerS() * burnTimeSeconds > propellantMassKg + 1e-9d) {
+
+            // Compact record constructors assign component fields only after this body completes.
+            // Validate from the constructor parameters directly rather than calling instance methods
+            // that would still observe default zero-valued fields at this point.
+            double massFlowKgPerS = thrustN / exhaustVelocityMps;
+            if (massFlowKgPerS * burnTimeSeconds > propellantMassKg + 1e-9d) {
                 throw new IllegalArgumentException("burn time requires more propellant than carried");
             }
-            if (terminalReserveMps > idealDeltaVMps() + 1e-9d) {
+            double wetMassKg = dryMassKg + propellantMassKg;
+            double idealDeltaVMps = propellantMassKg == 0d
+                    ? 0d
+                    : exhaustVelocityMps * Math.log(wetMassKg / dryMassKg);
+            if (terminalReserveMps > idealDeltaVMps + 1e-9d) {
                 throw new IllegalArgumentException("terminal reserve cannot exceed ideal delta-v");
             }
         }
