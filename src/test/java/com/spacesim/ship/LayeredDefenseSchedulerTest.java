@@ -52,7 +52,10 @@ class LayeredDefenseSchedulerTest {
     @Test
     void formationSpacingChangesWhetherPhysicalInterceptorCanReachInTime() {
         LayeredDefenseScheduler scheduler = new LayeredDefenseScheduler();
-        Threat fastThreat = new Threat(51L, 30_000d, 0d, -1_000d, 0d, 1_000d, true);
+        // At 2 km/s this body reaches the 5 km safe-intercept boundary in 12.5 s.
+        // The central station cannot physically cover the distance in that time, while a forward
+        // escort already near the inbound path can engage several seconds after launch.
+        Threat fastThreat = new Threat(51L, 30_000d, 0d, -2_000d, 0d, 1_000d, true);
         DefenseStation central = station(3L, 0d, 0d, 1, 1L, true);
         DefenseStation forwardEscort = station(3L, 22_000d, 0d, 1, 1L, true);
 
