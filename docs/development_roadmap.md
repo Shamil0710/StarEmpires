@@ -67,7 +67,7 @@ branch from exact green main
 
 ### Stages 12–14 — v0.3 Playable Space Sandbox
 
-**COMPLETE.** Player state/ownership, physical travel/docking/manual trade/mining/combat/progression, shared combat vertical slice, ship progression, UI and deterministic first-loop acceptance.
+**COMPLETE.** Player state/ownership, physical travel/docking/manual trade/mining, shared combat vertical slice, ship progression, UI and deterministic first-loop acceptance.
 
 ### Stage 15 — player fleets
 
@@ -398,7 +398,7 @@ Must honor:
 - a mix of hubs, forks, cycles, alternate paths, gateways, remote/frontier pockets and bounded chokepoints;
 - machine-readable anti-linearity, route-redundancy, articulation/bridge and gateway-concentration diagnostics;
 - spatially correlated resource geography derived from Stage-18 physical host/environment conditions plus local deterministic variance;
-- regional comparative advantage instead of uniform sector bonuses;
+- regional comparative advantage instead of uniform self-sufficiency or `sector = production bonus` shortcuts;
 - essential economic viability through physically reachable supply chains without requiring every system/sector to produce everything;
 - strategic scarcity and dependency strong enough to create real trade, stockpiling, infrastructure, diplomacy, security, expansion and warfare incentives;
 - faction-start placement after topology/resource generation, with asymmetric but recoverable starts and anti-accidental-monopoly checks;
