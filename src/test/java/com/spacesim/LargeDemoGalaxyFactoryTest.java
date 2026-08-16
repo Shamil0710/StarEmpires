@@ -4,6 +4,7 @@ import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.persistence.EntityState;
 import com.spacesim.persistence.WorldStateCodec;
+import com.spacesim.player.PlayableTestWorldFactory;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StarSystemNode;
 import com.spacesim.world.StarSystemSimulationState;
@@ -13,13 +14,12 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Acceptance for the pre-17.5 100-system manual-test galaxy. */
@@ -94,6 +94,33 @@ class LargeDemoGalaxyFactoryTest {
         assertEquals(large, decoded);
         assertArrayEquals(encoded, WorldStateCodec.encode(decoded),
                 "The 100-system demo must have deterministic canonical persistence");
+    }
+
+    @Test
+    void largeDesktopRouteCanPhysicallyTourEverySequentialSystem() {
+        String previous = System.getProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY);
+        System.setProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY, Boolean.TRUE.toString());
+        try {
+            PlayableTestWorldFactory.Route route = new PlayableTestWorldFactory.Route(
+                    DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                    DemoGalaxyFactory.INNER_SYSTEM_ID,
+                    "Source",
+                    "Destination",
+                    "item.ore",
+                    "Ore",
+                    10f,
+                    20f);
+            for (long id = 1L; id < LargeDemoGalaxyFactory.SYSTEM_COUNT; id++) {
+                assertEquals(new StarSystemId(id + 1L), route.otherEnd(new StarSystemId(id)));
+            }
+            assertNull(route.otherEnd(new StarSystemId(LargeDemoGalaxyFactory.SYSTEM_COUNT)));
+        } finally {
+            if (previous == null) {
+                System.clearProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY);
+            } else {
+                System.setProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY, previous);
+            }
+        }
     }
 
     private static int reachableSystemCount(WorldState state) {
