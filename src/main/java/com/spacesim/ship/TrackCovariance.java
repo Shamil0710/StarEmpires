@@ -11,6 +11,7 @@ package com.spacesim.ship;
  * @param bearingVarianceRad2 bearing variance
  * @param rangeVarianceM2 range variance when range is known, otherwise {@code null}
  */
+@SuppressWarnings("doclint:missing")
 public record TrackCovariance(
         Double positionVarianceM2,
         double bearingVarianceRad2,
