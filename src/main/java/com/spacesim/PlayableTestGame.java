@@ -41,6 +41,9 @@ import com.spacesim.player.PlayerRuntime;
 import com.spacesim.player.PlayerShipProgressionService;
 import com.spacesim.player.PlayerShipView;
 import com.spacesim.simulation.SimulationSession;
+import com.spacesim.ui.GalaxyStrategicMapModel;
+import com.spacesim.ui.GalaxyStrategicMapRenderer;
+import com.spacesim.ui.GalaxyStrategicMapSnapshot;
 import com.spacesim.ui.LocalMinimapModel;
 import com.spacesim.ui.LocalMinimapRenderer;
 import com.spacesim.ui.LocalMinimapSnapshot;
@@ -70,8 +73,7 @@ import java.util.Set;
  *
  * <p>The application remains intentionally thin: keyboard/mouse input is translated into ordinary
  * {@link PlayerRuntime}, market, mining, jump and ownership/progression commands. World-space
- * rendering, HUD and minimap read authoritative state only. No presentation code teleports ships,
- * creates goods, awards credits, applies damage or performs mining directly.</p>
+ * rendering, HUD, minimap and the global strategic overlay read authoritative state only.</p>
  */
 public final class PlayableTestGame extends ApplicationAdapter {
     private static final float MAP_PADDING = 18f;
@@ -102,6 +104,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
     private Label statusHudLabel;
     private WorldMapRenderer worldMapRenderer;
     private LocalMinimapRenderer minimapRenderer;
+    private GalaxyStrategicMapRenderer galaxyMapRenderer;
     private WorldMapLayout mapLayout;
     private WorldMapLayout minimapLayout;
     private final PlayableCameraState cameraState = new PlayableCameraState();
@@ -111,6 +114,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
     private boolean moveDown;
     private boolean moveLeft;
     private boolean moveRight;
+    private boolean galaxyMapVisible;
     private int selectedMarketIndex;
     private int selectedJumpNeighborIndex;
     private DiscoveredObjectRef lastDockedAt;
@@ -121,7 +125,6 @@ public final class PlayableTestGame extends ApplicationAdapter {
     public PlayableTestGame() {
     }
 
-    /** Creates the deterministic test world, HUD, follow camera, minimap and command adapter. */
     @Override
     public void create() {
         VisUI.load();
@@ -131,6 +134,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
         Skin skin = VisUI.getSkin();
         worldMapRenderer = new WorldMapRenderer(skin.get(Label.LabelStyle.class).font);
         minimapRenderer = new LocalMinimapRenderer(skin.get(Label.LabelStyle.class).font);
+        galaxyMapRenderer = new GalaxyStrategicMapRenderer(skin.get(Label.LabelStyle.class).font);
         createHud(skin);
 
         savePath = Gdx.files.local(SAVE_FILE).file().toPath();
@@ -183,6 +187,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
         world = playerRuntime.world();
         bindActiveSession();
         clearMovementKeys();
+        galaxyMapVisible = false;
         selectedMarketIndex = 0;
         lastDockedAt = null;
         cameraState.reset();
@@ -206,6 +211,16 @@ public final class PlayableTestGame extends ApplicationAdapter {
         return new InputAdapter() {
             @Override
             public boolean keyDown(int keycode) {
+                if (keycode == Input.Keys.G) {
+                    toggleGalaxyMap();
+                    return true;
+                }
+                if (galaxyMapVisible) {
+                    if (keycode == Input.Keys.ESCAPE) {
+                        toggleGalaxyMap();
+                    }
+                    return true;
+                }
                 switch (keycode) {
                     case Input.Keys.W -> moveUp = true;
                     case Input.Keys.S -> moveDown = true;
@@ -254,17 +269,30 @@ public final class PlayableTestGame extends ApplicationAdapter {
                         return false;
                     }
                 }
-                applyMovementIntent();
+                if (!galaxyMapVisible) {
+                    applyMovementIntent();
+                }
                 return true;
             }
 
             @Override
             public boolean scrolled(float amountX, float amountY) {
+                if (galaxyMapVisible) {
+                    return true;
+                }
                 cameraState.scroll(amountY);
                 statusMessage = String.format(Locale.ROOT, "Camera zoom %.2fx.", cameraState.zoom());
                 return true;
             }
         };
+    }
+
+    private void toggleGalaxyMap() {
+        galaxyMapVisible = !galaxyMapVisible;
+        clearMovementKeys();
+        statusMessage = galaxyMapVisible
+                ? "Global strategic map opened. Gameplay commands are blocked until it is closed."
+                : "Global strategic map closed.";
     }
 
     private void applyMovementIntent() {
@@ -306,11 +334,9 @@ public final class PlayableTestGame extends ApplicationAdapter {
             statusMessage = "Docked at " + target.name() + ".";
             lastDockedAt = null;
         } else {
-            statusMessage = String.format(
-                    Locale.ROOT,
+            statusMessage = String.format(Locale.ROOT,
                     "Docking rejected: %s is %.1f units away; move inside docking range.",
-                    target.name(),
-                    target.distance());
+                    target.name(), target.distance());
         }
     }
 
@@ -334,6 +360,17 @@ public final class PlayableTestGame extends ApplicationAdapter {
         statusMessage = "Selected direct jump: #" + destination.value() + " " + systemName(destination) + ".";
     }
 
+    private StarSystemId selectedJumpDestination() {
+        PlayerShipView ship = playerRuntime.activeShipView().orElse(null);
+        if (ship == null) {
+            return null;
+        }
+        selectedJumpNeighborIndex = PlayerJumpNavigationModel.normalizeSelectionIndex(
+                world.getTopology(), ship.systemId(), selectedJumpNeighborIndex);
+        return PlayerJumpNavigationModel.selectedDestination(
+                world.getTopology(), ship.systemId(), selectedJumpNeighborIndex);
+    }
+
     private void jumpToSelectedNeighbor() {
         PlayerShipView ship = playerRuntime.activeShipView().orElse(null);
         if (ship == null) {
@@ -346,14 +383,11 @@ public final class PlayableTestGame extends ApplicationAdapter {
             statusMessage = "Undock before jumping.";
             return;
         }
-        StarSystemId destination = PlayerJumpNavigationModel.selectedDestination(
-                world.getTopology(), ship.systemId(), selectedJumpNeighborIndex);
+        StarSystemId destination = selectedJumpDestination();
         if (destination == null) {
             statusMessage = "Current system has no direct jump connection.";
             return;
         }
-        selectedJumpNeighborIndex = PlayerJumpNavigationModel.normalizeSelectionIndex(
-                world.getTopology(), ship.systemId(), selectedJumpNeighborIndex);
         clearMovementKeys();
         miningService.clear();
         if (playerRuntime.requestJump(destination)) {
@@ -751,11 +785,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
         CombatCommandComponent command = ship.getComponent(CombatCommandComponent.class);
         text.append(String.format(Locale.ROOT,
                 "Combat: Hull %.0f/%.0f  Shield %.0f/%.0f  Range %.0f  Cooldown %.2fs\n",
-                combat.hull,
-                combat.maxHull,
-                combat.shields,
-                combat.maxShields,
-                combat.weaponRange,
+                combat.hull, combat.maxHull, combat.shields, combat.maxShields, combat.weaponRange,
                 runtime == null ? 0f : Math.max(0f, runtime.cooldownRemaining)));
         if (command == null || command.targetId == null) {
             text.append("Target: none [T nearest hostile]\n");
@@ -828,8 +858,8 @@ public final class PlayableTestGame extends ApplicationAdapter {
         text.append(String.format(Locale.ROOT,
                 "Camera %.2fx [wheel, HOME reset]   [TAB switch owned local ship]\n",
                 cameraState.zoom()));
-        text.append("WASD fly | E dock | K select jump | J jump | T target | F fire | SPACE pause | ")
-                .append("1/2/3/4 time | F5 save | F9 load | F2 reset");
+        text.append("[G global galaxy/factions] | WASD fly | E dock | K select jump | J jump | ")
+                .append("T target | F fire | SPACE pause | 1/2/3/4 time | F5 save | F9 load | F2 reset");
         contextHudLabel.setText(text.toString());
     }
 
@@ -914,17 +944,10 @@ public final class PlayableTestGame extends ApplicationAdapter {
         float minimapY = MINIMAP_MARGIN;
         float minimapZoom = ship == null ? WorldMapLayout.MIN_ZOOM : MINIMAP_ZOOM;
         minimapLayout = new WorldMapLayout(
-                minimapX,
-                minimapY,
-                minimapWidth,
-                minimapHeight,
-                MINIMAP_PADDING,
-                centerX,
-                centerY,
-                minimapZoom);
+                minimapX, minimapY, minimapWidth, minimapHeight, MINIMAP_PADDING,
+                centerX, centerY, minimapZoom);
     }
 
-    /** Advances the fixed-tick world, follows the active FleetId and renders the live demo UI. */
     @Override
     public void render() {
         float renderDelta = Gdx.graphics.getDeltaTime();
@@ -943,8 +966,16 @@ public final class PlayableTestGame extends ApplicationAdapter {
         }
         stage.act(renderDelta);
 
-        Entity playerEntity = activeShipEntity();
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        if (galaxyMapVisible) {
+            GalaxyStrategicMapSnapshot snapshot = GalaxyStrategicMapModel.capture(
+                    world, content, boundSystemId, selectedJumpDestination());
+            galaxyMapRenderer.render(
+                    stage.getCamera().combined, snapshot, stage.getWidth(), stage.getHeight());
+            return;
+        }
+
+        Entity playerEntity = activeShipEntity();
         worldMapRenderer.render(
                 stage.getCamera().combined,
                 PlayableMapEntityFilter.filter(
@@ -961,7 +992,6 @@ public final class PlayableTestGame extends ApplicationAdapter {
         stage.draw();
     }
 
-    /** Updates the Scene2D viewport; HUD scale remains screen-based and independent from world zoom. */
     @Override
     public void resize(int width, int height) {
         if (width <= 0 || height <= 0 || stage == null) {
@@ -971,7 +1001,6 @@ public final class PlayableTestGame extends ApplicationAdapter {
         updateMapLayouts();
     }
 
-    /** Releases Scene2D and renderer resources owned by the test client. */
     @Override
     public void dispose() {
         if (Gdx.input != null) {
@@ -988,6 +1017,10 @@ public final class PlayableTestGame extends ApplicationAdapter {
         if (minimapRenderer != null) {
             minimapRenderer.dispose();
             minimapRenderer = null;
+        }
+        if (galaxyMapRenderer != null) {
+            galaxyMapRenderer.dispose();
+            galaxyMapRenderer = null;
         }
         if (VisUI.isLoaded()) {
             VisUI.dispose();
