@@ -11,6 +11,7 @@ package com.spacesim.ship;
  * @param apertureFraction surviving/available aperture fraction in [0,1]
  * @param processingFraction available processing fraction in (0,1]
  */
+@SuppressWarnings("doclint:missing")
 public record SensorRuntimeState(
         boolean enabled,
         boolean eccmEnabled,
