@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "responseSurfaces": [
+    {
+      "id": "response.synthetic_heavy_v1",
+      "calibrationDomain": {
+        "minImpactVelocityMps": 1000.0,
+        "maxImpactVelocityMps": 20000.0,
+        "minProjectileMassKg": 1.0,
+        "maxProjectileMassKg": 1500.0,
+        "confidenceLabel": "synthetic_api_demonstrator_only"
+      }
+    }
+  ],
+  "materials": [
+    {
+      "id": "material.high_strength_steel_v1",
+      "densityKgPerM3": 7850.0,
+      "tags": ["structural", "metal"],
+      "thermalConductivityWPerMK": 45.0,
+      "specificHeatJPerKgK": 490.0,
+      "emissivity": 0.35,
+      "radarReflectivity": 0.80,
+      "heavyImpactResponseSurfaceId": "response.synthetic_heavy_v1",
+      "constructionMaterialFamilyId": "material_family.structural_metal",
+      "repairMaterialFamilyId": "material_family.structural_metal"
+    },
+    {
+      "id": "material.ceramic_strike_face_v1",
+      "densityKgPerM3": 3900.0,
+      "tags": ["armor", "ceramic"],
+      "thermalConductivityWPerMK": 30.0,
+      "specificHeatJPerKgK": 780.0,
+      "emissivity": 0.75,
+      "radarReflectivity": 0.25,
+      "heavyImpactResponseSurfaceId": "response.synthetic_heavy_v1",
+      "constructionMaterialFamilyId": "material_family.protection_ceramic",
+      "repairMaterialFamilyId": "material_family.protection_ceramic"
+    }
+  ],
+  "protectionStacks": [
+    {
+      "id": "protection.escort_structural_v1",
+      "mountMassKg": 250000.0,
+      "layers": [
+        {
+          "materialId": "material.ceramic_strike_face_v1",
+          "thicknessM": 0.08,
+          "spacingAfterM": 0.30,
+          "orientationRad": 0.0,
+          "coverageFraction": 1.0,
+          "responseSurfaceId": "response.synthetic_heavy_v1"
+        },
+        {
+          "materialId": "material.high_strength_steel_v1",
+          "thicknessM": 0.12,
+          "spacingAfterM": 0.0,
+          "orientationRad": 0.0,
+          "coverageFraction": 1.0,
+          "responseSurfaceId": "response.synthetic_heavy_v1"
+        }
+      ]
+    }
+  ],
+  "hulls": [
+    {
+      "id": "hull.escort_destroyer_v1",
+      "displayName": "Escort Destroyer Engineering Demonstrator",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 220.0, "widthM": 72.0, "heightM": 38.0},
+      "bareHullMassKg": 12000000.0,
+      "internalVolumeM3": 210000.0,
+      "slots": [
+        {
+          "id": "core_reactor",
+          "category": "CORE",
+          "maxDimensionsM": {"lengthM": 36.0, "widthM": 22.0, "heightM": 18.0},
+          "maxMassKg": 3000000.0
+        },
+        {
+          "id": "core_drive",
+          "category": "CORE",
+          "maxDimensionsM": {"lengthM": 48.0, "widthM": 28.0, "heightM": 22.0},
+          "maxMassKg": 3500000.0
+        },
+        {
+          "id": "utility_sensor",
+          "category": "UTILITY",
+          "maxDimensionsM": {"lengthM": 18.0, "widthM": 14.0, "heightM": 10.0},
+          "maxMassKg": 600000.0
+        },
+        {
+          "id": "utility_thermal",
+          "category": "UTILITY",
+          "maxDimensionsM": {"lengthM": 26.0, "widthM": 16.0, "heightM": 12.0},
+          "maxMassKg": 900000.0
+        }
+      ],
+      "hardpoints": [
+        {
+          "id": "weapon_spinal",
+          "size": "LARGE",
+          "positionM": {"xM": 0.0, "yM": 72.0, "zM": 0.0},
+          "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 0.17453292519943295},
+          "maxModuleDimensionsM": {"lengthM": 80.0, "widthM": 14.0, "heightM": 14.0},
+          "maxModuleMassKg": 1800000.0,
+          "maxRecoilImpulseNs": 900000000.0,
+          "allowedModuleFamilies": ["WEAPON_AMMUNITION"]
+        }
+      ],
+      "compartments": [
+        {
+          "id": "engineering",
+          "volumeM3": 70000.0,
+          "centerM": {"xM": 0.0, "yM": -45.0, "zM": 0.0},
+          "protectionStackId": "protection.escort_structural_v1",
+          "tags": ["reactor", "drive"]
+        },
+        {
+          "id": "mission_core",
+          "volumeM3": 85000.0,
+          "centerM": {"xM": 0.0, "yM": 20.0, "zM": 0.0},
+          "protectionStackId": "protection.escort_structural_v1",
+          "tags": ["crew", "sensor"]
+        },
+        {
+          "id": "weapons",
+          "volumeM3": 55000.0,
+          "centerM": {"xM": 0.0, "yM": 72.0, "zM": 0.0},
+          "protectionStackId": "protection.escort_structural_v1",
+          "tags": ["weapon", "magazine"]
+        }
+      ],
+      "crewBaseline": 180,
+      "lifeSupportCapacity": 240,
+      "baseSignatureGeometryAreaM2": 6200.0,
+      "structuralProtectionStackId": "protection.escort_structural_v1",
+      "maxOperationalMassKg": 26000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    }
+  ],
+  "modules": [
+    {
+      "id": "module.reactor_5gw_v1",
+      "displayName": "5 GW Reactor Demonstrator",
+      "family": "REACTOR_POWER",
+      "integrationCategories": ["CORE"],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 30.0, "widthM": 18.0, "heightM": 15.0},
+      "massKg": 2200000.0,
+      "occupiedVolumeM3": 8100.0,
+      "requiredMountStrengthN": 40000000.0,
+      "continuousPowerSupplyW": 5000000000.0,
+      "continuousPowerDemandW": 0.0,
+      "peakPowerDemandW": 0.0,
+      "storedEnergyCapacityJ": 0.0,
+      "wasteHeatW": 1250000000.0,
+      "localThermalCapacityJ": 80000000000.0,
+      "coolantTransferDemandW": 1250000000.0,
+      "heatRejectionW": 0.0,
+      "crewRequirement": 24,
+      "automationRequirement": 12,
+      "interfaces": [],
+      "signatureContributions": {"thermal_w": 1250000000.0},
+      "constructionInputs": [
+        {"contentId": "component.heavy", "amount": 1200.0},
+        {"contentId": "component.precision", "amount": 350.0}
+      ],
+      "maintenance": {"serviceIntervalSeconds": 432000.0, "maintenanceWorkSeconds": 21600.0, "repairComplexity": 0.85},
+      "capabilityParameters": {"rated_power_w": 5000000000.0}
+    },
+    {
+      "id": "module.main_drive_escort_v1",
+      "displayName": "Escort Main Drive Demonstrator",
+      "family": "MAIN_DRIVE",
+      "integrationCategories": ["CORE"],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 42.0, "widthM": 24.0, "heightM": 19.0},
+      "massKg": 2800000.0,
+      "occupiedVolumeM3": 14500.0,
+      "requiredMountStrengthN": 90000000.0,
+      "continuousPowerSupplyW": 0.0,
+      "continuousPowerDemandW": 2100000000.0,
+      "peakPowerDemandW": 2600000000.0,
+      "storedEnergyCapacityJ": 0.0,
+      "wasteHeatW": 420000000.0,
+      "localThermalCapacityJ": 52000000000.0,
+      "coolantTransferDemandW": 420000000.0,
+      "heatRejectionW": 0.0,
+      "crewRequirement": 18,
+      "automationRequirement": 8,
+      "interfaces": [
+        {"kind": "REACTION_MASS", "id": "propellant_feed", "capacity": 1800000.0}
+      ],
+      "signatureContributions": {"plume_w": 950000000000.0, "thermal_w": 420000000.0},
+      "constructionInputs": [
+        {"contentId": "component.heavy", "amount": 1600.0},
+        {"contentId": "component.precision", "amount": 500.0}
+      ],
+      "maintenance": {"serviceIntervalSeconds": 259200.0, "maintenanceWorkSeconds": 28800.0, "repairComplexity": 0.92},
+      "capabilityParameters": {"thrust_n": 13200000.0, "exhaust_velocity_mps": 65000.0}
+    },
+    {
+      "id": "module.sensor_array_escort_v1",
+      "displayName": "Escort Sensor/EW Array Demonstrator",
+      "family": "SENSOR_EW_FIRE_CONTROL",
+      "integrationCategories": ["UTILITY"],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 14.0, "widthM": 10.0, "heightM": 8.0},
+      "massKg": 420000.0,
+      "occupiedVolumeM3": 1120.0,
+      "requiredMountStrengthN": 3500000.0,
+      "continuousPowerSupplyW": 0.0,
+      "continuousPowerDemandW": 90000000.0,
+      "peakPowerDemandW": 280000000.0,
+      "storedEnergyCapacityJ": 12000000000.0,
+      "wasteHeatW": 70000000.0,
+      "localThermalCapacityJ": 9000000000.0,
+      "coolantTransferDemandW": 70000000.0,
+      "heatRejectionW": 0.0,
+      "crewRequirement": 28,
+      "automationRequirement": 20,
+      "interfaces": [],
+      "signatureContributions": {"active_radar_w": 450000000.0, "thermal_w": 70000000.0},
+      "constructionInputs": [
+        {"contentId": "component.electrical", "amount": 700.0},
+        {"contentId": "component.precision", "amount": 900.0}
+      ],
+      "maintenance": {"serviceIntervalSeconds": 172800.0, "maintenanceWorkSeconds": 14400.0, "repairComplexity": 0.78},
+      "capabilityParameters": {"aperture_area_m2": 240.0, "processing_channels": 96.0}
+    },
+    {
+      "id": "module.radiator_escort_v1",
+      "displayName": "Escort Thermal Rejection Demonstrator",
+      "family": "THERMAL_CONTROL",
+      "integrationCategories": ["UTILITY"],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 22.0, "widthM": 14.0, "heightM": 9.0},
+      "massKg": 650000.0,
+      "occupiedVolumeM3": 2400.0,
+      "requiredMountStrengthN": 4200000.0,
+      "continuousPowerSupplyW": 0.0,
+      "continuousPowerDemandW": 18000000.0,
+      "peakPowerDemandW": 30000000.0,
+      "storedEnergyCapacityJ": 0.0,
+      "wasteHeatW": 3000000.0,
+      "localThermalCapacityJ": 16000000000.0,
+      "coolantTransferDemandW": 0.0,
+      "heatRejectionW": 1500000000.0,
+      "crewRequirement": 6,
+      "automationRequirement": 10,
+      "interfaces": [],
+      "signatureContributions": {"thermal_w": 1500000000.0},
+      "constructionInputs": [
+        {"contentId": "component.heavy", "amount": 300.0},
+        {"contentId": "component.electrical", "amount": 220.0}
+      ],
+      "maintenance": {"serviceIntervalSeconds": 345600.0, "maintenanceWorkSeconds": 10800.0, "repairComplexity": 0.55},
+      "capabilityParameters": {"radiator_area_m2": 4200.0}
+    },
+    {
+      "id": "module.railgun_large_v1",
+      "displayName": "Large Kinetic Mount Demonstrator",
+      "family": "WEAPON_AMMUNITION",
+      "integrationCategories": ["WEAPON"],
+      "compatibleHardpointSizes": ["LARGE"],
+      "physicalDimensionsM": {"lengthM": 68.0, "widthM": 10.0, "heightM": 10.0},
+      "massKg": 1450000.0,
+      "occupiedVolumeM3": 6800.0,
+      "requiredMountStrengthN": 70000000.0,
+      "continuousPowerSupplyW": 0.0,
+      "continuousPowerDemandW": 25000000.0,
+      "peakPowerDemandW": 1600000000.0,
+      "storedEnergyCapacityJ": 36000000000.0,
+      "wasteHeatW": 180000000.0,
+      "localThermalCapacityJ": 14000000000.0,
+      "coolantTransferDemandW": 180000000.0,
+      "heatRejectionW": 0.0,
+      "crewRequirement": 12,
+      "automationRequirement": 10,
+      "interfaces": [
+        {"kind": "AMMUNITION", "id": "kinetic_magazine_feed", "capacity": 120000.0}
+      ],
+      "signatureContributions": {"thermal_w": 180000000.0},
+      "constructionInputs": [
+        {"contentId": "component.heavy", "amount": 1100.0},
+        {"contentId": "component.electrical", "amount": 450.0},
+        {"contentId": "component.precision", "amount": 260.0}
+      ],
+      "maintenance": {"serviceIntervalSeconds": 129600.0, "maintenanceWorkSeconds": 18000.0, "repairComplexity": 0.88},
+      "capabilityParameters": {"projectile_mass_kg": 150.0, "muzzle_velocity_mps": 9000.0, "recoil_impulse_ns": 1350000.0}
+    }
+  ],
+  "demonstratorFits": [
+    {
+      "id": "fit.escort_destroyer_schema_v1",
+      "hullId": "hull.escort_destroyer_v1",
+      "installedModules": [
+        {"mountId": "core_reactor", "moduleId": "module.reactor_5gw_v1"},
+        {"mountId": "core_drive", "moduleId": "module.main_drive_escort_v1"},
+        {"mountId": "utility_sensor", "moduleId": "module.sensor_array_escort_v1"},
+        {"mountId": "utility_thermal", "moduleId": "module.radiator_escort_v1"},
+        {"mountId": "weapon_spinal", "moduleId": "module.railgun_large_v1"}
+      ]
+    }
+  ]
+}
