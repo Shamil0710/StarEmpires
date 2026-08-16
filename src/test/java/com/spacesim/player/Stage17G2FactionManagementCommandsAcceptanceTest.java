@@ -65,9 +65,21 @@ class Stage17G2FactionManagementCommandsAcceptanceTest {
         PlayerFactionManagementService.AssetAffiliationResult affiliation = management.affiliateOwnedAssets();
         assertEquals(placementsBefore, runtime.world().getFleetPlacements(),
                 "Faction affiliation must not replace/move persistent FleetIds or placements");
-        assertEquals(runtime.player().ownedFleetIds().size(), affiliation.localFleets().ownedFleetIds().size()
-                        + affiliation.transitFleets().ownedFleetIds().size(),
-                "All player-owned physical fleets remain the same owned IDs after affiliation");
+        int ownedFleetCount = runtime.player().ownedFleetIds().size();
+        assertEquals(ownedFleetCount, affiliation.localFleets().inspectedOwnedFleets(),
+                "Local affiliation must inspect the same persistent owned FleetIds");
+        assertEquals(ownedFleetCount, affiliation.transitFleets().inspectedOwnedFleets(),
+                "Transit affiliation must inspect the same persistent owned FleetIds");
+        assertEquals(ownedFleetCount,
+                affiliation.localFleets().newlyAffiliatedLocalFleets()
+                        + affiliation.localFleets().alreadyAffiliatedLocalFleets()
+                        + affiliation.localFleets().deferredTransitFleets(),
+                "Local affiliation report must account for every owned FleetId exactly once");
+        assertEquals(ownedFleetCount,
+                affiliation.transitFleets().newlyAffiliatedTransitFleets()
+                        + affiliation.transitFleets().alreadyAffiliatedTransitFleets()
+                        + affiliation.transitFleets().deferredLocalFleets(),
+                "Transit affiliation report must account for every owned FleetId exactly once");
 
         assertTrue(management.capitalizeTreasury(CAPITALIZATION));
         long personalAfterCapitalization = runtime.player().walletMilliCredits();
