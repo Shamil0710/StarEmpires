@@ -28,12 +28,12 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Single deterministic Stage-17.5B fitting validator for authored hull/module definitions and one
+ * Single deterministic Stage-17.5 fitting validator for authored hull/module definitions and one
  * physical runtime load state.
  *
- * <p>The validator never repairs a fit and never uses doctrine/class-name bonuses. A budget that is
- * not yet closed by schema v1 is surfaced as an explicit warning rather than being silently filled
- * by a guessed capacity or multiplier.</p>
+ * <p>The validator never repairs a fit and never uses doctrine/class-name bonuses. Stage 17.5F
+ * accepts non-pristine module-integrity state after validating every damaged mount against the same
+ * physical hull topology; operational degradation is then derived by {@link DerivedShipCalculator}.</p>
  */
 public final class ShipFittingValidator {
     private static final String THRUST_N = "thrust_n";
@@ -57,7 +57,7 @@ public final class ShipFittingValidator {
      * @param hull authoritative hull definition
      * @param fit installed module assignments
      * @param consumables physical carried/load state
-     * @param damage damage input seam; 17.5B supports pristine capability only
+     * @param damage current local module-integrity state
      * @return deterministic immutable diagnostics
      */
     public ValidationResult validate(
@@ -184,13 +184,11 @@ public final class ShipFittingValidator {
                     "required=" + crewRequired + ",supported=" + checkedHull.lifeSupportCapacity());
         }
 
-        if (!checkedDamage.isPristine()) {
-            error(issues, ValidationCode.DAMAGE_MODEL_NOT_ACTIVE, checkedHull.id(),
-                    "non-pristine capability degradation belongs to Stage 17.5F");
-        }
         for (String mountId : checkedDamage.moduleIntegrityByMount().keySet()) {
             if (!slots.containsKey(mountId) && !hardpoints.containsKey(mountId)) {
                 error(issues, ValidationCode.UNKNOWN_MOUNT, mountId, "damage-state mount");
+            } else if (!installedByMount.containsKey(mountId)) {
+                error(issues, ValidationCode.UNKNOWN_MOUNT, mountId, "damage-state mount has no installed module");
             }
         }
 

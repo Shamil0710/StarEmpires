@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "heavyImpactModels": [
+    {
+      "responseSurfaceId": "response.synthetic_heavy_v1",
+      "specificAbsorptionJPerKg": 2400000.0,
+      "spallMassFraction": 0.08,
+      "spallEnergyFraction": 0.12,
+      "ricochetCriticalAngleRad": 1.2217304763960306,
+      "ricochetRetainedEnergyFraction": 0.65
+    }
+  ],
+  "hullDamageLayouts": [
+    {
+      "hullId": "hull.escort_destroyer_v1",
+      "compartments": [
+        {
+          "compartmentId": "engineering",
+          "structuralDamageCapacityJ": 90000000000.0,
+          "subsystemCouplingFraction": 0.60
+        },
+        {
+          "compartmentId": "mission_core",
+          "structuralDamageCapacityJ": 75000000000.0,
+          "subsystemCouplingFraction": 0.50
+        },
+        {
+          "compartmentId": "weapons",
+          "structuralDamageCapacityJ": 65000000000.0,
+          "subsystemCouplingFraction": 0.70
+        }
+      ],
+      "mounts": [
+        {
+          "mountId": "core_reactor",
+          "compartmentId": "engineering",
+          "subsystemDamageCapacityJ": 36000000000.0
+        },
+        {
+          "mountId": "core_drive",
+          "compartmentId": "engineering",
+          "subsystemDamageCapacityJ": 32000000000.0
+        },
+        {
+          "mountId": "utility_sensor",
+          "compartmentId": "mission_core",
+          "subsystemDamageCapacityJ": 9000000000.0
+        },
+        {
+          "mountId": "utility_thermal",
+          "compartmentId": "engineering",
+          "subsystemDamageCapacityJ": 12000000000.0
+        },
+        {
+          "mountId": "weapon_spinal",
+          "compartmentId": "weapons",
+          "subsystemDamageCapacityJ": 22000000000.0
+        }
+      ]
+    }
+  ]
+}

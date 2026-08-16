@@ -1,6 +1,6 @@
 # Star Empires — Stage 17.5 Combat Depth / Ship Fitting Foundation
 
-> Статус: **ACTIVE — 17.5A–17.5E COMPLETE; 17.5F NEXT**  
+> Статус: **ACTIVE — 17.5A–17.5F COMPLETE; 17.5G NEXT**  
 > Основание: accepted `Ship Mathematics v1.0 Design Baseline` (`docs/ship_mathematics_v1_0_design_baseline.md`)  
 > Machine-readable baseline: `docs/benchmarks/ship_mathematics_v1_0_design_baseline.json`  
 > Назначение: перенести принятую v1.0 инженерную модель из research в authoritative runtime без повторного проектирования fundamental ship/combat architecture.
@@ -356,6 +356,8 @@ No authoritative `weaponAccuracy`/`missileHitChance`/`PDChance`; ammunition depl
 
 # 9. Stage 17.5F — shields / armor / compartments / subsystem damage
 
+**COMPLETE — protection/damage runtime implemented; final live composition remains assigned to 17.5H.**
+
 Shield state uses:
 
 ```text
@@ -388,9 +390,15 @@ reactor/distribution damaged → power margin falls
 
 Hit location/orientation matters; global hull HP is not sole survivability; shield saturation/recharge accounting preserved; damage never creates capability; destruction/salvage use ordinary lifecycle/economy path.
 
+Canonical implementation record: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.
+
+Explicit integration boundary: Stage 17.5F activates authoritative local `DamageState` and damage-aware central capabilities. The existing Stage-17.5C `ShipEngineeringRuntime` still uses its pre-F pristine-damage live call path; final composition of damage/shield state with live power/thermal/thrust/FTL grants, capability APIs and binary persistence belongs to **Stage 17.5H**. Stage 17.5F does not fork that runtime.
+
 ---
 
 # 10. Stage 17.5G — shipyard / fitting / repair / maintenance seam
+
+**NEXT after the Stage-17.5F exact-head merge/post-merge gate.**
 
 Stage 17.5G defines **engineering and runtime requirements**; Stage 18 later supplies the full economic resource/facility graph.
 
@@ -451,6 +459,8 @@ getRepairNeed()
 UI exposes mass, acceleration, delta-v, power/heat margin, crew, ammo, sensors, protection, signature and operating/maintenance demand without mutating ECS directly.
 
 Persistence saves installed modules, consumables, damage, required thermal/shield/FTL state and persistent tracks where design requires. Derived state recomputes deterministically.
+
+17.5H must consume the Stage-17.5F compartment/module integrity and shield runtime state rather than resetting `DamageState` to pristine at live engineering/API/persistence boundaries.
 
 ---
 
@@ -561,13 +571,13 @@ Stage 17.5 не обязан:
 # 14. Recommended implementation order
 
 ```text
-17.5A schema/material/hull/module
-→ 17.5B derived calculator + fitting validator
-→ 17.5C propulsion/power/thermal/FTL
-→ 17.5D sensors/tracks/EW/datalink
-→ 17.5E weapons/guidance/PD/ammunition
-→ 17.5F shields/armor/compartments/damage
-→ 17.5G shipyard/refit/repair/maintenance seam
+17.5A schema/material/hull/module COMPLETE
+→ 17.5B derived calculator + fitting validator COMPLETE
+→ 17.5C propulsion/power/thermal/FTL COMPLETE
+→ 17.5D sensors/tracks/EW/datalink COMPLETE
+→ 17.5E weapons/guidance/PD/ammunition COMPLETE
+→ 17.5F shields/armor/compartments/damage COMPLETE
+→ 17.5G shipyard/refit/repair/maintenance seam NEXT
 → 17.5H capability APIs/UI/persistence
 → 17.5I full acceptance + combat test content + prototype tactical visuals
 ```

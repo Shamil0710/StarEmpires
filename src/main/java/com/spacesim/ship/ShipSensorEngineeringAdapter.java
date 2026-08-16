@@ -13,19 +13,17 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Stage-17.5D adapter from the common fitted engineering state to sensor/signature runtime objects.
+ * Stage-17.5D/F adapter from the common fitted engineering state to sensor/signature runtime objects.
  *
- * <p>The adapter does not own a second sensor-stat catalog. Sensor modes are authored as explicit
- * namespaced entries inside the existing {@link InstalledCapability#parameters()} payload of a
- * {@link ModuleFamily#SENSOR_EW_FIRE_CONTROL} module. Static signatures are read from the central
- * {@link DerivedShipState#signatureContributions()} projection. Active radar emission is deliberately
- * absent from the static signature and is produced only by {@link ShipSensorRuntime#observe} while
- * the fitted active sensor is actually enabled.</p>
+ * <p>Stage 17.5F consumes the runtime integrity injected by {@link DerivedShipCalculator}: damaged
+ * apertures become smaller/noisier and angular/range uncertainty worsens. A destroyed mount exposes
+ * no sensor mode. Damage therefore cannot improve a sensor or create a parallel damage bonus.</p>
  */
 public final class ShipSensorEngineeringAdapter {
     /** Shared physical aperture key for a multi-mode fitted sensor array. */
     public static final String APERTURE_AREA_M2 = "aperture_area_m2";
 
+    private static final double MIN_OPERATIONAL_INTEGRITY = 1e-6d;
     private static final String THERMAL_W = "thermal_w";
     private static final String PLUME_W = "plume_w";
     private static final String RADAR_CROSS_SECTION_M2 = "radar_cross_section_m2";
@@ -55,12 +53,16 @@ public final class ShipSensorEngineeringAdapter {
             if (capability.family() != ModuleFamily.SENSOR_EW_FIRE_CONTROL) {
                 continue;
             }
+            double integrity = integrity(capability.parameters());
+            if (integrity <= MIN_OPERATIONAL_INTEGRITY) {
+                continue;
+            }
             for (ModeSpec mode : MODES) {
                 if (hasMode(capability.parameters(), mode.prefix())) {
                     sensors.add(new FittedSensor(
                             capability.mountId(),
                             capability.moduleId(),
-                            buildDefinition(capability, mode)));
+                            buildDefinition(capability, mode, integrity)));
                 }
             }
         }
@@ -70,38 +72,42 @@ public final class ShipSensorEngineeringAdapter {
         return new FittedSensorSuite(sensors, signature);
     }
 
-    private static SensorDefinition buildDefinition(InstalledCapability capability, ModeSpec mode) {
+    private static SensorDefinition buildDefinition(
+            InstalledCapability capability, ModeSpec mode, double integrity) {
         Map<String, Double> parameters = capability.parameters();
-        double aperture = parameters.containsKey(mode.key("aperture_area_m2"))
+        double authoredAperture = parameters.containsKey(mode.key("aperture_area_m2"))
                 ? required(parameters, mode.key("aperture_area_m2"))
                 : required(parameters, APERTURE_AREA_M2);
+        double aperture = authoredAperture * integrity;
         double activeTransmitPowerW = mode.active()
-                ? required(parameters, mode.key("transmit_power_w")) : 0d;
-        double transmitGain = mode.active()
+                ? required(parameters, mode.key("transmit_power_w")) * integrity : 0d;
+        double authoredGain = mode.active()
                 ? required(parameters, mode.key("transmit_gain_linear")) : 1d;
+        double transmitGain = 1d + (authoredGain - 1d) * integrity;
         double activePowerDemandW = mode.active()
-                ? required(parameters, mode.key("power_demand_w")) : 0d;
+                ? required(parameters, mode.key("power_demand_w")) * integrity : 0d;
         double activeWasteHeatW = mode.active()
-                ? required(parameters, mode.key("waste_heat_w")) : 0d;
+                ? required(parameters, mode.key("waste_heat_w")) * integrity : 0d;
+        double authoredEccm = required(parameters, mode.key("eccm_processing_gain_linear"));
         return new SensorDefinition(
                 capability.moduleId() + "." + mode.prefix(),
                 mode.mode(),
                 mode.channel(),
                 aperture,
-                required(parameters, mode.key("receiver_noise_w")),
+                required(parameters, mode.key("receiver_noise_w")) / integrity,
                 required(parameters, mode.key("detection_snr")),
                 required(parameters, mode.key("classification_snr")),
                 required(parameters, mode.key("track_snr")),
                 required(parameters, mode.key("fire_control_snr")),
-                required(parameters, mode.key("bearing_sigma_floor_rad")),
-                required(parameters, mode.key("range_sigma_fraction")),
+                required(parameters, mode.key("bearing_sigma_floor_rad")) / integrity,
+                required(parameters, mode.key("range_sigma_fraction")) / integrity,
                 activeTransmitPowerW,
                 transmitGain,
                 activePowerDemandW,
                 activeWasteHeatW,
-                required(parameters, mode.key("eccm_processing_gain_linear")),
-                required(parameters, mode.key("eccm_power_demand_w")),
-                required(parameters, mode.key("eccm_waste_heat_w")));
+                1d + (authoredEccm - 1d) * integrity,
+                required(parameters, mode.key("eccm_power_demand_w")) * integrity,
+                required(parameters, mode.key("eccm_waste_heat_w")) * integrity);
     }
 
     private static SignatureState signature(Map<String, Double> contributions) {
@@ -120,8 +126,15 @@ public final class ShipSensorEngineeringAdapter {
     }
 
     private static boolean hasMode(Map<String, Double> parameters, String prefix) {
-        String marker = prefix + "_receiver_noise_w";
-        return parameters.containsKey(marker);
+        return parameters.containsKey(prefix + "_receiver_noise_w");
+    }
+
+    private static double integrity(Map<String, Double> parameters) {
+        double value = parameters.getOrDefault(DerivedShipCalculator.RUNTIME_INTEGRITY, 1d);
+        if (!Double.isFinite(value) || value < 0d || value > 1d) {
+            throw new IllegalArgumentException("Invalid runtime sensor integrity");
+        }
+        return value;
     }
 
     private static double required(Map<String, Double> parameters, String key) {
@@ -136,19 +149,19 @@ public final class ShipSensorEngineeringAdapter {
     }
 
     /**
-     * One fitted sensor mode bound to the physical module mount that owns it.
+     * One fitted sensor mode bound to its physical module mount.
      *
-     * @param mountId hull-local physical mount ID
-     * @param moduleId installed module content ID
-     * @param definition immutable physical sensor definition
+     * @param mountId physical fitted mount ID
+     * @param moduleId sensor module content ID
+     * @param definition damage-aware physical sensor definition
      */
     public record FittedSensor(String mountId, String moduleId, SensorDefinition definition) {
         /**
          * Validates one fitted sensor binding.
          *
-         * @param mountId hull-local physical mount ID
-         * @param moduleId installed module content ID
-         * @param definition immutable physical sensor definition
+         * @param mountId physical fitted mount ID
+         * @param moduleId sensor module content ID
+         * @param definition damage-aware physical sensor definition
          */
         public FittedSensor {
             requireNonBlank(mountId, "mountId");
@@ -160,15 +173,15 @@ public final class ShipSensorEngineeringAdapter {
     /**
      * Deterministic fitted sensor/signature projection for one ship state.
      *
-     * @param sensors fitted sensor modes in stable mount/mode order
-     * @param staticSignature non-operational channelized signature contributions
+     * @param sensors damage-aware fitted sensor modes
+     * @param staticSignature current static fitted signature projection
      */
     public record FittedSensorSuite(List<FittedSensor> sensors, SignatureState staticSignature) {
         /**
-         * Freezes the fitted sensor projection.
+         * Validates and freezes the fitted sensor projection.
          *
-         * @param sensors fitted sensor modes in stable mount/mode order
-         * @param staticSignature non-operational channelized signature contributions
+         * @param sensors damage-aware fitted sensor modes
+         * @param staticSignature current static fitted signature projection
          */
         public FittedSensorSuite {
             Objects.requireNonNull(sensors, "sensors");

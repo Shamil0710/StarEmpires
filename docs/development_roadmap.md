@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-17 / Stage 17.5 Combat Test Content + Tactical Prototype Visual exit gate.**  
+> **Последняя синхронизация: 2026-08-17 / Stage 17.5F shields / armor / compartments / subsystem damage implementation.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -40,7 +40,7 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5F NEXT** |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5G NEXT** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | PLANNED |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
@@ -221,9 +221,13 @@ Canonical 17.5D closeout: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew
 Canonical 17.5E closeout: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.  
 Projectile representation invariant: `docs/stage17_5e_projectile_representation_invariant.md`.
 
+> **Stage 17.5F — COMPLETE: finite geometry/reserve/power/heat shield runtime, bounded no-extrapolation heavy-impact material response with `STOPPED` / `RICOCHET` / `PERFORATED`, explicit compartment/mount damage topology and damage-aware common ship/sensor/weapon capabilities.**
+
+Canonical 17.5F closeout: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.
+
 ## 6. Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-**ACTIVE — 17.5A–17.5E COMPLETE; 17.5F NEXT.**
+**ACTIVE — 17.5A–17.5F COMPLETE; 17.5G NEXT.**
 
 Implementation sequence:
 
@@ -232,10 +236,12 @@ Implementation sequence:
 - **17.5C — COMPLETE:** propulsion/reaction mass/power/thermal/FTL runtime + persistent engineering state + single-FSM fitted jump integration;
 - **17.5D — COMPLETE:** signatures/sensors/tracks/datalink/EW + fitted sensor adapter + common player/AI information model;
 - **17.5E — COMPLETE:** kinetic/beam/guided/PD/ammunition + individual physical bodies + linked weapon/ammunition content + deterministic pooled projectile representation;
-- **17.5F — NEXT:** shields/armor/compartments/subsystem damage;
-- **17.5G:** shipyard/refit/repair/maintenance economy seam;
-- **17.5H:** capability APIs/UI/full migration surfaces, including final engineering-grant/weapon power-heat commit, binary sensor-knowledge persistence and weapon loadout/launcher-cycle persistence where required by live capability APIs;
+- **17.5F — COMPLETE:** finite shields + bounded armor/material response + compartments/subsystem damage + damage-aware derived/sensor/weapon capabilities;
+- **17.5G — NEXT:** shipyard/refit/repair/maintenance economy seam;
+- **17.5H:** capability APIs/UI/full migration surfaces, including final damage/shield composition with live engineering grants, final engineering-grant/weapon power-heat commit, binary sensor-knowledge persistence and weapon loadout/launcher-cycle persistence where required by live capability APIs;
 - **17.5I:** deterministic aggregate acceptance **plus mandatory Combat Test Content Pack and Tactical Prototype Visual Set**.
+
+Stage-17.5F activates authoritative local compartment/module damage and damage-aware central capability derivation. Stage-17.5H must consume this state at live engineering/API/persistence boundaries rather than reset `DamageState` to pristine; Stage-17.5F deliberately does not fork the existing Stage-17.5C runtime to bypass that integration slice.
 
 ### Mandatory Stage 17.5 exit content gate
 
@@ -276,6 +282,7 @@ Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.
 17.5C implementation record: `docs/stage17_5c_propulsion_power_thermal_ftl.md`.  
 17.5D implementation record: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`.  
 17.5E implementation record: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.  
+17.5F implementation record: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.  
 17.5I combat content / visual acceptance: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
 ## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
@@ -507,8 +514,8 @@ Stage 17 COMPLETE
 → Stage 17.5C propulsion / reaction mass / power / thermal / FTL COMPLETE
 → Stage 17.5D signatures / sensors / tracks / datalink / EW COMPLETE
 → Stage 17.5E kinetic / beam / guided / PD / ammunition COMPLETE
-→ Stage 17.5F shields / armor / compartments / subsystem damage NEXT
-→ Stage 17.5G shipyard / refit / repair / maintenance seam
+→ Stage 17.5F shields / armor / compartments / subsystem damage COMPLETE
+→ Stage 17.5G shipyard / refit / repair / maintenance seam NEXT
 → Stage 17.5H capability APIs / UI / persistence
 → Stage 17.5I deterministic multi-fleet acceptance + Combat Test Content Pack + Tactical Prototype Visual Set
 → Stage 18 Resources / Industry / Infrastructure
@@ -519,4 +526,4 @@ Stage 17 COMPLETE
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority remains Stage 17.5F. Stage 17.5 cannot close until the Stage-17.5I combat-content/visual exit gate passes.**
+**Immediate implementation priority after the Stage-17.5F merge gate is Stage 17.5G. Stage 17.5 cannot close until the Stage-17.5I combat-content/visual exit gate passes.**
