@@ -27,19 +27,22 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Детерминированный production bootstrap минимального multi-system мира.
+ * Deterministic compact multi-system bootstrap and compatibility gateway for the manual large demo.
  *
- * <p>Каждая звёздная система получает обычную {@link SimulationSession}. Strategic topology
- * содержит persistent landmarks, faction treasuries, relations и territory. Текущий demo policy
- * сохраняет рынки открытыми: отношения выше market-access threshold, поэтому введение Stage-8
- * diplomacy не меняет прежний economic baseline до отдельного изменения policy.</p>
+ * <p>{@link #createState(long, ContentCatalog)} always remains the three-system fixture used by
+ * focused automated tests. {@link #create(long)} switches to {@link LargeDemoGalaxyFactory} only
+ * when {@link #LARGE_DEMO_PROPERTY} is explicitly enabled by the desktop launcher. This keeps CI
+ * fixtures small while the normal playable executable exercises the same simulation at 100-system
+ * scale.</p>
  */
 public final class DemoGalaxyFactory {
+    /** JVM property enabling the 100-system manual demo through {@link #create(long)}. */
+    public static final String LARGE_DEMO_PROPERTY = "spacesim.demo.large";
     /** Система, которую desktop показывает и симулирует на полном local rate. */
     public static final StarSystemId ACTIVE_SYSTEM_ID = new StarSystemId(1L);
     /** Вторая экономически живая система demo galaxy. */
     public static final StarSystemId INNER_SYSTEM_ID = new StarSystemId(2L);
-    /** Удалённая frontier-система demo galaxy. */
+    /** Удалённая frontier-система compact demo galaxy. */
     public static final StarSystemId FRONTIER_SYSTEM_ID = new StarSystemId(3L);
 
     private DemoGalaxyFactory() {
@@ -47,12 +50,19 @@ public final class DemoGalaxyFactory {
     }
 
     /**
-     * Создаёт runtime demo galaxy на встроенном content catalog.
+     * Creates the selected runtime demo galaxy on the built-in content catalog.
      *
-     * @param rootSeed корневой seed demo world; active system сохраняет его без преобразования
-     * @return multi-system runtime с active system на полном local rate
+     * <p>Without an explicit large-demo property this returns the historical three-system runtime.
+     * Desktop/manual launch enables the property and therefore receives the 100-system live demo.
+     * The active system keeps the unmodified root seed in both modes.</p>
+     *
+     * @param rootSeed root deterministic seed
+     * @return compact or large ordinary multi-system runtime
      */
     public static WorldSimulation create(long rootSeed) {
+        if (Boolean.getBoolean(LARGE_DEMO_PROPERTY)) {
+            return LargeDemoGalaxyFactory.create(rootSeed);
+        }
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         return WorldSimulation.restore(
                 createState(rootSeed, content),
@@ -63,7 +73,10 @@ public final class DemoGalaxyFactory {
     }
 
     /**
-     * Создаёт persistent demo world на явно заданном semantic catalog.
+     * Creates the compact persistent fixture on an explicit semantic catalog.
+     *
+     * <p>This method intentionally never consults {@link #LARGE_DEMO_PROPERTY}. Existing unit and
+     * acceptance tests therefore continue to receive the exact legacy 3-system state.</p>
      *
      * @param rootSeed общий seed bootstrap
      * @param contentCatalog единый catalog всех локальных simulation sessions
@@ -101,14 +114,8 @@ public final class DemoGalaxyFactory {
                 List.of(new PlanetNode(new PlanetId(4L), "Prospect", 1.3d)),
                 List.of(new AsteroidFieldNode(
                         new AsteroidFieldId(3L), "Frontier Field", 1.6d, 1.1d, 2.1d)));
-        SectorNode core = new SectorNode(
-                new SectorId(1L),
-                "Core Sector",
-                List.of(anchor, corona));
-        SectorNode rim = new SectorNode(
-                new SectorId(2L),
-                "Outer Rim",
-                List.of(frontierNode));
+        SectorNode core = new SectorNode(new SectorId(1L), "Core Sector", List.of(anchor, corona));
+        SectorNode rim = new SectorNode(new SectorId(2L), "Outer Rim", List.of(frontierNode));
         GalaxyTopology topology = new GalaxyTopology(
                 new GalaxyId(1L),
                 "Star Empires Demo Galaxy",
@@ -130,29 +137,20 @@ public final class DemoGalaxyFactory {
                         factionState("faction.miners", 750_000d)),
                 List.of(
                         new FactionStrategicState(
-                                "faction.neutral",
-                                -25,
-                                List.of(
-                                        new FactionRelationState("faction.miners", 10),
+                                "faction.neutral", -25,
+                                List.of(new FactionRelationState("faction.miners", 10),
                                         new FactionRelationState("faction.trade_league", 10)),
-                                List.of(FRONTIER_SYSTEM_ID),
-                                doctrineState(content, "faction.neutral")),
+                                List.of(FRONTIER_SYSTEM_ID), doctrineState(content, "faction.neutral")),
                         new FactionStrategicState(
-                                "faction.trade_league",
-                                -25,
-                                List.of(
-                                        new FactionRelationState("faction.miners", 5),
+                                "faction.trade_league", -25,
+                                List.of(new FactionRelationState("faction.miners", 5),
                                         new FactionRelationState("faction.neutral", 20)),
-                                List.of(ACTIVE_SYSTEM_ID),
-                                doctrineState(content, "faction.trade_league")),
+                                List.of(ACTIVE_SYSTEM_ID), doctrineState(content, "faction.trade_league")),
                         new FactionStrategicState(
-                                "faction.miners",
-                                -25,
-                                List.of(
-                                        new FactionRelationState("faction.neutral", 10),
+                                "faction.miners", -25,
+                                List.of(new FactionRelationState("faction.neutral", 10),
                                         new FactionRelationState("faction.trade_league", 5)),
-                                List.of(INNER_SYSTEM_ID),
-                                doctrineState(content, "faction.miners"))));
+                                List.of(INNER_SYSTEM_ID), doctrineState(content, "faction.miners"))));
     }
 
     private static FactionDoctrineState doctrineState(ContentCatalog content, String factionContentId) {
@@ -161,12 +159,8 @@ public final class DemoGalaxyFactory {
                 "Authored faction missing from content catalog: " + factionContentId);
         ContentCatalog.FactionDoctrineDefinition doctrine = faction.doctrine();
         return new FactionDoctrineState(
-                doctrine.tradeOpenness(),
-                doctrine.securityPosture(),
-                doctrine.expansionPreference(),
-                doctrine.sovereigntySensitivity(),
-                doctrine.treatyLegalism(),
-                doctrine.interventionism(),
+                doctrine.tradeOpenness(), doctrine.securityPosture(), doctrine.expansionPreference(),
+                doctrine.sovereigntySensitivity(), doctrine.treatyLegalism(), doctrine.interventionism(),
                 doctrine.economicResiliencePriority());
     }
 
