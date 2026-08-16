@@ -79,7 +79,12 @@ public final class LargeDemoGalaxyFactory {
         throw new AssertionError("LargeDemoGalaxyFactory does not create instances");
     }
 
-    /** Creates the 100-system live-demo runtime on the default content catalog. */
+    /**
+     * Creates the 100-system live-demo runtime on the default content catalog.
+     *
+     * @param rootSeed deterministic root seed
+     * @return ordinary world runtime with exactly {@value #SYSTEM_COUNT} systems
+     */
     public static WorldSimulation create(long rootSeed) {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         return WorldSimulation.restore(
@@ -299,8 +304,7 @@ public final class LargeDemoGalaxyFactory {
         }
     }
 
-    private static FactionDescriptor controllerFor(
-            List<FactionDescriptor> factions, int region, int local) {
+    private static FactionDescriptor controllerFor(List<FactionDescriptor> factions, int region, int local) {
         List<FactionDescriptor> political = factions.stream()
                 .filter(value -> !value.id().equals("faction.neutral"))
                 .toList();
@@ -331,12 +335,8 @@ public final class LargeDemoGalaxyFactory {
                     faction.runtimeId(),
                     faction.displayName(),
                     new FactionDoctrineState(
-                            doctrine.tradeOpenness(),
-                            doctrine.securityPosture(),
-                            doctrine.expansionPreference(),
-                            doctrine.sovereigntySensitivity(),
-                            doctrine.treatyLegalism(),
-                            doctrine.interventionism(),
+                            doctrine.tradeOpenness(), doctrine.securityPosture(), doctrine.expansionPreference(),
+                            doctrine.sovereigntySensitivity(), doctrine.treatyLegalism(), doctrine.interventionism(),
                             doctrine.economicResiliencePriority())));
         }
         for (DemoFaction faction : DEMO_FACTIONS) {
@@ -391,13 +391,21 @@ public final class LargeDemoGalaxyFactory {
 
     /** Curated startup economy profiles; they modify only initial physical stocks/market demand. */
     public enum SystemProfile {
+        /** Dense, broadly stocked political/economic center. */
         CAPITAL,
+        /** Broadly stocked exchange and logistics-oriented starting market. */
         TRADE_HUB,
+        /** Ore-rich extraction-oriented starting economy with energy demand. */
         MINING,
+        /** Energy-rich starting economy. */
         ENERGY,
+        /** Food-rich agricultural starting economy. */
         AGRICULTURAL,
+        /** Steel-rich industrial starting economy with ore/energy demand. */
         INDUSTRIAL,
+        /** Weapons-rich military-production starting economy with steel/energy demand. */
         ARSENAL,
+        /** Low-stock, high-demand peripheral starting economy. */
         FRONTIER;
 
         double stockMultiplier(String itemId) {
