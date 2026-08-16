@@ -25,6 +25,10 @@ import java.util.Objects;
  * progress comes from the target system's authoritative simulation tick and the persisted
  * {@code buildStartedTick/buildDurationTicks}. Completed station balances likewise come from their
  * real operating {@link WalletComponent}.</p>
+ *
+ * <p>Stage 17 extends station affiliation to world-defined factions. Runtime faction IDs are
+ * therefore resolved through {@link com.spacesim.world.WorldSimulation#findFactionStableId(int)}
+ * rather than by scanning only immutable authored content.</p>
  */
 public final class PlayerConstructionManagementModel {
     private final PlayerRuntime runtime;
@@ -156,12 +160,9 @@ public final class PlayerConstructionManagementModel {
     }
 
     private String factionContentId(int runtimeId) {
-        for (ContentCatalog.FactionDefinition faction : content.getFactions()) {
-            if (faction.runtimeId() == runtimeId) {
-                return faction.id();
-            }
-        }
-        throw new IllegalStateException("Owned station references unknown faction runtime ID: " + runtimeId);
+        return runtime.world().findFactionStableId(runtimeId).orElseThrow(
+                () -> new IllegalStateException(
+                        "Owned station references unknown faction runtime ID: " + runtimeId));
     }
 
     private static long elapsedBuildTicks(ConstructionProjectState project, long currentTick) {
