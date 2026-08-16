@@ -46,9 +46,9 @@ public final class PlayerFactionManagementService {
      * Transfers real personal money into the player's faction treasury.
      *
      * @param amountMilliCredits strictly positive amount
-     * @return updated conserved treasury/personal view
+     * @return true when the full conserved transfer succeeded
      */
-    public PlayerFactionTreasuryView capitalizeTreasury(long amountMilliCredits) {
+    public boolean capitalizeTreasury(long amountMilliCredits) {
         requirePlayerFaction();
         return treasury.capitalize(amountMilliCredits);
     }
@@ -57,9 +57,9 @@ public final class PlayerFactionManagementService {
      * Transfers real faction-treasury money back to the player's personal wallet.
      *
      * @param amountMilliCredits strictly positive amount
-     * @return updated conserved treasury/personal view
+     * @return true when the full conserved transfer succeeded
      */
-    public PlayerFactionTreasuryView transferTreasuryToPersonal(long amountMilliCredits) {
+    public boolean transferTreasuryToPersonal(long amountMilliCredits) {
         requirePlayerFaction();
         return treasury.transferToPersonal(amountMilliCredits);
     }
