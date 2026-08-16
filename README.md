@@ -28,14 +28,16 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions, logistics, construction, expansion | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining, combat, progression | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, warfare | **ACTIVE** |
-| **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | PLANNED |
+| **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **ACTIVE** |
+| **v0.5 RPG & Living World** | physical world generation, discovery, NPC, missions, reputation | PLANNED |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | PLANNED |
 | **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED |
 
 На текущем `main` завершены Stages **0–16** и **17A–17G**. Следующий обязательный этап — **Stage 17H: persistence / migration / Stage-17 end-to-end gate**.
 
 Stage 17.5 (Combat Depth / Ship Fitting Foundation) уже имеет исследовательскую и design-базу, но runtime-реализация остаётся заблокированной до успешного завершения 17H.
+
+После Stage 17.5 roadmap теперь отдельно закрывает **Stage 18 Resources / Industry / Infrastructure Foundation** до strategic warfare и procedural world generation. Это нужно, чтобы генератор мира уже получал готовую онтологию ресурсов, способов добычи, производственных цепочек, facilities, станций и верфей, а не изобретал её по ходу генерации.
 
 ## Что уже реализовано
 
@@ -125,6 +127,7 @@ Stage 17A–17G реализует переход игрока из незави
 6. **Persistent identity должна переживать materialization, ownership changes и save/load.**
 7. **Determinism и conservation проверяются автоматическими acceptance tests.**
 8. **Производительность не должна достигаться ценой второй упрощённой экономики для далёкого мира.** Масштабирование проектируется через simulation LOD, event-driven transitions, aggregation и deterministic materialization.
+9. **Промышленный content следует причинной цепочке `resource → extraction → processing → component → physical product`.** Credits, station class или faction identity сами по себе не создают output.
 
 ## Технологии
 
@@ -238,6 +241,7 @@ branch from exact green main
 - [`docs/economic_invariants.md`](docs/economic_invariants.md) — экономические invariants;
 - [`docs/simulation_time_model.md`](docs/simulation_time_model.md) — модель времени;
 - [`docs/persistence_model.md`](docs/persistence_model.md) — persistence contract;
+- [`docs/simulation_scalability_architecture.md`](docs/simulation_scalability_architecture.md) — simulation LOD / scheduler / scalability contract;
 - [`docs/ai_behavior_roadmap.md`](docs/ai_behavior_roadmap.md) — AI behavior roadmap;
 - [`docs/stage15_player_fleets.md`](docs/stage15_player_fleets.md) — player fleets;
 - [`docs/stage16_player_construction.md`](docs/stage16_player_construction.md) — player construction/stations;
@@ -246,8 +250,9 @@ branch from exact green main
 - [`docs/ship_mathematics_v1_0_design_baseline.md`](docs/ship_mathematics_v1_0_design_baseline.md) — accepted ship mathematics design baseline;
 - [`docs/ship_hull_module_and_fleet_doctrine.md`](docs/ship_hull_module_and_fleet_doctrine.md) — hull/module/fleet doctrine;
 - [`docs/stage17_5_combat_depth_implementation_plan.md`](docs/stage17_5_combat_depth_implementation_plan.md) — будущая Stage 17.5 implementation sequence;
-- [`docs/stage19_physical_world_generation_plan.md`](docs/stage19_physical_world_generation_plan.md) — physical world generation;
-- [`docs/stage21_content_balance_plan.md`](docs/stage21_content_balance_plan.md) — content/balance alpha.
+- [`docs/stage18_resources_industry_infrastructure_plan.md`](docs/stage18_resources_industry_infrastructure_plan.md) — resource/extraction/industry/station/shipyard foundation;
+- [`docs/stage20_physical_world_generation_plan.md`](docs/stage20_physical_world_generation_plan.md) — physical world generation;
+- [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — content/balance alpha.
 
 Исторические roadmap snapshots находятся в `docs/archive/` и не должны использоваться как текущий статус проекта.
 
@@ -258,8 +263,12 @@ Stage 17H migration/end-to-end acceptance
 → Stage 17 COMPLETE
 → Stage 17.5A schema/material/hull/module
 → Stage 17.5 Combat Depth / Ship Fitting Foundation
-→ Stage 18 strategic warfare
-→ Stage 19–22 living world, content/balance and polish
+→ Stage 18 Resources / Industry / Infrastructure
+→ Stage 19 strategic warfare
+→ Stage 20 physical world generation
+→ Stage 21 RPG / living world
+→ Stage 22 content/balance alpha
+→ Stage 23 polish / RC
 ```
 
 До завершения **Stage 17H** нельзя перескакивать непосредственно к Stage 17.5 или Stage 18.
