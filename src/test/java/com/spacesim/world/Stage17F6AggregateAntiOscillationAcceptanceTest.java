@@ -128,9 +128,8 @@ class Stage17F6AggregateAntiOscillationAcceptanceTest {
         assertEquals(beforePhysicalApply.inventoryUnits(), afterPhysicalApply.inventoryUnits());
         assertEquals(beforePhysicalApply.entityWallets(), afterPhysicalApply.entityWallets());
         assertEquals(beforePhysicalApply.treasury(), afterPhysicalApply.treasury());
-        assertTrue(afterPhysicalApply.marketTargets() >= beforePhysicalApply.marketTargets(),
-                "Explicit ordinary apply may materialize higher demand but no resources");
-        assertEquals(10, sourceMarket.getComponent(MarketComponent.class).targetStock[item.runtimeId()]);
+        assertEquals(10, sourceMarket.getComponent(MarketComponent.class).targetStock[item.runtimeId()],
+                "Explicit ordinary apply must recompute effective demand from current configured/base/overlay sources");
 
         long secondTick = world.findFactionPolicyReviewState(SOURCE).orElseThrow().lastPolicyReviewTick()
                 + cadence.intervalTicks();
