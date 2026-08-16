@@ -27,7 +27,14 @@ public final class ShipShieldEngineeringAdapter {
             String moduleId,
             ShieldFieldRuntime.Definition definition,
             double emitterIntegrity) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates one fitted shield projection.
+         *
+         * @param mountId physical fitted emitter mount
+         * @param moduleId shield module content ID
+         * @param definition authored physical shield definition
+         * @param emitterIntegrity current emitter integrity in (0,1]
+         */
         public FittedShield {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
