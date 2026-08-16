@@ -645,6 +645,7 @@ public final class ShipSensorRuntime {
         }
     }
 
+    /** Internal fused Cartesian position/covariance solution. */
     private record PositionSolution(
             double xM,
             double yM,
@@ -668,6 +669,7 @@ public final class ShipSensorRuntime {
         }
     }
 
+    /** Internal candidate pair used to select deterministic two-bearing triangulation geometry. */
     private record BearingPair(
             SensorMeasurement first,
             SensorMeasurement second,
