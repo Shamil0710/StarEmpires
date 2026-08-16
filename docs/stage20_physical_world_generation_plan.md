@@ -43,6 +43,10 @@ UI может использовать km / million km / AU / h / days.
 
 Inter-system topology использует stable system IDs + explicit jump edges. Edge transit не является hidden teleport: fitted ship платит spool/energy/cooldown, а edge хранит explicit transit semantics.
 
+Канонический cross-stage navigation contract: `docs/inter_system_navigation_contract.md`.
+
+> **Ordinary inter-system movement разрешён только между непосредственными соседями jump graph. Если `B ∉ topology.neighbors(A)`, ordinary jump `A → B` невозможен. Любой дальний маршрут исполняется как последовательность отдельных neighbor hops.**
+
 Запрещено создавать несвязанные:
 
 - combat units;
@@ -177,6 +181,25 @@ REMOTE_RESOURCE_ROUTE
 
 Jump graph генерируется одновременно как strategic topology и physical/temporal logistics layer.
 
+## Neighbor-only movement invariant
+
+Generator создаёт explicit graph, а не fully connected distance map.
+
+```text
+route destination D
+≠ immediate jump destination D
+
+A → B → C → D
+= three authoritative hops
+= A→B, B→C, C→D
+```
+
+Immediate jump destination всегда обязан находиться в `topology.neighbors(currentSystem)`.
+
+Route planner может выбрать удалённую конечную систему и построить multi-hop route, но executor выполняет его edge-by-edge. После каждого hop следующий переход заново существует как ordinary world action; blockade, access state, damage, fuel/energy, diplomacy или topology changes могут изменить возможность продолжения маршрута.
+
+Special gate/wormhole/relay не получает скрытый teleport shortcut. Если он работает как ordinary jump connection, он материализуется как explicit edge. Иной transition type требует отдельного architecture decision.
+
 Для edge хранить минимум:
 
 ```text
@@ -213,6 +236,20 @@ heat/damage constraints
 ## DoD 20D
 
 Для generated region route planner должен выдавать физическое ETA и energy/operational consequence, а не только hop count.
+
+Дополнительно acceptance обязан доказывать:
+
+```text
+every ordinary inter-system hop
+→ corresponds to one explicit topology edge
+
+non-neighbor direct request
+→ rejected
+
+multi-hop route
+→ ordered sequence of neighbor edges
+→ no skipped intermediate systems
+```
 
 ---
 
@@ -502,15 +539,16 @@ Resource occurrence IDs/reserves, facilities and discovered knowledge входя
 1. every authoritative local distance maps to meters;
 2. every ship ETA uses actual movement/jump capability;
 3. cargo/ship mass affects logistics time through shared physics;
-4. no instant inter-system teleport outside jump FSM;
-5. sensor visibility uses physical channels;
-6. discovery does not grant omniscience;
-7. production cadence is checked against logistics latency;
-8. resource types/facilities come from Stage-18 ontology, not generator-only shortcuts;
-9. generated dead economy requires explicit intended scenario, not accidental seed failure;
-10. player and AI inhabit the same generated geometry;
-11. deterministic same seed/version produces equivalent world;
-12. generator never creates hidden supplies or emergency deposits to bypass physical economy.
+4. every ordinary inter-system movement is exactly one explicit neighbor edge; no direct jump to non-neighbor systems and no skipped intermediate hops;
+5. no instant inter-system teleport outside an explicitly designed transition contract;
+6. sensor visibility uses physical channels;
+7. discovery does not grant omniscience;
+8. production cadence is checked against logistics latency;
+9. resource types/facilities come from Stage-18 ontology, not generator-only shortcuts;
+10. generated dead economy requires explicit intended scenario, not accidental seed failure;
+11. player and AI inhabit the same generated geometry and jump graph;
+12. deterministic same seed/version produces equivalent world;
+13. generator never creates hidden supplies or emergency deposits to bypass physical economy.
 
 ---
 
@@ -518,4 +556,4 @@ Resource occurrence IDs/reserves, facilities and discovered knowledge входя
 
 Stage 20 COMPLETE означает:
 
-> **галактика и системы генерируются детерминированно из закрытой Stage-18 resource/industry ontology так, что расстояния, travel time, delta-v, jump topology, sensor visibility, resource occurrence, industrial specialization, logistics throughput и economic cadence согласованы с accepted Ship Mathematics и production capabilities; discovery остаётся explicit, а generated world не требует скрытых teleport/restock/resource shortcuts для нормальной жизни.**
+> **галактика и системы генерируются детерминированно из закрытой Stage-18 resource/industry ontology так, что расстояния, travel time, delta-v, neighbor-only jump topology, sensor visibility, resource occurrence, industrial specialization, logistics throughput и economic cadence согласованы с accepted Ship Mathematics и production capabilities; discovery остаётся explicit, дальние маршруты исполняются как последовательности direct edges, а generated world не требует скрытых teleport/restock/resource shortcuts для нормальной жизни.**

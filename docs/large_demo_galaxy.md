@@ -127,7 +127,7 @@ initial inventory stock
 
 Дальше систему изменяют только обычные economy/logistics/production/construction/diplomacy rules.
 
-## 6. Desktop integration
+## 6. Desktop integration и навигация
 
 Обычный `DesktopLauncher` включает JVM property:
 
@@ -144,13 +144,39 @@ spacesim.demo.large=true
 
 Graphics validation modes large world не включают.
 
+### Live navigation
+
+Playable HUD больше не трактует галактику как линейный `Anchor ↔ Corona` test route.
+
+Он показывает:
+
+- текущий `StarSystemId` и имя;
+- текущего strategic controller;
+- все direct neighbors из `GalaxyTopology.neighbors(current)`;
+- controller каждого соседнего узла;
+- текущий выбранный immediate jump destination.
+
+Управление:
+
+```text
+K
+→ циклически выбрать следующий direct neighbor
+
+J
+→ запросить ordinary authoritative jump в выбранного neighbor
+```
+
+UI не меняет положение флота и не строит отдельную travel path. Он только передаёт выбранный direct neighbor в `PlayerRuntime.requestJump(...)`, после чего существующий Stage-10 jump FSM повторно проверяет topology и выполняет переход.
+
+Канонический cross-stage contract: `docs/inter_system_navigation_contract.md`.
+
 ## 7. Compact-test isolation
 
 `DemoGalaxyFactory.createState(...)` всегда остаётся трёхсистемным deterministic fixture независимо от JVM property.
 
 Это защищает CI от умножения стоимости каждого исторического acceptance на 100 `SimulationSession`.
 
-Large-scale проверки находятся только в специализированном `LargeDemoGalaxyFactoryTest`.
+Large-scale проверки находятся только в специализированном `LargeDemoGalaxyFactoryTest` и navigation-specific tests.
 
 ## 8. Curated playable concessions
 
@@ -177,6 +203,8 @@ exactly 100 systems
 → 5 WORLD_BOOTSTRAP identities
 → runtime faction IDs 0..7 occur on physical ECS entities
 → every system has exactly one strategic controller
+→ every selectable immediate jump destination is a direct topology neighbor
+→ non-neighbor player/world jump requests are rejected
 → current WorldStateCodec round-trip exact
 → deterministic re-encode exact
 → compact createState remains exactly 3 systems
@@ -187,22 +215,25 @@ exactly 100 systems
 На large demo перед Stage 17.5 полезно проверять в живом desktop build:
 
 1. читаемость 100-system global map;
-2. переходы через много jump edges;
-3. remote-system lag и bounded strategic update behavior;
-4. divergence цен между mining/industrial/frontier/trade systems;
-5. реальные trade routes и shortages;
-6. supply pressure и faction economic decisions;
-7. faction treasuries и fiscal policy;
-8. diplomacy/treaty/embargo effects;
-9. claims/control/construction concessions;
-10. player construction и owned stations в разных регионах;
-11. save/load большого world state;
-12. повторное продолжение симуляции после load без duplication/reset.
+2. свободный выбор между direct neighbors через `K` и `J`;
+3. много-hop маршруты как последовательность реальных соседних переходов;
+4. remote-system lag и bounded strategic update behavior;
+5. divergence цен между mining/industrial/frontier/trade systems;
+6. реальные trade routes и shortages;
+7. supply pressure и faction economic decisions;
+8. faction treasuries и fiscal policy;
+9. diplomacy/treaty/embargo effects;
+10. claims/control/construction concessions;
+11. player construction и owned stations в разных регионах;
+12. save/load большого world state;
+13. повторное продолжение симуляции после load без duplication/reset.
 
 ## 11. Граница с будущими этапами
 
 Large demo не должен заранее решать задачи Stage 18 или Stage 20.
 
 Он переиспользует текущие пять commodity items и существующие station/ship archetypes. Набор ресурсов, extraction processes, facilities, shipyards и production graph будет расширяться на Stage 18; физически калиброванный universe placement — на Stage 20.
+
+При этом neighbor-only topology уже является долгоживущим cross-stage invariant: Stage 20 сможет заменить layout/edge generation, но не право ordinary jump пропускать промежуточные системы.
 
 Поэтому large demo — это **масштабный стенд текущих систем**, а не обещание финального распределения ресурсов, звёзд, планет или политической карты.

@@ -31,6 +31,7 @@ import com.spacesim.persistence.PlayableWorldStateCodec;
 import com.spacesim.player.DiscoveredObjectRef;
 import com.spacesim.player.PlayableTestWorldFactory;
 import com.spacesim.player.PlayableWorldState;
+import com.spacesim.player.PlayerJumpNavigationModel;
 import com.spacesim.player.PlayerMarketItemView;
 import com.spacesim.player.PlayerMarketService;
 import com.spacesim.player.PlayerMarketView;
@@ -52,6 +53,7 @@ import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StarSystemNode;
+import com.spacesim.world.WorldFactionIdentityState;
 import com.spacesim.world.WorldSimulation;
 
 import java.io.IOException;
@@ -64,12 +66,12 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Manually playable Stage-14 desktop test harness.
+ * Manually playable desktop test harness for the current production simulation.
  *
  * <p>The application remains intentionally thin: keyboard/mouse input is translated into ordinary
- * {@link PlayerRuntime}, market, mining and ownership/progression commands. World-space rendering,
- * HUD and minimap read authoritative state only. No presentation code teleports ships, creates
- * goods, awards credits, applies damage or performs mining directly.</p>
+ * {@link PlayerRuntime}, market, mining, jump and ownership/progression commands. World-space
+ * rendering, HUD and minimap read authoritative state only. No presentation code teleports ships,
+ * creates goods, awards credits, applies damage or performs mining directly.</p>
  */
 public final class PlayableTestGame extends ApplicationAdapter {
     private static final float MAP_PADDING = 18f;
@@ -110,6 +112,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
     private boolean moveLeft;
     private boolean moveRight;
     private int selectedMarketIndex;
+    private int selectedJumpNeighborIndex;
     private DiscoveredObjectRef lastDockedAt;
     private float hudAccumulator;
     private String statusMessage = "Fresh curated world loaded.";
@@ -196,6 +199,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
         boundSystemId = world.getActiveSystemId();
         activeSession = world.findSession(boundSystemId).orElseThrow(
                 () -> new IllegalStateException("Active test StarSystem has no SimulationSession"));
+        selectedJumpNeighborIndex = 0;
     }
 
     private InputAdapter createInputAdapter() {
@@ -208,7 +212,8 @@ public final class PlayableTestGame extends ApplicationAdapter {
                     case Input.Keys.A -> moveLeft = true;
                     case Input.Keys.D -> moveRight = true;
                     case Input.Keys.E -> toggleDocking();
-                    case Input.Keys.J -> jumpAlongTestRoute();
+                    case Input.Keys.K -> cycleJumpDestination(1);
+                    case Input.Keys.J -> jumpToSelectedNeighbor();
                     case Input.Keys.B -> tradeSelected(true);
                     case Input.Keys.V -> tradeSelected(false);
                     case Input.Keys.M -> selectNearestAsteroid();
@@ -309,7 +314,27 @@ public final class PlayableTestGame extends ApplicationAdapter {
         }
     }
 
-    private void jumpAlongTestRoute() {
+    private void cycleJumpDestination(int delta) {
+        PlayerShipView ship = playerRuntime.activeShipView().orElse(null);
+        if (ship == null) {
+            statusMessage = "Jump destination cannot be selected while the active ship is in transit.";
+            return;
+        }
+        List<StarSystemId> neighbors = PlayerJumpNavigationModel.neighbors(world.getTopology(), ship.systemId());
+        if (neighbors.isEmpty()) {
+            selectedJumpNeighborIndex = 0;
+            statusMessage = "Current system has no direct jump neighbors.";
+            return;
+        }
+        int normalized = PlayerJumpNavigationModel.normalizeSelectionIndex(
+                world.getTopology(), ship.systemId(), selectedJumpNeighborIndex);
+        selectedJumpNeighborIndex = Math.floorMod(normalized + delta, neighbors.size());
+        StarSystemId destination = PlayerJumpNavigationModel.selectedDestination(
+                world.getTopology(), ship.systemId(), selectedJumpNeighborIndex);
+        statusMessage = "Selected direct jump: #" + destination.value() + " " + systemName(destination) + ".";
+    }
+
+    private void jumpToSelectedNeighbor() {
         PlayerShipView ship = playerRuntime.activeShipView().orElse(null);
         if (ship == null) {
             FleetId activeFleet = playerRuntime.player().activeFleetId();
@@ -321,15 +346,19 @@ public final class PlayableTestGame extends ApplicationAdapter {
             statusMessage = "Undock before jumping.";
             return;
         }
-        StarSystemId destination = scenario.route().otherEnd(ship.systemId());
+        StarSystemId destination = PlayerJumpNavigationModel.selectedDestination(
+                world.getTopology(), ship.systemId(), selectedJumpNeighborIndex);
         if (destination == null) {
-            statusMessage = "Current system is outside the curated test route.";
+            statusMessage = "Current system has no direct jump connection.";
             return;
         }
+        selectedJumpNeighborIndex = PlayerJumpNavigationModel.normalizeSelectionIndex(
+                world.getTopology(), ship.systemId(), selectedJumpNeighborIndex);
         clearMovementKeys();
         miningService.clear();
         if (playerRuntime.requestJump(destination)) {
-            statusMessage = "Jump accepted by the authoritative Stage-10 transit FSM.";
+            statusMessage = "Jump to #" + destination.value() + " " + systemName(destination)
+                    + " accepted by the authoritative neighbor-only transit FSM.";
         } else {
             statusMessage = "Jump rejected by live travel/topology rules.";
         }
@@ -636,12 +665,26 @@ public final class PlayableTestGame extends ApplicationAdapter {
     }
 
     private String systemName(StarSystemId systemId) {
-        for (StarSystemNode node : world.getTopology().systems()) {
-            if (node.id().equals(systemId)) {
-                return node.name();
+        return world.getTopology().findSystem(systemId)
+                .map(StarSystemNode::name)
+                .orElse("System " + systemId.value());
+    }
+
+    private String controllerName(StarSystemId systemId) {
+        return world.controllingFaction(systemId).map(this::factionDisplayName).orElse("Unclaimed");
+    }
+
+    private String factionDisplayName(String factionContentId) {
+        ContentCatalog.FactionDefinition authored = content.findFaction(factionContentId);
+        if (authored != null) {
+            return authored.displayName();
+        }
+        for (WorldFactionIdentityState identity : world.getWorldFactionIdentities()) {
+            if (identity.stableFactionId().equals(factionContentId)) {
+                return identity.displayName();
             }
         }
-        return "System " + systemId.value();
+        return factionContentId;
     }
 
     private void updateHud() {
@@ -651,8 +694,9 @@ public final class PlayableTestGame extends ApplicationAdapter {
     }
 
     private void updateShipHud() {
-        StringBuilder text = new StringBuilder(640);
-        text.append("STAR EMPIRES — v0.3 PLAYABLE SANDBOX\n");
+        StringBuilder text = new StringBuilder(720);
+        int systemCount = world.getTopology().systems().size();
+        text.append("STAR EMPIRES — ").append(systemCount).append(" SYSTEM LIVE DEMO\n");
         FleetId activeFleet = playerRuntime.player().activeFleetId();
         PlayerShipView shipView = playerRuntime.activeShipView().orElse(null);
         Entity ship = activeShipEntity();
@@ -673,8 +717,10 @@ public final class PlayableTestGame extends ApplicationAdapter {
         if (shipView != null) {
             float speed = (float) Math.sqrt(shipView.velocityX() * shipView.velocityX()
                     + shipView.velocityY() * shipView.velocityY());
-            text.append("System: ").append(systemName(shipView.systemId()));
-            text.append(String.format(Locale.ROOT, "   Pos %.0f, %.0f   Speed %.1f\n",
+            text.append("System: #").append(shipView.systemId().value()).append(' ')
+                    .append(systemName(shipView.systemId()));
+            text.append("   Controller: ").append(controllerName(shipView.systemId())).append('\n');
+            text.append(String.format(Locale.ROOT, "Pos %.0f, %.0f   Speed %.1f\n",
                     shipView.x(), shipView.y(), speed));
             if (inventory != null) {
                 text.append("Cargo: ").append(inventory.getTotalStock()).append('/').append(inventory.capacity);
@@ -730,7 +776,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
     }
 
     private void updateContextHud() {
-        StringBuilder text = new StringBuilder(1000);
+        StringBuilder text = new StringBuilder(1200);
         PlayerMarketView market = marketService.view().orElse(null);
         PlayerMiningView mining = miningService.view().orElse(null);
 
@@ -778,14 +824,47 @@ public final class PlayableTestGame extends ApplicationAdapter {
             text.append(" [M target | R mine]\n");
         }
 
-        PlayableTestWorldFactory.Route route = scenario.route();
-        text.append("Navigation: ").append(systemName(route.sourceSystem())).append(" ↔ ")
-                .append(systemName(route.destinationSystem())).append(" [J jump]\n");
+        appendNavigationHud(text);
         text.append(String.format(Locale.ROOT,
                 "Camera %.2fx [wheel, HOME reset]   [TAB switch owned local ship]\n",
                 cameraState.zoom()));
-        text.append("WASD fly | E dock | T target | F fire | SPACE pause | 1/2/3/4 time | F5 save | F9 load | F2 reset");
+        text.append("WASD fly | E dock | K select jump | J jump | T target | F fire | SPACE pause | ")
+                .append("1/2/3/4 time | F5 save | F9 load | F2 reset");
         contextHudLabel.setText(text.toString());
+    }
+
+    private void appendNavigationHud(StringBuilder text) {
+        PlayerShipView ship = playerRuntime.activeShipView().orElse(null);
+        if (ship == null) {
+            text.append("Navigation: JUMP TRANSIT — destination selection resumes on arrival\n");
+            return;
+        }
+
+        StarSystemId current = ship.systemId();
+        List<StarSystemId> neighbors = PlayerJumpNavigationModel.neighbors(world.getTopology(), current);
+        text.append("Navigation: #").append(current.value()).append(' ').append(systemName(current));
+        text.append("   Controller: ").append(controllerName(current)).append('\n');
+        if (neighbors.isEmpty()) {
+            selectedJumpNeighborIndex = 0;
+            text.append("Direct neighbors: none\n");
+            return;
+        }
+
+        selectedJumpNeighborIndex = PlayerJumpNavigationModel.normalizeSelectionIndex(
+                world.getTopology(), current, selectedJumpNeighborIndex);
+        text.append("Direct neighbors [K select]: ");
+        for (int index = 0; index < neighbors.size(); index++) {
+            if (index > 0) {
+                text.append(" | ");
+            }
+            StarSystemId neighbor = neighbors.get(index);
+            if (index == selectedJumpNeighborIndex) {
+                text.append("> ");
+            }
+            text.append('#').append(neighbor.value()).append(' ').append(systemName(neighbor));
+            text.append(" {").append(controllerName(neighbor)).append('}');
+        }
+        text.append("\n[J jump to selected direct neighbor]\n");
     }
 
     private String cargoSummary(InventoryComponent inventory) {
@@ -845,14 +924,15 @@ public final class PlayableTestGame extends ApplicationAdapter {
                 minimapZoom);
     }
 
-    /** Advances the fixed-tick world, follows the active FleetId and renders Stage-14C UI. */
+    /** Advances the fixed-tick world, follows the active FleetId and renders the live demo UI. */
     @Override
     public void render() {
         float renderDelta = Gdx.graphics.getDeltaTime();
         playerRuntime.advanceFrame(renderDelta);
         if (!world.getActiveSystemId().equals(boundSystemId)) {
             bindActiveSession();
-            statusMessage = "Arrived in " + systemName(boundSystemId) + ". Active FleetId rebound locally.";
+            statusMessage = "Arrived in #" + boundSystemId.value() + " " + systemName(boundSystemId)
+                    + ". Direct-neighbor selection reset.";
             lastDockedAt = null;
         }
         updateMapLayouts();
@@ -877,7 +957,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
                 stage.getCamera().combined,
                 minimapLayout,
                 minimap,
-                "LOCAL — " + systemName(boundSystemId));
+                "LOCAL — #" + boundSystemId.value() + " " + systemName(boundSystemId));
         stage.draw();
     }
 
