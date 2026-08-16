@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-16 / Stage 17H + pre-17.5 world-generation + spatial-scale contracts.**  
+> **Последняя синхронизация: 2026-08-16 / Stage 17.5A production schema implementation.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -40,7 +40,7 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5A NEXT** |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5B NEXT** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | PLANNED |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
@@ -198,18 +198,20 @@ Accepted research/design prerequisite:
 - `docs/flight_dynamics_and_combat_depth_roadmap.md`;
 - `docs/stage17_5_combat_depth_implementation_plan.md`.
 
-The first implementation slice is fixed:
+First production slice:
 
-> **Stage 17.5A — production material/hull/module/protection/slot/hardpoint/compartment schema.**
+> **Stage 17.5A — COMPLETE: versioned material/hull/module/protection/slot/hardpoint/compartment content schema, strict loader/validation, machine-readable demonstrator fit and stable semantic fingerprint.**
+
+Canonical 17.5A closeout: `docs/stage17_5a_production_ship_content_schema.md`.
 
 ## 6. Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-**ACTIVE NEXT — research gate complete.**
+**ACTIVE — 17.5A COMPLETE; 17.5B NEXT.**
 
 Implementation sequence:
 
-- **17.5A:** production `MaterialDefinition` / `HullDefinition` / `ModuleDefinition` / protection/slots/hardpoints/compartments;
-- **17.5B:** central derived-ship calculator + fitting validator;
+- **17.5A — COMPLETE:** production `MaterialDefinition` / `HullDefinition` / `ModuleDefinition` / protection/slots/hardpoints/compartments + versioned loader/fingerprint;
+- **17.5B — NEXT:** central derived-ship calculator + fitting validator;
 - **17.5C:** propulsion/reaction mass/power/thermal/FTL;
 - **17.5D:** sensors/signatures/track/datalink/EW;
 - **17.5E:** kinetic/beam/guided/PD/ammunition;
@@ -228,7 +230,8 @@ Hard invariants:
 - authoritative fit/consumable/damage state remains persistent and deterministic;
 - persistent ↔ tactical materialization cannot reset state.
 
-Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.
+Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.  
+17.5A implementation record: `docs/stage17_5a_production_ship_content_schema.md`.
 
 ## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
 
@@ -452,8 +455,9 @@ No world-wide tactical/render-rate tick.
 
 ```text
 Stage 17 COMPLETE
-→ Stage 17.5A schema/material/hull/module
-→ 17.5B–17.5I Ship Fitting / Combat Depth
+→ Stage 17.5A production ship engineering schema COMPLETE
+→ Stage 17.5B derived-ship calculator + fitting validator
+→ Stage 17.5C–17.5I remaining Ship Fitting / Combat Depth
 → Stage 18 Resources / Industry / Infrastructure
 → Stage 19 Strategic Warfare
 → Stage 20 Physical World Generation
@@ -462,4 +466,4 @@ Stage 17 COMPLETE
 → Stage 23 RC
 ```
 
-**Immediate implementation priority after the Stage-17H merge gate is Stage 17.5A.**
+**Immediate implementation priority after the Stage-17.5A merge gate is Stage 17.5B.**
