@@ -35,11 +35,16 @@ public final class KineticProtectionRuntime {
         this.damageRuntime = Objects.requireNonNull(damageRuntime, "damageRuntime");
     }
 
-    /** Optional fitted shield input for one impact. */
+    /**
+     * Optional fitted shield input for one impact.
+     *
+     * @param definition fitted shield definition
+     * @param state current persistent shield state
+     */
     public record ShieldInput(
             ShieldFieldRuntime.Definition definition,
             ShieldFieldRuntime.State state) {
-        /** Validates a shield input pair. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public ShieldInput {
             Objects.requireNonNull(definition, "definition");
             Objects.requireNonNull(state, "state");
