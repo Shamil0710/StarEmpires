@@ -222,13 +222,40 @@
       "crewRequirement": 28,
       "automationRequirement": 20,
       "interfaces": [],
-      "signatureContributions": {"active_radar_w": 450000000.0, "thermal_w": 70000000.0},
+      "signatureContributions": {"thermal_w": 70000000.0},
       "constructionInputs": [
         {"contentId": "component.electrical", "amount": 700.0},
         {"contentId": "component.precision", "amount": 900.0}
       ],
       "maintenance": {"serviceIntervalSeconds": 172800.0, "maintenanceWorkSeconds": 14400.0, "repairComplexity": 0.78},
-      "capabilityParameters": {"aperture_area_m2": 240.0, "processing_channels": 96.0}
+      "capabilityParameters": {
+        "aperture_area_m2": 240.0,
+        "processing_channels": 96.0,
+        "passive_thermal_receiver_noise_w": 0.000001,
+        "passive_thermal_detection_snr": 5.0,
+        "passive_thermal_classification_snr": 20.0,
+        "passive_thermal_track_snr": 100.0,
+        "passive_thermal_fire_control_snr": 500.0,
+        "passive_thermal_bearing_sigma_floor_rad": 0.001,
+        "passive_thermal_range_sigma_fraction": 0.001,
+        "passive_thermal_eccm_processing_gain_linear": 20.0,
+        "passive_thermal_eccm_power_demand_w": 2000000.0,
+        "passive_thermal_eccm_waste_heat_w": 1000000.0,
+        "active_radar_receiver_noise_w": 0.000000000001,
+        "active_radar_detection_snr": 10.0,
+        "active_radar_classification_snr": 20.0,
+        "active_radar_track_snr": 50.0,
+        "active_radar_fire_control_snr": 100.0,
+        "active_radar_bearing_sigma_floor_rad": 0.0001,
+        "active_radar_range_sigma_fraction": 0.001,
+        "active_radar_transmit_power_w": 45000000.0,
+        "active_radar_transmit_gain_linear": 10.0,
+        "active_radar_power_demand_w": 60000000.0,
+        "active_radar_waste_heat_w": 15000000.0,
+        "active_radar_eccm_processing_gain_linear": 100.0,
+        "active_radar_eccm_power_demand_w": 5000000.0,
+        "active_radar_eccm_waste_heat_w": 2500000.0
+      }
     },
     {
       "id": "module.radiator_escort_v1",
