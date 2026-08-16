@@ -199,7 +199,7 @@
         {"contentId": "component.precision", "amount": 500.0}
       ],
       "maintenance": {"serviceIntervalSeconds": 259200.0, "maintenanceWorkSeconds": 28800.0, "repairComplexity": 0.92},
-      "capabilityParameters": {"thrust_n": 13200000.0, "exhaust_velocity_mps": 65000.0}
+      "capabilityParameters": {"thrust_n": 13200000.0, "exhaust_velocity_mps": 65000.0, "jet_power_w": 429000000000.0}
     },
     {
       "id": "module.sensor_array_escort_v1",
