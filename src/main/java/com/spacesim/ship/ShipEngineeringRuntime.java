@@ -14,8 +14,6 @@ import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -55,7 +53,7 @@ public final class ShipEngineeringRuntime {
     public static final String FTL_TRANSLATED_MASS_MAX_KG = "translated_mass_max_kg";
     /** FTL capability key for one jump charge energy. */
     public static final String FTL_JUMP_ENERGY_J = "jump_energy_j";
-    /** FTL capability key for charge power. */
+    /** FTL capability key for maximum charge power accepted by the jump hardware. */
     public static final String FTL_CHARGE_POWER_W = "charge_power_w";
     /** FTL capability key for spool time. */
     public static final String FTL_SPOOL_TIME_S = "spool_time_s";
@@ -104,8 +102,8 @@ public final class ShipEngineeringRuntime {
         /** FTL capability payload is missing or physically inconsistent. */ INVALID_CAPABILITY,
         /** Current translated mass exceeds the fitted envelope. */ TRANSLATED_MASS_EXCEEDED,
         /** FTL module is still cooling down. */ COOLDOWN_ACTIVE,
-        /** Shared bus cannot provide the required FTL charge power. */ CHARGE_POWER_UNAVAILABLE,
-        /** Shared ENERGY_STORAGE does not contain the required jump energy. */ STORED_ENERGY_UNAVAILABLE,
+        /** Reactor margin plus shared-storage discharge cannot supply the required spool power. */ CHARGE_POWER_UNAVAILABLE,
+        /** Shared ENERGY_STORAGE does not contain the remaining spool energy after reactor contribution. */ STORED_ENERGY_UNAVAILABLE,
         /** Jump heat would exceed the fitted module-local thermal capacity. */ THERMAL_LIMIT
     }
 
@@ -281,12 +279,18 @@ public final class ShipEngineeringRuntime {
     /**
      * Fitted FTL execution plan for one ordinary topology edge.
      *
+     * <p>The jump charge is a physical energy balance across the spool interval. Continuous reactor
+     * margin can supply part of the charge directly. Only the remaining energy may be drawn from
+     * shared {@link ModuleFamily#ENERGY_STORAGE}; local module buffers never enter this balance.</p>
+     *
      * @param allowed whether the current physical state can execute the plan
      * @param failure stable rejection reason, or NONE
      * @param mountId selected fitted FTL mount, empty when unavailable
      * @param translatedMassKg current ship mass translated by the jump
-     * @param requiredEnergyJ energy consumed from shared ENERGY_STORAGE when committed
-     * @param chargePowerW required charge power
+     * @param requiredEnergyJ total physical energy required by the fitted jump hardware
+     * @param reactorEnergyContributionJ energy supplied by continuous reactor margin during spool
+     * @param storedEnergyDrawJ remaining energy drawn from shared ENERGY_STORAGE at commit
+     * @param chargePowerW average physical charging power required during the spool interval
      * @param spoolSeconds fitted spool duration
      * @param edgeTransitSeconds current fixture edge-transit duration
      * @param cooldownSeconds fitted post-jump cooldown
@@ -298,6 +302,8 @@ public final class ShipEngineeringRuntime {
             String mountId,
             double translatedMassKg,
             double requiredEnergyJ,
+            double reactorEnergyContributionJ,
+            double storedEnergyDrawJ,
             double chargePowerW,
             double spoolSeconds,
             double edgeTransitSeconds,
@@ -310,8 +316,10 @@ public final class ShipEngineeringRuntime {
          * @param failure rejection reason
          * @param mountId selected FTL mount
          * @param translatedMassKg translated mass
-         * @param requiredEnergyJ required stored energy
-         * @param chargePowerW charge power
+         * @param requiredEnergyJ total required jump energy
+         * @param reactorEnergyContributionJ reactor-supplied spool energy
+         * @param storedEnergyDrawJ shared-storage energy draw
+         * @param chargePowerW average required charge power
          * @param spoolSeconds spool duration
          * @param edgeTransitSeconds edge-transit duration
          * @param cooldownSeconds cooldown duration
@@ -322,6 +330,8 @@ public final class ShipEngineeringRuntime {
             mountId = mountId == null ? "" : mountId;
             requireNonNegativeFinite(translatedMassKg, "translatedMassKg");
             requireNonNegativeFinite(requiredEnergyJ, "requiredEnergyJ");
+            requireNonNegativeFinite(reactorEnergyContributionJ, "reactorEnergyContributionJ");
+            requireNonNegativeFinite(storedEnergyDrawJ, "storedEnergyDrawJ");
             requireNonNegativeFinite(chargePowerW, "chargePowerW");
             requireNonNegativeFinite(spoolSeconds, "spoolSeconds");
             requireNonNegativeFinite(edgeTransitSeconds, "edgeTransitSeconds");
@@ -329,6 +339,13 @@ public final class ShipEngineeringRuntime {
             requireNonNegativeFinite(jumpHeatJ, "jumpHeatJ");
             if (allowed != (failure == JumpFailure.NONE)) {
                 throw new IllegalArgumentException("allowed and failure must agree");
+            }
+            if (allowed) {
+                double accounted = reactorEnergyContributionJ + storedEnergyDrawJ;
+                double tolerance = Math.max(1d, requiredEnergyJ) * 1e-9;
+                if (Math.abs(accounted - requiredEnergyJ) > tolerance) {
+                    throw new IllegalArgumentException("jump energy contributions must equal requiredEnergyJ");
+                }
             }
         }
     }
@@ -508,7 +525,8 @@ public final class ShipEngineeringRuntime {
         double shipHeatJ = Math.max(0d, shipHeatBeforeRejectJ - rejectedJ);
         double shipHeatCapacityJ = shipThermalStoreCapacityJ(checkedFit);
 
-        boolean saturated = shipHeatCapacityJ > 0d && shipHeatJ > shipHeatCapacityJ + EPSILON;
+        boolean saturated = shipHeatJ > EPSILON
+                && (shipHeatCapacityJ <= 0d || shipHeatJ > shipHeatCapacityJ + EPSILON);
         double oldLocalTotal = checkedState.localHeatJByMount().values().stream().mapToDouble(Double::doubleValue).sum();
         double newLocalTotal = localHeat.values().stream().mapToDouble(Double::doubleValue).sum();
         for (Use use : uses) {
@@ -590,12 +608,21 @@ public final class ShipEngineeringRuntime {
             if (checkedState.ftlCooldownSecondsByMount().getOrDefault(assignment.mountId(), 0d) > EPSILON) {
                 return rejected(JumpFailure.COOLDOWN_ACTIVE, assignment.mountId(), derived.totalMassKg());
             }
-            double maxChargePower = Math.max(0d, derived.continuousPowerMarginW())
-                    + sharedBusDischargePowerW(checkedFit);
-            if (capability.chargePowerW > maxChargePower + EPSILON) {
+
+            double averageRequiredChargePowerW = capability.jumpEnergyJ / capability.spoolTimeS;
+            if (averageRequiredChargePowerW > capability.chargePowerW + EPSILON) {
+                return rejected(JumpFailure.INVALID_CAPABILITY, assignment.mountId(), derived.totalMassKg());
+            }
+            double reactorPowerW = Math.min(
+                    averageRequiredChargePowerW,
+                    Math.max(0d, derived.continuousPowerMarginW()));
+            double storagePowerW = Math.max(0d, averageRequiredChargePowerW - reactorPowerW);
+            if (storagePowerW > sharedBusDischargePowerW(checkedFit) + EPSILON) {
                 return rejected(JumpFailure.CHARGE_POWER_UNAVAILABLE, assignment.mountId(), derived.totalMassKg());
             }
-            if (checkedState.sharedBusEnergyJ() + EPSILON < capability.jumpEnergyJ) {
+            double reactorEnergyJ = reactorPowerW * capability.spoolTimeS;
+            double storedEnergyDrawJ = Math.max(0d, capability.jumpEnergyJ - reactorEnergyJ);
+            if (checkedState.sharedBusEnergyJ() + EPSILON < storedEnergyDrawJ) {
                 return rejected(JumpFailure.STORED_ENERGY_UNAVAILABLE, assignment.mountId(), derived.totalMassKg());
             }
             double localHeatJ = checkedState.localHeatJByMount().getOrDefault(assignment.mountId(), 0d);
@@ -609,7 +636,9 @@ public final class ShipEngineeringRuntime {
                     assignment.mountId(),
                     derived.totalMassKg(),
                     capability.jumpEnergyJ,
-                    capability.chargePowerW,
+                    reactorEnergyJ,
+                    storedEnergyDrawJ,
+                    averageRequiredChargePowerW,
                     capability.spoolTimeS,
                     capability.edgeTransitTimeS,
                     capability.cooldownS,
@@ -619,7 +648,10 @@ public final class ShipEngineeringRuntime {
     }
 
     /**
-     * Commits the physical energy/heat/cooldown consequences of an already accepted jump plan.
+     * Commits the physical stored-energy/heat/cooldown consequences of an already accepted jump plan.
+     *
+     * <p>The reactor contribution in the plan is supplied during spool and therefore is not removed
+     * from storage. Only {@link JumpPlan#storedEnergyDrawJ()} is subtracted from the shared bus.</p>
      *
      * @param state current operating state
      * @param plan previously accepted plan
@@ -631,7 +663,7 @@ public final class ShipEngineeringRuntime {
         if (!checkedPlan.allowed()) {
             throw new IllegalArgumentException("cannot commit rejected jump plan: " + checkedPlan.failure());
         }
-        if (checked.sharedBusEnergyJ() + EPSILON < checkedPlan.requiredEnergyJ()) {
+        if (checked.sharedBusEnergyJ() + EPSILON < checkedPlan.storedEnergyDrawJ()) {
             throw new IllegalStateException("shared bus energy changed after jump planning");
         }
         Map<String, Double> localHeat = new TreeMap<>(checked.localHeatJByMount());
@@ -640,7 +672,7 @@ public final class ShipEngineeringRuntime {
         cooldowns.put(checkedPlan.mountId(), checkedPlan.cooldownSeconds());
         return new RuntimeState(
                 checked.consumables(),
-                checked.sharedBusEnergyJ() - checkedPlan.requiredEnergyJ(),
+                checked.sharedBusEnergyJ() - checkedPlan.storedEnergyDrawJ(),
                 checked.shipHeatStoredJ(),
                 localHeat,
                 checked.thrustLimitNByMount(),
@@ -755,7 +787,7 @@ public final class ShipEngineeringRuntime {
     }
 
     private static JumpPlan rejected(JumpFailure failure, String mountId, double translatedMassKg) {
-        return new JumpPlan(false, failure, mountId, translatedMassKg, 0d, 0d, 0d, 0d, 0d, 0d);
+        return new JumpPlan(false, failure, mountId, translatedMassKg, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d);
     }
 
     private static double reactionMassOnMount(ConsumableState state, String mountId) {
@@ -918,8 +950,7 @@ public final class ShipEngineeringRuntime {
                 return 0d;
             }
             double rated = requiredPositiveParameter(module, THRUST_N);
-            double limit = Math.min(rated, fraction <= 0d ? 0d : rated);
-            return limit * fraction;
+            return rated * fraction;
         }
     }
 
