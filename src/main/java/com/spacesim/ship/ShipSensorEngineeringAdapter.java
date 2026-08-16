@@ -148,9 +148,15 @@ public final class ShipSensorEngineeringAdapter {
         return value;
     }
 
-    /** One fitted sensor mode bound to its physical module mount. */
+    /**
+     * One fitted sensor mode bound to its physical module mount.
+     *
+     * @param mountId physical fitted mount ID
+     * @param moduleId sensor module content ID
+     * @param definition damage-aware physical sensor definition
+     */
     public record FittedSensor(String mountId, String moduleId, SensorDefinition definition) {
-        /** Validates one fitted sensor binding. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public FittedSensor {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
@@ -158,9 +164,14 @@ public final class ShipSensorEngineeringAdapter {
         }
     }
 
-    /** Deterministic fitted sensor/signature projection for one ship state. */
+    /**
+     * Deterministic fitted sensor/signature projection for one ship state.
+     *
+     * @param sensors damage-aware fitted sensor modes
+     * @param staticSignature current static fitted signature projection
+     */
     public record FittedSensorSuite(List<FittedSensor> sensors, SignatureState staticSignature) {
-        /** Freezes the fitted sensor projection. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public FittedSensorSuite {
             Objects.requireNonNull(sensors, "sensors");
             if (sensors.stream().anyMatch(Objects::isNull)) {
