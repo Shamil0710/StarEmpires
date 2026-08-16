@@ -2,6 +2,7 @@ package com.spacesim.persistence;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.EngineeringComponent;
+import com.spacesim.components.EntityIdComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
