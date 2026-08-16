@@ -11,14 +11,20 @@ package com.spacesim.ship;
  * @param apertureFraction surviving/available aperture fraction in [0,1]
  * @param processingFraction available processing fraction in (0,1]
  */
-@SuppressWarnings("doclint:missing")
 public record SensorRuntimeState(
         boolean enabled,
         boolean eccmEnabled,
         double apertureFraction,
         double processingFraction) {
 
-    /** Validates physical capability fractions. */
+    /**
+     * Validates physical capability fractions.
+     *
+     * @param enabled whether the sensor is operating
+     * @param eccmEnabled whether explicit ECCM processing is enabled
+     * @param apertureFraction surviving/available aperture fraction in [0,1]
+     * @param processingFraction available processing fraction in (0,1]
+     */
     public SensorRuntimeState {
         if (!Double.isFinite(apertureFraction) || apertureFraction < 0d || apertureFraction > 1d) {
             throw new IllegalArgumentException("apertureFraction must be finite in [0,1]");
