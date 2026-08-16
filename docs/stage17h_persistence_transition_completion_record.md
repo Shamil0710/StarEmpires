@@ -1,6 +1,6 @@
 # Star Empires — Stage 17H Persistence / Migration / Transition Completion Record
 
-> Статус: **IMPLEMENTED — merge gate pending**  
+> Статус: **COMPLETE — canonical after the required merge gate reaches main**  
 > Дата: **2026-08-16**  
 > Scope: финальный Stage-17 transition gate перед активацией Stage 17.5.
 
@@ -264,7 +264,7 @@ No production schema field was added solely for milestone bookkeeping.
 
 ## 9. Stage 17 completion gate
 
-Stage 17 can be marked **COMPLETE** only after:
+The implementation is considered canonical only through the mandatory repository gate:
 
 ```text
 exact PR head
@@ -274,9 +274,7 @@ exact PR head
 → post-merge CI green on exact new main SHA
 ```
 
-Until the merge and post-merge verification are green, this record remains `IMPLEMENTED — merge gate pending`.
-
-After that gate, the next implementation slice is:
+Once this record is present on a post-merge-green `main`, Stage 17 is closed and the next implementation slice is:
 
 ```text
 Stage 17.5A
