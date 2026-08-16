@@ -73,7 +73,9 @@ class GameStateMigrationTest {
         byte[] withoutV3MarketBaseline = removeSecondConsecutiveBlock(
                 currentBytes,
                 encodedIntegerList(List.of(1, 2, 3, 4, 5)));
-        byte[] legacyBytes = Arrays.copyOf(withoutV3MarketBaseline, withoutV3MarketBaseline.length - 1);
+        // Current v4 writes two trailing optional fields that schema v1 did not have:
+        // archetype-present and engineering-present. Both are false for this fixture.
+        byte[] legacyBytes = Arrays.copyOf(withoutV3MarketBaseline, withoutV3MarketBaseline.length - 2);
         ByteBuffer.wrap(legacyBytes).putInt(8, GameState.LEGACY_STAGE3_VERSION);
 
         GameState migrated = GameStateCodec.decode(legacyBytes);
@@ -103,6 +105,7 @@ class GameStateMigrationTest {
         assertEquals(List.of(2f, 3f), entity.priceHistory().history().get(1));
         assertEquals(List.of(), entity.priceHistory().history().get(5));
         assertNull(entity.archetype());
+        assertNull(entity.engineering(), "v1 migration must not invent engineering state");
     }
 
     @Test
@@ -147,7 +150,9 @@ class GameStateMigrationTest {
                 List.of(v2EntityShape));
 
         byte[] currentBytes = GameStateCodec.encode(current);
-        byte[] v2Bytes = removeSecondConsecutiveBlock(currentBytes, encodedIntegerList(target));
+        byte[] withoutV3MarketBaseline = removeSecondConsecutiveBlock(currentBytes, encodedIntegerList(target));
+        // Schema v2 already had archetype but did not have the trailing engineering-present field.
+        byte[] v2Bytes = Arrays.copyOf(withoutV3MarketBaseline, withoutV3MarketBaseline.length - 1);
         ByteBuffer.wrap(v2Bytes).putInt(8, GameState.ITEM_CAPACITY_ARCHETYPE_VERSION);
 
         GameState migrated = GameStateCodec.decode(v2Bytes);
@@ -157,6 +162,7 @@ class GameStateMigrationTest {
         assertEquals("station.agrodome", entity.archetype().contentId());
         assertEquals(target, entity.market().targetStock());
         assertEquals(target, entity.market().configuredTargetStock());
+        assertNull(entity.engineering(), "v2 migration must not invent engineering state");
     }
 
     @Test
@@ -210,6 +216,7 @@ class GameStateMigrationTest {
         assertEquals(effectiveTarget, migratedEntity.market().configuredTargetStock(),
                 "Schema v2 had no provenance field, so only its effective target is historical truth");
         assertEquals("station.agrodome", migratedEntity.archetype().contentId());
+        assertNull(migratedEntity.engineering(), "v2 value migration must remain neutral");
     }
 
     private static List<Integer> integerSlots(int firstValue) {
