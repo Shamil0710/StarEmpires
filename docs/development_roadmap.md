@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-16 / Stage 17H + pre-17.5 world-generation contract.**  
+> **Последняя синхронизация: 2026-08-16 / Stage 17H + pre-17.5 world-generation + spatial-scale contracts.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -316,12 +316,21 @@ Canonical generation contracts:
 - `docs/stage20_physical_world_generation_plan.md`;
 - `docs/inter_system_navigation_contract.md`;
 - `docs/physical_trade_route_scoring_contract.md`;
-- `docs/galaxy_topology_resource_geography_generation_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for non-linear topology, resource geography, economic dependency and world-generation quality gates.
+- `docs/galaxy_topology_resource_geography_generation_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for non-linear topology, resource geography, economic dependency and world-generation quality gates;
+- `docs/spatial_scale_and_unbounded_system_space_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for capability-calibrated local geometry, station scale, unbounded local space, numerical precision and LOD/world-boundary separation.
 
 Must honor:
 
 - SI physical scale and travel time;
 - propulsion/FTL capability;
+- ship acceleration/braking/delta-v and loaded-mass consequences;
+- Stage-17.5 sensor/signature/track/fire-control behavior;
+- kinetic/beam/guided/PD/formation physical engagement geometry;
+- Stage-18 station/shipyard/infrastructure physical footprint and approach geometry;
+- local star-system space without gameplay map edge or hard movement wall;
+- strict separation of physical coordinate space, generated operational/content envelope and render/materialization window;
+- numerical-precision/floating-origin or equivalent strategy that preserves physical distances at far local coordinates;
+- bounded simulation LOD without off-screen state loss/clamp/teleport;
 - Stage-18 resource occurrence rules and finite reserves;
 - extraction compatibility;
 - infrastructure/shipyard requirements;
@@ -340,15 +349,20 @@ Must honor:
 - faction-start placement after topology/resource generation, with asymmetric but recoverable starts and anti-accidental-monopoly checks;
 - whole-route delivered-cost/dependency analysis over actual neighbor edges;
 - deterministic world-quality gate with `ACCEPT / DETERMINISTIC_REPAIR / REJECT_SEED / EXPLICIT_SCENARIO_OVERRIDE` semantics;
-- bad seeds rejected or repaired before materialization, never rescued by runtime hidden supplies/emergency deposits.
+- bad seeds or bad spatial-scale profiles rejected/recalibrated before materialization, never rescued by runtime hidden supplies/emergency deposits or hidden speed/range shortcuts.
 
 Locked Stage-20 generation causality:
 
 ```text
-macro regions
+Stage-17.5 ship/sensor/weapon capability
++ Stage-18 station/infrastructure capability
++ Stage-19 tactical/response behavior
+→ versioned spatial-scale calibration profile
+→ macro regions
 → system placement
 → neighbor topology
 → topology quality gate
+→ local operational geometry
 → regional physical conditions
 → Stage-18 resource occurrences
 → facilities / economic bootstrap
@@ -358,16 +372,21 @@ macro regions
 → authoritative generated world
 ```
 
-Generator may place resources/facilities but cannot invent hidden emergency resources to rescue a bad seed.
+Generator may place resources/facilities but cannot invent hidden emergency resources to rescue a bad seed. Generated `system extent` may describe where meaningful content is concentrated, but it cannot clamp/delete/teleport ships at a map edge. Ordinary inter-system travel remains explicit neighbor-edge transition even when local space is unbounded.
 
 Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate all of the following simultaneously:
 
 - galaxy is connected where ordinary production topology requires it, but not predominantly chain-like;
 - core/developed regions have meaningful alternate-route coverage while chokepoints remain bounded strategic features;
+- generated local distances produce coherent acceleration/braking/delta-v/travel-time differences between representative ships;
+- sensor detection/track/fire-control and weapon/PD/formation envelopes remain physically meaningful and do not collapse into screen-space circles;
+- station size/spacing and jump-arrival stand-off are compatible with traffic, logistics and defensive geometry;
+- ships can move beyond visible/generated activity extents without world-edge clamp/delete/teleport, while far state remains deterministic through LOD;
+- far-coordinate numerical precision remains inside calibrated tolerance;
 - resource clusters are physically plausible and regionally recognizable without becoming uniform sector bonuses;
 - typical starts are viable but meaningfully dependent on external trade/supply for part of growth or advanced industry;
 - critical dependencies and gateway concentration are measurable from authoritative state;
-- no normal seed requires hidden restock, teleport, emergency deposit or faction-only generation exception;
+- no normal seed requires hidden restock, teleport, emergency deposit, hidden movement/range multiplier or faction-only generation exception;
 - player, NPC traders, faction logistics and warfare all consume the same generated geometry/resources.
 
 Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
