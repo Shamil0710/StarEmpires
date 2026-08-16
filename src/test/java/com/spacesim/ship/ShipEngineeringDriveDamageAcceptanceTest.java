@@ -61,11 +61,11 @@ class ShipEngineeringDriveDamageAcceptanceTest {
         assertEquals(ratedThrustN * 0.5d, result.actualThrustN(), 1e-6);
         assertEquals(
                 damagedThrustCeilingN / exhaustVelocityMps,
-                result.actualMassFlowKgPerS(),
+                result.massFlowKgPerS(),
                 1e-9,
                 "damage must reduce thrust and reaction-mass flow through the same physical drive ceiling");
         assertEquals(
-                100_000d - result.actualMassFlowKgPerS(),
+                100_000d - result.massFlowKgPerS(),
                 result.state().consumables().reactionMassKg(),
                 1e-9);
     }
