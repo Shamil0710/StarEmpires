@@ -22,10 +22,13 @@ import java.util.Objects;
  * @param fireControlSnr minimum SNR for a range-capable measurement to support FIRE_CONTROL evidence
  * @param bearingSigmaFloorRad best-case one-sigma bearing error floor
  * @param rangeSigmaFraction best-case fractional one-sigma range error for ranging modes
- * @param activeTransmitPowerW emitted radar power when active mode is enabled
+ * @param activeTransmitPowerW radiated transmitter power when active mode is enabled
  * @param transmitGainLinear directional transmit gain for active radar
+ * @param activeModePowerDemandW incremental shared-bus electrical demand while active mode transmits
+ * @param activeModeWasteHeatW incremental waste heat while active mode transmits
  * @param eccmProcessingGainLinear interference rejection gain while ECCM is enabled
  * @param eccmPowerDemandW explicit additional electrical demand while ECCM is enabled
+ * @param eccmWasteHeatW explicit additional waste heat while ECCM is enabled
  */
 public record SensorDefinition(
         String id,
@@ -41,8 +44,11 @@ public record SensorDefinition(
         double rangeSigmaFraction,
         double activeTransmitPowerW,
         double transmitGainLinear,
+        double activeModePowerDemandW,
+        double activeModeWasteHeatW,
         double eccmProcessingGainLinear,
-        double eccmPowerDemandW) {
+        double eccmPowerDemandW,
+        double eccmWasteHeatW) {
 
     /** Sensor measurement mode. */
     public enum Mode {
@@ -67,10 +73,13 @@ public record SensorDefinition(
      * @param fireControlSnr minimum SNR for a range-capable measurement to support FIRE_CONTROL evidence
      * @param bearingSigmaFloorRad best-case one-sigma bearing error floor
      * @param rangeSigmaFraction best-case fractional one-sigma range error for ranging modes
-     * @param activeTransmitPowerW emitted radar power when active mode is enabled
+     * @param activeTransmitPowerW radiated transmitter power when active mode is enabled
      * @param transmitGainLinear directional transmit gain for active radar
+     * @param activeModePowerDemandW incremental shared-bus electrical demand while active mode transmits
+     * @param activeModeWasteHeatW incremental waste heat while active mode transmits
      * @param eccmProcessingGainLinear interference rejection gain while ECCM is enabled
      * @param eccmPowerDemandW explicit additional electrical demand while ECCM is enabled
+     * @param eccmWasteHeatW explicit additional waste heat while ECCM is enabled
      */
     public SensorDefinition {
         if (id == null || id.isBlank()) {
@@ -94,13 +103,26 @@ public record SensorDefinition(
         requirePositive(rangeSigmaFraction, "rangeSigmaFraction");
         requireNonNegative(activeTransmitPowerW, "activeTransmitPowerW");
         requirePositive(transmitGainLinear, "transmitGainLinear");
+        requireNonNegative(activeModePowerDemandW, "activeModePowerDemandW");
+        requireNonNegative(activeModeWasteHeatW, "activeModeWasteHeatW");
         requirePositive(eccmProcessingGainLinear, "eccmProcessingGainLinear");
         requireNonNegative(eccmPowerDemandW, "eccmPowerDemandW");
-        if (mode == Mode.ACTIVE_RADAR && activeTransmitPowerW <= 0d) {
-            throw new IllegalArgumentException("ACTIVE_RADAR requires positive activeTransmitPowerW");
+        requireNonNegative(eccmWasteHeatW, "eccmWasteHeatW");
+        if (mode == Mode.ACTIVE_RADAR) {
+            if (activeTransmitPowerW <= 0d || activeModePowerDemandW <= 0d) {
+                throw new IllegalArgumentException("ACTIVE_RADAR requires positive transmit and active-mode power");
+            }
+            if (activeTransmitPowerW > activeModePowerDemandW) {
+                throw new IllegalArgumentException("radiated transmitter power cannot exceed active-mode electrical demand");
+            }
+            if (activeTransmitPowerW + activeModeWasteHeatW > activeModePowerDemandW) {
+                throw new IllegalArgumentException("active-mode radiated power plus waste heat cannot exceed electrical demand");
+            }
+        } else if (activeTransmitPowerW != 0d || activeModePowerDemandW != 0d || activeModeWasteHeatW != 0d) {
+            throw new IllegalArgumentException("passive sensor modes must not author active transmitter load");
         }
-        if (mode != Mode.ACTIVE_RADAR && activeTransmitPowerW != 0d) {
-            throw new IllegalArgumentException("passive sensor modes must not author activeTransmitPowerW");
+        if (eccmWasteHeatW > eccmPowerDemandW) {
+            throw new IllegalArgumentException("ECCM waste heat cannot exceed ECCM electrical demand");
         }
         if (mode == Mode.ACTIVE_RADAR && channel != Channel.RADAR) {
             throw new IllegalArgumentException("ACTIVE_RADAR must observe RADAR channel");
