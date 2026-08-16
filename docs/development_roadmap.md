@@ -67,7 +67,7 @@ branch from exact green main
 
 ### Stages 12–14 — v0.3 Playable Space Sandbox
 
-**COMPLETE.** Player state/ownership, physical travel/docking/manual trade/mining/combat, ship progression, UI and deterministic first-loop acceptance.
+**COMPLETE.** Player state/ownership, physical travel/docking/manual trade/mining, shared combat vertical slice, ship progression, UI and deterministic first-loop acceptance.
 
 ### Stage 15 — player fleets
 
