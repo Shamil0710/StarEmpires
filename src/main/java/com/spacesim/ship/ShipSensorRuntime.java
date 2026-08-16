@@ -535,7 +535,12 @@ public final class ShipSensorRuntime {
      * @param yM y coordinate
      */
     public record Position2d(double xM, double yM) {
-        /** Validates finite geometry. */
+        /**
+         * Validates finite geometry.
+         *
+         * @param xM x coordinate
+         * @param yM y coordinate
+         */
         public Position2d {
             requireFinite(xM, "xM");
             requireFinite(yM, "yM");
@@ -555,7 +560,14 @@ public final class ShipSensorRuntime {
             List<MeasurementHypothesis> deceptionHypotheses,
             SignatureState observerEmission,
             double additionalPowerDemandW) {
-        /** Validates immutable result values. */
+        /**
+         * Validates immutable result values.
+         *
+         * @param measurement true-target measurement if above detection SNR
+         * @param deceptionHypotheses explicit alternative measurements, never randomly selected
+         * @param observerEmission additional active RF signature caused by this observation
+         * @param additionalPowerDemandW explicit ECCM processing power demand
+         */
         public ObservationResult {
             measurement = Objects.requireNonNull(measurement, "measurement");
             deceptionHypotheses = List.copyOf(Objects.requireNonNull(deceptionHypotheses, "deceptionHypotheses"));
@@ -577,7 +589,13 @@ public final class ShipSensorRuntime {
             String hypothesisId,
             long sourceEmitterId,
             SensorMeasurement apparentMeasurement) {
-        /** Validates stable hypothesis identity. */
+        /**
+         * Validates stable hypothesis identity.
+         *
+         * @param hypothesisId stable authored/runtime hypothesis ID
+         * @param sourceEmitterId physical deceptive emitter
+         * @param apparentMeasurement apparent measurement to evaluate/fuse separately
+         */
         public MeasurementHypothesis {
             if (hypothesisId == null || hypothesisId.isBlank()) {
                 throw new IllegalArgumentException("hypothesisId must be non-blank");
@@ -607,7 +625,17 @@ public final class ShipSensorRuntime {
             double bearingProcessNoiseRad2PerSecond,
             double classificationConfidenceThreshold) {
 
-        /** Validates monotonic quality thresholds. */
+        /**
+         * Validates monotonic quality thresholds.
+         *
+         * @param trackedPositionSigmaM maximum one-sigma position error for TRACKED
+         * @param fireControlPositionSigmaM maximum one-sigma position error for FIRE_CONTROL
+         * @param trackedMaxAgeSeconds maximum TRACKED age
+         * @param fireControlMaxAgeSeconds maximum FIRE_CONTROL age
+         * @param positionProcessNoiseM2PerSecond covariance growth rate for stale position/range
+         * @param bearingProcessNoiseRad2PerSecond covariance growth rate for stale bearing
+         * @param classificationConfidenceThreshold threshold for CLASSIFIED when no tactical solution remains
+         */
         public TrackQualityPolicy {
             requirePositive(trackedPositionSigmaM, "trackedPositionSigmaM");
             requirePositive(fireControlPositionSigmaM, "fireControlPositionSigmaM");
