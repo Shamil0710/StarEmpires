@@ -1,15 +1,22 @@
 package com.spacesim.world;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinition;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityState;
 import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.persistence.FleetTransferStateMapper;
 import com.spacesim.persistence.WorldStateCodec;
+import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
+import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
+import com.spacesim.ship.ShipEngineeringState.ConsumableState;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.simulation.SimulationSession;
 import org.junit.jupiter.api.Test;
 
@@ -48,12 +55,17 @@ class FleetTransferAcceptanceTest {
         int addedCargo = Math.min(5, sourceInventory.getFreeCapacity());
         assertTrue(addedCargo > 0, "Acceptance fleet must have free cargo capacity");
         sourceInventory.stock[0] += addedCargo;
+        sourceEntity.add(engineering());
 
         EntityState expectedPayload = FleetTransferStateMapper.sanitize(EntityStateMapper.capture(sourceEntity));
         assertNotNull(expectedPayload.wallet());
         assertTrue(expectedPayload.wallet().balanceMilliCredits() > 0L);
         assertNotNull(expectedPayload.inventory());
         assertTrue(expectedPayload.inventory().stock().stream().mapToInt(Integer::intValue).sum() > 0);
+        assertNotNull(expectedPayload.engineering());
+        assertEquals(725d, expectedPayload.engineering().consumables().interfaceLoads().get(0).massKg(), 0d);
+        assertEquals(42_000_000d, expectedPayload.engineering().sharedBusEnergyJ(), 0d);
+        assertEquals(17.5d, expectedPayload.engineering().ftlCooldownSecondsByMount().get(0).value(), 0d);
 
         EntityId oldLocalId = sourcePlacement.localEntityId();
         int originLedgerEntries = sessions.get(ALPHA).getLedger().size();
@@ -79,10 +91,12 @@ class FleetTransferAcceptanceTest {
         assertEquals(1L, decoded.fleets().stream()
                 .filter(placement -> placement.id().equals(sourcePlacement.id()))
                 .count());
-        assertEquals(FleetLocationKind.IN_TRANSIT,
-                decoded.fleets().stream()
-                        .filter(placement -> placement.id().equals(sourcePlacement.id()))
-                        .findFirst().orElseThrow().locationKind());
+        FleetPlacementState decodedTransit = decoded.fleets().stream()
+                .filter(placement -> placement.id().equals(sourcePlacement.id()))
+                .findFirst().orElseThrow();
+        assertEquals(FleetLocationKind.IN_TRANSIT, decodedTransit.locationKind());
+        assertEquals(expectedPayload.engineering(), decodedTransit.transitState().entityState().engineering(),
+                "mid-transit world save must retain authoritative engineering state");
 
         Map<StarSystemId, SimulationSession> loadedSessions = restoreSessions(decoded);
         FleetWorldService loadedFleets = new FleetWorldService(
@@ -107,6 +121,8 @@ class FleetTransferAcceptanceTest {
         assertEquals(expectedPayload.faction(), arrivedPayload.faction());
         assertEquals(expectedPayload.ship(), arrivedPayload.ship());
         assertEquals(expectedPayload.combat(), arrivedPayload.combat());
+        assertEquals(expectedPayload.engineering(), arrivedPayload.engineering(),
+                "detach/save/load/attach must not reset fit, reaction mass, power, heat or cooldown");
         assertEquals(123.5f, arrivedEntity.getComponent(com.spacesim.components.TransformComponent.class).position.x);
         assertEquals(-44.25f, arrivedEntity.getComponent(com.spacesim.components.TransformComponent.class).position.y);
         assertEquals(originLedgerEntries, loadedSessions.get(ALPHA).getLedger().size());
@@ -114,6 +130,31 @@ class FleetTransferAcceptanceTest {
 
         WorldState completed = snapshot(decoded, loadedSessions, loadedFleets);
         assertEquals(completed, WorldStateCodec.decode(WorldStateCodec.encode(completed)));
+    }
+
+    private static EngineeringComponent engineering() {
+        InstalledFit fit = new InstalledFit(
+                "hull.transfer_test",
+                List.of(
+                        new InstalledModuleDefinition("core_drive", "module.drive_test"),
+                        new InstalledModuleDefinition("core_ftl", "module.ftl_test")));
+        ConsumableState loads = new ConsumableState(
+                1250d,
+                85d,
+                40d,
+                3d,
+                List.of(new ConsumableLoad(
+                        "core_drive", "propellant_feed", InterfaceKind.REACTION_MASS,
+                        725d, 725d, 0L)));
+        RuntimeState runtime = new RuntimeState(
+                loads,
+                42_000_000d,
+                7_500_000d,
+                Map.of("core_drive", 2_000_000d, "core_ftl", 3_000_000d),
+                Map.of("core_drive", 125_000d),
+                9_000_000d,
+                Map.of("core_ftl", 17.5d));
+        return new EngineeringComponent(fit, runtime);
     }
 
     private static boolean hasTransferableEconomicState(SimulationSession session, EntityId entityId) {
