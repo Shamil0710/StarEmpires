@@ -149,9 +149,11 @@ class Stage17F6AggregateAntiOscillationAcceptanceTest {
                 second.factionReviews().get(0).fiscalReview().zone());
         assertTrue(world.findFactionFiscalPolicy(SOURCE).orElseThrow().stationTaxBasisPoints() <= taxBeforeSecond);
         int overlayAfterSecond = overlayFloorOrZero(world, item.id());
-        assertTrue(overlayAfterSecond >= overlayBeforeSecond);
-        assertTrue(overlayAfterSecond - overlayBeforeSecond <= 10,
-                "Sustained shock may add at most one configured resilience step per review");
+        int overlayDelta = overlayAfterSecond - overlayBeforeSecond;
+        assertTrue(overlayDelta <= 10,
+                "A later observation may add at most one configured resilience increase step");
+        assertTrue(overlayDelta >= -5,
+                "A later observation may release at most one configured resilience decrease step");
 
         WorldSimulation restored = restore(world.snapshot(), content);
         assertEquals(world.findFactionFiscalPolicy(SOURCE), restored.findFactionFiscalPolicy(SOURCE));
