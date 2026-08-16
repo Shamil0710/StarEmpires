@@ -10,6 +10,7 @@ package com.spacesim.ship;
  * @param maxMeasurementAgeSeconds measurements older than this are not fused
  * @param transportVarianceM2PerSecond additional position-process variance accumulated per second of transport age
  */
+@SuppressWarnings("doclint:missing")
 public record DatalinkState(
         double latencySeconds,
         double maxMeasurementAgeSeconds,
