@@ -106,17 +106,17 @@ public record FactionManagementSnapshot(
                     || !counterparties.isEmpty() || !expansionPlans.isEmpty()) {
                 throw new IllegalArgumentException("Independent management snapshot cannot expose faction authority");
             }
-            return;
+        } else {
+            factionContentId = Objects.requireNonNull(factionContentId, "Faction content ID not set").strip();
+            if (factionContentId.isEmpty() || factionDisplayName.isBlank() || runtimeFactionId < 0) {
+                throw new IllegalArgumentException("Affiliated management snapshot requires resolved faction identity");
+            }
+            Objects.requireNonNull(economy, "Faction economy not set");
+            Objects.requireNonNull(doctrine, "Faction doctrine not set");
+            Objects.requireNonNull(fiscalPolicy, "Faction fiscal policy not set");
+            Objects.requireNonNull(stockProductionPolicy, "Faction stock/production policy not set");
+            Objects.requireNonNull(diplomacy, "Faction diplomacy not set");
         }
-        factionContentId = Objects.requireNonNull(factionContentId, "Faction content ID not set").strip();
-        if (factionContentId.isEmpty() || factionDisplayName.isBlank() || runtimeFactionId < 0) {
-            throw new IllegalArgumentException("Affiliated management snapshot requires resolved faction identity");
-        }
-        Objects.requireNonNull(economy, "Faction economy not set");
-        Objects.requireNonNull(doctrine, "Faction doctrine not set");
-        Objects.requireNonNull(fiscalPolicy, "Faction fiscal policy not set");
-        Objects.requireNonNull(stockProductionPolicy, "Faction stock/production policy not set");
-        Objects.requireNonNull(diplomacy, "Faction diplomacy not set");
     }
 
     /**
