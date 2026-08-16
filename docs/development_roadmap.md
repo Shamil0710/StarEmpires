@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-16 / Stage 17.5D signatures / sensors / tracks / datalink / EW implementation.**  
+> **Последняя синхронизация: 2026-08-16 / Stage 17.5E weapons / ammunition / guidance / layered defense implementation.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -40,7 +40,7 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5E NEXT** |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5F NEXT** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | PLANNED |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
@@ -216,9 +216,14 @@ Canonical 17.5C closeout: `docs/stage17_5c_propulsion_power_thermal_ftl.md`.
 
 Canonical 17.5D closeout: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`.
 
+> **Stage 17.5E — COMPLETE: individual physical kinetic/guided bodies, deterministic fire-control without hit-chance or hard-range abstractions, central physical ammunition depletion, beam spot/dwell physics, guided propulsion/seeker/datalink state, formation/resource-limited layered defense and dense deterministic projectile storage independent from rendering/Ashley.**
+
+Canonical 17.5E closeout: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.  
+Projectile representation invariant: `docs/stage17_5e_projectile_representation_invariant.md`.
+
 ## 6. Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-**ACTIVE — 17.5A–17.5D COMPLETE; 17.5E NEXT.**
+**ACTIVE — 17.5A–17.5E COMPLETE; 17.5F NEXT.**
 
 Implementation sequence:
 
@@ -226,10 +231,10 @@ Implementation sequence:
 - **17.5B — COMPLETE:** central deterministic derived-ship calculator + fitting validator + physical-load movement bridge + ID-preserving compatibility seam;
 - **17.5C — COMPLETE:** propulsion/reaction mass/power/thermal/FTL runtime + persistent engineering state + single-FSM fitted jump integration;
 - **17.5D — COMPLETE:** signatures/sensors/tracks/datalink/EW + fitted sensor adapter + common player/AI information model;
-- **17.5E — NEXT:** kinetic/beam/guided/PD/ammunition;
-- **17.5F:** shields/armor/compartments/subsystem damage;
+- **17.5E — COMPLETE:** kinetic/beam/guided/PD/ammunition + individual physical bodies + linked weapon/ammunition content + deterministic pooled projectile representation;
+- **17.5F — NEXT:** shields/armor/compartments/subsystem damage;
 - **17.5G:** shipyard/refit/repair/maintenance economy seam;
-- **17.5H:** capability APIs/UI/full migration surfaces, including final engineering-grant commit and binary sensor-knowledge persistence where required by live capability APIs;
+- **17.5H:** capability APIs/UI/full migration surfaces, including final engineering-grant/weapon power-heat commit, binary sensor-knowledge persistence and weapon loadout/launcher-cycle persistence where required by live capability APIs;
 - **17.5I:** deterministic aggregate acceptance.
 
 Hard invariants:
@@ -246,7 +251,8 @@ Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.
 17.5A implementation record: `docs/stage17_5a_production_ship_content_schema.md`.  
 17.5B implementation record: `docs/stage17_5b_derived_ship_calculator_and_fitting_validator.md`.  
 17.5C implementation record: `docs/stage17_5c_propulsion_power_thermal_ftl.md`.  
-17.5D implementation record: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`.
+17.5D implementation record: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`.  
+17.5E implementation record: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.
 
 ## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
 
@@ -474,8 +480,9 @@ Stage 17 COMPLETE
 → Stage 17.5B derived-ship calculator + fitting validator COMPLETE
 → Stage 17.5C propulsion / reaction mass / power / thermal / FTL COMPLETE
 → Stage 17.5D signatures / sensors / tracks / datalink / EW COMPLETE
-→ Stage 17.5E kinetic / beam / guided / PD / ammunition NEXT
-→ Stage 17.5F–17.5I remaining Ship Fitting / Combat Depth
+→ Stage 17.5E kinetic / beam / guided / PD / ammunition COMPLETE
+→ Stage 17.5F shields / armor / compartments / subsystem damage NEXT
+→ Stage 17.5G–17.5I remaining Ship Fitting / Combat Depth
 → Stage 18 Resources / Industry / Infrastructure
 → Stage 19 Strategic Warfare
 → Stage 20 Physical World Generation
@@ -484,4 +491,4 @@ Stage 17 COMPLETE
 → Stage 23 RC
 ```
 
-**Immediate implementation priority after the Stage-17.5D merge gate is Stage 17.5E.**
+**Immediate implementation priority after the Stage-17.5E merge gate is Stage 17.5F.**

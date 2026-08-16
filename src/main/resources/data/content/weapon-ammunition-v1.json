@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "kineticAmmunition": [
+    {
+      "id": "ammo.rail_dart_150kg_v1",
+      "materialId": "material.high_strength_steel_v1",
+      "shape": "DART",
+      "lengthM": 1.8,
+      "diameterM": 0.075,
+      "massKg": 150.0
+    }
+  ],
+  "guidedAmmunition": [
+    {
+      "id": "ammo.interceptor_1t_v1",
+      "materialId": "material.high_strength_steel_v1",
+      "shape": "SHELL",
+      "lengthM": 3.2,
+      "diameterM": 0.48,
+      "impactPayloadId": null,
+      "seekerId": "seeker.radar_interceptor_v1",
+      "dryMassKg": 800.0,
+      "propellantMassKg": 200.0,
+      "thrustN": 20000.0,
+      "exhaustVelocityMps": 5000.0,
+      "burnTimeSeconds": 40.0,
+      "seekerAngularSigmaRad": 0.0005,
+      "terminalReserveMps": 300.0
+    }
+  ]
+}
