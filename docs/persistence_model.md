@@ -1,7 +1,7 @@
 # Star Empires — Persistence Model
 
 > Статус: **authoritative persistence architecture**  
-> Синхронизация: **2026-08-16 / Stage 17H**
+> Синхронизация: **2026-08-16 / Stage 17.5C**
 
 ## 1. Core rule
 
@@ -38,7 +38,7 @@ PlayableWorldState
     ├── topology / factions / diplomacy / territory / fleets / construction
     └── StarSystemSimulationState[]
         └── GameState
-            └── local ECS/economy entities and subsystem state
+            └── local ECS/economy/entities/engineering state
 ```
 
 Версия меняется на том уровне, где реально изменился serialized authoritative contract.
@@ -47,11 +47,11 @@ PlayableWorldState
 
 | Layer | Logical schema | File format | Responsibility |
 | --- | ---: | ---: | --- |
-| `GameState` | **v3** | codec-owned current format | local fixed-step ECS/economy simulation |
+| `GameState` | **v4** | codec-owned current format | local fixed-step ECS/economy + fitted engineering state |
 | `WorldState` | **v9** | **v8** | galaxy/world strategic state |
 | `PlayableWorldState` | **v5** | **v1** | optional player envelope + embedded world |
 
-Stage 17H не повышает `PlayableWorldState` только ради номера milestone: Stage 17 не добавил нового serialized field в `PlayerState`; его новые authoritative state принадлежат `WorldState`.
+Stage 17.5C повышает только локальный `GameState`, потому что fitted ship engineering является состоянием конкретной physical ECS entity. `WorldState` и `PlayableWorldState` не повышаются ради номера milestone: их serialized authoritative shape не изменился.
 
 ---
 
@@ -59,7 +59,7 @@ Stage 17H не повышает `PlayableWorldState` только ради но�
 
 `SimulationSession` является authoritative owner локального simulation core.
 
-`GameState` current schema v3 сохраняет как минимум:
+`GameState` current schema v4 сохраняет как минимум:
 
 - root simulation seed;
 - exact `SimulationClock.State`;
@@ -69,7 +69,43 @@ Stage 17H не повышает `PlayableWorldState` только ради но�
 - asteroid-spawn state;
 - price-recorder state;
 - economic ledger state;
-- persistent `EntityState` records sorted by stable identity.
+- persistent `EntityState` records sorted by stable identity;
+- optional fitted Stage-17.5 engineering state per entity.
+
+### Local schema history
+
+```text
+v1 — historical Stage-3 entity/item shape
+v2 — expandable item slots + stable archetype IDs
+v3 — configured market target provenance
+v4 — fitted Stage-17.5 physical engineering state
+```
+
+### Stage-17.5 engineering payload
+
+When an entity has an authoritative fitted engineering state, v4 stores physical source state only:
+
+- fitted hull content ID;
+- deterministic module-to-mount assignments;
+- physical cargo/stores/mission payload and interface-bound consumable loads;
+- shared `ENERGY_STORAGE` bus energy;
+- ship-bus stored heat;
+- module-local heat by mount;
+- current physical thrust ceilings by mount;
+- current coolant-bus transfer capacity;
+- FTL cooldown by mount.
+
+It deliberately does **not** persist derived acceleration, delta-v, total mass, power margin, heat margin, DPS, sensor range or other derived capability caches. Those values recompute deterministically from content + fitted modules + physical mutable state.
+
+### Legacy v1–v3 migration into v4
+
+Historical files contain no fitted engineering payload. Migration therefore sets:
+
+```text
+engineering = null
+```
+
+It must never infer a fit, reaction mass, battery charge, heat state, coolant capacity or FTL cooldown from a legacy class/archetype name. A legacy fleet remains on the explicit compatibility path until an ordinary authoritative migration/refit operation supplies real fitted state.
 
 ### Entity identity
 
@@ -90,7 +126,7 @@ Loader rejects duplicate IDs and invalid allocator watermark.
 
 ### Local continuation
 
-Clock state сохраняет unfinished fixed-step accumulation, pause/time scale and tick. Named RNG streams сохраняют exact next-value continuation. Gameplay-significant subsystem timers are persistent.
+Clock state сохраняет unfinished fixed-step accumulation, pause/time scale and tick. Named RNG streams сохраняют exact next-value continuation. Gameplay-significant subsystem timers and fitted engineering mutable state are persistent.
 
 Следствие:
 
@@ -270,16 +306,22 @@ Founding a faction, affiliating assets or loading a save must not consume FleetI
 
 A refit/affiliation/materialization operation changes the same physical object unless an explicit lifecycle rule creates a new one.
 
+Stage 17.5C extends this invariant across system transfer: detach → transit snapshot → attach preserves the same `FleetId` and the same fitted engineering payload rather than respawning a replacement ship.
+
 ---
 
 ## 10. Money, cargo and conservation across save/load
 
-Persistence is not an economic event.
+Persistence is not an economic or engineering event.
 
 Save/load/materialization may not:
 
 - add/remove money;
 - refill cargo/ammunition/reaction mass;
+- recharge shared engineering energy;
+- erase or add stored/local heat;
+- repair drive/coolant capability;
+- reset FTL cooldown;
 - repair damage;
 - complete construction;
 - reset production progress;
@@ -287,7 +329,7 @@ Save/load/materialization may not:
 - replace destroyed/missing assets;
 - reset treaty/embargo/policy lifecycle.
 
-Economic transfers before save and after load continue through the same ordinary ledger/wallet/inventory systems.
+Economic transfers before save and after load continue through the same ordinary ledger/wallet/inventory systems. Engineering continuation similarly resumes from the persisted physical state.
 
 ---
 
@@ -354,14 +396,16 @@ Required migration result:
 
 - player remains independent;
 - wallet and existing player FleetIds are unchanged;
-- embedded local physical simulation states are unchanged;
+- embedded local physical simulation states are unchanged except later schema-neutral migration defaults;
 - construction/fleet allocator watermarks are unchanged;
 - no dynamic player faction is invented;
 - no territory/treaty/embargo/treasury grant is invented;
 - missing diplomacy becomes neutral;
 - subsequent current encode/decode is deterministic.
 
-See `Stage17HPreStage17MigrationAcceptanceTest`.
+When those embedded historical local `GameState` values are promoted to v4, fitted engineering remains absent (`engineering=null`); no physical capability is fabricated.
+
+See `Stage17HPreStage17MigrationAcceptanceTest` and `GameStateMigrationTest`.
 
 ---
 
@@ -388,7 +432,48 @@ See `Stage17HEndToEndTransitionAcceptanceTest`.
 
 ---
 
-## 14. File safety / bounded decoding
+## 14. Stage-17.5C engineering / FTL continuation guarantee
+
+Stage 17.5C adds three persistence guarantees at the physical ship boundary.
+
+### Local engineering round-trip
+
+```text
+Ashley EngineeringComponent
+→ EntityState.EngineeringState
+→ binary GameState v4
+→ decode/re-encode
+→ Ashley EngineeringComponent
+```
+
+must preserve fit, consumables, shared energy, heat, physical thrust/coolant limits and FTL cooldown exactly enough for deterministic authoritative continuation.
+
+### Fleet materialization boundary
+
+```text
+IN_SYSTEM entity
+→ detach
+→ FleetTransitState.EntityState
+→ optional WorldState binary save/load
+→ attach
+→ destination entity
+```
+
+must preserve the same physical engineering payload and world `FleetId`.
+
+### Active fitted FTL save boundary
+
+Once a fitted jump has crossed `JUMP_PENDING → IN_TRANSIT`, its physical energy/heat/cooldown consequences are already committed. Saving and restoring while `IN_TRANSIT` must not execute that commit a second time on arrival.
+
+See:
+
+- `EngineeringPersistenceTest`;
+- `FleetTransferAcceptanceTest`;
+- `FleetJumpPersistenceTest`.
+
+---
+
+## 15. File safety / bounded decoding
 
 All codecs use deterministic bounded binary parsing.
 
@@ -408,7 +493,7 @@ File replacement uses a temporary sibling file and atomic move where supported, 
 
 ---
 
-## 15. Runtime ownership boundaries
+## 16. Runtime ownership boundaries
 
 ```text
 SimulationSession
@@ -425,7 +510,7 @@ UI remains presentation/read-model layer. Loading replaces authoritative runtime
 
 ---
 
-## 16. Required regression guarantees
+## 17. Required regression guarantees
 
 The persistence architecture is considered healthy only while all relevant tests maintain:
 
@@ -440,6 +525,10 @@ The persistence architecture is considered healthy only while all relevant tests
 9. diplomacy/policy/access continuation;
 10. resource and money conservation;
 11. future/corrupt version fail-fast behavior;
-12. canonical re-save after migration.
+12. canonical re-save after migration;
+13. fitted engineering v4 round-trip without derived-stat cache;
+14. v1–v3 → v4 migration never invents engineering capability/resources;
+15. fleet detach/transit/attach preserves engineering state and world `FleetId`;
+16. active fitted FTL save/load preserves committed energy/heat/cooldown without double commit.
 
-These guarantees are prerequisites for Stage 17.5 fitting/combat persistence and later large-universe materialization.
+These guarantees are prerequisites for later Stage-17.5 combat/fitting persistence and large-universe materialization.
