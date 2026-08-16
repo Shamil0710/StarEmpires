@@ -44,7 +44,12 @@ public final class KineticProtectionRuntime {
     public record ShieldInput(
             ShieldFieldRuntime.Definition definition,
             ShieldFieldRuntime.State state) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates a shield definition/state pair.
+         *
+         * @param definition fitted shield definition
+         * @param state current persistent shield state
+         */
         public ShieldInput {
             Objects.requireNonNull(definition, "definition");
             Objects.requireNonNull(state, "state");
