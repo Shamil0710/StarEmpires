@@ -5,6 +5,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.Vector3d;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.content.ship.ShipProtectionCatalog;
 import com.spacesim.content.ship.ShipProtectionCatalogLoader;
+import com.spacesim.ship.HeavyImpactResolver.Outcome;
 import com.spacesim.ship.HeavyImpactResolver.OutsideCalibrationDomainException;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.WeaponDefinition.ProjectileShape;
@@ -17,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HeavyImpactAndShipDamageRuntimeTest {
     @Test
-    void boundedResponseStopsLowEnergyAndPenetratesHighEnergyWithoutExtrapolation() {
+    void boundedResponseStopsRicochetsAndPerforatesWithoutExtrapolation() {
         ShipEngineeringCatalog engineering = ShipEngineeringCatalogLoader.loadDefault();
         ShipProtectionCatalog protection = ShipProtectionCatalogLoader.loadDefault(engineering);
         HeavyImpactResolver resolver = new HeavyImpactResolver(engineering, protection);
@@ -26,6 +27,7 @@ class HeavyImpactAndShipDamageRuntimeTest {
         HeavyImpactResolver.ImpactResult stopped = resolver.resolve(
                 lowEnergy, "protection.escort_structural_v1", 0d);
         assertFalse(stopped.penetrated());
+        assertEquals(Outcome.STOPPED, stopped.outcome());
         assertEquals(0d, stopped.residualProjectileEnergyJ(), 1e-9d);
         assertFalse(stopped.layerInteractions().isEmpty());
 
@@ -33,10 +35,21 @@ class HeavyImpactAndShipDamageRuntimeTest {
         HeavyImpactResolver.ImpactResult penetrated = resolver.resolve(
                 highEnergy, "protection.escort_structural_v1", 0d);
         assertTrue(penetrated.penetrated());
+        assertEquals(Outcome.PERFORATED, penetrated.outcome());
         assertTrue(penetrated.residualProjectileEnergyJ() > 0d);
         assertTrue(penetrated.fragments().massKg() > 0d);
         assertTrue(penetrated.fragments().kineticEnergyJ() > 0d);
+        assertTrue(penetrated.fragments().internal());
         assertTrue(penetrated.internalDamageEnergyJ() > penetrated.residualProjectileEnergyJ());
+
+        HeavyImpactResolver.ImpactResult ricochet = resolver.resolve(
+                highEnergy, "protection.escort_structural_v1", Math.toRadians(75d));
+        assertEquals(Outcome.RICOCHET, ricochet.outcome());
+        assertFalse(ricochet.penetrated());
+        assertEquals(highEnergy.kineticEnergyJ() * 0.65d,
+                ricochet.residualProjectileEnergyJ(), 1e-6d);
+        assertEquals(0d, ricochet.internalDamageEnergyJ(), 0d);
+        assertFalse(ricochet.fragments().internal());
 
         ProjectileBody outOfDomain = projectile(3L, 150d, 0.12d, 500d);
         assertThrows(OutsideCalibrationDomainException.class,
