@@ -29,7 +29,7 @@ class ShipEngineeringRuntimeTest {
     private static final String FIT_ID = "fit.runtime_test";
 
     @Test
-    void sharedBusExcludesLocalWeaponSensorBuffersAndJumpConsumesOnlyEnergyStorage() {
+    void sharedBusExcludesLocalWeaponSensorBuffersAndJumpUsesReactorPlusSharedStorage() {
         Fixture fixture = fixture(ConsumableState.empty());
         RuntimeState initial = fixture.runtime.initialize(fixture.fit, fixture.loads);
 
@@ -40,11 +40,16 @@ class ShipEngineeringRuntimeTest {
         assertTrue(plan.allowed());
         assertEquals(JumpFailure.NONE, plan.failure());
         assertEquals(40_000_000d, plan.requiredEnergyJ(), 0d);
+        assertEquals(2_000_000d, plan.reactorEnergyContributionJ(), 1e-6,
+                "continuous reactor margin must contribute during the ten-second spool");
+        assertEquals(38_000_000d, plan.storedEnergyDrawJ(), 1e-6,
+                "only the remaining jump energy may come from shared ENERGY_STORAGE");
+        assertEquals(4_000_000d, plan.chargePowerW(), 0d);
         assertEquals(10d, plan.spoolSeconds(), 0d);
         assertEquals(30d, plan.edgeTransitSeconds(), 0d);
 
         RuntimeState committed = fixture.runtime.commitJump(initial, plan);
-        assertEquals(60_000_000d, committed.sharedBusEnergyJ(), 0d);
+        assertEquals(62_000_000d, committed.sharedBusEnergyJ(), 1e-6);
         assertEquals(10_000_000d, committed.localHeatJByMount().get("core_ftl"), 0d);
         assertEquals(60d, committed.ftlCooldownSecondsByMount().get("core_ftl"), 0d);
         assertEquals(JumpFailure.COOLDOWN_ACTIVE,
@@ -52,7 +57,7 @@ class ShipEngineeringRuntimeTest {
 
         TickResult recharged = fixture.runtime.advance(
                 fixture.fit, committed, OperatingCommand.idle(), 10d);
-        assertEquals(80_000_000d, recharged.state().sharedBusEnergyJ(), 1e-6,
+        assertEquals(82_000_000d, recharged.state().sharedBusEnergyJ(), 1e-6,
                 "surplus reactor power must charge only at the fitted battery charge-power limit");
         assertEquals(50d, recharged.state().ftlCooldownSecondsByMount().get("core_ftl"), 1e-9);
     }
@@ -255,7 +260,7 @@ class ShipEngineeringRuntimeTest {
                       "massKg": 100.0,
                       "occupiedVolumeM3": 8.0,
                       "requiredMountStrengthN": 1.0,
-                      "continuousPowerSupplyW": 10000000.0,
+                      "continuousPowerSupplyW": 3000000.0,
                       "continuousPowerDemandW": 0.0,
                       "peakPowerDemandW": 0.0,
                       "storedEnergyCapacityJ": 0.0,
@@ -269,7 +274,7 @@ class ShipEngineeringRuntimeTest {
                       "signatureContributions": {},
                       "constructionInputs": [],
                       "maintenance": {"serviceIntervalSeconds": 1000.0, "maintenanceWorkSeconds": 10.0, "repairComplexity": 0.1},
-                      "capabilityParameters": {"rated_power_w": 10000000.0}
+                      "capabilityParameters": {"rated_power_w": 3000000.0}
                     },
                     {
                       "id": "module.runtime_battery",
