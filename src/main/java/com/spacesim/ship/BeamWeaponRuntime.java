@@ -151,7 +151,7 @@ public final class BeamWeaponRuntime {
     }
 
     private static BeamSolution rejected(long targetId, Failure failure) {
-        return new BeamSolution(false, failure, targetId, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d);
+        return new BeamSolution(false, failure, targetId, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d);
     }
 
     private static void requirePositiveFinite(double value, String label) {
