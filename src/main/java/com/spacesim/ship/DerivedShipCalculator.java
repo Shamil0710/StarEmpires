@@ -229,6 +229,7 @@ public final class DerivedShipCalculator {
 
     /** Exception carrying the exact deterministic fitting diagnostics that blocked derivation. */
     public static final class InvalidShipFitException extends IllegalArgumentException {
+        /** Exact deterministic fitting diagnostics associated with this rejection. */
         private final ValidationResult validation;
 
         /**
