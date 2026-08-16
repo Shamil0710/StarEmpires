@@ -1,7 +1,7 @@
 # Star Empires — Flight Dynamics and Combat Depth Roadmap
 
 > Cross-cutting plan for ship mass/inertia, thrust-limited movement, cargo-dependent handling and the ordering of advanced tactical AI.  
-> Added: **2026-08-14**; synchronized with revised Stage 18–23 ordering on **2026-08-16**.
+> Added: **2026-08-14**; synchronized with revised Stage 18–23 ordering on **2026-08-17**.
 
 ---
 
@@ -125,9 +125,13 @@ Before sophisticated tactical AI, Stage 17.5 must provide materially different:
 - sensors/tracks/EW;
 - fitting/equipment;
 - subsystem damage/degradation;
-- stable shared capability queries.
+- stable shared capability queries;
+- representative production-valid hull/module/ammunition/fit content sufficient to build multiple materially different test fleets;
+- replaceable tactical prototype visuals sufficient to inspect the combat model interactively.
 
 No advanced AI should infer ability from hard-coded hull class names.
+
+The representative Stage-17.5 content is **content-provisional**. It validates mechanics and may later be re-authored, replaced or explicitly accepted during Stage 22; temporary visuals are presentation-only and may be replaced without changing authoritative state.
 
 ---
 
@@ -164,8 +168,12 @@ hull/module/material schema
 → shields/armor/compartments/damage
 → shipyard/refit/repair seam
 → shared capability APIs
-→ deterministic acceptance
+→ representative combat test content
+→ tactical prototype visuals
+→ deterministic multi-fleet acceptance
 ```
+
+Canonical Stage-17.5I combat-content/visual gate: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
 ### Stage 18 — Resources / Industry / Infrastructure
 
@@ -218,9 +226,11 @@ Commander/NPC personality may modify decision preferences above faction doctrine
 
 Large matrices tune movement, fitting, combat, industrial cost and fleet doctrine together.
 
+Stage 22 also owns the content review of Stage-17.5 provisional ships/modules/fits: they must be re-authored/rebalanced to the accepted technology, industry, faction and visual paradigms or explicitly promoted after review. Stage-17.5 prototype identity is never automatic canon.
+
 ### Stage 23 — Polish / RC
 
-Final control feel, HUD readability, performance and regression hardening. No new foundational flight physics.
+Final control feel, HUD readability, production ship/projectile/VFX replacement, performance and regression hardening. No new foundational flight physics.
 
 ---
 
@@ -239,6 +249,9 @@ Mature baseline must prove:
 9. **Fleet constraint:** escort planning respects slowest critical protected asset.
 10. **Industrial coupling:** Stage-18 replacement/refit inputs correspond to actual fitted equipment rather than class cost multipliers.
 11. **World coupling:** Stage-20 route ETA uses the same representative capability envelope.
+12. **Multi-fleet combat:** materially different kinetic-line, missile-strike, high-mobility/beam, defensive/EW and balanced-control fleets can be assembled from ordinary production-valid definitions and compared through deterministic scenario matrices.
+13. **Combat readability:** at least one interactive battle exposes ship orientation/scale, kinetic/beam/guided fire, interception, shield interaction, armor/penetration, subsystem damage and wreck/debris state through temporary replaceable tactical visuals.
+14. **Content boundary:** changing/replacing Stage-17.5 prototype art or later Stage-22 content definitions does not require a second combat physics model.
 
 ---
 
@@ -256,3 +269,6 @@ Mature baseline must prove:
 10. Damage/fuel/power/heat modify the same capability model.
 11. Stage-18 industry produces and maintains the same physical fitted state used by flight/combat.
 12. Stage-20 geometry is calibrated against these capabilities rather than arbitrary map units.
+13. Stage-17.5 Combat Test Content Pack must use production schemas/runtime, never test-only combat stats.
+14. Stage-17.5 hull/module/ammunition/fit identities and prototype visuals remain content-provisional until explicit later-stage content review.
+15. Rendering/VFX are projections of authoritative simulation state and cannot become a parallel combat authority.

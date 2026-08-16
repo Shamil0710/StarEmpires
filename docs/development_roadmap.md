@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-16 / Stage 17.5E weapons / ammunition / guidance / layered defense implementation.**  
+> **Последняя синхронизация: 2026-08-17 / Stage 17.5 Combat Test Content + Tactical Prototype Visual exit gate.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -235,7 +235,27 @@ Implementation sequence:
 - **17.5F — NEXT:** shields/armor/compartments/subsystem damage;
 - **17.5G:** shipyard/refit/repair/maintenance economy seam;
 - **17.5H:** capability APIs/UI/full migration surfaces, including final engineering-grant/weapon power-heat commit, binary sensor-knowledge persistence and weapon loadout/launcher-cycle persistence where required by live capability APIs;
-- **17.5I:** deterministic aggregate acceptance.
+- **17.5I:** deterministic aggregate acceptance **plus mandatory Combat Test Content Pack and Tactical Prototype Visual Set**.
+
+### Mandatory Stage 17.5 exit content gate
+
+Before Stage 17.5 can be marked COMPLETE, production schemas/runtime must support a compact representative set of hulls, equipment, ammunition and fits sufficient to assemble:
+
+- kinetic line fleet;
+- missile strike fleet;
+- high-mobility / beam fleet;
+- defensive / EW fleet;
+- balanced control fleet.
+
+These test assets are **production-valid but content-provisional**:
+
+- they use the same authoritative fitting, mass/volume/power/heat, sensors, weapons, protection, damage, consumable and persistence rules as future production content;
+- their names, faction identity, technology placement, final balance and visual design are not automatically canonical;
+- Stage 22 must re-author/rebalance/replace them according to the accepted technology, industrial, faction and visual paradigms or explicitly promote individual definitions after review.
+
+At least one interactive end-to-end battle must be inspectable using temporary top-down ship sprites plus prototype projectile/missile/beam/interception/shield/impact/damage/wreck visuals. Rendering/VFX remain presentation-only and must be replaceable without changing authoritative simulation state.
+
+Canonical detailed acceptance contract: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
 Hard invariants:
 
@@ -245,14 +265,18 @@ Hard invariants:
 - no final global-HP-only survivability model;
 - every module uses shared mass/volume/power/heat/economy budgets;
 - authoritative fit/consumable/damage state remains persistent and deterministic;
-- persistent ↔ tactical materialization cannot reset state.
+- persistent ↔ tactical materialization cannot reset state;
+- Combat Test Content Pack cannot use hidden test-only combat stats;
+- Tactical Prototype Visual Set cannot become authoritative combat state;
+- Stage-17.5 test content cannot silently become final Stage-22 canon.
 
 Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.  
 17.5A implementation record: `docs/stage17_5a_production_ship_content_schema.md`.  
 17.5B implementation record: `docs/stage17_5b_derived_ship_calculator_and_fitting_validator.md`.  
 17.5C implementation record: `docs/stage17_5c_propulsion_power_thermal_ftl.md`.  
 17.5D implementation record: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`.  
-17.5E implementation record: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.
+17.5E implementation record: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.  
+17.5I combat content / visual acceptance: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
 ## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
 
@@ -440,6 +464,8 @@ Expands the accepted physical/manufacturable language:
 - anti-linear-tier-obsolescence validation;
 - deterministic content/performance fingerprints.
 
+Stage 22 explicitly owns the content review of the Stage-17.5 Combat Test Content Pack. Test hulls/modules/ammunition/fits must be re-authored, rebalanced, replaced or explicitly promoted according to the accepted technology ladder, Stage-18 industrial ontology, faction engineering doctrine and faction visual language. **Stage-17.5 prototype identity is never automatic canon.**
+
 No isolated `Mk II = +25% all stats` parallel system.
 
 Detailed plan: `docs/stage22_content_balance_plan.md`.
@@ -450,7 +476,7 @@ Detailed plan: `docs/stage22_content_balance_plan.md`.
 
 UX/onboarding/accessibility/performance/content validation/save hardening after fundamental simulation/content architecture is stable.
 
-Stage 23 does not add a new economy/physics model. It closes profiler budgets, migration diagnostics, long-session stability and release hardening.
+Stage 23 replaces remaining prototype tactical presentation with production ship/projectile/VFX assets where not already finalized, without creating a new economy/physics model. It closes profiler budgets, migration diagnostics, long-session stability and release hardening.
 
 ## 13. Scalability cross-stage contract
 
@@ -482,13 +508,15 @@ Stage 17 COMPLETE
 → Stage 17.5D signatures / sensors / tracks / datalink / EW COMPLETE
 → Stage 17.5E kinetic / beam / guided / PD / ammunition COMPLETE
 → Stage 17.5F shields / armor / compartments / subsystem damage NEXT
-→ Stage 17.5G–17.5I remaining Ship Fitting / Combat Depth
+→ Stage 17.5G shipyard / refit / repair / maintenance seam
+→ Stage 17.5H capability APIs / UI / persistence
+→ Stage 17.5I deterministic multi-fleet acceptance + Combat Test Content Pack + Tactical Prototype Visual Set
 → Stage 18 Resources / Industry / Infrastructure
 → Stage 19 Strategic Warfare
 → Stage 20 Physical World Generation
 → Stage 21 Living World
-→ Stage 22 Content / Balance Alpha
-→ Stage 23 RC
+→ Stage 22 Content / Balance Alpha + re-author/review Stage-17.5 provisional content
+→ Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority after the Stage-17.5E merge gate is Stage 17.5F.**
+**Immediate implementation priority remains Stage 17.5F. Stage 17.5 cannot close until the Stage-17.5I combat-content/visual exit gate passes.**
