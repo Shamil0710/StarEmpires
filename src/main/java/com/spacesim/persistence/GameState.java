@@ -13,8 +13,8 @@ import java.util.List;
  *
  * <p>Формат содержит clock, точные RNG states, системные таймеры, ledger, следующий EntityId и
  * полный список {@link EntityState}. Schema v2 расширила item-indexed arrays и добавила stable
- * archetype IDs. Schema v3 сохраняет configured market target отдельно от effective target, чтобы
- * strategic demand можно было безопасно повышать и снижать без потери station baseline.</p>
+ * archetype IDs. Schema v3 сохраняет configured market target отдельно от effective target.
+ * Schema v4 добавляет fitted Stage-17.5 engineering state кораблей без derived-stat cache.</p>
  *
  * @param schemaVersion версия бинарной/логической схемы
  * @param rootSeed корневой seed игровой сессии
@@ -40,8 +40,11 @@ public record GameState(
         PriceRecorderSystem.State priceRecorder,
         EconomicLedger.State ledger,
         List<EntityState> entities) {
-    /** Текущая версия persistent schema с configured market target provenance. */
-    public static final int CURRENT_VERSION = 3;
+    /** Текущая schema с fitted Stage-17.5 engineering state. */
+    public static final int CURRENT_VERSION = 4;
+
+    /** Schema с configured market target provenance, но без engineering state. */
+    public static final int CONFIGURED_MARKET_TARGET_VERSION = 3;
 
     /** Schema с расширяемыми item slots и stable entity archetype, но без market target provenance. */
     public static final int ITEM_CAPACITY_ARCHETYPE_VERSION = 2;
