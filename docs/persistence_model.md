@@ -1,197 +1,445 @@
-# Persistence model
+# Star Empires — Persistence Model
 
-## Status
+> Статус: **authoritative persistence architecture**  
+> Синхронизация: **2026-08-16 / Stage 17H**
 
-Stage 3 persistence architecture. The current logical save schema is **version 1**.
+## 1. Core rule
 
-This document defines the authoritative save/load contract. It is intentionally stricter than the
-current UI requirements because later galaxy generation, factions, ownership, orders and strategic
-AI will build on the same identity and continuation guarantees.
+Save — это **value snapshot authoritative simulation**, а не сериализованный Ashley object graph.
 
-## Core rule
-
-A save file is a value snapshot of the simulation, **not a serialized Ashley object graph**.
-
-Persistent state may contain:
+Persistent state может содержать:
 
 - primitive values;
-- strings and enum names;
-- immutable lists of value records;
-- stable `EntityId` references.
+- stable strings/enums/content IDs;
+- immutable value records/lists;
+- stable `EntityId`, `FleetId`, `ConstructionProjectId`, `StarSystemId` references;
+- explicit simulation-time/RNG/scheduler state.
 
-Persistent state must not contain:
+Persistent state не должен зависеть от:
 
-- Ashley `Entity` references;
-- libGDX rendering objects or Scene2D actors;
-- `Vector2` instances;
-- Java object identity as a reference mechanism;
-- wall-clock timestamps used as simulation time;
-- JVM-private RNG state obtained by reflection.
+- Ashley `Entity` object identity;
+- Scene2D/libGDX presentation objects;
+- runtime-only caches/indexes;
+- wall-clock time как authoritative game time;
+- reflection-extracted JVM RNG state.
 
-`TradeAIComponent` and `MiningComponent` are protected by a regression test that rejects any future
-field assignable from Ashley `Entity`.
+Derived runtime indexes and presentation objects rebuild after load.
 
-## Entity identity
+---
 
-Every persistent runtime entity has exactly one `EntityIdComponent`.
+## 2. Persistence is layered
 
-`EntityId` is a positive `long`. A session owns one monotonic `EntityIdAllocator` shared by bootstrap
-entities and dynamically created entities. The allocator's next value is part of the save state.
+В текущем проекте нет одной глобальной цифры schema для всего save. Есть три вложенных уровня с разными responsibilities.
 
-On load:
+```text
+PlayableWorldState
+├── PlayerState
+└── WorldState
+    ├── topology / factions / diplomacy / territory / fleets / construction
+    └── StarSystemSimulationState[]
+        └── GameState
+            └── local ECS/economy entities and subsystem state
+```
 
-1. a new Ashley `Engine` is created;
-2. a new `EntityRegistry` is attached to it;
-3. systems are created in the canonical order;
-4. new Ashley entities are reconstructed from `EntityState` values;
-5. `EntityRegistry` rebuilds the runtime `EntityId -> Entity` index through normal lifecycle events.
+Версия меняется на том уровне, где реально изменился serialized authoritative contract.
 
-The loader rejects a save whose `nextEntityIdValue` is not greater than every stored entity ID.
-Duplicate IDs are rejected by the registry.
+### Current versions
 
-## GameState schema v1
+| Layer | Logical schema | File format | Responsibility |
+| --- | ---: | ---: | --- |
+| `GameState` | **v3** | codec-owned current format | local fixed-step ECS/economy simulation |
+| `WorldState` | **v9** | **v8** | galaxy/world strategic state |
+| `PlayableWorldState` | **v5** | **v1** | optional player envelope + embedded world |
 
-`GameState` contains:
+Stage 17H не повышает `PlayableWorldState` только ради номера milestone: Stage 17 не добавил нового serialized field в `PlayerState`; его новые authoritative state принадлежат `WorldState`.
 
-- schema version;
+---
+
+## 3. Local `GameState` contract
+
+`SimulationSession` является authoritative owner локального simulation core.
+
+`GameState` current schema v3 сохраняет как минимум:
+
 - root simulation seed;
 - exact `SimulationClock.State`;
-- next `EntityId` value;
-- exact RNG state for the economy-event stream;
-- exact RNG state for the asteroid-spawn stream;
-- `GlobalEventManager.State`;
-- `AsteroidSpawnSystem.State`;
-- `PriceRecorderSystem.State`;
-- `EconomicLedger.State`;
-- all persistent entities as `EntityState`, sorted by `EntityId` when captured.
+- `EntityIdAllocator` watermark;
+- named simulation RNG streams;
+- global event manager state;
+- asteroid-spawn state;
+- price-recorder state;
+- economic ledger state;
+- persistent `EntityState` records sorted by stable identity.
 
-### EntityState
+### Entity identity
 
-The entity snapshot currently supports all simulation components used by the demo vertical slice:
+Каждая persistent runtime entity имеет один stable positive `EntityId`.
 
-- identity;
-- transform position and velocity;
-- inventory capacity and stock;
-- wallet balance;
-- market targets, prices, consumption rates, fractional remainders, tradable flags and dirty state;
-- production recipes, active recipe and progress;
-- price history and retention limit;
-- faction;
-- reputation;
-- ship type;
-- TradeAI FSM, route IDs, target item/amount, movement, expected profit and cooldown;
-- Mining FSM, target/base IDs, extraction remainder and lifetime counters;
-- combat state;
-- asteroid origin and finite remaining resource.
+Load path:
 
-Adding a new authoritative component or a new mutable authoritative field requires either adding it
-to the current capture/restore path before release or incrementing the schema for an incompatible
-change.
+```text
+GameState
+→ new Ashley Engine
+→ new EntityRegistry
+→ canonical systems
+→ reconstruct EntityState values
+→ rebuild EntityId → Entity index
+```
 
-## Exact time continuation
+Loader rejects duplicate IDs and invalid allocator watermark.
 
-`SimulationClock.State` includes more than the completed tick number:
+### Local continuation
 
-- fixed-step duration;
-- whole nanoseconds accumulated toward the next tick;
-- fractional nanoseconds left by time scaling;
-- time scale;
-- pause state;
-- completed tick number.
+Clock state сохраняет unfinished fixed-step accumulation, pause/time scale and tick. Named RNG streams сохраняют exact next-value continuation. Gameplay-significant subsystem timers are persistent.
 
-This matters because saving between fixed-tick boundaries must not change the time of the next tick.
+Следствие:
 
-`GlobalEventManager.simulationTimeSeconds` is cross-validated against the restored clock. A mismatch
-is treated as corrupted state.
+```text
+simulate A
+→ save/load
+→ simulate B
+```
 
-## Exact RNG continuation
+должно быть authoritative-equivalent uninterrupted `A+B`.
 
-Simulation-owned random streams use `StatefulRandom`, a SplitMix64-based generator with an explicit
-64-bit state. Saving a stream does not consume a random number. Restoring a stream from that state
-must make its **next** generated value exactly equal to the next value from the uninterrupted stream.
+---
 
-Named streams remain isolated through `SimulationRandom`:
+## 4. `WorldState` contract
 
-- `economy-events`;
-- `asteroid-spawn`.
+`WorldState` current logical schema: **v9**.
 
-New random subsystems should receive their own stable stream name and must add their stream state to
-`GameState` before becoming authoritative.
+Он хранит authoritative state, который не принадлежит одному local Ashley session:
 
-## Stateful system timers
+- galaxy topology;
+- one persistent local `GameState` per `StarSystem`;
+- faction economic accounts/treasuries;
+- faction strategic state;
+- construction projects and allocator watermark;
+- economic-pressure/hysteresis state;
+- world-level persistent `FleetId` placements;
+- active jump state;
+- world-defined faction identity directory;
+- institutional diplomacy;
+- territory/claims/control/recognition/concessions;
+- doctrine;
+- fiscal/stock-production/resilience policy state;
+- policy-review lifecycle.
 
-Not all authoritative state lives directly on entities. Schema v1 also saves:
+### World logical schema history relevant to current migration
 
-- the event manager's next automatic-event countdown and revision;
-- active events and pending news;
-- the asteroid spawner's initialized flag, refill timer and spawn counters;
-- the price recorder's fractional interval timer;
-- the economic ledger and its next sequence number.
+```text
+v7 — Stage-10/15 jump-capable world
+v8 — Stage-16 external/player construction settlement and ownership era
+v9 — Stage-17 world-defined faction identity directory
+```
 
-Derived caches such as spatial indexes and `EntityRegistry` mappings are rebuilt instead of saved.
+Current `WorldStateCodec` continues to accept older supported schemas v1–v8 and migrates them to v9 through explicit constructors/default semantics.
 
-## Economic ledger
+---
 
-The ledger remains continuous across save/load. Its next sequence number is saved separately from
-the currently retained diagnostic entries, so a diagnostic `clear()` does not reset economic
-identity.
+## 5. World file-format trailers
 
-Normal demo-world activity contains no implicit money source/sink. Trade transfers money between
-wallets; resource source/sink/transform operations remain explicit ledger entries.
+World logical schema and file-format version deliberately evolve independently.
 
-## File format
+Current world file format: **v8**.
 
-`GameStateCodec` uses a dependency-free deterministic binary format.
+Historical additive trailers:
 
-The file contains:
+```text
+v1 base world payload
+v2 strategic-growth state
+v3 Stage-17D territory / claims / recognition / construction rights
+v4 Stage-17E institutional diplomacy
+v5 transaction/customs tariff state
+v6 Stage-17F doctrine
+v7 fiscal reserve / construction investment authorization
+v8 Stage-17F.6 policy-review watermark
+```
 
-1. a fixed magic header;
-2. file-format version;
-3. logical `GameState` schema version;
-4. fields in a fixed documented code order.
+When an old file lacks a later trailer, migration uses conservative defaults:
 
-Strings are length-prefixed UTF-8. Optional components are represented explicitly. Lists are
-length-prefixed and bounded. The decoder rejects:
+- no invented claim/control/recognition/right;
+- neutral diplomacy, no invented treaties/grievances/embargoes;
+- zero customs tariff;
+- neutral doctrine where absent;
+- previous-compatible fiscal defaults;
+- never-reviewed policy lifecycle where absent.
+
+A missing historical field may never become a hidden resource or permission grant.
+
+---
+
+## 6. Stage-16 → Stage-17 migration
+
+World schema v8 represents the pre-Stage17 boundary.
+
+Migration `WorldState.fromLegacyStage16(...)` preserves:
+
+- topology;
+- all local physical `GameState` snapshots;
+- faction economic states;
+- existing strategic state representable by the historical file;
+- construction projects;
+- economic pressure;
+- `FleetId` allocator and placements;
+- active jump state.
+
+It adds an **empty** world-defined faction identity directory rather than inventing a player faction.
+
+Later Stage-17 file trailers not present in the historical file receive only neutral/zero defaults described above.
+
+---
+
+## 7. `PlayableWorldState` contract
+
+Current playable logical schema remains **v5**.
+
+History:
+
+```text
+v1 Stage-12A player state
+v2 docking
+v3 persistent fleet orders
+v4 non-omniscient threat intelligence
+v5 Stage-16 construction-project + completed-station ownership
+```
+
+Playable envelope contains:
+
+- embedded `WorldStateCodec` payload;
+- optional `PlayerState`.
+
+Raw pre-player `WorldState` bytes remain supported and migrate to a current playable envelope with `playerState = null`; no player is invented.
+
+### `PlayerState`
+
+Current persistent player data includes:
+
+- personal wallet;
+- nullable `factionContentId`;
+- reputations;
+- owned `FleetId`s and active fleet;
+- discoveries;
+- home/docking state;
+- fleet orders;
+- threat intelligence;
+- owned construction-project IDs;
+- completed `OwnedStationRef`s.
+
+`factionContentId == null` is the authoritative independent-player state.
+
+Stage 17 uses the existing nullable affiliation field. Dynamic faction metadata and institutional state are world state, so Stage 17 does **not** require a new outer player payload.
+
+---
+
+## 8. Schema-version policy
+
+Version numbers are not milestone counters.
+
+Increment a logical/file schema when at least one is true:
+
+- authoritative serialized shape changes incompatibly;
+- old bytes need a new migration rule;
+- existing field semantics change such that old values need reinterpretation;
+- a new required persistent value cannot be deterministically reconstructed.
+
+Do **not** increment merely because a roadmap stage completed if serialized shape is unchanged.
+
+Every incompatible change requires:
+
+1. explicit version marker;
+2. bounded decoder branch;
+3. deterministic migration/default semantics;
+4. fixture/regression test;
+5. corruption/future-version rejection;
+6. documentation update.
+
+---
+
+## 9. Exact identity continuation
+
+Persistent references use stable value IDs, not runtime object identity.
+
+Important allocator invariants:
+
+- `nextEntityIdValue > all stored EntityId`;
+- `nextFleetIdValue > all stored FleetId`;
+- `nextConstructionProjectIdValue > all stored project IDs`.
+
+Founding a faction, affiliating assets or loading a save must not consume FleetId/ConstructionProjectId merely to rebuild ownership/affiliation.
+
+A refit/affiliation/materialization operation changes the same physical object unless an explicit lifecycle rule creates a new one.
+
+---
+
+## 10. Money, cargo and conservation across save/load
+
+Persistence is not an economic event.
+
+Save/load/materialization may not:
+
+- add/remove money;
+- refill cargo/ammunition/reaction mass;
+- repair damage;
+- complete construction;
+- reset production progress;
+- invent territory/access;
+- replace destroyed/missing assets;
+- reset treaty/embargo/policy lifecycle.
+
+Economic transfers before save and after load continue through the same ordinary ledger/wallet/inventory systems.
+
+---
+
+## 11. Stage-17 institutional persistence
+
+Stage 17 intentionally distributes state across existing authoritative layers rather than creating a separate player-faction save blob.
+
+### Player layer
+
+```text
+PlayerState.factionContentId
+```
+
+records whether the player is independent or affiliated.
+
+### World identity/economy layer
+
+Stores:
+
+- dynamic stable faction identity and runtime-ID mapping metadata;
+- treasury/economic state;
+- fiscal reserve/construction authorization;
+- policy review state.
+
+### Strategic/political layer
+
+Stores:
+
+- doctrine;
+- stock/production/resilience state;
+- claims/control/stabilization;
+- recognition/concessions;
+- strategic goals/growth state.
+
+### Diplomacy layer
+
+Stores:
+
+- standings/history inputs where modeled;
+- treaties and clauses;
+- embargoes;
+- customs tariff state;
+- lifecycle/revision data.
+
+Effective market access is derived from persistent law/diplomacy on restore; it is not saved as a player-only permission bit.
+
+---
+
+## 12. Stage-17H binary migration guarantee
+
+Stage 17H introduces a historical binary acceptance with this shape:
+
+```text
+Playable file format v1
+Playable schema v5
+    ↓
+World file format v2
+World schema v8
+```
+
+This represents a pre-Stage17 playable save whose world has no Stage-17 identity/territory/diplomacy trailers.
+
+Required migration result:
+
+- player remains independent;
+- wallet and existing player FleetIds are unchanged;
+- embedded local physical simulation states are unchanged;
+- construction/fleet allocator watermarks are unchanged;
+- no dynamic player faction is invented;
+- no territory/treaty/embargo/treasury grant is invented;
+- missing diplomacy becomes neutral;
+- subsequent current encode/decode is deterministic.
+
+See `Stage17HPreStage17MigrationAcceptanceTest`.
+
+---
+
+## 13. Stage-17H full transition guarantee
+
+The final transition acceptance starts from an actual completed Stage-16 player station and owned fleet, then executes:
+
+```text
+independent
+→ found faction
+→ affiliate same FleetId + station EntityId
+→ conserved capitalization
+→ shared fiscal policy authoring
+→ ordinary station→treasury fiscal transfer
+→ ordinary treaty/embargo access law
+→ non-instant territorial claim
+→ binary save/decode/re-encode
+→ runtime restore
+```
+
+It verifies persistence of economy, policy, diplomacy, access, territory and ownership while money/cargo/IDs remain conserved.
+
+See `Stage17HEndToEndTransitionAcceptanceTest`.
+
+---
+
+## 14. File safety / bounded decoding
+
+All codecs use deterministic bounded binary parsing.
+
+Decoders reject before live runtime creation:
 
 - wrong magic;
-- unknown file format version;
-- unknown logical schema version;
-- negative or excessive collection/string lengths;
-- truncated files;
-- trailing bytes;
-- invalid record invariants.
+- unknown file-format version;
+- unsupported future logical schema;
+- impossible collection/string lengths;
+- truncated payload;
+- unexpected trailing bytes;
+- invalid record invariants;
+- duplicate/unknown persistent references;
+- incompatible allocator watermarks.
 
-The current maximum save-file size is 32 MiB. This is a defensive parsing limit, not a design target.
+File replacement uses a temporary sibling file and atomic move where supported, with replacement fallback otherwise.
 
-File replacement uses a temporary file in the target directory followed by atomic move when the
-filesystem supports it, with replace fallback otherwise.
+---
 
-## Runtime integration
+## 15. Runtime ownership boundaries
 
-`SimulationSession` is the single authoritative owner of the headless simulation and exposes:
+```text
+SimulationSession
+→ owns one local GameState runtime
 
-- `snapshot()` / `restore(GameState)`;
-- `save(Path)` / `load(Path)`;
-- fixed-step frame advancement.
+WorldSimulation
+→ owns topology + multiple SimulationSessions + strategic world state
 
-`SpaceSimGame` is now a desktop UI shell over `SimulationSession`; it no longer creates a separate
-copy of the economic pipeline. Loading a save replaces the session and rebuilds UI objects that hold
-runtime registry/entity references. Selection and previously displayed UI news are transient and are
-not authoritative save state.
+PlayerRuntime
+→ owns WorldSimulation + PlayerState playable interaction boundary
+```
 
-## Required regression guarantees
+UI remains presentation/read-model layer. Loading replaces authoritative runtime values and rebuilds runtime/presentation references rather than restoring Java object identity.
 
-Stage 3 is not complete unless all of the following stay green:
+---
 
-1. every persistent economic entity has a stable unique `EntityId`;
-2. persistent components contain no Ashley `Entity` field;
-3. `Entity -> EntityState -> new Entity` gives the same value snapshot;
-4. `GameState -> binary -> GameState` is exact and deterministic;
-5. `simulate(A) -> snapshot -> restore -> simulate(B)` equals uninterrupted simulation;
-6. `simulate(A) -> file save -> file load -> simulate(B)` equals uninterrupted simulation;
-7. the equality comparison covers entities, wallets, markets, FSMs, RNG, events, system timers,
-   ledger and unfinished fixed-step time;
-8. malformed and unsupported files fail before becoming a live simulation session.
+## 16. Required regression guarantees
 
-These guarantees are architectural gates for later save migrations, galaxy-scale simulation and
-long-running benchmark tests.
+The persistence architecture is considered healthy only while all relevant tests maintain:
+
+1. stable unique entity/fleet/project identity;
+2. no Ashley references in persistent records;
+3. exact/local continuation through `GameState`;
+4. deterministic binary round-trip;
+5. bounded legacy migration;
+6. pre-Stage17 Stage-16 save compatibility;
+7. no invented player/faction/territory/access during migration;
+8. Stage-17 full binary transition round-trip;
+9. diplomacy/policy/access continuation;
+10. resource and money conservation;
+11. future/corrupt version fail-fast behavior;
+12. canonical re-save after migration.
+
+These guarantees are prerequisites for Stage 17.5 fitting/combat persistence and later large-universe materialization.
