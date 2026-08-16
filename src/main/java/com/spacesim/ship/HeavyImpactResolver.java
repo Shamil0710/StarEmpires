@@ -222,7 +222,19 @@ public final class HeavyImpactResolver {
             List<LayerInteraction> layerInteractions,
             FragmentCloud fragments,
             double internalDamageEnergyJ) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates and freezes one complete impact result.
+         *
+         * @param protectionStackId ordered protection stack used for the response
+         * @param incomingEnergyJ projectile energy entering material protection
+         * @param absorbedEnergyJ energy absorbed by traversed/impacting layers
+         * @param residualProjectileEnergyJ energy retained by residual or ricocheted projectile
+         * @param penetrated whether the projectile perforated the stack
+         * @param outcome terminal stop/ricochet/perforation outcome
+         * @param layerInteractions ordered layer response diagnostics
+         * @param fragments aggregate fragment/spall cloud
+         * @param internalDamageEnergyJ energy routed into internal compartment damage
+         */
         public ImpactResult {
             Objects.requireNonNull(outcome, "outcome");
             Objects.requireNonNull(layerInteractions, "layerInteractions");
