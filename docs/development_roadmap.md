@@ -34,10 +34,10 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/warfare | 15–18 + 17.5 | **ACTIVE — Stage 17H NEXT** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 19–20 | PLANNED |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 21 | PLANNED |
-| **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 22 | PLANNED |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17H NEXT** |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | PLANNED |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
+| **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
 Manual merge gate remains mandatory because branch protection cannot currently be configured through the available connector:
 
@@ -137,67 +137,20 @@ Physical consequences are realized only by ordinary market/logistics/production/
 
 17G is an application/read-model layer over Stage-17 authoritative state, not a second simulation subsystem.
 
-#### 17G.1 — immutable management projection
-
 Implemented:
 
-- `FactionManagementSnapshot`;
-- `FactionManagementModel`;
+- immutable `FactionManagementSnapshot` / `FactionManagementModel`;
 - explicit independent vs affiliated shape;
 - personal wallet + faction economy/treasury;
-- doctrine/fiscal/base stock-production/resilience overlay;
+- doctrine/fiscal/base stock-production/resilience projection;
 - player-owned physical fleets/projects/stations;
 - territory only for player-known systems through ordinary legal assessment;
-- own diplomacy + deterministic effective-access counterparty summaries;
+- own diplomacy + deterministic effective-access summaries;
 - persistent strategic growth plans;
-- deterministic read-only capture with no clock/state mutation.
+- shared management commands delegating to authoritative treasury/policy/diplomacy/territory systems;
+- `FactionGlobalMapSnapshot` / `FactionGlobalMapModel` as presentation projection.
 
-#### 17G.2 — shared management commands
-
-`PlayerFactionManagementService` delegates only to existing authoritative boundaries:
-
-- conserved personal ↔ treasury transfers;
-- id-preserving asset affiliation;
-- common `FactionPolicyCommand` path;
-- common treaty/embargo commands;
-- ordinary claim/withdraw/relinquish/recognition/construction-right law.
-
-It rejects independent faction authority and diplomatic actor impersonation.
-
-Tariff scope stays domain-correct:
-
-- own-station tax + foreign-territory levy — `FactionFiscalPolicyState` / common policy command;
-- ordinary customs tariff/treaty exemptions — diplomacy/transaction law;
-- no private player-only customs setter exists.
-
-#### 17G.3 — strategic global-map composition
-
-Implemented:
-
-- `FactionGlobalMapSnapshot`;
-- `FactionGlobalMapModel`.
-
-Existing `GlobalFleetMapRenderer` remains presentation-only and receives prepared visible state rather than `WorldSimulation`. Read models contain no mutation callbacks.
-
-#### 17G.4 — acceptance
-
-Acceptance tests:
-
-- `Stage17G1FactionManagementReadModelAcceptanceTest`;
-- `Stage17G2FactionManagementCommandsAcceptanceTest`.
-
-They prove:
-
-1. independent player keeps owned Stage-16 assets but receives no faction authority;
-2. repeated projection is deterministic and mutation-free;
-3. economy/policy/diplomacy/territory/growth projection equals authoritative state;
-4. asset affiliation preserves persistent fleet IDs/placement;
-5. capitalization conserves personal + treasury money exactly;
-6. fiscal/tariff policy uses common policy commands;
-7. treaty/embargo uses common diplomacy commands and blocks impersonation;
-8. claim cannot grant instant sovereignty;
-9. management operations neither create/delete cargo nor change total money;
-10. save/load preserves Stage-17G authoritative projection and physical totals.
+Acceptance proves deterministic/mutation-free projection, ID-preserving affiliation, exact capitalization conservation, common policy/diplomacy paths, no instant sovereignty, no cargo/money creation and save/load preservation.
 
 ### 17H — persistence / migration / Stage-17 end-to-end gate
 
@@ -255,49 +208,201 @@ Hard invariants: no player-only combat physics, no class-name bonuses, no free a
 
 Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.
 
-## 7. Stage 18 — strategic warfare / coercive diplomacy / advanced combat behavior
+## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
 
 **PLANNED after 17.5 COMPLETE.**
 
-Stage 18 consumes Stage-17 treaties/claims/trust/grievances/dependencies/treasury plus Stage-17.5 physical capabilities. It does not create a second diplomacy model or abstract war rewards.
+Stage 18 закрывает онтологию материального мира **до** warfare и procedural world generation.
+
+Главный вопрос:
+
+> Какие физические ресурсы существуют, где в принципе могут встречаться, как добываются, во что перерабатываются, какие facilities нужны, как из этого строятся modules/ships/stations и какие реальные logistics bottlenecks возникают?
+
+Каноническая цепочка:
+
+```text
+resource occurrence
+→ compatible extraction
+→ finite feedstock
+→ refining / purification
+→ engineering material / consumable
+→ industrial component
+→ module / ammunition / infrastructure
+→ ship / station
+→ wear / repair / loss
+→ bounded salvage / recycling
+```
+
+Baseline намеренно **реалистичен, но агрегирован**. Отдельный commodity/process создаётся только если он добавляет meaningful source, extraction/refining requirement, storage/logistics constraint, strategic bottleneck или substitution/recycling choice.
+
+### Baseline raw families
+
+- `WATER_ICE`;
+- `VOLATILE_FEEDSTOCK`;
+- `CARBONACEOUS_FEEDSTOCK`;
+- `METALLIC_ORE`;
+- `LIGHT_METAL_MINERALS`;
+- `CONDUCTOR_ORE`;
+- `STRATEGIC_METAL_ORE`;
+- `SILICATE_MINERALS`;
+- `FISSILE_MINERALS` where current technology requires it.
+
+### Baseline industrial outputs
+
+- purified water / industrial gases / technology-specific reaction mass or fuel;
+- structural / light / conductor / refractory material families;
+- ceramics/glass, carbon materials, industrial chemicals, electronic-grade materials;
+- `HEAVY_COMPONENTS`, `ELECTRICAL_COMPONENTS`, `PRECISION_COMPONENTS`;
+- real module/ammunition/station/ship recipes;
+- bounded salvage/recycling.
+
+### Stage 18 sub-stages
+
+- **18A:** schema / resource ontology;
+- **18B:** extraction and source compatibility;
+- **18C:** refining / material production;
+- **18D:** industrial components + module/ammunition recipes;
+- **18E:** facility capability architecture;
+- **18F:** stations / storage / logistics;
+- **18G:** shipyard / repair / refit industrial integration;
+- **18H:** recycling / salvage / construction economy;
+- **18I:** deterministic minimal-industrial-universe acceptance.
+
+Hard rules:
+
+- no `ORE → SHIP` direct economy;
+- no production from credits without physical inputs;
+- no station-class magic bonuses;
+- no infinite deposits by default;
+- no player/AI hidden supply;
+- no SKU explosion without gameplay value;
+- shipyards require real materials/components/modules/work/capabilities.
+
+Detailed plan: `docs/stage18_resources_industry_infrastructure_plan.md`.
+
+## 8. Stage 19 — strategic warfare / coercive diplomacy / advanced combat behavior
+
+**PLANNED after Stage 18 COMPLETE.**
+
+Stage 19 consumes Stage-17 treaties/claims/trust/grievances/dependencies/treasury, Stage-17.5 physical capabilities and Stage-18 real industrial/logistics network. It does not create a second diplomacy model or abstract war rewards.
 
 ```text
 crisis / war goal
 → mobilization demand and treasury pressure
+→ ammunition / reaction mass / repair / replacement demand
 → physical logistics/readiness
 → tactical operations using Stage-17.5 capability APIs
-→ real losses/blockade/territory effects
+→ real losses/blockade/industrial/territory effects
 → negotiated political/economic outcome
 ```
 
-## 8. Stage 19 — physically calibrated world generation
+Strategic targets become ordinary physical assets: mines, water/propellant sources, depots, precision fabs, ammunition plants, shipyards and routes.
 
-**PLANNED after empire/combat foundations.** World generation must honor physical scale, distance, travel time, propulsion/FTL capability, resource distribution, infrastructure and economic geography; topology cannot be balanced only by arbitrary graph distance.
+A blockade or destroyed facility changes war capacity through actual inventories/throughput/replacement time, not `-20% production` scripting.
 
-Detailed plan: `docs/stage19_physical_world_generation_plan.md`.
+## 9. Stage 20 — physically calibrated world generation / discovery
 
-## 9. Stage 20 — RPG / living-world layer
+**PLANNED after Stage 19.**
 
-**PLANNED.** NPCs, missions, discovery and reputation consume authoritative world/economic/political state instead of disconnected scripted state.
+Stage 20 отвечает на вопрос **«где существует уже определённый мир?»**.
 
-## 10. Stage 21 — content breadth / technology / balance alpha
+World generation must honor:
 
-**PLANNED.** New equipment follows the same physical manufacturable/logistical hull/module paradigm introduced in 17.5, not isolated stat modifiers. World-generation and balance benchmarks must respect physical scale/distance/speed and long-horizon economic consequences.
+- physical scale/distance;
+- travel time and propulsion/FTL capability;
+- Stage-18 world-object/resource occurrence rules;
+- extraction compatibility and finite reserves;
+- infrastructure/shipyard requirements;
+- logistics/economic geography;
+- sensor-consistent discovery;
+- Stage-19 strategic response times.
 
-Detailed plan: `docs/stage21_content_balance_plan.md`.
+Generator размещает Stage-18 resources/facilities, но не изобретает новые resource types или hidden emergency deposits для спасения плохого seed.
 
-## 11. Stage 22 — polish / release candidate
+Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
+
+## 10. Stage 21 — RPG / living-world layer
+
+**PLANNED after Stage 20.**
+
+NPCs, missions, discovery and reputation consume authoritative physical/economic/political state instead of disconnected scripted state.
+
+NPC/missions can react to:
+
+- real shortages and trade flows;
+- industrial employment/capability;
+- exploration/resource discoveries;
+- military losses/blockades;
+- territory/access/diplomacy;
+- actual ship/station/faction state.
+
+Living-world simulation must follow scalability architecture: persistent identity, relevance/cadence/event wakeups, deterministic deadlines and no all-NPC full AI tick.
+
+## 11. Stage 22 — content breadth / technology / balance alpha
+
+**PLANNED after Stage 21.**
+
+Stage 22 expands the accepted language instead of inventing parallel systems.
+
+It adds:
+
+- broader material/technology families where a split is meaningful;
+- reactor/drive/thermal/sensor/EW/weapon/shield/protection content;
+- hull families and variants;
+- faction engineering doctrines;
+- expanded shipyard/facility capabilities;
+- fleet composition balance;
+- world-scale logistics and macroeconomic soak;
+- anti-universal-build and anti-linear-tier-obsolescence validation;
+- technology/content fingerprint governance.
+
+New equipment follows the physical manufacturable/logistical paradigm introduced by Stage 17.5 and Stage 18, not isolated stat modifiers.
+
+Detailed plan: `docs/stage22_content_balance_plan.md`.
+
+## 12. Stage 23 — polish / release candidate
 
 **PLANNED.** UX/onboarding/accessibility/performance/content validation/save hardening after simulation/content architecture is stable.
 
-## 12. Current immediate sequence
+Stage 23 does not introduce a new foundational economy/physics layer. It closes release hardening, performance budgets, migration diagnostics and representative long-session validation.
+
+## 13. Cross-stage dependency chain
+
+```text
+Stage 17 faction actor
+→ Stage 17.5 physical ship/module language
+→ Stage 18 physical resource/industry language
+→ Stage 19 warfare consuming real industrial/logistics capacity
+→ Stage 20 physical placement/economic geography
+→ Stage 21 NPC/missions/living-world consequences
+→ Stage 22 content breadth/balance/long-run soak
+→ Stage 23 polish/RC
+```
+
+The ordering is deliberate:
+
+```text
+WHAT SHIPS NEED
+→ HOW THE ECONOMY PRODUCES IT
+→ HOW WAR CONSUMES/DESTROYS IT
+→ WHERE IT EXISTS
+→ WHO LIVES/ACTS INSIDE IT
+→ HOW BROAD/BALANCED THE CONTENT IS
+```
+
+## 14. Current immediate sequence
 
 ```text
 Stage 17H migration/end-to-end acceptance
 → Stage 17 COMPLETE + final transition gate
 → activate 17.5A schema/material/hull/module
 → Stage 17.5 implementation
-→ Stage 18
+→ Stage 18 resources/industry/infrastructure
+→ Stage 19 warfare
+→ Stage 20 world generation
+→ Stage 21 living world
+→ Stage 22 content/balance
+→ Stage 23 RC
 ```
 
-Do **not** skip directly to Stage 17.5 or Stage 18 while 17H is outstanding.
+**Immediate implementation priority remains Stage 17H.** Roadmap renumbering does not permit skipping Stage-17 or Stage-17.5 gates.

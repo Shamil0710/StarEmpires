@@ -1,10 +1,9 @@
 # Star Empires — Simulation Scalability Architecture
 
-> Версия: **0.2**  
+> Версия: **0.3**  
 > Статус: **cross-stage architectural contract**  
 > Синхронизация: **2026-08-16**  
-> Источник: пересмотр draft PR #125 на актуальном roadmap после Stage 17G.  
-> Область действия: Stage 17.5, Stage 18, Stage 19, Stage 20, Stage 21, Stage 22 и все последующие системы, увеличивающие число одновременно существующих экономических, стратегических, RPG или физических сущностей.
+> Область действия: Stage 17.5, Stage 18, Stage 19, Stage 20, Stage 21, Stage 22, Stage 23 и все последующие системы, увеличивающие число одновременно существующих экономических, стратегических, RPG или физических сущностей.
 
 ## 1. Назначение
 
@@ -18,17 +17,18 @@ Star Empires должен одновременно сохранять глубо
 
 Этот документ не создаёт вторую упрощённую offscreen-симуляцию. Он определяет разные вычислительные представления **одной и той же authoritative реальности**.
 
-## 2. Связь с уже принятыми контрактами
+## 2. Связь с принятыми контрактами
 
-Scalability architecture дополняет, а не заменяет существующие правила:
+Scalability architecture дополняет, а не заменяет:
 
 - `docs/development_roadmap.md` — канонический status/dependency roadmap;
 - `docs/simulation_time_model.md` — authoritative simulation time;
-- `docs/persistence_model.md` — save является value snapshot, а не сериализованным Ashley object graph;
+- `docs/persistence_model.md` — save как value snapshot;
 - `docs/economic_invariants.md` — conservation и physical economy;
-- `docs/stage17_5_combat_depth_implementation_plan.md` — будущий production ship/combat runtime;
-- `docs/stage19_physical_world_generation_plan.md` — физически калиброванный мир;
-- `docs/stage21_content_balance_plan.md` — content breadth и long-run soak.
+- `docs/stage17_5_combat_depth_implementation_plan.md` — ship/combat runtime;
+- `docs/stage18_resources_industry_infrastructure_plan.md` — resource/industry/facility ontology;
+- `docs/stage20_physical_world_generation_plan.md` — физически калиброванный generated world;
+- `docs/stage22_content_balance_plan.md` — content breadth и long-run soak.
 
 Нельзя использовать scalability как оправдание для:
 
@@ -37,7 +37,8 @@ Scalability architecture дополняет, а не заменяет сущес
 - hidden resource grants;
 - абстрактной второй экономики distant sectors;
 - потери persistent identity при despawn/materialization;
-- недетерминированного пропуска gameplay-significant событий.
+- недетерминированного пропуска gameplay-significant событий;
+- fake industrial output для distant systems.
 
 ## 3. Render rate не равен simulation rate
 
@@ -50,30 +51,26 @@ render frame
 → update every fleet
 → update every ship
 → update every market
-→ update every factory
+→ update every mine/refinery/factory
 → update every AI actor
 → update every NPC
 ```
 
 Runtime должен иметь явные clock/scheduler boundaries.
 
-Ориентиры ниже являются design ranges, а не замороженными gameplay constants:
+Ориентиры являются design ranges, а не frozen gameplay constants:
 
 | Layer | Типичная работа | Ориентир |
 | --- | --- | --- |
-| Tactical/local physical | бой, projectiles, detailed sensors, local maneuver | fixed 30–60 Hz или другой validated physics tick |
+| Tactical/local physical | combat, projectiles, detailed sensors, maneuver | fixed 30–60 Hz или validated physics tick |
 | Active local/system | docking, nearby traffic, local movement/events | ~5–10 Hz или event-driven |
 | Strategic/inter-system | fleets, orders, transit, high-level state | ~0.5–2 Hz или event-driven |
-| Economy/logistics | markets, production, cargo flow | scheduled/dirty updates |
-| Macro/politics | doctrine, expansion, policy review | редкая deterministic cadence |
+| Economy/industry/logistics | markets, extraction, production, cargo flow | scheduled/dirty updates |
+| Macro/politics/war | doctrine, mobilization, policy review | редкая deterministic cadence |
 | RPG/living-world | NPC intent, missions, reputation consequences | event/cadence by relevance |
-| Dormant | отсутствие непосредственной interaction relevance | event-only/on-demand |
-
-Конкретная subsystem может использовать другой cadence после correctness/performance evidence.
+| Dormant | отсутствие direct interaction relevance | event-only/on-demand |
 
 ## 4. Simulation LOD
-
-Каждая high-cardinality сущность или subsystem должна иметь явный simulation level-of-detail.
 
 Минимальная модель:
 
@@ -96,21 +93,20 @@ TACTICAL
 → DORMANT
 ```
 
-LOD — не только visual optimization. Он определяет, какие вычисления реально нужны, при сохранении authoritative persistent state.
+LOD — не только visual optimization. Он определяет required computation при сохранении authoritative persistent state.
 
 Примеры:
 
-- далёкий торговый корабль не интегрирует позицию каждый tactical tick;
-- стабильный market не пересчитывается без dirty input или due settlement;
-- fleet executor выполняет существующий order, а не полный strategic planning каждый tick;
-- NPC без локальной или сюжетно-системной relevance не запускает full behavior tree каждый кадр;
-- detailed combat state существует только внутри реального interaction domain.
+- далёкий freighter не интегрирует позицию каждый tactical tick;
+- стабильный market не пересчитывается без dirty input/due settlement;
+- refinery/factory не пересчитывает неизменившийся recipe every frame;
+- fleet executor выполняет order, а не полный strategic plan every tick;
+- NPC без relevance не запускает full behavior tree;
+- detailed combat state существует только внутри real interaction domain.
 
 ## 5. Persistent identity не равна Ashley Entity
 
 Ashley ECS остаётся runtime composition layer, но не является обязательным контейнером для каждой сущности галактики.
-
-Каноническая persistent identity должна существовать независимо от materialization:
 
 ```text
 Persistent World State
@@ -125,17 +121,17 @@ Materialization/dematerialization обязана быть:
 - deterministic;
 - lossless относительно authoritative state;
 - stable-ID preserving;
-- versioned при изменении persistence schema;
+- versioned при schema changes;
 - покрыта round-trip acceptance.
 
 Запрещается хранить сотни тысяч dormant ships/NPCs/facilities в полном tactical component set только потому, что локальная сущность использует его.
 
 ## 6. Materialization contract
 
-Для каждого scalable entity family необходимо явно определить:
+Для scalable entity family определить:
 
 1. persistent minimal state;
-2. derived state, который можно восстановить;
+2. derived reconstructable state;
 3. local runtime state;
 4. activation/materialization conditions;
 5. dematerialization conditions;
@@ -146,16 +142,18 @@ Materialization/dematerialization обязана быть:
 При materialization нельзя бесплатно:
 
 - пополнять ammunition/reaction mass/cargo;
+- пополнять industrial inputs/output;
+- восстанавливать depleted resource reserve;
 - ремонтировать damage;
 - сбрасывать orders/cooldowns;
 - менять ownership/affiliation;
 - терять scheduled commitments.
 
-## 7. Event-driven transit и scheduled transitions
+## 7. Event-driven transit и long processes
 
 Долгие процессы моделируются через state + due event там, где постоянная интеграция не добавляет значимого результата.
 
-Пример transit state:
+Пример transit:
 
 ```text
 TransitState
@@ -168,25 +166,17 @@ TransitState
 - interruption conditions
 ```
 
-Scheduler может зарегистрировать:
-
-```text
-ARRIVAL(entityId, arrivalTime)
-```
-
-До due event полный movement update не требуется, если объект не становится локально релевантным.
-
-Тот же принцип применяется к:
+Тот же принцип применим к:
 
 - construction completion;
+- extraction/production batches;
 - repair/refit completion;
-- production batches;
-- contract deadlines;
-- policy review cadence;
+- contracts;
+- policy review;
 - FTL phases;
-- scheduled fleet orders;
-- long logistics operations;
-- mission/NPC deadlines и world events.
+- fleet orders;
+- mission/NPC deadlines;
+- industrial maintenance events.
 
 ## 8. Scheduler contract
 
@@ -195,56 +185,53 @@ Simulation scheduler должен поддерживать разные cadence 
 Минимальные требования:
 
 - simulation time отделено от wall-clock/render time;
-- due events с одинаковым timestamp имеют deterministic ordering;
-- tie-break использует explicit priority + stable ID, а не hash iteration order;
-- subsystem может сообщать next due time вместо постоянного polling;
-- expensive work может распределяться по cadence, если semantics это допускают;
+- equal timestamp events имеют deterministic ordering;
+- tie-break использует explicit priority + stable ID;
+- subsystem может сообщать next due time вместо polling;
+- expensive work может распределяться по cadence, если semantics допускают;
 - gameplay-significant scheduler state переживает save/load;
-- одинаковый seed + initial state + command/event stream дают одинаковый authoritative result независимо от render FPS.
+- same seed + initial state + command/event stream дают одинаковый authoritative result независимо от render FPS.
 
-## 9. Dirty-state economy и incremental recomputation
+## 9. Dirty-state economy / industry
 
-Экономическая глубина не требует полного пересчёта всех markets/factories/orders каждый economy tick.
+Экономическая и промышленная глубина не требует полного пересчёта всех markets/facilities/orders каждый economy tick.
 
-State становится dirty при существенном изменении inputs, например:
+State становится dirty, например, когда:
 
-- physical inventory изменился;
+- inventory изменился;
 - cargo прибыл/убыл;
+- resource reserve/grade доступность изменилась;
 - recipe/capability изменился;
-- order создан/закрыт;
-- input availability/price существенно изменились;
 - facility получила damage/repair;
+- input availability/price изменились существенно;
+- order создан/закрыт;
 - legal access/route/territory state изменился;
-- наступил scheduled settlement/production event.
+- наступил scheduled extraction/production/settlement event.
 
-Если inputs не изменились и due event отсутствует, повторное вычисление того же результата должно избегаться.
+Если inputs не изменились и due event отсутствует, повторное вычисление того же результата избегается.
 
-Это оптимизация вычисления, **не отмена физических economic consequences**.
+Это оптимизация вычисления, **не отмена физических consequences**.
 
 ## 10. AI scheduling и decision hierarchy
 
 AI work не должен масштабироваться как `all actors × full planning × every tick`.
 
-Предпочтительная hierarchy:
-
 ```text
 Faction / polity intent
 → strategic planning
-→ fleet / organization orders
+→ fleet / industrial / organization orders
 → local controller
-→ ship/NPC execution
+→ ship/facility/NPC execution
 ```
 
-Каждый AI layer должен иметь:
+Каждый layer должен иметь:
 
 - explicit decision cadence;
 - event-driven wakeups;
 - bounded work budget;
 - deterministic tie-breaking;
 - hysteresis/commitment rules;
-- reuse/cache результатов при неизменных inputs.
-
-Обычный executor большую часть времени выполняет уже принятое решение.
+- reuse/cache при неизменных inputs.
 
 ## 11. Route/path cache policy
 
@@ -253,14 +240,16 @@ Mass logistics и fleet movement используют shared route infrastructur
 Требования:
 
 - route queries опираются на versioned navigation/world graph;
-- эквивалентные запросы могут использовать cache;
-- topology/cost/access changes явно invalidируют affected entries;
-- fleets/ships не пересчитывают неизменившийся маршрут каждый tick;
-- cache не является authoritative source — authoritative остаются graph, route policy и persistent order/transit state.
+- equivalent requests могут использовать cache;
+- topology/cost/access changes invalidируют affected entries;
+- ships/fleets не пересчитывают неизменившийся route each tick;
+- cache не является authoritative source.
+
+Stage-20 generation обязана иметь explicit topology version/invalidation semantics.
 
 ## 12. High time acceleration
 
-Режимы `×10`, `×50`, `×100` и другие high-speed modes нельзя реализовывать только многократным запуском полного tactical update.
+`×10`, `×50`, `×100` нельзя реализовывать только многократным запуском полного tactical update.
 
 Предпочтительные механизмы:
 
@@ -269,67 +258,58 @@ Mass logistics и fleet movement используют shared route infrastructur
 - scheduled completion events;
 - aggregate/incremental updates;
 - selective materialization;
-- validated analytic resolver там, где он эквивалентен required model semantics.
+- validated analytic resolver where semantically equivalent.
 
-Если система действительно требует high-frequency integration, должен существовать explicit boundary, ограничивающий acceleration или переводящий interaction в validated resolver.
-
-Ни одно gameplay-significant due event не может исчезнуть из-за ускорения времени.
+Ни одно gameplay-significant due event не исчезает из-за acceleration.
 
 ## 13. Combat и interaction domains
 
-Stage 17.5 реализует подробную Ship Mathematics v1.0 там, где подробность нужна.
-
-Из этого не следует, что каждый далёкий корабль постоянно выполняет:
-
-- detailed sensor measurements;
-- covariance updates;
-- fire-control calculations;
-- projectile integration;
-- thermal substeps;
-- subsystem damage routing.
+Stage 17.5 реализует подробную Ship Mathematics там, где подробность нужна.
 
 Detailed tactical state materialized только при наличии реального combat/sensor interaction domain.
 
-Если позднее вводится strategic combat resolver, он обязан:
+Strategic combat resolver, если позднее нужен, обязан:
 
-- быть явно названным approximation layer;
-- быть calibrated против detailed authoritative model;
+- быть explicit approximation layer;
+- быть calibrated против detailed model;
 - иметь bounded domain validity;
-- сохранять ammunition, damage, losses, fuel/reaction mass и economic consequences;
+- сохранять ammunition, damage, losses, reaction mass and economic consequences;
 - быть deterministic;
-- не сводить ship design к одному скрытому `combatPower` multiplier.
+- не сводить design к одному hidden `combatPower` multiplier.
 
-## 14. Data layout, allocations и GC
+## 14. Industrial scalability boundary
 
-Performance work начинается с profiling, а не с premature low-level rewrite.
+Stage 18 вводит large-cardinality resource occurrences/facilities/recipes, поэтому отдельно фиксируется:
 
-Для high-cardinality strategic data отслеживаются:
+- dormant deposit не требует every-frame depletion calculation;
+- extraction/production work может быть scheduled by batch/next-due semantics;
+- reserve state authoritative и finite;
+- facility capability remains persistent without full local ECS materialization;
+- aggregated distant throughput должен использовать те же recipe/input/output/work constraints;
+- materialization не создаёт missing inputs/output;
+- world generation не materialize-all deposits/facilities после load.
+
+Если strategic production resolver отличается от local detailed presentation, он обязан сохранять exact material accounting within declared deterministic semantics.
+
+## 15. Data layout, allocations и GC
+
+Performance work начинается с profiling.
+
+Для high-cardinality data отслеживаются:
 
 - object count;
 - boxing;
 - short-lived allocations;
-- iterator/stream allocations в hot loops;
+- hot-loop iterator/stream allocations;
 - cache locality;
 - duplicated derived state;
-- retention dormant runtime objects.
+- retained dormant runtime objects.
 
-После profiler evidence допустимы:
+После profiler evidence допустимы primitive collections, packed arrays, structure-of-arrays, pools и specialised immutable snapshots.
 
-- primitive collections;
-- packed arrays;
-- structure-of-arrays;
-- object pools при измеримой пользе;
-- specialised immutable snapshots.
-
-Новая dependency ради производительности добавляется только после benchmark evidence.
-
-## 15. Concurrency policy
-
-Default policy:
+## 16. Concurrency policy
 
 > **Сначала хороший single-thread deterministic baseline, затем parallelism только по profiler evidence.**
-
-Concurrency не должна маскировать архитектуру, которая просто делает слишком много работы.
 
 Parallel simulation требует:
 
@@ -337,12 +317,10 @@ Parallel simulation требует:
 - deterministic input snapshots;
 - explicit synchronization boundary;
 - deterministic merge/reduction order;
-- отсутствия gameplay-visible race dependence;
+- no gameplay-visible race dependence;
 - replay/save/load acceptance.
 
-## 16. Profiling workflow
-
-Базовый цикл:
+## 17. Profiling workflow
 
 ```text
 reproducible headless benchmark
@@ -354,29 +332,28 @@ reproducible headless benchmark
 → record regression/improvement
 ```
 
-JFR/JMC — development tooling, не runtime dependency.
-
 Минимальные metrics:
 
-- CPU/wall time per simulation domain;
+- CPU/wall time per domain;
 - p50/p95/p99 step/cadence time;
-- events processed per simulated hour/day;
-- allocations per simulated time unit;
-- GC count/pause/allocated bytes;
+- events per simulated hour/day;
+- allocations per simulated time;
+- GC count/pause/bytes;
 - live heap after stabilization;
 - materialized entity counts;
-- route queries/cache hit rate;
+- route query/cache hit rate;
 - AI decisions per simulated hour;
-- economy dirty/recomputed ratio;
+- economy/industry dirty/recomputed ratio;
 - achieved simulated-time / real-time acceleration.
 
-## 17. Versioned performance target envelope
+## 18. Versioned target envelope
 
-Начальный target envelope используется для проектирования и benchmark calibration, но **не является заявлением о текущей гарантированной производительности**:
+Начальный design envelope, не current guarantee:
 
 ```text
 Galaxy systems:                    10 000+
 Stations / major facilities:       10 000–50 000
+Resource occurrences:              100 000+
 Economically active actors:        100 000+
 Strategic ships / fleets:          100 000+
 Persistent NPC records:            100 000+
@@ -384,30 +361,27 @@ Locally materialized entities:     ~100–1 000
 Full tactical entities:            ~100–500
 ```
 
-После появления соответствующего runtime/content эти числа заменяются или уточняются versioned benchmark evidence.
+Числа уточняются benchmark evidence по мере появления runtime/content.
 
-Нельзя автоматически снижать intended simulation depth только потому, что текущая реализация неэффективна; сначала требуется profiler evidence.
-
-## 18. Canonical headless benchmark scenarios
+## 19. Canonical headless benchmark scenarios
 
 ### S1 — dormant universe scale
 
 ```text
 10 000 systems
 50 000 stations/facilities
+100 000+ resource occurrences
 100 000 economic actors
 100 000 strategic ships/fleets
 100 000 persistent NPC records
 majority dormant/event-driven
 ```
 
-Цель: размер persistent universe не должен создавать proportional tactical update cost.
+### S2 — logistics/economy/industry churn
 
-### S2 — logistics/economy churn
+Высокая доля changing inventories, deposits, routes, markets, extraction, production chains, facilities and contracts.
 
-Высокая доля изменяющихся inventories, routes, markets, production chains и contracts.
-
-Цель: измерить реальную стоимость activity и эффективность dirty-state processing.
+Цель: измерить cost of real activity и dirty-state efficiency.
 
 ### S3 — dense local combat
 
@@ -416,13 +390,9 @@ majority dormant/event-driven
 weapons/projectiles/sensors/EW/thermal/damage active
 ```
 
-Цель: определить local tactical ceiling и degradation curve.
-
 ### S4 — accelerated long-run
 
-Минимум один игровой год при high time acceleration с economy, logistics, AI, factions и scheduler.
-
-Цель: throughput, memory stability, bounded queues, determinism и systemic invariants.
+Минимум один игровой год при high acceleration с economy, industry, logistics, AI, factions and scheduler.
 
 ### S5 — materialization/save-load churn
 
@@ -432,14 +402,11 @@ weapons/projectiles/sensors/EW/thermal/damage active
 strategic → local → tactical → strategic
 save → load
 route interruption/resume
+production interruption/resume
 combat damage/consumable continuation
 ```
 
-Цель: доказать отсутствие identity/state leaks и hidden reset effects.
-
-До появления полного content размеры могут scale down, но scenario shape сохраняется.
-
-## 19. Deterministic scalability acceptance
+## 20. Deterministic scalability acceptance
 
 ### Same-seed replay
 
@@ -453,108 +420,82 @@ same seed
 
 ### Save/load equivalence
 
-Long run с save/load boundary даёт тот же authoritative result, что и uninterrupted run, кроме явно документированной numeric tolerance там, где она действительно необходима.
+Long run с save/load boundary даёт тот же authoritative result, что uninterrupted run, кроме explicitly documented numeric tolerance where necessary.
 
 ### Materialization round-trip
 
-```text
-strategic/dormant state
-→ materialize
-→ bounded local progression
-→ dematerialize
-```
-
-не теряет identity, inventory, fitting, damage, orders, transit commitments, policy/diplomacy references или scheduled events.
+Не теряет identity, inventory, fitting, damage, orders, resource reserve, facility/production state, transit commitments, policy/diplomacy references или scheduled events.
 
 ### Render-rate independence
 
-Разные render FPS не меняют authoritative world result.
+Different render FPS не меняют authoritative world result.
 
 ### Time-acceleration correctness
 
-High-speed execution сохраняет все gameplay-significant due events и invariants.
+High-speed execution сохраняет gameplay-significant due events and invariants.
 
-## 20. Performance regression governance
-
-Пока baseline формируется, benchmarks могут быть report-only.
+## 21. Performance regression governance
 
 После фиксации stable scenarios/environment вводятся versioned thresholds.
 
-Регрессия типа:
+Regression должна быть исправлена или явно объяснена/принята как conscious tradeoff. Нельзя скрывать regression ослаблением теста.
 
-```text
-strategic benchmark p95: 18 ms → 47 ms
-heap after soak:          1.2 GB → 2.6 GB
-allocation rate:          +150%
-```
-
-должна быть либо исправлена, либо явно объяснена и принята как conscious tradeoff с обновлением baseline.
-
-Нельзя скрывать regression простым ослаблением теста.
-
-## 21. Cross-stage gates по актуальному roadmap
+## 22. Cross-stage gates
 
 ### Stage 17H — current transition gate
 
-Этот документ **не меняет** текущий приоритет: Stage 17H остаётся следующим обязательным этапом.
-
-17H должен завершить migration/end-to-end contract Stage 17 и подтвердить save compatibility. Scalability runtime не должен внедряться ценой обхода этого gate.
+Текущий приоритет не меняется: Stage 17H завершает migration/end-to-end contract Stage 17 и save compatibility.
 
 ### Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-До завершения 17.5 должны существовать seams между persistent ship state и local tactical runtime.
+Требует persistent ↔ tactical seams, deterministic materialization, render-rate independence and bounded detailed interaction domains.
 
-17.5 не считается архитектурно закрытым, если:
-
-- Ship Mathematics требует постоянного tactical tick для каждого ship мира;
-- materialization/dematerialization не имеет deterministic round-trip;
-- render FPS влияет на authoritative combat;
-- dormant ships требуют brute-force tactical replay при time acceleration;
-- detailed sensors/fire-control невозможно отключать вне relevant interaction domain.
-
-### Stage 18 — strategic warfare / coercive diplomacy / advanced combat behavior
-
-Stage 18 использует Stage-17 political state и Stage-17.5 physical capabilities.
+### Stage 18 — Resources / Industry / Infrastructure
 
 Scalability requirements:
 
-- tactical AI full quality работает только в active combat domains;
-- strategic mobilization/war planning имеет bounded cadence/event wakeups;
-- fleet hierarchy передаёт orders вниз вместо полного faction replanning каждым ship;
-- blockades/fronts/threat intelligence обновляются через explicit state changes;
-- strategic resolver, если нужен, calibrated против detailed model и сохраняет физические losses/consumables.
+- deposits/facilities have persistent state separate from local ECS;
+- extraction/production support due-event/batch semantics;
+- finite reserves and inventories survive save/load;
+- dirty/incremental recomputation avoids all-facility polling;
+- facility capability is data state, not runtime class bonus;
+- industrial acceptance runs headless and deterministic.
 
-### Stage 19 — physically calibrated world generation
+### Stage 19 — strategic warfare
 
-Stage 19 должен генерировать мир, который масштабируется как mostly dormant/event-driven persistent universe.
+- tactical AI full quality only in active combat domains;
+- strategic mobilization/war planning bounded cadence/event wakeups;
+- fleet hierarchy passes orders down;
+- blockades/fronts/industrial-loss consequences update through explicit state changes;
+- resolver if needed calibrated and physically conservative.
 
-Требуется:
+### Stage 20 — physical world generation
+
+Generated universe remains mostly dormant/event-driven.
+
+Requires:
 
 - versioned navigation topology;
 - physical travel-time calibration;
-- route-cache invalidation semantics;
+- route-cache invalidation;
 - bounded local materialization;
-- generated density, совместимая с target performance envelope;
-- отсутствие требования materialize весь generated universe после load.
+- resource/facility density within performance envelope;
+- no materialize-all-on-load.
 
-### Stage 20 — RPG / living-world layer
+### Stage 21 — RPG / living world
 
-NPCs, missions, discovery и reputation не должны превращаться в `all NPCs × full AI × every tick`.
-
-Требуется:
-
-- persistent NPC identity отдельно от local presentation entity;
+- persistent NPC identity separate from local presentation;
 - relevance/cadence/event wakeups;
 - deterministic mission/world-event deadlines;
-- local materialization only where interaction requires it;
-- no omniscient instant reactions to distant events;
-- save/load continuation NPC/mission state.
+- local materialization only where needed;
+- no omniscient instant reactions;
+- save/load continuation.
 
-### Stage 21 — Content & Balance Alpha
+### Stage 22 — Content & Balance Alpha
 
-Stage 21 является основной calibration/soak stage для universe scale.
+Primary calibration/soak stage.
 
-До завершения Stage 21 должны существовать:
+Before completion require:
 
 - canonical headless performance suite;
 - long-run deterministic soak;
@@ -562,63 +503,64 @@ Stage 21 является основной calibration/soak stage для univers
 - allocation/GC profiling;
 - time-acceleration benchmark;
 - state-hash verification;
-- economy/AI/logistics/content-scale scenarios;
+- economy/industry/AI/logistics/content-scale scenarios;
 - documented safe local/tactical density;
 - documented strategic universe envelope.
 
-Content breadth не считается закрытой, если nominal world size достигается только ценой runaway CPU/heap/queue growth.
+### Stage 23 — Polish / Release Candidate
 
-### Stage 22 — Polish / Release Candidate
+No new foundational scalability model. Close:
 
-Stage 22 не проектирует новую фундаментальную scalability model. Он закрывает release hardening:
-
-- final profiler pass на representative content;
+- final profiler pass;
 - stable regression thresholds;
 - startup/load/materialization performance;
-- save hardening и migration diagnostics;
-- memory leak/long-session checks;
-- UI/render boundaries без нарушения simulation determinism;
-- documented supported performance envelope для RC.
+- save/migration diagnostics;
+- leak/long-session checks;
+- UI/render boundaries;
+- documented supported RC envelope.
 
-## 22. Запрещённые shortcut-подходы
+## 23. Запрещённые shortcuts
 
 Без explicit architecture decision запрещены:
 
-- `update()` для каждой world entity каждый render frame;
-- отдельная fake economy для distant sectors;
-- despawn с потерей persistent identity/state;
-- strategic `combatPower` как единственная замена fitted capabilities;
-- random tick skipping, зависящий от FPS/CPU load;
-- unlimited parallel tasks без deterministic merge contract;
-- premature JNI/native rewrite без profiler evidence;
-- микросервисная архитектура только ради local single-player performance;
-- вторая ECS только ради количества entities;
-- hidden AI/offscreen performance multipliers, меняющие игровые законы;
-- full strategic AI planning для каждого subordinate actor каждый tick;
-- materialize-all-on-load architecture.
+- `update()` for every world entity every render frame;
+- fake distant economy/industry;
+- despawn with identity/state loss;
+- strategic `combatPower` as sole ship model;
+- random tick skipping dependent on FPS/CPU;
+- unlimited nondeterministic parallel tasks;
+- premature JNI/native rewrite;
+- microservices only for local single-player performance;
+- second ECS only for quantity;
+- hidden AI/offscreen multipliers changing laws;
+- full strategic planning per subordinate each tick;
+- materialize-all-on-load;
+- generator-created emergency resources outside Stage-18 ontology;
+- distant factories receiving virtual inputs.
 
-## 23. Definition of Done для v0.2 contract
+## 24. Definition of Done для v0.3 contract
 
-Контракт считается реально внедрённым по мере развития roadmap, когда:
+Контракт внедрён по мере roadmap, когда:
 
-- [ ] Stage 17.5 имеет persistent ↔ tactical materialization seam;
-- [ ] scheduler поддерживает stable due-event ordering;
-- [ ] strategic transit не требует постоянного tactical movement update;
-- [ ] economy использует dirty/incremental recomputation там, где это корректно;
-- [ ] AI layers имеют decision cadences и event wakeups;
-- [ ] route computation имеет cache/invalidation policy;
-- [ ] high time acceleration имеет event/aggregate path;
-- [ ] Stage 19 generated universe может оставаться mostly dormant;
-- [ ] Stage 20 NPC layer не требует full per-frame NPC simulation;
-- [ ] canonical benchmark seeds/scenarios хранятся в репозитории;
-- [ ] Stage 21 включает long-run deterministic scalability soak;
-- [ ] profiling procedure воспроизводима;
+- [ ] Stage 17.5 has persistent ↔ tactical seam;
+- [ ] Stage 18 deposits/facilities support persistent scheduled simulation;
+- [ ] scheduler has stable due-event ordering;
+- [ ] strategic transit avoids constant tactical movement update;
+- [ ] economy/industry use dirty/incremental recomputation where correct;
+- [ ] AI layers have decision cadences/event wakeups;
+- [ ] route computation has cache/invalidation policy;
+- [ ] high acceleration has event/aggregate path;
+- [ ] Stage 20 generated universe can remain mostly dormant;
+- [ ] Stage 21 NPC layer avoids full per-frame NPC simulation;
+- [ ] canonical benchmark seeds/scenarios are versioned;
+- [ ] Stage 22 includes long-run deterministic scalability soak;
+- [ ] profiling procedure reproducible;
 - [ ] performance budget versioned;
-- [ ] regression governance включена в release process;
-- [ ] save/load + materialization round-trip покрыты acceptance;
-- [ ] ни один major subsystem не предполагает `render frame = world simulation tick`.
+- [ ] regression governance part of release process;
+- [ ] save/load + materialization round-trip acceptance exists;
+- [ ] no major subsystem assumes `render frame = world simulation tick`.
 
-## 24. Итоговый архитектурный инвариант
+## 25. Итоговый архитектурный инвариант
 
 ```text
 deterministic persistent world
@@ -632,4 +574,4 @@ deterministic persistent world
 → measured optimization
 ```
 
-Главная цель — позволить одновременно увеличивать **глубину** и **размер** живого мира, не превращая всю галактику в набор постоянно активных tactical entities и не отказываясь от единой физической, экономической и политической парадигмы Star Empires.
+Главная цель — увеличивать одновременно **глубину** и **размер** живого мира, не превращая галактику в набор постоянно активных tactical entities и не отказываясь от единой физической, экономической и политической парадигмы Star Empires.

@@ -1,35 +1,37 @@
 # Star Empires — контракт интеграции Ship Mathematics v1.0 в roadmap
 
-> Статус: **обязательное требование к завершению research track**  
-> Дата: **2026-08-15**  
-> Назначение: зафиксировать требования, которые должны быть перенесены в подробные планы Stage 17.5, Stage 19 и Stage 21 после принятия `Ship Mathematics v1.0 Design Baseline`.
+> Статус: **обязательный cross-stage integration contract**  
+> Дата первоначальной фиксации: **2026-08-15**  
+> Синхронизация с новым roadmap: **2026-08-16**  
+> Назначение: зафиксировать требования, которые должны проходить через Stage 17.5, Stage 18, Stage 20 и Stage 22 после принятия `Ship Mathematics v1.0 Design Baseline`.
 
 ---
 
-## 1. Обязательное действие после завершения исследования
+## 1. Обязательная integration chain
 
-После принятия `Ship Mathematics v1.0 Design Baseline` в `main` необходимо **до активации Stage 17.5** провести отдельный roadmap-integration pass.
+После принятия `Ship Mathematics v1.0 Design Baseline` долгосрочный roadmap обязан сохранять единую причинную цепочку:
 
-В рамках этого pass необходимо:
+1. **Stage 17.5 — Combat Depth / Ship Fitting Foundation:** production ship/module/physics runtime;
+2. **Stage 18 — Resources / Industry / Infrastructure:** реальные material/component/facility chains, которые производят и обслуживают Stage-17.5 оборудование;
+3. **Stage 20 — Physical World Generation:** physical scale/resources/infrastructure placement, согласованные с корабельной кинематикой и Stage-18 economy;
+4. **Stage 22 — Content Width / Technology / Balance:** массовый content строго внутри тех же physical/economic contracts.
 
-1. подробно переписать/расширить **Stage 17.5 — Combat Depth / Ship Fitting Foundation** на основе фактически принятой v1.0 модели;
-2. подробно переписать/расширить **Stage 21 — Content Width / Balance / Long-run Stability** так, чтобы массовый контент и technology ladder строились строго внутри той же модели;
-3. дополнить **Stage 19 — World Generation** требованиями физического масштаба, чтобы generated world был согласован с корабельной кинематикой, логистикой, сенсорами, экономикой и временем;
-4. добавить acceptance matrix, связывающую v1.0 benchmark seeds с runtime implementation Stage 17.5, world-generation calibration Stage 19 и content/balance soak Stage 21.
+Acceptance matrix должна связывать v1.0 benchmark seeds с:
 
-До выполнения этого roadmap-integration pass `Ship Mathematics v1.0` нельзя считать полностью интегрированной в долгосрочный план проекта, даже если сам research baseline принят.
+- runtime implementation Stage 17.5;
+- industrial/resource feasibility Stage 18;
+- world-generation calibration Stage 20;
+- content/balance soak Stage 22.
 
 ---
 
 ## 2. Единая парадигма всех модулей и оборудования
 
-Все вводимые корабельные системы, модули и оборудование должны работать внутри **одной инженерной модели**, а не быть набором отдельных подсистем с несопоставимыми характеристиками.
-
-Базовое правило:
+Все вводимые корабельные системы, модули и оборудование работают внутри **одной инженерной модели**, а не как набор несопоставимых бонусов.
 
 > **Модуль не даёт абстрактный bonus. Он занимает физическое место, имеет массу, потребляет/передаёт реальные ресурсы и создаёт конкретную capability через общие runtime-механизмы.**
 
-Минимальная общая authoring/runtime-парадигма должна поддерживать, где применимо:
+Минимальная общая authoring/runtime-парадигма поддерживает, где применимо:
 
 ```text
 stable module/content identity
@@ -53,11 +55,9 @@ repair / replacement requirements
 capability-specific physical parameters
 ```
 
-Не каждый модуль обязан иметь ненулевое значение каждого параметра. Например, passive armor может иметь `power = 0`, но всё равно участвует в общей системе массы, объёма, геометрии, материалов, повреждений и стоимости.
+Не каждый модуль обязан иметь ненулевое значение каждого параметра.
 
 ### 2.1. Единые derived budgets корабля
-
-Все модули должны сходиться в общих ship-level budgets:
 
 ```text
 mass
@@ -77,53 +77,39 @@ damage / redundancy / compartment exposure
 maintenance / logistics / operating cost
 ```
 
-Запрещено создавать параллельные скрытые системы вроде:
-
-```text
-weaponWeightPoints
-sensorPoints
-armorPoints
-stealthRating
-engineTierBonus
-```
-
-если они не являются UI-derived representation физически определённых исходных величин.
+Запрещены параллельные hidden systems вроде `weaponWeightPoints`, `sensorPoints`, `armorPoints`, `stealthRating`, `engineTierBonus`, если это не derived presentation физических inputs.
 
 ### 2.2. Общая парадигма по семействам модулей
 
-Одна и та же integration philosophy должна применяться к:
+Одна integration philosophy применяется к:
 
 - reactors / power conversion;
 - batteries / capacitors / energy storage;
 - main drives / maneuver thrusters / FTL integration;
 - radiators / coolant loops / thermal stores;
-- kinetic weapons;
-- beam weapons;
-- missile / torpedo / interceptor launch systems;
+- kinetic/beam/guided weapons;
 - magazines / ammunition handling;
-- passive / active sensors;
+- passive/active sensors;
 - fire control;
 - ECM / ECCM / decoys;
-- armor / bumpers / spaced protection / citadel protection;
+- armor / bumpers / citadel protection;
 - command / communications / datalinks;
 - crew support / automation;
 - cargo / tanks / stores;
 - hangars / small-craft support;
 - mining / salvage / repair / industrial / science / colony mission systems.
 
-Специализированные capability equations допускаются, но они должны получать inputs из той же общей физической и ресурсной модели.
-
 ---
 
 ## 3. Единство физики и экономики
 
-`Ship Mathematics v1.0` не должна оставаться только боевой системой.
+`Ship Mathematics v1.0` не является только боевой системой.
 
-Масса, объём и компонентный состав должны влиять одновременно на:
+Масса, объём и компонентный состав влияют одновременно на:
 
 ```text
-ship construction cost
-required industrial inputs
+ship construction inputs
+required industrial components
 shipyard capability
 construction time
 maintenance load
@@ -139,34 +125,79 @@ salvage outcome
 replacement economics
 ```
 
-Следовательно, Stage 21 не имеет права балансировать корабли только через цену, DPS или class multipliers независимо от их physical fit.
+Следовательно, Stage 18 обязан дать реальный industrial path к каждому production module/hull, а Stage 22 не имеет права балансировать ships только через цену, DPS или class multipliers независимо от physical fit.
 
-High-tier technology должна выражаться через реальные технологические возможности: specific power, material properties, sensor noise, cooling temperature, automation, manufacturing complexity, engine performance, component quality и т. п., а не через blanket `Mk II = +25% all stats`.
+High-tier technology выражается через реальные engineering/material/manufacturing capabilities, а не через blanket `Mk II = +25% all stats`.
 
 ---
 
-## 4. Обязательная связь с генерацией мира
+## 4. Обязательная связь со Stage 18 Resources / Industry / Infrastructure
 
-Stage 19 world generation должен использовать физические и временные масштабы, согласованные с `Ship Mathematics v1.0`.
+Stage 18 превращает `material/component construction requirements` из декларативных полей в живую экономику.
 
-Generated galaxy/system geometry нельзя определять исключительно художественными или случайными числами независимо от возможностей кораблей.
+Минимальная цепочка:
 
-Минимум должны учитываться:
+```text
+physical resource occurrence
+→ compatible extraction
+→ refining / purification
+→ engineering material / consumable
+→ industrial component
+→ module / ammunition / infrastructure
+→ ship / station
+→ maintenance / repair / replacement
+→ bounded salvage / recycling
+```
+
+Stage 18 должен:
+
+- использовать агрегированные, но физически осмысленные raw/material families;
+- различать bulk metal, light metal, conductor, strategic/refractory, silicate/electronic, carbon/chemical, water/volatile and fuel chains where they create gameplay distinctions;
+- давать `HEAVY_COMPONENTS`, `ELECTRICAL_COMPONENTS`, `PRECISION_COMPONENTS` или эквивалентный небольшой component layer;
+- связывать modules/ammunition с реальными recipes;
+- связывать shipyard capability с physical facilities;
+- не создавать hidden player/AI supply;
+- сохранять finite reserves, inventories, work and time;
+- поддерживать deterministic save/load and salvage/recycling conservation.
+
+### 4.1. Правило агрегации
+
+Не требуется отдельный commodity для каждого real-world alloying element, reagent или semiconductor dopant.
+
+Split aggregate family допустим только если он создаёт meaningful difference по:
+
+- source/occurrence;
+- extraction/refining method;
+- storage/logistics;
+- facility capability;
+- strategic scarcity;
+- module/technology dependency;
+- recycling/substitution.
+
+---
+
+## 5. Обязательная связь с генерацией мира
+
+**Stage 20** world generation использует физические и временные масштабы, согласованные с `Ship Mathematics v1.0`, и закрытую Stage-18 resource/facility ontology.
+
+Generated geometry нельзя определять независимо от возможностей ships и logistics.
+
+Минимум учитываются:
 
 ```text
 local distances m / km / AU
 inter-system topology and route lengths
 ship acceleration m/s2
-cruise / maneuver velocity evolution m/s
-braking distance and braking time
+velocity evolution m/s
+braking distance/time
 reaction-mass consumption kg / delta-v m/s
-jump / FTL travel time and operating constraints
+jump / FTL time and constraints
 sensor detection envelopes
 track/fire-control envelopes
-communications / datalink latency where relevant
+communications latency where relevant
 combat engagement distances
 station approach / docking distances
-mining-field and resource-cluster spacing
+resource-body/mining-field spacing
 logistics travel time
 trade-route round-trip time
 construction supply time
@@ -175,9 +206,9 @@ strategic response time
 production / consumption cycle time
 ```
 
-### 4.1. World scale must be calibrated from gameplay-capable ships
+### 5.1. World scale calibrated from representative ships
 
-До заморозки generation distributions необходимо выбрать representative ships как минимум:
+До freeze generation distributions выбрать минимум:
 
 - early civilian freighter;
 - bulk freighter;
@@ -186,40 +217,30 @@ production / consumption cycle time
 - frigate/destroyer;
 - cruiser;
 - capital fleet;
-- tanker / logistics support.
+- tanker/logistics support.
 
-Для каждого generated scale band должны существовать benchmark travel calculations:
+Для scale bands иметь benchmark travel calculations:
 
 ```text
 origin → local station
-station → mining zone
+station → resource zone
 inner-system → outer-system
 jump arrival → economic hub
 system → neighboring system
 regional multi-hop route
 ```
 
-World generation считается некалиброванной, если типичный маршрут создаёт бессмысленные времена относительно design goals или если физически разные корабли почти не отличаются по operational travel outcome.
+### 5.2. Экономический масштаб учитывает transport time
 
-### 4.2. Экономический масштаб должен учитывать транспортное время
+Production, consumption, buffers and construction demand калибруются относительно real logistics latency.
 
-Production, consumption, inventory, market buffer и construction demand должны калиброваться относительно реального logistics latency.
+Нельзя независимо задать factory cadence, которая физически несовместима с possible supply, если chronic shortage не является explicit design outcome.
 
-Например, нельзя независимо задать:
+### 5.3. Sensor/world scale compatibility
 
-```text
-factory consumes all reserves every 30 s
-```
+Если passive sensors способны обнаруживать emissions на system scale, visibility model обязана это учитывать.
 
-если типичный поставщик физически приходит раз в несколько часов/дней simulation time, если только именно хронический дефицит не является осознанным design outcome.
-
-И наоборот, огромные market buffers не должны полностью обнулять значение расстояния и транспортной инфраструктуры.
-
-### 4.3. Sensor scale и world scale должны быть совместимы
-
-Если passive sensor способен обнаруживать capital emission на масштабе системы, generation/visibility model должна это учитывать.
-
-Это не означает автоматическое знание точной позиции или identity: должны сохраняться различия
+Сохраняются уровни:
 
 ```text
 DETECTED
@@ -228,113 +249,100 @@ TRACKED
 FIRE_CONTROL
 ```
 
-Но world generation не должна помещать объекты на произвольные дистанции, игнорируя фактически рассчитанные signature/sensor envelopes.
+### 5.4. Combat/navigation — одна coordinate system
 
-### 4.4. Combat scale и navigation scale — одна система координат
+Combat distances, formation spacing, missile/interceptor stand-off, weapon time-of-flight and local navigation используют совместимые physical units.
 
-Боевые расстояния, formation spacing, missile/interceptor stand-off, weapon time-of-flight и local navigation должны использовать совместимые physical units и geometry.
-
-Запрещено иметь отдельно:
-
-```text
-strategic distance units
-combat distance units
-sensor distance units
-```
-
-которые не имеют однозначного преобразования в canonical physical scale.
-
-UI может использовать удобные km / thousand km / AU, но authoritative simulation должна иметь единый physical meaning.
+Запрещены unrelated strategic/combat/sensor distance units без canonical conversion.
 
 ---
 
-## 5. Требование к Stage 17.5 после v1.0
+## 6. Требование к Stage 17.5
 
-После завершения research track Stage 17.5 должен быть подробно разложен на runtime slices исходя из фактически принятой v1.0 architecture.
-
-Обязательные направления будущего уточнения:
+Stage 17.5 должен закрыть runtime slices:
 
 1. production `HullDefinition` / geometry / slot topology;
-2. production `ModuleDefinition` и единая module contract;
+2. production `ModuleDefinition` and common module contract;
 3. central derived-ship calculator;
-4. mass / thrust / reaction mass / delta-v runtime integration;
-5. power / stored energy / thermal topology;
+4. mass/thrust/reaction mass/delta-v runtime;
+5. power/stored energy/thermal topology;
 6. fitting validation;
-7. sensor / signature / track state;
-8. EW / datalink / fire-control integration;
-9. weapon families / ammunition / guidance;
-10. protection / compartments / subsystem damage;
-11. damage-driven degradation через изменение физических capabilities;
-12. persistence / migration всех новых state variables;
+7. sensor/signature/track state;
+8. EW/datalink/fire-control;
+9. weapon families/ammunition/guidance;
+10. protection/compartments/subsystem damage;
+11. damage-driven degradation of real capabilities;
+12. persistence/migration;
 13. player/AI shared capability APIs;
-14. fitting/shipyard UI поверх authoritative model;
-15. deterministic regression matrix против v1.0 benchmark seeds.
-
-Точный порядок и DoD должны быть сформированы **после** v1.0, чтобы roadmap отражал результат исследования, а не преждевременные предположения.
+14. fitting/shipyard UI over authoritative model;
+15. deterministic regression matrix against v1.0 benchmarks.
 
 ---
 
-## 6. Требование к Stage 21 после v1.0
+## 7. Требование к Stage 22 Content & Balance
 
-Stage 21 должен расширять контент, не создавая вторую систему правил.
+Stage 22 расширяет content, не создавая вторую систему правил.
 
-После v1.0 его необходимо подробно дополнить как минимум следующими направлениями:
+Направления:
 
-- полный technology ladder компонентов;
+- broader technology/material families where a split is meaningful;
 - faction-specific engineering doctrines;
-- civilian / military / industrial module catalog;
+- civilian/military/industrial module catalog;
 - hull families and variants;
 - weapons/ammunition/seeker families;
-- armor/material families;
+- armor/protection families;
 - sensor/EW families;
 - reactors/drives/thermal systems;
 - logistics/support modules;
-- shipyard/facility capability tiers;
-- construction material/component chains;
-- maintenance / repair / replacement economics;
-- fleet composition and doctrine balance;
+- expansion of Stage-18 shipyard/facility capabilities;
+- construction/maintenance/repair/replacement balance;
+- fleet composition/doctrine balance;
 - world-scale logistics soak;
 - combat saturation/endurance soak;
 - economic replacement-loss soak;
 - anti-universal-build tests;
 - anti-linear-tier-obsolescence tests.
 
-### Stage 21 invariant
+### Stage 22 invariant
 
-> Новый модуль, новый корпус или новый technology tier считается валидным только если его преимущества и недостатки выражаются через принятую v1.0 модель и проходят общие validation/benchmark rules.
+> Новый module/hull/technology/resource split валиден только если его advantages/disadvantages выражаются через accepted physical + Stage-18 economic model and common validation/benchmark rules.
 
-Если для нового контента требуется новый фундаментальный stat/budget, которого нет в v1.0, это должно считаться **architecture change request**, а не тихим расширением JSON.
-
----
-
-## 7. Acceptance requirements перед переходом от исследования к implementation
-
-Перед формальным закрытием `Ship Mathematics v1.0 Design Baseline` необходимо проверить:
-
-- все основные module families могут быть описаны одной общей integration contract;
-- нет обязательных combat/system capabilities, требующих class-name bonuses;
-- все derived ship characteristics вычисляются из authoritative inputs;
-- физические параметры имеют canonical units;
-- damage меняет реальные subsystem capabilities;
-- civilian/economic ships используют ту же mass/power/heat/movement model;
-- benchmark world scales согласованы с representative ship travel times;
-- sensor/weapon ranges согласованы с generated local-system scales;
-- logistics times согласованы с production/consumption/construction cadence;
-- Stage 17.5 roadmap готов к подробному runtime decomposition;
-- Stage 19 roadmap готов к physically calibrated generation pass;
-- Stage 21 roadmap готов к content/balance expansion внутри единой модели.
+Если нужен новый fundamental stat/resource, это **architecture change request**.
 
 ---
 
-## 8. Каноническое правило
+## 8. Acceptance requirements
+
+Проверить:
+
+- основные module families описываются общей integration contract;
+- нет mandatory class-name bonuses;
+- derived ship characteristics вычисляются из authoritative inputs;
+- physical parameters имеют canonical units;
+- damage меняет real subsystem capabilities;
+- civilian/economic ships используют same mass/power/heat/movement model;
+- Stage-18 recipes способны физически производить representative v1.0 ships/modules;
+- world scales согласованы с representative travel times;
+- sensor/weapon ranges согласованы with generated system scales;
+- logistics times согласованы with production/consumption/construction cadence;
+- Stage 17.5 runtime decomposition complete;
+- Stage 18 industrial ontology complete;
+- Stage 20 generation calibrated;
+- Stage 22 content expansion remains inside common model.
+
+---
+
+## 9. Каноническое правило
 
 ```text
 Ship Mathematics research
 → v1.0 Design Baseline
-→ detailed roadmap integration pass (17.5 + 19 + 21)
-→ Stage 17.5 runtime promotion
-→ Stage 19 physically calibrated world generation
-→ Stage 21 broad content / technology / balance
+→ Stage 17.5 physical runtime
+→ Stage 18 resource / industry / infrastructure foundation
+→ Stage 19 warfare consuming real logistics/industry
+→ Stage 20 physically calibrated world generation
+→ Stage 21 living-world/RPG layer
+→ Stage 22 broad content / technology / balance
 ```
 
-Порядок нельзя разворачивать так, чтобы массовый content или world generation закрепили масштабы, противоречащие принятой корабельной физике.
+Порядок нельзя разворачивать так, чтобы mass content или world generation закрепили scales/resources, противоречащие принятой корабельной физике и physical economy.

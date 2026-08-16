@@ -1,21 +1,26 @@
 # Star Empires — Stage 17.5 Combat Depth / Ship Fitting Foundation
 
-> Статус: **PLANNED — research gate satisfied; activation still requires this roadmap-integration PR to reach `main`**  
+> Статус: **PLANNED — research gate satisfied; activation still requires Stage 17H completion**  
 > Основание: accepted `Ship Mathematics v1.0 Design Baseline` (`docs/ship_mathematics_v1_0_design_baseline.md`)  
 > Machine-readable baseline: `docs/benchmarks/ship_mathematics_v1_0_design_baseline.json`  
-> Назначение: перенести принятую v1.0 инженерную модель из test-side research в authoritative runtime без повторного проектирования fundamental ship/combat architecture.
+> Назначение: перенести принятую v1.0 инженерную модель из research в authoritative runtime без повторного проектирования fundamental ship/combat architecture.
 
 ---
 
 # 1. Главная цель Stage 17.5
 
-Stage 17.5 должен заменить Stage-13 combat vertical slice полноценным, но всё ещё детерминированным foundation, на котором Stage 18 сможет строить weapon-aware tactical AI.
+Stage 17.5 заменяет Stage-13 combat vertical slice полноценным deterministic foundation, который затем используют:
+
+- **Stage 18** — resource/industry/facility production chains;
+- **Stage 19** — weapon-aware tactical AI and strategic warfare;
+- **Stage 20** — physically calibrated world generation;
+- **Stage 22** — broad technology/content/balance.
 
 Главный инвариант:
 
 > **Stage 17.5 реализует v1.0; он не изобретает вторую корабельную модель.**
 
-Production runtime обязан использовать ту же парадигму для player, AI, civilian, military и industrial ships.
+Production runtime использует ту же парадигму для player, AI, civilian, military и industrial ships.
 
 ---
 
@@ -26,19 +31,28 @@ Production runtime обязан использовать ту же паради�
 - accepted `Ship Mathematics v1.0 Design Baseline`;
 - machine-readable v1.0 benchmark;
 - green v1.0 deterministic acceptance;
-- этот подробный Stage-17.5 implementation plan;
-- подробные Stage-19 и Stage-21 планы, согласованные с той же моделью.
+- подробный Stage-17.5 implementation plan;
+- synchronized Stage-18 resource/industry plan;
+- synchronized Stage-20 world-generation plan;
+- synchronized Stage-22 content/balance plan;
+- completed Stage 17H migration/end-to-end gate.
 
-Stage 17 может продолжаться/завершаться параллельно, но Stage 17.5 не должен менять player-faction semantics.
+Stage 17.5 не меняет player-faction semantics.
 
 ---
 
-# 3. Frozen architecture, которую нельзя тихо менять внутри Stage 17.5
+# 3. Frozen architecture
 
 Stage 17.5 принимает как frozen:
 
 ```text
-Hull Size → Hull Architecture → Doctrine Class → Specialization → Ship Design → Variant/Refit → Ship Instance
+Hull Size
+→ Hull Architecture
+→ Doctrine Class
+→ Specialization
+→ Ship Design
+→ Variant/Refit
+→ Ship Instance
 ```
 
 и единые budgets:
@@ -61,19 +75,13 @@ protection / compartments
 maintenance / logistics / operating cost
 ```
 
-Если implementation обнаруживает реальное противоречие, требующее нового фундаментального stat/resource/budget, работа останавливается на explicit architecture change request. Нельзя обходить проблему временным hidden multiplier.
+Если implementation обнаруживает реальное противоречие, требующее нового fundamental stat/resource/budget, нужен explicit architecture change request. Hidden multiplier запрещён.
 
 ---
 
-# 4. Stage 17.5A — versioned content schema: HullDefinition / ModuleDefinition / MaterialDefinition
+# 4. Stage 17.5A — versioned content schema
 
-## Цель
-
-Создать production data model, способную описать v1.0 без compile-time enum explosion.
-
-## Обязательные definitions
-
-### `HullDefinition`
+## `HullDefinition`
 
 Минимум:
 
@@ -93,9 +101,7 @@ max operational mass / structural limits
 reference thrust-mount compatibility
 ```
 
-### `ModuleDefinition`
-
-Общий integration contract v1.0:
+## `ModuleDefinition`
 
 ```text
 stable ID
@@ -115,14 +121,12 @@ heat rejection
 crew/automation
 consumable/ammunition/reaction-mass interfaces
 signature contributions
-construction/material inputs
+Stage-18 construction/material/component inputs
 maintenance/repair metadata
 capability-specific payload
 ```
 
-### `MaterialDefinition`
-
-Минимум:
+## `MaterialDefinition`
 
 ```text
 stable ID
@@ -130,12 +134,10 @@ density
 role/tags
 thermal/optical/radar authoring properties where needed
 heavy-impact response-surface references
-construction/repair component requirements
+construction/repair material-family mapping
 ```
 
-Static strength values не заменяют HVI response surface.
-
-### `ProtectionStackDefinition`
+## `ProtectionStackDefinition`
 
 ```text
 layer material
@@ -148,30 +150,26 @@ response-surface lookup key
 
 ## Validation
 
-Catalog validation должен отклонять:
+Reject:
 
-- unknown material/module/hull IDs;
+- unknown IDs;
 - incompatible hardpoints;
 - negative/NaN SI values;
-- unbounded lists;
 - duplicate IDs;
-- response surfaces без calibration domain;
+- unbounded lists;
+- response surfaces without calibration domain;
 - hidden class bonuses;
 - missing migration version.
 
 ## DoD 17.5A
 
-Machine-readable v1.0 demonstrator fit загружается через production content schema и даёт тот же semantic fingerprint при deterministic reload.
+Machine-readable v1.0 demonstrator fit loads through production schema and gives stable semantic fingerprint after deterministic reload.
 
 ---
 
 # 5. Stage 17.5B — central derived-ship calculator + fitting validator
 
-## Цель
-
-Ввести единственную authoritative boundary для вычисления характеристик fitted ship.
-
-Пример API-направления:
+Single authoritative boundary:
 
 ```text
 DerivedShipState derive(HullDefinition hull,
@@ -180,9 +178,7 @@ DerivedShipState derive(HullDefinition hull,
                         DamageState damage)
 ```
 
-## Derived state
-
-Минимум:
+Derived state includes:
 
 ```text
 totalMassKg
@@ -211,42 +207,30 @@ protection state
 maintenance/logistics demand
 ```
 
-## Fitting validation
+Fitting validation simultaneously checks:
 
-Одновременно проверять:
-
-- physical slot/hardpoint;
-- mount size/arc;
+- slots/hardpoints/arcs;
 - mass;
 - volume;
-- power;
-- peak power / energy storage;
+- power/peak power;
+- energy storage;
 - heat transfer/rejection;
 - crew/automation;
 - ammunition/consumables;
-- required supporting modules;
+- support modules;
 - mission-space constraints.
 
-Не допускается sequential fitting, при котором последняя проверка не видит предыдущие budgets.
-
-## Runtime migration
-
-Существующие Stage-4/13/14 ship archetypes должны получить migration/adapter path. Нельзя respawn существующие `FleetId` ради нового fitting state.
+Existing Stage-4/13/14 archetypes need migration/adapter path without respawning existing `FleetId`.
 
 ## DoD 17.5B
 
-- representative Corvette/Destroyer/Battleship/Bulk Freighter/Tanker проходят production calculator;
-- v1.0 reference acceleration/delta-v совпадает с benchmark в пределах documented tolerance;
-- перегруженный/перегретый/over-power fit deterministic rejected;
-- cargo/ammunition/equipment mass влияет на movement через общий `FlightDynamics`.
+Representative Corvette/Destroyer/Battleship/Bulk Freighter/Tanker pass calculator; reference acceleration/delta-v match benchmarks within documented tolerance; invalid fits reject deterministically; cargo/ammunition/equipment mass affects movement through common `FlightDynamics`.
 
 ---
 
-# 6. Stage 17.5C — propulsion, reaction mass, power, thermal topology и FTL
+# 6. Stage 17.5C — propulsion / reaction mass / power / thermal / FTL
 
-## Local propulsion
-
-Production runtime переносит:
+Production runtime preserves:
 
 ```text
 a = F/m
@@ -255,15 +239,11 @@ jetPower >= 0.5 F ve
 deltaV = ve ln(m0/m1)
 ```
 
-Reaction mass становится real persistent consumable.
+Reaction mass is real persistent consumable.
 
-## Max vs sustained thrust
+Max and sustained thrust are capabilities of fit/damage/thermal state, not class constants.
 
-Оба режима являются capabilities конкретного fit/damage/thermal state, а не class constants.
-
-## Thermal topology
-
-Обязательны:
+Thermal topology supports:
 
 ```text
 module local thermal state
@@ -273,21 +253,9 @@ thermal stores
 radiators
 ```
 
-Damage локального coolant path должен влиять на конкретные modules.
+Power distinguishes continuous supply/demand, peak demand, stored energy, brownout/shedding and damaged distribution.
 
-## Power
-
-Разделить:
-
-- continuous supply/demand;
-- peak demand;
-- stored energy/capacitors;
-- brownout/shedding policy;
-- damaged generation/distribution.
-
-## FTL
-
-Stage-10 FSM сохраняется как lifecycle boundary, но jump capability теперь запрашивается из fitted ship:
+FTL uses fitted capability:
 
 ```text
 translated mass compatibility
@@ -299,23 +267,17 @@ cooldown
 heat/damage restrictions
 ```
 
-Current 1.3-s test edge остаётся fixture до Stage-19 scale calibration.
+Current short test edge remains fixture until **Stage 20** scale calibration.
 
 ## DoD 17.5C
 
-- same fitted ship changes acceleration after cargo/reaction-mass changes;
-- damaged drive lowers thrust without generic movement debuff;
-- damaged coolant can throttle module;
-- jump plan rejects ship over translated-mass envelope;
-- jump state survives save/load mid-charge/mid-transit/cooldown where persistent.
+Cargo/reaction-mass changes alter acceleration; damaged drive lowers thrust without generic debuff; cooling damage can throttle modules; jump planning respects translated-mass envelope; jump lifecycle survives save/load where persistent.
 
 ---
 
-# 7. Stage 17.5D — SignatureState, SensorMeasurement, TrackState, datalink и EW
+# 7. Stage 17.5D — signatures / sensors / tracks / datalink / EW
 
-## Production objects
-
-Минимум:
+Production objects:
 
 ```text
 SignatureState
@@ -327,25 +289,14 @@ ElectronicWarfareState
 DatalinkState
 ```
 
-## Signature channels
+Channels:
 
-### Thermal
+- thermal;
+- engine plume;
+- radar;
+- reflected optical.
 
-Temperature/emissivity/projected area/band.
-
-### Engine plume
-
-Derived from thrust/jet power + data-driven spectral/aspect authoring tables.
-
-### Radar
-
-Frequency × aspect RCS.
-
-### Reflected optical
-
-Illumination/phase/orientation/BRDF.
-
-## Information states
+Information states:
 
 ```text
 DETECTED
@@ -354,70 +305,31 @@ TRACKED
 FIRE_CONTROL
 ```
 
-UI может агрегировать качество, но authoritative TrackState хранит uncertainty.
+Recon improves fleet solution through measurement geometry, freshness/latency and covariance fusion, not aura bonus.
 
-## Distributed targeting
-
-Recon ship должен улучшать fleet solution через measurement geometry, datalink freshness/latency и covariance fusion, а не через aura bonus.
-
-## ECM/ECCM/decoys
-
-- noise/interference;
-- waveform overlap;
-- dwell/processing tradeoff;
-- residual/NIS gating;
-- multiple hypotheses where required;
-- no random `decoyChance` as sole mechanic.
+ECM/ECCM/decoys use interference/processing/hypothesis mechanics rather than one random `decoyChance`.
 
 ## DoD 17.5D
 
-- passive bearing-only contact не получает точную range;
-- distributed observers уменьшают range covariance;
-- active radar даёт ranging, но создаёт detectable emission;
-- jammer can deny and ECCM can recover at explicit cost;
-- stale track covariance grows;
-- player/AI use same track records.
+Bearing-only contact has no exact range; distributed observers reduce covariance; active radar ranges but emits; jammer/ECCM tradeoffs explicit; stale tracks degrade; player/AI share track model.
 
 ---
 
-# 8. Stage 17.5E — weapon families, ammunition, guidance и layered defense
+# 8. Stage 17.5E — weapons / ammunition / guidance / layered defense
 
 ## Kinetic
 
-Production projectile state:
-
-```text
-material
-shape
-length/diameter
-mass
-position/velocity
-momentum
-energy
-```
-
-Fire solution использует TrackState, weapon pointing, time of flight и target maneuver envelope.
+Projectile state includes material, shape, dimensions, mass, position/velocity, momentum and energy.
 
 ## Beam
 
-Runtime учитывает:
-
-- wavelength;
-- aperture;
-- jitter;
-- beam power;
-- range-derived spot;
-- dwell;
-- material/local response;
-- local thermal duty.
+Runtime uses wavelength, aperture, jitter, beam power, range-derived spot, dwell, local material response and thermal duty.
 
 ## Guided
 
-Missile/interceptor получает physical propulsion/seeker/guidance state.
+Missile/interceptor uses physical propulsion, seeker and guidance state.
 
 ## Magazines / launchers
-
-Хранить:
 
 ```text
 physical inventory
@@ -428,41 +340,21 @@ handling limits
 magazine damage
 ```
 
-## Layered defense scheduler
+## Layered defense
 
-Threat priority deterministic, минимум по predicted impact time + stable ID.
+Threat priority deterministic, at minimum predicted impact time + stable ID.
 
-Scheduler обязан учитывать:
-
-- layer geometry;
-- safe intercept range;
-- launcher readiness;
-- support channels;
-- ammunition;
-- laser emitter position;
-- thermal duty;
-- retry/inner-layer fallback;
-- residual debris.
-
-## v0.4/v0.5 parity
-
-Research scenarios становятся golden/reference regression для production resolver, но допускается documented numeric change после введения новых fragment/track/thermal layers.
+Scheduler accounts for geometry, safe intercept range, launcher readiness, support channels, ammunition, emitter position, thermal duty, fallback and residual debris.
 
 ## DoD 17.5E
 
-- нет `weaponAccuracy`, `missileHitChance`, `PDChance` как authoritative independent stats;
-- finite ammunition physically depletes;
-- formation spacing меняет defense outcome;
-- guidance kill не удаляет kinetic body;
-- repeated waves показывают magazine/thermal endurance.
+No authoritative `weaponAccuracy`/`missileHitChance`/`PDChance`; ammunition depletes physically; formation spacing changes defense; guidance kill does not delete kinetic body; repeated waves expose magazine/thermal endurance.
 
 ---
 
-# 9. Stage 17.5F — shields, armor, compartments и subsystem damage
+# 9. Stage 17.5F — shields / armor / compartments / subsystem damage
 
-## Shields
-
-Production shield использует v1.0 contract:
+Shield state uses:
 
 ```text
 emitter geometry / coverage
@@ -475,115 +367,70 @@ collapse/restart
 emitter damage
 ```
 
-Не хранить только generic `shieldHP` без физического backing state.
+Heavy-impact solver selects bounded `HeavyImpactResponseSurface` by projectile and protection-stack parameters. Silent extrapolation outside calibrated domain is forbidden.
 
-## Armor / heavy impact
+Compartments route damage through layers → compartments → systems.
 
-Solver выбирает bounded `HeavyImpactResponseSurface` по:
-
-```text
-projectile material/geometry/velocity/angle
-protection stack materials/thickness/spacing
-```
-
-Outside calibration domain:
-
-```text
-EXTRAPOLATION_FORBIDDEN
-```
-
-или explicit low-confidence fallback с diagnostics; silent extrapolation запрещена.
-
-## Debris
-
-Interception/armor hits могут создавать debris/fragment DamagePackets.
-
-## Compartments
-
-Минимальная spatial topology должна поддерживать routing damage через layers → compartments → systems.
-
-## Damage-driven degradation
-
-Примеры:
+Damage-driven degradation examples:
 
 ```text
 sensor aperture damaged → measurement sigma worsens
-coolant trunk damaged → local thermal limit worsens
-magazine damaged → inventory/handling capability changes
-shield emitter damaged → coverage/interaction power falls
+coolant trunk damaged → thermal limit worsens
+magazine damaged → inventory/handling changes
+shield emitter damaged → coverage/power falls
 drive damaged → thrust falls
 reactor/distribution damaged → power margin falls
 ```
 
 ## DoD 17.5F
 
-- same hit can produce different consequences by impact location/orientation;
-- no global hull HP as sole survivability mechanic;
-- shield saturation/recharge demonstrator reproduces v1.0 accounting;
-- damage never creates capability through negative values/overflow;
-- destruction/salvage still use ordinary lifecycle/economy path.
+Hit location/orientation matters; global hull HP is not sole survivability; shield saturation/recharge accounting preserved; damage never creates capability; destruction/salvage use ordinary lifecycle/economy path.
 
 ---
 
-# 10. Stage 17.5G — shipyard/fitting/equipment lifecycle + construction/repair/maintenance economy
+# 10. Stage 17.5G — shipyard / fitting / repair / maintenance seam
 
-## Goal
+Stage 17.5G defines **engineering and runtime requirements**; Stage 18 later supplies the full economic resource/facility graph.
 
-Связать инженерную модель с живой экономикой.
-
-Module/hull content должен иметь реальные construction inputs.
-
-Production/repair flow:
+Flow:
 
 ```text
-materials/components
+material/component requirements
 → capable shipyard/facility
 → build/refit/repair work
 → physical fitted asset
 ```
 
-## Shipyard capability
+Shipyard checks at least:
 
-Не `yardTier=3 can build tier3` как единственная проверка.
-
-Минимум учитывать:
-
-- integration volume/berth size;
-- fabrication capabilities;
+- berth/integration envelope;
+- fabrication capability;
 - material/component handling;
-- precision/technology capability;
-- available tooling;
+- precision capability;
+- tooling;
 - work rate;
 - labor/automation;
-- power/industrial inputs where modeled.
+- power/industrial input seam.
 
-Tier может быть UI-derived summary.
+`yardTier=3 can build tier3` cannot be the only check.
 
-## Maintenance / repair
+Repair requires parts/materials/work, not credits only. Refit modifies same physical asset; no respawn/clone.
 
-Повреждённый subsystem должен требовать соответствующие parts/materials/work, а не только credits.
+## Stage-18 handoff
 
-## Refit
-
-Refit изменяет тот же physical asset; не respawn/clone.
+Stage 18 must replace provisional generic inputs with a production graph based on real resource occurrence, extraction, refining, component manufacture, storage/logistics, facilities and bounded salvage/recycling.
 
 ## DoD 17.5G
 
-- fitting changes mass/performance immediately through common calculator;
-- purchase/refit/repair moves real money/resources;
-- damaged module repair consumes parts/work;
-- shipyard cannot build unsupported hull/module without capability;
-- player и AI используют общую production/fitting boundary.
+Fitting changes derived performance; purchase/refit/repair uses common economy seams; damaged module repair consumes inputs/work; unsupported hull/module cannot be built; player/AI use same production/fitting boundary.
 
 ---
 
-# 11. Stage 17.5H — shared capability APIs, player/AI commands, UI и persistence
+# 11. Stage 17.5H — shared capability APIs / UI / persistence
 
-## Stable query layer
+Stage **19** tactical/strategic AI and UI consume capability APIs instead of internal arrays.
 
-Stage 18 AI и UI должны потреблять capability APIs, а не читать внутренние arrays напрямую.
-
-Минимум:
+Minimum query layer:
 
 ```text
 getAccelerationEnvelope()
@@ -599,49 +446,15 @@ getDamageCapabilityState()
 getRepairNeed()
 ```
 
-## UI
+UI exposes mass, acceleration, delta-v, power/heat margin, crew, ammo, sensors, protection, signature and operating/maintenance demand without mutating ECS directly.
 
-Fitting screen должен показывать derived consequences:
-
-- mass;
-- acceleration;
-- delta-v;
-- power margin;
-- heat margin;
-- crew;
-- ammunition;
-- sensor capability;
-- shield/protection;
-- signature;
-- projected operating/maintenance demand.
-
-UI не мутирует ECS state напрямую.
-
-## Persistence
-
-Versioned save должен сохранять authoritative state:
-
-- installed modules;
-- consumables;
-- damage;
-- thermal state where required;
-- shield state;
-- FTL charge/cooldown;
-- persistent tracks only where design requires.
-
-Derived state можно recompute deterministically.
-
-## DoD 17.5H
-
-Full save/load continuation across fitting, combat damage, ammunition, thermal/shield state and FTL.
+Persistence saves installed modules, consumables, damage, required thermal/shield/FTL state and persistent tracks where design requires. Derived state recomputes deterministically.
 
 ---
 
 # 12. Stage 17.5I — deterministic end-to-end acceptance gate
 
-Stage 17.5 считается COMPLETE только после combined matrix.
-
-## Required scenarios
+Required scenarios:
 
 ### Fit / mass
 
@@ -655,44 +468,37 @@ vs extra ammunition
 
 ### Power/thermal
 
-Healthy fit survives expected duty; damaged cooling throttles physically.
+Healthy fit survives expected duty; cooling damage throttles physically.
 
 ### Sensor/network
 
-Recon geometry materially improves track/fire-control without bonus aura.
+Recon geometry improves track/fire-control without bonus aura.
 
 ### Combat saturation
 
-Repeat v0.5-style attacker/escort/spacing/wave matrix on production resolver.
+Repeat attacker/escort/spacing/wave matrices on production resolver.
 
 ### Shield
 
-Finite reserve + power + recharge + thermal state; repeated high-energy hits saturate.
+Finite reserve + power + recharge + heat; repeated hits saturate.
 
 ### Heavy impact
 
-Bounded response lookup + compartment damage + no extrapolation.
+Bounded response lookup + compartment damage + no silent extrapolation.
 
 ### Civilian
 
-Freighter/tanker use same mass/propulsion/power schema and retain economic usefulness.
+Freighter/tanker use same mass/propulsion/power schema.
 
 ### Economy
 
-Build/refit/repair consumes real resources and transfers real money.
+Build/refit/repair consumes real resources and money through common seams; Stage 18 later expands these into complete industrial chains.
 
 ### Persistence
 
-Save/load at:
+Save/load at fitted state, mid-combat damage, partial magazine, heated module, shield recharge and FTL lifecycle.
 
-- fitted healthy state;
-- mid-combat damage;
-- partial magazine;
-- heated module;
-- collapsed/recharging shield;
-- FTL spool/transit/cooldown.
-
-## Hard invariants
+Hard invariants:
 
 1. no player-only combat physics;
 2. no class-name performance bonus;
@@ -700,27 +506,27 @@ Save/load at:
 4. no free ammunition/reaction mass;
 5. no damage bypassing local/system state;
 6. no module outside common mass/volume/power/heat/economy contract;
-7. no fit accepted when a mandatory budget is negative;
-8. deterministic repeatability preserved;
-9. ordinary destruction/salvage/economic consequences preserved;
+7. no fit accepted with negative mandatory budget;
+8. deterministic repeatability;
+9. ordinary destruction/salvage consequences;
 10. full CI green.
 
 ---
 
 # 13. Explicit non-goals Stage 17.5
 
-Stage 17.5 **не обязан**:
+Stage 17.5 не обязан:
 
-- создать весь Stage-21 catalog;
-- финально сбалансировать все factions;
-- реализовать advanced tactical fleet AI Stage 18;
-- создать final galaxy Stage 19;
-- заморозить все numeric balance coefficients;
-- симулировать atom-by-atom material physics;
-- делать CFD/plasma simulation;
+- создать весь **Stage-22** technology/content catalog;
+- финально сбалансировать factions;
+- реализовать full resource/industry ontology Stage 18;
+- реализовать advanced tactical fleet AI **Stage 19**;
+- создать final generated galaxy **Stage 20**;
+- freeze all balance coefficients;
+- simulate atom-by-atom materials/CFD/plasma;
 - превращать exotic shields/FTL в реальную современную физику.
 
-Он обязан реализовать **правильные interfaces и authoritative accounting**.
+Он обязан реализовать правильные interfaces и authoritative accounting.
 
 ---
 
@@ -733,12 +539,12 @@ Stage 17.5 **не обязан**:
 → 17.5D sensors/tracks/EW/datalink
 → 17.5E weapons/guidance/PD/ammunition
 → 17.5F shields/armor/compartments/damage
-→ 17.5G shipyard/refit/repair/maintenance economy
+→ 17.5G shipyard/refit/repair/maintenance seam
 → 17.5H capability APIs/UI/persistence
 → 17.5I full acceptance
 ```
 
-Если practical implementation требует небольшого пересечения slices, dependency direction всё равно сохраняется: combat systems не должны создавать собственные parallel mass/power/heat state до появления central calculator.
+Combat subsystems не должны создавать parallel mass/power/heat state до central calculator.
 
 ---
 
@@ -746,6 +552,6 @@ Stage 17.5 **не обязан**:
 
 Stage 17.5 закрыт, когда:
 
-> **любой representative ship — от freighter до battleship — может быть описан одним data-driven fitting model, физически летать, обнаруживать/отслеживать, стрелять, защищаться, получать локальные повреждения, расходовать боеприпасы/реактивную массу, ремонтироваться/переоснащаться через реальную экономику и сохраняться/загружаться; player и AI используют те же capability APIs.**
+> **любой representative ship — от freighter до battleship — может быть описан одним data-driven fitting model, физически летать, обнаруживать/отслеживать, стрелять, защищаться, получать локальные повреждения, расходовать боеприпасы/реактивную массу, ремонтироваться/переоснащаться через общую economic seam и сохраняться/загружаться; player и AI используют те же capability APIs.**
 
-Только после этого Stage 18 может начинать advanced tactical AI.
+После этого активируется **Stage 18 Resources / Industry / Infrastructure**, который превращает construction/repair/material requirements в полноценную физическую производственную экосистему. Только после Stage 18 активируется **Stage 19 strategic warfare / advanced combat behavior**.

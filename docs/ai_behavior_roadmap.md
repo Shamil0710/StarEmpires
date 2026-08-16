@@ -1,90 +1,65 @@
 # Star Empires — AI Behavior, Risk and Doctrine Roadmap
 
-> Cross-cutting plan for civilian behavior, threat-aware routing, combat tactics, fleet coordination and faction doctrine.
->
-> Added: **2026-08-14** after Stage 13 established the first shared deterministic combat pipeline.
->
-> This document complements `docs/development_roadmap.md`. It does not create a second AI-only simulation: AI decisions must continue to execute through the same physical movement, travel, trade, mining, combat, destruction and ownership rules used elsewhere.
+> Cross-cutting plan for civilian behavior, threat-aware routing, combat tactics, fleet coordination and faction doctrine.  
+> Added: **2026-08-14**; synchronized with revised Stage 18–23 ordering on **2026-08-16**.  
+> This document complements `docs/development_roadmap.md` and never creates an AI-only simulation.
 
 ---
 
 ## 1. Goal
 
-AI should not behave as one generic script with different stats. Its decisions should emerge from:
+AI decisions should emerge from authoritative state:
 
 - current objective and economic opportunity;
 - known danger and uncertainty;
-- ship hull, shields, mobility, cargo and equipment;
-- weapon range/profile and current combat capability;
+- fitted ship capabilities;
+- cargo, ammunition, reaction mass and damage;
 - fleet composition and escort support;
 - faction doctrine and risk tolerance;
-- later, commander/NPC preferences where persistent identity matters.
+- Stage-18 logistics/industrial dependencies;
+- later commander/NPC preferences.
 
-Two ships observing the same situation should be allowed to make different rational choices because their roles, equipment, cargo, escorts or faction doctrine differ.
-
-Examples:
-
-- an unarmed freighter attacked by raiders should abandon its trade routine and flee toward safety;
-- a valuable convoy may accept a moderately dangerous route when protected by strong escorts;
-- a lightly armed independent trader may take a longer route around an active war zone even when the direct route is more profitable;
-- a long-range missile ship should try to preserve range rather than behave like a short-range brawler;
-- a damaged combat group should be able to break contact instead of fighting until every ship is destroyed;
-- an aggressive militarist faction and a conservative mercantile faction should evaluate the same danger differently without hidden combat bonuses.
+AI chooses **intent/commands**. Ordinary movement, trade, mining, production, combat, diplomacy and ownership systems apply the outcome.
 
 ---
 
-## 2. Architectural model
-
-The intended decision stack is:
+## 2. Decision architecture
 
 ```text
-world events / observations
+observations / world events / intelligence
         ↓
 Threat Intelligence / Danger Assessment
         ↓
-Opportunity + Risk Utility Scoring
+Opportunity + Risk Utility
         ↓
-Role / Ship / Fleet / Faction Doctrine
+Role + fitted capabilities + fleet + doctrine
         ↓
-chosen intent or tactical state
+chosen strategic/tactical intent
         ↓
 shared authoritative command APIs
         ↓
-movement / jump / trade / mine / combat systems
+physical simulation / economy / diplomacy
 ```
 
-The AI chooses **intent**. It does not directly mutate physical outcomes.
+No AI-only acceleration, free cargo, hidden resource supply, instant repair or omniscient map knowledge.
 
-### 2.1 Threat intelligence rather than omniscience
+### 2.1 Threat intelligence
 
-AI should not automatically know every combat event in the galaxy.
-
-Danger information should eventually distinguish:
+Danger information distinguishes:
 
 - directly observed threats;
-- recent combat known in the current system;
+- recent local combat;
 - faction/shared intelligence;
 - known hostile fleet strength;
-- piracy or repeated ship-loss history;
-- formal war/front/blockade state;
-- stale information whose confidence decays over time.
+- piracy/ship-loss history;
+- war/front/blockade state;
+- stale intelligence whose confidence decays.
 
-A strategic threat record should preserve at least:
-
-- location: system and, when useful, route/jump link;
-- source/type of threat;
-- affected faction/relation context;
-- estimated hostile strength;
-- event age;
-- confidence/freshness;
-- severity components;
-- revision/version for cached route decisions.
-
-This prevents a civilian ship on the far side of the galaxy from reacting instantly to information it could not reasonably possess.
+Persistent threat record should preserve location, source/type, affected relation context, estimated strength, event age, confidence/freshness, severity components and revision/version for cache invalidation.
 
 ### 2.2 Danger assessment
 
-Do not reduce the entire threat model to one permanently stored magic number. Preserve explanatory components, then derive a scalar when a decision requires comparison.
+Do not store one permanent magic danger number. Preserve explanatory components and derive a scalar only when a planner needs comparison.
 
 Possible components:
 
@@ -96,276 +71,181 @@ piracy risk
 blockade/front intensity
 route/chokepoint exposure
 friendly security presence
-station/safe-haven availability
+safe-haven availability
 intel freshness/confidence
 ```
 
-The resulting `DangerAssessment` may expose a normalized danger score for routing/UI while retaining the underlying reasons for debugging and later balancing.
-
 ### 2.3 Profit / danger utility
 
-Civilian and economic AI should evaluate opportunities approximately as:
+Conceptually:
 
 ```text
-utility = expected economic/objective value
+utility = expected objective/economic value
         - travel/time cost
         - expected danger cost
         - expected asset-loss cost
-        - opportunity-switching cost
+        - switching/commitment cost
 ```
 
-Danger cost should depend on the actor, not only the system.
+Danger depends on actor-specific state: cargo/ship value, damage, mobility, defense, escort strength, doctrine, urgency and intelligence confidence.
 
-For example:
+### 2.4 Hysteresis
 
-```text
-expected danger cost = danger
-                     × route exposure
-                     × actor risk aversion
-                     × vulnerable asset value
-                     × probability-of-loss estimate
-                     × intel confidence
-```
-
-Actor-specific inputs may include:
-
-- cargo value;
-- ship replacement value;
-- current hull/shield condition;
-- speed and escape capability;
-- defensive equipment;
-- combat capability;
-- escort strength;
-- fleet size/composition;
-- faction risk tolerance;
-- urgency/importance of the current objective.
-
-Therefore a route can be unacceptable to an unescorted freighter but acceptable to an escorted military supply convoy.
-
-### 2.4 Hysteresis and decision stability
-
-AI must not oscillate every tick when profit or danger crosses a threshold by a tiny amount.
-
-Use where appropriate:
-
-- minimum commitment time;
-- route/target switching penalty;
-- danger enter/exit hysteresis;
-- threat-memory decay;
-- cooldown before reevaluation after an accepted route/order;
-- explicit emergency conditions that may override commitment immediately.
+Use minimum commitment times, switching penalties, enter/exit thresholds, threat-memory decay and explicit emergency overrides. AI must not oscillate every simulation tick.
 
 ---
 
 ## 3. Civilian behavior
 
-Civilian ships should prioritize survival differently from combat ships.
+Civilian/economic ships should interrupt routine work under credible attack, evaluate ordinary escape/jump/safe-haven options, retain real cargo/damage state and later resume/replan/abandon their task.
 
-### 3.1 Immediate response to attack
+Typical differences:
 
-A civilian or economically tasked ship under credible attack should be able to:
+- unarmed freighter flees early;
+- armed transport may return fire while disengaging;
+- fast courier favors escape;
+- protected convoy may continue when escort keeps risk below doctrine threshold;
+- miner abandons extraction when continued work is unsafe.
 
-1. interrupt or suspend its current trade/mining/logistics task;
-2. stop attempting routine docking/trade/mining actions while actively threatened;
-3. evaluate local escape vectors / jump availability / nearby safe station;
-4. request escape through ordinary movement/jump APIs;
-5. retain its real cargo and damage state while fleeing;
-6. resume, replan or abandon the original task after danger falls below a stable threshold.
+### 3.1 Strategic route choice
 
-The exact response depends on capability:
-
-- unarmed freighter: flee very early;
-- armed transport: may return fire while disengaging;
-- fast courier: favor escape speed;
-- heavily escorted convoy: may continue if escorts keep threat below doctrine threshold;
-- miner: abandon asteroid and seek safety before resuming production.
-
-### 3.2 Strategic conflict avoidance
-
-Economic route planners should eventually include risk in addition to profit/time/access.
-
-A civilian ship should be able to choose:
+Economic planners compare:
 
 ```text
-short/high-profit/high-danger route
+short / profitable / dangerous
 vs
-longer/lower-profit/safer route
+longer / less profitable / safer
 ```
 
-based on its own risk profile.
+using current knowledge, ship/fleet capability and doctrine.
 
-Relevant factors include:
-
-- recent combat in candidate systems;
-- hostile/pirate presence;
-- war or blockade state;
-- recent friendly/civilian losses;
-- route alternatives;
-- cargo margin and cargo value;
-- ship value and current damage;
-- escort availability;
-- expected delay from rerouting;
-- faction policy.
-
-### 3.3 Economic consequences
-
-Threat-aware civilian behavior must affect the living economy physically.
-
-Examples:
+### 3.2 Physical economic consequences
 
 ```text
-war zone becomes dangerous
+war/piracy raises known danger
 → civilian traffic reroutes
-→ throughput through the region falls
-→ stations receive fewer inputs
-→ shortages and prices rise
-→ safer routes become busier/more profitable
-→ factions may allocate escorts/security or build alternate infrastructure
+→ route throughput changes
+→ Stage-18 resource/component deliveries change
+→ inventories/production/shipyards feel shortage
+→ prices and construction/repair times react
+→ factions can escort, secure or build alternate infrastructure
 ```
 
-This is preferable to applying an abstract wartime production penalty detached from actual ship movement.
+No abstract wartime production penalty is needed when physical flows already explain the effect.
 
 ---
 
 ## 4. Tactical combat behavior
 
-Stage 13 proves only the shared attack/damage pipeline. Later combat AI should choose tactics from the actual combat envelope.
+Advanced tactical AI consumes **Stage-17.5 capability APIs** rather than class names.
 
-### 4.1 Weapon-aware behavior
+It may reason about:
 
-Tactical decisions should inspect weapon characteristics such as:
+- acceleration / braking / turning;
+- delta-v / reaction mass;
+- sensor/track quality;
+- weapon engagement envelopes;
+- ammunition and thermal endurance;
+- shields/armor/subsystem damage;
+- ECM/ECCM;
+- target value;
+- current fleet objective.
 
-- minimum / preferred / maximum effective range;
-- burst/cooldown behavior;
-- projectile speed where projectiles exist;
-- tracking/accuracy or target-class effectiveness when introduced;
-- ammunition/energy constraints when introduced;
-- firing arcs / hardpoints when introduced;
-- area damage or friendly-fire risk when introduced.
-
-Examples:
-
-- long-range weapons: maintain or open distance, kite where mobility permits;
-- short-range high-DPS weapons: close aggressively when survival odds allow;
-- slow heavy weapons: prefer large/slow targets and favorable firing windows;
-- missile/limited-ammo platforms: avoid wasting ammunition on low-value targets;
-- point-defense/screen ships: stay near protected assets instead of chasing arbitrary enemies.
-
-### 4.2 Ship-model and equipment awareness
-
-A ship's behavior should account for:
-
-- acceleration/top speed/turning capability;
-- shield vs hull durability;
-- current damage;
-- weapon layout and effective range bands;
-- cargo or mission importance;
-- repair/ammunition/energy state where implemented;
-- specialized equipment such as mining gear, sensors, ECM or defensive systems when those mechanics exist.
-
-The same weapon profile on a slow armored ship and on a fast fragile ship should not necessarily yield the same tactic.
-
-### 4.3 Tactical states/actions
-
-Do not hard-code one monolithic behavior tree. A practical target is a hierarchical utility/state model with reusable actions, for example:
+Reusable tactical intents may include:
 
 ```text
 HOLD_OBJECTIVE
 APPROACH
 MAINTAIN_RANGE
-KITE / OPEN_RANGE
+OPEN_RANGE
 BREAK_CONTACT
 FLEE_TO_SAFETY
-ESCORT / SCREEN
+ESCORT
+SCREEN
 INTERCEPT
 FOCUS_FIRE
 PROTECT_ASSET
 REGROUP
 ```
 
-Utility chooses the state/intention; ordinary movement and combat systems execute it.
-
-### 4.4 Retreat and survival
-
-Military ships should not always fight to destruction.
-
-Retreat decisions may depend on:
-
-- own hull/shields;
-- local friendly vs hostile combat power;
-- objective importance;
-- escape route availability;
-- fleet cohesion;
-- remaining ammunition/energy where applicable;
-- faction doctrine;
-- whether protected civilians/logistics still require cover.
-
-A sacrificial last stand may be a valid doctrine choice, but must not be the universal default.
+Military ships do not universally fight to destruction. Retreat depends on state, objective, escape route, cohesion, logistics and doctrine.
 
 ---
 
 ## 5. Fleet-level behavior
 
-Once Stage 15 introduces persistent player/AI fleet orders, tactical decisions should consider the group rather than every ship behaving independently.
+Fleet assessment should consider:
 
-Fleet assessment should eventually include:
-
-- combined combat strength by range band;
-- number and value of civilian/logistics assets;
+- combat capability by engagement domain;
+- logistics/civilian assets being protected;
 - escort/screen strength;
 - damaged fraction;
-- mobility of the slowest critical ship;
+- mobility of slowest critical unit;
+- ammunition/reaction-mass/repair endurance;
 - target priority;
-- objective and retreat conditions;
-- formation/cohesion needs.
+- objective/retreat conditions;
+- formation/cohesion.
 
-Potential coordinated behavior:
-
-- escorts remain near convoy rather than chasing weak targets indefinitely;
-- screens intercept enemies approaching valuable transports/carriers;
-- compatible ships focus fire;
-- long-range and close-range elements maintain different preferred distances;
-- fleet retreats as a group when doctrine threshold is exceeded;
-- damaged ships disengage while escorts cover them;
-- pursuit stops when it would expose the protected objective or enter unacceptable danger.
+Expected coordinated behavior includes convoy protection, screening, focus fire, range separation between roles, group withdrawal, cover for damaged units and bounded pursuit.
 
 ---
 
-## 6. Data-driven faction doctrine
+## 6. Faction doctrine
 
-Faction differences should primarily come from **policy and doctrine**, not invisible statistical cheats.
+Faction differences come primarily from policy/doctrine, not invisible stat cheats.
 
-A future data-driven `FactionDoctrine`/behavior profile may contain parameters such as:
+A behavior profile can include:
 
 - civilian risk tolerance;
 - acceptable route danger;
-- aggression;
-- retreat threshold;
-- preferred engagement range bias;
+- aggression / retreat threshold;
+- preferred engagement-range bias;
 - willingness to pursue;
-- escort preference;
-- convoy size preference;
-- focus-fire tendency;
-- formation/cohesion preference;
+- escort/convoy preference;
+- focus-fire/cohesion preference;
 - willingness to enter hostile territory;
-- response to piracy;
-- protection priority for civilian/economic assets;
-- acceptable expected economic loss for strategic objectives.
+- piracy response;
+- protection priority for economic assets;
+- acceptable expected economic/industrial loss for strategic objectives.
 
-Example archetypes:
-
-- mercantile faction: strong danger aversion for civilian traffic, high escort investment, early retreat;
-- militarist faction: accepts greater combat exposure and strategic losses for objectives;
-- frontier/mining faction: tolerates moderate remote-system risk but strongly protects ore logistics;
-- pirate/raider faction: prefers isolated valuable targets and disengages from superior organized response.
-
-These are examples, not mandatory final faction personalities.
+Stage 17 already supplies institutional doctrine/policy state; later AI consumes it through shared decision boundaries.
 
 ---
 
-## 7. Information, personality and later NPC behavior
+## 7. Stage-18 industrial awareness
 
-Stage 20 can add persistent commander/NPC preferences above faction doctrine:
+The revised roadmap deliberately places **Resources / Industry / Infrastructure** before strategic warfare.
+
+AI strategic decisions should therefore be able to value real economic dependencies, for example:
+
+```text
+water / reaction-mass source
+bulk refinery
+precision/electronics fab
+ordnance plant
+logistics depot
+repair yard
+capital shipyard
+critical transport corridor
+```
+
+A strategic AI should not see all stations as equivalent `economicPower` points.
+
+Useful derived planning questions:
+
+- which facilities are bottlenecks for current fleet replacement?
+- which route supplies ammunition/reaction mass?
+- which resource source has no substitute within acceptable logistics radius?
+- how much production loss follows from a blockade according to ordinary inventories and throughput?
+- can damaged fleets physically reach a repair/replenishment base?
+
+The answer may use bounded cached projections, but outcomes remain Stage-18 physical economy state.
+
+---
+
+## 8. Information, personality and Stage-21 NPC behavior
+
+Stage 21 may add persistent commander/NPC preferences above faction doctrine:
 
 ```text
 final preference = faction doctrine
@@ -374,156 +254,155 @@ final preference = faction doctrine
                  + current objective/state
 ```
 
-A cautious captain and an aggressive captain from the same faction may therefore differ without violating the faction's broad strategic identity.
-
-Personal traits must not grant knowledge the character does not possess. Decision inputs remain bounded by available observations/intelligence.
+Traits never grant information the actor does not possess.
 
 ---
 
-## 8. Observability and debugging
+## 9. Observability and debugging
 
-Complex AI is impossible to balance if its reasoning is invisible.
-
-Important AI decisions should expose structured diagnostics such as:
+Important decisions should expose structured diagnostics:
 
 - selected objective/target/route;
 - candidate utilities;
-- profit estimate;
-- danger estimate and major contributing factors;
-- risk tolerance used;
-- reason for flee/retreat/continue decision;
-- reason for route abandonment;
-- doctrine/profile applied;
-- deterministic tie-break reason.
+- profit/objective estimate;
+- danger estimate + contributing factors;
+- logistics/industrial dependency considered;
+- risk tolerance;
+- reason for flee/retreat/continue;
+- doctrine/profile;
+- deterministic tie-break.
 
-These diagnostics are development/telemetry state, not necessarily permanent player-visible omniscient information.
-
-Where useful, player UI may later present appropriate in-world summaries such as "route dangerous", "convoy rerouting", "fleet retreating" or known danger overlays.
+Diagnostics are development telemetry, not player omniscience.
 
 ---
 
-## 9. Determinism, performance and simulation levels
+## 10. Determinism and scalability
 
-### Determinism
+Requirements:
 
 - stable candidate ordering;
 - explicit tie-breaks;
-- named RNG only for intentionally stochastic doctrine/personality behavior;
-- repeated equal state must produce equal decisions unless explicit RNG is part of the rule.
+- named RNG only for intentional stochastic behavior;
+- equal authoritative state + knowledge + doctrine → equal decision unless named RNG participates;
+- cached system/link danger with revision invalidation;
+- bounded reevaluation cadence;
+- full tactical reasoning only in active interaction domains;
+- remote strategic reasoning preserves compatible losses, inventories, route risk and economic consequences.
 
-### Performance
-
-Threat-aware routing and fleet tactics must remain bounded.
-
-Prefer:
-
-- cached per-system/per-link danger assessments with revision invalidation;
-- reevaluation intervals rather than scoring the entire galaxy every fixed tick;
-- local tactical decisions at full fidelity only where the simulation level supports it;
-- reduced remote strategic combat/risk decisions that preserve compatible economic consequences.
-
-Remote simulation may reduce tactical detail, but must not create a separate incompatible model where civilian losses, route risk or economic throughput mean something fundamentally different.
+Scalability architecture remains authoritative for AI cadence/LOD.
 
 ---
 
-## 10. Stage integration plan
+## 11. Current stage integration plan
 
 ### Stage 14 — First complete player loop
 
-Do not expand Stage 14 into the full AI rewrite. Establish only useful seams discovered during playable testing:
+Keep only useful seams: combat/danger events, observability and minimal under-attack disengage behavior where needed.
 
-- preserve combat/danger events in a form that later threat intelligence can consume;
-- expose enough combat state/reasons to diagnose civilian and combat AI behavior;
-- if the playable scenario requires civilian survival behavior, implement the smallest shared "under attack -> disengage/flee" slice without adding full strategic routing doctrine.
+### Stage 15 — Fleets / autonomous orders
 
-### Stage 15 — Fleets and autonomous orders
+First major civilian/fleet behavior phase:
 
-**First major AI behavior phase.**
+- reusable profiles;
+- flee/resume/replan;
+- route utility combining profit/time/danger;
+- escort-aware routing;
+- bounded MOVE/TRADE/MINE/ESCORT/PATROL behavior;
+- fleet cohesion foundations.
 
-Add:
+### Stage 16 — Construction / stations
 
-- reusable fleet/ship behavior profiles;
-- civilian task interruption and flee/resume/replan behavior;
-- route utility that combines economic profit/time with danger cost;
-- escort-aware willingness to enter risky systems;
-- bounded risk-aware MOVE/TRADE/MINE/ESCORT/PATROL decisions;
-- fleet-level objective/cohesion foundations.
-
-This is the natural point for civilian ships to stop treating every economically valid route as equally safe.
-
-### Stage 16 — Construction / station ownership
-
-Risk-aware logistics begins affecting construction supply:
-
-- construction convoys may reroute or request escort;
-- dangerous supply corridors can delay projects physically;
-- station security/safe-haven context may influence logistics behavior.
+Risk-aware logistics can reroute construction supply, request escorts and physically delay projects.
 
 ### Stage 17 — Player faction
 
-Introduce data-driven faction doctrine/profile configuration and apply it consistently to civilian routing, escort preference, retreat thresholds and strategic risk tolerance.
+Faction doctrine/policy influences civilian risk, escorts, retreat and strategic preferences through common commands/state.
 
-### Stage 18 — Strategic warfare / territory / politics
+### Stage 17.5 — Ship Fitting / Combat Depth
+
+Provides stable physical capability APIs and is the gate before sophisticated weapon-aware tactical behavior.
+
+### Stage 18 — Resources / Industry / Infrastructure
+
+Provides the physical economic dependency graph that strategic AI will later protect, exploit or attack.
+
+AI work in Stage 18 is limited to industrial/economic decision seams needed by ordinary economy. It is **not** the major warfare-AI stage.
+
+### Stage 19 — Strategic Warfare / Advanced Combat Behavior
 
 **Second major AI behavior phase.**
 
-Complete conflict-aware behavior:
+Implement:
 
 - war/front/blockade threat fields;
-- faction-shared intelligence and freshness/decay rules;
-- tactical weapon/range-aware combat doctrine;
-- fleet power comparison and coordinated retreat/pursuit;
-- protected convoy/screen/intercept behavior;
-- danger-aware strategic route planner/executor;
-- war-zone avoidance by civilian traffic;
-- military willingness to accept risk based on objective value/doctrine;
-- measurable conflict -> rerouting -> throughput -> shortage/price effects.
+- faction-shared intelligence + freshness/decay;
+- tactical weapon/range/track-aware combat doctrine;
+- fleet power/capability comparison;
+- coordinated retreat/pursuit;
+- convoy/screen/intercept behavior;
+- danger-aware strategic route planning;
+- civilian war-zone avoidance;
+- military risk acceptance based on objective/doctrine;
+- targeting/protection of real Stage-18 industrial/logistics assets;
+- conflict → rerouting/blockade/loss → physical throughput/repair/replacement consequence validation.
 
-### Stage 19–20 — Exploration / NPC / missions
+### Stage 20 — Physical World Generation / Discovery
 
-- uncertainty from incomplete exploration/intelligence;
-- commander/NPC risk/aggression preferences where persistent identity matters;
-- missions such as escort, patrol, recon and bounty arise from actual threat state.
+AI routing/intelligence consumes generated physical distance/topology and incomplete discovery. Generated geography must not be bypassed by AI-only route shortcuts.
 
-### Stage 21 — Content / balance / long-run stability
+### Stage 21 — RPG / Living World
 
-Run large scenario matrices to tune and prevent pathological behavior:
+Add commander/NPC preferences, missions and reputation reactions based on authoritative threat/economic/political state.
 
-- civilians never travel because risk aversion is too high;
-- civilians ignore obvious war zones because profit dominates too strongly;
-- fleets oscillate between engage/retreat;
-- escorts chase targets and abandon convoys;
-- all factions converge on identical doctrine;
-- permanent route avoidance kills economies with no recovery path;
-- danger fields never decay after conflict ends;
-- one faction snowballs because its doctrine accidentally dominates every situation.
+### Stage 22 — Content / Balance / Long-run Stability
 
----
+Run large scenario matrices to detect:
 
-## 11. Acceptance scenarios
+- excessive civilian risk aversion;
+- civilians ignoring obvious wars;
+- engage/retreat oscillation;
+- escorts abandoning convoys;
+- all factions converging on one doctrine;
+- permanent route avoidance;
+- non-decaying danger;
+- one dominant doctrine;
+- AI ignoring industrial bottlenecks;
+- pathological attacks on low-value facilities while critical logistics are exposed.
 
-At minimum, mature AI should eventually pass deterministic scenario tests like:
+### Stage 23 — Polish / RC
 
-1. **Civilian attacked:** an unescorted freighter interrupts trade and attempts physical escape rather than continuing to dock/trade under fire.
-2. **Profit vs danger:** two routes exist; a risk-averse civilian takes the safer route while a sufficiently protected/high-value convoy rationally accepts the riskier route.
-3. **War-zone rerouting:** conflict raises known danger, traffic moves to alternate routes, and real economic throughput changes.
-4. **Threat decay:** after hostilities cease and intelligence ages, civilian traffic gradually returns instead of avoiding the system forever.
-5. **Long-range vs brawler:** ships with different weapon envelopes choose different preferred ranges while using the same authoritative combat pipeline.
-6. **Retreat:** a damaged/outmatched fleet breaks contact according to doctrine rather than universally fighting to destruction.
-7. **Escort behavior:** escorts prioritize protection of the convoy and do not chase an irrelevant fleeing enemy indefinitely.
-8. **Faction differentiation:** two otherwise comparable fleets with different doctrines make predictably different but valid decisions.
-9. **No omniscience:** an actor without knowledge of a distant new conflict does not reroute until the information becomes available through an allowed intelligence path.
-10. **Determinism:** equal state + equal knowledge + equal doctrine produces equal decisions and stable tie-breaks.
+Tune diagnostics, player-readable intent presentation, performance and final behavior regressions. No new foundational AI model.
 
 ---
 
-## 12. Design constraints
+## 12. Acceptance scenarios
 
-1. AI chooses commands; authoritative simulation systems apply physical outcomes.
-2. Civilian safety behavior must affect real logistics/economy rather than only animation.
-3. Risk scoring retains explanatory components even when planners compare a scalar utility.
-4. No global omniscient danger knowledge without an explicit information source.
-5. Ship type, equipment, weapons, fleet composition and faction doctrine influence decisions through data/state, not scattered class-name conditionals.
-6. Emergency response may override ordinary economic commitment, but normal replanning uses hysteresis to prevent oscillation.
-7. Player-owned autonomous fleets should reuse the same behavior/planning components as equivalent AI fleets wherever possible.
-8. Remote simulation may simplify tactics but must preserve compatible loss, danger and economic-throughput consequences.
+At maturity, deterministic scenarios include:
+
+1. **Civilian attacked:** unescorted freighter interrupts trade and physically escapes.
+2. **Profit vs danger:** risk-averse and protected actors make different rational route choices.
+3. **War-zone rerouting:** known conflict moves traffic and real Stage-18 throughput changes.
+4. **Threat decay:** traffic returns as stale danger decays.
+5. **Range doctrine:** different fitted weapon/mobility envelopes yield different tactics.
+6. **Retreat:** damaged/outmatched fleet breaks contact according to doctrine.
+7. **Escort behavior:** escorts prioritize protected assets over irrelevant pursuit.
+8. **Faction differentiation:** different doctrines produce predictable valid decisions without physical bonuses.
+9. **No omniscience:** unknown distant conflict causes no instant reroute.
+10. **Industrial target value:** loss/blockade of a real bottleneck changes planning through ordinary supply consequences.
+11. **Logistics endurance:** fleet with insufficient ammo/reaction-mass/repair support changes operation rather than receiving virtual replenishment.
+12. **Determinism:** equal state + knowledge + doctrine yields stable decisions.
+
+---
+
+## 13. Design constraints
+
+1. AI chooses commands; authoritative systems apply outcomes.
+2. Civilian safety behavior affects real logistics/economy.
+3. Risk retains explanatory components.
+4. No omniscient danger knowledge without information source.
+5. Ship/fleet/faction differences come from data/state, not class-name conditionals.
+6. Hysteresis prevents constant replanning.
+7. Player-owned autonomous fleets reuse equivalent AI planning components.
+8. Remote simplification preserves compatible loss/inventory/economic consequences.
+9. Industrial target valuation derives from Stage-18 physical dependencies, not arbitrary target scores alone.
+10. AI cannot bypass Stage-18 production, Stage-20 geography or Stage-17 diplomatic/access law.
