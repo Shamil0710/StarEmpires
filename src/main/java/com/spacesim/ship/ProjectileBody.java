@@ -13,6 +13,7 @@ import java.util.Objects;
  *
  * @param projectileId stable simulation-local projectile identity
  * @param sourceEntityId local identity of the firing entity
+ * @param spawnTick deterministic simulation tick on which the body was materialized
  * @param materialId stable engineering material content ID
  * @param shape physical projectile shape category
  * @param lengthM projectile length in meters
@@ -26,6 +27,7 @@ import java.util.Objects;
 public record ProjectileBody(
         long projectileId,
         long sourceEntityId,
+        long spawnTick,
         String materialId,
         ProjectileShape shape,
         double lengthM,
@@ -40,6 +42,7 @@ public record ProjectileBody(
      *
      * @param projectileId stable simulation-local projectile identity
      * @param sourceEntityId local identity of the firing entity
+     * @param spawnTick deterministic simulation tick on which the body was materialized
      * @param materialId stable engineering material content ID
      * @param shape physical projectile shape category
      * @param lengthM projectile length in meters
@@ -56,6 +59,9 @@ public record ProjectileBody(
         }
         if (sourceEntityId <= 0L) {
             throw new IllegalArgumentException("sourceEntityId must be positive");
+        }
+        if (spawnTick < 0L) {
+            throw new IllegalArgumentException("spawnTick must be non-negative");
         }
         if (materialId == null || materialId.isBlank()) {
             throw new IllegalArgumentException("materialId must be non-blank");
@@ -108,6 +114,7 @@ public record ProjectileBody(
         return new ProjectileBody(
                 projectileId,
                 sourceEntityId,
+                spawnTick,
                 materialId,
                 shape,
                 lengthM,
