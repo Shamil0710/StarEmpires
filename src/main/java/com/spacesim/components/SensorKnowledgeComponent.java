@@ -12,26 +12,39 @@ import java.util.Objects;
 /**
  * Local-system authoritative sensor knowledge owned by one observing entity.
  *
- * <p>Tracks and in-flight datalink deliveries reference system-local EntityIds through the long
- * target/observer identity values used by Stage 17.5D. They therefore persist across save/load of
- * the same local system, but must be discarded when a fleet is detached into another star system.
- * This component never contains truth positions that were not produced by sensor measurements.</p>
+ * <p>Tracks, received measurements and in-flight datalink deliveries reference system-local
+ * EntityIds through the long target/observer identity values used by Stage 17.5D. The component is
+ * an explicit snapshotable runtime boundary for later Stage-17.5H save integration; it must be
+ * cleared when its owning fleet enters another star system because local target IDs do not survive
+ * that topology transition.</p>
  */
 public final class SensorKnowledgeComponent implements Component {
     private static final Comparator<TrackState> TRACK_ORDER = Comparator.comparingLong(TrackState::targetId);
+    private static final Comparator<SensorMeasurement> MEASUREMENT_ORDER = Comparator
+            .comparingLong(SensorMeasurement::targetId)
+            .thenComparingDouble(SensorMeasurement::timestampSeconds)
+            .thenComparingLong(SensorMeasurement::observerId)
+            .thenComparing(value -> value.channel().name())
+            .thenComparingDouble(SensorMeasurement::bearingRad);
     private static final Comparator<PendingMeasurement> PENDING_ORDER = Comparator
             .comparingDouble(PendingMeasurement::deliverAtSeconds)
-            .thenComparingLong(value -> value.measurement().targetId())
-            .thenComparingLong(value -> value.measurement().observerId())
-            .thenComparingDouble(value -> value.measurement().timestampSeconds());
+            .thenComparing(value -> value.measurement(), MEASUREMENT_ORDER);
 
     private final List<TrackState> tracks = new ArrayList<>();
+    private final List<SensorMeasurement> receivedMeasurements = new ArrayList<>();
     private final List<PendingMeasurement> pendingMeasurements = new ArrayList<>();
 
     /** @return immutable deterministic target-ID-ordered track snapshot */
     public List<TrackState> tracks() {
         List<TrackState> copy = new ArrayList<>(tracks);
         copy.sort(TRACK_ORDER);
+        return List.copyOf(copy);
+    }
+
+    /** @return immutable deterministic measurement-history snapshot */
+    public List<SensorMeasurement> receivedMeasurements() {
+        List<SensorMeasurement> copy = new ArrayList<>(receivedMeasurements);
+        copy.sort(MEASUREMENT_ORDER);
         return List.copyOf(copy);
     }
 
@@ -54,6 +67,18 @@ public final class SensorKnowledgeComponent implements Component {
     }
 
     /**
+     * Stores one measurement that has physically reached this observer/network node.
+     *
+     * @param measurement delivered local or datalink measurement
+     */
+    public void receiveMeasurement(SensorMeasurement measurement) {
+        SensorMeasurement value = Objects.requireNonNull(measurement, "measurement");
+        if (!receivedMeasurements.contains(value)) {
+            receivedMeasurements.add(value);
+        }
+    }
+
+    /**
      * Queues a measurement already transmitted over a datalink.
      *
      * @param measurement measurement payload
@@ -64,12 +89,12 @@ public final class SensorKnowledgeComponent implements Component {
     }
 
     /**
-     * Removes and returns all measurements whose physical delivery time has arrived.
+     * Moves all due datalink measurements into received history and returns them.
      *
      * @param nowSeconds authoritative current time
      * @return immutable deterministic delivered measurements
      */
-    public List<SensorMeasurement> drainDelivered(double nowSeconds) {
+    public List<SensorMeasurement> deliverDue(double nowSeconds) {
         if (!Double.isFinite(nowSeconds)) {
             throw new IllegalArgumentException("nowSeconds must be finite");
         }
@@ -78,12 +103,28 @@ public final class SensorKnowledgeComponent implements Component {
                 .sorted(PENDING_ORDER)
                 .toList();
         pendingMeasurements.removeAll(delivered);
-        return delivered.stream().map(PendingMeasurement::measurement).toList();
+        List<SensorMeasurement> result = delivered.stream().map(PendingMeasurement::measurement).toList();
+        result.forEach(this::receiveMeasurement);
+        return result;
     }
 
-    /** Clears system-local knowledge when the owning fleet leaves the star system. */
+    /**
+     * Removes measurements older than a link/fusion freshness horizon.
+     *
+     * @param nowSeconds authoritative current time
+     * @param maxAgeSeconds maximum retained measurement age
+     */
+    public void pruneMeasurements(double nowSeconds, double maxAgeSeconds) {
+        if (!Double.isFinite(nowSeconds) || !Double.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0d) {
+            throw new IllegalArgumentException("measurement retention inputs must be finite and maxAgeSeconds positive");
+        }
+        receivedMeasurements.removeIf(value -> nowSeconds - value.timestampSeconds() > maxAgeSeconds);
+    }
+
+    /** Clears all system-local information when the owner changes star-system identity domain. */
     public void clearLocalKnowledge() {
         tracks.clear();
+        receivedMeasurements.clear();
         pendingMeasurements.clear();
     }
 
