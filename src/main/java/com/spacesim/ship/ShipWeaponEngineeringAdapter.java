@@ -46,7 +46,16 @@ public final class ShipWeaponEngineeringAdapter {
             Launcher launcher,
             double pointingJitterRad,
             double recoilImpulseNs) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates one immutable fitted kinetic mount.
+         *
+         * @param mountId physical fitted weapon mount
+         * @param moduleId weapon module content ID
+         * @param round physical loaded kinetic round
+         * @param launcher damage-aware launcher timing/support definition
+         * @param pointingJitterRad current pointing uncertainty
+         * @param recoilImpulseNs physical recoil impulse
+         */
         public FittedKineticMount {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
