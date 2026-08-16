@@ -95,14 +95,16 @@ class WeaponFireControlTest {
                 0d,
                 0d);
 
-        ProjectileBody body = FIRE_CONTROL.materializeKineticProjectile(901L, 12L, ROUND, shooter, solution);
+        ProjectileBody body = FIRE_CONTROL.materializeKineticProjectile(901L, 12L, 4_200L, ROUND, shooter, solution);
         ProjectileBody later = body.advance(12d);
 
         assertEquals(150d, body.massKg(), 1e-12d);
+        assertEquals(4_200L, body.spawnTick());
         assertEquals("material.high_density_penetrator_v1", body.materialId());
         assertTrue(body.kineticEnergyJ() > 6.0e9d);
         assertEquals(body.velocityXMps(), later.velocityXMps(), 1e-12d);
         assertEquals(body.velocityYMps(), later.velocityYMps(), 1e-12d);
+        assertEquals(body.spawnTick(), later.spawnTick());
         assertTrue(Math.hypot(later.xM() - body.xM(), later.yM() - body.yM()) > 100_000d);
     }
 
