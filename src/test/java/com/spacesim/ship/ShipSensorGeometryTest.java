@@ -87,14 +87,18 @@ class ShipSensorGeometryTest {
         return new SensorDefinition(
                 "sensor.passive_thermal_test", Mode.PASSIVE_THERMAL, Channel.THERMAL,
                 10d, 1e-12d, 5d, 20d, 100d, 500d,
-                1e-3d, 1e-3d, 0d, 1d, 20d, 2_000d);
+                1e-3d, 1e-3d,
+                0d, 1d, 0d, 0d,
+                20d, 2_000d, 1_000d);
     }
 
     static SensorDefinition activeRadar() {
         return new SensorDefinition(
                 "sensor.active_radar_test", Mode.ACTIVE_RADAR, Channel.RADAR,
                 100d, 1e-12d, 10d, 20d, 50d, 100d,
-                1e-4d, 1e-3d, 1e12d, 1d, 100d, 5_000d);
+                1e-4d, 1e-3d,
+                1e12d, 1d, 1.2e12d, 1e11d,
+                100d, 5_000d, 2_500d);
     }
 
     static SignatureState brightTarget() {
