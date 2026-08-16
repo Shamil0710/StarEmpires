@@ -156,7 +156,13 @@ public final class ShipSensorEngineeringAdapter {
      * @param definition damage-aware physical sensor definition
      */
     public record FittedSensor(String mountId, String moduleId, SensorDefinition definition) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates one fitted sensor binding.
+         *
+         * @param mountId physical fitted mount ID
+         * @param moduleId sensor module content ID
+         * @param definition damage-aware physical sensor definition
+         */
         public FittedSensor {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
@@ -171,7 +177,12 @@ public final class ShipSensorEngineeringAdapter {
      * @param staticSignature current static fitted signature projection
      */
     public record FittedSensorSuite(List<FittedSensor> sensors, SignatureState staticSignature) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates and freezes the fitted sensor projection.
+         *
+         * @param sensors damage-aware fitted sensor modes
+         * @param staticSignature current static fitted signature projection
+         */
         public FittedSensorSuite {
             Objects.requireNonNull(sensors, "sensors");
             if (sensors.stream().anyMatch(Objects::isNull)) {
