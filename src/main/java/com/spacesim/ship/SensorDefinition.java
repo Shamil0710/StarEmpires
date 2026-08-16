@@ -27,6 +27,7 @@ import java.util.Objects;
  * @param eccmProcessingGainLinear interference rejection gain while ECCM is enabled
  * @param eccmPowerDemandW explicit additional electrical demand while ECCM is enabled
  */
+@SuppressWarnings("doclint:missing")
 public record SensorDefinition(
         String id,
         Mode mode,
