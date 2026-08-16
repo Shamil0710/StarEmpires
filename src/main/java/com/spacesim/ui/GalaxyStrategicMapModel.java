@@ -23,6 +23,16 @@ public final class GalaxyStrategicMapModel {
     private GalaxyStrategicMapModel() {
     }
 
+    /**
+     * Captures deterministic strategic presentation data from the current authoritative world.
+     *
+     * @param world authoritative world simulation
+     * @param content active content catalog used to resolve authored faction names
+     * @param activeSystemId currently active system, or {@code null} while no system is active
+     * @param selectedNeighborId currently selected direct jump neighbor, or {@code null}
+     * @return immutable strategic map snapshot
+     * @throws IllegalArgumentException if the active system is unknown or the selected marker is not a direct neighbor
+     */
     public static GalaxyStrategicMapSnapshot capture(
             WorldSimulation world,
             ContentCatalog content,
@@ -34,27 +44,33 @@ public final class GalaxyStrategicMapModel {
         if (activeSystemId != null && topology.findSystem(activeSystemId).isEmpty()) {
             throw new IllegalArgumentException("Active system is outside authoritative topology: " + activeSystemId);
         }
-        if (selectedNeighborId != null
-                && (activeSystemId == null || !topology.neighbors(activeSystemId).contains(selectedNeighborId))) {
-            throw new IllegalArgumentException("Selected jump destination is not a direct active-system neighbor");
+        if (selectedNeighborId != null) {
+            if (activeSystemId == null || !topology.neighbors(activeSystemId).contains(selectedNeighborId)) {
+                throw new IllegalArgumentException("Selected jump destination is not a direct active-system neighbor");
+            }
         }
 
         List<GalaxyStrategicMapSnapshot.SystemView> systems = new ArrayList<>(topology.systems().size());
         for (StarSystemNode system : topology.systems()) {
             String controllerId = checkedWorld.controllingFaction(system.id()).orElse(null);
             systems.add(new GalaxyStrategicMapSnapshot.SystemView(
-                    system.id(), system.name(),
+                    system.id(),
+                    system.name(),
                     topology.sectorOf(system.id()).map(sector -> sector.name()).orElse("Unassigned"),
-                    system.x(), system.y(), controllerId,
+                    system.x(),
+                    system.y(),
+                    controllerId,
                     controllerId == null ? "Unclaimed" : displayName(checkedWorld, checkedContent, controllerId),
-                    topology.neighbors(system.id()).size(), system.id().equals(activeSystemId),
+                    topology.neighbors(system.id()).size(),
+                    system.id().equals(activeSystemId),
                     system.id().equals(selectedNeighborId)));
         }
 
         List<GalaxyStrategicMapSnapshot.EdgeView> edges = new ArrayList<>(topology.connections().size());
         for (JumpConnection connection : topology.connections()) {
             edges.add(new GalaxyStrategicMapSnapshot.EdgeView(
-                    connection.first(), connection.second(),
+                    connection.first(),
+                    connection.second(),
                     activeSystemId != null
                             && (connection.first().equals(activeSystemId) || connection.second().equals(activeSystemId))));
         }
@@ -74,14 +90,15 @@ public final class GalaxyStrategicMapModel {
             FactionStrategicState strategy = checkedWorld.findFactionStrategicState(factionId).orElse(null);
             FactionEconomicState economy = checkedWorld.findFactionEconomicState(factionId).orElse(null);
             FactionDiplomacyState diplomacy = checkedWorld.findFactionDiplomacyState(factionId).orElse(null);
-            int controlled = strategy == null
-                    ? countControlledSystems(checkedWorld, topology, factionId)
+            int controlled = strategy == null ? countControlledSystems(checkedWorld, topology, factionId)
                     : strategy.controlledSystems().size();
             if (strategy == null && economy == null && diplomacy == null && controlled == 0) {
                 continue;
             }
             factions.add(new GalaxyStrategicMapSnapshot.FactionView(
-                    factionId, displayName(checkedWorld, checkedContent, factionId), controlled,
+                    factionId,
+                    displayName(checkedWorld, checkedContent, factionId),
+                    controlled,
                     economy == null ? 0L : economy.treasuryMilliCredits(),
                     strategy == null ? 0 : strategy.stationTaxBasisPoints(),
                     strategy == null ? 0 : strategy.foreignTerritoryTariffBasisPoints(),
@@ -92,7 +109,9 @@ public final class GalaxyStrategicMapModel {
                     diplomacy == null ? 0 : diplomacy.embargoes().size()));
         }
         factions.sort(Comparator.comparing(GalaxyStrategicMapSnapshot.FactionView::factionId));
-        return new GalaxyStrategicMapSnapshot(topology.name(), systems, edges, factions, activeSystemId, selectedNeighborId);
+
+        return new GalaxyStrategicMapSnapshot(
+                topology.name(), systems, edges, factions, activeSystemId, selectedNeighborId);
     }
 
     private static int countControlledSystems(WorldSimulation world, GalaxyTopology topology, String factionId) {

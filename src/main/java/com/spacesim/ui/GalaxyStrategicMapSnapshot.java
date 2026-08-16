@@ -14,6 +14,7 @@ public record GalaxyStrategicMapSnapshot(
         StarSystemId activeSystemId,
         StarSystemId selectedNeighborId) {
 
+    /** Validates and defensively copies all top-level strategic presentation collections. */
     public GalaxyStrategicMapSnapshot {
         galaxyName = Objects.requireNonNull(galaxyName, "Galaxy map name not set");
         systems = List.copyOf(Objects.requireNonNull(systems, "Galaxy map systems not set"));
@@ -21,6 +22,7 @@ public record GalaxyStrategicMapSnapshot(
         factions = List.copyOf(Objects.requireNonNull(factions, "Galaxy map factions not set"));
     }
 
+    /** One strategic system marker derived from topology and current territorial control. */
     public record SystemView(
             StarSystemId id,
             String name,
@@ -32,6 +34,7 @@ public record GalaxyStrategicMapSnapshot(
             int neighborCount,
             boolean active,
             boolean selectedNeighbor) {
+        /** Validates one immutable strategic system marker. */
         public SystemView {
             Objects.requireNonNull(id, "Galaxy map system ID not set");
             name = Objects.requireNonNull(name, "Galaxy map system name not set");
@@ -44,7 +47,9 @@ public record GalaxyStrategicMapSnapshot(
         }
     }
 
+    /** One explicit authoritative jump connection rendered on the global map. */
     public record EdgeView(StarSystemId first, StarSystemId second, boolean touchesActiveSystem) {
+        /** Validates an immutable non-self jump connection marker. */
         public EdgeView {
             Objects.requireNonNull(first, "Galaxy map edge first system not set");
             Objects.requireNonNull(second, "Galaxy map edge second system not set");
@@ -54,6 +59,7 @@ public record GalaxyStrategicMapSnapshot(
         }
     }
 
+    /** Read-only Stage-17 faction summary displayed beside the strategic map. */
     public record FactionView(
             String factionId,
             String displayName,
@@ -66,6 +72,7 @@ public record GalaxyStrategicMapSnapshot(
             int strategicGoals,
             int treatyRecords,
             int embargoRecords) {
+        /** Validates non-negative diagnostic counters and required faction identity fields. */
         public FactionView {
             factionId = Objects.requireNonNull(factionId, "Faction map ID not set");
             displayName = Objects.requireNonNull(displayName, "Faction map display name not set");

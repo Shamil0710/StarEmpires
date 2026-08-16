@@ -27,12 +27,18 @@ public final class GalaxyStrategicMapRenderer {
     private static final Color ACTIVE = new Color(1f, 0.9f, 0.28f, 1f);
     private static final Color SELECTED = new Color(0.35f, 0.95f, 1f, 1f);
     private static final Color[] FACTION_COLORS = {
-            new Color(0.38f, 0.72f, 1f, 1f), new Color(0.95f, 0.48f, 0.34f, 1f),
-            new Color(0.37f, 0.86f, 0.5f, 1f), new Color(0.78f, 0.52f, 1f, 1f),
-            new Color(1f, 0.78f, 0.3f, 1f), new Color(0.3f, 0.86f, 0.83f, 1f),
-            new Color(1f, 0.44f, 0.7f, 1f), new Color(0.68f, 0.76f, 0.34f, 1f),
-            new Color(0.66f, 0.66f, 1f, 1f), new Color(0.9f, 0.64f, 0.42f, 1f)
+            new Color(0.38f, 0.72f, 1f, 1f),
+            new Color(0.95f, 0.48f, 0.34f, 1f),
+            new Color(0.37f, 0.86f, 0.5f, 1f),
+            new Color(0.78f, 0.52f, 1f, 1f),
+            new Color(1f, 0.78f, 0.3f, 1f),
+            new Color(0.3f, 0.86f, 0.83f, 1f),
+            new Color(1f, 0.44f, 0.7f, 1f),
+            new Color(0.68f, 0.76f, 0.34f, 1f),
+            new Color(0.66f, 0.66f, 1f, 1f),
+            new Color(0.9f, 0.64f, 0.42f, 1f)
     };
+
     private static final float OUTER_MARGIN = 18f;
     private static final float PANEL_GAP = 14f;
     private static final float INNER_PADDING = 18f;
@@ -44,12 +50,28 @@ public final class GalaxyStrategicMapRenderer {
     private final BitmapFont font;
     private boolean disposed;
 
+    /**
+     * Creates a strategic renderer using a caller-owned UI font.
+     *
+     * @param font active UI font; ownership remains with the caller
+     */
     public GalaxyStrategicMapRenderer(BitmapFont font) {
         this.font = Objects.requireNonNull(font, "Galaxy map font not set");
     }
 
-    public void render(Matrix4 projectionMatrix, GalaxyStrategicMapSnapshot snapshot,
-                       float viewportWidth, float viewportHeight) {
+    /**
+     * Draws the full-screen strategic topology and faction overlay without mutating simulation state.
+     *
+     * @param projectionMatrix current screen-space projection
+     * @param snapshot immutable authoritative presentation snapshot
+     * @param viewportWidth current viewport width in pixels
+     * @param viewportHeight current viewport height in pixels
+     */
+    public void render(
+            Matrix4 projectionMatrix,
+            GalaxyStrategicMapSnapshot snapshot,
+            float viewportWidth,
+            float viewportHeight) {
         if (disposed || projectionMatrix == null || snapshot == null || viewportWidth <= 0f || viewportHeight <= 0f) {
             return;
         }
@@ -65,19 +87,25 @@ public final class GalaxyStrategicMapRenderer {
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         shapes.setProjectionMatrix(projectionMatrix);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(BACKGROUND); shapes.rect(0f, 0f, viewportWidth, viewportHeight);
-        shapes.setColor(MAP_PANEL); shapes.rect(contentX, contentY, mapWidth, contentHeight);
-        shapes.setColor(INFO_PANEL); shapes.rect(infoX, contentY, infoWidth, contentHeight);
+        shapes.setColor(BACKGROUND);
+        shapes.rect(0f, 0f, viewportWidth, viewportHeight);
+        shapes.setColor(MAP_PANEL);
+        shapes.rect(contentX, contentY, mapWidth, contentHeight);
+        shapes.setColor(INFO_PANEL);
+        shapes.rect(infoX, contentY, infoWidth, contentHeight);
         shapes.end();
 
-        Map<StarSystemId, Point> points = projectSystems(snapshot,
-                contentX + INNER_PADDING, contentY + INNER_PADDING + 24f,
+        Map<StarSystemId, Point> points = projectSystems(
+                snapshot, contentX + INNER_PADDING, contentY + INNER_PADDING + 24f,
                 mapWidth - INNER_PADDING * 2f, contentHeight - INNER_PADDING * 2f - 44f);
+
         shapes.begin(ShapeRenderer.ShapeType.Line);
         for (GalaxyStrategicMapSnapshot.EdgeView edge : snapshot.edges()) {
             Point first = points.get(edge.first());
             Point second = points.get(edge.second());
-            if (first == null || second == null) continue;
+            if (first == null || second == null) {
+                continue;
+            }
             shapes.setColor(edge.touchesActiveSystem() ? ACTIVE_EDGE : EDGE);
             shapes.line(first.x, first.y, second.x, second.y);
         }
@@ -86,13 +114,17 @@ public final class GalaxyStrategicMapRenderer {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.systems()) {
             Point point = points.get(system.id());
-            if (point == null) continue;
+            if (point == null) {
+                continue;
+            }
             shapes.setColor(colorForFaction(snapshot, system.controllerFactionId()));
             shapes.circle(point.x, point.y, SYSTEM_RADIUS, 14);
             if (system.active()) {
-                shapes.setColor(ACTIVE); drawCross(point.x, point.y, 10f);
+                shapes.setColor(ACTIVE);
+                drawCross(point.x, point.y, 10f);
             } else if (system.selectedNeighbor()) {
-                shapes.setColor(SELECTED); shapes.circle(point.x, point.y, 2.2f, 10);
+                shapes.setColor(SELECTED);
+                shapes.circle(point.x, point.y, 2.2f, 10);
             }
         }
         shapes.end();
@@ -102,7 +134,9 @@ public final class GalaxyStrategicMapRenderer {
         shapes.rect(contentX, contentY, mapWidth, contentHeight);
         shapes.rect(infoX, contentY, infoWidth, contentHeight);
         for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.systems()) {
-            if (!system.active() && !system.selectedNeighbor()) continue;
+            if (!system.active() && !system.selectedNeighbor()) {
+                continue;
+            }
             Point point = points.get(system.id());
             if (point != null) {
                 shapes.setColor(system.active() ? ACTIVE : SELECTED);
@@ -114,12 +148,15 @@ public final class GalaxyStrategicMapRenderer {
         batch.setProjectionMatrix(projectionMatrix);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.draw(batch, "GALAXY MAP — " + snapshot.galaxyName(), contentX + 10f, contentY + contentHeight - 10f);
+        font.draw(batch, "GALAXY MAP — " + snapshot.galaxyName(),
+                contentX + 10f, contentY + contentHeight - 10f);
         font.draw(batch, "explicit jump graph | node color = controller | yellow = current | cyan = selected jump",
                 contentX + 10f, contentY + contentHeight - 30f);
         for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.systems()) {
             Point point = points.get(system.id());
-            if (point == null) continue;
+            if (point == null) {
+                continue;
+            }
             font.setColor(system.active() ? ACTIVE : Color.LIGHT_GRAY);
             font.draw(batch, "#" + system.id().value(), point.x + 7f, point.y + 5f);
         }
@@ -129,82 +166,141 @@ public final class GalaxyStrategicMapRenderer {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void drawInfoPanel(SpriteBatch targetBatch, GalaxyStrategicMapSnapshot snapshot,
-                               float x, float topY, float width) {
+    private void drawInfoPanel(
+            SpriteBatch targetBatch,
+            GalaxyStrategicMapSnapshot snapshot,
+            float x,
+            float topY,
+            float width) {
         float y = topY;
-        font.setColor(Color.WHITE); font.draw(targetBatch, "CURRENT SYSTEM", x, y); y -= 22f;
+        font.setColor(Color.WHITE);
+        font.draw(targetBatch, "CURRENT SYSTEM", x, y);
+        y -= 22f;
         GalaxyStrategicMapSnapshot.SystemView current = findSystem(snapshot, snapshot.activeSystemId());
         if (current == null) {
-            font.draw(targetBatch, "No active in-system location", x, y); y -= 22f;
+            font.draw(targetBatch, "No active in-system location", x, y);
+            y -= 22f;
         } else {
-            font.setColor(ACTIVE); font.draw(targetBatch, "#" + current.id().value() + "  " + current.name(), x, y); y -= 19f;
+            font.setColor(ACTIVE);
+            font.draw(targetBatch, "#" + current.id().value() + "  " + current.name(), x, y);
+            y -= 19f;
             font.setColor(Color.LIGHT_GRAY);
-            font.draw(targetBatch, "Sector: " + current.sectorName(), x, y); y -= 19f;
-            font.draw(targetBatch, "Controller: " + current.controllerDisplayName(), x, y); y -= 19f;
-            font.draw(targetBatch, "Direct links: " + current.neighborCount(), x, y); y -= 22f;
+            font.draw(targetBatch, "Sector: " + current.sectorName(), x, y);
+            y -= 19f;
+            font.draw(targetBatch, "Controller: " + current.controllerDisplayName(), x, y);
+            y -= 19f;
+            font.draw(targetBatch, "Direct links: " + current.neighborCount(), x, y);
+            y -= 22f;
             String links = directLinksSummary(snapshot, current.id());
             if (!links.isEmpty()) {
-                font.draw(targetBatch, links, x, y, width, com.badlogic.gdx.utils.Align.left, true); y -= 40f;
+                font.draw(targetBatch, links, x, y, width, com.badlogic.gdx.utils.Align.left, true);
+                y -= 40f;
             }
         }
+
         y -= 4f;
-        font.setColor(Color.WHITE); font.draw(targetBatch, "FACTIONS — authoritative Stage 17 state", x, y); y -= 22f;
-        for (GalaxyStrategicMapSnapshot.FactionView faction : snapshot.factions()) {
+        font.setColor(Color.WHITE);
+        font.draw(targetBatch, "FACTIONS — authoritative Stage 17 state", x, y);
+        y -= 22f;
+        for (int index = 0; index < snapshot.factions().size(); index++) {
+            GalaxyStrategicMapSnapshot.FactionView faction = snapshot.factions().get(index);
             font.setColor(colorForFaction(snapshot, faction.factionId()));
-            font.draw(targetBatch, faction.displayName() + "  [" + faction.controlledSystems() + " systems]", x, y); y -= 17f;
+            font.draw(targetBatch,
+                    faction.displayName() + "  [" + faction.controlledSystems() + " systems]",
+                    x, y);
+            y -= 17f;
             font.setColor(Color.LIGHT_GRAY);
             String economy = String.format(Locale.ROOT,
                     "Treasury %,.0f cr | tax %.1f%% | transit %.1f%% | customs %.1f%%",
-                    Money.toCredits(faction.treasuryMilliCredits()), faction.stationTaxBasisPoints() / 100.0,
-                    faction.territorialTariffBasisPoints() / 100.0, faction.customsTariffBasisPoints() / 100.0);
-            font.draw(targetBatch, economy, x + 10f, y, width - 10f, com.badlogic.gdx.utils.Align.left, true); y -= 17f;
+                    Money.toCredits(faction.treasuryMilliCredits()),
+                    faction.stationTaxBasisPoints() / 100.0,
+                    faction.territorialTariffBasisPoints() / 100.0,
+                    faction.customsTariffBasisPoints() / 100.0);
+            font.draw(targetBatch, economy, x + 10f, y, width - 10f, com.badlogic.gdx.utils.Align.left, true);
+            y -= 17f;
             font.draw(targetBatch,
-                    "claims " + faction.activeClaims() + " | goals " + faction.strategicGoals()
-                            + " | treaty records " + faction.treatyRecords() + " | embargo records " + faction.embargoRecords(),
-                    x + 10f, y, width - 10f, com.badlogic.gdx.utils.Align.left, true); y -= 23f;
+                    "claims " + faction.activeClaims()
+                            + " | goals " + faction.strategicGoals()
+                            + " | treaty records " + faction.treatyRecords()
+                            + " | embargo records " + faction.embargoRecords(),
+                    x + 10f, y, width - 10f, com.badlogic.gdx.utils.Align.left, true);
+            y -= 23f;
             if (y < 38f) {
-                font.setColor(Color.GRAY); font.draw(targetBatch, "… additional factions omitted at this resolution", x, y); break;
+                font.setColor(Color.GRAY);
+                font.draw(targetBatch, "… additional factions omitted at this resolution", x, y);
+                break;
             }
         }
-        font.setColor(Color.GRAY); font.draw(targetBatch, "[G / ESC] close strategic map", x, 38f);
+        font.setColor(Color.GRAY);
+        font.draw(targetBatch, "[G / ESC] close strategic map", x, 38f);
     }
 
-    private static String directLinksSummary(GalaxyStrategicMapSnapshot snapshot, StarSystemId activeSystemId) {
+    private static String directLinksSummary(
+            GalaxyStrategicMapSnapshot snapshot,
+            StarSystemId activeSystemId) {
         StringBuilder text = new StringBuilder("Links: ");
         int shown = 0;
-        GalaxyStrategicMapSnapshot.SystemView active = findSystem(snapshot, activeSystemId);
         for (GalaxyStrategicMapSnapshot.EdgeView edge : snapshot.edges()) {
-            StarSystemId neighbor = edge.first().equals(activeSystemId) ? edge.second()
-                    : edge.second().equals(activeSystemId) ? edge.first() : null;
-            if (neighbor == null) continue;
+            StarSystemId neighbor = null;
+            if (edge.first().equals(activeSystemId)) {
+                neighbor = edge.second();
+            } else if (edge.second().equals(activeSystemId)) {
+                neighbor = edge.first();
+            }
+            if (neighbor == null) {
+                continue;
+            }
             GalaxyStrategicMapSnapshot.SystemView view = findSystem(snapshot, neighbor);
-            if (shown > 0) text.append(" | ");
+            if (shown > 0) {
+                text.append(" | ");
+            }
             text.append('#').append(neighbor.value());
-            if (view != null) text.append(' ').append(view.name()).append(" {").append(view.controllerDisplayName()).append('}');
+            if (view != null) {
+                text.append(' ').append(view.name()).append(" {").append(view.controllerDisplayName()).append('}');
+            }
             shown++;
             if (shown >= 5) {
-                if (active != null && shown < active.neighborCount()) text.append(" | …");
+                if (shown < findSystem(snapshot, activeSystemId).neighborCount()) {
+                    text.append(" | …");
+                }
                 break;
             }
         }
         return shown == 0 ? "" : text.toString();
     }
 
-    private static GalaxyStrategicMapSnapshot.SystemView findSystem(GalaxyStrategicMapSnapshot snapshot, StarSystemId id) {
-        if (id == null) return null;
-        for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.systems()) if (system.id().equals(id)) return system;
+    private static GalaxyStrategicMapSnapshot.SystemView findSystem(
+            GalaxyStrategicMapSnapshot snapshot,
+            StarSystemId id) {
+        if (id == null) {
+            return null;
+        }
+        for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.systems()) {
+            if (system.id().equals(id)) {
+                return system;
+            }
+        }
         return null;
     }
 
-    private static Map<StarSystemId, Point> projectSystems(GalaxyStrategicMapSnapshot snapshot,
-                                                            float x, float y, float width, float height) {
-        double minX = Double.POSITIVE_INFINITY, maxX = Double.NEGATIVE_INFINITY;
-        double minY = Double.POSITIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY;
+    private static Map<StarSystemId, Point> projectSystems(
+            GalaxyStrategicMapSnapshot snapshot,
+            float x,
+            float y,
+            float width,
+            float height) {
+        double minX = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
         for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.systems()) {
-            minX = Math.min(minX, system.galaxyX()); maxX = Math.max(maxX, system.galaxyX());
-            minY = Math.min(minY, system.galaxyY()); maxY = Math.max(maxY, system.galaxyY());
+            minX = Math.min(minX, system.galaxyX());
+            maxX = Math.max(maxX, system.galaxyX());
+            minY = Math.min(minY, system.galaxyY());
+            maxY = Math.max(maxY, system.galaxyY());
         }
-        double spanX = Math.max(1.0, maxX - minX), spanY = Math.max(1.0, maxY - minY);
+        double spanX = Math.max(1.0, maxX - minX);
+        double spanY = Math.max(1.0, maxY - minY);
         Map<StarSystemId, Point> result = new HashMap<>();
         for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.systems()) {
             float sx = x + (float) ((system.galaxyX() - minX) / spanX) * Math.max(1f, width);
@@ -220,17 +316,27 @@ public final class GalaxyStrategicMapRenderer {
     }
 
     private static Color colorForFaction(GalaxyStrategicMapSnapshot snapshot, String factionId) {
-        if (factionId == null) return UNCLAIMED;
+        if (factionId == null) {
+            return UNCLAIMED;
+        }
         for (int index = 0; index < snapshot.factions().size(); index++) {
-            if (snapshot.factions().get(index).factionId().equals(factionId)) return FACTION_COLORS[index % FACTION_COLORS.length];
+            if (snapshot.factions().get(index).factionId().equals(factionId)) {
+                return FACTION_COLORS[index % FACTION_COLORS.length];
+            }
         }
         return UNCLAIMED;
     }
 
+    /** Releases graphics resources owned by this renderer. */
     public void dispose() {
-        if (disposed) return;
-        disposed = true; shapes.dispose(); batch.dispose();
+        if (disposed) {
+            return;
+        }
+        disposed = true;
+        shapes.dispose();
+        batch.dispose();
     }
 
-    private record Point(float x, float y) { }
+    private record Point(float x, float y) {
+    }
 }

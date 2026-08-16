@@ -121,6 +121,7 @@ public final class PlayableTestGame extends ApplicationAdapter {
     private float hudAccumulator;
     private String statusMessage = "Fresh curated world loaded.";
 
+    /** Creates an uninitialized desktop test client; libGDX resources are allocated in create(). */
     public PlayableTestGame() {
     }
 
