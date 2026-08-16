@@ -11,13 +11,18 @@ package com.spacesim.ship;
  * @param bearingVarianceRad2 bearing variance
  * @param rangeVarianceM2 range variance when range is known, otherwise {@code null}
  */
-@SuppressWarnings("doclint:missing")
 public record TrackCovariance(
         Double positionVarianceM2,
         double bearingVarianceRad2,
         Double rangeVarianceM2) {
 
-    /** Validates explicit known/unknown covariance channels. */
+    /**
+     * Validates explicit known/unknown covariance channels.
+     *
+     * @param positionVarianceM2 Cartesian position variance when position is known, otherwise {@code null}
+     * @param bearingVarianceRad2 bearing variance
+     * @param rangeVarianceM2 range variance when range is known, otherwise {@code null}
+     */
     public TrackCovariance {
         requirePositive(bearingVarianceRad2, "bearingVarianceRad2");
         if (positionVarianceM2 != null) {
