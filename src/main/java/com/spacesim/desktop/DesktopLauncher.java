@@ -3,6 +3,7 @@ package com.spacesim.desktop;
 import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
+import com.spacesim.DemoGalaxyFactory;
 import com.spacesim.PlayableTestGame;
 import com.spacesim.SpaceSimGame;
 import com.spacesim.presentation.validation.GraphicsValidationApp;
@@ -12,9 +13,9 @@ import com.spacesim.presentation.validation.HeavyCorvetteAssetValidationApp;
 /**
  * Desktop entry point for Star Empires on LWJGL3.
  *
- * <p>The default executable now opens the curated playable Stage-12 test world. The legacy
- * spectator/economy view remains available through {@code --spectator}; Stage-8.5 graphics and
- * asset validation modes remain unchanged.</p>
+ * <p>The normal playable build and economy spectator explicitly enable the 100-system large demo.
+ * Automated tests and graphics-validation modes do not set the large-demo property, so compact
+ * deterministic fixtures remain the default outside manual desktop play.</p>
  */
 public final class DesktopLauncher {
     private static final String GRAPHICS_SPIKE_ARGUMENT = "--graphics-spike";
@@ -55,7 +56,8 @@ public final class DesktopLauncher {
             configuration.setForegroundFPS(0);
             listener = new GraphicsValidationApp();
         } else if (spectator) {
-            configuration.setTitle("Star Empires — Economy Spectator");
+            enableLargeDemo();
+            configuration.setTitle("Star Empires — 100 System Economy Spectator");
             configuration.setWindowedMode(1280, 720);
             configuration.setWindowSizeLimits(800, 600, -1, -1);
             configuration.setResizable(true);
@@ -63,7 +65,8 @@ public final class DesktopLauncher {
             configuration.setForegroundFPS(60);
             listener = new SpaceSimGame();
         } else {
-            configuration.setTitle("Star Empires — Playable Test World");
+            enableLargeDemo();
+            configuration.setTitle("Star Empires — 100 System Live Demo");
             configuration.setWindowedMode(1440, 900);
             configuration.setWindowSizeLimits(1000, 650, -1, -1);
             configuration.setResizable(true);
@@ -73,6 +76,10 @@ public final class DesktopLauncher {
         }
 
         new Lwjgl3Application(listener, configuration);
+    }
+
+    private static void enableLargeDemo() {
+        System.setProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY, Boolean.TRUE.toString());
     }
 
     private static boolean containsArgument(String[] args, String expected) {
