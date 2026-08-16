@@ -60,18 +60,25 @@ public final class KineticProtectionRuntime {
      * Result of one composed protection interaction.
      *
      * @param shieldInteraction shield result or {@code null} when no field was fitted
-     * @param residualProjectile physical residual body reaching/deflecting from armor, or null when shield stopped it
-     * @param armorImpact armor response or null when shield stopped it
-     * @param damageEvent local internal damage or null when no internal energy entered the hull
+     * @param armorEntryProjectile physical body that reached armor after shield interaction, or {@code null} when the field stopped it
+     * @param armorImpact armor response or {@code null} when shield stopped the body before material contact
+     * @param postProtectionProjectile residual physical body after ricochet/perforation, or {@code null} when stopped
+     * @param damageEvent local internal damage or {@code null} when no internal energy entered the hull
      */
     public record Result(
             ShieldFieldRuntime.Interaction shieldInteraction,
-            ProjectileBody residualProjectile,
+            ProjectileBody armorEntryProjectile,
             ImpactResult armorImpact,
+            ProjectileBody postProtectionProjectile,
             DamageEvent damageEvent) {
         /** @return whether armor was physically reached */
         public boolean armorReached() {
             return armorImpact != null;
+        }
+
+        /** @return whether a physical projectile body remains after material response */
+        public boolean residualBodyRemains() {
+            return postProtectionProjectile != null;
         }
 
         /** @return whether internal compartment/subsystem damage occurred */
@@ -88,7 +95,7 @@ public final class KineticProtectionRuntime {
      * @param threatDirectionRad hull-local incoming direction for shield coverage
      * @param shieldInteractionSeconds interaction duration used by shield power limit
      * @param protectionStackId ordered armor/protection stack
-     * @param incidenceAngleRad impact angle from armor normal
+     * @param incidenceAngleRad signed impact angle from armor normal
      * @param hull target hull
      * @param fit target installed fit
      * @param layout target explicit damage layout
@@ -123,16 +130,21 @@ public final class KineticProtectionRuntime {
                     threatDirectionRad, shieldInteractionSeconds);
             residualEnergyJ = shieldInteraction.residualEnergyJ();
             if (residualEnergyJ <= 0d) {
-                return new Result(shieldInteraction, null, null, null);
+                return new Result(shieldInteraction, null, null, null, null);
             }
         }
 
-        ProjectileBody residual = withKineticEnergy(checkedProjectile, residualEnergyJ);
-        ImpactResult impact = impactResolver.resolve(residual, protectionStackId, incidenceAngleRad);
+        ProjectileBody armorEntry = withKineticEnergy(checkedProjectile, residualEnergyJ);
+        ImpactResult impact = impactResolver.resolve(armorEntry, protectionStackId, incidenceAngleRad);
         DamageEvent damage = impact.internalDamageEnergyJ() > 0d
                 ? damageRuntime.applyImpact(hull, fit, layout, damageState, impact, hitPointM)
                 : null;
-        return new Result(shieldInteraction, residual, impact, damage);
+        return new Result(
+                shieldInteraction,
+                armorEntry,
+                impact,
+                impact.residualProjectile(),
+                damage);
     }
 
     private static ProjectileBody withKineticEnergy(ProjectileBody body, double energyJ) {
