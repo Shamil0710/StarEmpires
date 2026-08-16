@@ -20,14 +20,17 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Central authoritative Stage-17.5B common-budget ship calculator.
+ * Central authoritative Stage-17.5 common-budget ship calculator.
  *
  * <p>The calculator resolves shared mass, integration volume, power, energy, heat, crew, physical
- * carried mass and propulsion equations from content definitions. It deliberately exposes rather
- * than interprets sensor/EW/shield/weapon family parameters; those specialized equations belong to
- * Stage 17.5D-F. No result depends on {@code ShipType}, doctrine class or player/AI ownership.</p>
+ * carried mass and propulsion equations from content definitions. Stage 17.5F additionally applies
+ * local module integrity produced by the compartment/subsystem damage model. No result depends on
+ * {@code ShipType}, doctrine class or player/AI ownership.</p>
  */
 public final class DerivedShipCalculator {
+    /** Runtime-only installed-capability key exposing local subsystem integrity to specialized adapters. */
+    public static final String RUNTIME_INTEGRITY = "runtime_integrity";
+
     private static final String THRUST_N = "thrust_n";
     private static final String EXHAUST_VELOCITY_MPS = "exhaust_velocity_mps";
 
@@ -50,7 +53,7 @@ public final class DerivedShipCalculator {
      * @param hull authoritative hull definition
      * @param fit installed fit
      * @param consumables physical cargo/stores/ammunition/reaction-mass state
-     * @param damage damage-state seam; only pristine capability is active in 17.5B
+     * @param damage local Stage-17.5F module-integrity state
      * @return immutable derived state with deterministic warnings
      * @throws InvalidShipFitException when the fit violates a hard fitting/budget rule
      */
@@ -93,29 +96,32 @@ public final class DerivedShipCalculator {
             if (module == null) {
                 throw new IllegalStateException("Validated fit lost module: " + assignment.moduleId());
             }
+            double integrity = checkedDamage.moduleIntegrityByMount().getOrDefault(assignment.mountId(), 1d);
             moduleMassKg += module.massKg();
             usedVolumeM3 += module.occupiedVolumeM3();
-            powerSupplyW += module.continuousPowerSupplyW();
-            powerDemandW += module.continuousPowerDemandW();
-            peakPowerDemandW += module.peakPowerDemandW();
-            storedEnergyJ += module.storedEnergyCapacityJ();
-            wasteHeatW += module.wasteHeatW();
-            heatRejectionW += module.heatRejectionW();
-            localThermalCapacityJ += module.localThermalCapacityJ();
-            coolantTransferDemandW += module.coolantTransferDemandW();
+            powerSupplyW += module.continuousPowerSupplyW() * integrity;
+            powerDemandW += module.continuousPowerDemandW() * integrity;
+            peakPowerDemandW += module.peakPowerDemandW() * integrity;
+            storedEnergyJ += module.storedEnergyCapacityJ() * integrity;
+            wasteHeatW += module.wasteHeatW() * integrity;
+            heatRejectionW += module.heatRejectionW() * integrity;
+            localThermalCapacityJ += module.localThermalCapacityJ() * integrity;
+            coolantTransferDemandW += module.coolantTransferDemandW() * integrity;
             moduleCrewRequired = Math.addExact(moduleCrewRequired, module.crewRequirement());
             automationRequired = Math.addExact(automationRequired, module.automationRequirement());
 
             for (Map.Entry<String, Double> signature : module.signatureContributions().entrySet()) {
-                signatures.merge(signature.getKey(), signature.getValue(), Double::sum);
+                signatures.merge(signature.getKey(), signature.getValue() * integrity, Double::sum);
             }
+            Map<String, Double> runtimeParameters = new TreeMap<>(module.capabilityParameters());
+            runtimeParameters.put(RUNTIME_INTEGRITY, integrity);
             capabilities.add(new InstalledCapability(
-                    assignment.mountId(), module.id(), module.family(), module.capabilityParameters()));
+                    assignment.mountId(), module.id(), module.family(), runtimeParameters));
             maintenance.add(new MaintenanceDemand(assignment.mountId(), module.id(), module.maintenance()));
 
             if (module.family() == ModuleFamily.MAIN_DRIVE
                     || module.family() == ModuleFamily.MANEUVER_THRUSTERS) {
-                double moduleThrustN = module.capabilityParameters().get(THRUST_N);
+                double moduleThrustN = module.capabilityParameters().get(THRUST_N) * integrity;
                 double exhaustVelocityMps = module.capabilityParameters().get(EXHAUST_VELOCITY_MPS);
                 thrustN += moduleThrustN;
                 massFlowKgPerS += moduleThrustN / exhaustVelocityMps;
