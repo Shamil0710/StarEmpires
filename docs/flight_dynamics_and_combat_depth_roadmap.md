@@ -1,183 +1,55 @@
 # Star Empires — Flight Dynamics and Combat Depth Roadmap
 
-> Cross-cutting plan for ship mass/inertia, thrust-limited movement, cargo-dependent handling and the ordering of advanced tactical AI after the combat model becomes sufficiently expressive.
->
-> Added: **2026-08-14** after Stage 13 established the first shared deterministic combat pipeline and after `docs/ai_behavior_roadmap.md` established civilian risk-aware behavior as a separate concern.
+> Cross-cutting plan for ship mass/inertia, thrust-limited movement, cargo-dependent handling and the ordering of advanced tactical AI.  
+> Added: **2026-08-14**; synchronized with revised Stage 18–23 ordering on **2026-08-16**.
 
 ---
 
 ## 1. Design decision
 
-Two future directions are explicitly separated:
+Two directions remain deliberately separated:
 
-1. **civilian / strategic behavior can improve early** — flee from attacks, avoid known dangerous systems, trade profit against risk and use escorts;
-2. **advanced tactical combat AI is gated by combat-system depth** — it should not be tuned around a temporary combat model that only has simple range, shields, hull and one weapon profile.
+1. **civilian/strategic behavior can improve early** — flee, risk-aware routing, escorts, convoy decisions;
+2. **advanced tactical combat AI is gated by combat depth** — it should not be tuned around a temporary combat model.
 
-Advanced tactical AI should become a major implementation phase only after the game has enough physical and combat variables for tactics to be meaningful, including at least:
-
-- several ship classes with materially different movement/combat envelopes;
-- meaningful armor and shield behavior;
-- multiple weapon categories/range profiles;
-- equipment/fitting choices that change capability;
-- enough weapon/ship metadata for target and range decisions;
-- shared inertial movement where acceleration and braking are real constraints.
-
-This avoids writing sophisticated AI twice: first around a placeholder combat model, then again after armor, fitting, weapon classes and mobility change the optimal tactics.
+The major tactical-AI phase starts only after Stage 17.5 exposes stable physical capabilities: movement, armor/shields, multiple weapon families, fitting, sensors/tracks, consumables and subsystem damage.
 
 ---
 
-## 2. Current movement seam
+## 2. Target flight model
 
-The current Stage-12 direct-control implementation intentionally provides a simple playable movement primitive: `PlayerDirectControlSystem` writes requested velocity directly from input speed and advances position during the fixed tick.
+The target is **game-friendly inertial space flight**, not unrestricted orbital mechanics.
 
-That is sufficient for the original playable harness but does **not** model ship inertia. A future flight-dynamics layer should replace the instantaneous-velocity assumption with shared thrust-limited acceleration while preserving the existing rule that UI/player input only submits intent and authoritative fixed-tick simulation mutates physical state.
+Desired behavior:
 
-The new movement model must be shared by player and AI wherever equivalent movement is simulated. AI must not receive hidden acceleration/braking advantages.
+- velocity cannot jump instantly;
+- braking consumes time and available thrust;
+- light ships respond faster than heavy ships;
+- cargo/equipment/armor mass changes handling;
+- propulsion damage reduces real capability;
+- optional flight assist may translate intent into bounded thrust without bypassing physics.
 
----
-
-## 3. Game-feel target: inertial, not hardcore simulation
-
-The target is a **game-friendly inertial space-flight model**, not an unrestricted orbital-mechanics simulator.
-
-Desired feel:
-
-- velocity does not jump instantly when the player presses a direction;
-- releasing input does not necessarily stop the ship instantly;
-- braking requires time and available reverse/maneuvering thrust;
-- a light interceptor responds quickly;
-- a heavy freighter responds slowly;
-- the same freighter handles noticeably worse when heavily loaded;
-- equipment/armor can trade survivability for mobility;
-- a damaged propulsion system may later degrade acceleration or maneuverability;
-- controls remain readable and predictable for a top-down sandbox.
-
-Default controls may use **flight assist**: input represents desired motion, while the flight controller applies the physically available thrust needed to approach that motion. The underlying acceleration/braking remains real and bounded.
-
-A later optional assist-off/drift mode may be considered, but is not required for the core design.
-
----
-
-## 4. Mass model
-
-In space the relevant property is **mass**, not gravitational weight.
-
-A future authoritative ship mass can be derived as:
-
-```text
-totalMass = dryHullMass
-          + cargoMass
-          + armorMass
-          + equipmentMass
-          + ammunitionMass
-          + other physical stores
-```
-
-Not every term must be introduced simultaneously. The model should grow as those mechanics become real.
-
-### 4.1 Dry hull mass
-
-Every ship archetype should eventually define a stable dry mass.
-
-Examples of intended qualitative differences:
-
-- interceptor / light fighter — very low mass;
-- corvette — low/medium mass;
-- frigate — medium mass;
-- freighter — high dry mass plus large cargo-mass variation;
-- carrier / capital ship — very high mass and correspondingly large absolute thrust, but lower thrust-to-mass response.
-
-### 4.2 Cargo mass
-
-Cargo must influence handling physically rather than being only an inventory integer.
-
-Each physical item/resource may eventually expose unit mass. Then:
-
-```text
-cargoMass = sum(itemQuantity × itemUnitMass)
-```
-
-This creates useful emergent differences:
-
-```text
-empty bulk freighter
-→ acceptable acceleration / braking
-
-fully loaded bulk freighter
-→ significantly more momentum
-→ slower acceleration
-→ longer braking distance
-→ weaker lateral response
-```
-
-A cargo ship therefore behaves differently during the outbound empty leg and the loaded return leg without requiring a special scripted state.
-
-### 4.3 Equipment and armor mass
-
-When fitting becomes richer, installed modules and armor should contribute to mass where appropriate.
-
-This enables real trade-offs:
-
-- heavier armor improves survivability but harms acceleration;
-- larger reactor/engine package may increase both mass and available power/thrust;
-- extra cargo expansion may make a ship more profitable but less agile;
-- weapon packages can influence handling through physical mass rather than hidden class penalties.
-
----
-
-## 5. Propulsion model
-
-The fundamental relationship should be conceptually equivalent to:
+Authoritative relation:
 
 ```text
 acceleration = availableThrust / totalMass
 ```
 
-The implementation may use game-scaled units, but the dependency should remain explicit and deterministic.
+Ship mass derives from real fitted/inventory state:
 
-A ship archetype / propulsion fit can eventually distinguish:
-
-- forward/main-engine thrust;
-- reverse/braking thrust;
-- lateral maneuvering thrust;
-- rotational torque / turning authority;
-- cruise/operational speed limits where required for game readability;
-- boost/afterburn capability where later equipment supports it.
-
-### 5.1 Braking
-
-Braking is not an instantaneous `velocity = 0` operation.
-
-The flight controller should calculate available deceleration from the current mass and appropriate braking/reverse thrust. A heavy loaded vessel therefore needs more distance and time to stop.
-
-Useful player-facing information later includes:
-
-- current speed;
-- acceleration capability;
-- estimated braking distance/time;
-- mass/load state;
-- optional vector indicator when velocity and facing/intended movement differ.
-
-### 5.2 Turning / rotational inertia
-
-Once facing and weapon arcs matter, rotational behavior should also differ between hulls.
-
-A practical model can use:
-
-- hull rotational inertia class or computed moment-of-inertia approximation;
-- maneuvering torque;
-- angular acceleration;
-- bounded angular velocity.
-
-This prevents a capital ship from rotating like a fighter and gives weapon arcs/hardpoints tactical meaning.
-
-Rotational inertia can be introduced after translational acceleration if needed; it does not have to block the first movement-dynamics slice.
+```text
+totalMass = hull/structure
+          + modules/equipment
+          + armor
+          + cargo
+          + ammunition
+          + reaction mass
+          + other stores
+```
 
 ---
 
-## 6. Shared movement architecture
-
-The intended architecture is:
+## 3. Shared movement architecture
 
 ```text
 player input / AI navigation intent
@@ -186,267 +58,201 @@ player input / AI navigation intent
               ↓
      shared flight controller
               ↓
- mass + propulsion + current velocity
+ fitted mass + propulsion + damage + current velocity
               ↓
  authoritative fixed-tick acceleration
               ↓
- Transform velocity / position
+       velocity / position
 ```
 
-Important invariant:
+Player and AI express intent. Neither can set velocity directly to bypass the physical envelope.
 
-**player and AI express intent; the same physical flight dynamics decides what the ship can actually do.**
-
-This prevents future tactical AI from cheating by setting its velocity directly while the player is acceleration-limited.
-
-Path planners may estimate travel time using the same ship mobility envelope at a strategic approximation level, but local execution remains authoritative.
+Strategic planners may use validated travel-time approximations from the same capabilities.
 
 ---
 
-## 7. Why this matters to combat
+## 4. Translational and rotational behavior
 
-Movement dynamics becomes part of the combat model rather than only presentation.
+### Translational
 
-Examples:
+Need:
 
-- a light interceptor can close distance rapidly but may have low durability;
-- a missile ship can attempt to preserve range only if its thrust-to-mass ratio permits it;
-- a heavy brawler may win once it closes but struggle to catch a faster target;
-- a loaded freighter may be unable to escape an attacker that the same empty hull could outrun;
-- escorts must account for the slowest protected ship;
-- braking distance matters when overshooting a target or station;
-- armor/fitting choices alter both combat durability and maneuverability.
+- main thrust;
+- braking/reverse thrust;
+- lateral maneuvering thrust;
+- current velocity;
+- bounded acceleration;
+- estimated braking distance/time.
 
-Therefore advanced tactical AI should be trained/balanced only after these relationships exist.
+Loaded freighter and empty freighter therefore differ without scripted state.
+
+### Rotational
+
+When facing/arcs matter, use hull geometry/moment-of-inertia approximation + maneuvering torque + angular acceleration/velocity. Capital ships must not rotate like fighters.
+
+Rotational dynamics may arrive after translational baseline if necessary, but fitting/weapon geometry eventually consumes it.
 
 ---
 
-## 8. Combat-depth prerequisite before advanced tactical AI
+## 5. Why movement belongs to combat and economy
 
-Stage 13 remains the correct minimal combat foundation, but it is intentionally not the final tactical model.
+Movement affects:
 
-Before the **major advanced combat-AI phase**, implement a combat-depth layer with enough of the following mechanics to create real tactical choices.
+- ability to close/open range;
+- escape probability;
+- escort behavior;
+- braking/overshoot;
+- weapon arcs and firing windows;
+- cargo-route timing;
+- mining and construction logistics;
+- convoy vulnerability;
+- Stage-20 physical world calibration.
 
-### 8.1 Ship classes and hull roles
+A heavy armor/refit choice therefore changes combat and logistics through the same mass model.
 
-At minimum several materially different combat hull envelopes should exist, for example:
+---
 
-- light fighter/interceptor;
-- corvette;
-- frigate;
-- heavier combat vessel;
-- civilian transport/miner with limited or optional armament.
+## 6. Combat-depth prerequisite
 
-Differences should come from data such as:
+Before sophisticated tactical AI, Stage 17.5 must provide materially different:
 
-- mass;
-- thrust/mobility;
-- hull/armor/shield capacity;
-- hardpoints / weapon compatibility;
-- cargo/equipment capacity;
-- sensor/signature values where introduced.
-
-### 8.2 Armor
-
-Armor should become more than additional generic hull HP.
-
-Possible staged mechanics:
-
-- armor durability / mitigation;
-- armor class/thickness by hull or fitted package;
-- damage-type interaction;
-- armor degradation;
-- later directional/sectional armor only if it improves gameplay enough to justify complexity.
-
-The first useful version should remain deterministic and data-driven.
-
-### 8.3 Shields
-
-Shields can later gain meaningful distinctions such as:
-
-- capacity;
-- recharge rate/delay;
-- power demand;
-- damage-type efficiency;
-- overload or temporary collapse behavior.
-
-This creates decisions about burst damage, disengagement and re-engagement instead of shields being only a second HP bar.
-
-### 8.4 Weapon categories
-
-Introduce several weapon envelopes before sophisticated weapon-aware AI, for example:
-
-- short-range rapid weapons;
-- medium-range general-purpose weapons;
-- long-range guns/energy weapons;
-- missiles/torpedoes with limited ammunition or other constraints;
-- point defense;
-- later area/specialized weapons where justified.
-
-Relevant data may include:
-
-- damage and damage type;
-- range / preferred range;
-- cooldown/burst;
-- projectile speed;
-- tracking/accuracy;
-- ammunition or energy use;
-- hardpoint/firing arc;
-- target-size effectiveness;
-- special effect tags.
-
-### 8.5 Equipment / fitting
-
-Ships should eventually have data-driven equipment that changes their actual capabilities, such as:
-
-- engines/thrusters;
-- reactors/power systems;
+- hull envelopes;
+- mobility;
+- armor/protection;
 - shields;
-- armor packages;
-- sensors;
-- ECM/ECCM;
-- cargo modules;
-- mining equipment;
-- weapon mounts/ammunition support;
-- utility/defensive systems.
+- kinetic/beam/guided/PD weapons;
+- ammunition and reaction mass;
+- sensors/tracks/EW;
+- fitting/equipment;
+- subsystem damage/degradation;
+- stable shared capability queries.
 
-The exact slot model can be decided when fitting work begins. The critical AI requirement is that capability be queryable from authoritative state rather than inferred from hard-coded ship names.
-
----
-
-## 9. Advanced combat AI gate
-
-The major tactical-AI implementation should not start merely because more AI code would be possible.
-
-Suggested gate:
-
-**Advanced tactical combat AI becomes ACTIVE only when:**
-
-1. shared inertial movement is operational for representative player/AI ships;
-2. at least several ship classes have distinct mobility/durability envelopes;
-3. armor and shields have stable first-pass mechanics;
-4. multiple weapon categories produce different preferred engagement behavior;
-5. fitting/equipment can materially alter at least mobility, defense or weapons;
-6. combat state exposes these capabilities through stable data/query APIs;
-7. deterministic combat acceptance tests exist for the enriched model.
-
-Before this gate, combat AI should remain deliberately simple and correct rather than elaborate and disposable.
-
-Civilian flee/risk-routing AI is **not** blocked by this gate because its value already exists with the current living economy and shared travel model.
+No advanced AI should infer ability from hard-coded hull class names.
 
 ---
 
-## 10. Revised stage ordering
+## 7. Stage integration under the current roadmap
 
-### Stage 14 — First complete player loop
+### Stage 14 — first playable loop
 
-Keep the current Stage-14 goals, but add a **flight-dynamics foundation before final v0.3 acceptance** if implementation risk remains manageable.
+The original first-loop work established playable movement and useful seams. Any legacy direct-velocity behavior is a migration target for Stage 17.5 rather than a permanent physics rule.
 
-Recommended order inside Stage 14:
+### Stage 15 — fleets
 
-```text
-14A player mining
-14B real ship purchase / switching
-14C navigation + HUD + minimap
-14E flight-dynamics baseline
-14D first-hour acceptance / telemetry
-```
+Fleet orders, risk-aware routing and convoy behavior use shared movement semantics wherever already supported. Final weapon-aware tactical AI remains deferred.
 
-`14E` is deliberately named as an inserted cross-cutting slice rather than renumbering existing work.
+### Stage 16 — construction/stations
 
-Minimum 14E target:
+Heavy construction cargo and logistics should ultimately pay the same mass/travel consequences.
 
-- dry mass per representative hull;
-- cargo contributes real mass;
-- thrust-limited acceleration;
-- non-instant braking;
-- shared movement executor for direct player movement and compatible AI movement paths;
-- deterministic tests showing a light ship and a loaded freighter accelerate/stop differently;
-- HUD/debug exposure for speed/mass/acceleration sufficient to tune the model.
+### Stage 17 — player faction
 
-If implementing all of this inside Stage 14 would destabilize the first-loop milestone, move 14E immediately after Stage 14 and **before Stage 15 fleet behavior**, rather than postponing it until advanced combat.
-
-### Stage 15 — Fleets / autonomous orders
-
-Civilian and fleet-level AI may already improve here:
-
-- flee from attack;
-- risk-aware route selection;
-- escort-aware route decisions;
-- convoy cohesion based on the slowest critical vessel;
-- movement orders executed through the shared inertial model.
-
-Do **not** attempt the final sophisticated weapon-aware tactical AI yet.
-
-### Stage 16 — Construction / station ownership
-
-Risk-aware logistics and convoy movement use real ship mass/mobility. Heavy construction cargo can therefore have real transport-time and vulnerability consequences.
-
-### Stage 17 — Player faction
-
-Introduce faction doctrine parameters for civilian risk, escort preference and broad aggression/retreat policy. These doctrine values may exist before the advanced tactical executor that will later consume the richer combat-specific subset.
+Faction doctrine can author broad aggression/retreat/escort/risk preferences without granting physical bonuses.
 
 ### Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-Insert a dedicated prerequisite slice before strategic warfare if the mechanics have not already matured organically.
+This is the explicit physical gate.
 
-Target:
-
-- representative hull classes;
-- armor mechanics;
-- richer shields;
-- multiple weapon categories;
-- equipment/fitting foundation;
-- mobility/fitting mass integration;
-- stable combat capability queries;
-- deterministic enriched-combat acceptance tests.
-
-This stage is the explicit **gate before advanced tactical AI**.
-
-### Stage 18 — Strategic Warfare + Advanced Combat Behavior
-
-Stage 18 should then be ordered internally as:
+Required foundation:
 
 ```text
-18A consume stable combat-depth capability model
-18B advanced tactical AI / range / target / retreat / formation behavior
-18C fleet combat doctrine / escort / screen / coordinated actions
-18D strategic war / fronts / blockade / territory effects
-18E conflict → traffic rerouting → economic consequence validation
+hull/module/material schema
+→ central derived-ship calculator
+→ thrust/reaction mass/power/thermal/FTL
+→ sensors/tracks/EW
+→ weapons/ammunition/PD
+→ shields/armor/compartments/damage
+→ shipyard/refit/repair seam
+→ shared capability APIs
+→ deterministic acceptance
 ```
 
-The advanced AI now optimizes against mechanics that are intended to survive into later development instead of temporary placeholders.
+### Stage 18 — Resources / Industry / Infrastructure
 
-### Stage 20–21
+Stage 18 does **not** add the major tactical-AI phase. It makes the physical ships economically manufacturable and supportable.
 
-Commander personality can specialize doctrine later, and Stage 21 scenario/soak matrices tune the resulting movement + fitting + tactical ecosystem.
+It connects fitted mass/equipment/consumables to:
+
+- resource extraction;
+- refining/materials;
+- industrial components;
+- ammunition and reaction-mass production;
+- repair inputs;
+- shipyard capabilities;
+- replacement/salvage economics.
+
+This ordering matters because Stage 19 warfare should already have real logistical endurance and replacement consequences.
+
+### Stage 19 — Strategic Warfare / Advanced Combat Behavior
+
+Major tactical/strategic combat-AI phase:
+
+```text
+19A consume Stage-17.5 capability model
+19B weapon/track/range/retreat tactical AI
+19C fleet doctrine / screen / escort / coordination
+19D mobilization / war goals / fronts / blockade
+19E target real Stage-18 logistics/industry
+19F conflict → losses/rerouting/shortages/replacement consequences
+```
+
+AI optimizes against the intended long-term physical model rather than temporary placeholders.
+
+### Stage 20 — Physical World Generation
+
+Generated distances and topology are calibrated from representative fitted ships and real logistics:
+
+- station → station;
+- station → resource source;
+- jump arrival → hub;
+- inner → outer system;
+- multi-hop trade/fleet routes.
+
+No separate strategic distance system.
+
+### Stage 21 — RPG / Living World
+
+Commander/NPC personality may modify decision preferences above faction doctrine but never physical capabilities or knowledge.
+
+### Stage 22 — Content / Balance Alpha
+
+Large matrices tune movement, fitting, combat, industrial cost and fleet doctrine together.
+
+### Stage 23 — Polish / RC
+
+Final control feel, HUD readability, performance and regression hardening. No new foundational flight physics.
 
 ---
 
-## 11. Acceptance scenarios for flight dynamics
+## 8. Acceptance scenarios
 
-At minimum the mature baseline should prove deterministic cases such as:
+Mature baseline must prove:
 
-1. **Light vs heavy acceleration:** a light interceptor reaches the same requested speed faster than a heavy freighter.
-2. **Cargo mass:** the same freighter accelerates and brakes more slowly when loaded with a heavy cargo than when empty.
-3. **No instant stop:** releasing or reversing movement cannot zero velocity in one tick unless the physical thrust/mass envelope genuinely permits it.
-4. **Shared player/AI physics:** equivalent player and AI ships under equivalent thrust/mass conditions receive the same physical acceleration limits.
-5. **Braking distance:** a faster/heavier ship requires measurably more distance/time to stop.
-6. **Armor/equipment trade-off:** a heavier fitted configuration can gain capability while paying the corresponding movement cost once fitting exists.
-7. **Save/load continuity:** any persistent velocity/mass-dependent state required for deterministic continuation survives save/load correctly.
-8. **Fleet constraint:** an escort group protecting a heavy transport does not plan tactical movement as if every member had interceptor mobility.
+1. **Light vs heavy acceleration:** lighter ship reaches requested velocity faster for comparable thrust-to-mass conditions.
+2. **Cargo mass:** same freighter accelerates/brakes differently empty vs loaded.
+3. **No instant stop:** velocity changes only within available thrust/mass envelope.
+4. **Shared player/AI physics:** equivalent state produces equivalent limits.
+5. **Braking distance:** speed/mass/thrust produce measurable stopping differences.
+6. **Armor/equipment trade-off:** heavier fit pays movement cost through mass.
+7. **Damage:** propulsion/thermal/power damage changes real movement capability.
+8. **Save/load:** persistent movement/fit/consumable state continues deterministically.
+9. **Fleet constraint:** escort planning respects slowest critical protected asset.
+10. **Industrial coupling:** Stage-18 replacement/refit inputs correspond to actual fitted equipment rather than class cost multipliers.
+11. **World coupling:** Stage-20 route ETA uses the same representative capability envelope.
 
 ---
 
-## 12. Design constraints
+## 9. Design constraints
 
-1. Use mass and thrust as authoritative gameplay data; do not fake handling differences only in animation.
-2. Cargo mass must come from real inventory content/state where practical.
-3. Player and AI use the same local flight-dynamics rules.
-4. Movement remains fixed-tick and deterministic.
-5. Do not introduce full unrestricted Newtonian complexity unless it demonstrably improves the intended game.
-6. Flight assist may make controls convenient but may not bypass physical acceleration/braking limits.
-7. Advanced tactical AI is gated by stable combat depth; civilian survival/risk AI is not.
-8. Ship/fitting differentiation should emerge from data and shared systems, not scattered class-name conditionals.
-9. Strategic travel-time estimates and local movement should be compatible enough that planners do not systematically choose physically impossible schedules.
-10. Any future propulsion damage, fuel, power or heat mechanics must modify the same capability model rather than adding parallel exceptions.
+1. Mass and thrust are authoritative gameplay data.
+2. Cargo mass comes from real inventory content/state where practical.
+3. Player and AI use the same local dynamics.
+4. Movement remains deterministic and simulation-time driven.
+5. Flight assist cannot bypass acceleration/braking limits.
+6. Advanced tactical AI is gated by stable Stage-17.5 combat depth.
+7. Civilian survival/risk AI is not blocked by that gate.
+8. Ship differentiation emerges from fitted data, not class-name conditionals.
+9. Strategic ETA and local motion must remain compatible.
+10. Damage/fuel/power/heat modify the same capability model.
+11. Stage-18 industry produces and maintains the same physical fitted state used by flight/combat.
+12. Stage-20 geometry is calibrated against these capabilities rather than arbitrary map units.
