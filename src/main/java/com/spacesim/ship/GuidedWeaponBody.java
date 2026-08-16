@@ -1,6 +1,7 @@
 package com.spacesim.ship;
 
 import com.spacesim.ship.WeaponDefinition.GuidedWeapon;
+import com.spacesim.ship.WeaponDefinition.ProjectileShape;
 
 import java.util.Objects;
 
@@ -8,13 +9,18 @@ import java.util.Objects;
  * One authoritative Stage-17.5E guided missile/interceptor body.
  *
  * <p>Guidance and seeker availability are capabilities of the body, not its existence. Destroying
- * guidance therefore never deletes the physical mass, position, velocity or residual kinetic energy.
- * Propulsion consumes real propellant and changes velocity through the rocket equation.</p>
+ * guidance therefore never deletes the physical mass, geometry, position, velocity or residual
+ * kinetic energy. Propulsion consumes real propellant and changes velocity through the rocket equation.</p>
  *
  * @param bodyId stable simulation-local guided-body identity
  * @param sourceEntityId local identity of the launching entity
  * @param targetId current target hypothesis identity
- * @param definition immutable physical guided-weapon definition
+ * @param definition immutable physical guided-weapon propulsion/seeker definition
+ * @param materialId stable material content ID of the residual physical body
+ * @param shape physical body shape category used by later impact processing
+ * @param lengthM physical body length in meters
+ * @param diameterM physical body diameter in meters
+ * @param impactPayloadId optional stable warhead/impact-payload content seam; null means kinetic body only
  * @param xM current x position in meters
  * @param yM current y position in meters
  * @param velocityXMps current x velocity in meters per second
@@ -28,6 +34,11 @@ public record GuidedWeaponBody(
         long sourceEntityId,
         long targetId,
         GuidedWeapon definition,
+        String materialId,
+        ProjectileShape shape,
+        double lengthM,
+        double diameterM,
+        String impactPayloadId,
         double xM,
         double yM,
         double velocityXMps,
@@ -43,7 +54,12 @@ public record GuidedWeaponBody(
      * @param bodyId stable simulation-local guided-body identity
      * @param sourceEntityId local identity of the launching entity
      * @param targetId current target hypothesis identity
-     * @param definition immutable physical guided-weapon definition
+     * @param definition immutable physical guided-weapon propulsion/seeker definition
+     * @param materialId stable material content ID of the residual physical body
+     * @param shape physical body shape category
+     * @param lengthM physical body length in meters
+     * @param diameterM physical body diameter in meters
+     * @param impactPayloadId optional stable warhead/impact-payload content seam
      * @param xM current x position in meters
      * @param yM current y position in meters
      * @param velocityXMps current x velocity in meters per second
@@ -63,6 +79,13 @@ public record GuidedWeaponBody(
             throw new IllegalArgumentException("targetId must be positive");
         }
         Objects.requireNonNull(definition, "definition");
+        requireNonBlank(materialId, "materialId");
+        Objects.requireNonNull(shape, "shape");
+        requirePositiveFinite(lengthM, "lengthM");
+        requirePositiveFinite(diameterM, "diameterM");
+        if (impactPayloadId != null && impactPayloadId.isBlank()) {
+            throw new IllegalArgumentException("impactPayloadId must be null or non-blank");
+        }
         requireFinite(xM, "xM");
         requireFinite(yM, "yM");
         requireFinite(velocityXMps, "velocityXMps");
@@ -80,6 +103,11 @@ public record GuidedWeaponBody(
      * @param sourceEntityId launching entity identity
      * @param targetId target hypothesis identity
      * @param definition physical guided-weapon definition
+     * @param materialId stable material content ID of the body
+     * @param shape physical body shape category
+     * @param lengthM physical body length in meters
+     * @param diameterM physical body diameter in meters
+     * @param impactPayloadId optional warhead/impact-payload content seam
      * @param xM launch x position
      * @param yM launch y position
      * @param velocityXMps launch x velocity
@@ -91,6 +119,11 @@ public record GuidedWeaponBody(
             long sourceEntityId,
             long targetId,
             GuidedWeapon definition,
+            String materialId,
+            ProjectileShape shape,
+            double lengthM,
+            double diameterM,
+            String impactPayloadId,
             double xM,
             double yM,
             double velocityXMps,
@@ -101,6 +134,11 @@ public record GuidedWeaponBody(
                 sourceEntityId,
                 targetId,
                 checked,
+                materialId,
+                shape,
+                lengthM,
+                diameterM,
+                impactPayloadId,
                 xM,
                 yM,
                 velocityXMps,
@@ -141,18 +179,7 @@ public record GuidedWeaponBody(
      * @return body with guidance disabled and all physical state preserved
      */
     public GuidedWeaponBody disableGuidance() {
-        return new GuidedWeaponBody(
-                bodyId,
-                sourceEntityId,
-                targetId,
-                definition,
-                xM,
-                yM,
-                velocityXMps,
-                velocityYMps,
-                remainingPropellantKg,
-                seekerAvailable,
-                false);
+        return copyWith(seekerAvailable, false, xM, yM, velocityXMps, velocityYMps, remainingPropellantKg);
     }
 
     /**
@@ -161,18 +188,7 @@ public record GuidedWeaponBody(
      * @return body with seeker disabled and all physical state preserved
      */
     public GuidedWeaponBody disableSeeker() {
-        return new GuidedWeaponBody(
-                bodyId,
-                sourceEntityId,
-                targetId,
-                definition,
-                xM,
-                yM,
-                velocityXMps,
-                velocityYMps,
-                remainingPropellantKg,
-                false,
-                guidanceAvailable);
+        return copyWith(false, guidanceAvailable, xM, yM, velocityXMps, velocityYMps, remainingPropellantKg);
     }
 
     /**
@@ -210,18 +226,14 @@ public record GuidedWeaponBody(
         double finalPropellant = Math.max(0d, remainingPropellantKg - consumed);
         double finalMass = definition.dryMassKg() + finalPropellant;
         double deltaV = definition.exhaustVelocityMps() * Math.log(initialMass / finalMass);
-        return new GuidedWeaponBody(
-                bodyId,
-                sourceEntityId,
-                targetId,
-                definition,
+        return copyWith(
+                seekerAvailable,
+                guidanceAvailable,
                 xM,
                 yM,
                 velocityXMps + unitX * deltaV,
                 velocityYMps + unitY * deltaV,
-                finalPropellant,
-                seekerAvailable,
-                guidanceAvailable);
+                finalPropellant);
     }
 
     /**
@@ -232,18 +244,47 @@ public record GuidedWeaponBody(
      */
     public GuidedWeaponBody advanceBallistic(double deltaSeconds) {
         requirePositiveFinite(deltaSeconds, "deltaSeconds");
+        return copyWith(
+                seekerAvailable,
+                guidanceAvailable,
+                xM + velocityXMps * deltaSeconds,
+                yM + velocityYMps * deltaSeconds,
+                velocityXMps,
+                velocityYMps,
+                remainingPropellantKg);
+    }
+
+    private GuidedWeaponBody copyWith(
+            boolean nextSeekerAvailable,
+            boolean nextGuidanceAvailable,
+            double nextXM,
+            double nextYM,
+            double nextVelocityXMps,
+            double nextVelocityYMps,
+            double nextRemainingPropellantKg) {
         return new GuidedWeaponBody(
                 bodyId,
                 sourceEntityId,
                 targetId,
                 definition,
-                xM + velocityXMps * deltaSeconds,
-                yM + velocityYMps * deltaSeconds,
-                velocityXMps,
-                velocityYMps,
-                remainingPropellantKg,
-                seekerAvailable,
-                guidanceAvailable);
+                materialId,
+                shape,
+                lengthM,
+                diameterM,
+                impactPayloadId,
+                nextXM,
+                nextYM,
+                nextVelocityXMps,
+                nextVelocityYMps,
+                nextRemainingPropellantKg,
+                nextSeekerAvailable,
+                nextGuidanceAvailable);
+    }
+
+    private static void requireNonBlank(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " must be non-blank");
+        }
     }
 
     private static void requirePositiveFinite(double value, String label) {
