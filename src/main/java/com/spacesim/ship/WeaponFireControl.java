@@ -236,6 +236,7 @@ public final class WeaponFireControl {
      *
      * @param projectileId new simulation-local projectile identity
      * @param sourceEntityId firing entity local identity
+     * @param spawnTick deterministic simulation tick at muzzle exit
      * @param round physical round definition
      * @param shooter firing-platform state at muzzle exit
      * @param solution previously accepted solution
@@ -244,18 +245,23 @@ public final class WeaponFireControl {
     public ProjectileBody materializeKineticProjectile(
             long projectileId,
             long sourceEntityId,
+            long spawnTick,
             KineticRound round,
             KinematicState shooter,
             KineticFireSolution solution) {
         KineticRound checkedRound = Objects.requireNonNull(round, "round");
         KinematicState checkedShooter = Objects.requireNonNull(shooter, "shooter");
         KineticFireSolution checkedSolution = Objects.requireNonNull(solution, "solution");
+        if (spawnTick < 0L) {
+            throw new IllegalArgumentException("spawnTick must be non-negative");
+        }
         if (!checkedSolution.allowed()) {
             throw new IllegalArgumentException("cannot materialize a rejected fire solution");
         }
         return new ProjectileBody(
                 projectileId,
                 sourceEntityId,
+                spawnTick,
                 checkedRound.materialId(),
                 checkedRound.shape(),
                 checkedRound.lengthM(),
