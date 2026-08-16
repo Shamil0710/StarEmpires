@@ -29,7 +29,16 @@ public final class ShipWeaponEngineeringAdapter {
     private static final double RELATIVE_TOLERANCE = 1e-9d;
     private static final double MIN_OPERATIONAL_INTEGRITY = 1e-6d;
 
-    /** One fitted kinetic mount ready for common fire-control/ammunition runtime. */
+    /**
+     * One fitted kinetic mount ready for common fire-control/ammunition runtime.
+     *
+     * @param mountId physical fitted weapon mount
+     * @param moduleId weapon module content ID
+     * @param round physical loaded kinetic round
+     * @param launcher damage-aware launcher timing/support definition
+     * @param pointingJitterRad current pointing uncertainty
+     * @param recoilImpulseNs physical recoil impulse
+     */
     public record FittedKineticMount(
             String mountId,
             String moduleId,
@@ -37,7 +46,7 @@ public final class ShipWeaponEngineeringAdapter {
             Launcher launcher,
             double pointingJitterRad,
             double recoilImpulseNs) {
-        /** Validates one immutable fitted kinetic mount. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public FittedKineticMount {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
