@@ -4,7 +4,8 @@
 > Основание: accepted `Ship Mathematics v1.0 Design Baseline`, production Stage 17.5 и Stage 18 Resources / Industry / Infrastructure Foundation  
 > Назначение: сделать deterministic seed-driven galaxy generation физически согласованной с кораблями, сенсорами, логистикой, промышленной онтологией, экономикой и временем.
 
-Canonical generation-diversity contract: `docs/galaxy_topology_resource_geography_generation_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT**.
+Canonical generation-diversity contract: `docs/galaxy_topology_resource_geography_generation_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT**.  
+Canonical spatial-scale contract: `docs/spatial_scale_and_unbounded_system_space_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT**.
 
 ---
 
@@ -29,16 +30,19 @@ Stage 18 resource/object/facility ontology
 Дополнительная mandatory generation chain:
 
 ```text
-macro regions
+production ship/sensor/weapon/station capability
+→ spatial-scale calibration profile
+→ macro regions
 → system placement
 → explicit neighbor topology
 → topology diversity gate
+→ local system operational geometry
 → regional physical conditions
 → Stage-18 resource occurrences
 → facilities / economic bootstrap
 → faction-start candidates
 → whole-route delivered-cost / dependency analysis
-→ world-quality gate
+→ spatial/topology/economic world-quality gate
 → materialized authoritative world
 ```
 
@@ -64,6 +68,32 @@ Inter-system topology использует stable system IDs + explicit jump edg
 Канонический cross-stage navigation contract: `docs/inter_system_navigation_contract.md`.
 
 > **Ordinary inter-system movement разрешён только между непосредственными соседями jump graph. Если `B ∉ topology.neighbors(A)`, ordinary jump `A → B` невозможен. Любой дальний маршрут исполняется как последовательность отдельных neighbor hops.**
+
+## Unbounded local system space
+
+Локальное пространство star system концептуально **не ограничено краем игровой карты**.
+
+Нужно различать:
+
+```text
+authoritative physical coordinate space
+≠ generated operational/content envelope
+≠ render/materialization window
+```
+
+`Operational/content envelope` определяет, где generator обычно размещает значимые celestial bodies, stations, resource fields, jump zones и special locations. Он не является wall/radius движения.
+
+`Render/materialization window` может быть bounded ради performance, но выход объекта за camera/culling bounds не может:
+
+- остановить или развернуть корабль;
+- удалить authoritative entity/state;
+- телепортировать объект обратно;
+- сбросить damage/consumables/velocity;
+- автоматически перевести объект в другую систему.
+
+Полет на большое локальное расстояние остаётся движением внутри текущего `StarSystemId`. Переход в другую систему всё равно требует explicit transition semantics; ordinary case — один neighbor edge.
+
+Production implementation обязан иметь documented numerical-precision strategy для больших local coordinates: sufficiently precise authoritative representation, local reference frames, floating origin/camera-relative rendering, hierarchical coordinates или другой deterministic equivalent. Origin rebasing не имеет права менять physical distance/state.
 
 Запрещено создавать несвязанные:
 
@@ -103,6 +133,22 @@ stores/endurance
 sensor visibility along route
 ```
 
+Spatial calibration additionally consumes representative Stage-17.5/18 matrices:
+
+```text
+target signature states
+sensor suites / channels
+track-quality thresholds
+fire-control thresholds
+kinetic / beam / guided weapon families
+weapon time-of-flight / effectiveness bands
+PD / interceptor safe-intercept geometry
+formation spacing
+station physical footprints
+station defensive/sensor capability
+jump-arrival geometry
+```
+
 Reference v1.0 lower-bound anchors:
 
 - loaded bulk freighter 100,000 km ≈ 19.18 h;
@@ -110,9 +156,17 @@ Reference v1.0 lower-bound anchors:
 - escort destroyer sustained 100,000 km ≈ 14.32 h;
 - escort destroyer sustained 1,000,000 km ≈ 45.29 h.
 
-Это не target travel times. Stage 20 должен решить, какие distributions дают желаемый gameplay cadence, и при необходимости менять world geometry, jump network density или technology content **внутри accepted model**, а не вводить teleport speed multiplier.
+Reference v1.0 scale relationship additionally includes:
 
-Те же calibration runs задают versioned acceptance bands для topology/resource quality metrics. Порогам запрещено быть произвольными вечными constants: они должны быть проверены representative ships, trade cadence, reinforcement times и Stage-18 supply chains.
+```text
+heavy direct-fire reference envelope ~ 3,000 km
+local logistics calibration leg = 100,000 km
+destroyer central plume detection reference ~ 30 million km
+```
+
+Это не target travel times/ranges и не hard system radius. Stage 20 должен решить, какие distributions дают желаемый gameplay cadence, и при необходимости менять world geometry, jump network density или technology content **внутри accepted model**, а не вводить teleport speed multiplier или screen-space weapon/sensor range.
+
+Те же calibration runs задают versioned acceptance bands для topology/resource/spatial quality metrics. Порогам запрещено быть произвольными вечными constants: они должны быть проверены representative ships, trade cadence, engagement geometry, reinforcement times и Stage-18 supply chains.
 
 ## DoD 20A
 
@@ -126,6 +180,12 @@ inner → outer system
 system → neighboring system
 regional 3–5 hop route
 fleet reinforcement route
+sensor detection → classification → track → fire-control
+weapon time-of-flight / effectiveness by representative target
+missile / interceptor terminal geometry
+formation / PD spacing
+station defensive / traffic geometry
+far-coordinate numerical precision
 ```
 
 с расчётом civilian и military profiles.
@@ -141,6 +201,23 @@ maxSingleGatewayDependency
 sectorExitBand
 hubDegreeBand
 regionalHopDistanceBand
+
+localTravelTimeBands
+brakingDistanceBands
+sensorDetectionBands
+classificationBands
+trackQualityBands
+fireControlQualityBands
+weaponEffectivenessBands
+weaponTimeOfFlightBands
+pdInterceptBands
+formationSpacingBands
+stationPhysicalFootprintBands
+stationSpacingBands
+jumpArrivalStandOffBands
+majorInfrastructureExtentBands
+precisionErrorBudget
+materializationDistanceBands
 ```
 
 ---
@@ -163,6 +240,37 @@ Generator должен создавать system geometry в SI.
 
 Star Empires не обязан быть orbital-mechanics simulator. Но если orbit/planet distance используется визуально или mechanically, geometry должна быть internally coherent и иметь physical coordinates.
 
+## System extent is descriptive, not a wall
+
+Допустимо генерировать descriptive metrics:
+
+```text
+coreActivityRadiusPercentile
+majorInfrastructureExtent
+resourceFieldExtent
+jumpArrivalExtent
+surveyedContentExtent
+expectedTrafficExtent
+```
+
+Они описывают распределение meaningful content и помогают maps/LOD/calibration, но не являются authoritative `systemRadius` для clamp/delete/teleport.
+
+За пределами normal content envelope local space остаётся валидным, хотя может становиться всё более пустым.
+
+## Station geometry
+
+Station physical footprint не выводится из размера UI icon/sprite. Stage-18 facility/station layout должен предоставлять или позволять вывести, где применимо:
+
+- collision/structural footprint;
+- berth/docking geometry;
+- shipyard integration envelope;
+- storage/industrial footprint;
+- radiator/thermal infrastructure;
+- sensor/weapon mount geometry;
+- traffic/approach clearance.
+
+UI icon может быть exaggerated на дальнем zoom только как presentation.
+
 ## Placement constraints
 
 Generation должен проверять:
@@ -173,11 +281,19 @@ Generation должен проверять:
 - weapon safety/strategic stand-off where needed;
 - sensor line-of-sight/occlusion if implemented;
 - mining approach/access;
-- practical travel-time bands.
+- practical travel-time bands;
+- acceleration/braking distance;
+- sensor detection/track/fire-control warning geometry;
+- weapon time-of-flight/effectiveness geometry;
+- PD/formation geometry;
+- station defensive coverage versus civilian traffic;
+- numerical precision at far operational coordinates.
 
 ## Anti-pattern
 
 Не создавать 30 stations на круге radius `1000 units`, если `unit` не имеет SI meaning и все маршруты занимают одинаковые секунды независимо от ship mass/thrust.
+
+Также запрещено считать border экрана или renderer viewport границей star system.
 
 ---
 
@@ -193,9 +309,13 @@ militaryResponseTimeBand
 roundTripDeltaVBand
 expectedCargoCycleTime
 expectedSensorExposureTime
+sensorDetectionToFireControlWarningBand
+weaponTimeOfFlightBand
+jumpArrivalApproachBand
+stationDefenseStandOffBand
 ```
 
-Затем подбирает physical geometry, которая даёт такие bands для representative ships.
+Затем подбирает physical geometry, которая даёт такие bands для representative ships/targets/weapons.
 
 Можно авторить labels:
 
@@ -207,6 +327,8 @@ REMOTE_RESOURCE_ROUTE
 ```
 
 но каждый label обязан разрешаться в SI distance/time distributions через calibration, а не быть самостоятельной distance system.
+
+Default generation не должна случайно ставить major independent stations так близко, что они постоянно находятся в unavoidable mutual point-blank combat geometry. При этом intentionally fortified gateways/bases могут физически перекрывать route/approach, если это реальный generated strategic outcome.
 
 ---
 
@@ -253,6 +375,8 @@ spool time
 cooldown
 heat/damage constraints
 ```
+
+Arrival geometry внутри destination system проверяется spatial calibration: ordinary arrival не должен автоматически materialize fleet внутри guaranteed lethal point-blank envelope major station без explicit design rule, но и не должен создавать disproportionate empty-flight leg до любого meaningful content.
 
 ## Topology goals
 
@@ -576,6 +700,8 @@ KNOWN_STATIC_LOCATION
 - loadout;
 - fire-control position.
 
+Generated geometry должна давать meaningful duration для intermediate information states. Если representative bright contact почти мгновенно переходит из first detection в point-blank fire-control только потому, что карта слишком мала, spatial profile отклоняется.
+
 ## Resource knowledge
 
 Discovery resource body не означает точное знание reserve.
@@ -696,6 +822,8 @@ Save хранит уже materialized authoritative world; изменение ge
 
 Resource occurrence IDs/reserves, facilities and discovered knowledge входят в persistence semantics.
 
+Far-local positions/velocities и state, необходимые для причинного продолжения движения, также не могут теряться из-за render/materialization culling.
+
 ---
 
 # 14. Stage 20L — physical world acceptance matrix
@@ -705,12 +833,30 @@ Resource occurrence IDs/reserves, facilities and discovered knowledge входя
 Для N representative seeds проверить distributions:
 
 - station spacing;
+- station physical footprint/approach clearance;
 - mining route spacing;
 - hub-to-jump distance;
 - local travel time;
 - multi-hop travel time;
 - reinforcement time;
-- delta-v demand.
+- delta-v demand;
+- acceleration/braking consequence;
+- sensor detection/classification/track/fire-control distance and warning-time bands;
+- weapon effectiveness/time-of-flight bands;
+- PD/interceptor/formation spacing;
+- jump-arrival defensive stand-off;
+- system meaningful-content extent;
+- far-coordinate numerical precision.
+
+## Unbounded-space tests
+
+- ship can move beyond visible/system-map presentation extent without clamp/bounce/delete;
+- camera/render culling does not change authoritative position/velocity/state;
+- tactical materialization → distant LOD → rematerialization preserves equivalent elapsed physical consequences;
+- traveling arbitrarily far locally does not enter another system without explicit transition;
+- empty space outside normal content envelope remains valid coordinate space;
+- camera/floating-origin rebase leaves physical distances unchanged;
+- precision at far operational coordinates remains inside calibrated error budget.
 
 ## Topology diversity tests
 
@@ -765,21 +911,27 @@ Seed не принимается только потому, что connected: co
 
 - visible objects не скрываются artificial map radius;
 - detection ≠ fire-control;
+- detection-to-fire-control phase has measurable geometry/time for representative cases;
 - recon placement меняет knowledge quality;
 - resource survey quality changes deposit knowledge rather than reserve itself.
 
 ## Tactical/strategic scale tests
 
-- combat envelopes малы относительно typical strategic route where intended;
+- combat envelopes малы относительно typical strategic/local-logistics route where intended;
+- long-range detection can materially precede fire-control for representative bright targets;
 - formation/PD distances сохраняют физический смысл;
-- jump arrival zones не создают guaranteed instant point-blank combat без explicit design.
+- jump arrival zones не создают guaranteed instant point-blank combat без explicit design;
+- major-station spacing does not accidentally collapse the whole system into permanent mutual weapon envelopes;
+- fast patrol and loaded freighter experience different transit consequences on the same generated route.
 
 ## Performance tests
 
 - generation bounded;
 - remote simulation does not full-rate integrate every object;
 - generated topology remains route-planner scalable;
-- generated facilities/resources fit scalability target envelope.
+- generated facilities/resources fit scalability target envelope;
+- unbounded conceptual local space does not require simulation of empty volume;
+- LOD/materialization cost remains bounded independently of absolute coordinate distance.
 
 ## World-quality gate outcome
 
@@ -794,35 +946,52 @@ EXPLICIT_SCENARIO_OVERRIDE
 
 Repair bounded и versioned. Repair не имеет права создавать hidden resources, нарушать Stage-18 host compatibility, physics, conservation, player/AI parity или выдавать free faction assets.
 
+Spatial repair также не имеет права вводить invisible walls, hidden speed multipliers, screen-space ranges или player-only travel shortcuts.
+
 ---
 
 # 15. Stage 20 hard invariants
 
 1. every authoritative local distance maps to meters;
-2. every ship ETA uses actual movement/jump capability;
-3. cargo/ship mass affects logistics time through shared physics;
-4. every ordinary inter-system movement is exactly one explicit neighbor edge; no direct jump to non-neighbor systems and no skipped intermediate hops;
-5. production topology cannot use sequential chain as a sufficient final generation algorithm;
-6. generated topology must pass measurable anti-linearity/redundancy/criticality gates;
-7. sectors are spatial/strategic regions, not list partitions;
-8. no instant inter-system teleport outside an explicitly designed transition contract;
-9. sensor visibility uses physical channels;
-10. discovery does not grant omniscience;
-11. production cadence is checked against logistics latency;
-12. resource types/facilities come from Stage-18 ontology, not generator-only shortcuts;
-13. resource geography combines regional physical correlation + host compatibility + local deterministic variance;
-14. sector/archetype labels cannot grant hidden resource/production bonuses;
-15. ordinary world does not require every system/sector to be self-sufficient;
-16. essential start viability must be physically reachable without hidden supplies;
-17. strategic scarcity/dependency must survive bootstrap strongly enough to affect logistics/economics;
-18. industrial specialization exists through real facilities/inputs/imports;
-19. whole-route economic value/dependency uses actual neighbor-edge paths;
-20. generated dead economy requires explicit intended scenario, not accidental seed failure;
-21. accidental civilization-critical monopoly is rejected unless explicit scenario design passes acceptance;
-22. faction interests derive from authoritative world state, not injected worldgen objectives;
-23. player and AI inhabit the same generated geometry, resources and jump graph;
-24. deterministic same seed/version/profile/content fingerprint produces equivalent world/report;
-25. generator never creates runtime hidden supplies or emergency deposits to bypass physical economy.
+2. star-system local coordinate space has no gameplay wall/edge;
+3. generated operational/content envelope is descriptive, not a movement boundary;
+4. render/camera/materialization bounds are never physics bounds;
+5. every ship ETA uses actual movement/jump capability;
+6. cargo/ship mass affects logistics time through shared physics;
+7. acceleration/braking/delta-v remain meaningful at generated local distances;
+8. sensor detection/classification/track/fire-control remain distinct physical/information states;
+9. weapon effectiveness is family-specific physical solution, not screen-space hard radius;
+10. tactical, logistics and broad system scales remain measurably distinct where intended;
+11. station physical geometry is independent from presentation icon size;
+12. jump-arrival geometry is calibrated against approach and defensive envelopes;
+13. off-screen/far objects cannot be clamped, deleted, reset or teleported because of presentation bounds;
+14. simulation LOD preserves authoritative state and elapsed physical consequences;
+15. numerical-precision/origin-rebasing strategy must preserve calibrated relative-position error budget;
+16. moving far locally never bypasses explicit inter-system transition semantics;
+17. every ordinary inter-system movement is exactly one explicit neighbor edge; no direct jump to non-neighbor systems and no skipped intermediate hops;
+18. production topology cannot use sequential chain as a sufficient final generation algorithm;
+19. generated topology must pass measurable anti-linearity/redundancy/criticality gates;
+20. sectors are spatial/strategic regions, not list partitions;
+21. no instant inter-system teleport outside an explicitly designed transition contract;
+22. sensor visibility uses physical channels;
+23. discovery does not grant omniscience;
+24. production cadence is checked against logistics latency;
+25. resource types/facilities come from Stage-18 ontology, not generator-only shortcuts;
+26. resource geography combines regional physical correlation + host compatibility + local deterministic variance;
+27. sector/archetype labels cannot grant hidden resource/production bonuses;
+28. ordinary world does not require every system/sector to be self-sufficient;
+29. essential start viability must be physically reachable without hidden supplies;
+30. strategic scarcity/dependency must survive bootstrap strongly enough to affect logistics/economics;
+31. industrial specialization exists through real facilities/inputs/imports;
+32. whole-route economic value/dependency uses actual neighbor-edge paths;
+33. generated dead economy requires explicit intended scenario, not accidental seed failure;
+34. accidental civilization-critical monopoly is rejected unless explicit scenario design passes acceptance;
+35. faction interests derive from authoritative world state, not injected worldgen objectives;
+36. player and AI inhabit the same generated geometry, resources and jump graph;
+37. time acceleration/autopilot cannot create player-only faster physical travel;
+38. deterministic same seed/version/profile/content fingerprint produces equivalent world/report;
+39. generator never creates runtime hidden supplies or emergency deposits to bypass physical economy;
+40. bad spatial-scale profiles are rejected/recalibrated before production world acceptance.
 
 ---
 
@@ -830,4 +999,4 @@ Repair bounded и versioned. Repair не имеет права создават�
 
 Stage 20 COMPLETE означает:
 
-> **галактика и системы генерируются детерминированно из закрытой Stage-18 resource/industry ontology так, что расстояния, travel time, delta-v, neighbor-only jump topology, sensor visibility, resource occurrence, industrial specialization, logistics throughput и economic cadence согласованы с accepted Ship Mathematics и production capabilities; topology имеет измеримое разнообразие вместо преобладающей линейной очереди; sectors образуют различимые regions с hubs, forks, cycles, gateways, alternate paths, frontier pockets и bounded chokepoints; resources образуют физически осмысленные региональные кластеры с comparative advantage и local variance; typical starts жизнеспособны, но сохраняют реальные внешние зависимости; whole-route delivered cost и gateway concentration естественно создают торговые и стратегические интересы; плохие seeds отклоняются или детерминированно исправляются до materialization; discovery остаётся explicit, дальние маршруты исполняются как последовательности direct edges, а generated world не требует hidden teleport/restock/resource shortcuts для нормальной жизни.**
+> **галактика и системы генерируются детерминированно из закрытой Stage-18 resource/industry ontology так, что единое SI-пространство, acceleration/braking/delta-v, neighbor-only jump topology, sensor detection/track/fire-control, weapon/PD/formation geometry, station physical size/spacing, jump-arrival stand-off, resource occurrence, industrial specialization, logistics throughput и economic cadence согласованы с accepted Ship Mathematics и production capabilities; локальное пространство системы не имеет gameplay map edge, generated content envelope и render/materialization windows остаются лишь bounded distributions/implementation windows, far objects сохраняют authoritative state и numerical precision; topology имеет измеримое разнообразие вместо преобладающей линейной очереди; sectors образуют различимые regions с hubs, forks, cycles, gateways, alternate paths, frontier pockets и bounded chokepoints; resources образуют физически осмысленные региональные кластеры с comparative advantage и local variance; typical starts жизнеспособны, но сохраняют реальные внешние зависимости; whole-route delivered cost и gateway concentration естественно создают торговые и стратегические интересы; плохие seeds/scale profiles отклоняются или детерминированно исправляются до materialization; discovery остаётся explicit, дальние маршруты исполняются как последовательности direct edges, а generated world не требует hidden teleport/restock/resource shortcuts для нормальной жизни.**
