@@ -19,6 +19,7 @@ import java.util.Objects;
  * @param contributingObservers number of distinct observers in the current solution
  * @param fusedMeasurementCount number of measurements fused into the current solution
  */
+@SuppressWarnings("doclint:missing")
 public record TrackState(
         long targetId,
         InformationState informationState,
@@ -67,7 +68,12 @@ public record TrackState(
         }
     }
 
-    /** @return track age in seconds at the supplied authoritative time */
+    /**
+     * Returns track age at an authoritative time.
+     *
+     * @param nowSeconds authoritative current time, not earlier than the freshest measurement
+     * @return track age in seconds
+     */
     public double ageSeconds(double nowSeconds) {
         if (!Double.isFinite(nowSeconds) || nowSeconds < lastMeasurementSeconds) {
             throw new IllegalArgumentException("nowSeconds must be finite and not precede the last measurement");
