@@ -19,7 +19,6 @@ import java.util.Objects;
  * @param contributingObservers number of distinct observers in the current solution
  * @param fusedMeasurementCount number of measurements fused into the current solution
  */
-@SuppressWarnings("doclint:missing")
 public record TrackState(
         long targetId,
         InformationState informationState,
@@ -40,7 +39,20 @@ public record TrackState(
         /** Fresh covariance is good enough for downstream weapon-specific fire-control work. */ FIRE_CONTROL
     }
 
-    /** Validates stable identity and explicit known/unknown position semantics. */
+    /**
+     * Validates stable identity and explicit known/unknown position semantics.
+     *
+     * @param targetId stable target identity value
+     * @param informationState current information quality state
+     * @param positionKnown whether Cartesian target position has been solved
+     * @param estimatedXM estimated x position when known
+     * @param estimatedYM estimated y position when known
+     * @param covariance current uncertainty state
+     * @param classificationConfidence deterministic classification evidence in [0,1]
+     * @param lastMeasurementSeconds authoritative time of the freshest fused measurement
+     * @param contributingObservers number of distinct observers in the current solution
+     * @param fusedMeasurementCount number of measurements fused into the current solution
+     */
     public TrackState {
         if (targetId <= 0L) {
             throw new IllegalArgumentException("targetId must be positive");
