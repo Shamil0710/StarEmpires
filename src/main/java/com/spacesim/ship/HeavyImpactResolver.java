@@ -23,6 +23,13 @@ import java.util.Objects;
 public final class HeavyImpactResolver {
     private static final double MIN_COSINE = 0.05d;
 
+    /** Stable terminal material-response outcome. */
+    public enum Outcome {
+        /** Projectile energy was consumed by the protection stack. */ STOPPED,
+        /** Authored shallow-angle response deflected a residual physical projectile. */ RICOCHET,
+        /** Residual projectile energy passed through the ordered protection stack. */ PERFORATED
+    }
+
     private final ShipEngineeringCatalog engineering;
     private final ShipProtectionCatalog protection;
 
@@ -88,11 +95,34 @@ public final class HeavyImpactResolver {
             requireInside(surface, checkedProjectile);
 
             double relativeAngle = incidenceAngleRad - layer.orientationRad();
+            double angleFromNormal = Math.acos(Math.abs(Math.cos(relativeAngle)));
             double cosine = Math.max(MIN_COSINE, Math.abs(Math.cos(relativeAngle)));
             double effectiveThicknessM = layer.thicknessM() / cosine;
             double encounteredMassKg = material.densityKgPerM3() * effectiveThicknessM * projectileAreaM2
                     * layer.coverageFraction();
             double capacityJ = encounteredMassKg * model.specificAbsorptionJPerKg();
+
+            if (angleFromNormal >= model.ricochetCriticalAngleRad()) {
+                double retainedJ = residualEnergyJ * model.ricochetRetainedEnergyFraction();
+                double absorbedJ = residualEnergyJ - retainedJ;
+                double spallMassKg = encounteredMassKg * model.spallMassFraction()
+                        * Math.min(1d, absorbedJ / Math.max(capacityJ, 1e-12d));
+                double spallEnergyJ = absorbedJ * model.spallEnergyFraction();
+                interactions.add(new LayerInteraction(
+                        layerIndex, material.id(), responseId, effectiveThicknessM, encounteredMassKg,
+                        capacityJ, absorbedJ, retainedJ, spallMassKg, spallEnergyJ));
+                return new ImpactResult(
+                        protectionStackId,
+                        checkedProjectile.kineticEnergyJ(),
+                        absorbedJ,
+                        retainedJ,
+                        false,
+                        Outcome.RICOCHET,
+                        interactions,
+                        new FragmentCloud(spallMassKg, spallEnergyJ, false),
+                        0d);
+            }
+
             double absorbedJ = Math.min(residualEnergyJ, capacityJ);
             residualEnergyJ -= absorbedJ;
             totalAbsorbedJ += absorbedJ;
@@ -119,14 +149,16 @@ public final class HeavyImpactResolver {
             }
         }
 
-        FragmentCloud fragments = new FragmentCloud(totalSpallMassKg, totalSpallEnergyJ);
-        double internalDamageEnergyJ = residualEnergyJ + totalSpallEnergyJ;
+        boolean penetrated = residualEnergyJ > 0d;
+        FragmentCloud fragments = new FragmentCloud(totalSpallMassKg, totalSpallEnergyJ, penetrated);
+        double internalDamageEnergyJ = penetrated ? residualEnergyJ + totalSpallEnergyJ : 0d;
         return new ImpactResult(
                 protectionStackId,
                 checkedProjectile.kineticEnergyJ(),
                 totalAbsorbedJ,
                 residualEnergyJ,
-                residualEnergyJ > 0d,
+                penetrated,
+                penetrated ? Outcome.PERFORATED : Outcome.STOPPED,
                 interactions,
                 fragments,
                 internalDamageEnergyJ);
@@ -159,12 +191,13 @@ public final class HeavyImpactResolver {
             double spallEnergyJ) { }
 
     /**
-     * Deterministic aggregate fragment/spall cloud emitted by the traversed protection layers.
+     * Deterministic aggregate fragment/spall cloud emitted by protection interaction.
      *
      * @param massKg aggregate fragment mass
      * @param kineticEnergyJ aggregate fragment kinetic energy
+     * @param internal whether this cloud is routed into ship-internal damage geometry
      */
-    public record FragmentCloud(double massKg, double kineticEnergyJ) { }
+    public record FragmentCloud(double massKg, double kineticEnergyJ, boolean internal) { }
 
     /** Complete physical response of one stack to one projectile. */
     public record ImpactResult(
@@ -173,11 +206,13 @@ public final class HeavyImpactResolver {
             double absorbedEnergyJ,
             double residualProjectileEnergyJ,
             boolean penetrated,
+            Outcome outcome,
             List<LayerInteraction> layerInteractions,
             FragmentCloud fragments,
             double internalDamageEnergyJ) {
         /** Freezes ordered layer results. */
         public ImpactResult {
+            Objects.requireNonNull(outcome, "outcome");
             Objects.requireNonNull(layerInteractions, "layerInteractions");
             layerInteractions = List.copyOf(layerInteractions);
             Objects.requireNonNull(fragments, "fragments");
