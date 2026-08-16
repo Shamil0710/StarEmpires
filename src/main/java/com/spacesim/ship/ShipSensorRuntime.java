@@ -650,6 +650,14 @@ public final class ShipSensorRuntime {
             double yM,
             double positionVarianceM2,
             double rangeVarianceM2) {
+        /**
+         * Validates one fused Cartesian position solution.
+         *
+         * @param xM fused target x coordinate in meters
+         * @param yM fused target y coordinate in meters
+         * @param positionVarianceM2 positive Cartesian position variance
+         * @param rangeVarianceM2 positive range variance retained for downstream covariance reporting
+         */
         private PositionSolution {
             requireFinite(xM, "xM");
             requireFinite(yM, "yM");
@@ -664,6 +672,13 @@ public final class ShipSensorRuntime {
             SensorMeasurement first,
             SensorMeasurement second,
             double geometry) implements Comparable<BearingPair> {
+        /**
+         * Validates one candidate two-bearing triangulation pair.
+         *
+         * @param first first bearing measurement
+         * @param second second bearing measurement from a distinct observer
+         * @param geometry positive absolute sine of bearing intersection angle
+         */
         private BearingPair {
             Objects.requireNonNull(first, "first");
             Objects.requireNonNull(second, "second");
