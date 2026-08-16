@@ -97,18 +97,27 @@ public final class ShipProtectionCatalog {
      * @param specificAbsorptionJPerKg energy absorbed per kilogram of directly encountered layer material
      * @param spallMassFraction fraction of encountered material emitted as an aggregate fragment cloud
      * @param spallEnergyFraction fraction of absorbed energy carried by the aggregate fragment cloud
+     * @param ricochetCriticalAngleRad minimum absolute incidence angle from normal for authored ricochet
+     * @param ricochetRetainedEnergyFraction fraction of projectile energy retained after authored ricochet
      */
     public record HeavyImpactModel(
             String responseSurfaceId,
             double specificAbsorptionJPerKg,
             double spallMassFraction,
-            double spallEnergyFraction) {
+            double spallEnergyFraction,
+            double ricochetCriticalAngleRad,
+            double ricochetRetainedEnergyFraction) {
         /** Validates a bounded response model. */
         public HeavyImpactModel {
             requireNonBlank(responseSurfaceId, "responseSurfaceId");
             requirePositiveFinite(specificAbsorptionJPerKg, "specificAbsorptionJPerKg");
             requireUnitInterval(spallMassFraction, "spallMassFraction");
             requireUnitInterval(spallEnergyFraction, "spallEnergyFraction");
+            if (!Double.isFinite(ricochetCriticalAngleRad)
+                    || ricochetCriticalAngleRad <= 0d || ricochetCriticalAngleRad > Math.PI / 2d) {
+                throw new IllegalArgumentException("ricochetCriticalAngleRad must be in (0,pi/2]");
+            }
+            requireUnitInterval(ricochetRetainedEnergyFraction, "ricochetRetainedEnergyFraction");
         }
     }
 
