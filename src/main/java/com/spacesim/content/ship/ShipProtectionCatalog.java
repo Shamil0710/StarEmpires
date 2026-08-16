@@ -107,7 +107,16 @@ public final class ShipProtectionCatalog {
             double spallEnergyFraction,
             double ricochetCriticalAngleRad,
             double ricochetRetainedEnergyFraction) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates a bounded response model.
+         *
+         * @param responseSurfaceId referenced Stage-17.5A surface ID
+         * @param specificAbsorptionJPerKg energy absorbed per kilogram of directly encountered layer material
+         * @param spallMassFraction fraction of encountered material emitted as an aggregate fragment cloud
+         * @param spallEnergyFraction fraction of absorbed energy carried by the aggregate fragment cloud
+         * @param ricochetCriticalAngleRad minimum absolute incidence angle from normal for authored ricochet
+         * @param ricochetRetainedEnergyFraction fraction of projectile energy retained after authored ricochet
+         */
         public HeavyImpactModel {
             requireNonBlank(responseSurfaceId, "responseSurfaceId");
             requirePositiveFinite(specificAbsorptionJPerKg, "specificAbsorptionJPerKg");
@@ -132,7 +141,13 @@ public final class ShipProtectionCatalog {
             String hullId,
             List<CompartmentDamageDefinition> compartments,
             List<MountDamageDefinition> mounts) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates and freezes deterministic damage-layout data.
+         *
+         * @param hullId referenced engineering hull ID
+         * @param compartments authored compartment structural damage capacities/coupling
+         * @param mounts explicit installed-mount locations and subsystem damage capacities
+         */
         public HullDamageLayout {
             requireNonBlank(hullId, "hullId");
             Objects.requireNonNull(compartments, "compartments");
@@ -175,7 +190,13 @@ public final class ShipProtectionCatalog {
             String compartmentId,
             double structuralDamageCapacityJ,
             double subsystemCouplingFraction) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates compartment damage parameters.
+         *
+         * @param compartmentId hull-local compartment ID
+         * @param structuralDamageCapacityJ energy scale for degrading compartment structural integrity
+         * @param subsystemCouplingFraction fraction of penetrating internal energy coupled to located subsystems
+         */
         public CompartmentDamageDefinition {
             requireNonBlank(compartmentId, "compartmentId");
             requirePositiveFinite(structuralDamageCapacityJ, "structuralDamageCapacityJ");
@@ -194,7 +215,13 @@ public final class ShipProtectionCatalog {
             String mountId,
             String compartmentId,
             double subsystemDamageCapacityJ) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates mount location/capacity.
+         *
+         * @param mountId hull-local slot/hardpoint ID
+         * @param compartmentId containing compartment ID
+         * @param subsystemDamageCapacityJ energy scale for reducing this mount's integrity from 1 to 0
+         */
         public MountDamageDefinition {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(compartmentId, "compartmentId");
