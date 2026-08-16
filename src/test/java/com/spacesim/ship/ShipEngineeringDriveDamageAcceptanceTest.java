@@ -39,6 +39,8 @@ class ShipEngineeringDriveDamageAcceptanceTest {
         RuntimeState healthy = runtime.initialize(fit, loads);
         double ratedThrustN = catalog.findModule("module.main_drive_escort_v1")
                 .capabilityParameters().get("thrust_n");
+        double exhaustVelocityMps = catalog.findModule("module.main_drive_escort_v1")
+                .capabilityParameters().get("exhaust_velocity_mps");
         double damagedThrustCeilingN = ratedThrustN * 0.5d;
         RuntimeState driveDamaged = new RuntimeState(
                 healthy.consumables(),
@@ -56,11 +58,15 @@ class ShipEngineeringDriveDamageAcceptanceTest {
                 1d);
 
         assertEquals(13_200_000d, ratedThrustN, 0d);
-        assertEquals(6_600_000d, result.actualThrustN(), 1e-6);
+        assertEquals(ratedThrustN * 0.5d, result.actualThrustN(), 1e-6);
         assertEquals(
-                result.actualThrustN() / result.derivedState().totalMassKg(),
-                result.actualThrustN() / result.derivedState().totalMassKg(),
-                0d,
-                "damage consequence must come from the mount's physical thrust ceiling, not a class-name modifier");
+                damagedThrustCeilingN / exhaustVelocityMps,
+                result.actualMassFlowKgPerS(),
+                1e-9,
+                "damage must reduce thrust and reaction-mass flow through the same physical drive ceiling");
+        assertEquals(
+                100_000d - result.actualMassFlowKgPerS(),
+                result.state().consumables().reactionMassKg(),
+                1e-9);
     }
 }
