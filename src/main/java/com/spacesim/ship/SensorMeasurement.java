@@ -26,7 +26,6 @@ import java.util.Objects;
  * @param snr resulting signal-to-noise-plus-interference ratio
  * @param evidenceState strongest information-state evidence supplied by this measurement alone
  */
-@SuppressWarnings("doclint:missing")
 public record SensorMeasurement(
         long observerId,
         long targetId,
@@ -43,7 +42,24 @@ public record SensorMeasurement(
         double snr,
         TrackState.InformationState evidenceState) {
 
-    /** Validates identity, geometry and covariance semantics. */
+    /**
+     * Validates identity, geometry and covariance semantics.
+     *
+     * @param observerId stable observer identity value
+     * @param targetId stable target identity value
+     * @param channel signature channel
+     * @param timestampSeconds authoritative measurement time
+     * @param observerXM observer x position in meters
+     * @param observerYM observer y position in meters
+     * @param bearingRad measured bearing
+     * @param rangeM measured range or {@code null} for bearing-only measurement
+     * @param bearingVarianceRad2 one-sigma bearing variance
+     * @param rangeVarianceM2 range variance or {@code null} when range is unknown
+     * @param receivedSignalPowerW received target signal power
+     * @param effectiveInterferencePowerW post-ECCM interference power
+     * @param snr resulting signal-to-noise-plus-interference ratio
+     * @param evidenceState strongest information-state evidence supplied by this measurement alone
+     */
     public SensorMeasurement {
         if (observerId <= 0L || targetId <= 0L) {
             throw new IllegalArgumentException("observerId and targetId must be positive");
