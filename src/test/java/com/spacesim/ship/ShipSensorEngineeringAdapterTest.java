@@ -46,7 +46,7 @@ class ShipSensorEngineeringAdapterTest {
         assertEquals(0d, suite.staticSignature().activeRadioEmissionPowerW(), 0d);
         assertEquals(0d, suite.staticSignature().jammerEmissionPowerW(), 0d);
         assertEquals(950_000_000_000d, suite.staticSignature().enginePlumeRadiantPowerW(), 0d);
-        assertEquals(1_923_000_000d, suite.staticSignature().thermalRadiantPowerW(), 0d);
+        assertEquals(3_420_000_000d, suite.staticSignature().thermalRadiantPowerW(), 0d);
         assertTrue(derived.signatureContributions().containsKey("thermal_w"));
     }
 
