@@ -38,7 +38,12 @@ public final class ShipDamageRuntime {
     public record Snapshot(
             Map<String, Double> compartmentIntegrityById,
             DamageState moduleDamage) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates and freezes one damage snapshot.
+         *
+         * @param compartmentIntegrityById local structural integrity values in [0,1]
+         * @param moduleDamage central module-integrity state consumed by the derived ship calculator
+         */
         public Snapshot {
             Objects.requireNonNull(compartmentIntegrityById, "compartmentIntegrityById");
             TreeMap<String, Double> copy = new TreeMap<>();
@@ -90,7 +95,15 @@ public final class ShipDamageRuntime {
             double compartmentDamageEnergyJ,
             double subsystemDamageEnergyJ,
             List<String> damagedMounts) {
-        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
+        /**
+         * Validates and freezes one local damage event.
+         *
+         * @param snapshot updated persistent damage snapshot
+         * @param compartmentId selected compartment
+         * @param compartmentDamageEnergyJ energy applied to local structure
+         * @param subsystemDamageEnergyJ energy coupled into located installed subsystems
+         * @param damagedMounts stable IDs of mounts whose integrity decreased
+         */
         public DamageEvent {
             Objects.requireNonNull(snapshot, "snapshot");
             if (compartmentId == null || compartmentId.isBlank()) {
