@@ -4,7 +4,7 @@
 
 Implementation slice for Stage 17F.6 policy feedback / anti-oscillation.
 
-This slice joins resilience-driven strategic stock review to the same persistent common review window already used by fiscal policy and upgrades the earlier upward-only guard to a separate reversible automatic demand overlay. It does **not** complete Stage 17F.6.
+This slice joins resilience-driven strategic stock review to the same persistent common review window already used by fiscal policy and upgrades the earlier upward-only guard to a separate reversible automatic demand overlay. Production-policy isolation has now also been audited and locked by acceptance: the current autonomous review loop has no recipe-switch actuator. It does **not** complete Stage 17F.6 until the aggregate long-horizon gate is green.
 
 ## Causal contract
 
@@ -77,6 +77,29 @@ A nonzero recommendation inside the deadband is held stable. When Stage-17F.5 di
 
 Base stock policy is never modified by this automatic reviewer.
 
+## Production-policy isolation
+
+The current Stage-17F.6 autonomous policy loop deliberately has **no automatic recipe-switch actuator**.
+
+The relevant boundaries are distinct:
+
+- `FactionLocalProductionPlanner` is read-only. It maps resilience intent onto already owned canonical production capability and explicitly does not infer arbitrary retool capability.
+- `FactionPolicyReviewCoordinator` coordinates only fiscal review and the automatic resilience stock overlay. It neither authors `productionPolicies()` nor invokes the strategic-policy executor.
+- `FactionStockProductionPolicyState.productionPolicies()` is the common player/AI authoring value for recipe preferences. Authoring is physically inert.
+- `FactionStrategicPolicyEngine.apply(...)` may retool an owned station only when a separately authored production preference already exists and the ordinary explicit executor is invoked. A real retool resets recipe progress at that boundary.
+
+Therefore adding persistent recipe dwell timers or recipe hysteresis to the present Stage-17F.6 loop would create unused state rather than prevent an existing oscillation. The anti-oscillation invariant is instead:
+
+```text
+autonomous policy review
+!= production-policy authoring
+!= physical recipe retool
+```
+
+If a future autonomous recipe selector is introduced, it must first receive persisted cadence/dwell/hysteresis semantics and deterministic acceptance before joining the common review coordinator.
+
+`Stage17F6ProductionPolicyIsolationAcceptanceTest` locks this contract across repeated due review windows: an intentionally different authored recipe preference remains unchanged, the live recipe/index/progress remain untouched by autonomous review, and only a later explicit strategic-policy apply materializes the retool.
+
 ## Reversible physical market demand
 
 PR #128 added persistent market-demand provenance:
@@ -140,12 +163,13 @@ supplier/dependency shock
 
 Around review authoring, inventory, entity wallets, treasury and physical market targets remain unchanged. Physical target changes occur only at the explicit ordinary strategic-policy apply boundary.
 
+`Stage17F6ProductionPolicyIsolationAcceptanceTest` verifies repeated due common reviews cannot implicitly author or apply a recipe switch even when a conflicting production preference already exists.
+
 ## Remaining Stage 17F.6 work
 
 After this slice:
 
-1. review production-policy switching and add dwell/deadband semantics if automatic recipe selection can oscillate;
-2. run a long-horizon aggregate anti-oscillation acceptance covering repeated fiscal and resilience shocks/recoveries across save/load continuation;
-3. verify deterministic policy decisions for identical state and explicit autonomous-faction sets;
-4. update the canonical roadmap / completion record only after the aggregate gate is green;
-5. then proceed to Stage 17F.7 player/AI parity.
+1. run a long-horizon aggregate anti-oscillation acceptance covering repeated fiscal and resilience shocks/recoveries across save/load continuation;
+2. verify deterministic policy decisions for identical state and explicit autonomous-faction sets in that aggregate scenario;
+3. update the canonical roadmap / completion record only after the aggregate gate is green;
+4. then proceed to Stage 17F.7 player/AI parity.
