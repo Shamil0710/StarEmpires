@@ -5,8 +5,12 @@ import com.spacesim.DemoGalaxyFactory;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.world.DiplomaticEmbargoCommand;
+import com.spacesim.world.DiplomaticTreatyClauseState;
+import com.spacesim.world.DiplomaticTreatyCommand;
+import com.spacesim.world.DiplomaticTreatyCommandResult;
 import com.spacesim.world.FactionDoctrineState;
 import com.spacesim.world.FactionEconomicState;
+import com.spacesim.world.FactionFiscalPolicyState;
 import com.spacesim.world.FactionPolicyCommand;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.StarSystemNode;
@@ -95,6 +99,42 @@ class Stage17G2FactionManagementCommandsAcceptanceTest {
         management.submitPolicy(new FactionPolicyCommand.UpdateDoctrine(doctrine));
         assertEquals(doctrine,
                 runtime.world().findFactionStrategicState(PLAYER_FACTION).orElseThrow().doctrine());
+
+        FactionFiscalPolicyState fiscalPolicy = new FactionFiscalPolicyState(
+                750,
+                250,
+                5_000_000L,
+                1_000_000L,
+                500_000L,
+                2_000_000L);
+        management.submitPolicy(new FactionPolicyCommand.UpdateFiscalPolicy(fiscalPolicy));
+        assertEquals(fiscalPolicy, runtime.world().findFactionFiscalPolicy(PLAYER_FACTION).orElseThrow(),
+                "Player tax/foreign-territory tariff authoring must use the shared faction policy command");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> management.submitTreaty(new DiplomaticTreatyCommand.Offer(
+                        targetFaction,
+                        PLAYER_FACTION,
+                        List.of(new DiplomaticTreatyClauseState(
+                                DiplomaticTreatyClauseState.Kind.MARKET_ACCESS,
+                                DiplomaticTreatyClauseState.Direction.MUTUAL,
+                                null)),
+                        -1L)),
+                "Player-facing treaty facade must not allow another faction to be impersonated");
+
+        DiplomaticTreatyCommandResult treatyOffer = management.submitTreaty(new DiplomaticTreatyCommand.Offer(
+                PLAYER_FACTION,
+                targetFaction,
+                List.of(new DiplomaticTreatyClauseState(
+                        DiplomaticTreatyClauseState.Kind.MARKET_ACCESS,
+                        DiplomaticTreatyClauseState.Direction.MUTUAL,
+                        null)),
+                -1L));
+        assertEquals(DiplomaticTreatyCommandResult.Operation.OFFERED, treatyOffer.operation());
+        assertEquals(PLAYER_FACTION, treatyOffer.treatyOwnerFactionContentId());
+        assertEquals(treatyOffer.treaty(), runtime.world().findDiplomaticTreaty(treatyOffer.treaty().treatyId())
+                .orElseThrow(),
+                "Treaty facade must write the same authoritative diplomacy directory as AI/world commands");
 
         assertThrows(IllegalArgumentException.class,
                 () -> management.submitEmbargo(new DiplomaticEmbargoCommand.Impose(
