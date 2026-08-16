@@ -13,6 +13,7 @@ package com.spacesim.ship;
  * @param activeRadioEmissionPowerW active radar/communications emission power visible to passive RF sensors
  * @param jammerEmissionPowerW deliberate EW emission power visible to passive RF sensors
  */
+@SuppressWarnings("doclint:missing")
 public record SignatureState(
         double thermalRadiantPowerW,
         double enginePlumeRadiantPowerW,
