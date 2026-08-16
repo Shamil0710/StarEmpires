@@ -36,7 +36,7 @@ public final class ShieldFieldRuntime {
             double restartDelaySeconds,
             double coverageCenterRad,
             double coverageHalfArcRad) {
-        /** Validates one physical shield definition. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public Definition {
             if (mountId == null || mountId.isBlank()) {
                 throw new IllegalArgumentException("mountId must be non-blank");
@@ -69,7 +69,7 @@ public final class ShieldFieldRuntime {
             boolean collapsed,
             double restartRemainingSeconds,
             double emitterIntegrity) {
-        /** Validates a shield state snapshot. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public State {
             requireNonNegative(reserveJ, "reserveJ");
             requireNonNegative(accumulatedHeatJ, "accumulatedHeatJ");
