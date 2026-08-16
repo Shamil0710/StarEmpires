@@ -39,7 +39,7 @@ final class FleetJumpService {
     private final Map<StarSystemId, SimulationSession> sessionsById;
     private final FleetWorldService fleetWorldService;
     private final JumpTransitTiming timing;
-    private final ShipEngineeringRuntime engineeringRuntime;
+    private final FittedJumpResolver fittedJumpResolver;
     private final Map<FleetId, FleetJumpState> jumpsByFleetId = new HashMap<>();
 
     FleetJumpService(
@@ -64,11 +64,27 @@ final class FleetJumpService {
             JumpTransitTiming timing,
             ShipEngineeringRuntime engineeringRuntime,
             List<FleetJumpState> initialStates) {
+        this(
+                topology,
+                sessionsById,
+                fleetWorldService,
+                timing,
+                runtimeResolver(Objects.requireNonNull(engineeringRuntime, "ShipEngineeringRuntime не задан")),
+                initialStates);
+    }
+
+    FleetJumpService(
+            GalaxyTopology topology,
+            Map<StarSystemId, SimulationSession> sessionsById,
+            FleetWorldService fleetWorldService,
+            JumpTransitTiming timing,
+            FittedJumpResolver fittedJumpResolver,
+            List<FleetJumpState> initialStates) {
         this.topology = Objects.requireNonNull(topology, "GalaxyTopology не задан");
         this.sessionsById = Map.copyOf(Objects.requireNonNull(sessionsById, "Simulation sessions не заданы"));
         this.fleetWorldService = Objects.requireNonNull(fleetWorldService, "FleetWorldService не задан");
         this.timing = Objects.requireNonNull(timing, "JumpTransitTiming не задан");
-        this.engineeringRuntime = Objects.requireNonNull(engineeringRuntime, "ShipEngineeringRuntime не задан");
+        this.fittedJumpResolver = Objects.requireNonNull(fittedJumpResolver, "FittedJumpResolver не задан");
         for (FleetJumpState state : Objects.requireNonNull(initialStates, "Jump states не заданы")) {
             FleetJumpState checked = Objects.requireNonNull(state, "FleetJumpState не задан");
             if (jumpsByFleetId.putIfAbsent(checked.fleetId(), checked) != null) {
@@ -183,7 +199,7 @@ final class FleetJumpService {
                     FittedJump context = fitted.orElseThrow();
                     previousEngineeringState = context.component().runtimeState;
                     context.component().setRuntimeState(
-                            engineeringRuntime.commitJump(previousEngineeringState, context.plan()));
+                            fittedJumpResolver.commit(context.component(), context.plan()));
                 }
 
                 FleetPlacementState transit;
@@ -259,7 +275,8 @@ final class FleetJumpService {
         if (component.fit == null || component.runtimeState == null) {
             throw new IllegalStateException("Fleet EngineeringComponent is incomplete: " + fleetId);
         }
-        JumpPlan plan = engineeringRuntime.planJump(component.fit, component.runtimeState);
+        JumpPlan plan = Objects.requireNonNull(
+                fittedJumpResolver.plan(component), "FittedJumpResolver returned null plan");
         return Optional.of(new FittedJump(
                 component,
                 plan,
@@ -325,6 +342,20 @@ final class FleetJumpService {
         return session;
     }
 
+    private static FittedJumpResolver runtimeResolver(ShipEngineeringRuntime runtime) {
+        return new FittedJumpResolver() {
+            @Override
+            public JumpPlan plan(EngineeringComponent component) {
+                return runtime.planJump(component.fit, component.runtimeState);
+            }
+
+            @Override
+            public RuntimeState commit(EngineeringComponent component, JumpPlan plan) {
+                return runtime.commitJump(component.runtimeState, plan);
+            }
+        };
+    }
+
     private static IllegalStateException fittedJumpUnavailable(FleetId fleetId, JumpPlan plan) {
         return new IllegalStateException(
                 "Fitted FTL jump unavailable for " + fleetId + ": " + plan.failure());
@@ -350,6 +381,13 @@ final class FleetJumpService {
         } catch (ArithmeticException exception) {
             throw new IllegalStateException("Jump phase tick overflow", exception);
         }
+    }
+
+    /** Narrow Stage-17.5C dependency used to compose the already-tested engineering runtime with the world FSM. */
+    interface FittedJumpResolver {
+        JumpPlan plan(EngineeringComponent component);
+
+        RuntimeState commit(EngineeringComponent component, JumpPlan plan);
     }
 
     private record FittedJump(
