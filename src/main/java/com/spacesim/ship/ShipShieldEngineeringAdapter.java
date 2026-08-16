@@ -14,13 +14,20 @@ import java.util.Objects;
 public final class ShipShieldEngineeringAdapter {
     private static final double MIN_OPERATIONAL_INTEGRITY = 1e-6d;
 
-    /** One physical fitted emitter definition plus its current subsystem integrity. */
+    /**
+     * One physical fitted emitter definition plus its current subsystem integrity.
+     *
+     * @param mountId physical fitted emitter mount
+     * @param moduleId shield module content ID
+     * @param definition authored physical shield definition
+     * @param emitterIntegrity current emitter integrity in (0,1]
+     */
     public record FittedShield(
             String mountId,
             String moduleId,
             ShieldFieldRuntime.Definition definition,
             double emitterIntegrity) {
-        /** Validates one fitted shield projection. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public FittedShield {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
