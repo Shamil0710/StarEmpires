@@ -12,12 +12,16 @@ import java.util.Objects;
  * @param noiseJammers active noise/interference emitters
  * @param deceptionSources explicit false-measurement hypotheses
  */
-@SuppressWarnings("doclint:missing")
 public record ElectronicWarfareState(
         List<NoiseJammer> noiseJammers,
         List<DeceptionSource> deceptionSources) {
 
-    /** Validates immutable non-null EW lists. */
+    /**
+     * Validates immutable non-null EW lists.
+     *
+     * @param noiseJammers active noise/interference emitters
+     * @param deceptionSources explicit false-measurement hypotheses
+     */
     public ElectronicWarfareState {
         noiseJammers = List.copyOf(Objects.requireNonNull(noiseJammers, "noiseJammers"));
         deceptionSources = List.copyOf(Objects.requireNonNull(deceptionSources, "deceptionSources"));
@@ -50,7 +54,16 @@ public record ElectronicWarfareState(
             double gainLinear,
             double waveformOverlapFraction) {
 
-        /** Validates physical emitter parameters. */
+        /**
+         * Validates physical emitter parameters.
+         *
+         * @param emitterId stable emitter identity value
+         * @param xM emitter x position in meters
+         * @param yM emitter y position in meters
+         * @param radiatedPowerW radiated jammer power in the modeled band
+         * @param gainLinear directional/effective gain toward the victim receiver
+         * @param waveformOverlapFraction fraction [0,1] overlapping the sensor's current waveform/band
+         */
         public NoiseJammer {
             if (emitterId <= 0L) {
                 throw new IllegalArgumentException("emitterId must be positive");
@@ -82,7 +95,15 @@ public record ElectronicWarfareState(
             double apparentRangeBiasM,
             double receivedEquivalentPowerW) {
 
-        /** Validates explicit hypothesis parameters. */
+        /**
+         * Validates explicit hypothesis parameters.
+         *
+         * @param emitterId stable emitter identity value
+         * @param hypothesisId stable hypothesis label
+         * @param apparentBearingBiasRad deterministic apparent bearing bias
+         * @param apparentRangeBiasM deterministic apparent range bias; ignored for bearing-only sensors
+         * @param receivedEquivalentPowerW equivalent received deceptive signal power before receiver noise
+         */
         public DeceptionSource {
             if (emitterId <= 0L) {
                 throw new IllegalArgumentException("emitterId must be positive");
