@@ -4,6 +4,8 @@
 > Основание: accepted `Ship Mathematics v1.0 Design Baseline`, production Stage 17.5 и Stage 18 Resources / Industry / Infrastructure Foundation  
 > Назначение: сделать deterministic seed-driven galaxy generation физически согласованной с кораблями, сенсорами, логистикой, промышленной онтологией, экономикой и временем.
 
+Canonical generation-diversity contract: `docs/galaxy_topology_resource_geography_generation_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT**.
+
 ---
 
 # 1. Главный принцип
@@ -22,6 +24,22 @@ Stage 18 resource/object/facility ontology
 → logistics cadence
 → economic buffers / production cadence
 → playable physical economic geography
+```
+
+Дополнительная mandatory generation chain:
+
+```text
+macro regions
+→ system placement
+→ explicit neighbor topology
+→ topology diversity gate
+→ regional physical conditions
+→ Stage-18 resource occurrences
+→ facilities / economic bootstrap
+→ faction-start candidates
+→ whole-route delivered-cost / dependency analysis
+→ world-quality gate
+→ materialized authoritative world
 ```
 
 Stage 20 отвечает прежде всего на вопрос **«где это существует?»**, а не повторно определяет **«что существует?»**.
@@ -94,6 +112,8 @@ Reference v1.0 lower-bound anchors:
 
 Это не target travel times. Stage 20 должен решить, какие distributions дают желаемый gameplay cadence, и при необходимости менять world geometry, jump network density или technology content **внутри accepted model**, а не вводить teleport speed multiplier.
 
+Те же calibration runs задают versioned acceptance bands для topology/resource quality metrics. Порогам запрещено быть произвольными вечными constants: они должны быть проверены representative ships, trade cadence, reinforcement times и Stage-18 supply chains.
+
 ## DoD 20A
 
 Machine-readable table минимум для:
@@ -109,6 +129,19 @@ fleet reinforcement route
 ```
 
 с расчётом civilian и military profiles.
+
+Generation profile также фиксирует calibrated bands минимум для:
+
+```text
+maxLinearCorridorLength
+maxDegreeOneFraction
+minRegionalCycleCoverage
+minCoreRouteRedundancy
+maxSingleGatewayDependency
+sectorExitBand
+hubDegreeBand
+regionalHopDistanceBand
+```
 
 ---
 
@@ -233,6 +266,62 @@ heat/damage constraints
 - strategic value of tankers/logistics;
 - fleet response times, не мгновенные на всю галактику.
 
+## Topology diversity generation
+
+`Sector` должен быть spatial/strategic region, а не механическим отрезком списка systems.
+
+Generator обязан поддерживать смесь structural motifs:
+
+```text
+local hubs
+forks
+cycles / rings
+low-density meshes
+corridors
+border gateways
+remote pockets
+bounded frontier dead ends
+alternate long/risky paths
+rare strategic chokepoints
+```
+
+Production connectivity algorithm не может считать sequential chain достаточным финальным результатом.
+
+Допустим connected backbone как технический intermediate step, но после него mandatory:
+
+```text
+spatial candidate edges
+→ connected backbone
+→ intra-region redundancy
+→ selected inter-region gateways
+→ bounded frontier branches
+→ topology quality analysis
+→ deterministic repair or seed rejection
+```
+
+В общем случае developed/core sector имеет больше internal route redundancy, чем inter-sector gateway density. Это создаёт meaningful borders без превращения galaxy в railroad.
+
+## Topology diagnostics
+
+Machine-readable quality report минимум содержит:
+
+- connected components / unreachable systems;
+- degree distribution;
+- fraction of degree-1 / degree-2 systems;
+- hub distribution;
+- longest and percentile linear-corridor lengths;
+- cycle participation;
+- alternate / edge-disjoint route coverage where required;
+- articulation systems;
+- bridge edges;
+- gateway / betweenness concentration proxy;
+- sector exit count;
+- internal sector redundancy;
+- regional remoteness / hop-distance bands;
+- structural motif fingerprint per sector.
+
+Long accidental chains, excessive dead ends или excessive single-gateway dependency приводят к deterministic bounded repair или seed rejection. Intentional frontier corridors/chokepoints допускаются только внутри calibrated generation budget.
+
 ## DoD 20D
 
 Для generated region route planner должен выдавать физическое ETA и energy/operational consequence, а не только hop count.
@@ -249,6 +338,12 @@ non-neighbor direct request
 multi-hop route
 → ordered sequence of neighbor edges
 → no skipped intermediate systems
+
+representative generated galaxy
+→ connected where intended
+→ not predominantly chain-like
+→ measurable cycles/forks/hubs/alternate paths
+→ bounded chokepoint concentration
 ```
 
 ---
@@ -302,6 +397,102 @@ rocky differentiated body
 
 Это probabilistic/seed-driven distributions, а не гарантированный loot list.
 
+## Regional resource geography
+
+Generator не делает independent uniform resource roll для каждой системы.
+
+До concrete deposits он создаёт spatially correlated latent physical conditions, поддерживаемые Stage-18 ontology, например:
+
+```text
+metallicity / metal-rich potential
+asteroid-body density
+water / ice potential
+volatile potential
+carbonaceous potential
+light-metal potential
+conductor-resource potential
+strategic/heavy-metal potential
+silicate/rocky potential
+fissile potential where applicable
+energy/environment potential
+other Stage-18-backed physical conditions
+```
+
+Concrete occurrence затем выводится как:
+
+```text
+regional condition
++ physical host body
++ Stage-18 compatibility
++ local deterministic variance
++ concentration / grade
++ finite reserve
++ extraction difficulty
+→ actual deposit
+```
+
+Regional correlation создаёт recognizable belts/clusters; local variance и rare exceptions сохраняют exploration value. Ни regional field, ни presentation label не являются runtime production multiplier.
+
+## Comparative advantage
+
+Generation должна создавать regional comparative advantage вместо uniform self-sufficiency.
+
+Один region может быть богат metals, другой volatiles, третий — выгодным industrial/logistics center только потому, что реальные facilities, energy/access и routes позволяют импортировать feedstock.
+
+`SYSTEM_TYPE_INDUSTRIAL = +30% production` и аналогичные bonuses запрещены.
+
+## Essential viability versus strategic dependency
+
+Essential Stage-18 chains стартовой экономики обязаны быть физически reachable в calibrated time/throughput envelope, но не обязаны находиться внутри каждой system/sector.
+
+Допустимо и желательно, чтобы growth/advanced industry/shipbuilding/military production зависели от внешних sources.
+
+Target causal chain:
+
+```text
+shortage / expensive source
+→ inventory + price pressure
+→ profitable imports / substitution
+→ physical traffic
+→ infrastructure / escort / stockpile demand
+→ measurable faction dependency
+→ diplomacy / diversification / expansion / coercion / war
+→ changed physical supply state
+```
+
+Shortage допустим. Dependency допустима. Crisis допустим. Accidental unrecoverable dead economy — нет.
+
+## Faction-start placement order
+
+Faction starts оцениваются только после topology + resources + facilities:
+
+```text
+topology + resources + facilities
+→ viability/dependency diagnostics
+→ faction-start candidate evaluation
+→ bounded deterministic placement
+```
+
+Starts могут быть асимметричны по centrality, resource access, frontier exposure и supplier diversity, но normal procedural seed не должен создавать accidental unrecoverable start или случайную civilization-critical monopoly одной faction без explicit scenario design.
+
+## Required dependency diagnostics
+
+Минимум для sector/faction-start region:
+
+- essential local supply coverage;
+- import dependency by family;
+- export potential;
+- supplier concentration;
+- route concentration;
+- delivered-cost bands;
+- throughput headroom;
+- buffer depletion exposure;
+- critical gateway dependency;
+- alternative supplier/path count;
+- accessible reserve/ownership concentration for critical resources.
+
+Это authoritative-derived diagnostics, а не scripted objectives.
+
 ## Необходимая economic coupling
 
 ```text
@@ -315,6 +506,8 @@ resource distance
 
 Ресурс может быть намеренно remote и дорогим, но это должно быть economic outcome, а не случайный dead economy.
 
+Whole-route dependency/cost использует `docs/physical_trade_route_scoring_contract.md`: геометрическая близость не заменяет actual neighbor-edge path.
+
 ## Bootstrap acceptance
 
 Generated world не принимается, если типичная seed economy:
@@ -324,7 +517,9 @@ Generated world не принимается, если типичная seed econ
 - имеет consumption быстрее theoretical maximum delivery без намеренного shortage design;
 - требует facility capability, которой физически невозможно снабжаться;
 - автоматически получает hidden supplies;
-- добавляет universal fallback deposit только ради спасения экономики.
+- добавляет universal fallback deposit только ради спасения экономики;
+- имеет accidental start, который необратимо collapses независимо от разумных faction actions;
+- создаёт unintentional civilization-critical monopoly без meaningful alternative source/route/political response.
 
 ---
 
@@ -348,6 +543,8 @@ Generated `resource frontier` может быть богат сырьём и б�
 Generated `high-tech center` может зависеть от remote bulk inputs, но иметь precision/electronics advantage только через реальные facilities.
 
 World generator не пишет `SYSTEM_TYPE_INDUSTRIAL = +30% production`.
+
+Industrial center может быть intentionally separated от resource source, если actual freight routes, storage, energy/access и facilities делают такую специализацию жизнеспособной.
 
 ---
 
@@ -468,6 +665,8 @@ shipyard replenishment time
 
 Не использовать hidden `market restock per minute` как замену перевозкам.
 
+Calibration также должна показать, что regional comparative advantage действительно создаёт measurable trade potential, а не только красивые resource labels.
+
 ---
 
 # 13. Stage 20K — deterministic seed/persistence contract
@@ -481,6 +680,17 @@ Generator обязан быть:
 - reproducible headless.
 
 Generated stable IDs не должны зависеть от collection iteration order.
+
+Same:
+
+```text
+worldSeed
++ generatorVersion
++ generationProfile
++ contentFingerprint
+```
+
+должны создавать equivalent physical world и equivalent generation-quality report.
 
 Save хранит уже materialized authoritative world; изменение generator версии не переписывает существующую кампанию без explicit migration/new-world policy.
 
@@ -502,15 +712,54 @@ Resource occurrence IDs/reserves, facilities and discovered knowledge входя
 - reinforcement time;
 - delta-v demand.
 
+## Topology diversity tests
+
+Для representative seed batch проверять минимум:
+
+- one connected ordinary production galaxy where intended;
+- degree distribution;
+- bounded degree-1 fraction;
+- bounded long degree-2 / no-choice corridors;
+- hub/fork/cycle presence;
+- regional cycle / alternate-route coverage;
+- articulation-system and bridge-edge concentration;
+- critical gateway dependency;
+- sector exit diversity;
+- core versus frontier redundancy;
+- topology fingerprint diversity between sectors.
+
+Seed не принимается только потому, что connected: connected chain остаётся плохим production result.
+
 ## Resource/economy tests
 
 - Stage-18 occurrence associations statistically plausible within authored setting rules;
+- regional resource autocorrelation measurable without uniform sector bonuses;
+- local variance preserves exploration-worthy exceptions;
 - essential supply chains physically feasible;
 - remote resources создают measurable logistics premium;
 - refining/precision/shipyard specialization creates real trade;
+- comparative advantage creates inter-region flows;
+- typical start regions viable but not universally self-sufficient;
+- supplier and route concentration measurable;
+- accidental civilization-critical monopoly rejected unless explicit scenario design;
 - no hidden restock;
 - buffers не обнуляют distance;
 - world does not require every system to be economically self-sufficient.
+
+## Strategic emergence tests
+
+- gateway closure changes delivered cost/route choice/dependency diagnostics;
+- rich source with poor access differs economically from equally rich redundant-access source;
+- critical supplier/gateway importance can be derived from authoritative state;
+- faction strategic response consumes measured interests/dependencies rather than worldgen capture tags.
+
+## Faction-start tests
+
+- asymmetry allowed;
+- no accidental unrecoverable start;
+- essential inputs physically reachable in accepted time/throughput bands;
+- alternatives exist for civilization-critical dependency unless explicit scenario override;
+- no free faction asset/resource correction after start.
 
 ## Sensor tests
 
@@ -532,6 +781,19 @@ Resource occurrence IDs/reserves, facilities and discovered knowledge входя
 - generated topology remains route-planner scalable;
 - generated facilities/resources fit scalability target envelope.
 
+## World-quality gate outcome
+
+Каждый production candidate получает reproducible machine-readable result:
+
+```text
+ACCEPT
+DETERMINISTIC_REPAIR
+REJECT_SEED
+EXPLICIT_SCENARIO_OVERRIDE
+```
+
+Repair bounded и versioned. Repair не имеет права создавать hidden resources, нарушать Stage-18 host compatibility, physics, conservation, player/AI parity или выдавать free faction assets.
+
 ---
 
 # 15. Stage 20 hard invariants
@@ -540,15 +802,27 @@ Resource occurrence IDs/reserves, facilities and discovered knowledge входя
 2. every ship ETA uses actual movement/jump capability;
 3. cargo/ship mass affects logistics time through shared physics;
 4. every ordinary inter-system movement is exactly one explicit neighbor edge; no direct jump to non-neighbor systems and no skipped intermediate hops;
-5. no instant inter-system teleport outside an explicitly designed transition contract;
-6. sensor visibility uses physical channels;
-7. discovery does not grant omniscience;
-8. production cadence is checked against logistics latency;
-9. resource types/facilities come from Stage-18 ontology, not generator-only shortcuts;
-10. generated dead economy requires explicit intended scenario, not accidental seed failure;
-11. player and AI inhabit the same generated geometry and jump graph;
-12. deterministic same seed/version produces equivalent world;
-13. generator never creates hidden supplies or emergency deposits to bypass physical economy.
+5. production topology cannot use sequential chain as a sufficient final generation algorithm;
+6. generated topology must pass measurable anti-linearity/redundancy/criticality gates;
+7. sectors are spatial/strategic regions, not list partitions;
+8. no instant inter-system teleport outside an explicitly designed transition contract;
+9. sensor visibility uses physical channels;
+10. discovery does not grant omniscience;
+11. production cadence is checked against logistics latency;
+12. resource types/facilities come from Stage-18 ontology, not generator-only shortcuts;
+13. resource geography combines regional physical correlation + host compatibility + local deterministic variance;
+14. sector/archetype labels cannot grant hidden resource/production bonuses;
+15. ordinary world does not require every system/sector to be self-sufficient;
+16. essential start viability must be physically reachable without hidden supplies;
+17. strategic scarcity/dependency must survive bootstrap strongly enough to affect logistics/economics;
+18. industrial specialization exists through real facilities/inputs/imports;
+19. whole-route economic value/dependency uses actual neighbor-edge paths;
+20. generated dead economy requires explicit intended scenario, not accidental seed failure;
+21. accidental civilization-critical monopoly is rejected unless explicit scenario design passes acceptance;
+22. faction interests derive from authoritative world state, not injected worldgen objectives;
+23. player and AI inhabit the same generated geometry, resources and jump graph;
+24. deterministic same seed/version/profile/content fingerprint produces equivalent world/report;
+25. generator never creates runtime hidden supplies or emergency deposits to bypass physical economy.
 
 ---
 
@@ -556,4 +830,4 @@ Resource occurrence IDs/reserves, facilities and discovered knowledge входя
 
 Stage 20 COMPLETE означает:
 
-> **галактика и системы генерируются детерминированно из закрытой Stage-18 resource/industry ontology так, что расстояния, travel time, delta-v, neighbor-only jump topology, sensor visibility, resource occurrence, industrial specialization, logistics throughput и economic cadence согласованы с accepted Ship Mathematics и production capabilities; discovery остаётся explicit, дальние маршруты исполняются как последовательности direct edges, а generated world не требует скрытых teleport/restock/resource shortcuts для нормальной жизни.**
+> **галактика и системы генерируются детерминированно из закрытой Stage-18 resource/industry ontology так, что расстояния, travel time, delta-v, neighbor-only jump topology, sensor visibility, resource occurrence, industrial specialization, logistics throughput и economic cadence согласованы с accepted Ship Mathematics и production capabilities; topology имеет измеримое разнообразие вместо преобладающей линейной очереди; sectors образуют различимые regions с hubs, forks, cycles, gateways, alternate paths, frontier pockets и bounded chokepoints; resources образуют физически осмысленные региональные кластеры с comparative advantage и local variance; typical starts жизнеспособны, но сохраняют реальные внешние зависимости; whole-route delivered cost и gateway concentration естественно создают торговые и стратегические интересы; плохие seeds отклоняются или детерминированно исправляются до materialization; discovery остаётся explicit, дальние маршруты исполняются как последовательности direct edges, а generated world не требует hidden teleport/restock/resource shortcuts для нормальной жизни.**
