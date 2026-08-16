@@ -15,6 +15,9 @@ public final class FleetTransferStateMapper {
     /**
      * Clears references that are valid only inside the origin SimulationSession.
      *
+     * <p>Stage-17.5 engineering state is physical ship state rather than a session-local reference,
+     * so fit, reaction mass, power, heat and cooldown must pass through sanitization unchanged.</p>
+     *
      * @param state local fleet state
      * @return session-independent fleet state
      */
@@ -44,7 +47,7 @@ public final class FleetTransferStateMapper {
                 checked.id(), checked.identity(), transform, checked.inventory(), checked.wallet(),
                 checked.market(), checked.production(), checked.priceHistory(), checked.faction(),
                 checked.reputation(), checked.ship(), trade, mining, checked.combat(),
-                checked.asteroid(), checked.archetype());
+                checked.asteroid(), checked.archetype(), checked.engineering());
     }
 
     /**
