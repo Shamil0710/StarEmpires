@@ -12,6 +12,7 @@ import java.util.Objects;
  * @param noiseJammers active noise/interference emitters
  * @param deceptionSources explicit false-measurement hypotheses
  */
+@SuppressWarnings("doclint:missing")
 public record ElectronicWarfareState(
         List<NoiseJammer> noiseJammers,
         List<DeceptionSource> deceptionSources) {
