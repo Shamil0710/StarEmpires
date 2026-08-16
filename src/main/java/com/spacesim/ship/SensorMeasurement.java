@@ -26,6 +26,7 @@ import java.util.Objects;
  * @param snr resulting signal-to-noise-plus-interference ratio
  * @param evidenceState strongest information-state evidence supplied by this measurement alone
  */
+@SuppressWarnings("doclint:missing")
 public record SensorMeasurement(
         long observerId,
         long targetId,
