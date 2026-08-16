@@ -10,7 +10,6 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -71,7 +70,6 @@ public final class ShipEngineeringState {
      * @param installedModules module-to-mount assignments
      */
     public record InstalledFit(String hullId, List<InstalledModuleDefinition> installedModules) {
-        /** Creates a deterministic immutable fit. */
         public InstalledFit {
             requireNonBlank(hullId, "hullId");
             Objects.requireNonNull(installedModules, "installedModules");
@@ -117,7 +115,6 @@ public final class ShipEngineeringState {
             double amount,
             double massKg,
             long itemCount) {
-        /** Validates one immutable physical load. */
         public ConsumableLoad {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(interfaceId, "interfaceId");
@@ -145,7 +142,6 @@ public final class ShipEngineeringState {
             double missionPayloadMassKg,
             double missionIntegrationVolumeM3,
             List<ConsumableLoad> interfaceLoads) {
-        /** Creates a deterministic immutable load state. */
         public ConsumableState {
             requireNonNegativeFinite(cargoMassKg, "cargoMassKg");
             requireNonNegativeFinite(storesMassKg, "storesMassKg");
@@ -216,7 +212,6 @@ public final class ShipEngineeringState {
      * @param moduleIntegrityByMount optional mount integrity values in [0,1]
      */
     public record DamageState(Map<String, Double> moduleIntegrityByMount) {
-        /** Creates a deterministic immutable damage input. */
         public DamageState {
             Objects.requireNonNull(moduleIntegrityByMount, "moduleIntegrityByMount");
             TreeMap<String, Double> copy = new TreeMap<>();
@@ -252,7 +247,6 @@ public final class ShipEngineeringState {
      */
     public record ValidationIssue(
             ValidationSeverity severity, ValidationCode code, String subject, String detail) {
-        /** Creates one immutable issue. */
         public ValidationIssue {
             Objects.requireNonNull(severity, "severity");
             Objects.requireNonNull(code, "code");
@@ -267,7 +261,6 @@ public final class ShipEngineeringState {
      * @param issues sorted diagnostics
      */
     public record ValidationResult(List<ValidationIssue> issues) {
-        /** Creates a sorted immutable result. */
         public ValidationResult {
             Objects.requireNonNull(issues, "issues");
             List<ValidationIssue> copy = new ArrayList<>(issues);
@@ -304,7 +297,6 @@ public final class ShipEngineeringState {
      */
     public record InstalledCapability(
             String mountId, String moduleId, ModuleFamily family, Map<String, Double> parameters) {
-        /** Creates an immutable capability projection. */
         public InstalledCapability {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
@@ -322,7 +314,6 @@ public final class ShipEngineeringState {
      * @param maintenance authored physical work/service metadata
      */
     public record MaintenanceDemand(String mountId, String moduleId, MaintenanceDefinition maintenance) {
-        /** Creates one immutable maintenance demand. */
         public MaintenanceDemand {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
@@ -336,6 +327,43 @@ public final class ShipEngineeringState {
      * <p>Specialized sensor/weapon/shield equations are intentionally not guessed here. Their
      * installed capability parameters are exposed through {@link #installedCapabilities()} for
      * Stage 17.5D-F consumers while common mass/power/heat/propulsion budgets are already resolved.</p>
+     *
+     * @param hullId stable hull content ID
+     * @param installedDryMassKg bare hull plus installed module mass
+     * @param consumableMassKg all carried non-module physical mass
+     * @param totalMassKg current physical ship mass
+     * @param usedInternalVolumeM3 installed module plus mission integration volume
+     * @param remainingIntegrationVolumeM3 remaining hull integration volume
+     * @param continuousPowerSupplyW continuous installed electrical supply
+     * @param continuousPowerDemandW continuous installed electrical demand
+     * @param continuousPowerMarginW supply minus continuous demand
+     * @param peakPowerDemandW simultaneous authored peak demand
+     * @param storedEnergyAvailableJ installed stored electrical energy
+     * @param wasteHeatW continuous authored waste heat
+     * @param heatRejectionW continuous authored heat rejection
+     * @param continuousHeatMarginW rejection minus continuous waste heat
+     * @param localThermalCapacityJ aggregate local thermal buffer capacity
+     * @param coolantTransferDemandW aggregate authored coolant-transfer demand
+     * @param crewRequired larger of hull baseline and simultaneous module crew demand
+     * @param crewSupported hull life-support capacity
+     * @param automationRequired aggregate authored automation demand
+     * @param ammunitionMassKg physical ammunition mass
+     * @param ammunitionCount authored ammunition item count
+     * @param storesMassKg physical general stores mass
+     * @param cargoMassKg physical cargo mass
+     * @param missionPayloadMassKg physical mission payload mass
+     * @param reactionMassKg physical propulsion reaction mass
+     * @param availableThrustN aggregate installed propulsion thrust before Stage-17.5C throttling
+     * @param massFlowKgPerS aggregate idealized propulsion mass flow
+     * @param accelerationMps2 thrust divided by current total physical mass
+     * @param effectiveExhaustVelocityMps thrust-weighted effective exhaust velocity
+     * @param deltaVMps idealized current rocket-equation delta-v
+     * @param structuralProtectionStackId hull structural protection content ID
+     * @param compartments immutable compartment geometry/protection definitions
+     * @param signatureContributions aggregate authored signature-channel contributions
+     * @param installedCapabilities family-specific parameters preserved per mount
+     * @param maintenanceDemands physical maintenance metadata preserved per mount
+     * @param validation deterministic warnings associated with the accepted fit
      */
     public record DerivedShipState(
             String hullId,
@@ -374,7 +402,6 @@ public final class ShipEngineeringState {
             List<InstalledCapability> installedCapabilities,
             List<MaintenanceDemand> maintenanceDemands,
             ValidationResult validation) {
-        /** Makes collection projections deeply immutable and deterministically ordered. */
         public DerivedShipState {
             requireNonBlank(hullId, "hullId");
             requireNonBlank(structuralProtectionStackId, "structuralProtectionStackId");
@@ -393,10 +420,6 @@ public final class ShipEngineeringState {
         public double carriedMassKg() {
             return consumableMassKg;
         }
-    }
-
-    static Map<String, Double> sortedDoubleMap(Map<String, Double> source) {
-        return Collections.unmodifiableMap(new LinkedHashMap<>(new TreeMap<>(source)));
     }
 
     private static void requireNonBlank(String value, String field) {
