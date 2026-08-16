@@ -18,26 +18,18 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Projects fitted Stage-17.5 engineering capabilities into physical Stage-17.5E weapon mounts.
+ * Projects fitted Stage-17.5 engineering capabilities into physical Stage-17.5E/F weapon mounts.
  *
- * <p>The adapter does not infer performance from ship class or role. Muzzle velocity and recoil are
- * taken from the installed engineering module, capability-specific timing/geometry comes from a
- * profile linked to that exact module ID, ammunition body properties come from the ammunition
- * catalog, and feed quantity/mass remains in central consumable state.</p>
+ * <p>Stage 17.5F consumes local mount integrity from the central derived state. A destroyed mount is
+ * absent; a damaged kinetic mount retains the authored projectile body/muzzle energy but pays a
+ * longer physical cycle and worse pointing uncertainty. This avoids the dangerous generic pattern
+ * of scaling every parameter, which could accidentally make lower-is-better values improve.</p>
  */
 public final class ShipWeaponEngineeringAdapter {
     private static final double RELATIVE_TOLERANCE = 1e-9d;
+    private static final double MIN_OPERATIONAL_INTEGRITY = 1e-6d;
 
-    /**
-     * One fitted kinetic mount ready for common fire-control/ammunition runtime.
-     *
-     * @param mountId fitted hull-local mount ID
-     * @param moduleId engineering module content ID
-     * @param round loaded physical kinetic round combined with fitted muzzle velocity
-     * @param launcher physical launcher/feed cycle definition
-     * @param pointingJitterRad one-sigma fitted launcher pointing uncertainty
-     * @param recoilImpulseNs physical shot recoil impulse derived from loaded round and muzzle velocity
-     */
+    /** One fitted kinetic mount ready for common fire-control/ammunition runtime. */
     public record FittedKineticMount(
             String mountId,
             String moduleId,
@@ -45,16 +37,7 @@ public final class ShipWeaponEngineeringAdapter {
             Launcher launcher,
             double pointingJitterRad,
             double recoilImpulseNs) {
-        /**
-         * Validates one immutable fitted kinetic mount.
-         *
-         * @param mountId fitted hull-local mount ID
-         * @param moduleId engineering module content ID
-         * @param round loaded physical kinetic round
-         * @param launcher physical launcher/feed definition
-         * @param pointingJitterRad one-sigma fitted launcher pointing uncertainty
-         * @param recoilImpulseNs physical recoil impulse
-         */
+        /** Validates one immutable fitted kinetic mount. */
         public FittedKineticMount {
             requireNonBlank(mountId, "mountId");
             requireNonBlank(moduleId, "moduleId");
@@ -87,6 +70,10 @@ public final class ShipWeaponEngineeringAdapter {
         List<FittedKineticMount> result = new ArrayList<>();
         for (InstalledCapability capability : checkedDerived.installedCapabilities()) {
             if (capability.family() != ModuleFamily.WEAPON_AMMUNITION) {
+                continue;
+            }
+            double integrity = runtimeIntegrity(capability.parameters());
+            if (integrity <= MIN_OPERATIONAL_INTEGRITY) {
                 continue;
             }
             LauncherProfile profile = checkedLaunchers.findByModuleId(capability.moduleId());
@@ -127,18 +114,26 @@ public final class ShipWeaponEngineeringAdapter {
                     "launcher." + capability.moduleId(),
                     profile.ammunitionInterfaceId(),
                     profile.ammunitionAmountPerShot(),
-                    profile.cycleTimeSeconds(),
+                    profile.cycleTimeSeconds() / integrity,
                     profile.supportChannelCount());
             result.add(new FittedKineticMount(
                     capability.mountId(),
                     capability.moduleId(),
                     round,
                     launcher,
-                    profile.pointingJitterRad(),
+                    profile.pointingJitterRad() / integrity,
                     physicalRecoil));
         }
         result.sort(Comparator.comparing(FittedKineticMount::mountId).thenComparing(FittedKineticMount::moduleId));
         return List.copyOf(result);
+    }
+
+    private static double runtimeIntegrity(Map<String, Double> parameters) {
+        double value = parameters.getOrDefault(DerivedShipCalculator.RUNTIME_INTEGRITY, 1d);
+        if (!Double.isFinite(value) || value < 0d || value > 1d) {
+            throw new IllegalArgumentException("Invalid runtime weapon integrity");
+        }
+        return value;
     }
 
     private static void validateEnvelope(LauncherProfile profile, KineticAmmunitionDefinition ammunition) {
