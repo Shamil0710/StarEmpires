@@ -10,7 +10,6 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TreeMap;
 
 /**
@@ -20,12 +19,7 @@ import java.util.TreeMap;
  * does not derive acceleration, power balance, heat balance, damage or combat outcomes; those are
  * Stage 17.5B+ responsibilities. All IDs are persistent content IDs and the semantic fingerprint is
  * independent from JSON whitespace and ordering of independent definitions.</p>
- *
- * <p>The nested records are immutable content DTOs. Their component names and SI suffixes are the
- * public schema documentation; compact constructors only make defensive collection copies. Missing
- * member prose is therefore intentionally suppressed while all other doclint categories stay active.</p>
  */
-@SuppressWarnings("doclint:missing")
 public final class ShipEngineeringCatalog {
     private final int schemaVersion;
     private final int migrationVersion;
@@ -54,12 +48,18 @@ public final class ShipEngineeringCatalog {
             List<DemonstratorFitDefinition> demonstratorFits) {
         this.schemaVersion = schemaVersion;
         this.migrationVersion = migrationVersion;
-        this.materials = sortedCopy(materials, Comparator.comparing(MaterialDefinition::id));
-        this.responseSurfaces = sortedCopy(responseSurfaces, Comparator.comparing(HeavyImpactResponseSurfaceDefinition::id));
-        this.protectionStacks = sortedCopy(protectionStacks, Comparator.comparing(ProtectionStackDefinition::id));
-        this.hulls = sortedCopy(hulls, Comparator.comparing(HullDefinition::id));
-        this.modules = sortedCopy(modules, Comparator.comparing(ModuleDefinition::id));
-        this.demonstratorFits = sortedCopy(demonstratorFits, Comparator.comparing(DemonstratorFitDefinition::id));
+        this.materials = sortedCopy(materials.stream().map(ShipEngineeringCatalog::copyMaterial).toList(),
+                Comparator.comparing(MaterialDefinition::id));
+        this.responseSurfaces = sortedCopy(responseSurfaces,
+                Comparator.comparing(HeavyImpactResponseSurfaceDefinition::id));
+        this.protectionStacks = sortedCopy(protectionStacks.stream().map(ShipEngineeringCatalog::copyProtectionStack).toList(),
+                Comparator.comparing(ProtectionStackDefinition::id));
+        this.hulls = sortedCopy(hulls.stream().map(ShipEngineeringCatalog::copyHull).toList(),
+                Comparator.comparing(HullDefinition::id));
+        this.modules = sortedCopy(modules.stream().map(ShipEngineeringCatalog::copyModule).toList(),
+                Comparator.comparing(ModuleDefinition::id));
+        this.demonstratorFits = sortedCopy(demonstratorFits.stream().map(ShipEngineeringCatalog::copyFit).toList(),
+                Comparator.comparing(DemonstratorFitDefinition::id));
         this.materialsById = index(this.materials, MaterialDefinition::id);
         this.responseSurfacesById = index(this.responseSurfaces, HeavyImpactResponseSurfaceDefinition::id);
         this.protectionStacksById = index(this.protectionStacks, ProtectionStackDefinition::id);
@@ -96,22 +96,52 @@ public final class ShipEngineeringCatalog {
     /** @return lowercase SHA-256 semantic fingerprint */
     public String getFingerprint() { return fingerprint; }
 
-    /** @param id material content ID @return material or {@code null} */
+    /**
+     * Finds a material by stable content ID.
+     *
+     * @param id material content ID
+     * @return material definition or {@code null}
+     */
     public MaterialDefinition findMaterial(String id) { return materialsById.get(id); }
 
-    /** @param id response-surface content ID @return response surface or {@code null} */
+    /**
+     * Finds a heavy-impact response surface by stable content ID.
+     *
+     * @param id response-surface content ID
+     * @return response-surface definition or {@code null}
+     */
     public HeavyImpactResponseSurfaceDefinition findResponseSurface(String id) { return responseSurfacesById.get(id); }
 
-    /** @param id protection-stack content ID @return stack or {@code null} */
+    /**
+     * Finds a protection stack by stable content ID.
+     *
+     * @param id protection-stack content ID
+     * @return protection-stack definition or {@code null}
+     */
     public ProtectionStackDefinition findProtectionStack(String id) { return protectionStacksById.get(id); }
 
-    /** @param id hull content ID @return hull or {@code null} */
+    /**
+     * Finds a hull by stable content ID.
+     *
+     * @param id hull content ID
+     * @return hull definition or {@code null}
+     */
     public HullDefinition findHull(String id) { return hullsById.get(id); }
 
-    /** @param id module content ID @return module or {@code null} */
+    /**
+     * Finds a module by stable content ID.
+     *
+     * @param id module content ID
+     * @return module definition or {@code null}
+     */
     public ModuleDefinition findModule(String id) { return modulesById.get(id); }
 
-    /** @param id fit content ID @return demonstrator fit or {@code null} */
+    /**
+     * Finds a machine-readable demonstrator fit by stable content ID.
+     *
+     * @param id fit content ID
+     * @return demonstrator fit or {@code null}
+     */
     public DemonstratorFitDefinition findDemonstratorFit(String id) { return demonstratorFitsById.get(id); }
 
     private String computeFingerprint() {
@@ -250,6 +280,50 @@ public final class ShipEngineeringCatalog {
         }
     }
 
+    private static MaterialDefinition copyMaterial(MaterialDefinition value) {
+        return new MaterialDefinition(value.id(), value.densityKgPerM3(), List.copyOf(value.tags()),
+                value.thermalConductivityWPerMK(), value.specificHeatJPerKgK(), value.emissivity(),
+                value.radarReflectivity(), value.heavyImpactResponseSurfaceId(), value.constructionMaterialFamilyId(),
+                value.repairMaterialFamilyId());
+    }
+
+    private static ProtectionStackDefinition copyProtectionStack(ProtectionStackDefinition value) {
+        return new ProtectionStackDefinition(value.id(), value.mountMassKg(), List.copyOf(value.layers()));
+    }
+
+    private static HullDefinition copyHull(HullDefinition value) {
+        List<HardpointDefinition> hardpoints = value.hardpoints().stream()
+                .map(h -> new HardpointDefinition(h.id(), h.size(), h.positionM(), h.arc(), h.maxModuleDimensionsM(),
+                        h.maxModuleMassKg(), h.maxRecoilImpulseNs(), List.copyOf(h.allowedModuleFamilies())))
+                .toList();
+        List<CompartmentDefinition> compartments = value.compartments().stream()
+                .map(c -> new CompartmentDefinition(c.id(), c.volumeM3(), c.centerM(), c.protectionStackId(),
+                        List.copyOf(c.tags())))
+                .toList();
+        return new HullDefinition(value.id(), value.displayName(), value.architecture(), value.boundingDimensionsM(),
+                value.bareHullMassKg(), value.internalVolumeM3(), List.copyOf(value.slots()), hardpoints, compartments,
+                value.crewBaseline(), value.lifeSupportCapacity(), value.baseSignatureGeometryAreaM2(),
+                value.structuralProtectionStackId(), value.maxOperationalMassKg(),
+                List.copyOf(value.thrustMountCompatibility()));
+    }
+
+    private static ModuleDefinition copyModule(ModuleDefinition value) {
+        return new ModuleDefinition(value.id(), value.displayName(), value.family(),
+                List.copyOf(value.integrationCategories()), List.copyOf(value.compatibleHardpointSizes()),
+                value.physicalDimensionsM(), value.massKg(), value.occupiedVolumeM3(), value.requiredMountStrengthN(),
+                value.continuousPowerSupplyW(), value.continuousPowerDemandW(), value.peakPowerDemandW(),
+                value.storedEnergyCapacityJ(), value.wasteHeatW(), value.localThermalCapacityJ(),
+                value.coolantTransferDemandW(), value.heatRejectionW(), value.crewRequirement(),
+                value.automationRequirement(), List.copyOf(value.interfaces()),
+                Collections.unmodifiableMap(new LinkedHashMap<>(value.signatureContributions())),
+                List.copyOf(value.constructionInputs()), value.maintenance(),
+                Collections.unmodifiableMap(new LinkedHashMap<>(value.capabilityParameters())));
+    }
+
+    private static DemonstratorFitDefinition copyFit(DemonstratorFitDefinition value) {
+        return new DemonstratorFitDefinition(value.id(), value.hullId(), List.copyOf(value.installedModules()));
+    }
+
     private static long bits(double value) { return Double.doubleToLongBits(value); }
     private static String nullable(String value) { return value == null ? "~" : value; }
     private static void appendDimensions(StringBuilder out, Dimensions3d v) {
@@ -281,119 +355,253 @@ public final class ShipEngineeringCatalog {
         for (T value : values) result.put(idFunction.apply(value), value);
         return Collections.unmodifiableMap(result);
     }
-    private static Map<String, Double> immutableMap(Map<String, Double> source) {
-        return Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(source, "map")));
-    }
 
     /** Broad physical hull construction architecture; names never grant bonuses. */
-    public enum HullArchitecture { MONOCOQUE, FRAME, TRUSS, HYBRID }
+    public enum HullArchitecture {
+        /** Monocoque shell architecture. */ MONOCOQUE,
+        /** Internal load-bearing frame architecture. */ FRAME,
+        /** Open truss architecture. */ TRUSS,
+        /** Mixed structural architecture. */ HYBRID
+    }
+
     /** Shared integration zones used by hull slots and module compatibility. */
-    public enum IntegrationCategory { CORE, WEAPON, UTILITY, INTERNAL, MISSION }
+    public enum IntegrationCategory {
+        /** Primary ship-system integration zone. */ CORE,
+        /** Weapon-system integration zone. */ WEAPON,
+        /** General utility integration zone. */ UTILITY,
+        /** Internal equipment integration zone. */ INTERNAL,
+        /** Mission-specific integration zone. */ MISSION
+    }
+
     /** Geometric hardpoint size class used only as a fit constraint. */
-    public enum HardpointSize { SMALL, MEDIUM, LARGE, EXTRA_LARGE }
+    public enum HardpointSize {
+        /** Small hardpoint. */ SMALL,
+        /** Medium hardpoint. */ MEDIUM,
+        /** Large hardpoint. */ LARGE,
+        /** Extra-large hardpoint. */ EXTRA_LARGE
+    }
+
     /** Common Stage-17.5 module families. */
     public enum ModuleFamily {
-        REACTOR_POWER, ENERGY_STORAGE, MAIN_DRIVE, MANEUVER_THRUSTERS, FTL_JUMP,
-        THERMAL_CONTROL, SENSOR_EW_FIRE_CONTROL, COMMUNICATION_DATALINK, SHIELD_FIELD,
-        ARMOR_PROTECTION, WEAPON_AMMUNITION, CREW_LIFE_SUPPORT_AUTOMATION,
-        CARGO_TANK_STORES, HANGAR_SMALL_CRAFT, MINING_SALVAGE_REPAIR_INDUSTRIAL_SCIENCE
+        /** Electrical generation. */ REACTOR_POWER,
+        /** Stored electrical energy. */ ENERGY_STORAGE,
+        /** Main propulsion. */ MAIN_DRIVE,
+        /** Maneuvering propulsion. */ MANEUVER_THRUSTERS,
+        /** Inter-system translation hardware. */ FTL_JUMP,
+        /** Heat transport, storage and rejection. */ THERMAL_CONTROL,
+        /** Sensors, electronic warfare and fire control. */ SENSOR_EW_FIRE_CONTROL,
+        /** Communications and datalink. */ COMMUNICATION_DATALINK,
+        /** Energetic field protection. */ SHIELD_FIELD,
+        /** Passive material protection. */ ARMOR_PROTECTION,
+        /** Weapons, launchers and ammunition handling. */ WEAPON_AMMUNITION,
+        /** Crew support and automation. */ CREW_LIFE_SUPPORT_AUTOMATION,
+        /** Cargo, tanks and mission stores. */ CARGO_TANK_STORES,
+        /** Hangars and embarked craft support. */ HANGAR_SMALL_CRAFT,
+        /** Industrial, mining, salvage, repair and science equipment. */ MINING_SALVAGE_REPAIR_INDUSTRIAL_SCIENCE
     }
-    /** Physical consumable interface category. */
-    public enum InterfaceKind { AMMUNITION, CONSUMABLE, REACTION_MASS }
 
+    /** Physical consumable interface category. */
+    public enum InterfaceKind {
+        /** Ammunition feed or storage interface. */ AMMUNITION,
+        /** Generic physical consumable interface. */ CONSUMABLE,
+        /** Reaction-mass feed or storage interface. */ REACTION_MASS
+    }
+
+    /**
+     * Three-dimensional physical envelope.
+     * @param lengthM length in meters
+     * @param widthM width in meters
+     * @param heightM height in meters
+     */
     public record Dimensions3d(double lengthM, double widthM, double heightM) { }
+
+    /**
+     * Hull-local or world-local vector expressed in meters.
+     * @param xM x component in meters
+     * @param yM y component in meters
+     * @param zM z component in meters
+     */
     public record Vector3d(double xM, double yM, double zM) { }
+
+    /**
+     * Angular traverse or coverage arc.
+     * @param azimuthCenterRad center azimuth in radians
+     * @param halfArcRad half-width in radians
+     */
     public record ArcDefinition(double azimuthCenterRad, double halfArcRad) { }
+
+    /**
+     * Explicit bounded calibration domain for heavy-impact response lookup.
+     * @param minImpactVelocityMps minimum calibrated impact speed
+     * @param maxImpactVelocityMps maximum calibrated impact speed
+     * @param minProjectileMassKg minimum calibrated projectile mass
+     * @param maxProjectileMassKg maximum calibrated projectile mass
+     * @param confidenceLabel authored calibration/provenance label
+     */
     public record CalibrationDomainDefinition(
             double minImpactVelocityMps, double maxImpactVelocityMps,
-            double minProjectileMassKg, double maxProjectileMassKg, String confidenceLabel) {
-        public CalibrationDomainDefinition { Objects.requireNonNull(confidenceLabel, "confidenceLabel"); }
-    }
+            double minProjectileMassKg, double maxProjectileMassKg, String confidenceLabel) { }
+
+    /**
+     * Engineering material definition.
+     * @param id stable content ID
+     * @param densityKgPerM3 material density
+     * @param tags authored material-role tags
+     * @param thermalConductivityWPerMK thermal conductivity
+     * @param specificHeatJPerKgK specific heat
+     * @param emissivity thermal emissivity
+     * @param radarReflectivity authored radar-reflection coefficient
+     * @param heavyImpactResponseSurfaceId optional bounded response-surface ID
+     * @param constructionMaterialFamilyId Stage-18 construction-family seam
+     * @param repairMaterialFamilyId Stage-18 repair-family seam
+     */
     public record MaterialDefinition(
             String id, double densityKgPerM3, List<String> tags,
             double thermalConductivityWPerMK, double specificHeatJPerKgK,
             double emissivity, double radarReflectivity,
             String heavyImpactResponseSurfaceId, String constructionMaterialFamilyId,
-            String repairMaterialFamilyId) {
-        public MaterialDefinition {
-            Objects.requireNonNull(id, "id");
-            tags = List.copyOf(Objects.requireNonNull(tags, "tags"));
-        }
-    }
-    public record HeavyImpactResponseSurfaceDefinition(String id, CalibrationDomainDefinition calibrationDomain) {
-        public HeavyImpactResponseSurfaceDefinition {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(calibrationDomain, "calibrationDomain");
-        }
-    }
+            String repairMaterialFamilyId) { }
+
+    /**
+     * Named heavy-impact response surface with an explicit valid domain.
+     * @param id stable content ID
+     * @param calibrationDomain bounded calibration domain
+     */
+    public record HeavyImpactResponseSurfaceDefinition(String id, CalibrationDomainDefinition calibrationDomain) { }
+
+    /**
+     * One ordered layer in a physical protection stack.
+     * @param materialId material content ID
+     * @param thicknessM layer thickness
+     * @param spacingAfterM spacing after the layer
+     * @param orientationRad layer orientation
+     * @param coverageFraction covered fraction
+     * @param responseSurfaceId optional layer-specific response surface
+     */
     public record ProtectionLayerDefinition(
             String materialId, double thicknessM, double spacingAfterM,
-            double orientationRad, double coverageFraction, String responseSurfaceId) {
-        public ProtectionLayerDefinition { Objects.requireNonNull(materialId, "materialId"); }
-    }
-    public record ProtectionStackDefinition(String id, double mountMassKg, List<ProtectionLayerDefinition> layers) {
-        public ProtectionStackDefinition {
-            Objects.requireNonNull(id, "id");
-            layers = List.copyOf(Objects.requireNonNull(layers, "layers"));
-        }
-    }
-    public record SlotDefinition(String id, IntegrationCategory category, Dimensions3d maxDimensionsM, double maxMassKg) {
-        public SlotDefinition {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(category, "category");
-            Objects.requireNonNull(maxDimensionsM, "maxDimensionsM");
-        }
-    }
+            double orientationRad, double coverageFraction, String responseSurfaceId) { }
+
+    /**
+     * Ordered physical protection stack.
+     * @param id stable content ID
+     * @param mountMassKg non-layer structural/mounting mass
+     * @param layers ordered outside-to-inside layers
+     */
+    public record ProtectionStackDefinition(String id, double mountMassKg, List<ProtectionLayerDefinition> layers) { }
+
+    /**
+     * Internal or integration slot envelope.
+     * @param id hull-local stable mount ID
+     * @param category integration category
+     * @param maxDimensionsM maximum module dimensions
+     * @param maxMassKg maximum supported module mass
+     */
+    public record SlotDefinition(String id, IntegrationCategory category, Dimensions3d maxDimensionsM, double maxMassKg) { }
+
+    /**
+     * External hardpoint envelope and geometry.
+     * @param id hull-local stable mount ID
+     * @param size hardpoint size class
+     * @param positionM hull-local position
+     * @param arc traverse/coverage arc
+     * @param maxModuleDimensionsM maximum module dimensions
+     * @param maxModuleMassKg maximum supported module mass
+     * @param maxRecoilImpulseNs maximum supported recoil impulse
+     * @param allowedModuleFamilies allowed module families
+     */
     public record HardpointDefinition(
             String id, HardpointSize size, Vector3d positionM, ArcDefinition arc,
             Dimensions3d maxModuleDimensionsM, double maxModuleMassKg, double maxRecoilImpulseNs,
-            List<ModuleFamily> allowedModuleFamilies) {
-        public HardpointDefinition {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(size, "size");
-            Objects.requireNonNull(positionM, "positionM");
-            Objects.requireNonNull(arc, "arc");
-            Objects.requireNonNull(maxModuleDimensionsM, "maxModuleDimensionsM");
-            allowedModuleFamilies = List.copyOf(Objects.requireNonNull(allowedModuleFamilies, "allowedModuleFamilies"));
-        }
-    }
+            List<ModuleFamily> allowedModuleFamilies) { }
+
+    /**
+     * Spatial compartment in the future subsystem-damage topology.
+     * @param id hull-local stable compartment ID
+     * @param volumeM3 compartment volume
+     * @param centerM hull-local center
+     * @param protectionStackId optional local protection stack
+     * @param tags authored subsystem or mission tags
+     */
     public record CompartmentDefinition(
-            String id, double volumeM3, Vector3d centerM, String protectionStackId, List<String> tags) {
-        public CompartmentDefinition {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(centerM, "centerM");
-            tags = List.copyOf(Objects.requireNonNull(tags, "tags"));
-        }
-    }
+            String id, double volumeM3, Vector3d centerM, String protectionStackId, List<String> tags) { }
+
+    /**
+     * Physical hull definition before fitted modules and consumables.
+     * @param id stable content ID
+     * @param displayName display name
+     * @param architecture physical architecture label without hidden bonuses
+     * @param boundingDimensionsM hull bounding dimensions
+     * @param bareHullMassKg structural bare-hull mass
+     * @param internalVolumeM3 integration volume
+     * @param slots internal/integration slots
+     * @param hardpoints external hardpoints
+     * @param compartments compartment topology
+     * @param crewBaseline baseline crew requirement
+     * @param lifeSupportCapacity supported crew capacity
+     * @param baseSignatureGeometryAreaM2 reference projected signature area
+     * @param structuralProtectionStackId structural protection-stack ID
+     * @param maxOperationalMassKg structural operating-mass limit
+     * @param thrustMountCompatibility supported propulsion families
+     */
     public record HullDefinition(
             String id, String displayName, HullArchitecture architecture, Dimensions3d boundingDimensionsM,
             double bareHullMassKg, double internalVolumeM3, List<SlotDefinition> slots,
             List<HardpointDefinition> hardpoints, List<CompartmentDefinition> compartments,
             int crewBaseline, int lifeSupportCapacity, double baseSignatureGeometryAreaM2,
             String structuralProtectionStackId, double maxOperationalMassKg,
-            List<ModuleFamily> thrustMountCompatibility) {
-        public HullDefinition {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(displayName, "displayName");
-            Objects.requireNonNull(architecture, "architecture");
-            Objects.requireNonNull(boundingDimensionsM, "boundingDimensionsM");
-            slots = List.copyOf(Objects.requireNonNull(slots, "slots"));
-            hardpoints = List.copyOf(Objects.requireNonNull(hardpoints, "hardpoints"));
-            compartments = List.copyOf(Objects.requireNonNull(compartments, "compartments"));
-            Objects.requireNonNull(structuralProtectionStackId, "structuralProtectionStackId");
-            thrustMountCompatibility = List.copyOf(Objects.requireNonNull(thrustMountCompatibility, "thrustMountCompatibility"));
-        }
-    }
-    public record InterfaceDefinition(InterfaceKind kind, String id, double capacity) {
-        public InterfaceDefinition {
-            Objects.requireNonNull(kind, "kind");
-            Objects.requireNonNull(id, "id");
-        }
-    }
-    public record ConstructionInputDefinition(String contentId, double amount) {
-        public ConstructionInputDefinition { Objects.requireNonNull(contentId, "contentId"); }
-    }
+            List<ModuleFamily> thrustMountCompatibility) { }
+
+    /**
+     * Physical ammunition, consumable or reaction-mass interface.
+     * @param kind interface category
+     * @param id module-local stable interface ID
+     * @param capacity interface-specific physical capacity
+     */
+    public record InterfaceDefinition(InterfaceKind kind, String id, double capacity) { }
+
+    /**
+     * Stage-18 construction/material input seam.
+     * @param contentId material or component content ID
+     * @param amount positive physical/catalog amount
+     */
+    public record ConstructionInputDefinition(String contentId, double amount) { }
+
+    /**
+     * Maintenance and repair metadata.
+     * @param serviceIntervalSeconds nominal service interval
+     * @param maintenanceWorkSeconds nominal maintenance work
+     * @param repairComplexity non-negative authored repair complexity
+     */
     public record MaintenanceDefinition(double serviceIntervalSeconds, double maintenanceWorkSeconds, double repairComplexity) { }
+
+    /**
+     * Shared production module definition.
+     * @param id stable content ID
+     * @param displayName display name
+     * @param family common physical module family
+     * @param integrationCategories compatible integration categories
+     * @param compatibleHardpointSizes compatible external hardpoint sizes
+     * @param physicalDimensionsM module dimensions
+     * @param massKg dry module mass
+     * @param occupiedVolumeM3 occupied integration volume
+     * @param requiredMountStrengthN required structural mounting strength
+     * @param continuousPowerSupplyW continuous supplied electrical power
+     * @param continuousPowerDemandW continuous consumed electrical power
+     * @param peakPowerDemandW peak consumed electrical power
+     * @param storedEnergyCapacityJ local stored energy
+     * @param wasteHeatW waste heat generation
+     * @param localThermalCapacityJ local thermal capacity
+     * @param coolantTransferDemandW coolant-transfer demand
+     * @param heatRejectionW direct heat-rejection capability
+     * @param crewRequirement required crew
+     * @param automationRequirement required automation capacity
+     * @param interfaces physical consumable interfaces
+     * @param signatureContributions channel-specific signature authoring values
+     * @param constructionInputs Stage-18 construction/component seams
+     * @param maintenance maintenance and repair metadata
+     * @param capabilityParameters family-specific physical authoring parameters
+     */
     public record ModuleDefinition(
             String id, String displayName, ModuleFamily family,
             List<IntegrationCategory> integrationCategories, List<HardpointSize> compatibleHardpointSizes,
@@ -403,32 +611,20 @@ public final class ShipEngineeringCatalog {
             double localThermalCapacityJ, double coolantTransferDemandW, double heatRejectionW,
             int crewRequirement, int automationRequirement, List<InterfaceDefinition> interfaces,
             Map<String, Double> signatureContributions, List<ConstructionInputDefinition> constructionInputs,
-            MaintenanceDefinition maintenance, Map<String, Double> capabilityParameters) {
-        public ModuleDefinition {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(displayName, "displayName");
-            Objects.requireNonNull(family, "family");
-            integrationCategories = List.copyOf(Objects.requireNonNull(integrationCategories, "integrationCategories"));
-            compatibleHardpointSizes = List.copyOf(Objects.requireNonNull(compatibleHardpointSizes, "compatibleHardpointSizes"));
-            Objects.requireNonNull(physicalDimensionsM, "physicalDimensionsM");
-            interfaces = List.copyOf(Objects.requireNonNull(interfaces, "interfaces"));
-            signatureContributions = immutableMap(signatureContributions);
-            constructionInputs = List.copyOf(Objects.requireNonNull(constructionInputs, "constructionInputs"));
-            Objects.requireNonNull(maintenance, "maintenance");
-            capabilityParameters = immutableMap(capabilityParameters);
-        }
-    }
-    public record InstalledModuleDefinition(String mountId, String moduleId) {
-        public InstalledModuleDefinition {
-            Objects.requireNonNull(mountId, "mountId");
-            Objects.requireNonNull(moduleId, "moduleId");
-        }
-    }
-    public record DemonstratorFitDefinition(String id, String hullId, List<InstalledModuleDefinition> installedModules) {
-        public DemonstratorFitDefinition {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(hullId, "hullId");
-            installedModules = List.copyOf(Objects.requireNonNull(installedModules, "installedModules"));
-        }
-    }
+            MaintenanceDefinition maintenance, Map<String, Double> capabilityParameters) { }
+
+    /**
+     * One module-to-mount assignment in a schema demonstrator.
+     * @param mountId hull-local slot or hardpoint ID
+     * @param moduleId module content ID
+     */
+    public record InstalledModuleDefinition(String mountId, String moduleId) { }
+
+    /**
+     * Machine-readable schema demonstrator, not yet an authoritative runtime ship instance.
+     * @param id stable fit ID
+     * @param hullId referenced hull ID
+     * @param installedModules module-to-mount assignments
+     */
+    public record DemonstratorFitDefinition(String id, String hullId, List<InstalledModuleDefinition> installedModules) { }
 }
