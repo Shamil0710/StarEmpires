@@ -13,7 +13,6 @@ package com.spacesim.ship;
  * @param activeRadioEmissionPowerW active radar/communications emission power visible to passive RF sensors
  * @param jammerEmissionPowerW deliberate EW emission power visible to passive RF sensors
  */
-@SuppressWarnings("doclint:missing")
 public record SignatureState(
         double thermalRadiantPowerW,
         double enginePlumeRadiantPowerW,
@@ -30,7 +29,16 @@ public record SignatureState(
         /** Reflected visible/near-visible optical energy. */ REFLECTED_OPTICAL
     }
 
-    /** Validates finite non-negative channel values. */
+    /**
+     * Validates finite non-negative channel values.
+     *
+     * @param thermalRadiantPowerW thermal-band radiant power presented to the observer model
+     * @param enginePlumeRadiantPowerW engine-plume radiant power in the observed band
+     * @param radarCrossSectionM2 radar cross section for the current frequency/aspect/configuration sample
+     * @param reflectedOpticalPowerW reflected optical power presented to the observer model
+     * @param activeRadioEmissionPowerW active radar/communications emission power visible to passive RF sensors
+     * @param jammerEmissionPowerW deliberate EW emission power visible to passive RF sensors
+     */
     public SignatureState {
         requireNonNegativeFinite(thermalRadiantPowerW, "thermalRadiantPowerW");
         requireNonNegativeFinite(enginePlumeRadiantPowerW, "enginePlumeRadiantPowerW");
