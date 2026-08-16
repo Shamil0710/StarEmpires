@@ -96,6 +96,7 @@ class BeamAndGuidanceRuntimeTest {
 
     @Test
     void terminalReservePolicyPreventsGuidanceFromSpendingReservedDeltaV() {
+        double fullIdealDeltaV = 5_000d * Math.log(1_000d / 800d);
         GuidedWeapon definition = new GuidedWeapon(
                 "ammo.reserve_test_v1",
                 "seeker.radar_v1",
@@ -105,7 +106,7 @@ class BeamAndGuidanceRuntimeTest {
                 5_000d,
                 40d,
                 0.0005d,
-                1_100d);
+                fullIdealDeltaV);
         GuidedWeaponBody body = GuidedWeaponBody.launch(
                 9001L, 44L, 77L, definition,
                 "material.high_strength_steel_v1", ProjectileShape.SHELL,
