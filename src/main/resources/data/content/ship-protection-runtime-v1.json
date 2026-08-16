@@ -5,7 +5,9 @@
       "responseSurfaceId": "response.synthetic_heavy_v1",
       "specificAbsorptionJPerKg": 2400000.0,
       "spallMassFraction": 0.08,
-      "spallEnergyFraction": 0.12
+      "spallEnergyFraction": 0.12,
+      "ricochetCriticalAngleRad": 1.2217304763960306,
+      "ricochetRetainedEnergyFraction": 0.65
     }
   ],
   "hullDamageLayouts": [
