@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-16 / Stage 17H.**  
+> **Последняя синхронизация: 2026-08-16 / Stage 17H + pre-17.5 world-generation contract.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -311,6 +311,13 @@ Mines, depots, water/propellant sources, precision fabs, ammunition plants, ship
 
 Answers **where the already-defined world exists**.
 
+Canonical generation contracts:
+
+- `docs/stage20_physical_world_generation_plan.md`;
+- `docs/inter_system_navigation_contract.md`;
+- `docs/physical_trade_route_scoring_contract.md`;
+- `docs/galaxy_topology_resource_geography_generation_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for non-linear topology, resource geography, economic dependency and world-generation quality gates.
+
 Must honor:
 
 - SI physical scale and travel time;
@@ -321,9 +328,47 @@ Must honor:
 - logistics/economic geography;
 - sensor-consistent discovery;
 - Stage-19 strategic response times;
-- bounded mostly-dormant scalability architecture.
+- bounded mostly-dormant scalability architecture;
+- sectors as spatial/strategic regions rather than list partitions;
+- explicit neighbor graph with measurable structural diversity instead of a sequential-chain production topology;
+- a mix of hubs, forks, cycles, alternate paths, gateways, remote/frontier pockets and bounded chokepoints;
+- machine-readable anti-linearity, route-redundancy, articulation/bridge and gateway-concentration diagnostics;
+- spatially correlated resource geography derived from Stage-18 physical host/environment conditions plus local deterministic variance;
+- regional comparative advantage instead of uniform self-sufficiency or `sector = production bonus` shortcuts;
+- essential economic viability through physically reachable supply chains without requiring every system/sector to produce everything;
+- strategic scarcity and dependency strong enough to create real trade, stockpiling, infrastructure, diplomacy, security, expansion and warfare incentives;
+- faction-start placement after topology/resource generation, with asymmetric but recoverable starts and anti-accidental-monopoly checks;
+- whole-route delivered-cost/dependency analysis over actual neighbor edges;
+- deterministic world-quality gate with `ACCEPT / DETERMINISTIC_REPAIR / REJECT_SEED / EXPLICIT_SCENARIO_OVERRIDE` semantics;
+- bad seeds rejected or repaired before materialization, never rescued by runtime hidden supplies/emergency deposits.
+
+Locked Stage-20 generation causality:
+
+```text
+macro regions
+→ system placement
+→ neighbor topology
+→ topology quality gate
+→ regional physical conditions
+→ Stage-18 resource occurrences
+→ facilities / economic bootstrap
+→ faction-start candidates
+→ delivered-cost / dependency analysis
+→ whole-world quality gate
+→ authoritative generated world
+```
 
 Generator may place resources/facilities but cannot invent hidden emergency resources to rescue a bad seed.
+
+Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate all of the following simultaneously:
+
+- galaxy is connected where ordinary production topology requires it, but not predominantly chain-like;
+- core/developed regions have meaningful alternate-route coverage while chokepoints remain bounded strategic features;
+- resource clusters are physically plausible and regionally recognizable without becoming uniform sector bonuses;
+- typical starts are viable but meaningfully dependent on external trade/supply for part of growth or advanced industry;
+- critical dependencies and gateway concentration are measurable from authoritative state;
+- no normal seed requires hidden restock, teleport, emergency deposit or faction-only generation exception;
+- player, NPC traders, faction logistics and warfare all consume the same generated geometry/resources.
 
 Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
 
