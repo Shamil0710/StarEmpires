@@ -11,8 +11,9 @@ import java.util.Objects;
  *
  * <p>Stage 3 schema v1 имела ровно пять item slots и не содержала stable content archetype ID.
  * Schema v2 расширила item arrays и добавила stable archetype IDs. Schema v3 сохраняет configured
- * market target отдельно от effective target. Для v1/v2 текущий effective target консервативно
- * становится configured baseline, поэтому миграция никогда не уменьшает существующий спрос.</p>
+ * market target отдельно от effective target. Schema v4 добавляет optional fitted engineering
+ * state; при миграции v1-v3 он нейтрально отсутствует, поэтому никакой fit, топливо или энергия не
+ * изобретаются из legacy class/archetype данных.</p>
  */
 public final class GameStateMigration {
     /** Число товарных slots в Stage 3 schema v1. */
@@ -39,6 +40,9 @@ public final class GameStateMigration {
         if (state.schemaVersion() == GameState.CURRENT_VERSION) {
             return normalizeCurrentFactionCapacity(state);
         }
+        if (state.schemaVersion() == GameState.CONFIGURED_MARKET_TARGET_VERSION) {
+            return normalizeCurrentFactionCapacity(migrateVersion3(state));
+        }
         if (state.schemaVersion() == GameState.ITEM_CAPACITY_ARCHETYPE_VERSION) {
             return normalizeCurrentFactionCapacity(migrateVersion2(state));
         }
@@ -63,6 +67,21 @@ public final class GameStateMigration {
                 state.priceRecorder(),
                 state.ledger(),
                 List.copyOf(migratedEntities)));
+    }
+
+    private static GameState migrateVersion3(GameState state) {
+        return new GameState(
+                GameState.CURRENT_VERSION,
+                state.rootSeed(),
+                state.clock(),
+                state.nextEntityIdValue(),
+                state.eventRandomState(),
+                state.asteroidRandomState(),
+                state.events(),
+                state.asteroidSpawner(),
+                state.priceRecorder(),
+                state.ledger(),
+                List.copyOf(state.entities()));
     }
 
     private static GameState migrateVersion2(GameState state) {
@@ -167,7 +186,8 @@ public final class GameStateMigration {
                 entity.mining(),
                 entity.combat(),
                 entity.asteroid(),
-                entity.archetype());
+                entity.archetype(),
+                entity.engineering());
     }
 
     private static EntityState migrateLegacyStage3Entity(EntityState entity) {

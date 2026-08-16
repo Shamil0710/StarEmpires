@@ -143,7 +143,8 @@ final class FleetWorldService {
                 source.mining(),
                 source.combat(),
                 source.asteroid(),
-                source.archetype());
+                source.archetype(),
+                source.engineering());
         FleetTransitState updatedTransit = new FleetTransitState(
                 transit.originSystemId(),
                 transit.destinationSystemId(),

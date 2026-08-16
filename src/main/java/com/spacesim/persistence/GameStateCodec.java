@@ -32,8 +32,8 @@ import java.util.Objects;
  *
  * <p>{@link #write(Path, GameState)} сначала создаёт временный файл рядом с целевым, затем заменяет
  * сохранение atomic move, если файловая система его поддерживает. {@link #decode(byte[])} принимает
- * current schema, schema v2 и Stage-3 schema v1, которые переводятся через {@link GameStateMigration}.
- * Entity archetype появился в schema v2; configured market target provenance — в schema v3.</p>
+ * current schema и legacy v1-v3, которые переводятся через {@link GameStateMigration}. Entity
+ * archetype появился в v2, configured market target provenance — в v3, fitted engineering — v4.</p>
  */
 public final class GameStateCodec {
     private static final int MAGIC = 0x5354454D; // STEM — Star Empires save magic.
@@ -45,6 +45,7 @@ public final class GameStateCodec {
     private static final int MAX_EVENTS = 100_000;
     private static final int MAX_NEWS = 100_000;
     private static final int MAX_LIST_ENTRIES = 1_000_000;
+    private static final int MAX_ENGINEERING_ROWS = 4096;
 
     private GameStateCodec() {
         throw new AssertionError("GameStateCodec не создаёт экземпляров");
@@ -192,6 +193,7 @@ public final class GameStateCodec {
     private static GameState readGameState(DataInputStream input) throws IOException {
         int schemaVersion = input.readInt();
         if (schemaVersion != GameState.CURRENT_VERSION
+                && schemaVersion != GameState.CONFIGURED_MARKET_TARGET_VERSION
                 && schemaVersion != GameState.ITEM_CAPACITY_ARCHETYPE_VERSION
                 && schemaVersion != GameState.LEGACY_STAGE3_VERSION) {
             throw new IllegalArgumentException("Неподдерживаемая schema version: " + schemaVersion);
@@ -454,6 +456,7 @@ public final class GameStateCodec {
             output.writeLong(value.remainingResource());
         });
         writeOptional(output, entity.archetype(), value -> writeString(output, value.contentId()));
+        writeOptional(output, entity.engineering(), value -> writeEngineering(output, value));
     }
 
     private static EntityState readEntity(DataInputStream input, int schemaVersion) throws IOException {
@@ -537,16 +540,19 @@ public final class GameStateCodec {
         EntityState.ArchetypeState archetype = schemaVersion >= GameState.ITEM_CAPACITY_ARCHETYPE_VERSION
                 ? readOptional(input, () -> new EntityState.ArchetypeState(readString(input)))
                 : null;
+        EntityState.EngineeringState engineering = schemaVersion >= GameState.CURRENT_VERSION
+                ? readOptional(input, () -> readEngineering(input))
+                : null;
         return new EntityState(
                 id, identity, transform, inventory, wallet, market, production, history,
-                faction, reputation, ship, tradeAi, mining, combat, asteroid, archetype);
+                faction, reputation, ship, tradeAi, mining, combat, asteroid, archetype, engineering);
     }
 
     private static EntityState.MarketState readMarket(
             DataInputStream input,
             int schemaVersion) throws IOException {
         List<Integer> target = readIntegerList(input);
-        List<Integer> configuredTarget = schemaVersion >= GameState.CURRENT_VERSION
+        List<Integer> configuredTarget = schemaVersion >= GameState.CONFIGURED_MARKET_TARGET_VERSION
                 ? readIntegerList(input)
                 : target;
         return new EntityState.MarketState(
@@ -558,6 +564,141 @@ public final class GameStateCodec {
                 readDoubleList(input),
                 readBooleanList(input),
                 input.readBoolean());
+    }
+
+    private static void writeEngineering(
+            DataOutputStream output,
+            EntityState.EngineeringState value) throws IOException {
+        writeString(output, requireNonNullString(value.hullId(), "engineering.hullId"));
+        List<EntityState.InstalledModuleState> modules = require(value.installedModules(), "engineering.installedModules");
+        writeCount(output, modules.size(), MAX_ENGINEERING_ROWS, "engineering.modules");
+        for (EntityState.InstalledModuleState module : modules) {
+            writeString(output, requireNonNullString(require(module, "engineering.module").mountId(), "module.mountId"));
+            writeString(output, requireNonNullString(module.moduleId(), "module.moduleId"));
+        }
+        EntityState.EngineeringConsumableState consumables = require(value.consumables(), "engineering.consumables");
+        writeNonNegativeDouble(output, consumables.cargoMassKg(), "engineering.cargoMassKg");
+        writeNonNegativeDouble(output, consumables.storesMassKg(), "engineering.storesMassKg");
+        writeNonNegativeDouble(output, consumables.missionPayloadMassKg(), "engineering.missionPayloadMassKg");
+        writeNonNegativeDouble(output, consumables.missionIntegrationVolumeM3(), "engineering.missionIntegrationVolumeM3");
+        List<EntityState.EngineeringConsumableLoadState> loads = require(
+                consumables.interfaceLoads(), "engineering.interfaceLoads");
+        writeCount(output, loads.size(), MAX_ENGINEERING_ROWS, "engineering.interfaceLoads");
+        for (EntityState.EngineeringConsumableLoadState load : loads) {
+            EntityState.EngineeringConsumableLoadState checked = require(load, "engineering.load");
+            writeString(output, requireNonNullString(checked.mountId(), "load.mountId"));
+            writeString(output, requireNonNullString(checked.interfaceId(), "load.interfaceId"));
+            writeString(output, requireNonNullString(checked.kindName(), "load.kindName"));
+            writeNonNegativeDouble(output, checked.amount(), "load.amount");
+            writeNonNegativeDouble(output, checked.massKg(), "load.massKg");
+            if (checked.itemCount() < 0L) {
+                throw new IllegalArgumentException("load.itemCount не может быть отрицательным");
+            }
+            output.writeLong(checked.itemCount());
+        }
+        writeNonNegativeDouble(output, value.sharedBusEnergyJ(), "engineering.sharedBusEnergyJ");
+        writeNonNegativeDouble(output, value.shipHeatStoredJ(), "engineering.shipHeatStoredJ");
+        writeMountDoubles(output, value.localHeatJByMount(), "engineering.localHeat");
+        writeMountDoubles(output, value.thrustLimitNByMount(), "engineering.thrustLimit");
+        writeNonNegativeDouble(output, value.coolantBusCapacityW(), "engineering.coolantBusCapacityW");
+        writeMountDoubles(output, value.ftlCooldownSecondsByMount(), "engineering.ftlCooldown");
+    }
+
+    private static EntityState.EngineeringState readEngineering(DataInputStream input) throws IOException {
+        String hullId = requireNonNullString(readString(input), "engineering.hullId");
+        int moduleCount = readCount(input, MAX_ENGINEERING_ROWS, "engineering.modules");
+        List<EntityState.InstalledModuleState> modules = new ArrayList<>(moduleCount);
+        for (int index = 0; index < moduleCount; index++) {
+            modules.add(new EntityState.InstalledModuleState(
+                    requireNonNullString(readString(input), "module.mountId"),
+                    requireNonNullString(readString(input), "module.moduleId")));
+        }
+        double cargoMass = readNonNegativeDouble(input, "engineering.cargoMassKg");
+        double storesMass = readNonNegativeDouble(input, "engineering.storesMassKg");
+        double missionPayloadMass = readNonNegativeDouble(input, "engineering.missionPayloadMassKg");
+        double missionVolume = readNonNegativeDouble(input, "engineering.missionIntegrationVolumeM3");
+        int loadCount = readCount(input, MAX_ENGINEERING_ROWS, "engineering.interfaceLoads");
+        List<EntityState.EngineeringConsumableLoadState> loads = new ArrayList<>(loadCount);
+        for (int index = 0; index < loadCount; index++) {
+            String mountId = requireNonNullString(readString(input), "load.mountId");
+            String interfaceId = requireNonNullString(readString(input), "load.interfaceId");
+            String kindName = requireNonNullString(readString(input), "load.kindName");
+            double amount = readNonNegativeDouble(input, "load.amount");
+            double massKg = readNonNegativeDouble(input, "load.massKg");
+            long itemCount = input.readLong();
+            if (itemCount < 0L) {
+                throw new IllegalArgumentException("load.itemCount не может быть отрицательным");
+            }
+            loads.add(new EntityState.EngineeringConsumableLoadState(
+                    mountId, interfaceId, kindName, amount, massKg, itemCount));
+        }
+        EntityState.EngineeringConsumableState consumables = new EntityState.EngineeringConsumableState(
+                cargoMass, storesMass, missionPayloadMass, missionVolume, List.copyOf(loads));
+        return new EntityState.EngineeringState(
+                hullId,
+                List.copyOf(modules),
+                consumables,
+                readNonNegativeDouble(input, "engineering.sharedBusEnergyJ"),
+                readNonNegativeDouble(input, "engineering.shipHeatStoredJ"),
+                readMountDoubles(input, "engineering.localHeat"),
+                readMountDoubles(input, "engineering.thrustLimit"),
+                readNonNegativeDouble(input, "engineering.coolantBusCapacityW"),
+                readMountDoubles(input, "engineering.ftlCooldown"));
+    }
+
+    private static void writeMountDoubles(
+            DataOutputStream output,
+            List<EntityState.MountDoubleState> values,
+            String label) throws IOException {
+        List<EntityState.MountDoubleState> checked = require(values, label);
+        writeCount(output, checked.size(), MAX_ENGINEERING_ROWS, label);
+        String previous = null;
+        for (EntityState.MountDoubleState row : checked) {
+            EntityState.MountDoubleState value = require(row, label + " row");
+            String mountId = requireNonNullString(value.mountId(), label + ".mountId");
+            if (previous != null && previous.compareTo(mountId) >= 0) {
+                throw new IllegalArgumentException(label + " должен быть строго отсортирован по mountId");
+            }
+            previous = mountId;
+            writeString(output, mountId);
+            writeNonNegativeDouble(output, value.value(), label + ".value");
+        }
+    }
+
+    private static List<EntityState.MountDoubleState> readMountDoubles(
+            DataInputStream input,
+            String label) throws IOException {
+        int count = readCount(input, MAX_ENGINEERING_ROWS, label);
+        List<EntityState.MountDoubleState> result = new ArrayList<>(count);
+        String previous = null;
+        for (int index = 0; index < count; index++) {
+            String mountId = requireNonNullString(readString(input), label + ".mountId");
+            if (previous != null && previous.compareTo(mountId) >= 0) {
+                throw new IllegalArgumentException(label + " содержит duplicate/unsorted mountId");
+            }
+            previous = mountId;
+            result.add(new EntityState.MountDoubleState(
+                    mountId, readNonNegativeDouble(input, label + ".value")));
+        }
+        return List.copyOf(result);
+    }
+
+    private static void writeNonNegativeDouble(
+            DataOutputStream output,
+            double value,
+            String label) throws IOException {
+        if (!Double.isFinite(value) || value < 0d) {
+            throw new IllegalArgumentException(label + " должен быть конечным неотрицательным");
+        }
+        output.writeDouble(value);
+    }
+
+    private static double readNonNegativeDouble(DataInputStream input, String label) throws IOException {
+        double value = input.readDouble();
+        if (!Double.isFinite(value) || value < 0d) {
+            throw new IllegalArgumentException(label + " должен быть конечным неотрицательным");
+        }
+        return value;
     }
 
     private static void writeEntityId(DataOutputStream output, EntityId id) throws IOException {
