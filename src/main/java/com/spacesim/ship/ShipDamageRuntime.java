@@ -38,7 +38,7 @@ public final class ShipDamageRuntime {
     public record Snapshot(
             Map<String, Double> compartmentIntegrityById,
             DamageState moduleDamage) {
-        /** Validates and freezes one damage snapshot. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public Snapshot {
             Objects.requireNonNull(compartmentIntegrityById, "compartmentIntegrityById");
             TreeMap<String, Double> copy = new TreeMap<>();
@@ -90,7 +90,7 @@ public final class ShipDamageRuntime {
             double compartmentDamageEnergyJ,
             double subsystemDamageEnergyJ,
             List<String> damagedMounts) {
-        /** Freezes deterministic damaged-mount ordering. */
+        // Compact-constructor validation; record-level Javadoc owns the public parameter contract.
         public DamageEvent {
             Objects.requireNonNull(snapshot, "snapshot");
             if (compartmentId == null || compartmentId.isBlank()) {
