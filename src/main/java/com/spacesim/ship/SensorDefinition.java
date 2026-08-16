@@ -27,7 +27,6 @@ import java.util.Objects;
  * @param eccmProcessingGainLinear interference rejection gain while ECCM is enabled
  * @param eccmPowerDemandW explicit additional electrical demand while ECCM is enabled
  */
-@SuppressWarnings("doclint:missing")
 public record SensorDefinition(
         String id,
         Mode mode,
@@ -54,7 +53,25 @@ public record SensorDefinition(
         /** Active monostatic radar: emits, obtains bearing and range. */ ACTIVE_RADAR
     }
 
-    /** Validates monotonic thresholds and finite physical parameters. */
+    /**
+     * Validates monotonic thresholds and finite physical parameters.
+     *
+     * @param id stable sensor definition ID
+     * @param mode sensing mode
+     * @param channel observed signature channel
+     * @param apertureAreaM2 effective collecting aperture
+     * @param receiverNoisePowerW receiver noise in the modeled observation band/dwell
+     * @param detectionSnr minimum SNR for DETECTED evidence
+     * @param classificationSnr minimum SNR for CLASSIFIED evidence
+     * @param trackSnr minimum SNR for a range-capable measurement to support TRACKED evidence
+     * @param fireControlSnr minimum SNR for a range-capable measurement to support FIRE_CONTROL evidence
+     * @param bearingSigmaFloorRad best-case one-sigma bearing error floor
+     * @param rangeSigmaFraction best-case fractional one-sigma range error for ranging modes
+     * @param activeTransmitPowerW emitted radar power when active mode is enabled
+     * @param transmitGainLinear directional transmit gain for active radar
+     * @param eccmProcessingGainLinear interference rejection gain while ECCM is enabled
+     * @param eccmPowerDemandW explicit additional electrical demand while ECCM is enabled
+     */
     public SensorDefinition {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("sensor id must be non-blank");
