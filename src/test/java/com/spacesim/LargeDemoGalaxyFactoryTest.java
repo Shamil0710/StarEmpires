@@ -19,6 +19,7 @@ import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -115,11 +116,34 @@ class LargeDemoGalaxyFactoryTest {
             }
             assertNull(route.otherEnd(new StarSystemId(LargeDemoGalaxyFactory.SYSTEM_COUNT)));
         } finally {
-            if (previous == null) {
-                System.clearProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY);
-            } else {
-                System.setProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY, previous);
-            }
+            restoreLargeDemoProperty(previous);
+        }
+    }
+
+    @Test
+    void actualPlayableBootstrapUsesLargeWorldAndSharedFactionInfrastructure() {
+        String previous = System.getProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY);
+        System.setProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY, Boolean.TRUE.toString());
+        try {
+            PlayableTestWorldFactory.Scenario scenario = PlayableTestWorldFactory.create(0x1005_19L);
+            assertEquals(100, scenario.runtime().world().getTopology().systems().size());
+            assertEquals(8, scenario.runtime().world().snapshot().factions().size());
+            assertEquals(5, scenario.runtime().world().getWorldFactionIdentities().size());
+            assertNotNull(scenario.runtime().player().activeFleetId());
+            assertEquals(DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                    scenario.runtime().world().findFleet(scenario.runtime().player().activeFleetId()).orElseThrow().systemId());
+            assertEquals(DemoGalaxyFactory.FRONTIER_SYSTEM_ID,
+                    scenario.route().otherEnd(DemoGalaxyFactory.INNER_SYSTEM_ID));
+        } finally {
+            restoreLargeDemoProperty(previous);
+        }
+    }
+
+    private static void restoreLargeDemoProperty(String previous) {
+        if (previous == null) {
+            System.clearProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY);
+        } else {
+            System.setProperty(DemoGalaxyFactory.LARGE_DEMO_PROPERTY, previous);
         }
     }
 
