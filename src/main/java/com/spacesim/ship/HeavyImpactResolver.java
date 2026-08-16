@@ -49,9 +49,9 @@ public final class HeavyImpactResolver {
      *
      * @param projectile authoritative projectile body
      * @param protectionStackId protection stack content ID
-     * @param incidenceAngleRad angle from layer normal; zero is normal impact
+     * @param incidenceAngleRad signed angle from the base layer normal; zero is normal impact
      * @return deterministic material response
-     * @throws OutsideCalibrationDomainException when a referenced response surface does not cover the impact
+     * @throws OutsideCalibrationDomainException when a referenced response surface does not cover the current residual impact
      */
     public ImpactResult resolve(
             ProjectileBody projectile,
@@ -92,7 +92,9 @@ public final class HeavyImpactResolver {
             if (surface == null || model == null) {
                 throw new IllegalArgumentException("Missing Stage-17.5F response model: " + responseId);
             }
-            requireInside(surface, checkedProjectile);
+
+            double residualSpeedMps = speedForEnergy(checkedProjectile.massKg(), residualEnergyJ);
+            requireInside(surface, checkedProjectile.massKg(), residualSpeedMps);
 
             double relativeAngle = incidenceAngleRad - layer.orientationRad();
             double angleFromNormal = Math.acos(Math.abs(Math.cos(relativeAngle)));
@@ -105,21 +107,26 @@ public final class HeavyImpactResolver {
             if (angleFromNormal >= model.ricochetCriticalAngleRad()) {
                 double retainedJ = residualEnergyJ * model.ricochetRetainedEnergyFraction();
                 double absorbedJ = residualEnergyJ - retainedJ;
+                totalAbsorbedJ += absorbedJ;
                 double spallMassKg = encounteredMassKg * model.spallMassFraction()
                         * Math.min(1d, absorbedJ / Math.max(capacityJ, 1e-12d));
                 double spallEnergyJ = absorbedJ * model.spallEnergyFraction();
+                totalSpallMassKg += spallMassKg;
+                totalSpallEnergyJ += spallEnergyJ;
                 interactions.add(new LayerInteraction(
                         layerIndex, material.id(), responseId, effectiveThicknessM, encounteredMassKg,
                         capacityJ, absorbedJ, retainedJ, spallMassKg, spallEnergyJ));
+                ProjectileBody residualProjectile = ricochetBody(checkedProjectile, retainedJ, relativeAngle);
                 return new ImpactResult(
                         protectionStackId,
                         checkedProjectile.kineticEnergyJ(),
-                        absorbedJ,
+                        totalAbsorbedJ,
                         retainedJ,
                         false,
                         Outcome.RICOCHET,
                         interactions,
-                        new FragmentCloud(spallMassKg, spallEnergyJ, false),
+                        new FragmentCloud(totalSpallMassKg, totalSpallEnergyJ, false),
+                        residualProjectile,
                         0d);
             }
 
@@ -152,6 +159,9 @@ public final class HeavyImpactResolver {
         boolean penetrated = residualEnergyJ > 0d;
         FragmentCloud fragments = new FragmentCloud(totalSpallMassKg, totalSpallEnergyJ, penetrated);
         double internalDamageEnergyJ = penetrated ? residualEnergyJ + totalSpallEnergyJ : 0d;
+        ProjectileBody residualProjectile = penetrated
+                ? scaledBody(checkedProjectile, residualEnergyJ, checkedProjectile.velocityXMps(), checkedProjectile.velocityYMps())
+                : null;
         return new ImpactResult(
                 protectionStackId,
                 checkedProjectile.kineticEnergyJ(),
@@ -161,20 +171,68 @@ public final class HeavyImpactResolver {
                 penetrated ? Outcome.PERFORATED : Outcome.STOPPED,
                 interactions,
                 fragments,
+                residualProjectile,
                 internalDamageEnergyJ);
     }
 
     private static void requireInside(
             HeavyImpactResponseSurfaceDefinition surface,
-            ProjectileBody projectile) {
+            double massKg,
+            double velocityMps) {
         CalibrationDomainDefinition domain = surface.calibrationDomain();
-        double velocity = projectile.speedMps();
-        double mass = projectile.massKg();
-        if (velocity < domain.minImpactVelocityMps() || velocity > domain.maxImpactVelocityMps()
-                || mass < domain.minProjectileMassKg() || mass > domain.maxProjectileMassKg()) {
+        if (velocityMps < domain.minImpactVelocityMps() || velocityMps > domain.maxImpactVelocityMps()
+                || massKg < domain.minProjectileMassKg() || massKg > domain.maxProjectileMassKg()) {
             throw new OutsideCalibrationDomainException(
-                    surface.id(), velocity, mass, domain);
+                    surface.id(), velocityMps, massKg, domain);
         }
+    }
+
+    private static double speedForEnergy(double massKg, double energyJ) {
+        if (!Double.isFinite(massKg) || massKg <= 0d || !Double.isFinite(energyJ) || energyJ < 0d) {
+            throw new IllegalArgumentException("massKg must be positive and energyJ non-negative");
+        }
+        return Math.sqrt(2d * energyJ / massKg);
+    }
+
+    private static ProjectileBody ricochetBody(
+            ProjectileBody body,
+            double retainedEnergyJ,
+            double signedIncidenceAngleRad) {
+        double incomingDirection = Math.atan2(body.velocityYMps(), body.velocityXMps());
+        double normalDirection = incomingDirection - signedIncidenceAngleRad;
+        double reflectedDirection = 2d * normalDirection + Math.PI - incomingDirection;
+        double speedMps = speedForEnergy(body.massKg(), retainedEnergyJ);
+        return scaledBody(
+                body,
+                retainedEnergyJ,
+                Math.cos(reflectedDirection) * speedMps,
+                Math.sin(reflectedDirection) * speedMps);
+    }
+
+    private static ProjectileBody scaledBody(
+            ProjectileBody body,
+            double retainedEnergyJ,
+            double directionXMps,
+            double directionYMps) {
+        double directionSpeed = Math.hypot(directionXMps, directionYMps);
+        if (directionSpeed <= 0d) {
+            throw new IllegalArgumentException("Residual projectile direction must be non-zero");
+        }
+        double targetSpeed = speedForEnergy(body.massKg(), retainedEnergyJ);
+        double scale = targetSpeed / directionSpeed;
+        return new ProjectileBody(
+                body.projectileId(),
+                body.sourceEntityId(),
+                body.spawnTick(),
+                body.materialId(),
+                body.shape(),
+                body.lengthM(),
+                body.diameterM(),
+                body.massKg(),
+                body.xM(),
+                body.yM(),
+                directionXMps * scale,
+                directionYMps * scale);
     }
 
     /** One ordered layer interaction. */
@@ -210,6 +268,7 @@ public final class HeavyImpactResolver {
      * @param outcome terminal stop/ricochet/perforation outcome
      * @param layerInteractions ordered layer response diagnostics
      * @param fragments aggregate fragment/spall cloud
+     * @param residualProjectile post-protection physical body for ricochet/perforation, or {@code null} when stopped
      * @param internalDamageEnergyJ energy routed into internal compartment damage
      */
     public record ImpactResult(
@@ -221,6 +280,7 @@ public final class HeavyImpactResolver {
             Outcome outcome,
             List<LayerInteraction> layerInteractions,
             FragmentCloud fragments,
+            ProjectileBody residualProjectile,
             double internalDamageEnergyJ) {
         /**
          * Validates and freezes one complete impact result.
@@ -233,13 +293,23 @@ public final class HeavyImpactResolver {
          * @param outcome terminal stop/ricochet/perforation outcome
          * @param layerInteractions ordered layer response diagnostics
          * @param fragments aggregate fragment/spall cloud
+         * @param residualProjectile post-protection physical body for ricochet/perforation, or {@code null} when stopped
          * @param internalDamageEnergyJ energy routed into internal compartment damage
          */
         public ImpactResult {
+            if (protectionStackId == null || protectionStackId.isBlank()) {
+                throw new IllegalArgumentException("protectionStackId must be non-blank");
+            }
             Objects.requireNonNull(outcome, "outcome");
             Objects.requireNonNull(layerInteractions, "layerInteractions");
             layerInteractions = List.copyOf(layerInteractions);
             Objects.requireNonNull(fragments, "fragments");
+            if (outcome == Outcome.STOPPED && residualProjectile != null) {
+                throw new IllegalArgumentException("Stopped impact cannot expose a residual projectile");
+            }
+            if (outcome != Outcome.STOPPED && residualProjectile == null) {
+                throw new IllegalArgumentException("Ricochet/perforation requires a residual projectile");
+            }
         }
     }
 
