@@ -1,6 +1,6 @@
 # Star Empires — Stage 17.5 Combat Depth / Ship Fitting Foundation
 
-> Статус: **PLANNED — research gate satisfied; activation still requires Stage 17H completion**  
+> Статус: **ACTIVE — 17.5A–17.5E COMPLETE; 17.5F NEXT**  
 > Основание: accepted `Ship Mathematics v1.0 Design Baseline` (`docs/ship_mathematics_v1_0_design_baseline.md`)  
 > Machine-readable baseline: `docs/benchmarks/ship_mathematics_v1_0_design_baseline.json`  
 > Назначение: перенести принятую v1.0 инженерную модель из research в authoritative runtime без повторного проектирования fundamental ship/combat architecture.
@@ -21,6 +21,8 @@ Stage 17.5 заменяет Stage-13 combat vertical slice полноценны�
 > **Stage 17.5 реализует v1.0; он не изобретает вторую корабельную модель.**
 
 Production runtime использует ту же парадигму для player, AI, civilian, military и industrial ships.
+
+Stage 17.5 дополнительно обязан закончиться не только subsystem-level acceptance, но и production-valid **Combat Test Content Pack + Tactical Prototype Visual Set**, на которых несколько физически различных флотов проходят deterministic и interactive боевые столкновения. Детальный exit-gate contract: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
 ---
 
@@ -454,6 +456,13 @@ Persistence saves installed modules, consumables, damage, required thermal/shiel
 
 # 12. Stage 17.5I — deterministic end-to-end acceptance gate
 
+Stage 17.5I включает два обязательных слоя acceptance:
+
+1. subsystem/end-to-end deterministic scenarios ниже;
+2. production-valid **Combat Test Content Pack + Tactical Prototype Visual Set** по `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
+
+Тестовый content pack обязан позволять собрать несколько физически различных hull/fits и минимум четыре специализированные fleet doctrines плюс balanced/control fleet. Эти assets используют production schemas/runtime, но остаются **content-provisional**: они не получают автоматический канонический статус Stage 22.
+
 Required scenarios:
 
 ### Fit / mass
@@ -498,6 +507,18 @@ Build/refit/repair consumes real resources and money through common seams; Stage
 
 Save/load at fitted state, mid-combat damage, partial magazine, heated module, shield recharge and FTL lifecycle.
 
+### Multi-fleet combat content
+
+Required acceptance includes materially different kinetic-line, missile-strike, high-mobility/beam, defensive/EW and balanced-control fleet configurations built from ordinary production-valid hull/module/ammunition/fit definitions.
+
+The matrix must exercise equal-count/equal-mass style comparisons, formation spacing, ammunition depletion, pre-damage/thermal stress and sensor-information differences. The purpose is mechanics coverage/regression discovery, not final Stage-22 win-rate balance.
+
+### Tactical prototype visuals
+
+At least one interactive combat scene must be readable with temporary top-down ship sprites plus prototype kinetic, beam, missile/interceptor/decoy, engine/thruster, shield, impact, penetration, damage and wreck/debris representations where authoritative state exists.
+
+Rendering remains presentation-only. A sprite/VFX replacement cannot mutate authoritative combat state.
+
 Hard invariants:
 
 1. no player-only combat physics;
@@ -509,7 +530,10 @@ Hard invariants:
 7. no fit accepted with negative mandatory budget;
 8. deterministic repeatability;
 9. ordinary destruction/salvage consequences;
-10. full CI green.
+10. Combat Test Content Pack uses production schemas/runtime rather than test-only stats;
+11. prototype tactical visuals are replaceable presentation, never authoritative state;
+12. Stage-17.5 test hulls/modules/fits/visuals do not silently become final Stage-22 canon;
+13. full CI green.
 
 ---
 
@@ -519,12 +543,16 @@ Stage 17.5 не обязан:
 
 - создать весь **Stage-22** technology/content catalog;
 - финально сбалансировать factions;
+- финализировать faction hull rosters, ship names or production visual identity;
+- создавать final production-quality ship/projectile/VFX art;
 - реализовать full resource/industry ontology Stage 18;
 - реализовать advanced tactical fleet AI **Stage 19**;
 - создать final generated galaxy **Stage 20**;
 - freeze all balance coefficients;
 - simulate atom-by-atom materials/CFD/plasma;
 - превращать exotic shields/FTL в реальную современную физику.
+
+При этом Stage 17.5 **обязан** создать минимальный production-valid, content-provisional набор корпусов/оборудования/боеприпасов/fits и временный tactical visual set, достаточные для multi-fleet acceptance. Это test vocabulary, а не финальная Stage-22 энциклопедия контента.
 
 Он обязан реализовать правильные interfaces и authoritative accounting.
 
@@ -541,7 +569,7 @@ Stage 17.5 не обязан:
 → 17.5F shields/armor/compartments/damage
 → 17.5G shipyard/refit/repair/maintenance seam
 → 17.5H capability APIs/UI/persistence
-→ 17.5I full acceptance
+→ 17.5I full acceptance + combat test content + prototype tactical visuals
 ```
 
 Combat subsystems не должны создавать parallel mass/power/heat state до central calculator.
@@ -553,5 +581,11 @@ Combat subsystems не должны создавать parallel mass/power/heat 
 Stage 17.5 закрыт, когда:
 
 > **любой representative ship — от freighter до battleship — может быть описан одним data-driven fitting model, физически летать, обнаруживать/отслеживать, стрелять, защищаться, получать локальные повреждения, расходовать боеприпасы/реактивную массу, ремонтироваться/переоснащаться через общую economic seam и сохраняться/загружаться; player и AI используют те же capability APIs.**
+
+Дополнительный обязательный exit gate:
+
+> **несколько production-valid, но content-provisional hull/module/ammunition/fits позволяют собрать минимум четыре materially different специализированных флота и balanced control fleet; их deterministic combat matrix проходит production resolver, а минимум одно interactive столкновение полностью читаемо через replaceable Tactical Prototype Visual Set.**
+
+Эти тестовые корабли, модули, фиты и visuals существуют для проверки mechanics coverage. Stage 22 обязан переработать/заменить/явно принять их по общей technology/faction/content парадигме; prototype visuals позднее заменяются production art без изменения authoritative physics.
 
 После этого активируется **Stage 18 Resources / Industry / Infrastructure**, который превращает construction/repair/material requirements в полноценную физическую производственную экосистему. Только после Stage 18 активируется **Stage 19 strategic warfare / advanced combat behavior**.
