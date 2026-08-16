@@ -2,6 +2,7 @@ package com.spacesim.player;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.LargeDemoGalaxyFactory;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
@@ -24,7 +25,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Curated Stage-12 desktop test world built entirely from ordinary production simulation objects.
+ * Curated desktop test world built entirely from ordinary production simulation objects.
  *
  * <p>The scenario does not introduce a player-only economy. It starts from the ordinary demo
  * galaxy, assigns one existing physical FleetId to the player, creates a deliberate destination
@@ -54,7 +55,7 @@ public final class PlayableTestWorldFactory {
      * Creates a deterministic playable test scenario.
      *
      * @param rootSeed deterministic world seed
-     * @return content catalog, playable runtime and recommended two-system trade route
+     * @return content catalog, playable runtime and recommended initial trade route
      */
     public static Scenario create(long rootSeed) {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
@@ -242,7 +243,7 @@ public final class PlayableTestWorldFactory {
     }
 
     /**
-     * Human-readable recommended two-system trade route for manual testing.
+     * Human-readable initial trade route plus the manual large-demo jump-tour adapter.
      *
      * @param sourceSystem source StarSystem
      * @param destinationSystem destination StarSystem
@@ -290,12 +291,23 @@ public final class PlayableTestWorldFactory {
         }
 
         /**
-         * Returns the opposite test-route endpoint.
+         * Returns the next legal manual-test destination.
          *
-         * @param current current endpoint
-         * @return opposite endpoint, or {@code null} when current is outside the route
+         * <p>Compact fixtures retain the historical source↔destination route. In explicit large-demo
+         * mode, the generated topology guarantees direct edges 1→2→...→100, so repeated {@code J}
+         * requests can physically tour every system through the ordinary jump FSM. System 100 is the
+         * end of the forward tour; reset/load can start another pass.</p>
+         *
+         * @param current current endpoint/system
+         * @return next direct destination, or {@code null} when no curated destination exists
          */
         public StarSystemId otherEnd(StarSystemId current) {
+            if (Boolean.getBoolean(DemoGalaxyFactory.LARGE_DEMO_PROPERTY)
+                    && current != null
+                    && current.value() >= sourceSystem.value()
+                    && current.value() < LargeDemoGalaxyFactory.SYSTEM_COUNT) {
+                return new StarSystemId(current.value() + 1L);
+            }
             if (sourceSystem.equals(current)) {
                 return destinationSystem;
             }
