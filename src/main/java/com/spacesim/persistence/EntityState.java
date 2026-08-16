@@ -25,6 +25,7 @@ import java.util.List;
  * @param combat боевое состояние либо {@code null}
  * @param asteroid природный ресурс либо {@code null}
  * @param archetype stable content archetype либо {@code null} для legacy/dynamic сущности
+ * @param engineering fitted Stage-17.5 physical engineering state либо {@code null}
  */
 public record EntityState(
         EntityId id,
@@ -42,7 +43,50 @@ public record EntityState(
         MiningState mining,
         CombatState combat,
         AsteroidState asteroid,
-        ArchetypeState archetype) {
+        ArchetypeState archetype,
+        EngineeringState engineering) {
+
+    /**
+     * Compatibility constructor for pre-Stage-17.5C value code without engineering state.
+     *
+     * @param id persistent entity ID
+     * @param identity identity state
+     * @param transform transform state
+     * @param inventory inventory state
+     * @param wallet wallet state
+     * @param market market state
+     * @param production production state
+     * @param priceHistory price-history state
+     * @param faction faction state
+     * @param reputation reputation state
+     * @param ship legacy ship state
+     * @param tradeAi trade-AI state
+     * @param mining mining state
+     * @param combat legacy combat state
+     * @param asteroid asteroid state
+     * @param archetype stable content archetype
+     */
+    public EntityState(
+            EntityId id,
+            IdentityState identity,
+            TransformState transform,
+            InventoryState inventory,
+            WalletState wallet,
+            MarketState market,
+            ProductionState production,
+            PriceHistoryState priceHistory,
+            FactionState faction,
+            ReputationState reputation,
+            ShipState ship,
+            TradeAiState tradeAi,
+            MiningState mining,
+            CombatState combat,
+            AsteroidState asteroid,
+            ArchetypeState archetype) {
+        this(
+                id, identity, transform, inventory, wallet, market, production, priceHistory,
+                faction, reputation, ship, tradeAi, mining, combat, asteroid, archetype, null);
+    }
 
     /**
      * @param name отображаемое имя
@@ -256,5 +300,78 @@ public record EntityState(
 
     /** @param contentId stable archetype content ID */
     public record ArchetypeState(String contentId) {
+    }
+
+    /**
+     * Persistent Stage-17.5 fitted engineering state. Derived capabilities are intentionally absent.
+     *
+     * @param hullId stable fitted hull content ID
+     * @param installedModules deterministic module-to-mount assignments
+     * @param consumables physical carried/interface loads
+     * @param sharedBusEnergyJ energy available on the shared ENERGY_STORAGE bus
+     * @param shipHeatStoredJ heat stored on the ship heat bus
+     * @param localHeatJByMount module-local heat values
+     * @param thrustLimitNByMount current physical thrust ceilings
+     * @param coolantBusCapacityW current physical coolant-transfer capacity
+     * @param ftlCooldownSecondsByMount FTL cooldown values
+     */
+    public record EngineeringState(
+            String hullId,
+            List<InstalledModuleState> installedModules,
+            EngineeringConsumableState consumables,
+            double sharedBusEnergyJ,
+            double shipHeatStoredJ,
+            List<MountDoubleState> localHeatJByMount,
+            List<MountDoubleState> thrustLimitNByMount,
+            double coolantBusCapacityW,
+            List<MountDoubleState> ftlCooldownSecondsByMount) {
+    }
+
+    /**
+     * @param mountId hull-local mount ID
+     * @param moduleId installed module content ID
+     */
+    public record InstalledModuleState(String mountId, String moduleId) {
+    }
+
+    /**
+     * @param cargoMassKg cargo mass
+     * @param storesMassKg stores mass
+     * @param missionPayloadMassKg mission payload mass
+     * @param missionIntegrationVolumeM3 mission integration volume
+     * @param interfaceLoads physical interface loads
+     */
+    public record EngineeringConsumableState(
+            double cargoMassKg,
+            double storesMassKg,
+            double missionPayloadMassKg,
+            double missionIntegrationVolumeM3,
+            List<EngineeringConsumableLoadState> interfaceLoads) {
+    }
+
+    /**
+     * @param mountId installed module mount ID
+     * @param interfaceId module-local interface ID
+     * @param kindName physical interface kind enum name
+     * @param amount authored physical amount
+     * @param massKg physical mass
+     * @param itemCount physical item count where meaningful
+     */
+    public record EngineeringConsumableLoadState(
+            String mountId,
+            String interfaceId,
+            String kindName,
+            double amount,
+            double massKg,
+            long itemCount) {
+    }
+
+    /**
+     * Deterministically ordered mount-to-double row used instead of serializing JVM maps.
+     *
+     * @param mountId hull-local mount ID
+     * @param value finite non-negative physical value
+     */
+    public record MountDoubleState(String mountId, double value) {
     }
 }
