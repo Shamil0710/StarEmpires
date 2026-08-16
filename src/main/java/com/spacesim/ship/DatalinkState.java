@@ -10,13 +10,18 @@ package com.spacesim.ship;
  * @param maxMeasurementAgeSeconds measurements older than this are not fused
  * @param transportVarianceM2PerSecond additional position-process variance accumulated per second of transport age
  */
-@SuppressWarnings("doclint:missing")
 public record DatalinkState(
         double latencySeconds,
         double maxMeasurementAgeSeconds,
         double transportVarianceM2PerSecond) {
 
-    /** Validates finite non-negative transport parameters. */
+    /**
+     * Validates finite non-negative transport parameters.
+     *
+     * @param latencySeconds deterministic end-to-end delivery latency
+     * @param maxMeasurementAgeSeconds measurements older than this are not fused
+     * @param transportVarianceM2PerSecond additional position-process variance accumulated per second of transport age
+     */
     public DatalinkState {
         requireNonNegative(latencySeconds, "latencySeconds");
         if (!Double.isFinite(maxMeasurementAgeSeconds) || maxMeasurementAgeSeconds <= 0d) {
