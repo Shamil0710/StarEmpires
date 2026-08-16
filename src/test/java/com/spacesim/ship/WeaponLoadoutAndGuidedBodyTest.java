@@ -2,6 +2,7 @@ package com.spacesim.ship;
 
 import com.spacesim.ship.WeaponDefinition.GuidedWeapon;
 import com.spacesim.ship.WeaponDefinition.Launcher;
+import com.spacesim.ship.WeaponDefinition.ProjectileShape;
 import com.spacesim.ship.WeaponLoadoutState.FeedBinding;
 import org.junit.jupiter.api.Test;
 
@@ -49,22 +50,18 @@ class WeaponLoadoutAndGuidedBodyTest {
     }
 
     @Test
-    void guidanceKillPreservesPhysicalBodyMomentumMassAndBallisticMotion() {
-        GuidedWeapon definition = new GuidedWeapon(
-                "ammo.interceptor_v1",
-                "seeker.radar_v1",
-                800d,
-                200d,
-                20_000d,
-                5_000d,
-                40d,
-                0.0005d,
-                300d);
+    void guidanceKillPreservesPhysicalBodyMomentumMassGeometryAndBallisticMotion() {
+        GuidedWeapon definition = interceptorDefinition();
         GuidedWeaponBody launched = GuidedWeaponBody.launch(
                 5001L,
                 91L,
                 777L,
                 definition,
+                "material.structural_aluminum_v1",
+                ProjectileShape.SHELL,
+                3.2d,
+                0.48d,
+                null,
                 10_000d,
                 -5_000d,
                 1_500d,
@@ -79,6 +76,10 @@ class WeaponLoadoutAndGuidedBodyTest {
         assertFalse(disabled.guidanceAvailable());
         assertEquals(massBeforeKill, disabled.currentMassKg(), 1e-9d);
         assertEquals(energyBeforeKill, disabled.kineticEnergyJ(), 1e-6d);
+        assertEquals("material.structural_aluminum_v1", disabled.materialId());
+        assertEquals(ProjectileShape.SHELL, disabled.shape());
+        assertEquals(3.2d, disabled.lengthM(), 1e-12d);
+        assertEquals(0.48d, disabled.diameterM(), 1e-12d);
         assertEquals(disabled.velocityXMps(), later.velocityXMps(), 1e-12d);
         assertEquals(disabled.velocityYMps(), later.velocityYMps(), 1e-12d);
         assertTrue(Math.hypot(later.xM() - disabled.xM(), later.yM() - disabled.yM()) > 20_000d);
@@ -86,21 +87,17 @@ class WeaponLoadoutAndGuidedBodyTest {
 
     @Test
     void guidedBurnConsumesRealPropellantAndReducesRemainingDeltaV() {
-        GuidedWeapon definition = new GuidedWeapon(
-                "ammo.interceptor_v1",
-                "seeker.radar_v1",
-                800d,
-                200d,
-                20_000d,
-                5_000d,
-                40d,
-                0.0005d,
-                300d);
+        GuidedWeapon definition = interceptorDefinition();
         GuidedWeaponBody initial = GuidedWeaponBody.launch(
                 5002L,
                 91L,
                 778L,
                 definition,
+                "material.structural_aluminum_v1",
+                ProjectileShape.SHELL,
+                3.2d,
+                0.48d,
+                null,
                 0d,
                 0d,
                 0d,
@@ -111,5 +108,18 @@ class WeaponLoadoutAndGuidedBodyTest {
         assertTrue(burned.remainingPropellantKg() < initial.remainingPropellantKg());
         assertTrue(burned.remainingDeltaVMps() < initial.remainingDeltaVMps());
         assertTrue(burned.velocityYMps() > 0d);
+    }
+
+    private static GuidedWeapon interceptorDefinition() {
+        return new GuidedWeapon(
+                "ammo.interceptor_v1",
+                "seeker.radar_v1",
+                800d,
+                200d,
+                20_000d,
+                5_000d,
+                40d,
+                0.0005d,
+                300d);
     }
 }
