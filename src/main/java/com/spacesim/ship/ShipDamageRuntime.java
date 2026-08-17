@@ -24,9 +24,11 @@ import java.util.TreeSet;
  * Deterministic Stage-17.5F local compartment/subsystem damage router.
  *
  * <p>Damage enters through a physical hull-local hit point, selects the nearest authored compartment,
- * degrades that compartment's structural state, and couples an authored fraction of internal impact
+ * degrades that compartment's structural state, and couples an authored fraction of internal physical
  * energy into only the fitted subsystem mounts explicitly located in that compartment. No class-name
- * modifier or global hull-HP shortcut is used.</p>
+ * modifier or global hull-HP shortcut is used. Kinetic penetration/spall and beam material penetration
+ * therefore share the same local damage topology after their distinct protection solvers determine
+ * how much energy actually reaches the ship interior.</p>
  */
 public final class ShipDamageRuntime {
     /**
@@ -109,6 +111,8 @@ public final class ShipDamageRuntime {
             if (compartmentId == null || compartmentId.isBlank()) {
                 throw new IllegalArgumentException("compartmentId must be non-blank");
             }
+            requireNonNegativeFinite(compartmentDamageEnergyJ, "compartmentDamageEnergyJ");
+            requireNonNegativeFinite(subsystemDamageEnergyJ, "subsystemDamageEnergyJ");
             Objects.requireNonNull(damagedMounts, "damagedMounts");
             damagedMounts = List.copyOf(damagedMounts);
         }
@@ -132,12 +136,44 @@ public final class ShipDamageRuntime {
             Snapshot snapshot,
             ImpactResult impact,
             Vector3d hitPointM) {
+        ImpactResult checkedImpact = Objects.requireNonNull(impact, "impact");
+        return applyInternalEnergy(
+                hull,
+                fit,
+                layout,
+                snapshot,
+                checkedImpact.internalDamageEnergyJ(),
+                hitPointM);
+    }
+
+    /**
+     * Applies already-resolved physical energy that reached the ship interior.
+     *
+     * <p>The caller owns the distinct external protection physics that produced this energy. This
+     * method only routes the surviving energy through the common compartment/subsystem topology, so
+     * beam and kinetic protection cannot fork local damage semantics.</p>
+     *
+     * @param hull authoritative hull definition
+     * @param fit current installed fit
+     * @param layout explicit hull damage layout
+     * @param snapshot current damage snapshot
+     * @param internalEnergyJ non-negative energy reaching the ship interior
+     * @param hitPointM hull-local hit point
+     * @return deterministic local damage event
+     */
+    public DamageEvent applyInternalEnergy(
+            HullDefinition hull,
+            InstalledFit fit,
+            HullDamageLayout layout,
+            Snapshot snapshot,
+            double internalEnergyJ,
+            Vector3d hitPointM) {
         HullDefinition checkedHull = Objects.requireNonNull(hull, "hull");
         InstalledFit checkedFit = Objects.requireNonNull(fit, "fit");
         HullDamageLayout checkedLayout = Objects.requireNonNull(layout, "layout");
         Snapshot checkedSnapshot = Objects.requireNonNull(snapshot, "snapshot");
-        ImpactResult checkedImpact = Objects.requireNonNull(impact, "impact");
         Vector3d checkedHit = Objects.requireNonNull(hitPointM, "hitPointM");
+        requireNonNegativeFinite(internalEnergyJ, "internalEnergyJ");
         if (!checkedHull.id().equals(checkedFit.hullId()) || !checkedHull.id().equals(checkedLayout.hullId())) {
             throw new IllegalArgumentException("Hull/fit/damage-layout ID mismatch");
         }
@@ -149,7 +185,6 @@ public final class ShipDamageRuntime {
             throw new IllegalStateException("Damage layout lost compartment: " + target.id());
         }
 
-        double internalEnergyJ = checkedImpact.internalDamageEnergyJ();
         TreeMap<String, Double> compartmentIntegrity = new TreeMap<>(checkedSnapshot.compartmentIntegrityById());
         double oldCompartmentIntegrity = compartmentIntegrity.getOrDefault(target.id(), 1d);
         double compartmentLoss = internalEnergyJ / compartmentDamage.structuralDamageCapacityJ();
@@ -218,6 +253,12 @@ public final class ShipDamageRuntime {
     private static void requireIntegrity(double value, String field) {
         if (!Double.isFinite(value) || value < 0d || value > 1d) {
             throw new IllegalArgumentException(field + " must be in [0,1]");
+        }
+    }
+
+    private static void requireNonNegativeFinite(double value, String field) {
+        if (!Double.isFinite(value) || value < 0d) {
+            throw new IllegalArgumentException(field + " must be finite and non-negative");
         }
     }
 }
