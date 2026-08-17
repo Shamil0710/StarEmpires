@@ -3,30 +3,26 @@ package com.spacesim.persistence;
 import java.util.List;
 
 /**
- * Value-based сериализуемый снимок одной ECS-сущности и всех поддерживаемых компонентов.
+ * Value-based serializable snapshot of one ECS entity and all supported persistent components.
  *
- * <p>DTO не содержит Ashley {@code Entity}, libGDX-векторов или изменяемых коллекций компонентов.
- * Отсутствующий компонент представлен {@code null}. Списки создаются immutable mapper/codec-слоем,
- * поэтому record equality подходит для точного round-trip и continuation-тестов.</p>
- *
- * @param id устойчивый обязательный ID сущности
- * @param identity пользовательская идентичность либо {@code null}
- * @param transform положение/скорость либо {@code null}
- * @param inventory склад либо {@code null}
- * @param wallet баланс либо {@code null}
- * @param market рынок либо {@code null}
- * @param production производство либо {@code null}
- * @param priceHistory история цен либо {@code null}
- * @param faction фракция либо {@code null}
- * @param reputation репутация либо {@code null}
- * @param ship корабельный тип либо {@code null}
- * @param tradeAi состояние торгового AI либо {@code null}
- * @param mining состояние добычи либо {@code null}
- * @param combat боевое состояние либо {@code null}
- * @param asteroid природный ресурс либо {@code null}
- * @param archetype stable content archetype либо {@code null} для legacy/dynamic сущности
- * @param engineering fitted Stage-17.5 physical engineering state либо {@code null}
- * @param sensorKnowledge system-local Stage-17.5D/H information state либо {@code null}
+ * @param id stable required entity ID
+ * @param identity identity state or {@code null}
+ * @param transform transform state or {@code null}
+ * @param inventory inventory state or {@code null}
+ * @param wallet wallet state or {@code null}
+ * @param market market state or {@code null}
+ * @param production production state or {@code null}
+ * @param priceHistory price history or {@code null}
+ * @param faction faction state or {@code null}
+ * @param reputation reputation state or {@code null}
+ * @param ship legacy ship classification or {@code null}
+ * @param tradeAi trade AI state or {@code null}
+ * @param mining mining state or {@code null}
+ * @param combat legacy combat state or {@code null}
+ * @param asteroid asteroid state or {@code null}
+ * @param archetype stable content archetype or {@code null}
+ * @param engineering fitted Stage-17.5 engineering state or {@code null}
+ * @param sensorKnowledge system-local Stage-17.5D/H information state or {@code null}
  */
 public record EntityState(
         EntityId id,
@@ -49,7 +45,7 @@ public record EntityState(
         SensorKnowledgeState sensorKnowledge) {
 
     /**
-     * Compatibility constructor for Stage-17.5C–G value code without sensor knowledge persistence.
+     * Compatibility constructor for Stage-17.5C-G values without sensor knowledge persistence.
      *
      * @param id persistent entity ID
      * @param identity identity state
@@ -93,7 +89,7 @@ public record EntityState(
     }
 
     /**
-     * Compatibility constructor for pre-Stage-17.5C value code without engineering state.
+     * Compatibility constructor for pre-Stage-17.5C values without engineering state.
      *
      * @param id persistent entity ID
      * @param identity identity state
@@ -134,27 +130,46 @@ public record EntityState(
                 null, null);
     }
 
-    /** @param name отображаемое имя @param kindName имя {@code IdentityComponent.Kind} */
+    /**
+     * Persistent identity fields.
+     *
+     * @param name display name
+     * @param kindName identity-kind enum name
+     */
     public record IdentityState(String name, String kindName) { }
 
-    /** @param x координата X @param y координата Y @param velocityX скорость X @param velocityY скорость Y */
+    /**
+     * Persistent transform fields.
+     *
+     * @param x x coordinate
+     * @param y y coordinate
+     * @param velocityX x velocity
+     * @param velocityY y velocity
+     */
     public record TransformState(float x, float y, float velocityX, float velocityY) { }
 
-    /** @param capacity общая вместимость @param stock остатки всех runtime-товаров по item ID */
+    /**
+     * Persistent inventory fields.
+     *
+     * @param capacity inventory capacity
+     * @param stock item-indexed stock
+     */
     public record InventoryState(int capacity, List<Integer> stock) { }
 
-    /** @param balanceMilliCredits authoritative баланс в milli-credits */
+    /** @param balanceMilliCredits authoritative balance in milli-credits */
     public record WalletState(long balanceMilliCredits) { }
 
     /**
-     * @param targetStock текущие effective целевые остатки
-     * @param configuredTargetStock исходные station-configured baseline targets
-     * @param baseConsumption базовое потребление
-     * @param sellPrices цены продажи
-     * @param buyPrices цены покупки
-     * @param consumptionRemainder дробные остатки потребления
-     * @param tradableItems маска торгуемых товаров
-     * @param dirty требуется ли пересчёт рынка
+     * Persistent market fields.
+     *
+     * @param targetStock effective target stock
+     * @param configuredTargetStock authored baseline target stock
+     * @param baseConsumption base consumption
+     * @param sellPrices sell prices
+     * @param buyPrices buy prices
+     * @param consumptionRemainder fractional consumption remainder
+     * @param tradableItems tradable mask
+     * @param dirty recalculation flag
      */
     public record MarketState(
             List<Integer> targetStock,
@@ -165,7 +180,17 @@ public record EntityState(
             List<Double> consumptionRemainder,
             List<Boolean> tradableItems,
             boolean dirty) {
-        /** Compatibility constructor for schema v1/v2 values without explicit target provenance. */
+        /**
+         * Compatibility constructor for schema v1/v2 values without configured target provenance.
+         *
+         * @param targetStock legacy effective target stock
+         * @param baseConsumption base consumption
+         * @param sellPrices sell prices
+         * @param buyPrices buy prices
+         * @param consumptionRemainder fractional consumption remainder
+         * @param tradableItems tradable mask
+         * @param dirty recalculation flag
+         */
         public MarketState(
                 List<Integer> targetStock,
                 List<Float> baseConsumption,
@@ -179,36 +204,56 @@ public record EntityState(
         }
     }
 
-    /** @param recipes recipes @param activeRecipeIndex active recipe @param progressSeconds progress */
+    /**
+     * Persistent production fields.
+     *
+     * @param recipes recipes
+     * @param activeRecipeIndex active recipe index
+     * @param progressSeconds current recipe progress
+     */
     public record ProductionState(List<RecipeState> recipes, int activeRecipeIndex, float progressSeconds) { }
 
-    /** @param name name @param durationSeconds duration @param inputs inputs @param outputs outputs */
+    /**
+     * Persistent recipe fields.
+     *
+     * @param name recipe name
+     * @param durationSeconds recipe duration
+     * @param inputs item-indexed inputs
+     * @param outputs item-indexed outputs
+     */
     public record RecipeState(String name, float durationSeconds, List<Integer> inputs, List<Integer> outputs) { }
 
-    /** @param maxPoints history limit @param history price history */
+    /**
+     * Persistent price-history fields.
+     *
+     * @param maxPoints history limit per item
+     * @param history item-indexed price series
+     */
     public record PriceHistoryState(int maxPoints, List<List<Float>> history) { }
 
-    /** @param factionId runtime ID фракции */
+    /** @param factionId runtime faction ID */
     public record FactionState(int factionId) { }
 
-    /** @param values значения отношений по faction ID */
+    /** @param values item-indexed reputation values */
     public record ReputationState(List<Float> values) { }
 
-    /** @param typeName имя {@code ShipType} либо {@code null} */
+    /** @param typeName legacy ship-type enum name or {@code null} */
     public record ShipState(String typeName) { }
 
     /**
-     * @param stateName state name
+     * Persistent trade-AI state.
+     *
+     * @param stateName FSM state name
      * @param buyStationId buy station
      * @param sellStationId sell station
-     * @param targetStationId target station
-     * @param targetItem item
-     * @param specializedItem specialization
-     * @param targetAmount amount
-     * @param cargoSpace cargo
+     * @param targetStationId current target station
+     * @param targetItem selected item
+     * @param specializedItem specialized item
+     * @param targetAmount target amount
+     * @param cargoSpace cargo constraint
      * @param movementSpeed movement speed
      * @param expectedProfitMilliCredits expected profit
-     * @param routeSearchCooldown cooldown
+     * @param routeSearchCooldown route-search cooldown
      */
     public record TradeAiState(
             String stateName, EntityId buyStationId, EntityId sellStationId, EntityId targetStationId,
@@ -216,38 +261,55 @@ public record EntityState(
             long expectedProfitMilliCredits, float routeSearchCooldown) { }
 
     /**
-     * @param resourceItem resource
-     * @param extractionPerSecond extraction
-     * @param movementSpeed speed
-     * @param extractionRange range
+     * Persistent mining state.
+     *
+     * @param resourceItem extracted item
+     * @param extractionPerSecond extraction rate
+     * @param movementSpeed movement speed
+     * @param extractionRange extraction range
      * @param dockingRange docking range
-     * @param extractionRemainder remainder
+     * @param extractionRemainder fractional extraction remainder
      * @param totalMined total mined
      * @param totalDelivered total delivered
-     * @param active active
-     * @param stateName state
-     * @param targetAsteroidId target
-     * @param homeBaseId home
+     * @param active active flag
+     * @param stateName FSM state name
+     * @param targetAsteroidId target asteroid
+     * @param homeBaseId home base
      */
     public record MiningState(
             int resourceItem, float extractionPerSecond, float movementSpeed, float extractionRange,
             float dockingRange, double extractionRemainder, long totalMined, long totalDelivered,
             boolean active, String stateName, EntityId targetAsteroidId, EntityId homeBaseId) { }
 
-    /** @param hull hull @param maxHull max hull @param shields shields @param maxShields max shields
-     * @param damagePerSecond damage @param weaponRange range */
+    /**
+     * Legacy combat state retained for compatibility.
+     *
+     * @param hull current legacy hull value
+     * @param maxHull maximum legacy hull value
+     * @param shields current legacy shield value
+     * @param maxShields maximum legacy shield value
+     * @param damagePerSecond legacy damage value
+     * @param weaponRange legacy range value
+     */
     public record CombatState(
             float hull, float maxHull, float shields, float maxShields,
             float damagePerSecond, float weaponRange) { }
 
-    /** @param spawnPointId point @param resourceItem item @param initialResource initial @param remainingResource remaining */
+    /**
+     * Persistent asteroid state.
+     *
+     * @param spawnPointId stable spawn-point ID
+     * @param resourceItem resource item
+     * @param initialResource initial amount
+     * @param remainingResource remaining amount
+     */
     public record AsteroidState(String spawnPointId, int resourceItem, long initialResource, long remainingResource) { }
 
     /** @param contentId stable archetype content ID */
     public record ArchetypeState(String contentId) { }
 
     /**
-     * Persistent Stage-17.5 fitted engineering state. Derived capabilities are intentionally absent.
+     * Persistent Stage-17.5 fitted engineering state; derived capabilities are intentionally absent.
      *
      * @param hullId stable fitted hull content ID
      * @param installedModules deterministic module-to-mount assignments
@@ -271,7 +333,19 @@ public record EntityState(
             double coolantBusCapacityW,
             List<MountDoubleState> ftlCooldownSecondsByMount,
             ShipInstanceState instanceState) {
-        /** Compatibility constructor for core GameState v4 payloads without Stage-17.5H extension. */
+        /**
+         * Compatibility constructor for core GameState v4 payloads without Stage-17.5H extension.
+         *
+         * @param hullId stable fitted hull content ID
+         * @param installedModules deterministic module-to-mount assignments
+         * @param consumables physical carried/interface loads
+         * @param sharedBusEnergyJ shared ENERGY_STORAGE energy
+         * @param shipHeatStoredJ ship-bus heat
+         * @param localHeatJByMount module-local heat
+         * @param thrustLimitNByMount physical thrust ceilings
+         * @param coolantBusCapacityW coolant-transfer capacity
+         * @param ftlCooldownSecondsByMount FTL cooldowns
+         */
         public EngineeringState(
                 String hullId,
                 List<InstalledModuleState> installedModules,
@@ -288,10 +362,17 @@ public record EntityState(
         }
     }
 
-    /** @param mountId hull-local mount ID @param moduleId installed module content ID */
+    /**
+     * Persistent installed module assignment.
+     *
+     * @param mountId hull-local mount ID
+     * @param moduleId installed module content ID
+     */
     public record InstalledModuleState(String mountId, String moduleId) { }
 
     /**
+     * Persistent physical carried/interface loads.
+     *
      * @param cargoMassKg cargo mass
      * @param storesMassKg stores mass
      * @param missionPayloadMassKg mission payload mass
@@ -303,9 +384,11 @@ public record EntityState(
             double missionIntegrationVolumeM3, List<EngineeringConsumableLoadState> interfaceLoads) { }
 
     /**
+     * Persistent one-interface physical load.
+     *
      * @param mountId installed module mount ID
      * @param interfaceId module-local interface ID
-     * @param kindName physical interface kind enum name
+     * @param kindName physical interface-kind enum name
      * @param amount authored physical amount
      * @param massKg physical mass
      * @param itemCount physical item count
@@ -314,7 +397,12 @@ public record EntityState(
             String mountId, String interfaceId, String kindName,
             double amount, double massKg, long itemCount) { }
 
-    /** @param mountId deterministic key @param value finite physical value */
+    /**
+     * Deterministically keyed double value.
+     *
+     * @param mountId stable local key
+     * @param value finite physical value
+     */
     public record MountDoubleState(String mountId, double value) { }
 
     /**
@@ -336,6 +424,8 @@ public record EntityState(
             List<MountDoubleState> weaponCooldownByMount) { }
 
     /**
+     * Persistent shield runtime state.
+     *
      * @param mountId shield emitter mount
      * @param reserveJ current field reserve
      * @param accumulatedHeatJ shield-local accumulated heat
@@ -347,11 +437,17 @@ public record EntityState(
             String mountId, double reserveJ, double accumulatedHeatJ, boolean collapsed,
             double restartRemainingSeconds, double emitterIntegrity) { }
 
-    /** @param mountId weapon mount @param interfaceId feed ID @param ammunitionContentId ammunition content ID */
+    /**
+     * Persistent weapon-feed identity binding.
+     *
+     * @param mountId weapon mount
+     * @param interfaceId feed ID
+     * @param ammunitionContentId ammunition content ID
+     */
     public record WeaponFeedState(String mountId, String interfaceId, String ammunitionContentId) { }
 
     /**
-     * System-local sensor knowledge persisted only while the entity remains in the same identity domain.
+     * System-local sensor knowledge persisted while entity identity remains valid.
      *
      * @param tracks fused tracks
      * @param receivedMeasurements delivered measurement history
@@ -363,6 +459,8 @@ public record EntityState(
             List<PendingSensorMeasurementState> pendingMeasurements) { }
 
     /**
+     * Persistent fused sensor track.
+     *
      * @param targetId target ID
      * @param informationStateName information-state enum name
      * @param positionKnown whether position is solved
@@ -384,6 +482,8 @@ public record EntityState(
             int contributingObservers, int fusedMeasurementCount) { }
 
     /**
+     * Persistent sensor measurement.
+     *
      * @param observerId observer ID
      * @param targetId target ID
      * @param channelName signature channel name
@@ -405,6 +505,11 @@ public record EntityState(
             double bearingVarianceRad2, Double rangeVarianceM2, double receivedSignalPowerW,
             double effectiveInterferencePowerW, double snr, String evidenceStateName) { }
 
-    /** @param measurement transmitted measurement @param deliverAtSeconds delivery time */
+    /**
+     * Persistent delayed datalink delivery.
+     *
+     * @param measurement transmitted measurement
+     * @param deliverAtSeconds delivery time
+     */
     public record PendingSensorMeasurementState(SensorMeasurementState measurement, double deliverAtSeconds) { }
 }
