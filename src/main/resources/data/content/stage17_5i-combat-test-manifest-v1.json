@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "contentStatus": "PRODUCTION_VALID_CONTENT_PROVISIONAL",
+  "stage22ReviewRequired": true,
+  "fleets": [
+    {
+      "id": "fleet.ct_a_kinetic_line_v1",
+      "doctrine": "KINETIC_LINE",
+      "ships": [
+        {"fitId": "fit.ct_cruiser_armor_gun_v1", "count": 1},
+        {"fitId": "fit.ct_destroyer_kinetic_v1", "count": 2},
+        {"fitId": "fit.ct_frigate_escort_v1", "count": 2}
+      ]
+    },
+    {
+      "id": "fleet.ct_b_missile_strike_v1",
+      "doctrine": "MISSILE_STRIKE",
+      "ships": [
+        {"fitId": "fit.ct_destroyer_missile_v1", "count": 2},
+        {"fitId": "fit.ct_frigate_missile_v1", "count": 3},
+        {"fitId": "fit.ct_frigate_recon_v1", "count": 1}
+      ]
+    },
+    {
+      "id": "fleet.ct_c_mobility_beam_v1",
+      "doctrine": "HIGH_MOBILITY_BEAM",
+      "ships": [
+        {"fitId": "fit.ct_cruiser_beam_v1", "count": 1},
+        {"fitId": "fit.ct_corvette_beam_v1", "count": 4},
+        {"fitId": "fit.ct_frigate_recon_v1", "count": 1}
+      ]
+    },
+    {
+      "id": "fleet.ct_d_defensive_ew_v1",
+      "doctrine": "DEFENSIVE_EW",
+      "ships": [
+        {"fitId": "fit.ct_destroyer_defense_v1", "count": 2},
+        {"fitId": "fit.ct_frigate_recon_v1", "count": 2},
+        {"fitId": "fit.ct_cruiser_command_v1", "count": 1}
+      ]
+    },
+    {
+      "id": "fleet.ct_e_balanced_control_v1",
+      "doctrine": "BALANCED_CONTROL",
+      "ships": [
+        {"fitId": "fit.ct_destroyer_kinetic_v1", "count": 1},
+        {"fitId": "fit.ct_destroyer_missile_v1", "count": 1},
+        {"fitId": "fit.ct_frigate_escort_v1", "count": 1},
+        {"fitId": "fit.ct_frigate_recon_v1", "count": 1},
+        {"fitId": "fit.ct_corvette_beam_v1", "count": 2}
+      ]
+    }
+  ],
+  "matchups": [
+    {"id": "match.ct_a_a_v1", "fleetAId": "fleet.ct_a_kinetic_line_v1", "fleetBId": "fleet.ct_a_kinetic_line_v1"},
+    {"id": "match.ct_a_b_v1", "fleetAId": "fleet.ct_a_kinetic_line_v1", "fleetBId": "fleet.ct_b_missile_strike_v1"},
+    {"id": "match.ct_a_c_v1", "fleetAId": "fleet.ct_a_kinetic_line_v1", "fleetBId": "fleet.ct_c_mobility_beam_v1"},
+    {"id": "match.ct_a_d_v1", "fleetAId": "fleet.ct_a_kinetic_line_v1", "fleetBId": "fleet.ct_d_defensive_ew_v1"},
+    {"id": "match.ct_a_e_v1", "fleetAId": "fleet.ct_a_kinetic_line_v1", "fleetBId": "fleet.ct_e_balanced_control_v1"},
+    {"id": "match.ct_b_c_v1", "fleetAId": "fleet.ct_b_missile_strike_v1", "fleetBId": "fleet.ct_c_mobility_beam_v1"},
+    {"id": "match.ct_b_d_v1", "fleetAId": "fleet.ct_b_missile_strike_v1", "fleetBId": "fleet.ct_d_defensive_ew_v1"},
+    {"id": "match.ct_b_e_v1", "fleetAId": "fleet.ct_b_missile_strike_v1", "fleetBId": "fleet.ct_e_balanced_control_v1"},
+    {"id": "match.ct_c_d_v1", "fleetAId": "fleet.ct_c_mobility_beam_v1", "fleetBId": "fleet.ct_d_defensive_ew_v1"},
+    {"id": "match.ct_c_e_v1", "fleetAId": "fleet.ct_c_mobility_beam_v1", "fleetBId": "fleet.ct_e_balanced_control_v1"},
+    {"id": "match.ct_d_e_v1", "fleetAId": "fleet.ct_d_defensive_ew_v1", "fleetBId": "fleet.ct_e_balanced_control_v1"}
+  ],
+  "variations": [
+    {"id": "variation.ct_baseline_v1", "initialSeparationM": 250000.0, "formationSpacingM": 5000.0, "ammunitionLoadFraction": 1.0, "preDamageIntegrity": 1.0, "initialThermalLoadFraction": 0.0, "informationQuality": "TRACKED"},
+    {"id": "variation.ct_close_formation_v1", "initialSeparationM": 180000.0, "formationSpacingM": 1800.0, "ammunitionLoadFraction": 1.0, "preDamageIntegrity": 1.0, "initialThermalLoadFraction": 0.0, "informationQuality": "TRACKED"},
+    {"id": "variation.ct_open_formation_v1", "initialSeparationM": 320000.0, "formationSpacingM": 12000.0, "ammunitionLoadFraction": 1.0, "preDamageIntegrity": 1.0, "initialThermalLoadFraction": 0.0, "informationQuality": "TRACKED"},
+    {"id": "variation.ct_ammo_half_v1", "initialSeparationM": 250000.0, "formationSpacingM": 5000.0, "ammunitionLoadFraction": 0.5, "preDamageIntegrity": 1.0, "initialThermalLoadFraction": 0.0, "informationQuality": "TRACKED"},
+    {"id": "variation.ct_predamaged_v1", "initialSeparationM": 250000.0, "formationSpacingM": 5000.0, "ammunitionLoadFraction": 1.0, "preDamageIntegrity": 0.72, "initialThermalLoadFraction": 0.0, "informationQuality": "TRACKED"},
+    {"id": "variation.ct_thermal_stress_v1", "initialSeparationM": 250000.0, "formationSpacingM": 5000.0, "ammunitionLoadFraction": 1.0, "preDamageIntegrity": 1.0, "initialThermalLoadFraction": 0.65, "informationQuality": "TRACKED"},
+    {"id": "variation.ct_poor_information_v1", "initialSeparationM": 250000.0, "formationSpacingM": 5000.0, "ammunitionLoadFraction": 1.0, "preDamageIntegrity": 1.0, "initialThermalLoadFraction": 0.0, "informationQuality": "DETECTED"}
+  ]
+}
