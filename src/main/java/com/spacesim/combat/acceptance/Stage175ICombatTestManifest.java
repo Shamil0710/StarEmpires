@@ -109,7 +109,8 @@ public final class Stage175ICombatTestManifest {
     /** Initial information quality used to seed an acceptance scenario without omniscience. */
     public enum InformationQuality {
         /** Contact exists but does not begin with a complete solution. */ DETECTED,
-        /** Existing track-quality information is available at scenario start. */ TRACKED
+        /** Position-known track exists but may still be insufficient for some weapons. */ TRACKED,
+        /** Fire-control-quality position/covariance information is available at scenario start. */ FIRE_CONTROL
     }
 
     /**
