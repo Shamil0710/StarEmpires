@@ -45,7 +45,16 @@ public final class Stage175IFleetDoctrineCatalog {
             WeaponLoadoutState weaponLoadout,
             int defaultFleetCount,
             double defaultSpacingM) {
-        /** Validates one immutable acceptance fixture. */
+        /**
+         * Validates one immutable acceptance fixture.
+         *
+         * @param id fixture identity only
+         * @param fitId ordinary engineering fit content ID
+         * @param initialConsumables physical initial reaction mass and ammunition
+         * @param weaponLoadout ammunition content identity for each occupied physical feed
+         * @param defaultFleetCount default equal-count matrix size
+         * @param defaultSpacingM default formation spacing in meters
+         */
         public Doctrine {
             Objects.requireNonNull(id, "id");
             if (fitId == null || fitId.isBlank()) {
@@ -71,7 +80,12 @@ public final class Stage175IFleetDoctrineCatalog {
         throw new AssertionError("utility class");
     }
 
-    /** @return deterministic doctrine fixture by acceptance identity */
+    /**
+     * Returns a deterministic doctrine fixture by acceptance identity.
+     *
+     * @param id acceptance doctrine identity
+     * @return matching immutable physical fixture
+     */
     public static Doctrine get(DoctrineId id) {
         Doctrine result = DOCTRINES.get(Objects.requireNonNull(id, "id"));
         if (result == null) {
