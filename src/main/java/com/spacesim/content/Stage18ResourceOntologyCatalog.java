@@ -47,12 +47,14 @@ public final class Stage18ResourceOntologyCatalog {
         this.capabilityTags = sortedCopy(capabilityTags, Comparator.comparing(CapabilityTagDefinition::id));
         this.commodities = sortedCopy(commodities, Comparator.comparing(CommodityDefinition::id));
         this.occurrenceTypes = sortedCopy(occurrenceTypes, Comparator.comparing(ResourceOccurrenceTypeDefinition::id));
-        this.legacyMappings = sortedCopy(legacyMappings, Comparator.comparing(LegacyItemMappingDefinition::legacyItemContentId));
+        this.legacyMappings = sortedCopy(
+                legacyMappings, Comparator.comparing(LegacyItemMappingDefinition::legacyItemContentId));
         this.storageClassesById = index(this.storageClasses, StorageClassDefinition::id);
         this.capabilityTagsById = index(this.capabilityTags, CapabilityTagDefinition::id);
         this.commoditiesById = index(this.commodities, CommodityDefinition::id);
         this.occurrenceTypesById = index(this.occurrenceTypes, ResourceOccurrenceTypeDefinition::id);
-        this.legacyMappingsByItemId = index(this.legacyMappings, LegacyItemMappingDefinition::legacyItemContentId);
+        this.legacyMappingsByItemId = index(
+                this.legacyMappings, LegacyItemMappingDefinition::legacyItemContentId);
         this.fingerprint = computeFingerprint();
     }
 
@@ -174,7 +176,8 @@ public final class Stage18ResourceOntologyCatalog {
         }
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(canonical.toString().getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of().formatHex(
+                    digest.digest(canonical.toString().getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("JVM does not provide mandatory SHA-256", exception);
         }
@@ -186,7 +189,8 @@ public final class Stage18ResourceOntologyCatalog {
         return List.copyOf(copy);
     }
 
-    private static <T> Map<String, T> index(List<T> source, java.util.function.Function<T, String> idFunction) {
+    private static <T> Map<String, T> index(
+            List<T> source, java.util.function.Function<T, String> idFunction) {
         Map<String, T> result = new LinkedHashMap<>();
         for (T value : source) {
             result.put(idFunction.apply(value), value);
@@ -227,8 +231,15 @@ public final class Stage18ResourceOntologyCatalog {
      * @param displayName diagnostic/display name
      * @param legacyCategory current cargo-policy compatibility category
      */
-    public record StorageClassDefinition(String id, String displayName, ItemCategory legacyCategory) {
-        /** Validates immutable storage-class metadata. */
+    public record StorageClassDefinition(
+            String id, String displayName, ItemCategory legacyCategory) {
+        /**
+         * Validates immutable storage-class metadata.
+         *
+         * @param id stable storage-class ID
+         * @param displayName diagnostic/display name
+         * @param legacyCategory current cargo-policy compatibility category
+         */
         public StorageClassDefinition {
             requireText(id, "storage class id");
             requireText(displayName, "storage class displayName");
@@ -241,7 +252,12 @@ public final class Stage18ResourceOntologyCatalog {
      * @param displayName diagnostic/display name
      */
     public record CapabilityTagDefinition(String id, String displayName) {
-        /** Validates immutable capability metadata. */
+        /**
+         * Validates immutable capability metadata.
+         *
+         * @param id stable process/capability tag ID
+         * @param displayName diagnostic/display name
+         */
         public CapabilityTagDefinition {
             requireText(id, "capability tag id");
             requireText(displayName, "capability tag displayName");
@@ -263,7 +279,16 @@ public final class Stage18ResourceOntologyCatalog {
             CommodityKind kind,
             String storageClassId,
             QuantityUnit quantityUnit) {
-        /** Validates immutable commodity metadata. */
+        /**
+         * Validates immutable commodity metadata.
+         *
+         * @param id stable commodity-family ID
+         * @param codeName stable technical name
+         * @param displayName diagnostic/display name
+         * @param kind material-chain role
+         * @param storageClassId stable storage-class reference
+         * @param quantityUnit physical quantity basis
+         */
         public CommodityDefinition {
             requireText(id, "commodity id");
             requireText(codeName, "commodity codeName");
@@ -283,13 +308,21 @@ public final class Stage18ResourceOntologyCatalog {
      */
     public record ResourceOccurrenceTypeDefinition(
             String id, String displayName, List<String> feedstockCommodityIds) {
-        /** Validates immutable occurrence-type metadata. */
+        /**
+         * Validates immutable occurrence-type metadata.
+         *
+         * @param id stable occurrence-type ID
+         * @param displayName diagnostic/display name
+         * @param feedstockCommodityIds extracted feedstock families potentially supplied by this occurrence type
+         */
         public ResourceOccurrenceTypeDefinition {
             requireText(id, "occurrence type id");
             requireText(displayName, "occurrence type displayName");
-            feedstockCommodityIds = List.copyOf(Objects.requireNonNull(feedstockCommodityIds, "feedstockCommodityIds"));
+            feedstockCommodityIds = List.copyOf(
+                    Objects.requireNonNull(feedstockCommodityIds, "feedstockCommodityIds"));
             if (feedstockCommodityIds.isEmpty()) {
-                throw new IllegalArgumentException("Occurrence type must reference at least one feedstock: " + id);
+                throw new IllegalArgumentException(
+                        "Occurrence type must reference at least one feedstock: " + id);
             }
         }
     }
@@ -305,7 +338,14 @@ public final class Stage18ResourceOntologyCatalog {
             LegacyDisposition disposition,
             String successorCommodityId,
             String migrationNote) {
-        /** Validates immutable migration metadata. */
+        /**
+         * Validates immutable migration metadata.
+         *
+         * @param legacyItemContentId persistent ID from the existing content catalog
+         * @param disposition migration policy
+         * @param successorCommodityId semantic successor, required only for {@link LegacyDisposition#SEMANTIC_SUCCESSOR}
+         * @param migrationNote human-readable reason/boundary of the mapping
+         */
         public LegacyItemMappingDefinition {
             requireText(legacyItemContentId, "legacyItemContentId");
             Objects.requireNonNull(disposition, "disposition");
@@ -313,7 +353,8 @@ public final class Stage18ResourceOntologyCatalog {
             if (disposition == LegacyDisposition.SEMANTIC_SUCCESSOR) {
                 requireText(successorCommodityId, "successorCommodityId");
             } else if (successorCommodityId != null) {
-                throw new IllegalArgumentException("Retained legacy item cannot declare a successor: " + legacyItemContentId);
+                throw new IllegalArgumentException(
+                        "Retained legacy item cannot declare a successor: " + legacyItemContentId);
             }
         }
     }
