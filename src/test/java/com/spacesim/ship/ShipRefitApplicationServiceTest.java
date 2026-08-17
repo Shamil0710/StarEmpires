@@ -30,25 +30,25 @@ class ShipRefitApplicationServiceTest {
         InstalledFit target = new InstalledFit(
                 source.hullId(),
                 source.installedModules().stream()
-                        .filter(module -> !module.mountId().equals("weapon_1"))
+                        .filter(module -> !module.mountId().equals("weapon_spinal"))
                         .toList());
         ShipEngineeringRuntime runtime = new ShipEngineeringRuntime(catalog);
         RuntimeState initial = runtime.initialize(source, ConsumableState.empty());
         RuntimeState hot = new RuntimeState(
                 initial.consumables(), initial.sharedBusEnergyJ(), initial.shipHeatStoredJ(),
-                Map.of("core_drive", 500d, "weapon_1", 250d),
+                Map.of("core_drive", 500d, "weapon_spinal", 250d),
                 initial.thrustLimitNByMount(), initial.coolantBusCapacityW(),
-                Map.of("core_ftl", 8d));
+                initial.ftlCooldownSecondsByMount());
         ShipDamageRuntime.Snapshot damage = new ShipDamageRuntime.Snapshot(
                 Map.of("compartment_mid", 0.8d), new DamageState(Map.of("core_drive", 0.7d)));
         ShipInstanceRuntimeState instance = new ShipInstanceRuntimeState(
                 damage,
                 Map.of(),
-                new MaintenanceState(Map.of("core_drive", 900d, "weapon_1", 300d)),
+                new MaintenanceState(Map.of("core_drive", 900d, "weapon_spinal", 300d)),
                 new WeaponLoadoutState(List.of(
                         new WeaponLoadoutState.FeedBinding(
-                                "weapon_1", "primary_feed", "ammo.kinetic_slug_v1"))),
-                new WeaponMountRuntime.RuntimeState(Map.of("weapon_1", 3d)));
+                                "weapon_spinal", "kinetic_magazine_feed", "ammo.kinetic_slug_v1"))),
+                new WeaponMountRuntime.RuntimeState(Map.of("weapon_spinal", 3d)));
         EngineeringComponent component = new EngineeringComponent(source, hot, instance);
         EntityId id = new EntityId(712L);
         Completion completion = new Completion(
@@ -57,7 +57,7 @@ class ShipRefitApplicationServiceTest {
                 damage,
                 new MaintenanceState(Map.of("core_drive", 900d)),
                 List.of(new ShipyardRefitContinuity.RemovedModuleState(
-                        new InstalledModuleDefinition("weapon_1", "module.kinetic_cannon_escort_v1"),
+                        new InstalledModuleDefinition("weapon_spinal", "module.railgun_large_v1"),
                         1d, 300d)));
 
         EngineeringComponent returned = new ShipRefitApplicationService(catalog).apply(id, component, completion);
@@ -65,8 +65,9 @@ class ShipRefitApplicationServiceTest {
         assertSame(component, returned);
         assertEquals(target, component.fit);
         assertEquals(500d, component.runtimeState.localHeatJByMount().get("core_drive"), 0d);
-        assertFalse(component.runtimeState.localHeatJByMount().containsKey("weapon_1"));
-        assertEquals(8d, component.runtimeState.ftlCooldownSecondsByMount().get("core_ftl"), 0d);
+        assertFalse(component.runtimeState.localHeatJByMount().containsKey("weapon_spinal"));
+        assertEquals(initial.ftlCooldownSecondsByMount(), component.runtimeState.ftlCooldownSecondsByMount(),
+                "refit must preserve the actual fitted FTL-cycle state rather than inventing one");
         assertEquals(0.7d,
                 component.instanceState.damage().moduleDamage().moduleIntegrityByMount().get("core_drive"), 0d);
         assertEquals(900d,
