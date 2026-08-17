@@ -41,7 +41,7 @@ class Stage18ShipConsumableServiceTest {
 
         assertTrue(result.committed());
         assertEquals(30_000d, storage.commodityMassKg("commodity.material.purified_water"), 1e-9d);
-        assertEquals(20_000d, result.consumables().totalInterfaceConsumableMassKg(), 1e-9d);
+        assertEquals(20_000d, result.consumables().interfaceLoadMassKg(), 1e-9d);
         assertEquals(1, result.consumables().interfaceLoads().size());
         assertEquals(20_000d, result.consumables().interfaceLoads().get(0).amount(), 1e-9d);
     }
