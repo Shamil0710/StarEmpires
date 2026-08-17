@@ -85,7 +85,20 @@ public final class Stage175ICombatAcceptanceHarness {
         /** Current evidence is aged before fire-control use. */ DEGRADED
     }
 
-    /** One deterministic aggregate scenario. */
+    /**
+     * One deterministic aggregate scenario.
+     *
+     * @param leftDoctrine left-side physical fit/stores fixture
+     * @param rightDoctrine right-side physical fit/stores fixture
+     * @param leftCount physical ship count represented by the side
+     * @param rightCount physical ship count represented by the side
+     * @param spacingM formation spacing used by defense geometry
+     * @param ammunitionFraction fraction [0,1] of authored ammunition loaded
+     * @param initialIntegrity common pre-damage integrity [0,1] applied to compartments/modules
+     * @param thermalStressFraction fraction [0,1] used to make defense thermal availability explicit
+     * @param informationPreset sensor-information freshness variant
+     * @param protectedLogisticsAsset whether an explicit defended logistics zone/interceptor probe is active
+     */
     public record Scenario(
             DoctrineId leftDoctrine,
             DoctrineId rightDoctrine,
@@ -97,6 +110,20 @@ public final class Stage175ICombatAcceptanceHarness {
             double thermalStressFraction,
             InformationPreset informationPreset,
             boolean protectedLogisticsAsset) {
+        /**
+         * Validates one immutable deterministic scenario.
+         *
+         * @param leftDoctrine left-side physical fit/stores fixture
+         * @param rightDoctrine right-side physical fit/stores fixture
+         * @param leftCount physical ship count represented by the side
+         * @param rightCount physical ship count represented by the side
+         * @param spacingM formation spacing used by defense geometry
+         * @param ammunitionFraction fraction [0,1] of authored ammunition loaded
+         * @param initialIntegrity common pre-damage integrity [0,1] applied to compartments/modules
+         * @param thermalStressFraction fraction [0,1] used to make defense thermal availability explicit
+         * @param informationPreset sensor-information freshness variant
+         * @param protectedLogisticsAsset whether an explicit defended logistics zone/interceptor probe is active
+         */
         public Scenario {
             Objects.requireNonNull(leftDoctrine, "leftDoctrine");
             Objects.requireNonNull(rightDoctrine, "rightDoctrine");
@@ -110,7 +137,13 @@ public final class Stage175ICombatAcceptanceHarness {
             requireUnitInterval(thermalStressFraction, "thermalStressFraction");
         }
 
-        /** @return canonical equal-count nominal scenario for one required doctrine pair */
+        /**
+         * Creates the canonical equal-count nominal scenario for one required doctrine pair.
+         *
+         * @param left left doctrine
+         * @param right right doctrine
+         * @return canonical nominal scenario
+         */
         public static Scenario nominal(DoctrineId left, DoctrineId right) {
             Doctrine leftFixture = Stage175IFleetDoctrineCatalog.get(left);
             Doctrine rightFixture = Stage175IFleetDoctrineCatalog.get(right);
@@ -151,10 +184,22 @@ public final class Stage175ICombatAcceptanceHarness {
             double postExchangePowerMarginW,
             double postExchangeSensorApertureM2) { }
 
-    /** Aggregate deterministic result. */
+    /**
+     * Aggregate deterministic result.
+     *
+     * @param scenario exact scenario inputs
+     * @param left physical left-side measurements
+     * @param right physical right-side measurements
+     * @param fingerprint lowercase SHA-256 over canonical inputs/outputs
+     */
     public record Result(Scenario scenario, SideResult left, SideResult right, String fingerprint) { }
 
-    /** Executes one deterministic two-sided acceptance exchange. */
+    /**
+     * Executes one deterministic two-sided acceptance exchange.
+     *
+     * @param scenario exact physical/information fixture
+     * @return immutable physical metrics and stable fingerprint
+     */
     public Result run(Scenario scenario) {
         Scenario checked = Objects.requireNonNull(scenario, "scenario");
         SideState left = createSide(
@@ -224,7 +269,7 @@ public final class Stage175ICombatAcceptanceHarness {
         double attackerX = leftToRight ? 0d : DEFAULT_RANGE_M;
         double targetX = leftToRight ? DEFAULT_RANGE_M : 0d;
         TrackState track = acquireTrack(
-                attacker, defender, attackerEntityId, targetId,
+                attacker, defender, attackerEntityId, targetEntityId,
                 attackerX, targetX, scenario.informationPreset());
 
         int kineticShots = 0;
@@ -347,7 +392,7 @@ public final class Stage175ICombatAcceptanceHarness {
                     guidedLaunches++;
                     if (scenario.protectedLogisticsAsset()) {
                         defenseAssignments += scheduleInterceptorProbe(
-                                body, defender, scenario, targetX, leftToRight);
+                                body, scenario, targetX, leftToRight);
                     }
                 }
             }
@@ -438,7 +483,6 @@ public final class Stage175ICombatAcceptanceHarness {
 
     private int scheduleInterceptorProbe(
             GuidedWeaponBody inbound,
-            SideState defender,
             Scenario scenario,
             double protectedCenterX,
             boolean inboundFromLeft) {
