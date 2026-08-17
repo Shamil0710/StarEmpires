@@ -43,24 +43,6 @@ final class EngineeringStatePersistenceMapper {
                         value.mountId(), value.interfaceId(), value.kind().name(),
                         value.amount(), value.massKg(), value.itemCount()))
                 .toList();
-        List<EntityState.ShieldRuntimeState> shields = instance.shieldStatesByMount().entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> new EntityState.ShieldRuntimeState(
-                        entry.getKey(), entry.getValue().reserveJ(), entry.getValue().accumulatedHeatJ(),
-                        entry.getValue().collapsed(), entry.getValue().restartRemainingSeconds(),
-                        entry.getValue().emitterIntegrity()))
-                .toList();
-        List<EntityState.WeaponFeedState> feeds = instance.weaponLoadout().feeds().stream()
-                .map(value -> new EntityState.WeaponFeedState(
-                        value.mountId(), value.interfaceId(), value.ammunitionContentId()))
-                .toList();
-        EntityState.ShipInstanceState instanceState = new EntityState.ShipInstanceState(
-                captureMap(instance.damage().compartmentIntegrityById()),
-                captureMap(instance.damage().moduleDamage().moduleIntegrityByMount()),
-                shields,
-                captureMap(instance.maintenance().secondsSinceServiceByMount()),
-                feeds,
-                captureMap(instance.weaponMountRuntime().cooldownSecondsByMount()));
         return new EntityState.EngineeringState(
                 fit.hullId(),
                 List.copyOf(modules),
@@ -76,7 +58,7 @@ final class EngineeringStatePersistenceMapper {
                 captureMap(runtime.thrustLimitNByMount()),
                 runtime.coolantBusCapacityW(),
                 captureMap(runtime.ftlCooldownSecondsByMount()),
-                instanceState);
+                captureInstance(instance));
     }
 
     static EngineeringComponent restore(EntityState.EngineeringState state) {
@@ -124,6 +106,35 @@ final class EngineeringStatePersistenceMapper {
                 restoreMap(checked.ftlCooldownSecondsByMount(), "ftlCooldownSecondsByMount"));
         ShipInstanceRuntimeState instance = restoreInstance(checked.instanceState());
         return new EngineeringComponent(fit, runtime, instance);
+    }
+
+    private static EntityState.ShipInstanceState captureInstance(ShipInstanceRuntimeState instance) {
+        if (instance.damage().compartmentIntegrityById().isEmpty()
+                && instance.damage().moduleDamage().moduleIntegrityByMount().isEmpty()
+                && instance.shieldStatesByMount().isEmpty()
+                && instance.maintenance().secondsSinceServiceByMount().isEmpty()
+                && instance.weaponLoadout().feeds().isEmpty()
+                && instance.weaponMountRuntime().cooldownSecondsByMount().isEmpty()) {
+            return null;
+        }
+        List<EntityState.ShieldRuntimeState> shields = instance.shieldStatesByMount().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> new EntityState.ShieldRuntimeState(
+                        entry.getKey(), entry.getValue().reserveJ(), entry.getValue().accumulatedHeatJ(),
+                        entry.getValue().collapsed(), entry.getValue().restartRemainingSeconds(),
+                        entry.getValue().emitterIntegrity()))
+                .toList();
+        List<EntityState.WeaponFeedState> feeds = instance.weaponLoadout().feeds().stream()
+                .map(value -> new EntityState.WeaponFeedState(
+                        value.mountId(), value.interfaceId(), value.ammunitionContentId()))
+                .toList();
+        return new EntityState.ShipInstanceState(
+                captureMap(instance.damage().compartmentIntegrityById()),
+                captureMap(instance.damage().moduleDamage().moduleIntegrityByMount()),
+                shields,
+                captureMap(instance.maintenance().secondsSinceServiceByMount()),
+                feeds,
+                captureMap(instance.weaponMountRuntime().cooldownSecondsByMount()));
     }
 
     private static ShipInstanceRuntimeState restoreInstance(EntityState.ShipInstanceState state) {
