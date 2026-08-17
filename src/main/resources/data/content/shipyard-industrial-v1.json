@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "hullProfiles": [
+    {
+      "hullId": "hull.escort_destroyer_v1",
+      "constructionInputs": [
+        {"contentId": "component.heavy", "amount": 6200.0},
+        {"contentId": "component.electrical", "amount": 900.0},
+        {"contentId": "component.precision", "amount": 320.0}
+      ],
+      "fabricationCapabilities": ["heavy_structure", "pressure_hull", "armor_integration"],
+      "toolingTags": ["escort_frame_fixture", "heavy_lift"],
+      "precisionRequirement": 0.35,
+      "industrialPowerW": 900000000.0,
+      "laborRequirement": 120,
+      "automationRequirement": 80,
+      "assemblyWorkSeconds": 2592000.0,
+      "compartmentRepairs": [
+        {
+          "compartmentId": "engineering",
+          "repairInputsAtFullLoss": [
+            {"contentId": "component.heavy", "amount": 1100.0},
+            {"contentId": "component.electrical", "amount": 340.0}
+          ],
+          "repairWorkSecondsAtFullLoss": 345600.0
+        },
+        {
+          "compartmentId": "mission_core",
+          "repairInputsAtFullLoss": [
+            {"contentId": "component.heavy", "amount": 780.0},
+            {"contentId": "component.electrical", "amount": 320.0},
+            {"contentId": "component.precision", "amount": 180.0}
+          ],
+          "repairWorkSecondsAtFullLoss": 302400.0
+        },
+        {
+          "compartmentId": "weapons",
+          "repairInputsAtFullLoss": [
+            {"contentId": "component.heavy", "amount": 920.0},
+            {"contentId": "component.electrical", "amount": 260.0},
+            {"contentId": "component.precision", "amount": 120.0}
+          ],
+          "repairWorkSecondsAtFullLoss": 324000.0
+        }
+      ]
+    }
+  ],
+  "moduleProfiles": [
+    {
+      "moduleId": "module.reactor_5gw_v1",
+      "fabricationCapabilities": ["heavy_machinery", "power_system_integration"],
+      "toolingTags": ["reactor_service_fixture", "heavy_lift"],
+      "precisionRequirement": 0.72,
+      "industrialPowerW": 520000000.0,
+      "laborRequirement": 34,
+      "automationRequirement": 24,
+      "manufacturingWorkSeconds": 604800.0,
+      "installationWorkSeconds": 86400.0,
+      "removalWorkSeconds": 64800.0
+    },
+    {
+      "moduleId": "module.main_drive_escort_v1",
+      "fabricationCapabilities": ["heavy_machinery", "propulsion_integration"],
+      "toolingTags": ["drive_alignment_fixture", "heavy_lift"],
+      "precisionRequirement": 0.78,
+      "industrialPowerW": 640000000.0,
+      "laborRequirement": 42,
+      "automationRequirement": 28,
+      "manufacturingWorkSeconds": 691200.0,
+      "installationWorkSeconds": 108000.0,
+      "removalWorkSeconds": 75600.0
+    },
+    {
+      "moduleId": "module.sensor_array_escort_v1",
+      "fabricationCapabilities": ["electronics_integration", "precision_alignment"],
+      "toolingTags": ["sensor_calibration_rig"],
+      "precisionRequirement": 0.95,
+      "industrialPowerW": 120000000.0,
+      "laborRequirement": 28,
+      "automationRequirement": 30,
+      "manufacturingWorkSeconds": 388800.0,
+      "installationWorkSeconds": 57600.0,
+      "removalWorkSeconds": 36000.0
+    },
+    {
+      "moduleId": "module.radiator_escort_v1",
+      "fabricationCapabilities": ["thermal_system_integration", "light_structure"],
+      "toolingTags": ["coolant_pressure_rig"],
+      "precisionRequirement": 0.52,
+      "industrialPowerW": 90000000.0,
+      "laborRequirement": 18,
+      "automationRequirement": 16,
+      "manufacturingWorkSeconds": 259200.0,
+      "installationWorkSeconds": 43200.0,
+      "removalWorkSeconds": 28800.0
+    },
+    {
+      "moduleId": "module.railgun_large_v1",
+      "fabricationCapabilities": ["heavy_machinery", "weapon_integration", "precision_alignment"],
+      "toolingTags": ["weapon_bore_alignment_rig", "heavy_lift"],
+      "precisionRequirement": 0.86,
+      "industrialPowerW": 410000000.0,
+      "laborRequirement": 38,
+      "automationRequirement": 26,
+      "manufacturingWorkSeconds": 518400.0,
+      "installationWorkSeconds": 79200.0,
+      "removalWorkSeconds": 54000.0
+    }
+  ]
+}
