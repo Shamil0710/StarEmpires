@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-17 / Stage 17.5F shields / armor / compartments / subsystem damage implementation.**  
+> **Последняя синхронизация: 2026-08-17 / Stage 17.5G shipyard / refit / repair / maintenance implementation.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -40,7 +40,7 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5G NEXT** |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5H NEXT** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | PLANNED |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
@@ -225,9 +225,13 @@ Projectile representation invariant: `docs/stage17_5e_projectile_representation_
 
 Canonical 17.5F closeout: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.
 
+> **Stage 17.5G — COMPLETE: data-driven shipyard capability/work requirements, physical input/work settlement, identity-preserving refit/repair, scheduled maintenance and removed-module condition continuity through the common engineering/economy seam.**
+
+Canonical 17.5G closeout: `docs/stage17_5g_shipyard_refit_repair_maintenance.md`.
+
 ## 6. Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-**ACTIVE — 17.5A–17.5F COMPLETE; 17.5G NEXT.**
+**ACTIVE — 17.5A–17.5G COMPLETE; 17.5H NEXT.**
 
 Implementation sequence:
 
@@ -237,11 +241,13 @@ Implementation sequence:
 - **17.5D — COMPLETE:** signatures/sensors/tracks/datalink/EW + fitted sensor adapter + common player/AI information model;
 - **17.5E — COMPLETE:** kinetic/beam/guided/PD/ammunition + individual physical bodies + linked weapon/ammunition content + deterministic pooled projectile representation;
 - **17.5F — COMPLETE:** finite shields + bounded armor/material response + compartments/subsystem damage + damage-aware derived/sensor/weapon capabilities;
-- **17.5G — NEXT:** shipyard/refit/repair/maintenance economy seam;
-- **17.5H:** capability APIs/UI/full migration surfaces, including final damage/shield composition with live engineering grants, final engineering-grant/weapon power-heat commit, binary sensor-knowledge persistence and weapon loadout/launcher-cycle persistence where required by live capability APIs;
+- **17.5G — COMPLETE:** shipyard/refit/repair/maintenance capability and physical input/work economy seam with identity/condition continuity;
+- **17.5H — NEXT:** capability APIs/UI/full migration surfaces, including final damage/shield composition with live engineering grants, final engineering-grant/weapon power-heat commit, binary sensor-knowledge persistence, weapon loadout/launcher-cycle persistence and Stage-17.5G refit/maintenance continuity where required by live capability APIs;
 - **17.5I:** deterministic aggregate acceptance **plus mandatory Combat Test Content Pack and Tactical Prototype Visual Set**.
 
 Stage-17.5F activates authoritative local compartment/module damage and damage-aware central capability derivation. Stage-17.5H must consume this state at live engineering/API/persistence boundaries rather than reset `DamageState` to pristine; Stage-17.5F deliberately does not fork the existing Stage-17.5C runtime to bypass that integration slice.
+
+Stage-17.5G additionally activates the common shipyard engineering/economy handoff. Stage-17.5H must preserve `ShipyardRefitContinuity` and maintenance condition through live ECS/persistence and reconcile module-local runtime state rather than treating a refit as respawn or implicit repair.
 
 ### Mandatory Stage 17.5 exit content gate
 
@@ -283,6 +289,7 @@ Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.
 17.5D implementation record: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`.  
 17.5E implementation record: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.  
 17.5F implementation record: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.  
+17.5G implementation record: `docs/stage17_5g_shipyard_refit_repair_maintenance.md`.  
 17.5I combat content / visual acceptance: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
 ## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
@@ -372,7 +379,7 @@ Canonical generation contracts:
 - `docs/inter_system_navigation_contract.md`;
 - `docs/physical_trade_route_scoring_contract.md`;
 - `docs/galaxy_topology_resource_geography_generation_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for non-linear topology, resource geography, economic dependency and world-generation quality gates;
-- `docs/spatial_scale_and_unbounded_system_space_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for capability-calibrated local geometry, station scale, unbounded local space, numerical precision and LOD/world-boundary separation.
+- `docs/spatial_scale_and_unbounded_system_space_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for capability-calibrated local geometry, station scale, unbounded local space, numerical precision и LOD/world-boundary separation.
 
 Must honor:
 
@@ -515,8 +522,8 @@ Stage 17 COMPLETE
 → Stage 17.5D signatures / sensors / tracks / datalink / EW COMPLETE
 → Stage 17.5E kinetic / beam / guided / PD / ammunition COMPLETE
 → Stage 17.5F shields / armor / compartments / subsystem damage COMPLETE
-→ Stage 17.5G shipyard / refit / repair / maintenance seam NEXT
-→ Stage 17.5H capability APIs / UI / persistence
+→ Stage 17.5G shipyard / refit / repair / maintenance seam COMPLETE
+→ Stage 17.5H capability APIs / UI / persistence NEXT
 → Stage 17.5I deterministic multi-fleet acceptance + Combat Test Content Pack + Tactical Prototype Visual Set
 → Stage 18 Resources / Industry / Infrastructure
 → Stage 19 Strategic Warfare
@@ -526,4 +533,4 @@ Stage 17 COMPLETE
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority after the Stage-17.5F merge gate is Stage 17.5G. Stage 17.5 cannot close until the Stage-17.5I combat-content/visual exit gate passes.**
+**Immediate implementation priority after the Stage-17.5G merge gate is Stage 17.5H. Stage 17.5 cannot close until the Stage-17.5I combat-content/visual exit gate passes.**
