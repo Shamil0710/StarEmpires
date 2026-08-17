@@ -2,6 +2,7 @@ package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.ship.ShipEngineeringGrantService.IntervalBudget;
 import com.spacesim.ship.ShipObservationService.ExecutionResult;
 import com.spacesim.ship.ShipObservationService.OperationPlan;
 import com.spacesim.ship.ShipSensorEngineeringAdapter.FittedSensor;
@@ -44,7 +45,7 @@ public final class ShipObservationEngineeringService {
     }
 
     /**
-     * Plans, physically admits/commits and executes one fitted sensor operation.
+     * Plans, physically admits/commits and executes one non-overlapping fitted sensor operation.
      *
      * @param engineering authoritative observing ship engineering component
      * @param sensor fitted physical sensor mode
@@ -71,6 +72,79 @@ public final class ShipObservationEngineeringService {
             SignatureState targetSignature,
             ElectronicWarfareState ewState,
             double timestampSeconds) {
+        return observeInternal(
+                engineering,
+                sensor,
+                state,
+                operationDurationSeconds,
+                observerId,
+                targetId,
+                observer,
+                target,
+                targetSignature,
+                ewState,
+                timestampSeconds,
+                null);
+    }
+
+    /**
+     * Plans and executes one fitted sensor operation against a shared same-interval power budget.
+     *
+     * @param engineering authoritative observing ship engineering component
+     * @param sensor fitted physical sensor mode
+     * @param state current sensor/ECCM state
+     * @param operationDurationSeconds positive interval over which incremental power/heat apply
+     * @param observerId observing entity ID
+     * @param targetId target entity ID
+     * @param observer observing ship position
+     * @param target target position
+     * @param targetSignature target physical signature
+     * @param ewState current physical EW state
+     * @param timestampSeconds authoritative observation timestamp
+     * @param intervalBudget shared reservation ledger for overlapping ship operations
+     * @return executed or physically denied observation result
+     */
+    public ExecutionResult observe(
+            EngineeringComponent engineering,
+            FittedSensor sensor,
+            SensorRuntimeState state,
+            double operationDurationSeconds,
+            long observerId,
+            long targetId,
+            Position2d observer,
+            Position2d target,
+            SignatureState targetSignature,
+            ElectronicWarfareState ewState,
+            double timestampSeconds,
+            IntervalBudget intervalBudget) {
+        return observeInternal(
+                engineering,
+                sensor,
+                state,
+                operationDurationSeconds,
+                observerId,
+                targetId,
+                observer,
+                target,
+                targetSignature,
+                ewState,
+                timestampSeconds,
+                Objects.requireNonNull(intervalBudget, "intervalBudget"));
+    }
+
+    private ExecutionResult observeInternal(
+            EngineeringComponent engineering,
+            FittedSensor sensor,
+            SensorRuntimeState state,
+            double operationDurationSeconds,
+            long observerId,
+            long targetId,
+            Position2d observer,
+            Position2d target,
+            SignatureState targetSignature,
+            ElectronicWarfareState ewState,
+            double timestampSeconds,
+            IntervalBudget intervalBudget) {
         EngineeringComponent component = Objects.requireNonNull(engineering, "engineering");
         FittedSensor fitted = Objects.requireNonNull(sensor, "sensor");
         SensorRuntimeState runtimeState = Objects.requireNonNull(state, "state");
@@ -89,12 +163,20 @@ public final class ShipObservationEngineeringService {
                     Objects.requireNonNull(ewState, "ewState"),
                     timestampSeconds);
         }
-        ShipEngineeringGrantService.GrantResult grant = grants.grantAndCommit(
-                component,
-                plan.mountId(),
-                plan.requiredPowerW(),
-                plan.requiredHeatW(),
-                operationDurationSeconds);
+        ShipEngineeringGrantService.GrantResult grant = intervalBudget == null
+                ? grants.grantAndCommit(
+                        component,
+                        plan.mountId(),
+                        plan.requiredPowerW(),
+                        plan.requiredHeatW(),
+                        operationDurationSeconds)
+                : grants.grantAndCommit(
+                        component,
+                        plan.mountId(),
+                        plan.requiredPowerW(),
+                        plan.requiredHeatW(),
+                        operationDurationSeconds,
+                        intervalBudget);
         return observations.execute(
                 plan,
                 grant.grant(),
