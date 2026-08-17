@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "construction.profile.resource_site",
+      "displayName": "Resource-site industrial structure",
+      "inputs": [
+        {"commodityId": "commodity.material.structural_alloy", "fractionOfInstalledMass": 0.55},
+        {"commodityId": "commodity.material.light_alloy", "fractionOfInstalledMass": 0.10},
+        {"commodityId": "commodity.material.ceramic_glass", "fractionOfInstalledMass": 0.05},
+        {"commodityId": "commodity.component.heavy_components", "fractionOfInstalledMass": 0.20},
+        {"commodityId": "commodity.component.electrical_components", "fractionOfInstalledMass": 0.07},
+        {"commodityId": "commodity.component.precision_components", "fractionOfInstalledMass": 0.03}
+      ],
+      "requiredCapabilityTags": ["capability.fabrication.heavy", "capability.fabrication.assembly"],
+      "workSecondsPerInstalledKg": 0.07
+    },
+    {
+      "id": "construction.profile.light_industrial",
+      "displayName": "Light industrial plant structure",
+      "inputs": [
+        {"commodityId": "commodity.material.structural_alloy", "fractionOfInstalledMass": 0.45},
+        {"commodityId": "commodity.material.light_alloy", "fractionOfInstalledMass": 0.15},
+        {"commodityId": "commodity.material.ceramic_glass", "fractionOfInstalledMass": 0.10},
+        {"commodityId": "commodity.component.heavy_components", "fractionOfInstalledMass": 0.15},
+        {"commodityId": "commodity.component.electrical_components", "fractionOfInstalledMass": 0.10},
+        {"commodityId": "commodity.component.precision_components", "fractionOfInstalledMass": 0.05}
+      ],
+      "requiredCapabilityTags": ["capability.fabrication.heavy", "capability.fabrication.assembly"],
+      "workSecondsPerInstalledKg": 0.08
+    },
+    {
+      "id": "construction.profile.heavy_industrial",
+      "displayName": "Heavy industrial plant structure",
+      "inputs": [
+        {"commodityId": "commodity.material.structural_alloy", "fractionOfInstalledMass": 0.50},
+        {"commodityId": "commodity.material.refractory_alloy", "fractionOfInstalledMass": 0.08},
+        {"commodityId": "commodity.material.ceramic_glass", "fractionOfInstalledMass": 0.07},
+        {"commodityId": "commodity.material.carbon_material", "fractionOfInstalledMass": 0.05},
+        {"commodityId": "commodity.component.heavy_components", "fractionOfInstalledMass": 0.18},
+        {"commodityId": "commodity.component.electrical_components", "fractionOfInstalledMass": 0.07},
+        {"commodityId": "commodity.component.precision_components", "fractionOfInstalledMass": 0.05}
+      ],
+      "requiredCapabilityTags": ["capability.fabrication.heavy", "capability.fabrication.assembly"],
+      "workSecondsPerInstalledKg": 0.10
+    },
+    {
+      "id": "construction.profile.hazardous_process",
+      "displayName": "Hazardous process plant structure",
+      "inputs": [
+        {"commodityId": "commodity.material.structural_alloy", "fractionOfInstalledMass": 0.35},
+        {"commodityId": "commodity.material.refractory_alloy", "fractionOfInstalledMass": 0.10},
+        {"commodityId": "commodity.material.ceramic_glass", "fractionOfInstalledMass": 0.08},
+        {"commodityId": "commodity.material.carbon_material", "fractionOfInstalledMass": 0.07},
+        {"commodityId": "commodity.material.industrial_chemicals", "fractionOfInstalledMass": 0.10},
+        {"commodityId": "commodity.component.heavy_components", "fractionOfInstalledMass": 0.15},
+        {"commodityId": "commodity.component.electrical_components", "fractionOfInstalledMass": 0.10},
+        {"commodityId": "commodity.component.precision_components", "fractionOfInstalledMass": 0.05}
+      ],
+      "requiredCapabilityTags": ["capability.fabrication.heavy", "capability.fabrication.electrical", "capability.fabrication.assembly"],
+      "workSecondsPerInstalledKg": 0.12
+    },
+    {
+      "id": "construction.profile.high_tech",
+      "displayName": "High-technology industrial structure",
+      "inputs": [
+        {"commodityId": "commodity.material.structural_alloy", "fractionOfInstalledMass": 0.25},
+        {"commodityId": "commodity.material.light_alloy", "fractionOfInstalledMass": 0.10},
+        {"commodityId": "commodity.material.refractory_alloy", "fractionOfInstalledMass": 0.08},
+        {"commodityId": "commodity.material.electronic_grade_material", "fractionOfInstalledMass": 0.12},
+        {"commodityId": "commodity.component.heavy_components", "fractionOfInstalledMass": 0.10},
+        {"commodityId": "commodity.component.electrical_components", "fractionOfInstalledMass": 0.18},
+        {"commodityId": "commodity.component.precision_components", "fractionOfInstalledMass": 0.17}
+      ],
+      "requiredCapabilityTags": ["capability.fabrication.heavy", "capability.fabrication.electrical", "capability.fabrication.precision", "capability.fabrication.assembly"],
+      "workSecondsPerInstalledKg": 0.16
+    }
+  ],
+  "facilities": [
+    {"facilityDefinitionId": "facility.extraction.asteroid", "profileId": "construction.profile.resource_site", "installedMassKg": 8000000.0},
+    {"facilityDefinitionId": "facility.extraction.surface", "profileId": "construction.profile.resource_site", "installedMassKg": 40000000.0},
+    {"facilityDefinitionId": "facility.extraction.deep", "profileId": "construction.profile.heavy_industrial", "installedMassKg": 80000000.0},
+    {"facilityDefinitionId": "facility.extraction.atmospheric", "profileId": "construction.profile.light_industrial", "installedMassKg": 25000000.0},
+    {"facilityDefinitionId": "facility.processing.volatiles", "profileId": "construction.profile.hazardous_process", "installedMassKg": 12000000.0},
+    {"facilityDefinitionId": "facility.processing.bulk_refinery", "profileId": "construction.profile.heavy_industrial", "installedMassKg": 60000000.0},
+    {"facilityDefinitionId": "facility.processing.advanced_materials", "profileId": "construction.profile.high_tech", "installedMassKg": 35000000.0},
+    {"facilityDefinitionId": "facility.processing.chemical", "profileId": "construction.profile.hazardous_process", "installedMassKg": 30000000.0},
+    {"facilityDefinitionId": "facility.processing.recycling", "profileId": "construction.profile.heavy_industrial", "installedMassKg": 18000000.0},
+    {"facilityDefinitionId": "facility.fabrication.heavy", "profileId": "construction.profile.heavy_industrial", "installedMassKg": 30000000.0},
+    {"facilityDefinitionId": "facility.fabrication.electrical", "profileId": "construction.profile.high_tech", "installedMassKg": 12000000.0},
+    {"facilityDefinitionId": "facility.fabrication.precision", "profileId": "construction.profile.high_tech", "installedMassKg": 10000000.0},
+    {"facilityDefinitionId": "facility.fabrication.ordnance", "profileId": "construction.profile.hazardous_process", "installedMassKg": 15000000.0},
+    {"facilityDefinitionId": "facility.fabrication.assembly", "profileId": "construction.profile.heavy_industrial", "installedMassKg": 40000000.0}
+  ]
+}
