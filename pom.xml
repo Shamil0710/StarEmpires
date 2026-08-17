@@ -115,6 +115,7 @@
                         <exclude>com/spacesim/PlayableTestGame*</exclude>
                         <exclude>com/spacesim/desktop/**</exclude>
                         <exclude>com/spacesim/presentation/validation/Stage175ITacticalAcceptanceApp*</exclude>
+                        <exclude>com/spacesim/presentation/validation/LiveTacticalSimulationApp*</exclude>
                         <exclude>com/spacesim/ui/WorldMapRenderer*</exclude>
                         <exclude>com/spacesim/ui/LocalMinimapRenderer*</exclude>
                         <exclude>com/spacesim/ui/TacticalPrototypeRenderer*</exclude>
