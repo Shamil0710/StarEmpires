@@ -1,5 +1,7 @@
 package com.spacesim.combat.acceptance;
 
+import com.spacesim.content.ship.BeamMaterialResponseCatalog;
+import com.spacesim.content.ship.BeamMaterialResponseCatalogLoader;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.content.ship.ShipProtectionCatalog;
@@ -24,10 +26,10 @@ import java.util.Objects;
 /**
  * Immutable production-valid/content-provisional Stage-17.5I acceptance content bundle.
  *
- * <p>The bundle deliberately reuses the ordinary engineering, ammunition, launcher and protection
- * loaders. It adds no combat-only ship stats and no alternate fitting or damage model. The combined
- * semantic fingerprint lets the deterministic acceptance runner identify the exact test vocabulary
- * used for one result without promoting that vocabulary to Stage-22 canon.</p>
+ * <p>The bundle deliberately reuses ordinary engineering, ammunition, launcher, kinetic-protection
+ * and beam-material loaders. It adds no combat-only ship stats and no alternate fitting or damage
+ * model. The combined semantic fingerprint identifies the exact test vocabulary used for one result
+ * without promoting that vocabulary to Stage-22 canon.</p>
  */
 public final class Stage175ICombatTestContentPack {
     /** Engineering hull/module/fit resource. */
@@ -42,6 +44,9 @@ public final class Stage175ICombatTestContentPack {
     /** Local heavy-impact/compartment/subsystem damage resource. */
     public static final String PROTECTION_RESOURCE =
             "data/content/stage17_5i-combat-test-protection-v1.json";
+    /** Data-driven beam/material thermal-ablation response resource. */
+    public static final String BEAM_MATERIAL_RESOURCE =
+            "data/content/stage17_5i-beam-material-response-v1.json";
     /** Five-fleet/matchup/variation manifest resource. */
     public static final String MANIFEST_RESOURCE =
             "data/content/stage17_5i-combat-test-manifest-v1.json";
@@ -50,6 +55,7 @@ public final class Stage175ICombatTestContentPack {
     private final WeaponAmmunitionCatalog ammunition;
     private final WeaponLauncherCatalog launchers;
     private final ShipProtectionCatalog protection;
+    private final BeamMaterialResponseCatalog beamMaterials;
     private final Stage175ICombatTestManifest manifest;
     private final String fingerprint;
 
@@ -58,18 +64,20 @@ public final class Stage175ICombatTestContentPack {
             WeaponAmmunitionCatalog ammunition,
             WeaponLauncherCatalog launchers,
             ShipProtectionCatalog protection,
+            BeamMaterialResponseCatalog beamMaterials,
             Stage175ICombatTestManifest manifest) {
         this.engineering = Objects.requireNonNull(engineering, "engineering");
         this.ammunition = Objects.requireNonNull(ammunition, "ammunition");
         this.launchers = Objects.requireNonNull(launchers, "launchers");
         this.protection = Objects.requireNonNull(protection, "protection");
+        this.beamMaterials = Objects.requireNonNull(beamMaterials, "beamMaterials");
         this.manifest = Objects.requireNonNull(manifest, "manifest");
         validateCrossReferences();
         this.fingerprint = computeFingerprint();
     }
 
     /**
-     * Loads the built-in Stage-17.5I pack through the ordinary production loaders.
+     * Loads the built-in Stage-17.5I pack through ordinary production loaders.
      *
      * @return immutable validated acceptance pack
      */
@@ -81,10 +89,12 @@ public final class Stage175ICombatTestContentPack {
                 read(LAUNCHER_RESOURCE), engineering);
         ShipProtectionCatalog protection = ShipProtectionCatalogLoader.parse(
                 read(PROTECTION_RESOURCE), engineering);
+        BeamMaterialResponseCatalog beamMaterials = BeamMaterialResponseCatalogLoader.parse(
+                read(BEAM_MATERIAL_RESOURCE), engineering);
         Stage175ICombatTestManifest manifest = Stage175ICombatTestManifestLoader.parse(
                 read(MANIFEST_RESOURCE), engineering);
         return new Stage175ICombatTestContentPack(
-                engineering, ammunition, launchers, protection, manifest);
+                engineering, ammunition, launchers, protection, beamMaterials, manifest);
     }
 
     /** @return ordinary production engineering catalog */
@@ -102,9 +112,14 @@ public final class Stage175ICombatTestContentPack {
         return launchers;
     }
 
-    /** @return ordinary production protection/damage catalog */
+    /** @return ordinary production kinetic/local-damage catalog */
     public ShipProtectionCatalog protection() {
         return protection;
+    }
+
+    /** @return data-driven production beam/material response catalog */
+    public BeamMaterialResponseCatalog beamMaterials() {
+        return beamMaterials;
     }
 
     /** @return data-driven representative fleet/scenario manifest */
@@ -131,6 +146,12 @@ public final class Stage175ICombatTestContentPack {
                 }
             }
         }
+        engineering.getProtectionStacks().forEach(stack -> stack.layers().forEach(layer -> {
+            if (beamMaterials.findByMaterialId(layer.materialId()) == null) {
+                throw new IllegalArgumentException(
+                        "Protection material has no beam response in acceptance pack: " + layer.materialId());
+            }
+        }));
     }
 
     private String computeFingerprint() {
@@ -138,6 +159,7 @@ public final class Stage175ICombatTestContentPack {
         canonical.append("engineering|").append(engineering.getFingerprint()).append('\n');
         canonical.append("ammunition|").append(ammunition.getFingerprint()).append('\n');
         canonical.append("launchers|").append(launchers.getFingerprint()).append('\n');
+        canonical.append("beam-materials|").append(beamMaterials.fingerprint()).append('\n');
         canonical.append("manifest|").append(manifest.fingerprint()).append('\n');
         canonical.append("protection-schema|").append(protection.getSchemaVersion()).append('\n');
         for (HeavyImpactModel model : protection.getHeavyImpactModels()) {
