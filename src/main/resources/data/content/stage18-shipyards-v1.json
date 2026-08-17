@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "yards": [
+    {
+      "id": "yard.orbital_escort_v1",
+      "displayName": "Orbital escort construction and service yard",
+      "requiredSupportFacilityDefinitionIds": [
+        "facility.fabrication.heavy",
+        "facility.fabrication.assembly"
+      ],
+      "berthDimensionsM": {"lengthM": 300.0, "widthM": 120.0, "heightM": 70.0},
+      "maxServiceMassKg": 30000000.0,
+      "stage175FabricationCapabilities": [
+        "heavy_structure",
+        "pressure_hull",
+        "armor_integration",
+        "heavy_machinery",
+        "power_system_integration",
+        "propulsion_integration",
+        "electronics_integration",
+        "precision_alignment",
+        "thermal_system_integration",
+        "light_structure",
+        "weapon_integration"
+      ],
+      "stage175HandledRequirementIds": [
+        "component.heavy",
+        "component.electrical",
+        "component.precision"
+      ],
+      "toolingTags": [
+        "escort_frame_fixture",
+        "heavy_lift",
+        "reactor_service_fixture",
+        "drive_alignment_fixture",
+        "sensor_calibration_rig",
+        "coolant_pressure_rig",
+        "weapon_bore_alignment_rig"
+      ],
+      "precisionCapability": 1.0,
+      "ratedIntegrationPowerW": 1200000000.0,
+      "ratedEngineeringWorkRate": 12.0,
+      "laborCapacity": 500,
+      "automationCapacity": 500,
+      "handledStorageClassIds": [
+        "storage.dry_bulk",
+        "storage.general_container",
+        "storage.hazardous_controlled",
+        "storage.high_value_controlled",
+        "storage.oversized"
+      ],
+      "maxHandledUnitMassKg": 5000000.0,
+      "allowedLocationTags": ["location.orbital_station"]
+    }
+  ],
+  "hullProfiles": [
+    {
+      "hullId": "hull.escort_destroyer_v1",
+      "buildInputsKg": [
+        {"commodityId": "commodity.material.structural_alloy", "massKg": 7800000.0},
+        {"commodityId": "commodity.material.light_alloy", "massKg": 1000000.0},
+        {"commodityId": "commodity.material.refractory_alloy", "massKg": 500000.0},
+        {"commodityId": "commodity.material.ceramic_glass", "massKg": 900000.0},
+        {"commodityId": "commodity.material.carbon_material", "massKg": 500000.0},
+        {"commodityId": "commodity.material.electronic_grade_material", "massKg": 100000.0},
+        {"commodityId": "commodity.component.heavy_components", "massKg": 800000.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 250000.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 150000.0}
+      ],
+      "compartmentRepairs": [
+        {
+          "compartmentId": "engineering",
+          "inputsAtFullLossKg": [
+            {"commodityId": "commodity.material.structural_alloy", "massKg": 600000.0},
+            {"commodityId": "commodity.material.refractory_alloy", "massKg": 150000.0},
+            {"commodityId": "commodity.component.heavy_components", "massKg": 180000.0},
+            {"commodityId": "commodity.component.electrical_components", "massKg": 80000.0},
+            {"commodityId": "commodity.component.precision_components", "massKg": 40000.0}
+          ]
+        },
+        {
+          "compartmentId": "mission_core",
+          "inputsAtFullLossKg": [
+            {"commodityId": "commodity.material.structural_alloy", "massKg": 350000.0},
+            {"commodityId": "commodity.material.light_alloy", "massKg": 100000.0},
+            {"commodityId": "commodity.material.ceramic_glass", "massKg": 100000.0},
+            {"commodityId": "commodity.component.electrical_components", "massKg": 100000.0},
+            {"commodityId": "commodity.component.precision_components", "massKg": 80000.0}
+          ]
+        },
+        {
+          "compartmentId": "weapons",
+          "inputsAtFullLossKg": [
+            {"commodityId": "commodity.material.structural_alloy", "massKg": 450000.0},
+            {"commodityId": "commodity.material.refractory_alloy", "massKg": 80000.0},
+            {"commodityId": "commodity.component.heavy_components", "massKg": 150000.0},
+            {"commodityId": "commodity.component.electrical_components", "massKg": 70000.0},
+            {"commodityId": "commodity.component.precision_components", "massKg": 50000.0}
+          ]
+        }
+      ]
+    }
+  ],
+  "moduleServiceProfiles": [
+    {
+      "moduleId": "module.reactor_5gw_v1",
+      "repairInputsAtFullLossKg": [
+        {"commodityId": "commodity.component.heavy_components", "massKg": 300000.0},
+        {"commodityId": "commodity.material.refractory_alloy", "massKg": 150000.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 60000.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 100000.0},
+        {"commodityId": "commodity.material.electronic_grade_material", "massKg": 50000.0}
+      ],
+      "maintenanceInputsKg": [
+        {"commodityId": "commodity.material.refractory_alloy", "massKg": 2000.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 3000.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 4000.0},
+        {"commodityId": "commodity.material.industrial_chemicals", "massKg": 2000.0}
+      ]
+    },
+    {
+      "moduleId": "module.main_drive_escort_v1",
+      "repairInputsAtFullLossKg": [
+        {"commodityId": "commodity.component.heavy_components", "massKg": 400000.0},
+        {"commodityId": "commodity.material.refractory_alloy", "massKg": 180000.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 80000.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 130000.0},
+        {"commodityId": "commodity.material.carbon_material", "massKg": 50000.0}
+      ],
+      "maintenanceInputsKg": [
+        {"commodityId": "commodity.component.heavy_components", "massKg": 4000.0},
+        {"commodityId": "commodity.material.refractory_alloy", "massKg": 3000.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 3000.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 3000.0},
+        {"commodityId": "commodity.material.industrial_chemicals", "massKg": 1000.0}
+      ]
+    },
+    {
+      "moduleId": "module.sensor_array_escort_v1",
+      "repairInputsAtFullLossKg": [
+        {"commodityId": "commodity.component.electrical_components", "massKg": 30000.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 45000.0},
+        {"commodityId": "commodity.material.electronic_grade_material", "massKg": 30000.0}
+      ],
+      "maintenanceInputsKg": [
+        {"commodityId": "commodity.component.electrical_components", "massKg": 1000.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 2000.0},
+        {"commodityId": "commodity.material.electronic_grade_material", "massKg": 1200.0}
+      ]
+    },
+    {
+      "moduleId": "module.radiator_escort_v1",
+      "repairInputsAtFullLossKg": [
+        {"commodityId": "commodity.material.light_alloy", "massKg": 70000.0},
+        {"commodityId": "commodity.material.structural_alloy", "massKg": 40000.0},
+        {"commodityId": "commodity.material.conductor_metal", "massKg": 20000.0},
+        {"commodityId": "commodity.material.carbon_material", "massKg": 20000.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 12500.0}
+      ],
+      "maintenanceInputsKg": [
+        {"commodityId": "commodity.material.light_alloy", "massKg": 1000.0},
+        {"commodityId": "commodity.material.conductor_metal", "massKg": 750.0},
+        {"commodityId": "commodity.material.industrial_chemicals", "massKg": 1000.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 500.0}
+      ]
+    },
+    {
+      "moduleId": "module.railgun_large_v1",
+      "repairInputsAtFullLossKg": [
+        {"commodityId": "commodity.material.structural_alloy", "massKg": 150000.0},
+        {"commodityId": "commodity.material.refractory_alloy", "massKg": 100000.0},
+        {"commodityId": "commodity.material.conductor_metal", "massKg": 50000.0},
+        {"commodityId": "commodity.component.heavy_components", "massKg": 80000.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 30000.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 25000.0}
+      ],
+      "maintenanceInputsKg": [
+        {"commodityId": "commodity.material.refractory_alloy", "massKg": 1500.0},
+        {"commodityId": "commodity.material.conductor_metal", "massKg": 1500.0},
+        {"commodityId": "commodity.component.heavy_components", "massKg": 1500.0},
+        {"commodityId": "commodity.component.electrical_components", "massKg": 1250.0},
+        {"commodityId": "commodity.component.precision_components", "massKg": 1500.0}
+      ]
+    }
+  ]
+}
