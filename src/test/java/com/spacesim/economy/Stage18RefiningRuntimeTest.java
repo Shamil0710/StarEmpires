@@ -35,7 +35,7 @@ class Stage18RefiningRuntimeTest {
     void structuralAlloyRefiningConsumesMassAndFiniteProcessBudgetAtomically() {
         PhysicalMaterialStore store = store(Map.of("commodity.feedstock.metallic_ore", 100d));
         RefiningCapability capability = capability(Set.of("capability.process.bulk_refining"),
-                10_000_000d, 5d, 1d);
+                30_000_000d, 5d, 1d);
         IntervalBudget budget = capability.openInterval(10d);
 
         RefiningResult result = runtime.refine("refining.structural_alloy", 50d, store, budget);
@@ -49,7 +49,7 @@ class Stage18RefiningRuntimeTest {
         assertEquals(50d, result.outputMassStoredKg() + result.discardedMassKg(), TOLERANCE);
         assertEquals(50d, store.massKg("commodity.feedstock.metallic_ore"), TOLERANCE);
         assertEquals(34d, store.massKg("commodity.material.structural_alloy"), TOLERANCE);
-        assertEquals(50_000_000d, budget.remainingEnergyJ(), TOLERANCE);
+        assertEquals(100_000_000d, budget.remainingEnergyJ(), TOLERANCE);
         assertEquals(0d, budget.remainingWorkSeconds(), TOLERANCE);
         assertEquals(4d, budget.remainingMaintenanceWorkSeconds(), TOLERANCE);
     }
@@ -60,7 +60,7 @@ class Stage18RefiningRuntimeTest {
                 "commodity.feedstock.carbonaceous_feedstock", 100d,
                 "commodity.feedstock.volatile_feedstock", 100d));
         RefiningCapability capability = capability(Set.of("capability.process.chemical_processing"),
-                20_000_000d, 10d, 2d);
+                60_000_000d, 20d, 2d);
 
         RefiningResult result = runtime.refine(
                 "refining.industrial_chemicals", 100d, store, capability.openInterval(10d));
@@ -91,7 +91,7 @@ class Stage18RefiningRuntimeTest {
     }
 
     @Test
-    void missingCapabilityAndOutputStorageAreRejectedWithoutMutation() {
+    void missingCapabilityAndMissingOutputStorageAreRejectedWithoutMutation() {
         PhysicalMaterialStore missingCapabilityStore = store(Map.of("commodity.feedstock.metallic_ore", 100d));
         RefiningCapability wrongCapability = capability(Set.of("capability.process.chemical_processing"),
                 20_000_000d, 10d, 2d);
@@ -100,19 +100,35 @@ class Stage18RefiningRuntimeTest {
         assertEquals(Status.MISSING_CAPABILITY, capabilityResult.status());
         assertEquals(100d, missingCapabilityStore.massKg("commodity.feedstock.metallic_ore"), TOLERANCE);
 
-        PhysicalMaterialStore noDryBulkOutputSpace = new PhysicalMaterialStore(
+        PhysicalMaterialStore noLiquidOutputSpace = new PhysicalMaterialStore(
+                ontology,
+                Map.of("storage.dry_bulk", 100d),
+                Map.of("commodity.feedstock.water_ice", 100d));
+        RefiningCapability volatileProcessor = capability(Set.of("capability.process.volatile_processing"),
+                1_000_000d, 10d, 2d);
+        IntervalBudget budget = volatileProcessor.openInterval(10d);
+        RefiningResult storageResult = runtime.refine(
+                "refining.water_purification", 10d, noLiquidOutputSpace, budget);
+        assertEquals(Status.STORAGE_FULL, storageResult.status());
+        assertEquals(100d, noLiquidOutputSpace.massKg("commodity.feedstock.water_ice"), TOLERANCE);
+        assertEquals(10_000_000d, budget.remainingEnergyJ(), TOLERANCE);
+    }
+
+    @Test
+    void consumingInputCanFreeCapacityInTheSameStorageClass() {
+        PhysicalMaterialStore store = new PhysicalMaterialStore(
                 ontology,
                 Map.of("storage.dry_bulk", 100d),
                 Map.of("commodity.feedstock.metallic_ore", 100d));
-        RefiningCapability proper = capability(Set.of("capability.process.bulk_refining"),
+        RefiningCapability capability = capability(Set.of("capability.process.bulk_refining"),
                 20_000_000d, 10d, 2d);
-        RefiningResult storageResult = runtime.refine(
-                "refining.structural_alloy", 10d, noDryBulkOutputSpace, proper.openInterval(10d));
-        // Consuming 10 kg frees the same dry-bulk class, and the 6.8 kg output fits.
-        assertEquals(Status.REFINED, storageResult.status());
-        assertEquals(96.8d,
-                noDryBulkOutputSpace.massKg("commodity.feedstock.metallic_ore")
-                        + noDryBulkOutputSpace.massKg("commodity.material.structural_alloy"), TOLERANCE);
+
+        RefiningResult result = runtime.refine(
+                "refining.structural_alloy", 10d, store, capability.openInterval(10d));
+
+        assertEquals(Status.REFINED, result.status());
+        assertEquals(90d, store.massKg("commodity.feedstock.metallic_ore"), TOLERANCE);
+        assertEquals(6.8d, store.massKg("commodity.material.structural_alloy"), TOLERANCE);
     }
 
     private PhysicalMaterialStore store(Map<String, Double> masses) {
