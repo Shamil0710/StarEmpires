@@ -25,11 +25,12 @@ if not exist "%PROJECT_DIR%mvnw.cmd" (
     goto :failure
 )
 
-echo [1/2] Building the project and running tests...
-call "%PROJECT_DIR%mvnw.cmd" --batch-mode --no-transfer-progress clean package
+echo [1/2] Building the desktop application...
+echo Unit/integration tests are intentionally skipped for interactive launch; CI remains authoritative.
+call "%PROJECT_DIR%mvnw.cmd" --batch-mode --no-transfer-progress -DskipTests clean package
 if errorlevel 1 (
     echo.
-    echo [ERROR] The build or tests failed.
+    echo [ERROR] The application build failed.
     goto :failure
 )
 
