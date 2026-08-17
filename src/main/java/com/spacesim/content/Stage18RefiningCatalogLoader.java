@@ -20,7 +20,9 @@ import java.util.regex.Pattern;
 
 /** Loads and strictly validates the versioned Stage-18C refining recipe catalog. */
 public final class Stage18RefiningCatalogLoader {
+    /** Current supported Stage-18C refining schema version. */
     public static final int CURRENT_SCHEMA_VERSION = 1;
+    /** Default production Stage-18C refining recipe resource. */
     public static final String DEFAULT_RESOURCE = "data/content/stage18-refining-v1.json";
 
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+");
@@ -41,6 +43,11 @@ public final class Stage18RefiningCatalogLoader {
         throw new AssertionError("No instances");
     }
 
+    /**
+     * Loads the production Stage-18C refining catalog against the production resource ontology.
+     *
+     * @return immutable validated production refining catalog
+     */
     public static Stage18RefiningCatalog loadDefault() {
         Stage18ResourceOntologyCatalog ontology = Stage18ResourceOntologyLoader.loadDefault();
         ClassLoader classLoader = Stage18RefiningCatalogLoader.class.getClassLoader();
@@ -57,6 +64,13 @@ public final class Stage18RefiningCatalogLoader {
         }
     }
 
+    /**
+     * Parses a refining document and validates all commodity and capability references.
+     *
+     * @param json non-empty refining JSON document
+     * @param ontology Stage-18 resource ontology referenced by the document
+     * @return immutable validated refining catalog
+     */
     public static Stage18RefiningCatalog parse(String json, Stage18ResourceOntologyCatalog ontology) {
         Objects.requireNonNull(json, "json");
         Stage18ResourceOntologyCatalog checkedOntology = Objects.requireNonNull(ontology, "ontology");
