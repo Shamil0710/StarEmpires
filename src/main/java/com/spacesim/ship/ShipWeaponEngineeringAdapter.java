@@ -96,8 +96,12 @@ public final class ShipWeaponEngineeringAdapter {
             }
             LauncherProfile profile = checkedLaunchers.findByModuleId(capability.moduleId());
             if (profile == null) {
+                if (isBeamCapability(capability.parameters())) {
+                    continue;
+                }
                 throw new IllegalArgumentException(
-                        "Installed weapon module lacks Stage-17.5E launcher profile: " + capability.moduleId());
+                        "Installed non-beam weapon module lacks Stage-17.5E launcher profile: "
+                                + capability.moduleId());
             }
             if (profile.family() != Family.KINETIC) {
                 continue;
@@ -144,6 +148,12 @@ public final class ShipWeaponEngineeringAdapter {
         }
         result.sort(Comparator.comparing(FittedKineticMount::mountId).thenComparing(FittedKineticMount::moduleId));
         return List.copyOf(result);
+    }
+
+    private static boolean isBeamCapability(Map<String, Double> parameters) {
+        return parameters.containsKey("beam_power_w")
+                && parameters.containsKey("beam_aperture_m")
+                && parameters.containsKey("wavelength_m");
     }
 
     private static double runtimeIntegrity(Map<String, Double> parameters) {
