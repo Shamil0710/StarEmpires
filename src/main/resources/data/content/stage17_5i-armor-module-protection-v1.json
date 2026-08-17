@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "moduleId": "module.ct_armor_heavy_v1",
+      "externalProtectionStackId": "protection.ct_light_v1"
+    }
+  ]
+}
