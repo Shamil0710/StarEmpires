@@ -3,10 +3,16 @@ package com.spacesim.persistence;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
+import com.spacesim.ship.ShieldFieldRuntime;
+import com.spacesim.ship.ShipDamageRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
 import com.spacesim.ship.ShipEngineeringState.ConsumableState;
+import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
+import com.spacesim.ship.ShipInstanceRuntimeState;
+import com.spacesim.ship.ShipyardEngineeringService.MaintenanceState;
+import com.spacesim.ship.WeaponLoadoutState;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +32,8 @@ final class EngineeringStatePersistenceMapper {
         }
         InstalledFit fit = Objects.requireNonNull(component.fit, "EngineeringComponent.fit");
         RuntimeState runtime = Objects.requireNonNull(component.runtimeState, "EngineeringComponent.runtimeState");
+        ShipInstanceRuntimeState instance = Objects.requireNonNull(
+                component.instanceState, "EngineeringComponent.instanceState");
         List<EntityState.InstalledModuleState> modules = fit.installedModules().stream()
                 .map(value -> new EntityState.InstalledModuleState(value.mountId(), value.moduleId()))
                 .toList();
@@ -35,6 +43,24 @@ final class EngineeringStatePersistenceMapper {
                         value.mountId(), value.interfaceId(), value.kind().name(),
                         value.amount(), value.massKg(), value.itemCount()))
                 .toList();
+        List<EntityState.ShieldRuntimeState> shields = instance.shieldStatesByMount().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> new EntityState.ShieldRuntimeState(
+                        entry.getKey(), entry.getValue().reserveJ(), entry.getValue().accumulatedHeatJ(),
+                        entry.getValue().collapsed(), entry.getValue().restartRemainingSeconds(),
+                        entry.getValue().emitterIntegrity()))
+                .toList();
+        List<EntityState.WeaponFeedState> feeds = instance.weaponLoadout().feeds().stream()
+                .map(value -> new EntityState.WeaponFeedState(
+                        value.mountId(), value.interfaceId(), value.ammunitionContentId()))
+                .toList();
+        EntityState.ShipInstanceState instanceState = new EntityState.ShipInstanceState(
+                captureMap(instance.damage().compartmentIntegrityById()),
+                captureMap(instance.damage().moduleDamage().moduleIntegrityByMount()),
+                shields,
+                captureMap(instance.maintenance().secondsSinceServiceByMount()),
+                feeds,
+                captureMap(instance.weaponMountRuntime().cooldownSecondsByMount()));
         return new EntityState.EngineeringState(
                 fit.hullId(),
                 List.copyOf(modules),
@@ -49,7 +75,8 @@ final class EngineeringStatePersistenceMapper {
                 captureMap(runtime.localHeatJByMount()),
                 captureMap(runtime.thrustLimitNByMount()),
                 runtime.coolantBusCapacityW(),
-                captureMap(runtime.ftlCooldownSecondsByMount()));
+                captureMap(runtime.ftlCooldownSecondsByMount()),
+                instanceState);
     }
 
     static EngineeringComponent restore(EntityState.EngineeringState state) {
@@ -95,7 +122,38 @@ final class EngineeringStatePersistenceMapper {
                 restoreMap(checked.thrustLimitNByMount(), "thrustLimitNByMount"),
                 checked.coolantBusCapacityW(),
                 restoreMap(checked.ftlCooldownSecondsByMount(), "ftlCooldownSecondsByMount"));
-        return new EngineeringComponent(fit, runtime);
+        ShipInstanceRuntimeState instance = restoreInstance(checked.instanceState());
+        return new EngineeringComponent(fit, runtime, instance);
+    }
+
+    private static ShipInstanceRuntimeState restoreInstance(EntityState.ShipInstanceState state) {
+        if (state == null) {
+            return ShipInstanceRuntimeState.legacyNeutral();
+        }
+        Map<String, Double> compartments = restoreMap(state.compartmentIntegrityById(), "compartmentIntegrityById");
+        Map<String, Double> modules = restoreMap(state.moduleIntegrityByMount(), "moduleIntegrityByMount");
+        TreeMap<String, ShieldFieldRuntime.State> shields = new TreeMap<>();
+        for (EntityState.ShieldRuntimeState row : requireList(state.shieldsByMount(), "shieldsByMount")) {
+            String mountId = requireNonBlank(row.mountId(), "shield mountId");
+            if (shields.putIfAbsent(mountId, new ShieldFieldRuntime.State(
+                    row.reserveJ(), row.accumulatedHeatJ(), row.collapsed(),
+                    row.restartRemainingSeconds(), row.emitterIntegrity())) != null) {
+                throw new IllegalArgumentException("Duplicate shield mount: " + mountId);
+            }
+        }
+        List<WeaponLoadoutState.FeedBinding> feeds = requireList(state.weaponFeeds(), "weaponFeeds").stream()
+                .map(row -> new WeaponLoadoutState.FeedBinding(
+                        requireNonBlank(row.mountId(), "weapon feed mountId"),
+                        requireNonBlank(row.interfaceId(), "weapon feed interfaceId"),
+                        requireNonBlank(row.ammunitionContentId(), "weapon feed ammunitionContentId")))
+                .toList();
+        return new ShipInstanceRuntimeState(
+                new ShipDamageRuntime.Snapshot(compartments, new DamageState(modules)),
+                shields,
+                new MaintenanceState(restoreMap(state.serviceAgeByMount(), "serviceAgeByMount")),
+                new WeaponLoadoutState(feeds),
+                new com.spacesim.ship.WeaponMountRuntime.RuntimeState(
+                        restoreMap(state.weaponCooldownByMount(), "weaponCooldownByMount")));
     }
 
     private static List<EntityState.MountDoubleState> captureMap(Map<String, Double> source) {
@@ -108,9 +166,9 @@ final class EngineeringStatePersistenceMapper {
     private static Map<String, Double> restoreMap(List<EntityState.MountDoubleState> rows, String label) {
         TreeMap<String, Double> result = new TreeMap<>();
         for (EntityState.MountDoubleState row : requireList(rows, label)) {
-            String mountId = requireNonBlank(row.mountId(), label + " mountId");
+            String mountId = requireNonBlank(row.mountId(), label + " key");
             if (result.putIfAbsent(mountId, row.value()) != null) {
-                throw new IllegalArgumentException("Duplicate " + label + " mount: " + mountId);
+                throw new IllegalArgumentException("Duplicate " + label + " key: " + mountId);
             }
         }
         return result;
