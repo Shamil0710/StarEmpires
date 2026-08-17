@@ -29,7 +29,7 @@ class HeavyImpactResidualCalibrationTest {
                 1d,
                 0d,
                 0d,
-                1500d,
+                1100d,
                 0d);
 
         OutsideCalibrationDomainException failure = assertThrows(

@@ -31,8 +31,8 @@ class KineticProtectionRuntimeTest {
 
         assertNotNull(result.shieldInteraction());
         assertTrue(result.shieldInteraction().absorbedEnergyJ() > 0d);
-        assertNotNull(result.residualProjectile());
-        assertTrue(result.residualProjectile().kineticEnergyJ() < projectile(1L).kineticEnergyJ());
+        assertNotNull(result.armorEntryProjectile());
+        assertTrue(result.armorEntryProjectile().kineticEnergyJ() < projectile(1L).kineticEnergyJ());
         assertTrue(result.armorReached());
         assertNotNull(result.armorImpact());
         assertTrue(result.internalDamageOccurred());
@@ -56,8 +56,9 @@ class KineticProtectionRuntimeTest {
         assertTrue(result.shieldInteraction().absorbedEnergyJ() > 0d);
         assertFalse(result.armorReached());
         assertFalse(result.internalDamageOccurred());
-        assertNull(result.residualProjectile());
+        assertNull(result.armorEntryProjectile());
         assertNull(result.armorImpact());
+        assertNull(result.postProtectionProjectile());
         assertNull(result.damageEvent());
     }
 
