@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "heavyImpactModels": [
+    {
+      "responseSurfaceId": "response.ct_heavy_v1",
+      "specificAbsorptionJPerKg": 2400000.0,
+      "spallMassFraction": 0.08,
+      "spallEnergyFraction": 0.12,
+      "ricochetCriticalAngleRad": 1.2217304763960306,
+      "ricochetRetainedEnergyFraction": 0.65
+    }
+  ],
+  "hullDamageLayouts": [
+    {
+      "hullId": "hull.ct_corvette_v1",
+      "compartments": [
+        {"compartmentId": "engineering", "structuralDamageCapacityJ": 45000000000.0, "subsystemCouplingFraction": 0.60},
+        {"compartmentId": "mission", "structuralDamageCapacityJ": 38000000000.0, "subsystemCouplingFraction": 0.50},
+        {"compartmentId": "weapons", "structuralDamageCapacityJ": 32000000000.0, "subsystemCouplingFraction": 0.70}
+      ],
+      "mounts": [
+        {"mountId": "core_reactor", "compartmentId": "engineering", "subsystemDamageCapacityJ": 18000000000.0},
+        {"mountId": "core_drive", "compartmentId": "engineering", "subsystemDamageCapacityJ": 16000000000.0},
+        {"mountId": "core_storage", "compartmentId": "engineering", "subsystemDamageCapacityJ": 12000000000.0},
+        {"mountId": "utility_thermal", "compartmentId": "engineering", "subsystemDamageCapacityJ": 10000000000.0},
+        {"mountId": "utility_sensor", "compartmentId": "mission", "subsystemDamageCapacityJ": 7000000000.0},
+        {"mountId": "utility_support", "compartmentId": "mission", "subsystemDamageCapacityJ": 8000000000.0},
+        {"mountId": "internal_crew", "compartmentId": "mission", "subsystemDamageCapacityJ": 10000000000.0},
+        {"mountId": "internal_ftl", "compartmentId": "mission", "subsystemDamageCapacityJ": 12000000000.0},
+        {"mountId": "weapon_primary_a", "compartmentId": "weapons", "subsystemDamageCapacityJ": 11000000000.0},
+        {"mountId": "weapon_defense_a", "compartmentId": "weapons", "subsystemDamageCapacityJ": 5000000000.0}
+      ]
+    },
+    {
+      "hullId": "hull.ct_frigate_v1",
+      "compartments": [
+        {"compartmentId": "engineering", "structuralDamageCapacityJ": 90000000000.0, "subsystemCouplingFraction": 0.60},
+        {"compartmentId": "mission", "structuralDamageCapacityJ": 76000000000.0, "subsystemCouplingFraction": 0.50},
+        {"compartmentId": "weapons", "structuralDamageCapacityJ": 68000000000.0, "subsystemCouplingFraction": 0.70}
+      ],
+      "mounts": [
+        {"mountId": "core_reactor", "compartmentId": "engineering", "subsystemDamageCapacityJ": 36000000000.0},
+        {"mountId": "core_drive", "compartmentId": "engineering", "subsystemDamageCapacityJ": 32000000000.0},
+        {"mountId": "core_storage", "compartmentId": "engineering", "subsystemDamageCapacityJ": 24000000000.0},
+        {"mountId": "utility_thermal", "compartmentId": "engineering", "subsystemDamageCapacityJ": 22000000000.0},
+        {"mountId": "utility_sensor", "compartmentId": "mission", "subsystemDamageCapacityJ": 14000000000.0},
+        {"mountId": "utility_support", "compartmentId": "mission", "subsystemDamageCapacityJ": 16000000000.0},
+        {"mountId": "internal_crew", "compartmentId": "mission", "subsystemDamageCapacityJ": 20000000000.0},
+        {"mountId": "internal_ftl", "compartmentId": "mission", "subsystemDamageCapacityJ": 24000000000.0},
+        {"mountId": "weapon_primary_a", "compartmentId": "weapons", "subsystemDamageCapacityJ": 22000000000.0},
+        {"mountId": "weapon_primary_b", "compartmentId": "weapons", "subsystemDamageCapacityJ": 22000000000.0},
+        {"mountId": "weapon_defense_a", "compartmentId": "weapons", "subsystemDamageCapacityJ": 9000000000.0},
+        {"mountId": "weapon_defense_b", "compartmentId": "weapons", "subsystemDamageCapacityJ": 9000000000.0}
+      ]
+    },
+    {
+      "hullId": "hull.ct_destroyer_v1",
+      "compartments": [
+        {"compartmentId": "engineering", "structuralDamageCapacityJ": 180000000000.0, "subsystemCouplingFraction": 0.58},
+        {"compartmentId": "mission", "structuralDamageCapacityJ": 150000000000.0, "subsystemCouplingFraction": 0.48},
+        {"compartmentId": "weapons", "structuralDamageCapacityJ": 135000000000.0, "subsystemCouplingFraction": 0.68}
+      ],
+      "mounts": [
+        {"mountId": "core_reactor", "compartmentId": "engineering", "subsystemDamageCapacityJ": 72000000000.0},
+        {"mountId": "core_drive", "compartmentId": "engineering", "subsystemDamageCapacityJ": 64000000000.0},
+        {"mountId": "core_storage", "compartmentId": "engineering", "subsystemDamageCapacityJ": 48000000000.0},
+        {"mountId": "utility_thermal", "compartmentId": "engineering", "subsystemDamageCapacityJ": 44000000000.0},
+        {"mountId": "utility_sensor", "compartmentId": "mission", "subsystemDamageCapacityJ": 28000000000.0},
+        {"mountId": "utility_support", "compartmentId": "mission", "subsystemDamageCapacityJ": 32000000000.0},
+        {"mountId": "internal_crew", "compartmentId": "mission", "subsystemDamageCapacityJ": 40000000000.0},
+        {"mountId": "internal_ftl", "compartmentId": "mission", "subsystemDamageCapacityJ": 48000000000.0},
+        {"mountId": "weapon_primary_a", "compartmentId": "weapons", "subsystemDamageCapacityJ": 45000000000.0},
+        {"mountId": "weapon_primary_b", "compartmentId": "weapons", "subsystemDamageCapacityJ": 45000000000.0},
+        {"mountId": "weapon_defense_a", "compartmentId": "weapons", "subsystemDamageCapacityJ": 18000000000.0},
+        {"mountId": "weapon_defense_b", "compartmentId": "weapons", "subsystemDamageCapacityJ": 18000000000.0}
+      ]
+    },
+    {
+      "hullId": "hull.ct_cruiser_v1",
+      "compartments": [
+        {"compartmentId": "engineering", "structuralDamageCapacityJ": 360000000000.0, "subsystemCouplingFraction": 0.55},
+        {"compartmentId": "mission", "structuralDamageCapacityJ": 300000000000.0, "subsystemCouplingFraction": 0.45},
+        {"compartmentId": "weapons", "structuralDamageCapacityJ": 270000000000.0, "subsystemCouplingFraction": 0.65}
+      ],
+      "mounts": [
+        {"mountId": "core_reactor", "compartmentId": "engineering", "subsystemDamageCapacityJ": 145000000000.0},
+        {"mountId": "core_drive", "compartmentId": "engineering", "subsystemDamageCapacityJ": 130000000000.0},
+        {"mountId": "core_storage", "compartmentId": "engineering", "subsystemDamageCapacityJ": 96000000000.0},
+        {"mountId": "utility_thermal", "compartmentId": "engineering", "subsystemDamageCapacityJ": 88000000000.0},
+        {"mountId": "utility_sensor", "compartmentId": "mission", "subsystemDamageCapacityJ": 56000000000.0},
+        {"mountId": "utility_support", "compartmentId": "mission", "subsystemDamageCapacityJ": 64000000000.0},
+        {"mountId": "internal_crew", "compartmentId": "mission", "subsystemDamageCapacityJ": 80000000000.0},
+        {"mountId": "internal_ftl", "compartmentId": "mission", "subsystemDamageCapacityJ": 96000000000.0},
+        {"mountId": "weapon_primary_a", "compartmentId": "weapons", "subsystemDamageCapacityJ": 90000000000.0},
+        {"mountId": "weapon_primary_b", "compartmentId": "weapons", "subsystemDamageCapacityJ": 90000000000.0},
+        {"mountId": "weapon_defense_a", "compartmentId": "weapons", "subsystemDamageCapacityJ": 36000000000.0},
+        {"mountId": "weapon_defense_b", "compartmentId": "weapons", "subsystemDamageCapacityJ": 36000000000.0}
+      ]
+    },
+    {
+      "hullId": "hull.ct_bulk_freighter_v1",
+      "compartments": [
+        {"compartmentId": "engineering", "structuralDamageCapacityJ": 220000000000.0, "subsystemCouplingFraction": 0.55},
+        {"compartmentId": "habitation", "structuralDamageCapacityJ": 160000000000.0, "subsystemCouplingFraction": 0.42},
+        {"compartmentId": "cargo", "structuralDamageCapacityJ": 260000000000.0, "subsystemCouplingFraction": 0.25}
+      ],
+      "mounts": [
+        {"mountId": "core_reactor", "compartmentId": "engineering", "subsystemDamageCapacityJ": 90000000000.0},
+        {"mountId": "core_drive", "compartmentId": "engineering", "subsystemDamageCapacityJ": 80000000000.0},
+        {"mountId": "utility_thermal", "compartmentId": "engineering", "subsystemDamageCapacityJ": 60000000000.0},
+        {"mountId": "utility_sensor", "compartmentId": "habitation", "subsystemDamageCapacityJ": 32000000000.0},
+        {"mountId": "internal_crew", "compartmentId": "habitation", "subsystemDamageCapacityJ": 48000000000.0},
+        {"mountId": "internal_ftl", "compartmentId": "habitation", "subsystemDamageCapacityJ": 60000000000.0},
+        {"mountId": "mission_cargo", "compartmentId": "cargo", "subsystemDamageCapacityJ": 140000000000.0},
+        {"mountId": "weapon_defense_a", "compartmentId": "habitation", "subsystemDamageCapacityJ": 20000000000.0}
+      ]
+    },
+    {
+      "hullId": "hull.ct_tanker_v1",
+      "compartments": [
+        {"compartmentId": "engineering", "structuralDamageCapacityJ": 240000000000.0, "subsystemCouplingFraction": 0.55},
+        {"compartmentId": "habitation", "structuralDamageCapacityJ": 170000000000.0, "subsystemCouplingFraction": 0.42},
+        {"compartmentId": "tankage", "structuralDamageCapacityJ": 280000000000.0, "subsystemCouplingFraction": 0.30}
+      ],
+      "mounts": [
+        {"mountId": "core_reactor", "compartmentId": "engineering", "subsystemDamageCapacityJ": 95000000000.0},
+        {"mountId": "core_drive", "compartmentId": "engineering", "subsystemDamageCapacityJ": 85000000000.0},
+        {"mountId": "utility_thermal", "compartmentId": "engineering", "subsystemDamageCapacityJ": 65000000000.0},
+        {"mountId": "utility_sensor", "compartmentId": "habitation", "subsystemDamageCapacityJ": 34000000000.0},
+        {"mountId": "internal_crew", "compartmentId": "habitation", "subsystemDamageCapacityJ": 50000000000.0},
+        {"mountId": "internal_ftl", "compartmentId": "habitation", "subsystemDamageCapacityJ": 65000000000.0},
+        {"mountId": "mission_tank", "compartmentId": "tankage", "subsystemDamageCapacityJ": 150000000000.0},
+        {"mountId": "weapon_defense_a", "compartmentId": "habitation", "subsystemDamageCapacityJ": 20000000000.0}
+      ]
+    }
+  ]
+}
