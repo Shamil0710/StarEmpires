@@ -87,11 +87,11 @@ class Stage175IDoctrineContentPackTest {
         double kineticAperture = sensorAdapter.derive(kinetic).sensors().get(0).definition().apertureAreaM2();
         double missileAperture = sensorAdapter.derive(missile).sensors().get(0).definition().apertureAreaM2();
         assertTrue(missileAperture > kineticAperture);
-        assertTrue(sensorAdapter.derive(defensive).staticSignature().jammerPowerW() > 0d);
+        assertTrue(sensorAdapter.derive(defensive).staticSignature().jammerEmissionPowerW() > 0d);
 
         ShipShieldEngineeringAdapter shieldAdapter = new ShipShieldEngineeringAdapter();
-        double kineticReserve = shieldAdapter.derive(kinetic).get(0).definition().fieldReserveJ();
-        double defensiveReserve = shieldAdapter.derive(defensive).get(0).definition().fieldReserveJ();
+        double kineticReserve = shieldAdapter.derive(kinetic).get(0).definition().reserveCapacityJ();
+        double defensiveReserve = shieldAdapter.derive(defensive).get(0).definition().reserveCapacityJ();
         assertTrue(defensiveReserve > kineticReserve);
     }
 
