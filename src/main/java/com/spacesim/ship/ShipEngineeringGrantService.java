@@ -176,7 +176,15 @@ public final class ShipEngineeringGrantService {
             double storageDrawJ,
             double generatedHeatJ,
             boolean committed) {
-        /** Validates one grant result. */
+        /**
+         * Validates one grant result.
+         *
+         * @param grant grant consumable by a fitted capability service
+         * @param state resulting physical operating state
+         * @param storageDrawJ electrical energy removed from shared storage
+         * @param generatedHeatJ heat committed to the physical mount
+         * @param committed whether state and grant were physically committed
+         */
         public GrantResult {
             Objects.requireNonNull(grant, "grant");
             Objects.requireNonNull(state, "state");
