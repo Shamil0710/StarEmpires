@@ -41,11 +41,14 @@ class Stage175IKineticImpactAcceptanceTest {
                         attacker.engineering().instanceState.weaponLoadout())
                 .get(0);
         long ammunitionBefore = attacker.engineering().runtimeState.consumables().ammunitionCount();
-        var remaining = new AmmunitionRuntime().consumeOne(
-                attacker.engineering().runtimeState.consumables(), mount.launcher(), mount.round());
+        var consumed = new AmmunitionRuntime().consumeOne(
+                attacker.engineering().runtimeState.consumables(),
+                mount.mountId(),
+                mount.launcher(),
+                mount.round().massKg());
         RuntimeState current = attacker.engineering().runtimeState;
         attacker.engineering().setRuntimeState(new RuntimeState(
-                remaining,
+                consumed.consumables(),
                 current.sharedBusEnergyJ(),
                 current.shipHeatStoredJ(),
                 current.localHeatJByMount(),
