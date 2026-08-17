@@ -379,7 +379,7 @@ Canonical generation contracts:
 - `docs/inter_system_navigation_contract.md`;
 - `docs/physical_trade_route_scoring_contract.md`;
 - `docs/galaxy_topology_resource_geography_generation_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for non-linear topology, resource geography, economic dependency and world-generation quality gates;
-- `docs/spatial_scale_and_unbounded_system_space_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for capability-calibrated local geometry, station scale, unbounded local space, numerical precision и LOD/world-boundary separation.
+- `docs/spatial_scale_and_unbounded_system_space_contract.md` — **ACCEPTED CROSS-STAGE INVARIANT** for capability-calibrated local geometry, station scale, unbounded local space, numerical precision and LOD/world-boundary separation.
 
 Must honor:
 
