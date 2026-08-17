@@ -3,12 +3,15 @@ package com.spacesim.ship;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.Dimensions3d;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinition;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.content.ship.ShipyardIndustrialCatalog;
 import com.spacesim.content.ship.ShipyardIndustrialCatalogLoader;
 import com.spacesim.persistence.EntityId;
+import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
 import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.ShipEngineeringState.DamageState;
+import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipyardEngineeringService.FeasibilityCode;
 import com.spacesim.ship.ShipyardEngineeringService.MaintenanceState;
@@ -111,10 +114,7 @@ class ShipyardEngineeringServiceTest {
     void refitChangesSameAssetReturnsRemovedModuleAndDoesNotTransferItsDamageToReplacementState() {
         Fixture fixture = fixture();
         EntityId asset = new EntityId(88L);
-        List<InstalledModuleDefinition> withoutSensor = fixture.fit.installedModules().stream()
-                .filter(value -> !value.mountId().equals("utility_sensor"))
-                .toList();
-        InstalledFit target = new InstalledFit(fixture.fit.hullId(), withoutSensor);
+        InstalledFit target = withoutMount(fixture.fit, "utility_sensor");
         ShipDamageRuntime.Snapshot damaged = damagedSnapshot(
                 Map.of("utility_sensor", 0.4d, "core_drive", 0.6d), 1d);
 
@@ -134,6 +134,46 @@ class ShipyardEngineeringServiceTest {
         assertFalse(completion.damage().moduleDamage().moduleIntegrityByMount().containsKey("utility_sensor"));
         assertEquals(0.6d,
                 completion.damage().moduleDamage().moduleIntegrityByMount().get("core_drive"), 1e-12d);
+    }
+
+    @Test
+    void refitChangesPerformanceOnlyThroughTheCentralDerivedCalculator() {
+        Fixture fixture = fixture();
+        InstalledFit target = withoutMount(fixture.fit, "utility_sensor");
+        WorkPlan plan = fixture.service.planRefit(
+                new EntityId(880L), fixture.fit, target, ConsumableState.empty(),
+                damagedSnapshot(Map.of(), 1d), capableYard());
+        ShipyardEngineeringService.RefitCompletion completion = fixture.service.completeRefit(
+                plan, fullySettled(plan));
+
+        DerivedShipCalculator calculator = new DerivedShipCalculator(fixture.engineering);
+        ShipEngineeringCatalog.HullDefinition hull = fixture.engineering.findHull(fixture.fit.hullId());
+        DerivedShipState before = calculator.derive(
+                hull, fixture.fit, ConsumableState.empty(), DamageState.pristine());
+        DerivedShipState after = calculator.derive(
+                hull, completion.fit(), ConsumableState.empty(), completion.damage().moduleDamage());
+
+        assertTrue(after.totalMassKg() < before.totalMassKg());
+        assertTrue(after.continuousPowerDemandW() < before.continuousPowerDemandW());
+    }
+
+    @Test
+    void refitRejectsTargetUntilConsumablesBoundToRemovedHardwareAreUnloaded() {
+        Fixture fixture = fixture();
+        InstalledFit target = withoutMount(fixture.fit, "weapon_spinal");
+        ConsumableState loadedWeapon = new ConsumableState(
+                0d, 0d, 0d, 0d,
+                List.of(new ConsumableLoad(
+                        "weapon_spinal", "kinetic_magazine_feed", InterfaceKind.AMMUNITION,
+                        150d, 150d, 1L)));
+
+        WorkPlan plan = fixture.service.planRefit(
+                new EntityId(881L), fixture.fit, target, loadedWeapon,
+                damagedSnapshot(Map.of(), 1d), capableYard());
+
+        assertFalse(plan.feasibility().feasible());
+        assertTrue(plan.feasibility().issues().stream()
+                .anyMatch(value -> value.code() == FeasibilityCode.INVALID_TARGET_FIT));
     }
 
     @Test
@@ -159,12 +199,23 @@ class ShipyardEngineeringServiceTest {
         assertEquals(200_000d, completion.maintenance().secondsSinceServiceByMount().get("core_drive"), 0d);
     }
 
+    @Test
+    void identicalRequestsUseOneOwnershipNeutralPlanningBoundary() {
+        Fixture fixture = fixture();
+        WorkPlan first = fixture.service.planBuild(fixture.fit, capableYard());
+        WorkPlan second = fixture.service.planBuild(fixture.fit, capableYard());
+
+        assertEquals(first.requirements(), second.requirements());
+        assertEquals(first.feasibility(), second.feasibility());
+        assertEquals(first.targetFit(), second.targetFit());
+    }
+
     private static Fixture fixture() {
         ShipEngineeringCatalog engineering = ShipEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog industrial = ShipyardIndustrialCatalogLoader.loadDefault(engineering);
         InstalledFit fit = InstalledFit.fromDemonstrator(
                 engineering.findDemonstratorFit("fit.escort_destroyer_schema_v1"));
-        return new Fixture(new ShipyardEngineeringService(engineering, industrial), fit);
+        return new Fixture(engineering, new ShipyardEngineeringService(engineering, industrial), fit);
     }
 
     private static ShipyardCapability capableYard() {
@@ -198,6 +249,13 @@ class ShipyardEngineeringServiceTest {
         return new ShipDamageRuntime.Snapshot(compartments, new DamageState(moduleIntegrity));
     }
 
+    private static InstalledFit withoutMount(InstalledFit fit, String mountId) {
+        List<InstalledModuleDefinition> modules = fit.installedModules().stream()
+                .filter(value -> !value.mountId().equals(mountId))
+                .toList();
+        return new InstalledFit(fit.hullId(), modules);
+    }
+
     private static WorkSettlement fullySettled(WorkPlan plan) {
         Map<String, Double> inputs = new LinkedHashMap<>();
         for (ShipyardEngineeringService.IndustrialInputRequirement input : plan.requirements().inputs()) {
@@ -206,8 +264,12 @@ class ShipyardEngineeringServiceTest {
         return new WorkSettlement(inputs, plan.requirements().totalWorkSeconds());
     }
 
-    private record Fixture(ShipyardEngineeringService service, InstalledFit fit) {
+    private record Fixture(
+            ShipEngineeringCatalog engineering,
+            ShipyardEngineeringService service,
+            InstalledFit fit) {
         private Fixture {
+            assertNotNull(engineering);
             assertNotNull(service);
             assertNotNull(fit);
         }
