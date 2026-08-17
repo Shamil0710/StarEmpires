@@ -22,17 +22,12 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Stage-17.5C deterministic propulsion, reaction-mass, power, thermal and FTL runtime core.
+ * Deterministic propulsion, reaction-mass, power, thermal and FTL runtime core.
  *
- * <p>This class consumes the same Stage-17.5A catalog and Stage-17.5B fit/load state used by the
- * central derived calculator. It does not inspect doctrine class, player ownership or AI ownership.
- * Shared-bus electrical storage is provided only by {@link ModuleFamily#ENERGY_STORAGE}; local
- * energy buffers on sensors or weapons remain local and cannot silently power propulsion or FTL.</p>
- *
- * <p>The runtime keeps physical reaction mass in {@link ConsumableState}, accounts for drive mass
- * flow, models a bounded shared power bus with deterministic load shedding, transports module heat
- * through an explicit coolant-bus capacity into a ship thermal store/radiators, and exposes fitted
- * FTL requirements as a plan that later world integration can bind to the existing jump FSM.</p>
+ * <p>Stage 17.5H closes the former pristine-damage live seam: authoritative overloads accept the
+ * current {@link DamageState} and apply the same local module integrity used by
+ * {@link DerivedShipCalculator}. Legacy overloads remain for compatibility and explicitly delegate
+ * with pristine damage; production ship-instance code must use the damage-aware overloads.</p>
  */
 public final class ShipEngineeringRuntime {
     /** Capability key for drive thrust. */
@@ -65,15 +60,12 @@ public final class ShipEngineeringRuntime {
     public static final String FTL_JUMP_HEAT_J = "jump_heat_j";
 
     private static final double EPSILON = 1e-9;
+    private static final double MIN_OPERATIONAL_INTEGRITY = 1e-6d;
 
     private final ShipEngineeringCatalog catalog;
     private final DerivedShipCalculator calculator;
 
-    /**
-     * Creates one runtime over an immutable production engineering catalog.
-     *
-     * @param catalog production engineering catalog
-     */
+    /** Creates one runtime over an immutable production engineering catalog. */
     public ShipEngineeringRuntime(ShipEngineeringCatalog catalog) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.calculator = new DerivedShipCalculator(catalog);
@@ -108,14 +100,14 @@ public final class ShipEngineeringRuntime {
     }
 
     /**
-     * Persistent-ready operating state for one fitted ship instance.
+     * Persistent-ready propulsion/power/thermal/FTL state for one fitted ship instance.
      *
-     * @param consumables current physical cargo/stores/ammunition/reaction-mass state
-     * @param sharedBusEnergyJ current energy in modules of family ENERGY_STORAGE only
-     * @param shipHeatStoredJ current heat stored on the ship heat bus after radiator rejection
-     * @param localHeatJByMount current module-local thermal energy by mount
-     * @param thrustLimitNByMount current physical thrust ceiling by propulsion mount
-     * @param coolantBusCapacityW current total ship coolant-transfer capacity; damage may reduce it
+     * @param consumables physical cargo/stores/ammunition/reaction-mass state
+     * @param sharedBusEnergyJ current shared-bus electrical energy
+     * @param shipHeatStoredJ current heat stored on the ship heat bus
+     * @param localHeatJByMount module-local thermal energy by mount
+     * @param thrustLimitNByMount physical thrust ceilings by drive mount
+     * @param coolantBusCapacityW current physical coolant-transfer ceiling
      * @param ftlCooldownSecondsByMount remaining FTL cooldown by mount
      */
     public record RuntimeState(
@@ -126,17 +118,7 @@ public final class ShipEngineeringRuntime {
             Map<String, Double> thrustLimitNByMount,
             double coolantBusCapacityW,
             Map<String, Double> ftlCooldownSecondsByMount) {
-        /**
-         * Creates one immutable deterministic operating state.
-         *
-         * @param consumables current physical cargo/stores/ammunition/reaction-mass state
-         * @param sharedBusEnergyJ current shared-bus electrical energy
-         * @param shipHeatStoredJ current ship-bus heat energy
-         * @param localHeatJByMount module-local heat by mount
-         * @param thrustLimitNByMount physical thrust ceilings by drive mount
-         * @param coolantBusCapacityW current coolant-bus transfer capacity
-         * @param ftlCooldownSecondsByMount remaining FTL cooldown by mount
-         */
+        /** Validates and freezes one operating state. */
         public RuntimeState {
             Objects.requireNonNull(consumables, "consumables");
             requireNonNegativeFinite(sharedBusEnergyJ, "sharedBusEnergyJ");
@@ -149,27 +131,12 @@ public final class ShipEngineeringRuntime {
         }
     }
 
-    /**
-     * Shared operating command used equally by player and AI callers.
-     *
-     * <p>Power priority is operational policy, not a performance bonus. Larger numeric values are
-     * shed first when physical generation/storage cannot close the requested demand.</p>
-     *
-     * @param throttleByMount commanded propulsion throttle in [0,1]
-     * @param powerPriorityByMount deterministic load-shed priority; larger values shed first
-     * @param disabledMounts mounts explicitly commanded off
-     */
+    /** Shared operating command used equally by player and AI callers. */
     public record OperatingCommand(
             Map<String, Double> throttleByMount,
             Map<String, Integer> powerPriorityByMount,
             Set<String> disabledMounts) {
-        /**
-         * Creates one immutable deterministic operating command.
-         *
-         * @param throttleByMount commanded propulsion throttle in [0,1]
-         * @param powerPriorityByMount load-shed priorities
-         * @param disabledMounts explicitly disabled mounts
-         */
+        /** Validates and freezes one command. */
         public OperatingCommand {
             Objects.requireNonNull(throttleByMount, "throttleByMount");
             TreeMap<String, Double> throttles = new TreeMap<>();
@@ -210,23 +177,7 @@ public final class ShipEngineeringRuntime {
         }
     }
 
-    /**
-     * Result of one deterministic operating step.
-     *
-     * @param state new authoritative operating state
-     * @param derivedState central derived state recomputed after physical consumable depletion
-     * @param actualThrustN actual surviving propulsion thrust during the step
-     * @param massFlowKgPerS actual reaction-mass flow during the step
-     * @param powerSupplyW surviving continuous supply
-     * @param powerDemandW surviving electrical demand
-     * @param storageDischargeW shared storage discharge used during the step
-     * @param powerStatus resulting power condition
-     * @param generatedHeatW total module heat generated during the step
-     * @param coolantTransferW heat transferred from module-local loops into the ship bus
-     * @param radiatorRejectionW heat rejected from the ship bus to space
-     * @param thermalStatus resulting thermal condition
-     * @param shedMounts deterministic list of power-shed mounts
-     */
+    /** Result of one deterministic operating step. */
     public record TickResult(
             RuntimeState state,
             DerivedShipState derivedState,
@@ -241,23 +192,7 @@ public final class ShipEngineeringRuntime {
             double radiatorRejectionW,
             ThermalStatus thermalStatus,
             List<String> shedMounts) {
-        /**
-         * Creates one immutable tick result.
-         *
-         * @param state new operating state
-         * @param derivedState recomputed central derived state
-         * @param actualThrustN actual thrust
-         * @param massFlowKgPerS actual mass flow
-         * @param powerSupplyW surviving supply
-         * @param powerDemandW surviving demand
-         * @param storageDischargeW shared-storage discharge
-         * @param powerStatus power condition
-         * @param generatedHeatW generated heat
-         * @param coolantTransferW transferred heat
-         * @param radiatorRejectionW rejected heat
-         * @param thermalStatus thermal condition
-         * @param shedMounts shed mounts
-         */
+        /** Validates and freezes one tick result. */
         public TickResult {
             Objects.requireNonNull(state, "state");
             Objects.requireNonNull(derivedState, "derivedState");
@@ -271,31 +206,11 @@ public final class ShipEngineeringRuntime {
             requireNonNegativeFinite(coolantTransferW, "coolantTransferW");
             requireNonNegativeFinite(radiatorRejectionW, "radiatorRejectionW");
             Objects.requireNonNull(thermalStatus, "thermalStatus");
-            Objects.requireNonNull(shedMounts, "shedMounts");
-            shedMounts = List.copyOf(shedMounts);
+            shedMounts = List.copyOf(Objects.requireNonNull(shedMounts, "shedMounts"));
         }
     }
 
-    /**
-     * Fitted FTL execution plan for one ordinary topology edge.
-     *
-     * <p>The jump charge is a physical energy balance across the spool interval. Continuous reactor
-     * margin can supply part of the charge directly. Only the remaining energy may be drawn from
-     * shared {@link ModuleFamily#ENERGY_STORAGE}; local module buffers never enter this balance.</p>
-     *
-     * @param allowed whether the current physical state can execute the plan
-     * @param failure stable rejection reason, or NONE
-     * @param mountId selected fitted FTL mount, empty when unavailable
-     * @param translatedMassKg current ship mass translated by the jump
-     * @param requiredEnergyJ total physical energy required by the fitted jump hardware
-     * @param reactorEnergyContributionJ energy supplied by continuous reactor margin during spool
-     * @param storedEnergyDrawJ remaining energy drawn from shared ENERGY_STORAGE at commit
-     * @param chargePowerW average physical charging power required during the spool interval
-     * @param spoolSeconds fitted spool duration
-     * @param edgeTransitSeconds current fixture edge-transit duration
-     * @param cooldownSeconds fitted post-jump cooldown
-     * @param jumpHeatJ heat deposited into the FTL module-local thermal state
-     */
+    /** Deterministic FTL execution plan. */
     public record JumpPlan(
             boolean allowed,
             JumpFailure failure,
@@ -309,22 +224,7 @@ public final class ShipEngineeringRuntime {
             double edgeTransitSeconds,
             double cooldownSeconds,
             double jumpHeatJ) {
-        /**
-         * Creates one immutable FTL plan.
-         *
-         * @param allowed whether execution is allowed
-         * @param failure rejection reason
-         * @param mountId selected FTL mount
-         * @param translatedMassKg translated mass
-         * @param requiredEnergyJ total required jump energy
-         * @param reactorEnergyContributionJ reactor-supplied spool energy
-         * @param storedEnergyDrawJ shared-storage energy draw
-         * @param chargePowerW average required charge power
-         * @param spoolSeconds spool duration
-         * @param edgeTransitSeconds edge-transit duration
-         * @param cooldownSeconds cooldown duration
-         * @param jumpHeatJ local jump heat
-         */
+        /** Validates one plan. */
         public JumpPlan {
             Objects.requireNonNull(failure, "failure");
             mountId = mountId == null ? "" : mountId;
@@ -351,19 +251,25 @@ public final class ShipEngineeringRuntime {
     }
 
     /**
-     * Builds a fully charged healthy runtime state from a valid fit and physical load state.
-     *
-     * <p>Only ENERGY_STORAGE capacity is placed on the shared electrical bus. Local buffers from
-     * other module families remain unavailable to the bus by construction.</p>
-     *
-     * @param fit installed production fit
-     * @param consumables initial physical load state
-     * @return initialized runtime state
+     * Legacy pristine initialization path retained for compatibility.
+     * New authoritative materialization should call the damage-aware overload.
      */
     public RuntimeState initialize(InstalledFit fit, ConsumableState consumables) {
+        return initialize(fit, consumables, DamageState.pristine());
+    }
+
+    /**
+     * Builds an operating state against current local subsystem integrity.
+     *
+     * <p>Only physically surviving ENERGY_STORAGE/coolant/thrust capacity is initialized. This
+     * method is suitable for new assets or explicit reconstruction; loading an existing save must
+     * restore the persisted {@link RuntimeState} instead of calling initialize.</p>
+     */
+    public RuntimeState initialize(InstalledFit fit, ConsumableState consumables, DamageState damage) {
         InstalledFit checkedFit = Objects.requireNonNull(fit, "fit");
         ConsumableState checkedLoads = Objects.requireNonNull(consumables, "consumables");
-        derive(checkedFit, checkedLoads);
+        DamageState checkedDamage = Objects.requireNonNull(damage, "damage");
+        derive(checkedFit, checkedLoads, checkedDamage);
 
         double busEnergy = 0d;
         double coolantBus = 0d;
@@ -372,16 +278,18 @@ public final class ShipEngineeringRuntime {
         Map<String, Double> cooldowns = new TreeMap<>();
         for (InstalledModuleDefinition assignment : checkedFit.installedModules()) {
             ModuleDefinition module = requireModule(assignment.moduleId());
+            double integrity = integrity(checkedDamage, assignment.mountId());
             localHeat.put(assignment.mountId(), 0d);
             if (module.family() == ModuleFamily.ENERGY_STORAGE) {
-                busEnergy += module.storedEnergyCapacityJ();
+                busEnergy += module.storedEnergyCapacityJ() * integrity;
             }
             if (module.family() == ModuleFamily.THERMAL_CONTROL) {
-                coolantBus += optionalParameter(module, COOLANT_BUS_CAPACITY_W, 0d);
+                coolantBus += optionalParameter(module, COOLANT_BUS_CAPACITY_W, 0d) * integrity;
             }
             if (isDrive(module)) {
                 validateDriveCapability(module);
-                thrustLimits.put(assignment.mountId(), requiredPositiveParameter(module, THRUST_N));
+                thrustLimits.put(
+                        assignment.mountId(), requiredPositiveParameter(module, THRUST_N) * integrity);
             }
             if (module.family() == ModuleFamily.FTL_JUMP) {
                 cooldowns.put(assignment.mountId(), 0d);
@@ -391,48 +299,59 @@ public final class ShipEngineeringRuntime {
                 checkedLoads, busEnergy, 0d, localHeat, thrustLimits, coolantBus, cooldowns);
     }
 
-    /**
-     * Advances propulsion, reaction mass, power storage/shedding, heat transport and cooldowns.
-     *
-     * @param fit installed production fit
-     * @param state current authoritative operating state
-     * @param command shared player/AI operating command
-     * @param deltaSeconds positive simulation duration
-     * @return deterministic physical result and next state
-     */
+    /** Legacy pristine operating step retained for compatibility. */
     public TickResult advance(
             InstalledFit fit,
             RuntimeState state,
             OperatingCommand command,
             double deltaSeconds) {
+        return advance(fit, state, DamageState.pristine(), command, deltaSeconds);
+    }
+
+    /**
+     * Advances propulsion, reaction mass, power storage/shedding, thermal state and FTL cooldowns
+     * using the current local subsystem integrity.
+     */
+    public TickResult advance(
+            InstalledFit fit,
+            RuntimeState state,
+            DamageState damage,
+            OperatingCommand command,
+            double deltaSeconds) {
         InstalledFit checkedFit = Objects.requireNonNull(fit, "fit");
         RuntimeState checkedState = Objects.requireNonNull(state, "state");
+        DamageState checkedDamage = Objects.requireNonNull(damage, "damage");
         OperatingCommand checkedCommand = Objects.requireNonNull(command, "command");
         requirePositiveFinite(deltaSeconds, "deltaSeconds");
-        derive(checkedFit, checkedState.consumables());
+        derive(checkedFit, checkedState.consumables(), checkedDamage);
 
         List<Use> uses = new ArrayList<>();
         boolean thermallyLimitedAtStart = false;
         for (InstalledModuleDefinition assignment : checkedFit.installedModules()) {
             ModuleDefinition module = requireModule(assignment.moduleId());
+            double integrity = integrity(checkedDamage, assignment.mountId());
             double localHeat = checkedState.localHeatJByMount().getOrDefault(assignment.mountId(), 0d);
-            boolean overheated = module.localThermalCapacityJ() > 0d
-                    && localHeat >= module.localThermalCapacityJ() - EPSILON;
-            thermallyLimitedAtStart |= overheated;
-            boolean enabled = !checkedCommand.disabledMounts().contains(assignment.mountId()) && !overheated;
+            double damagedThermalCapacity = module.localThermalCapacityJ() * integrity;
+            boolean destroyed = integrity <= MIN_OPERATIONAL_INTEGRITY;
+            boolean overheated = damagedThermalCapacity > 0d
+                    && localHeat >= damagedThermalCapacity - EPSILON;
+            thermallyLimitedAtStart |= !destroyed && overheated;
+            boolean enabled = !destroyed
+                    && !checkedCommand.disabledMounts().contains(assignment.mountId())
+                    && !overheated;
             double fraction = enabled ? operatingFraction(
                     assignment.mountId(), module, checkedState, checkedCommand, deltaSeconds) : 0d;
+            fraction *= integrity;
             uses.add(new Use(assignment.mountId(), module, enabled, fraction));
         }
         uses.sort(Comparator.comparing(use -> use.mountId));
 
         PowerTotals totals = totals(uses);
-        double busCapacityJ = sharedBusEnergyCapacityJ(checkedFit);
-        double maxDischargeW = sharedBusDischargePowerW(checkedFit);
-        double maxChargeW = sharedBusChargePowerW(checkedFit);
-        double availableDischargeW = Math.min(
-                maxDischargeW,
-                checkedState.sharedBusEnergyJ() / deltaSeconds);
+        double busCapacityJ = sharedBusEnergyCapacityJ(checkedFit, checkedDamage);
+        double maxDischargeW = sharedBusDischargePowerW(checkedFit, checkedDamage);
+        double maxChargeW = sharedBusChargePowerW(checkedFit, checkedDamage);
+        double currentBusEnergyJ = Math.min(checkedState.sharedBusEnergyJ(), busCapacityJ);
+        double availableDischargeW = Math.min(maxDischargeW, currentBusEnergyJ / deltaSeconds);
 
         List<String> shedMounts = new ArrayList<>();
         if (totals.demandW > totals.supplyW + availableDischargeW + EPSILON) {
@@ -449,9 +368,7 @@ public final class ShipEngineeringRuntime {
                 use.fraction = 0d;
                 shedMounts.add(use.mountId);
                 totals = totals(uses);
-                availableDischargeW = Math.min(
-                        maxDischargeW,
-                        checkedState.sharedBusEnergyJ() / deltaSeconds);
+                availableDischargeW = Math.min(maxDischargeW, currentBusEnergyJ / deltaSeconds);
                 if (totals.demandW <= totals.supplyW + availableDischargeW + EPSILON) {
                     break;
                 }
@@ -462,8 +379,7 @@ public final class ShipEngineeringRuntime {
         double requiredDischargeW = Math.max(0d, totals.demandW - totals.supplyW);
         double storageDischargeW = Math.min(requiredDischargeW, availableDischargeW);
         boolean unresolvedBrownout = requiredDischargeW > storageDischargeW + EPSILON;
-        double busEnergyJ = checkedState.sharedBusEnergyJ() - storageDischargeW * deltaSeconds;
-        busEnergyJ = Math.max(0d, busEnergyJ);
+        double busEnergyJ = Math.max(0d, currentBusEnergyJ - storageDischargeW * deltaSeconds);
         if (!unresolvedBrownout && totals.supplyW > totals.demandW) {
             double chargeW = Math.min(totals.supplyW - totals.demandW, maxChargeW);
             chargeW = Math.min(chargeW, Math.max(0d, busCapacityJ - busEnergyJ) / deltaSeconds);
@@ -501,7 +417,8 @@ public final class ShipEngineeringRuntime {
         }
 
         Map<String, Double> localHeat = new TreeMap<>();
-        double remainingCoolantW = checkedState.coolantBusCapacityW();
+        double damageAwareCoolantBusW = coolantBusCapacityW(checkedFit, checkedDamage);
+        double remainingCoolantW = Math.min(checkedState.coolantBusCapacityW(), damageAwareCoolantBusW);
         double coolantTransferW = 0d;
         double generatedHeatW = 0d;
         for (Use use : uses) {
@@ -510,7 +427,7 @@ public final class ShipEngineeringRuntime {
             generatedHeatW += generatedW;
             double transportableW = generatedW + previousLocalJ / deltaSeconds;
             double transferW = Math.min(
-                    Math.min(use.module.coolantTransferDemandW(), transportableW),
+                    Math.min(use.module.coolantTransferDemandW() * use.integrityFraction(), transportableW),
                     remainingCoolantW);
             transferW = Math.max(0d, transferW);
             remainingCoolantW -= transferW;
@@ -523,14 +440,15 @@ public final class ShipEngineeringRuntime {
         double radiatorRejectionW = totals(uses).heatRejectionW;
         double rejectedJ = Math.min(shipHeatBeforeRejectJ, radiatorRejectionW * deltaSeconds);
         double shipHeatJ = Math.max(0d, shipHeatBeforeRejectJ - rejectedJ);
-        double shipHeatCapacityJ = shipThermalStoreCapacityJ(checkedFit);
+        double shipHeatCapacityJ = shipThermalStoreCapacityJ(checkedFit, checkedDamage);
 
         boolean saturated = shipHeatJ > EPSILON
                 && (shipHeatCapacityJ <= 0d || shipHeatJ > shipHeatCapacityJ + EPSILON);
-        double oldLocalTotal = checkedState.localHeatJByMount().values().stream().mapToDouble(Double::doubleValue).sum();
+        double oldLocalTotal = checkedState.localHeatJByMount().values().stream()
+                .mapToDouble(Double::doubleValue).sum();
         double newLocalTotal = localHeat.values().stream().mapToDouble(Double::doubleValue).sum();
         for (Use use : uses) {
-            double capacityJ = use.module.localThermalCapacityJ();
+            double capacityJ = use.module.localThermalCapacityJ() * use.integrityFraction();
             if (capacityJ > 0d && localHeat.getOrDefault(use.mountId, 0d) > capacityJ + EPSILON) {
                 saturated = true;
             }
@@ -558,9 +476,9 @@ public final class ShipEngineeringRuntime {
                 shipHeatJ,
                 localHeat,
                 checkedState.thrustLimitNByMount(),
-                checkedState.coolantBusCapacityW(),
+                Math.min(checkedState.coolantBusCapacityW(), damageAwareCoolantBusW),
                 cooldowns);
-        DerivedShipState derived = derive(checkedFit, consumables);
+        DerivedShipState derived = derive(checkedFit, consumables, checkedDamage);
         return new TickResult(
                 next,
                 derived,
@@ -577,23 +495,23 @@ public final class ShipEngineeringRuntime {
                 shedMounts);
     }
 
-    /**
-     * Plans FTL use from the fitted capability and current physical state.
-     *
-     * <p>The returned transit time is still a content fixture. Stage 20 later calibrates real edge
-     * geometry/time against the same fitted capability instead of replacing this interface.</p>
-     *
-     * @param fit installed production fit
-     * @param state current operating state
-     * @return deterministic FTL plan or stable rejection reason
-     */
+    /** Legacy pristine FTL planning path retained for compatibility. */
     public JumpPlan planJump(InstalledFit fit, RuntimeState state) {
+        return planJump(fit, state, DamageState.pristine());
+    }
+
+    /** Plans FTL use from the fitted capability, live state and current subsystem damage. */
+    public JumpPlan planJump(InstalledFit fit, RuntimeState state, DamageState damage) {
         InstalledFit checkedFit = Objects.requireNonNull(fit, "fit");
         RuntimeState checkedState = Objects.requireNonNull(state, "state");
-        DerivedShipState derived = derive(checkedFit, checkedState.consumables());
+        DamageState checkedDamage = Objects.requireNonNull(damage, "damage");
+        DerivedShipState derived = derive(checkedFit, checkedState.consumables(), checkedDamage);
         for (InstalledModuleDefinition assignment : checkedFit.installedModules()) {
             ModuleDefinition module = requireModule(assignment.moduleId());
             if (module.family() != ModuleFamily.FTL_JUMP) {
+                continue;
+            }
+            if (integrity(checkedDamage, assignment.mountId()) <= MIN_OPERATIONAL_INTEGRITY) {
                 continue;
             }
             FtlCapability capability;
@@ -617,17 +535,20 @@ public final class ShipEngineeringRuntime {
                     averageRequiredChargePowerW,
                     Math.max(0d, derived.continuousPowerMarginW()));
             double storagePowerW = Math.max(0d, averageRequiredChargePowerW - reactorPowerW);
-            if (storagePowerW > sharedBusDischargePowerW(checkedFit) + EPSILON) {
+            if (storagePowerW > sharedBusDischargePowerW(checkedFit, checkedDamage) + EPSILON) {
                 return rejected(JumpFailure.CHARGE_POWER_UNAVAILABLE, assignment.mountId(), derived.totalMassKg());
             }
             double reactorEnergyJ = reactorPowerW * capability.spoolTimeS;
             double storedEnergyDrawJ = Math.max(0d, capability.jumpEnergyJ - reactorEnergyJ);
-            if (checkedState.sharedBusEnergyJ() + EPSILON < storedEnergyDrawJ) {
+            double usableStoredEnergyJ = Math.min(
+                    checkedState.sharedBusEnergyJ(), sharedBusEnergyCapacityJ(checkedFit, checkedDamage));
+            if (usableStoredEnergyJ + EPSILON < storedEnergyDrawJ) {
                 return rejected(JumpFailure.STORED_ENERGY_UNAVAILABLE, assignment.mountId(), derived.totalMassKg());
             }
             double localHeatJ = checkedState.localHeatJByMount().getOrDefault(assignment.mountId(), 0d);
-            if (module.localThermalCapacityJ() > 0d
-                    && localHeatJ + capability.jumpHeatJ > module.localThermalCapacityJ() + EPSILON) {
+            double localCapacityJ = module.localThermalCapacityJ()
+                    * integrity(checkedDamage, assignment.mountId());
+            if (localCapacityJ > 0d && localHeatJ + capability.jumpHeatJ > localCapacityJ + EPSILON) {
                 return rejected(JumpFailure.THERMAL_LIMIT, assignment.mountId(), derived.totalMassKg());
             }
             return new JumpPlan(
@@ -647,16 +568,7 @@ public final class ShipEngineeringRuntime {
         return rejected(JumpFailure.NO_FTL_MODULE, "", derived.totalMassKg());
     }
 
-    /**
-     * Commits the physical stored-energy/heat/cooldown consequences of an already accepted jump plan.
-     *
-     * <p>The reactor contribution in the plan is supplied during spool and therefore is not removed
-     * from storage. Only {@link JumpPlan#storedEnergyDrawJ()} is subtracted from the shared bus.</p>
-     *
-     * @param state current operating state
-     * @param plan previously accepted plan
-     * @return next state after FTL charge commitment
-     */
+    /** Commits stored-energy, local-heat and cooldown consequences of an accepted jump plan. */
     public RuntimeState commitJump(RuntimeState state, JumpPlan plan) {
         RuntimeState checked = Objects.requireNonNull(state, "state");
         JumpPlan checkedPlan = Objects.requireNonNull(plan, "plan");
@@ -680,12 +592,20 @@ public final class ShipEngineeringRuntime {
                 cooldowns);
     }
 
-    private DerivedShipState derive(InstalledFit fit, ConsumableState consumables) {
+    /** Re-derives the common ship capability using the exact current damage state. */
+    public DerivedShipState derive(InstalledFit fit, RuntimeState state, DamageState damage) {
+        return derive(
+                Objects.requireNonNull(fit, "fit"),
+                Objects.requireNonNull(state, "state").consumables(),
+                Objects.requireNonNull(damage, "damage"));
+    }
+
+    private DerivedShipState derive(InstalledFit fit, ConsumableState consumables, DamageState damage) {
         ShipEngineeringCatalog.HullDefinition hull = catalog.findHull(fit.hullId());
         if (hull == null) {
             throw new IllegalArgumentException("unknown hull: " + fit.hullId());
         }
-        return calculator.derive(hull, fit, consumables, DamageState.pristine());
+        return calculator.derive(hull, fit, consumables, damage);
     }
 
     private double operatingFraction(
@@ -728,45 +648,60 @@ public final class ShipEngineeringRuntime {
         return new PowerTotals(supply, demand, heatRejection);
     }
 
-    private double sharedBusEnergyCapacityJ(InstalledFit fit) {
+    private double sharedBusEnergyCapacityJ(InstalledFit fit, DamageState damage) {
         double result = 0d;
         for (InstalledModuleDefinition assignment : fit.installedModules()) {
             ModuleDefinition module = requireModule(assignment.moduleId());
             if (module.family() == ModuleFamily.ENERGY_STORAGE) {
-                result += module.storedEnergyCapacityJ();
+                result += module.storedEnergyCapacityJ() * integrity(damage, assignment.mountId());
             }
         }
         return result;
     }
 
-    private double sharedBusChargePowerW(InstalledFit fit) {
+    private double sharedBusChargePowerW(InstalledFit fit, DamageState damage) {
         double result = 0d;
         for (InstalledModuleDefinition assignment : fit.installedModules()) {
             ModuleDefinition module = requireModule(assignment.moduleId());
             if (module.family() == ModuleFamily.ENERGY_STORAGE) {
-                result += optionalParameter(module, MAX_CHARGE_POWER_W, 0d);
+                result += optionalParameter(module, MAX_CHARGE_POWER_W, 0d)
+                        * integrity(damage, assignment.mountId());
             }
         }
         return result;
     }
 
-    private double sharedBusDischargePowerW(InstalledFit fit) {
+    private double sharedBusDischargePowerW(InstalledFit fit, DamageState damage) {
         double result = 0d;
         for (InstalledModuleDefinition assignment : fit.installedModules()) {
             ModuleDefinition module = requireModule(assignment.moduleId());
             if (module.family() == ModuleFamily.ENERGY_STORAGE) {
-                result += optionalParameter(module, MAX_DISCHARGE_POWER_W, 0d);
+                result += optionalParameter(module, MAX_DISCHARGE_POWER_W, 0d)
+                        * integrity(damage, assignment.mountId());
             }
         }
         return result;
     }
 
-    private double shipThermalStoreCapacityJ(InstalledFit fit) {
+    private double coolantBusCapacityW(InstalledFit fit, DamageState damage) {
         double result = 0d;
         for (InstalledModuleDefinition assignment : fit.installedModules()) {
             ModuleDefinition module = requireModule(assignment.moduleId());
             if (module.family() == ModuleFamily.THERMAL_CONTROL) {
-                result += optionalParameter(module, SHIP_THERMAL_STORE_CAPACITY_J, 0d);
+                result += optionalParameter(module, COOLANT_BUS_CAPACITY_W, 0d)
+                        * integrity(damage, assignment.mountId());
+            }
+        }
+        return result;
+    }
+
+    private double shipThermalStoreCapacityJ(InstalledFit fit, DamageState damage) {
+        double result = 0d;
+        for (InstalledModuleDefinition assignment : fit.installedModules()) {
+            ModuleDefinition module = requireModule(assignment.moduleId());
+            if (module.family() == ModuleFamily.THERMAL_CONTROL) {
+                result += optionalParameter(module, SHIP_THERMAL_STORE_CAPACITY_J, 0d)
+                        * integrity(damage, assignment.mountId());
             }
         }
         return result;
@@ -788,6 +723,10 @@ public final class ShipEngineeringRuntime {
 
     private static JumpPlan rejected(JumpFailure failure, String mountId, double translatedMassKg) {
         return new JumpPlan(false, failure, mountId, translatedMassKg, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d);
+    }
+
+    private static double integrity(DamageState damage, String mountId) {
+        return Objects.requireNonNull(damage, "damage").moduleIntegrityByMount().getOrDefault(mountId, 1d);
     }
 
     private static double reactionMassOnMount(ConsumableState state, String mountId) {
@@ -929,6 +868,17 @@ public final class ShipEngineeringRuntime {
             this.fraction = fraction;
         }
 
+        private double integrityFraction() {
+            if (!enabled && fraction <= 0d) {
+                return 0d;
+            }
+            if (isDrive(module)) {
+                double requested = Math.max(EPSILON, fraction);
+                return Math.min(1d, requested / Math.max(EPSILON, requested));
+            }
+            return Math.max(0d, Math.min(1d, fraction));
+        }
+
         private double supplyW() {
             return enabled ? module.continuousPowerSupplyW() * fraction : 0d;
         }
@@ -949,8 +899,7 @@ public final class ShipEngineeringRuntime {
             if (!enabled || !isDrive(module)) {
                 return 0d;
             }
-            double rated = requiredPositiveParameter(module, THRUST_N);
-            return rated * fraction;
+            return requiredPositiveParameter(module, THRUST_N) * fraction;
         }
     }
 
