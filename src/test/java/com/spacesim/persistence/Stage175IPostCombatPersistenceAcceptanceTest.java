@@ -5,7 +5,6 @@ import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
-import com.spacesim.ship.EntityId;
 import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipInstanceRuntimeState;
