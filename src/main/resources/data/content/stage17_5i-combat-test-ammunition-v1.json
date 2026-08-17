@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "kineticAmmunition": [
+    {
+      "id": "ammo.ct_rail_dart_50kg_v1",
+      "materialId": "material.ct_structural_alloy_v1",
+      "shape": "DART",
+      "lengthM": 1.6,
+      "diameterM": 0.07,
+      "massKg": 50.0
+    },
+    {
+      "id": "ammo.ct_rail_dart_200kg_v1",
+      "materialId": "material.ct_structural_alloy_v1",
+      "shape": "DART",
+      "lengthM": 3.0,
+      "diameterM": 0.13,
+      "massKg": 200.0
+    }
+  ],
+  "guidedAmmunition": [
+    {
+      "id": "ammo.ct_antiship_missile_v1",
+      "materialId": "material.ct_structural_alloy_v1",
+      "shape": "SHELL",
+      "lengthM": 6.8,
+      "diameterM": 0.72,
+      "impactPayloadId": "payload.ct_kinetic_fragmentation_v1",
+      "seekerId": "seeker.ct_multimode_antiship_v1",
+      "dryMassKg": 1800.0,
+      "propellantMassKg": 1200.0,
+      "thrustN": 900000.0,
+      "exhaustVelocityMps": 3400.0,
+      "burnTimeSeconds": 4.5,
+      "seekerAngularSigmaRad": 0.00035,
+      "terminalReserveMps": 450.0
+    },
+    {
+      "id": "ammo.ct_interceptor_v1",
+      "materialId": "material.ct_structural_alloy_v1",
+      "shape": "SHELL",
+      "lengthM": 2.8,
+      "diameterM": 0.34,
+      "impactPayloadId": null,
+      "seekerId": "seeker.ct_interceptor_v1",
+      "dryMassKg": 420.0,
+      "propellantMassKg": 280.0,
+      "thrustN": 360000.0,
+      "exhaustVelocityMps": 3100.0,
+      "burnTimeSeconds": 3.6,
+      "seekerAngularSigmaRad": 0.00055,
+      "terminalReserveMps": 260.0
+    }
+  ]
+}
