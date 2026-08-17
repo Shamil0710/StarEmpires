@@ -32,13 +32,22 @@ public final class ShipCapabilityService {
     private final ShipSensorEngineeringAdapter sensorAdapter = new ShipSensorEngineeringAdapter();
     private final ShipShieldEngineeringAdapter shieldAdapter = new ShipShieldEngineeringAdapter();
 
-    /** @param catalog production ship engineering definitions */
+    /**
+     * Creates the shared capability projection service.
+     *
+     * @param catalog production ship engineering definitions
+     */
     public ShipCapabilityService(ShipEngineeringCatalog catalog) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.engineeringRuntime = new ShipEngineeringRuntime(catalog);
     }
 
-    /** @param component authoritative physical engineering component @return immutable projection */
+    /**
+     * Builds the complete immutable physical capability projection.
+     *
+     * @param component authoritative physical engineering component
+     * @return immutable projection
+     */
     public Snapshot snapshot(EngineeringComponent component) {
         EngineeringComponent checked = requireComponent(component);
         DamageState damage = checked.instanceState.damage().moduleDamage();
@@ -50,7 +59,12 @@ public final class ShipCapabilityService {
                 maintenanceState(checked), sensorAdapter.derive(derived));
     }
 
-    /** @param component authoritative physical engineering component @return acceleration envelope */
+    /**
+     * Returns the damage-aware thrust and acceleration envelope.
+     *
+     * @param component authoritative physical engineering component
+     * @return acceleration envelope
+     */
     public AccelerationEnvelope getAccelerationEnvelope(EngineeringComponent component) {
         EngineeringComponent checked = requireComponent(component);
         DamageState damage = checked.instanceState.damage().moduleDamage();
@@ -58,28 +72,48 @@ public final class ShipCapabilityService {
         return accelerationEnvelope(checked, derived, damage);
     }
 
-    /** @param component authoritative component @return remaining delta-v in meters per second */
+    /**
+     * Returns current remaining reaction-mass delta-v.
+     *
+     * @param component authoritative component
+     * @return remaining delta-v in meters per second
+     */
     public double getRemainingDeltaV(EngineeringComponent component) {
         EngineeringComponent checked = requireComponent(component);
         return engineeringRuntime.derive(checked.fit, checked.runtimeState,
                 checked.instanceState.damage().moduleDamage()).deltaVMps();
     }
 
-    /** @param component authoritative component @return damage-aware fitted jump plan */
+    /**
+     * Plans an FTL jump using the current damage-aware fit and operating state.
+     *
+     * @param component authoritative component
+     * @return damage-aware fitted jump plan
+     */
     public JumpPlan planJump(EngineeringComponent component) {
         EngineeringComponent checked = requireComponent(component);
         return engineeringRuntime.planJump(checked.fit, checked.runtimeState,
                 checked.instanceState.damage().moduleDamage());
     }
 
-    /** @param component authoritative component @return fitted shield coverage */
+    /**
+     * Returns current fitted shield coverage and reserve state.
+     *
+     * @param component authoritative component
+     * @return fitted shield coverage
+     */
     public List<ShieldCoverage> getShieldCoverage(EngineeringComponent component) {
         EngineeringComponent checked = requireComponent(component);
         DamageState damage = checked.instanceState.damage().moduleDamage();
         return shieldCoverage(checked, engineeringRuntime.derive(checked.fit, checked.runtimeState, damage));
     }
 
-    /** @param component authoritative component @return thermal endurance */
+    /**
+     * Returns current thermal margins and stored heat.
+     *
+     * @param component authoritative component
+     * @return thermal endurance
+     */
     public ThermalEndurance getThermalEndurance(EngineeringComponent component) {
         EngineeringComponent checked = requireComponent(component);
         DamageState damage = checked.instanceState.damage().moduleDamage();
@@ -88,17 +122,32 @@ public final class ShipCapabilityService {
                 remainingLocalThermalCapacityJ(checked, damage));
     }
 
-    /** @param component authoritative component @return ammunition endurance */
+    /**
+     * Returns physical ammunition mass/count and feed bindings.
+     *
+     * @param component authoritative component
+     * @return ammunition endurance
+     */
     public AmmunitionEndurance getAmmunitionEndurance(EngineeringComponent component) {
         return ammunitionEndurance(requireComponent(component));
     }
 
-    /** @param component authoritative component @return local damage capability state */
+    /**
+     * Returns local compartment and module integrity.
+     *
+     * @param component authoritative component
+     * @return local damage capability state
+     */
     public DamageCapabilityState getDamageCapabilityState(EngineeringComponent component) {
         return damageCapabilityState(requireComponent(component));
     }
 
-    /** @param component authoritative component @return ordinary repair need */
+    /**
+     * Returns ordinary repair need without mutating engineering state.
+     *
+     * @param component authoritative component
+     * @return ordinary repair need
+     */
     public RepairNeed getRepairNeed(EngineeringComponent component) {
         DamageCapabilityState damage = getDamageCapabilityState(component);
         List<String> compartments = damage.compartmentIntegrityById().entrySet().stream()
@@ -130,7 +179,9 @@ public final class ShipCapabilityService {
         double remaining = 0d;
         for (InstalledModuleDefinition assignment : component.fit.installedModules()) {
             ModuleDefinition module = catalog.findModule(assignment.moduleId());
-            if (module == null) continue;
+            if (module == null) {
+                continue;
+            }
             double integrity = damage.moduleIntegrityByMount().getOrDefault(assignment.mountId(), 1d);
             double capacity = module.localThermalCapacityJ() * integrity;
             double stored = component.runtimeState.localHeatJByMount().getOrDefault(assignment.mountId(), 0d);
@@ -163,9 +214,12 @@ public final class ShipCapabilityService {
         List<ShieldCoverage> result = new ArrayList<>();
         for (FittedShield fitted : shieldAdapter.derive(derived)) {
             State persisted = component.instanceState.shieldStatesByMount().get(fitted.mountId());
-            if (persisted == null) persisted = new State(0d, 0d, true, 0d, fitted.emitterIntegrity());
-            else persisted = new ShieldFieldRuntime().withEmitterIntegrity(
-                    fitted.definition(), persisted, fitted.emitterIntegrity());
+            if (persisted == null) {
+                persisted = new State(0d, 0d, true, 0d, fitted.emitterIntegrity());
+            } else {
+                persisted = new ShieldFieldRuntime().withEmitterIntegrity(
+                        fitted.definition(), persisted, fitted.emitterIntegrity());
+            }
             result.add(new ShieldCoverage(fitted.mountId(), fitted.moduleId(),
                     fitted.definition().coverageCenterRad(), fitted.definition().coverageHalfArcRad(),
                     persisted.reserveJ(), fitted.definition().reserveCapacityJ() * fitted.emitterIntegrity(),
@@ -183,7 +237,9 @@ public final class ShipCapabilityService {
             ages.put(assignment.mountId(), age);
             ModuleDefinition module = catalog.findModule(assignment.moduleId());
             if (module != null && module.maintenance().serviceIntervalSeconds() > 0d
-                    && age + EPSILON >= module.maintenance().serviceIntervalSeconds()) overdue.add(assignment.mountId());
+                    && age + EPSILON >= module.maintenance().serviceIntervalSeconds()) {
+                overdue.add(assignment.mountId());
+            }
         }
         return new MaintenanceProjection(ages, overdue);
     }
@@ -198,6 +254,7 @@ public final class ShipCapabilityService {
 
     /**
      * All-in-one read-only capability projection.
+     *
      * @param derived central damage-aware engineering state
      * @param acceleration current acceleration envelope
      * @param remainingDeltaVMps remaining reaction-mass delta-v
@@ -212,48 +269,157 @@ public final class ShipCapabilityService {
             ThermalEndurance thermal, AmmunitionEndurance ammunition, DamageCapabilityState damage,
             List<ShieldCoverage> shields, MaintenanceProjection maintenance,
             ShipSensorEngineeringAdapter.FittedSensorSuite sensors) {
-        /** Validates and freezes one snapshot. */
+        /**
+         * Validates and freezes one snapshot.
+         *
+         * @param derived central damage-aware engineering state
+         * @param acceleration current acceleration envelope
+         * @param remainingDeltaVMps remaining reaction-mass delta-v
+         * @param thermal thermal endurance
+         * @param ammunition ammunition endurance
+         * @param damage local damage
+         * @param shields shield coverage
+         * @param maintenance maintenance projection
+         * @param sensors fitted sensor suite
+         */
         public Snapshot {
-            Objects.requireNonNull(derived, "derived"); Objects.requireNonNull(acceleration, "acceleration");
-            if (!Double.isFinite(remainingDeltaVMps) || remainingDeltaVMps < 0d)
+            Objects.requireNonNull(derived, "derived");
+            Objects.requireNonNull(acceleration, "acceleration");
+            if (!Double.isFinite(remainingDeltaVMps) || remainingDeltaVMps < 0d) {
                 throw new IllegalArgumentException("remainingDeltaVMps must be finite and non-negative");
-            Objects.requireNonNull(thermal, "thermal"); Objects.requireNonNull(ammunition, "ammunition");
-            Objects.requireNonNull(damage, "damage"); shields = List.copyOf(Objects.requireNonNull(shields, "shields"));
-            Objects.requireNonNull(maintenance, "maintenance"); Objects.requireNonNull(sensors, "sensors");
+            }
+            Objects.requireNonNull(thermal, "thermal");
+            Objects.requireNonNull(ammunition, "ammunition");
+            Objects.requireNonNull(damage, "damage");
+            shields = List.copyOf(Objects.requireNonNull(shields, "shields"));
+            Objects.requireNonNull(maintenance, "maintenance");
+            Objects.requireNonNull(sensors, "sensors");
         }
     }
 
-    /** @param maxThrustN max thrust @param maxAccelerationMps2 max acceleration @param totalMassKg mass */
+    /**
+     * Current thrust-derived acceleration envelope.
+     *
+     * @param maxThrustN maximum available thrust
+     * @param maxAccelerationMps2 maximum acceleration
+     * @param totalMassKg current total mass
+     */
     public record AccelerationEnvelope(double maxThrustN, double maxAccelerationMps2, double totalMassKg) { }
-    /** @param continuousHeatMarginW heat margin @param shipHeatStoredJ stored heat @param remainingLocalCapacityJ local capacity */
-    public record ThermalEndurance(double continuousHeatMarginW, double shipHeatStoredJ, double remainingLocalCapacityJ) { }
-    /** @param ammunitionMassKg ammo mass @param ammunitionCount ammo count @param feeds feed rows */
+
+    /**
+     * Current thermal headroom projection.
+     *
+     * @param continuousHeatMarginW continuous heat margin
+     * @param shipHeatStoredJ stored ship-bus heat
+     * @param remainingLocalCapacityJ remaining module-local thermal capacity
+     */
+    public record ThermalEndurance(double continuousHeatMarginW, double shipHeatStoredJ,
+            double remainingLocalCapacityJ) { }
+
+    /**
+     * Current ammunition endurance projection.
+     *
+     * @param ammunitionMassKg physical ammunition mass
+     * @param ammunitionCount physical ammunition item count
+     * @param feeds loaded weapon feed rows
+     */
     public record AmmunitionEndurance(double ammunitionMassKg, long ammunitionCount, List<AmmunitionFeed> feeds) {
-        /** Validates and freezes feeds. */ public AmmunitionEndurance { feeds = List.copyOf(Objects.requireNonNull(feeds, "feeds")); }
+        /**
+         * Validates and freezes feeds.
+         *
+         * @param ammunitionMassKg physical ammunition mass
+         * @param ammunitionCount physical ammunition item count
+         * @param feeds loaded weapon feed rows
+         */
+        public AmmunitionEndurance {
+            feeds = List.copyOf(Objects.requireNonNull(feeds, "feeds"));
+        }
     }
-    /** @param mountId mount @param interfaceId interface @param ammunitionContentId ammo ID @param amount amount @param itemCount count */
-    public record AmmunitionFeed(String mountId, String interfaceId, String ammunitionContentId, double amount, long itemCount) { }
-    /** @param compartmentIntegrityById compartments @param moduleIntegrityByMount modules */
-    public record DamageCapabilityState(Map<String, Double> compartmentIntegrityById, Map<String, Double> moduleIntegrityByMount) {
-        /** Validates and freezes integrity maps. */
+
+    /**
+     * One loaded ammunition feed projection.
+     *
+     * @param mountId weapon mount
+     * @param interfaceId feed interface
+     * @param ammunitionContentId ammunition content ID
+     * @param amount interface-native physical amount
+     * @param itemCount physical item count
+     */
+    public record AmmunitionFeed(String mountId, String interfaceId, String ammunitionContentId,
+            double amount, long itemCount) { }
+
+    /**
+     * Current local damage capability state.
+     *
+     * @param compartmentIntegrityById compartment integrity by compartment ID
+     * @param moduleIntegrityByMount module integrity by fitted mount
+     */
+    public record DamageCapabilityState(Map<String, Double> compartmentIntegrityById,
+            Map<String, Double> moduleIntegrityByMount) {
+        /**
+         * Validates and freezes integrity maps.
+         *
+         * @param compartmentIntegrityById compartment integrity by compartment ID
+         * @param moduleIntegrityByMount module integrity by fitted mount
+         */
         public DamageCapabilityState {
             compartmentIntegrityById = Map.copyOf(Objects.requireNonNull(compartmentIntegrityById, "compartments"));
             moduleIntegrityByMount = Map.copyOf(Objects.requireNonNull(moduleIntegrityByMount, "modules"));
         }
     }
-    /** @param repairRequired flag @param damagedCompartmentIds compartments @param damagedMountIds mounts */
+
+    /**
+     * Ordinary repair requirement projection.
+     *
+     * @param repairRequired whether any physical repair is required
+     * @param damagedCompartmentIds damaged compartment IDs
+     * @param damagedMountIds damaged fitted mount IDs
+     */
     public record RepairNeed(boolean repairRequired, List<String> damagedCompartmentIds, List<String> damagedMountIds) {
-        /** Validates and freezes targets. */ public RepairNeed {
+        /**
+         * Validates and freezes repair targets.
+         *
+         * @param repairRequired whether any physical repair is required
+         * @param damagedCompartmentIds damaged compartment IDs
+         * @param damagedMountIds damaged fitted mount IDs
+         */
+        public RepairNeed {
             damagedCompartmentIds = List.copyOf(Objects.requireNonNull(damagedCompartmentIds, "compartments"));
             damagedMountIds = List.copyOf(Objects.requireNonNull(damagedMountIds, "mounts"));
         }
     }
-    /** @param mountId mount @param moduleId module @param coverageCenterRad center @param coverageHalfArcRad half arc @param reserveJ reserve @param reserveCapacityJ capacity @param collapsed collapsed @param restartRemainingSeconds restart @param emitterIntegrity integrity */
+
+    /**
+     * Current shield emitter coverage projection.
+     *
+     * @param mountId emitter mount
+     * @param moduleId emitter module content ID
+     * @param coverageCenterRad coverage center angle
+     * @param coverageHalfArcRad coverage half arc
+     * @param reserveJ current field reserve
+     * @param reserveCapacityJ damage-aware reserve capacity
+     * @param collapsed whether the field is collapsed
+     * @param restartRemainingSeconds remaining restart lockout
+     * @param emitterIntegrity current emitter integrity
+     */
     public record ShieldCoverage(String mountId, String moduleId, double coverageCenterRad, double coverageHalfArcRad,
-            double reserveJ, double reserveCapacityJ, boolean collapsed, double restartRemainingSeconds, double emitterIntegrity) { }
-    /** @param secondsSinceServiceByMount ages @param overdueMounts overdue mounts */
+            double reserveJ, double reserveCapacityJ, boolean collapsed, double restartRemainingSeconds,
+            double emitterIntegrity) { }
+
+    /**
+     * Current maintenance projection.
+     *
+     * @param secondsSinceServiceByMount service age by fitted mount
+     * @param overdueMounts mounts at or beyond authored service interval
+     */
     public record MaintenanceProjection(Map<String, Double> secondsSinceServiceByMount, List<String> overdueMounts) {
-        /** Validates and freezes maintenance collections. */ public MaintenanceProjection {
+        /**
+         * Validates and freezes maintenance collections.
+         *
+         * @param secondsSinceServiceByMount service age by fitted mount
+         * @param overdueMounts mounts at or beyond authored service interval
+         */
+        public MaintenanceProjection {
             secondsSinceServiceByMount = Map.copyOf(Objects.requireNonNull(secondsSinceServiceByMount, "ages"));
             overdueMounts = List.copyOf(Objects.requireNonNull(overdueMounts, "overdueMounts"));
         }
