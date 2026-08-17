@@ -1,0 +1,508 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "responseSurfaces": [
+    {
+      "id": "response.ct_heavy_v1",
+      "calibrationDomain": {
+        "minImpactVelocityMps": 1000.0,
+        "maxImpactVelocityMps": 20000.0,
+        "minProjectileMassKg": 1.0,
+        "maxProjectileMassKg": 2000.0,
+        "confidenceLabel": "stage17_5i_provisional_acceptance_only"
+      }
+    }
+  ],
+  "materials": [
+    {
+      "id": "material.ct_structural_alloy_v1",
+      "densityKgPerM3": 7800.0,
+      "tags": ["structural", "metal", "stage17_5i_provisional"],
+      "thermalConductivityWPerMK": 42.0,
+      "specificHeatJPerKgK": 510.0,
+      "emissivity": 0.36,
+      "radarReflectivity": 0.78,
+      "heavyImpactResponseSurfaceId": "response.ct_heavy_v1",
+      "constructionMaterialFamilyId": "material_family.structural_metal",
+      "repairMaterialFamilyId": "material_family.structural_metal"
+    },
+    {
+      "id": "material.ct_ceramic_v1",
+      "densityKgPerM3": 3900.0,
+      "tags": ["armor", "ceramic", "stage17_5i_provisional"],
+      "thermalConductivityWPerMK": 28.0,
+      "specificHeatJPerKgK": 790.0,
+      "emissivity": 0.74,
+      "radarReflectivity": 0.24,
+      "heavyImpactResponseSurfaceId": "response.ct_heavy_v1",
+      "constructionMaterialFamilyId": "material_family.protection_ceramic",
+      "repairMaterialFamilyId": "material_family.protection_ceramic"
+    }
+  ],
+  "protectionStacks": [
+    {
+      "id": "protection.ct_light_v1",
+      "mountMassKg": 120000.0,
+      "layers": [
+        {
+          "materialId": "material.ct_ceramic_v1",
+          "thicknessM": 0.035,
+          "spacingAfterM": 0.16,
+          "orientationRad": 0.0,
+          "coverageFraction": 1.0,
+          "responseSurfaceId": "response.ct_heavy_v1"
+        },
+        {
+          "materialId": "material.ct_structural_alloy_v1",
+          "thicknessM": 0.055,
+          "spacingAfterM": 0.0,
+          "orientationRad": 0.0,
+          "coverageFraction": 1.0,
+          "responseSurfaceId": "response.ct_heavy_v1"
+        }
+      ]
+    },
+    {
+      "id": "protection.ct_heavy_v1",
+      "mountMassKg": 520000.0,
+      "layers": [
+        {
+          "materialId": "material.ct_ceramic_v1",
+          "thicknessM": 0.10,
+          "spacingAfterM": 0.35,
+          "orientationRad": 0.0,
+          "coverageFraction": 1.0,
+          "responseSurfaceId": "response.ct_heavy_v1"
+        },
+        {
+          "materialId": "material.ct_structural_alloy_v1",
+          "thicknessM": 0.18,
+          "spacingAfterM": 0.10,
+          "orientationRad": 0.0,
+          "coverageFraction": 1.0,
+          "responseSurfaceId": "response.ct_heavy_v1"
+        },
+        {
+          "materialId": "material.ct_structural_alloy_v1",
+          "thicknessM": 0.06,
+          "spacingAfterM": 0.0,
+          "orientationRad": 0.0,
+          "coverageFraction": 1.0,
+          "responseSurfaceId": "response.ct_heavy_v1"
+        }
+      ]
+    }
+  ],
+  "hulls": [
+    {
+      "id": "hull.ct_corvette_v1",
+      "displayName": "Stage 17.5I Corvette Test Hull",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 92.0, "widthM": 28.0, "heightM": 18.0},
+      "bareHullMassKg": 1500000.0,
+      "internalVolumeM3": 18000.0,
+      "slots": [
+        {"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 20.0, "widthM": 12.0, "heightM": 10.0}, "maxMassKg": 1200000.0},
+        {"id": "core_drive", "category": "CORE", "maxDimensionsM": {"lengthM": 26.0, "widthM": 14.0, "heightM": 12.0}, "maxMassKg": 1500000.0},
+        {"id": "core_storage", "category": "CORE", "maxDimensionsM": {"lengthM": 16.0, "widthM": 10.0, "heightM": 8.0}, "maxMassKg": 700000.0},
+        {"id": "utility_thermal", "category": "UTILITY", "maxDimensionsM": {"lengthM": 18.0, "widthM": 10.0, "heightM": 8.0}, "maxMassKg": 650000.0},
+        {"id": "utility_sensor", "category": "UTILITY", "maxDimensionsM": {"lengthM": 14.0, "widthM": 10.0, "heightM": 8.0}, "maxMassKg": 450000.0},
+        {"id": "utility_support", "category": "UTILITY", "maxDimensionsM": {"lengthM": 15.0, "widthM": 10.0, "heightM": 8.0}, "maxMassKg": 600000.0},
+        {"id": "internal_crew", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 14.0, "widthM": 10.0, "heightM": 8.0}, "maxMassKg": 500000.0},
+        {"id": "internal_ftl", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 18.0, "widthM": 12.0, "heightM": 10.0}, "maxMassKg": 900000.0}
+      ],
+      "hardpoints": [
+        {"id": "weapon_primary_a", "size": "MEDIUM", "positionM": {"xM": 0.0, "yM": 32.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 0.5235987755982988}, "maxModuleDimensionsM": {"lengthM": 26.0, "widthM": 8.0, "heightM": 8.0}, "maxModuleMassKg": 700000.0, "maxRecoilImpulseNs": 3000000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_defense_a", "size": "SMALL", "positionM": {"xM": 8.0, "yM": 8.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.6179938779914944}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 250000.0, "maxRecoilImpulseNs": 800000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]}
+      ],
+      "compartments": [
+        {"id": "engineering", "volumeM3": 6000.0, "centerM": {"xM": 0.0, "yM": -24.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["reactor", "drive"]},
+        {"id": "mission", "volumeM3": 7000.0, "centerM": {"xM": 0.0, "yM": 5.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["crew", "sensor"]},
+        {"id": "weapons", "volumeM3": 5000.0, "centerM": {"xM": 0.0, "yM": 30.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["weapon", "magazine"]}
+      ],
+      "crewBaseline": 70,
+      "lifeSupportCapacity": 100,
+      "baseSignatureGeometryAreaM2": 1200.0,
+      "structuralProtectionStackId": "protection.ct_light_v1",
+      "maxOperationalMassKg": 6500000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.ct_frigate_v1",
+      "displayName": "Stage 17.5I Frigate Test Hull",
+      "architecture": "HYBRID",
+      "boundingDimensionsM": {"lengthM": 142.0, "widthM": 42.0, "heightM": 25.0},
+      "bareHullMassKg": 4200000.0,
+      "internalVolumeM3": 52000.0,
+      "slots": [
+        {"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 28.0, "widthM": 18.0, "heightM": 14.0}, "maxMassKg": 2200000.0},
+        {"id": "core_drive", "category": "CORE", "maxDimensionsM": {"lengthM": 34.0, "widthM": 20.0, "heightM": 16.0}, "maxMassKg": 2600000.0},
+        {"id": "core_storage", "category": "CORE", "maxDimensionsM": {"lengthM": 20.0, "widthM": 14.0, "heightM": 10.0}, "maxMassKg": 1100000.0},
+        {"id": "utility_thermal", "category": "UTILITY", "maxDimensionsM": {"lengthM": 24.0, "widthM": 14.0, "heightM": 10.0}, "maxMassKg": 1100000.0},
+        {"id": "utility_sensor", "category": "UTILITY", "maxDimensionsM": {"lengthM": 20.0, "widthM": 14.0, "heightM": 10.0}, "maxMassKg": 750000.0},
+        {"id": "utility_support", "category": "UTILITY", "maxDimensionsM": {"lengthM": 22.0, "widthM": 14.0, "heightM": 10.0}, "maxMassKg": 1200000.0},
+        {"id": "internal_crew", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 20.0, "widthM": 14.0, "heightM": 10.0}, "maxMassKg": 900000.0},
+        {"id": "internal_ftl", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 24.0, "widthM": 16.0, "heightM": 12.0}, "maxMassKg": 1500000.0}
+      ],
+      "hardpoints": [
+        {"id": "weapon_primary_a", "size": "MEDIUM", "positionM": {"xM": -9.0, "yM": 48.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 0.6981317007977318}, "maxModuleDimensionsM": {"lengthM": 30.0, "widthM": 9.0, "heightM": 9.0}, "maxModuleMassKg": 900000.0, "maxRecoilImpulseNs": 4500000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_primary_b", "size": "MEDIUM", "positionM": {"xM": 9.0, "yM": 48.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 0.6981317007977318}, "maxModuleDimensionsM": {"lengthM": 30.0, "widthM": 9.0, "heightM": 9.0}, "maxModuleMassKg": 900000.0, "maxRecoilImpulseNs": 4500000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_defense_a", "size": "SMALL", "positionM": {"xM": -13.0, "yM": 10.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.6179938779914944}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 300000.0, "maxRecoilImpulseNs": 900000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_defense_b", "size": "SMALL", "positionM": {"xM": 13.0, "yM": 10.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.6179938779914944}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 300000.0, "maxRecoilImpulseNs": 900000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]}
+      ],
+      "compartments": [
+        {"id": "engineering", "volumeM3": 17500.0, "centerM": {"xM": 0.0, "yM": -38.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["reactor", "drive"]},
+        {"id": "mission", "volumeM3": 19500.0, "centerM": {"xM": 0.0, "yM": 8.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["crew", "sensor", "communications"]},
+        {"id": "weapons", "volumeM3": 15000.0, "centerM": {"xM": 0.0, "yM": 48.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["weapon", "magazine"]}
+      ],
+      "crewBaseline": 140,
+      "lifeSupportCapacity": 190,
+      "baseSignatureGeometryAreaM2": 2800.0,
+      "structuralProtectionStackId": "protection.ct_light_v1",
+      "maxOperationalMassKg": 12500000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.ct_destroyer_v1",
+      "displayName": "Stage 17.5I Destroyer Test Hull",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 224.0, "widthM": 66.0, "heightM": 36.0},
+      "bareHullMassKg": 11800000.0,
+      "internalVolumeM3": 165000.0,
+      "slots": [
+        {"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 36.0, "widthM": 24.0, "heightM": 18.0}, "maxMassKg": 4200000.0},
+        {"id": "core_drive", "category": "CORE", "maxDimensionsM": {"lengthM": 48.0, "widthM": 28.0, "heightM": 22.0}, "maxMassKg": 4800000.0},
+        {"id": "core_storage", "category": "CORE", "maxDimensionsM": {"lengthM": 28.0, "widthM": 18.0, "heightM": 14.0}, "maxMassKg": 1900000.0},
+        {"id": "utility_thermal", "category": "UTILITY", "maxDimensionsM": {"lengthM": 30.0, "widthM": 20.0, "heightM": 14.0}, "maxMassKg": 1900000.0},
+        {"id": "utility_sensor", "category": "UTILITY", "maxDimensionsM": {"lengthM": 26.0, "widthM": 18.0, "heightM": 12.0}, "maxMassKg": 1100000.0},
+        {"id": "utility_support", "category": "UTILITY", "maxDimensionsM": {"lengthM": 28.0, "widthM": 18.0, "heightM": 14.0}, "maxMassKg": 2200000.0},
+        {"id": "internal_crew", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 26.0, "widthM": 18.0, "heightM": 12.0}, "maxMassKg": 1400000.0},
+        {"id": "internal_ftl", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 30.0, "widthM": 20.0, "heightM": 14.0}, "maxMassKg": 2200000.0}
+      ],
+      "hardpoints": [
+        {"id": "weapon_primary_a", "size": "LARGE", "positionM": {"xM": -14.0, "yM": 74.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 0.4363323129985824}, "maxModuleDimensionsM": {"lengthM": 72.0, "widthM": 12.0, "heightM": 12.0}, "maxModuleMassKg": 1900000.0, "maxRecoilImpulseNs": 9000000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_primary_b", "size": "LARGE", "positionM": {"xM": 14.0, "yM": 74.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 0.4363323129985824}, "maxModuleDimensionsM": {"lengthM": 72.0, "widthM": 12.0, "heightM": 12.0}, "maxModuleMassKg": 1900000.0, "maxRecoilImpulseNs": 9000000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_defense_a", "size": "SMALL", "positionM": {"xM": -22.0, "yM": 8.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.8797932657906435}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 320000.0, "maxRecoilImpulseNs": 900000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_defense_b", "size": "SMALL", "positionM": {"xM": 22.0, "yM": 8.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.8797932657906435}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 320000.0, "maxRecoilImpulseNs": 900000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]}
+      ],
+      "compartments": [
+        {"id": "engineering", "volumeM3": 56000.0, "centerM": {"xM": 0.0, "yM": -58.0, "zM": 0.0}, "protectionStackId": "protection.ct_heavy_v1", "tags": ["reactor", "drive"]},
+        {"id": "mission", "volumeM3": 59000.0, "centerM": {"xM": 0.0, "yM": 12.0, "zM": 0.0}, "protectionStackId": "protection.ct_heavy_v1", "tags": ["crew", "sensor", "communications"]},
+        {"id": "weapons", "volumeM3": 50000.0, "centerM": {"xM": 0.0, "yM": 76.0, "zM": 0.0}, "protectionStackId": "protection.ct_heavy_v1", "tags": ["weapon", "magazine"]}
+      ],
+      "crewBaseline": 260,
+      "lifeSupportCapacity": 340,
+      "baseSignatureGeometryAreaM2": 6500.0,
+      "structuralProtectionStackId": "protection.ct_heavy_v1",
+      "maxOperationalMassKg": 30000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.ct_cruiser_v1",
+      "displayName": "Stage 17.5I Cruiser Test Hull",
+      "architecture": "HYBRID",
+      "boundingDimensionsM": {"lengthM": 338.0, "widthM": 98.0, "heightM": 52.0},
+      "bareHullMassKg": 32000000.0,
+      "internalVolumeM3": 420000.0,
+      "slots": [
+        {"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 44.0, "widthM": 30.0, "heightM": 22.0}, "maxMassKg": 6500000.0},
+        {"id": "core_drive", "category": "CORE", "maxDimensionsM": {"lengthM": 60.0, "widthM": 34.0, "heightM": 26.0}, "maxMassKg": 7200000.0},
+        {"id": "core_storage", "category": "CORE", "maxDimensionsM": {"lengthM": 34.0, "widthM": 22.0, "heightM": 16.0}, "maxMassKg": 3000000.0},
+        {"id": "utility_thermal", "category": "UTILITY", "maxDimensionsM": {"lengthM": 38.0, "widthM": 24.0, "heightM": 18.0}, "maxMassKg": 3200000.0},
+        {"id": "utility_sensor", "category": "UTILITY", "maxDimensionsM": {"lengthM": 32.0, "widthM": 22.0, "heightM": 16.0}, "maxMassKg": 1800000.0},
+        {"id": "utility_support", "category": "UTILITY", "maxDimensionsM": {"lengthM": 36.0, "widthM": 24.0, "heightM": 18.0}, "maxMassKg": 3500000.0},
+        {"id": "internal_crew", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 32.0, "widthM": 22.0, "heightM": 16.0}, "maxMassKg": 2600000.0},
+        {"id": "internal_ftl", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 38.0, "widthM": 26.0, "heightM": 18.0}, "maxMassKg": 3600000.0}
+      ],
+      "hardpoints": [
+        {"id": "weapon_primary_a", "size": "LARGE", "positionM": {"xM": -22.0, "yM": 112.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 0.6108652381980153}, "maxModuleDimensionsM": {"lengthM": 76.0, "widthM": 14.0, "heightM": 14.0}, "maxModuleMassKg": 2400000.0, "maxRecoilImpulseNs": 12000000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_primary_b", "size": "LARGE", "positionM": {"xM": 22.0, "yM": 112.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 0.6108652381980153}, "maxModuleDimensionsM": {"lengthM": 76.0, "widthM": 14.0, "heightM": 14.0}, "maxModuleMassKg": 2400000.0, "maxRecoilImpulseNs": 12000000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_defense_a", "size": "SMALL", "positionM": {"xM": -32.0, "yM": 12.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.8797932657906435}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 350000.0, "maxRecoilImpulseNs": 900000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]},
+        {"id": "weapon_defense_b", "size": "SMALL", "positionM": {"xM": 32.0, "yM": 12.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.8797932657906435}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 350000.0, "maxRecoilImpulseNs": 900000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]}
+      ],
+      "compartments": [
+        {"id": "engineering", "volumeM3": 145000.0, "centerM": {"xM": 0.0, "yM": -88.0, "zM": 0.0}, "protectionStackId": "protection.ct_heavy_v1", "tags": ["reactor", "drive"]},
+        {"id": "mission", "volumeM3": 155000.0, "centerM": {"xM": 0.0, "yM": 18.0, "zM": 0.0}, "protectionStackId": "protection.ct_heavy_v1", "tags": ["crew", "sensor", "communications"]},
+        {"id": "weapons", "volumeM3": 120000.0, "centerM": {"xM": 0.0, "yM": 112.0, "zM": 0.0}, "protectionStackId": "protection.ct_heavy_v1", "tags": ["weapon", "magazine"]}
+      ],
+      "crewBaseline": 520,
+      "lifeSupportCapacity": 680,
+      "baseSignatureGeometryAreaM2": 12500.0,
+      "structuralProtectionStackId": "protection.ct_heavy_v1",
+      "maxOperationalMassKg": 70000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.ct_bulk_freighter_v1",
+      "displayName": "Stage 17.5I Bulk Freighter Test Hull",
+      "architecture": "TRUSS",
+      "boundingDimensionsM": {"lengthM": 285.0, "widthM": 82.0, "heightM": 56.0},
+      "bareHullMassKg": 19000000.0,
+      "internalVolumeM3": 640000.0,
+      "slots": [
+        {"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 34.0, "widthM": 24.0, "heightM": 18.0}, "maxMassKg": 3600000.0},
+        {"id": "core_drive", "category": "CORE", "maxDimensionsM": {"lengthM": 46.0, "widthM": 28.0, "heightM": 22.0}, "maxMassKg": 4300000.0},
+        {"id": "utility_thermal", "category": "UTILITY", "maxDimensionsM": {"lengthM": 34.0, "widthM": 22.0, "heightM": 16.0}, "maxMassKg": 2400000.0},
+        {"id": "utility_sensor", "category": "UTILITY", "maxDimensionsM": {"lengthM": 24.0, "widthM": 16.0, "heightM": 12.0}, "maxMassKg": 900000.0},
+        {"id": "internal_crew", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 26.0, "widthM": 18.0, "heightM": 14.0}, "maxMassKg": 1500000.0},
+        {"id": "internal_ftl", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 32.0, "widthM": 22.0, "heightM": 16.0}, "maxMassKg": 2600000.0},
+        {"id": "mission_cargo", "category": "MISSION", "maxDimensionsM": {"lengthM": 140.0, "widthM": 55.0, "heightM": 42.0}, "maxMassKg": 8000000.0}
+      ],
+      "hardpoints": [
+        {"id": "weapon_defense_a", "size": "SMALL", "positionM": {"xM": 24.0, "yM": 18.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.8797932657906435}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 350000.0, "maxRecoilImpulseNs": 900000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]}
+      ],
+      "compartments": [
+        {"id": "engineering", "volumeM3": 125000.0, "centerM": {"xM": 0.0, "yM": -82.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["reactor", "drive"]},
+        {"id": "habitation", "volumeM3": 95000.0, "centerM": {"xM": 0.0, "yM": -20.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["crew", "sensor"]},
+        {"id": "cargo", "volumeM3": 420000.0, "centerM": {"xM": 0.0, "yM": 72.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["cargo"]}
+      ],
+      "crewBaseline": 110,
+      "lifeSupportCapacity": 160,
+      "baseSignatureGeometryAreaM2": 13800.0,
+      "structuralProtectionStackId": "protection.ct_light_v1",
+      "maxOperationalMassKg": 155000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.ct_tanker_v1",
+      "displayName": "Stage 17.5I Tanker Test Hull",
+      "architecture": "TRUSS",
+      "boundingDimensionsM": {"lengthM": 252.0, "widthM": 74.0, "heightM": 62.0},
+      "bareHullMassKg": 23000000.0,
+      "internalVolumeM3": 560000.0,
+      "slots": [
+        {"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 34.0, "widthM": 24.0, "heightM": 18.0}, "maxMassKg": 3600000.0},
+        {"id": "core_drive", "category": "CORE", "maxDimensionsM": {"lengthM": 46.0, "widthM": 28.0, "heightM": 22.0}, "maxMassKg": 4300000.0},
+        {"id": "utility_thermal", "category": "UTILITY", "maxDimensionsM": {"lengthM": 34.0, "widthM": 22.0, "heightM": 16.0}, "maxMassKg": 2400000.0},
+        {"id": "utility_sensor", "category": "UTILITY", "maxDimensionsM": {"lengthM": 24.0, "widthM": 16.0, "heightM": 12.0}, "maxMassKg": 900000.0},
+        {"id": "internal_crew", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 26.0, "widthM": 18.0, "heightM": 14.0}, "maxMassKg": 1500000.0},
+        {"id": "internal_ftl", "category": "INTERNAL", "maxDimensionsM": {"lengthM": 32.0, "widthM": 22.0, "heightM": 16.0}, "maxMassKg": 2600000.0},
+        {"id": "mission_tank", "category": "MISSION", "maxDimensionsM": {"lengthM": 130.0, "widthM": 52.0, "heightM": 46.0}, "maxMassKg": 9000000.0}
+      ],
+      "hardpoints": [
+        {"id": "weapon_defense_a", "size": "SMALL", "positionM": {"xM": 22.0, "yM": 14.0, "zM": 0.0}, "arc": {"azimuthCenterRad": 1.5707963267948966, "halfArcRad": 2.8797932657906435}, "maxModuleDimensionsM": {"lengthM": 10.0, "widthM": 6.0, "heightM": 6.0}, "maxModuleMassKg": 350000.0, "maxRecoilImpulseNs": 900000.0, "allowedModuleFamilies": ["WEAPON_AMMUNITION"]}
+      ],
+      "compartments": [
+        {"id": "engineering", "volumeM3": 115000.0, "centerM": {"xM": 0.0, "yM": -72.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["reactor", "drive"]},
+        {"id": "habitation", "volumeM3": 85000.0, "centerM": {"xM": 0.0, "yM": -18.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["crew", "sensor"]},
+        {"id": "tankage", "volumeM3": 360000.0, "centerM": {"xM": 0.0, "yM": 64.0, "zM": 0.0}, "protectionStackId": "protection.ct_light_v1", "tags": ["reaction_mass", "stores"]}
+      ],
+      "crewBaseline": 125,
+      "lifeSupportCapacity": 175,
+      "baseSignatureGeometryAreaM2": 12800.0,
+      "structuralProtectionStackId": "protection.ct_light_v1",
+      "maxOperationalMassKg": 165000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    }
+  ],
+  "modules": [
+    {
+      "id": "module.ct_reactor_endurance_v1", "displayName": "Stage 17.5I Endurance Reactor", "family": "REACTOR_POWER", "integrationCategories": ["CORE"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 18.0, "widthM": 11.0, "heightM": 9.0}, "massKg": 900000.0, "occupiedVolumeM3": 3000.0, "requiredMountStrengthN": 18000000.0,
+      "continuousPowerSupplyW": 3200000000.0, "continuousPowerDemandW": 0.0, "peakPowerDemandW": 0.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 420000000.0, "localThermalCapacityJ": 32000000000.0, "coolantTransferDemandW": 420000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 18, "automationRequirement": 10, "interfaces": [], "signatureContributions": {"thermal_w": 420000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 600.0}, {"contentId": "component.precision", "amount": 180.0}],
+      "maintenance": {"serviceIntervalSeconds": 518400.0, "maintenanceWorkSeconds": 14400.0, "repairComplexity": 0.65}, "capabilityParameters": {"rated_power_w": 3200000000.0}
+    },
+    {
+      "id": "module.ct_reactor_combat_v1", "displayName": "Stage 17.5I Combat Reactor", "family": "REACTOR_POWER", "integrationCategories": ["CORE"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 27.0, "widthM": 17.0, "heightM": 13.0}, "massKg": 1850000.0, "occupiedVolumeM3": 6200.0, "requiredMountStrengthN": 32000000.0,
+      "continuousPowerSupplyW": 7200000000.0, "continuousPowerDemandW": 0.0, "peakPowerDemandW": 0.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 1350000000.0, "localThermalCapacityJ": 62000000000.0, "coolantTransferDemandW": 1350000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 30, "automationRequirement": 16, "interfaces": [], "signatureContributions": {"thermal_w": 1350000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 1200.0}, {"contentId": "component.precision", "amount": 420.0}],
+      "maintenance": {"serviceIntervalSeconds": 345600.0, "maintenanceWorkSeconds": 21600.0, "repairComplexity": 0.82}, "capabilityParameters": {"rated_power_w": 7200000000.0}
+    },
+    {
+      "id": "module.ct_battery_v1", "displayName": "Stage 17.5I Pulse Energy Storage", "family": "ENERGY_STORAGE", "integrationCategories": ["CORE"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 14.0, "widthM": 9.0, "heightM": 7.0}, "massKg": 480000.0, "occupiedVolumeM3": 1000.0, "requiredMountStrengthN": 7000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 4000000.0, "peakPowerDemandW": 6000000.0, "storedEnergyCapacityJ": 90000000000.0, "wasteHeatW": 2000000.0, "localThermalCapacityJ": 12000000000.0, "coolantTransferDemandW": 2000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 2, "automationRequirement": 4, "interfaces": [], "signatureContributions": {"thermal_w": 2000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 500.0}, {"contentId": "component.precision", "amount": 140.0}],
+      "maintenance": {"serviceIntervalSeconds": 432000.0, "maintenanceWorkSeconds": 7200.0, "repairComplexity": 0.50}, "capabilityParameters": {"max_charge_power_w": 1800000000.0, "max_discharge_power_w": 3600000000.0}
+    },
+    {
+      "id": "module.ct_drive_endurance_v1", "displayName": "Stage 17.5I Endurance Drive", "family": "MAIN_DRIVE", "integrationCategories": ["CORE"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 24.0, "widthM": 14.0, "heightM": 11.0}, "massKg": 1200000.0, "occupiedVolumeM3": 4200.0, "requiredMountStrengthN": 34000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 1250000000.0, "peakPowerDemandW": 1450000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 230000000.0, "localThermalCapacityJ": 28000000000.0, "coolantTransferDemandW": 230000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 12, "automationRequirement": 8, "interfaces": [{"kind": "REACTION_MASS", "id": "propellant_feed", "capacity": 35000000.0}], "signatureContributions": {"plume_w": 520000000000.0, "thermal_w": 230000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 850.0}, {"contentId": "component.precision", "amount": 240.0}],
+      "maintenance": {"serviceIntervalSeconds": 345600.0, "maintenanceWorkSeconds": 18000.0, "repairComplexity": 0.75}, "capabilityParameters": {"thrust_n": 16000000.0, "exhaust_velocity_mps": 95000.0, "jet_power_w": 760000000000.0}
+    },
+    {
+      "id": "module.ct_drive_combat_v1", "displayName": "Stage 17.5I High-Thrust Combat Drive", "family": "MAIN_DRIVE", "integrationCategories": ["CORE"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 32.0, "widthM": 18.0, "heightM": 14.0}, "massKg": 2200000.0, "occupiedVolumeM3": 7600.0, "requiredMountStrengthN": 62000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 2700000000.0, "peakPowerDemandW": 3200000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 620000000.0, "localThermalCapacityJ": 48000000000.0, "coolantTransferDemandW": 620000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 18, "automationRequirement": 10, "interfaces": [{"kind": "REACTION_MASS", "id": "propellant_feed", "capacity": 26000000.0}], "signatureContributions": {"plume_w": 1200000000000.0, "thermal_w": 620000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 1400.0}, {"contentId": "component.precision", "amount": 420.0}],
+      "maintenance": {"serviceIntervalSeconds": 259200.0, "maintenanceWorkSeconds": 25200.0, "repairComplexity": 0.90}, "capabilityParameters": {"thrust_n": 34000000.0, "exhaust_velocity_mps": 68000.0, "jet_power_w": 1156000000000.0}
+    },
+    {
+      "id": "module.ct_radiator_light_v1", "displayName": "Stage 17.5I Light Radiator", "family": "THERMAL_CONTROL", "integrationCategories": ["UTILITY"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 16.0, "widthM": 9.0, "heightM": 7.0}, "massKg": 360000.0, "occupiedVolumeM3": 900.0, "requiredMountStrengthN": 3500000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 12000000.0, "peakPowerDemandW": 18000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 2000000.0, "localThermalCapacityJ": 11000000000.0, "coolantTransferDemandW": 0.0, "heatRejectionW": 850000000.0,
+      "crewRequirement": 4, "automationRequirement": 6, "interfaces": [], "signatureContributions": {"thermal_w": 850000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 180.0}, {"contentId": "component.electrical", "amount": 120.0}],
+      "maintenance": {"serviceIntervalSeconds": 432000.0, "maintenanceWorkSeconds": 7200.0, "repairComplexity": 0.45}, "capabilityParameters": {"radiator_area_m2": 2200.0, "coolant_bus_capacity_w": 1100000000.0, "ship_thermal_store_capacity_j": 70000000000.0}
+    },
+    {
+      "id": "module.ct_radiator_heavy_v1", "displayName": "Stage 17.5I Armored Thermal Plant", "family": "THERMAL_CONTROL", "integrationCategories": ["UTILITY"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 28.0, "widthM": 18.0, "heightM": 13.0}, "massKg": 1450000.0, "occupiedVolumeM3": 3600.0, "requiredMountStrengthN": 11000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 42000000.0, "peakPowerDemandW": 65000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 7000000.0, "localThermalCapacityJ": 36000000000.0, "coolantTransferDemandW": 0.0, "heatRejectionW": 2600000000.0,
+      "crewRequirement": 8, "automationRequirement": 10, "interfaces": [], "signatureContributions": {"thermal_w": 2600000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 620.0}, {"contentId": "component.electrical", "amount": 300.0}],
+      "maintenance": {"serviceIntervalSeconds": 345600.0, "maintenanceWorkSeconds": 12600.0, "repairComplexity": 0.60}, "capabilityParameters": {"radiator_area_m2": 6800.0, "coolant_bus_capacity_w": 3300000000.0, "ship_thermal_store_capacity_j": 220000000000.0}
+    },
+    {
+      "id": "module.ct_sensor_passive_v1", "displayName": "Stage 17.5I Passive Recon Array", "family": "SENSOR_EW_FIRE_CONTROL", "integrationCategories": ["UTILITY"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 12.0, "widthM": 8.0, "heightM": 7.0}, "massKg": 260000.0, "occupiedVolumeM3": 600.0, "requiredMountStrengthN": 2200000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 35000000.0, "peakPowerDemandW": 90000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 18000000.0, "localThermalCapacityJ": 7000000000.0, "coolantTransferDemandW": 18000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 12, "automationRequirement": 16, "interfaces": [], "signatureContributions": {"thermal_w": 18000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 340.0}, {"contentId": "component.precision", "amount": 520.0}],
+      "maintenance": {"serviceIntervalSeconds": 259200.0, "maintenanceWorkSeconds": 9000.0, "repairComplexity": 0.62},
+      "capabilityParameters": {"aperture_area_m2": 360.0, "processing_channels": 128.0, "passive_thermal_receiver_noise_w": 0.0000007, "passive_thermal_detection_snr": 5.0, "passive_thermal_classification_snr": 20.0, "passive_thermal_track_snr": 80.0, "passive_thermal_fire_control_snr": 420.0, "passive_thermal_bearing_sigma_floor_rad": 0.0008, "passive_thermal_range_sigma_fraction": 0.001, "passive_thermal_eccm_processing_gain_linear": 30.0, "passive_thermal_eccm_power_demand_w": 2500000.0, "passive_thermal_eccm_waste_heat_w": 1200000.0}
+    },
+    {
+      "id": "module.ct_sensor_firecontrol_v1", "displayName": "Stage 17.5I Active Fire-Control Array", "family": "SENSOR_EW_FIRE_CONTROL", "integrationCategories": ["UTILITY"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 18.0, "widthM": 12.0, "heightM": 9.0}, "massKg": 620000.0, "occupiedVolumeM3": 1400.0, "requiredMountStrengthN": 4200000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 95000000.0, "peakPowerDemandW": 420000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 62000000.0, "localThermalCapacityJ": 13000000000.0, "coolantTransferDemandW": 62000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 24, "automationRequirement": 24, "interfaces": [], "signatureContributions": {"thermal_w": 62000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 620.0}, {"contentId": "component.precision", "amount": 900.0}],
+      "maintenance": {"serviceIntervalSeconds": 172800.0, "maintenanceWorkSeconds": 12600.0, "repairComplexity": 0.78},
+      "capabilityParameters": {"aperture_area_m2": 520.0, "processing_channels": 192.0, "passive_thermal_receiver_noise_w": 0.000001, "passive_thermal_detection_snr": 5.0, "passive_thermal_classification_snr": 20.0, "passive_thermal_track_snr": 100.0, "passive_thermal_fire_control_snr": 500.0, "passive_thermal_bearing_sigma_floor_rad": 0.0007, "passive_thermal_range_sigma_fraction": 0.001, "passive_thermal_eccm_processing_gain_linear": 50.0, "passive_thermal_eccm_power_demand_w": 3500000.0, "passive_thermal_eccm_waste_heat_w": 1800000.0, "active_radar_receiver_noise_w": 0.000000000001, "active_radar_detection_snr": 10.0, "active_radar_classification_snr": 20.0, "active_radar_track_snr": 50.0, "active_radar_fire_control_snr": 100.0, "active_radar_bearing_sigma_floor_rad": 0.00008, "active_radar_range_sigma_fraction": 0.0008, "active_radar_transmit_power_w": 65000000.0, "active_radar_transmit_gain_linear": 12.0, "active_radar_power_demand_w": 85000000.0, "active_radar_waste_heat_w": 22000000.0, "active_radar_eccm_processing_gain_linear": 120.0, "active_radar_eccm_power_demand_w": 6000000.0, "active_radar_eccm_waste_heat_w": 3000000.0}
+    },
+    {
+      "id": "module.ct_datalink_ew_v1", "displayName": "Stage 17.5I Datalink/EW Support", "family": "COMMUNICATION_DATALINK", "integrationCategories": ["UTILITY"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 14.0, "widthM": 10.0, "heightM": 8.0}, "massKg": 420000.0, "occupiedVolumeM3": 900.0, "requiredMountStrengthN": 3000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 140000000.0, "peakPowerDemandW": 360000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 90000000.0, "localThermalCapacityJ": 12000000000.0, "coolantTransferDemandW": 90000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 14, "automationRequirement": 22, "interfaces": [], "signatureContributions": {"thermal_w": 90000000.0, "radar_w": 1000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 520.0}, {"contentId": "component.precision", "amount": 680.0}],
+      "maintenance": {"serviceIntervalSeconds": 172800.0, "maintenanceWorkSeconds": 10800.0, "repairComplexity": 0.72}, "capabilityParameters": {"datalink_channels": 96.0, "jammer_power_w": 90000000.0, "eccm_processing_gain_linear": 80.0, "decoy_support_channels": 8.0}
+    },
+    {
+      "id": "module.ct_shield_v1", "displayName": "Stage 17.5I Shield Emitter", "family": "SHIELD_FIELD", "integrationCategories": ["UTILITY"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 15.0, "widthM": 10.0, "heightM": 8.0}, "massKg": 520000.0, "occupiedVolumeM3": 1100.0, "requiredMountStrengthN": 4500000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 120000000.0, "peakPowerDemandW": 1600000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 85000000.0, "localThermalCapacityJ": 22000000000.0, "coolantTransferDemandW": 85000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 8, "automationRequirement": 14, "interfaces": [], "signatureContributions": {"thermal_w": 85000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 700.0}, {"contentId": "component.precision", "amount": 880.0}],
+      "maintenance": {"serviceIntervalSeconds": 172800.0, "maintenanceWorkSeconds": 14400.0, "repairComplexity": 0.86}, "capabilityParameters": {"field_reserve_j": 180000000000.0, "interaction_power_w": 1800000000.0, "recharge_power_w": 750000000.0, "recharge_efficiency": 0.78, "heat_per_absorbed_j": 0.10, "restart_delay_s": 18.0, "coverage_center_rad": 1.5707963267948966, "coverage_half_arc_rad": 3.141592653589793}
+    },
+    {
+      "id": "module.ct_armor_heavy_v1", "displayName": "Stage 17.5I Heavy Armor Package", "family": "ARMOR_PROTECTION", "integrationCategories": ["UTILITY"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 20.0, "widthM": 12.0, "heightM": 9.0}, "massKg": 1050000.0, "occupiedVolumeM3": 2100.0, "requiredMountStrengthN": 15000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 0.0, "peakPowerDemandW": 0.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 0.0, "localThermalCapacityJ": 0.0, "coolantTransferDemandW": 0.0, "heatRejectionW": 0.0,
+      "crewRequirement": 0, "automationRequirement": 0, "interfaces": [], "signatureContributions": {},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 950.0}],
+      "maintenance": {"serviceIntervalSeconds": 777600.0, "maintenanceWorkSeconds": 10800.0, "repairComplexity": 0.40}, "capabilityParameters": {"protection_mass_kg": 1050000.0}
+    },
+    {
+      "id": "module.ct_ftl_v1", "displayName": "Stage 17.5I FTL Translator", "family": "FTL_JUMP", "integrationCategories": ["INTERNAL"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 22.0, "widthM": 14.0, "heightM": 11.0}, "massKg": 980000.0, "occupiedVolumeM3": 2600.0, "requiredMountStrengthN": 9000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 55000000.0, "peakPowerDemandW": 1200000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 28000000.0, "localThermalCapacityJ": 30000000000.0, "coolantTransferDemandW": 28000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 8, "automationRequirement": 12, "interfaces": [], "signatureContributions": {"thermal_w": 28000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 820.0}, {"contentId": "component.precision", "amount": 1100.0}],
+      "maintenance": {"serviceIntervalSeconds": 259200.0, "maintenanceWorkSeconds": 18000.0, "repairComplexity": 0.90}, "capabilityParameters": {"ftl_translated_mass_max_kg": 180000000.0, "ftl_jump_energy_j": 150000000000.0, "charge_power_w": 1000000000.0, "spool_time_s": 180.0, "edge_transit_time_s": 900.0, "cooldown_s": 300.0, "jump_heat_j": 12000000000.0}
+    },
+    {
+      "id": "module.ct_crew_v1", "displayName": "Stage 17.5I Crew/Automation Baseline", "family": "CREW_LIFE_SUPPORT_AUTOMATION", "integrationCategories": ["INTERNAL"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 14.0, "widthM": 10.0, "heightM": 8.0}, "massKg": 420000.0, "occupiedVolumeM3": 1800.0, "requiredMountStrengthN": 2000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 48000000.0, "peakPowerDemandW": 65000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 22000000.0, "localThermalCapacityJ": 8000000000.0, "coolantTransferDemandW": 22000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 20, "automationRequirement": 30, "interfaces": [{"kind": "CONSUMABLE", "id": "life_support_stores", "capacity": 400000.0}], "signatureContributions": {"thermal_w": 22000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 320.0}, {"contentId": "component.precision", "amount": 240.0}],
+      "maintenance": {"serviceIntervalSeconds": 345600.0, "maintenanceWorkSeconds": 7200.0, "repairComplexity": 0.50}, "capabilityParameters": {"life_support_capacity": 180.0, "automation_capacity": 96.0}
+    },
+    {
+      "id": "module.ct_kinetic_medium_v1", "displayName": "Stage 17.5I Medium Railgun", "family": "WEAPON_AMMUNITION", "integrationCategories": ["WEAPON"], "compatibleHardpointSizes": ["MEDIUM"],
+      "physicalDimensionsM": {"lengthM": 25.0, "widthM": 7.0, "heightM": 7.0}, "massKg": 620000.0, "occupiedVolumeM3": 2100.0, "requiredMountStrengthN": 22000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 18000000.0, "peakPowerDemandW": 850000000.0, "storedEnergyCapacityJ": 12000000000.0, "wasteHeatW": 95000000.0, "localThermalCapacityJ": 11000000000.0, "coolantTransferDemandW": 95000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 8, "automationRequirement": 8, "interfaces": [{"kind": "AMMUNITION", "id": "kinetic_feed", "capacity": 60000.0}], "signatureContributions": {"thermal_w": 95000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 520.0}, {"contentId": "component.precision", "amount": 220.0}],
+      "maintenance": {"serviceIntervalSeconds": 129600.0, "maintenanceWorkSeconds": 14400.0, "repairComplexity": 0.82}, "capabilityParameters": {"projectile_mass_kg": 50.0, "muzzle_velocity_mps": 8500.0, "recoil_impulse_ns": 425000.0}
+    },
+    {
+      "id": "module.ct_kinetic_large_v1", "displayName": "Stage 17.5I Heavy Railgun", "family": "WEAPON_AMMUNITION", "integrationCategories": ["WEAPON"], "compatibleHardpointSizes": ["LARGE"],
+      "physicalDimensionsM": {"lengthM": 68.0, "widthM": 11.0, "heightM": 11.0}, "massKg": 1650000.0, "occupiedVolumeM3": 7200.0, "requiredMountStrengthN": 68000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 35000000.0, "peakPowerDemandW": 1900000000.0, "storedEnergyCapacityJ": 24000000000.0, "wasteHeatW": 220000000.0, "localThermalCapacityJ": 18000000000.0, "coolantTransferDemandW": 220000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 12, "automationRequirement": 10, "interfaces": [{"kind": "AMMUNITION", "id": "kinetic_feed", "capacity": 120000.0}], "signatureContributions": {"thermal_w": 220000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 1200.0}, {"contentId": "component.precision", "amount": 340.0}],
+      "maintenance": {"serviceIntervalSeconds": 129600.0, "maintenanceWorkSeconds": 19800.0, "repairComplexity": 0.90}, "capabilityParameters": {"projectile_mass_kg": 200.0, "muzzle_velocity_mps": 9000.0, "recoil_impulse_ns": 1800000.0}
+    },
+    {
+      "id": "module.ct_missile_medium_v1", "displayName": "Stage 17.5I Guided Missile Launcher", "family": "WEAPON_AMMUNITION", "integrationCategories": ["WEAPON"], "compatibleHardpointSizes": ["MEDIUM", "LARGE"],
+      "physicalDimensionsM": {"lengthM": 28.0, "widthM": 8.0, "heightM": 8.0}, "massKg": 720000.0, "occupiedVolumeM3": 2600.0, "requiredMountStrengthN": 12000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 22000000.0, "peakPowerDemandW": 220000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 28000000.0, "localThermalCapacityJ": 9000000000.0, "coolantTransferDemandW": 28000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 10, "automationRequirement": 12, "interfaces": [{"kind": "AMMUNITION", "id": "guided_feed", "capacity": 180000.0}], "signatureContributions": {"thermal_w": 28000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 420.0}, {"contentId": "component.precision", "amount": 420.0}],
+      "maintenance": {"serviceIntervalSeconds": 172800.0, "maintenanceWorkSeconds": 12600.0, "repairComplexity": 0.76}, "capabilityParameters": {"support_channels": 12.0}
+    },
+    {
+      "id": "module.ct_beam_v1", "displayName": "Stage 17.5I Beam Emitter", "family": "WEAPON_AMMUNITION", "integrationCategories": ["WEAPON"], "compatibleHardpointSizes": ["MEDIUM", "LARGE"],
+      "physicalDimensionsM": {"lengthM": 24.0, "widthM": 8.0, "heightM": 8.0}, "massKg": 640000.0, "occupiedVolumeM3": 2200.0, "requiredMountStrengthN": 9000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 140000000.0, "peakPowerDemandW": 1400000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 420000000.0, "localThermalCapacityJ": 20000000000.0, "coolantTransferDemandW": 420000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 8, "automationRequirement": 12, "interfaces": [], "signatureContributions": {"thermal_w": 420000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 720.0}, {"contentId": "component.precision", "amount": 780.0}],
+      "maintenance": {"serviceIntervalSeconds": 129600.0, "maintenanceWorkSeconds": 16200.0, "repairComplexity": 0.88}, "capabilityParameters": {"beam_aperture_m": 2.5, "beam_power_w": 1200000000.0, "wavelength_m": 0.00000106, "pointing_jitter_rad": 0.00002}
+    },
+    {
+      "id": "module.ct_pd_v1", "displayName": "Stage 17.5I Point Defense Mount", "family": "WEAPON_AMMUNITION", "integrationCategories": ["WEAPON"], "compatibleHardpointSizes": ["SMALL"],
+      "physicalDimensionsM": {"lengthM": 8.0, "widthM": 5.0, "heightM": 5.0}, "massKg": 180000.0, "occupiedVolumeM3": 350.0, "requiredMountStrengthN": 2800000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 14000000.0, "peakPowerDemandW": 180000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 22000000.0, "localThermalCapacityJ": 4500000000.0, "coolantTransferDemandW": 22000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 4, "automationRequirement": 8, "interfaces": [{"kind": "AMMUNITION", "id": "interceptor_feed", "capacity": 30000.0}], "signatureContributions": {"thermal_w": 22000000.0},
+      "constructionInputs": [{"contentId": "component.electrical", "amount": 220.0}, {"contentId": "component.precision", "amount": 260.0}],
+      "maintenance": {"serviceIntervalSeconds": 129600.0, "maintenanceWorkSeconds": 9000.0, "repairComplexity": 0.70}, "capabilityParameters": {"support_channels": 6.0}
+    },
+    {
+      "id": "module.ct_cargo_v1", "displayName": "Stage 17.5I Bulk Cargo Integration", "family": "CARGO_TANK_STORES", "integrationCategories": ["MISSION"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 120.0, "widthM": 48.0, "heightM": 38.0}, "massKg": 5500000.0, "occupiedVolumeM3": 220000.0, "requiredMountStrengthN": 18000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 18000000.0, "peakPowerDemandW": 24000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 6000000.0, "localThermalCapacityJ": 7000000000.0, "coolantTransferDemandW": 6000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 12, "automationRequirement": 20, "interfaces": [{"kind": "CONSUMABLE", "id": "cargo_handling_stores", "capacity": 90000000.0}], "signatureContributions": {"thermal_w": 6000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 2800.0}],
+      "maintenance": {"serviceIntervalSeconds": 777600.0, "maintenanceWorkSeconds": 14400.0, "repairComplexity": 0.35}, "capabilityParameters": {"cargo_volume_m3": 320000.0}
+    },
+    {
+      "id": "module.ct_tank_v1", "displayName": "Stage 17.5I Fleet Tankage Integration", "family": "CARGO_TANK_STORES", "integrationCategories": ["MISSION"], "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 115.0, "widthM": 46.0, "heightM": 42.0}, "massKg": 6200000.0, "occupiedVolumeM3": 205000.0, "requiredMountStrengthN": 22000000.0,
+      "continuousPowerSupplyW": 0.0, "continuousPowerDemandW": 24000000.0, "peakPowerDemandW": 32000000.0, "storedEnergyCapacityJ": 0.0, "wasteHeatW": 8000000.0, "localThermalCapacityJ": 8000000000.0, "coolantTransferDemandW": 8000000.0, "heatRejectionW": 0.0,
+      "crewRequirement": 14, "automationRequirement": 22, "interfaces": [{"kind": "REACTION_MASS", "id": "bulk_propellant_transfer", "capacity": 95000000.0}], "signatureContributions": {"thermal_w": 8000000.0},
+      "constructionInputs": [{"contentId": "component.heavy", "amount": 3100.0}],
+      "maintenance": {"serviceIntervalSeconds": 777600.0, "maintenanceWorkSeconds": 16200.0, "repairComplexity": 0.40}, "capabilityParameters": {"tank_capacity_kg": 95000000.0}
+    }
+  ],
+  "demonstratorFits": [
+    {"id": "fit.ct_corvette_beam_v1", "hullId": "hull.ct_corvette_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_combat_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_combat_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_light_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_firecontrol_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_primary_a", "moduleId": "module.ct_beam_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_frigate_recon_v1", "hullId": "hull.ct_frigate_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_endurance_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_endurance_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_light_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_passive_v1"}, {"mountId": "utility_support", "moduleId": "module.ct_datalink_ew_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_frigate_escort_v1", "hullId": "hull.ct_frigate_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_endurance_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_combat_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_firecontrol_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_primary_a", "moduleId": "module.ct_kinetic_medium_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}, {"mountId": "weapon_defense_b", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_frigate_missile_v1", "hullId": "hull.ct_frigate_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_endurance_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_endurance_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_light_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_passive_v1"}, {"mountId": "utility_support", "moduleId": "module.ct_datalink_ew_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_primary_a", "moduleId": "module.ct_missile_medium_v1"}, {"mountId": "weapon_primary_b", "moduleId": "module.ct_missile_medium_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_destroyer_kinetic_v1", "hullId": "hull.ct_destroyer_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_combat_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_endurance_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_firecontrol_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_primary_a", "moduleId": "module.ct_kinetic_large_v1"}, {"mountId": "weapon_primary_b", "moduleId": "module.ct_kinetic_large_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}, {"mountId": "weapon_defense_b", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_destroyer_missile_v1", "hullId": "hull.ct_destroyer_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_combat_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_combat_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_firecontrol_v1"}, {"mountId": "utility_support", "moduleId": "module.ct_datalink_ew_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_primary_a", "moduleId": "module.ct_missile_medium_v1"}, {"mountId": "weapon_primary_b", "moduleId": "module.ct_missile_medium_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_destroyer_defense_v1", "hullId": "hull.ct_destroyer_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_endurance_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_endurance_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_firecontrol_v1"}, {"mountId": "utility_support", "moduleId": "module.ct_shield_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}, {"mountId": "weapon_defense_b", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_cruiser_armor_gun_v1", "hullId": "hull.ct_cruiser_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_combat_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_endurance_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_firecontrol_v1"}, {"mountId": "utility_support", "moduleId": "module.ct_armor_heavy_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_primary_a", "moduleId": "module.ct_kinetic_large_v1"}, {"mountId": "weapon_primary_b", "moduleId": "module.ct_kinetic_large_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}, {"mountId": "weapon_defense_b", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_cruiser_beam_v1", "hullId": "hull.ct_cruiser_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_combat_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_combat_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_firecontrol_v1"}, {"mountId": "utility_support", "moduleId": "module.ct_shield_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_primary_a", "moduleId": "module.ct_beam_v1"}, {"mountId": "weapon_primary_b", "moduleId": "module.ct_beam_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_cruiser_command_v1", "hullId": "hull.ct_cruiser_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_endurance_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_endurance_v1"}, {"mountId": "core_storage", "moduleId": "module.ct_battery_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_firecontrol_v1"}, {"mountId": "utility_support", "moduleId": "module.ct_datalink_ew_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "weapon_primary_a", "moduleId": "module.ct_missile_medium_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}, {"mountId": "weapon_defense_b", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_bulk_freighter_v1", "hullId": "hull.ct_bulk_freighter_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_endurance_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_endurance_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_passive_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "mission_cargo", "moduleId": "module.ct_cargo_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}
+    ]},
+    {"id": "fit.ct_tanker_v1", "hullId": "hull.ct_tanker_v1", "installedModules": [
+      {"mountId": "core_reactor", "moduleId": "module.ct_reactor_endurance_v1"}, {"mountId": "core_drive", "moduleId": "module.ct_drive_endurance_v1"}, {"mountId": "utility_thermal", "moduleId": "module.ct_radiator_heavy_v1"}, {"mountId": "utility_sensor", "moduleId": "module.ct_sensor_passive_v1"}, {"mountId": "internal_crew", "moduleId": "module.ct_crew_v1"}, {"mountId": "internal_ftl", "moduleId": "module.ct_ftl_v1"}, {"mountId": "mission_tank", "moduleId": "module.ct_tank_v1"}, {"mountId": "weapon_defense_a", "moduleId": "module.ct_pd_v1"}
+    ]}
+  ]
+}
