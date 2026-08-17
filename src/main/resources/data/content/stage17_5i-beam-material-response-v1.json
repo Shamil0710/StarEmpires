@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "responses": [
+    {
+      "materialId": "material.ct_structural_alloy_v1",
+      "absorptionFraction": 0.62,
+      "ablationSpecificEnergyJPerKg": 8200000.0,
+      "internalResidualCouplingFraction": 0.72
+    },
+    {
+      "materialId": "material.ct_ceramic_v1",
+      "absorptionFraction": 0.78,
+      "ablationSpecificEnergyJPerKg": 11800000.0,
+      "internalResidualCouplingFraction": 0.64
+    }
+  ]
+}
