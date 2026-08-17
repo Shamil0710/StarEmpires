@@ -3,6 +3,7 @@ package com.spacesim.ship;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.ship.ShieldFieldRuntime.State;
+import com.spacesim.ship.ShipEngineeringGrantService.IntervalBudget;
 import com.spacesim.ship.ShipShieldEngineeringAdapter.FittedShield;
 
 import java.util.Map;
@@ -34,7 +35,7 @@ public final class ShipShieldEngineeringService {
     }
 
     /**
-     * Advances recharge/restart for one currently fitted emitter and persists the resulting state.
+     * Advances non-overlapping recharge/restart for one currently fitted emitter and persists state.
      *
      * @param engineering authoritative physical ship component
      * @param mountId fitted shield emitter mount
@@ -45,6 +46,35 @@ public final class ShipShieldEngineeringService {
             EngineeringComponent engineering,
             String mountId,
             double deltaSeconds) {
+        return stepRechargeInternal(engineering, mountId, deltaSeconds, null);
+    }
+
+    /**
+     * Advances recharge/restart for one fitted emitter against a shared same-interval power budget.
+     *
+     * @param engineering authoritative physical ship component
+     * @param mountId fitted shield emitter mount
+     * @param deltaSeconds positive simulation interval not exceeding the shared interval
+     * @param intervalBudget shared reservation ledger for overlapping ship operations
+     * @return persisted next shield state
+     */
+    public State stepRecharge(
+            EngineeringComponent engineering,
+            String mountId,
+            double deltaSeconds,
+            IntervalBudget intervalBudget) {
+        return stepRechargeInternal(
+                engineering,
+                mountId,
+                deltaSeconds,
+                Objects.requireNonNull(intervalBudget, "intervalBudget"));
+    }
+
+    private State stepRechargeInternal(
+            EngineeringComponent engineering,
+            String mountId,
+            double deltaSeconds,
+            IntervalBudget intervalBudget) {
         EngineeringComponent component = Objects.requireNonNull(engineering, "engineering");
         if (mountId == null || mountId.isBlank()) {
             throw new IllegalArgumentException("mountId must be non-blank");
@@ -64,8 +94,15 @@ public final class ShipShieldEngineeringService {
                 : fitted.definition().rechargePowerW() * fitted.emitterIntegrity();
         double grantedPowerW = 0d;
         if (requestedPowerW > 0d) {
-            ShipEngineeringGrantService.GrantResult grant = grants.grantAndCommit(
-                    component, mountId, requestedPowerW, 0d, deltaSeconds);
+            ShipEngineeringGrantService.GrantResult grant = intervalBudget == null
+                    ? grants.grantAndCommit(component, mountId, requestedPowerW, 0d, deltaSeconds)
+                    : grants.grantAndCommit(
+                            component,
+                            mountId,
+                            requestedPowerW,
+                            0d,
+                            deltaSeconds,
+                            intervalBudget);
             if (grant.committed()) {
                 grantedPowerW = grant.grant().grantedPowerW();
             }
