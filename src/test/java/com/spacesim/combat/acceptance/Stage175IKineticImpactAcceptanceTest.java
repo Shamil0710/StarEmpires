@@ -106,7 +106,7 @@ class Stage175IKineticImpactAcceptanceTest {
         assertTrue(attacker.engineering().runtimeState.consumables().ammunitionCount() == ammunitionBefore - 1L);
         assertNotNull(impact.shieldInteraction());
         assertTrue(impact.shieldInteraction().absorbedEnergyJ() > 0d);
-        assertTrue(impact.shieldInteraction().updatedState().reserveJ() < shieldState.reserveJ());
+        assertTrue(impact.shieldInteraction().state().reserveJ() < shieldState.reserveJ());
         assertTrue(impact.armorReached());
         assertTrue(impact.internalDamageOccurred());
         assertNotNull(impact.damageEvent());
@@ -116,7 +116,7 @@ class Stage175IKineticImpactAcceptanceTest {
 
         TreeMap<String, ShieldFieldRuntime.State> shields = new TreeMap<>(
                 target.engineering().instanceState.shieldStatesByMount());
-        shields.put(fittedShield.mountId(), impact.shieldInteraction().updatedState());
+        shields.put(fittedShield.mountId(), impact.shieldInteraction().state());
         target.engineering().setInstanceState(new com.spacesim.ship.ShipInstanceRuntimeState(
                 impact.damageEvent().snapshot(),
                 Map.copyOf(shields),
