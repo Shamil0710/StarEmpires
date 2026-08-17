@@ -65,7 +65,15 @@ public final class Stage175ICombatMatrixCatalog {
             Scenario scenario,
             double leftFleetMassKg,
             double rightFleetMassKg) {
-        /** Validates one immutable matrix case. */
+        /**
+         * Validates one immutable matrix case.
+         *
+         * @param kind required variation category
+         * @param id stable acceptance-case ID
+         * @param scenario exact combat harness inputs
+         * @param leftFleetMassKg physical fitted mass times left ship count
+         * @param rightFleetMassKg physical fitted mass times right ship count
+         */
         public MatrixCase {
             Objects.requireNonNull(kind, "kind");
             requireNonBlank(id, "id");
