@@ -82,7 +82,7 @@ class ShipEngineeringDriveDamageAcceptanceTest {
                 "persistent thrust ceiling must not pre-apply local integrity");
         assertEquals(ratedThrustN * 0.5d, result.actualThrustN(), 1e-6,
                 "current module integrity must scale live thrust exactly once, not integrity squared");
-        assertEquals(ratedThrustN * 0.5d, result.derivedState().totalThrustN(), 1e-6,
+        assertEquals(ratedThrustN * 0.5d, result.derivedState().availableThrustN(), 1e-6,
                 "live result and central derived calculator must agree on damaged thrust");
     }
 
