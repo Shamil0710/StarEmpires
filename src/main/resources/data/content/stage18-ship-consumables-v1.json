@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "bindings": [
+    {
+      "id": "ship_consumable.reaction_mass.escort_water_v1",
+      "moduleId": "module.main_drive_escort_v1",
+      "interfaceId": "propellant_feed",
+      "interfaceKind": "REACTION_MASS",
+      "commodityId": "commodity.material.purified_water",
+      "amountPerKg": 1.0
+    }
+  ]
+}
