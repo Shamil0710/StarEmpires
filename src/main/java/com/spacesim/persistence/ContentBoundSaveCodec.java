@@ -479,7 +479,13 @@ public final class ContentBoundSaveCodec {
      * @param legacyRawFormat был ли вход историческим raw GameStateCodec save
      */
     public record DecodedSave(GameState state, String contentFingerprint, boolean legacyRawFormat) {
-        /** Проверяет обязательные значения decoded envelope. */
+        /**
+         * Проверяет обязательные значения decoded envelope.
+         *
+         * @param state migrated authoritative GameState
+         * @param contentFingerprint ожидаемый semantic fingerprint каталога
+         * @param legacyRawFormat был ли вход историческим raw GameStateCodec save
+         */
         public DecodedSave {
             Objects.requireNonNull(state, "Decoded GameState не задан");
             contentFingerprint = requireFingerprint(contentFingerprint);
