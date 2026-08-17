@@ -122,6 +122,7 @@ public final class ShipEngineeringRuntime {
             Map<String, Double> thrustLimitNByMount,
             double coolantBusCapacityW,
             Map<String, Double> ftlCooldownSecondsByMount) {
+        /** Validates and freezes one persistent-ready operating state. */
         public RuntimeState {
             Objects.requireNonNull(consumables, "consumables");
             requireNonNegativeFinite(sharedBusEnergyJ, "sharedBusEnergyJ");
@@ -145,6 +146,7 @@ public final class ShipEngineeringRuntime {
             Map<String, Double> throttleByMount,
             Map<String, Integer> powerPriorityByMount,
             Set<String> disabledMounts) {
+        /** Validates, sorts and freezes one shared player/AI operating command. */
         public OperatingCommand {
             Objects.requireNonNull(throttleByMount, "throttleByMount");
             TreeMap<String, Double> throttles = new TreeMap<>();
@@ -216,6 +218,7 @@ public final class ShipEngineeringRuntime {
             double radiatorRejectionW,
             ThermalStatus thermalStatus,
             List<String> shedMounts) {
+        /** Validates and freezes one deterministic engineering tick result. */
         public TickResult {
             Objects.requireNonNull(state, "state");
             Objects.requireNonNull(derivedState, "derivedState");
@@ -262,6 +265,7 @@ public final class ShipEngineeringRuntime {
             double edgeTransitSeconds,
             double cooldownSeconds,
             double jumpHeatJ) {
+        /** Validates energy closure and immutable scalar values of one jump plan. */
         public JumpPlan {
             Objects.requireNonNull(failure, "failure");
             mountId = mountId == null ? "" : mountId;
