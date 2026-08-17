@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "methods": [
+    {
+      "id": "extraction.asteroid_excavation",
+      "displayName": "Asteroid/free-body excavation",
+      "sourceKind": "NATURAL_OCCURRENCE",
+      "environment": "FREE_BODY",
+      "compatibleOccurrenceTypeIds": [
+        "occurrence.water_ice",
+        "occurrence.carbonaceous",
+        "occurrence.metallic",
+        "occurrence.light_metals",
+        "occurrence.conductors",
+        "occurrence.strategic_metals",
+        "occurrence.silicates",
+        "occurrence.fissiles"
+      ],
+      "requiredCapabilityTags": ["capability.extraction.asteroid_excavation"],
+      "workSecondsPerSourceKg": 0.08,
+      "energyJPerSourceKg": 120000.0,
+      "maintenanceWorkSecondsPerSourceKg": 0.004,
+      "maxSourceKgPerSecond": 25.0,
+      "recoveryFraction": 0.92
+    },
+    {
+      "id": "extraction.surface_mining",
+      "displayName": "Surface/regolith mining",
+      "sourceKind": "NATURAL_OCCURRENCE",
+      "environment": "SURFACE",
+      "compatibleOccurrenceTypeIds": [
+        "occurrence.water_ice",
+        "occurrence.carbonaceous",
+        "occurrence.metallic",
+        "occurrence.light_metals",
+        "occurrence.conductors",
+        "occurrence.strategic_metals",
+        "occurrence.silicates",
+        "occurrence.fissiles"
+      ],
+      "requiredCapabilityTags": ["capability.extraction.surface_mining"],
+      "workSecondsPerSourceKg": 0.12,
+      "energyJPerSourceKg": 90000.0,
+      "maintenanceWorkSecondsPerSourceKg": 0.006,
+      "maxSourceKgPerSecond": 20.0,
+      "recoveryFraction": 0.90
+    },
+    {
+      "id": "extraction.deep_mining",
+      "displayName": "Deep/hard-rock mining",
+      "sourceKind": "NATURAL_OCCURRENCE",
+      "environment": "DEEP_SUBSURFACE",
+      "compatibleOccurrenceTypeIds": [
+        "occurrence.metallic",
+        "occurrence.light_metals",
+        "occurrence.conductors",
+        "occurrence.strategic_metals",
+        "occurrence.silicates",
+        "occurrence.fissiles"
+      ],
+      "requiredCapabilityTags": ["capability.extraction.deep_mining"],
+      "workSecondsPerSourceKg": 0.25,
+      "energyJPerSourceKg": 180000.0,
+      "maintenanceWorkSecondsPerSourceKg": 0.012,
+      "maxSourceKgPerSecond": 12.0,
+      "recoveryFraction": 0.88
+    },
+    {
+      "id": "extraction.thermal_volatiles",
+      "displayName": "Thermal volatile extraction",
+      "sourceKind": "NATURAL_OCCURRENCE",
+      "environment": "VOLATILE_BEARING",
+      "compatibleOccurrenceTypeIds": [
+        "occurrence.water_ice",
+        "occurrence.volatiles",
+        "occurrence.carbonaceous"
+      ],
+      "requiredCapabilityTags": ["capability.extraction.thermal_volatiles"],
+      "workSecondsPerSourceKg": 0.18,
+      "energyJPerSourceKg": 800000.0,
+      "maintenanceWorkSecondsPerSourceKg": 0.008,
+      "maxSourceKgPerSecond": 15.0,
+      "recoveryFraction": 0.85
+    },
+    {
+      "id": "extraction.salvage_recovery",
+      "displayName": "Pre-accounted salvage stream recovery",
+      "sourceKind": "SALVAGE_STREAM",
+      "environment": "SALVAGE_SITE",
+      "compatibleOccurrenceTypeIds": [],
+      "requiredCapabilityTags": ["capability.process.recycling"],
+      "workSecondsPerSourceKg": 0.30,
+      "energyJPerSourceKg": 220000.0,
+      "maintenanceWorkSecondsPerSourceKg": 0.020,
+      "maxSourceKgPerSecond": 8.0,
+      "recoveryFraction": 0.70
+    }
+  ]
+}

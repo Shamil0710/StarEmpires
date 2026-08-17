@@ -1,8 +1,8 @@
 # Stage 18A — Resource / Schema Ontology
 
-> Status: **IMPLEMENTED / GREEN — pending PR and post-merge gate**  
+> Status: **COMPLETE — merged by PR #159; post-merge `main` gate green**  
 > Stage owner: Stage 18 Resources / Industry / Infrastructure Foundation  
-> Next slice after merge: **Stage 18B — extraction/source compatibility and finite occurrence state**
+> Next slice: **Stage 18B — extraction/source compatibility and finite occurrence state**
 
 ## 1. Purpose
 
@@ -206,13 +206,13 @@ Stage 18A does not implement:
 
 Early implementation checkpoint `309cca98...` executed the full suite with **878 tests, 0 failures/errors/skips**. That checkpoint failed only the repository's strict Javadoc gate because compact record constructors lacked duplicated `@param` documentation.
 
-The Javadoc defect was corrected on `e28a19a4...`. Exact-head CI #2834 then passed the complete `clean verify` gate including tests, JaCoCo coverage, strict Javadoc and desktop packaging.
+The Javadoc defect was corrected on `e28a19a4...`; the final documented Stage-18A feature head passed the complete `clean verify` gate including tests, JaCoCo coverage, strict Javadoc and desktop packaging.
 
-Final documented head must still pass the normal exact-head → PR-head → exact-SHA merge → post-merge `main` gate before Stage 18A is marked merged COMPLETE.
+PR **#159** was merged. The resulting `main` commit is `267e2e6eae0124e860fed8295e5d570a60edbb53`, and post-merge CI **#2840** completed successfully.
 
 ## 13. Exit decision
 
-The Stage-18A implementation satisfies its defined DoD:
+Stage 18A satisfies its defined DoD and is canonical **COMPLETE**:
 
 - production-grade data-driven ontology definitions exist;
 - no class/doctrine bonus path is introduced;
@@ -222,4 +222,4 @@ The Stage-18A implementation satisfies its defined DoD:
 - all five current early-game items have an explicit migration/mapping disposition;
 - no free resource, reserve, recipe, facility output or quantity migration is invented.
 
-After repository merge gates pass, **Stage 18A becomes COMPLETE and Stage 18B becomes NEXT**.
+**Stage 18B is the active successor slice.**
