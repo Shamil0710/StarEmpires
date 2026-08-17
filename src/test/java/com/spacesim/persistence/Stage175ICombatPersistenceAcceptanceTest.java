@@ -96,14 +96,17 @@ class Stage175ICombatPersistenceAcceptanceTest {
 
         assertEquals(state, decoded.state());
         assertEquals(fingerprint, decoded.contentFingerprint());
-        assertFalse(decoded.legacyRaw());
+        assertFalse(decoded.legacyRawFormat());
         assertArrayEquals(encoded, ContentBoundSaveCodec.encode(decoded.state(), fingerprint),
                 "production envelope must remain deterministic after a mid-combat round-trip");
 
         assertNotNull(restored.engineering());
         assertNotNull(restored.engineering().instanceState());
-        assertTrue(restored.engineering().consumables().ammunitionCount()
-                        < doctrine.initialConsumables().ammunitionCount(),
+        long persistedAmmunition = restored.engineering().consumables().interfaceLoads().stream()
+                .filter(load -> load.kindName().equals(InterfaceKind.AMMUNITION.name()))
+                .mapToLong(EntityState.EngineeringConsumableLoadState::itemCount)
+                .sum();
+        assertTrue(persistedAmmunition < doctrine.initialConsumables().ammunitionCount(),
                 "partial magazine must remain physically depleted");
         assertEquals(6_000_000_000d,
                 mountValue(restored.engineering().localHeatJByMount(), "utility_thermal"), 0d);
@@ -164,7 +167,7 @@ class Stage175ICombatPersistenceAcceptanceTest {
                 2,
                 4);
         SensorMeasurement measurement = new SensorMeasurement(
-                observerId.value(), 17_500_902L, Channel.ACTIVE_RADAR, 120d,
+                observerId.value(), 17_500_902L, Channel.RADAR, 120d,
                 0d, 0d, -0.225d, 49_244d, 0.0001d, 25d,
                 120d, 250d, 900d, TrackState.InformationState.FIRE_CONTROL);
         knowledge.putTrack(track);
