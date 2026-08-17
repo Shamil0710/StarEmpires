@@ -1,7 +1,7 @@
 # Star Empires — Persistence Model
 
 > Статус: **authoritative persistence architecture**  
-> Синхронизация: **2026-08-16 / Stage 17.5C**
+> Синхронизация: **2026-08-17 / Stage 17.5H**
 
 ## 1. Core rule
 
@@ -23,13 +23,13 @@ Persistent state не должен зависеть от:
 - wall-clock time как authoritative game time;
 - reflection-extracted JVM RNG state.
 
-Derived runtime indexes and presentation objects rebuild after load.
+Derived runtime indexes, capability projections and presentation objects rebuild after load.
 
 ---
 
 ## 2. Persistence is layered
 
-В текущем проекте нет одной глобальной цифры schema для всего save. Есть три вложенных уровня с разными responsibilities.
+В текущем проекте нет одной глобальной цифры schema для всего save. Есть три logical state levels плюс content-bound file envelope для локального production save.
 
 ```text
 PlayableWorldState
@@ -38,24 +38,29 @@ PlayableWorldState
     ├── topology / factions / diplomacy / territory / fleets / construction
     └── StarSystemSimulationState[]
         └── GameState
-            └── local ECS/economy/entities/engineering state
+            └── local ECS/economy/entities/engineering source state
+
+ContentBoundSaveCodec v2
+└── GameStateCodec v4 core payload
+    + Stage-17.5H deterministic continuity extension
 ```
 
 Версия меняется на том уровне, где реально изменился serialized authoritative contract.
 
 ### Current versions
 
-| Layer | Logical schema | File format | Responsibility |
-| --- | ---: | ---: | --- |
-| `GameState` | **v4** | codec-owned current format | local fixed-step ECS/economy + fitted engineering state |
-| `WorldState` | **v9** | **v8** | galaxy/world strategic state |
-| `PlayableWorldState` | **v5** | **v1** | optional player envelope + embedded world |
+| Layer | Logical schema / format | Responsibility |
+| --- | ---: | --- |
+| `GameState` / `GameStateCodec` | **v4** | local fixed-step ECS/economy + fitted Stage-17.5C core engineering state |
+| `ContentBoundSaveCodec` | envelope **v2** | semantic content binding + Stage-17.5H local ship-instance/information continuity extension |
+| `WorldState` | schema **v9** / file **v8** | galaxy/world strategic state |
+| `PlayableWorldState` | schema **v5** / file **v1** | optional player envelope + embedded world |
 
-Stage 17.5C повышает только локальный `GameState`, потому что fitted ship engineering является состоянием конкретной physical ECS entity. `WorldState` и `PlayableWorldState` не повышаются ради номера milestone: их serialized authoritative shape не изменился.
+Stage 17.5C raised only local `GameState` to v4 because fitted ship engineering is physical ECS entity state. Stage 17.5H intentionally keeps that backward-compatible core payload at v4 and raises the production content-bound envelope to v2 for the H continuity extension. `WorldState` and `PlayableWorldState` do not increase merely because a milestone completed.
 
 ---
 
-## 3. Local `GameState` contract
+## 3. Local `GameState` core contract
 
 `SimulationSession` является authoritative owner локального simulation core.
 
@@ -70,7 +75,7 @@ Stage 17.5C повышает только локальный `GameState`, пот
 - price-recorder state;
 - economic ledger state;
 - persistent `EntityState` records sorted by stable identity;
-- optional fitted Stage-17.5 engineering state per entity.
+- optional fitted Stage-17.5 engineering core state per entity.
 
 ### Local schema history
 
@@ -78,12 +83,12 @@ Stage 17.5C повышает только локальный `GameState`, пот
 v1 — historical Stage-3 entity/item shape
 v2 — expandable item slots + stable archetype IDs
 v3 — configured market target provenance
-v4 — fitted Stage-17.5 physical engineering state
+v4 — fitted Stage-17.5 physical engineering core state
 ```
 
-### Stage-17.5 engineering payload
+### Stage-17.5 engineering core payload
 
-When an entity has an authoritative fitted engineering state, v4 stores physical source state only:
+When an entity has an authoritative fitted engineering state, v4 stores physical source state:
 
 - fitted hull content ID;
 - deterministic module-to-mount assignments;
@@ -96,6 +101,8 @@ When an entity has an authoritative fitted engineering state, v4 stores physical
 - FTL cooldown by mount.
 
 It deliberately does **not** persist derived acceleration, delta-v, total mass, power margin, heat margin, DPS, sensor range or other derived capability caches. Those values recompute deterministically from content + fitted modules + physical mutable state.
+
+Stage-17.5H does not duplicate these fields in a second mutable capability cache. H adds the remaining local continuity fields through the production content-bound envelope described below.
 
 ### Legacy v1–v3 migration into v4
 
@@ -140,7 +147,72 @@ simulate A
 
 ---
 
-## 4. `WorldState` contract
+## 4. Stage-17.5H content-bound local envelope
+
+`ContentBoundSaveCodec` wraps the backward-compatible `GameStateCodec` payload with a semantic content fingerprint and deterministic Stage-17.5H extension.
+
+Current envelope format: **v2**.
+
+```text
+envelope v2
+├── magic/version
+├── semantic content fingerprint
+├── GameStateCodec v4 payload
+└── Stage-17.5H extension keyed by stable EntityId
+```
+
+The extension exists to preserve physical/information state that Stage 17.5F/G made authoritative without forcing unrelated core-schema consumers to reinterpret `GameStateCodec` v4.
+
+### H ship-instance extension
+
+For entities that require it, envelope v2 persists:
+
+- compartment integrity by stable compartment ID;
+- installed module integrity by mount;
+- shield reserve;
+- shield accumulated heat;
+- shield collapse flag;
+- shield restart remaining time;
+- emitter integrity;
+- scheduled-service age by mount;
+- weapon mount/interface → ammunition content ID binding;
+- launcher cooldown by mount.
+
+These are fields of the same authoritative `EntityState`/`EngineeringComponent` snapshot. The envelope is serialization composition, not a second simulation owner.
+
+### H system-local sensor knowledge extension
+
+Where design requires continuity inside the same information domain, envelope v2 may persist:
+
+- fused tracks;
+- received sensor measurements;
+- pending datalink measurement deliveries and delivery times.
+
+Sensor knowledge is **not** global physical truth. Save/load may preserve what an actor legitimately knew; it may not reconstruct hidden contacts from object positions, fabricate range/classification/fire-control quality or bypass Stage-17.5D freshness/covariance rules.
+
+### Neutral compatibility semantics
+
+`ContentBoundSaveCodec` accepts:
+
+- current envelope v2;
+- legacy envelope v1;
+- historical raw `GameStateCodec` payloads supported by the core codec.
+
+When H extension data is absent, migration is conservative. It must not invent:
+
+- charged shield reserve;
+- repaired compartment/module integrity;
+- ammunition feed identity;
+- reset maintenance age;
+- reset launcher cooldown;
+- sensor tracks/measurements;
+- extra power, stored energy, reaction mass or any other resource.
+
+Missing H state is neutral/absent, never generous.
+
+---
+
+## 5. `WorldState` contract
 
 `WorldState` current logical schema: **v9**.
 
@@ -173,7 +245,7 @@ Current `WorldStateCodec` continues to accept older supported schemas v1–v8 an
 
 ---
 
-## 5. World file-format trailers
+## 6. World file-format trailers
 
 World logical schema and file-format version deliberately evolve independently.
 
@@ -205,7 +277,7 @@ A missing historical field may never become a hidden resource or permission gran
 
 ---
 
-## 6. Stage-16 → Stage-17 migration
+## 7. Stage-16 → Stage-17 migration
 
 World schema v8 represents the pre-Stage17 boundary.
 
@@ -226,7 +298,7 @@ Later Stage-17 file trailers not present in the historical file receive only neu
 
 ---
 
-## 7. `PlayableWorldState` contract
+## 8. `PlayableWorldState` contract
 
 Current playable logical schema remains **v5**.
 
@@ -268,7 +340,7 @@ Stage 17 uses the existing nullable affiliation field. Dynamic faction metadata 
 
 ---
 
-## 8. Schema-version policy
+## 9. Schema-version policy
 
 Version numbers are not milestone counters.
 
@@ -290,9 +362,11 @@ Every incompatible change requires:
 5. corruption/future-version rejection;
 6. documentation update.
 
+Stage 17.5H is the concrete example of why logical core schema and production envelope versions are separate: core `GameState` remains v4 while content-bound envelope moves to v2.
+
 ---
 
-## 9. Exact identity continuation
+## 10. Exact identity continuation
 
 Persistent references use stable value IDs, not runtime object identity.
 
@@ -308,21 +382,29 @@ A refit/affiliation/materialization operation changes the same physical object u
 
 Stage 17.5C extends this invariant across system transfer: detach → transit snapshot → attach preserves the same `FleetId` and the same fitted engineering payload rather than respawning a replacement ship.
 
+Stage 17.5H extends the same rule to local damage, shields, maintenance and weapon continuity. A materialized/refitted ship is not a pristine replacement merely because its ECS object was rebuilt.
+
 ---
 
-## 10. Money, cargo and conservation across save/load
+## 11. Money, cargo and conservation across save/load
 
-Persistence is not an economic or engineering event.
+Persistence is not an economic, repair, rearm or engineering event.
 
 Save/load/materialization may not:
 
 - add/remove money;
 - refill cargo/ammunition/reaction mass;
 - recharge shared engineering energy;
+- recharge shield reserve merely because H state was absent;
 - erase or add stored/local heat;
 - repair drive/coolant capability;
+- repair compartment/module integrity;
+- reset shield collapse/restart state;
 - reset FTL cooldown;
-- repair damage;
+- reset launcher cooldown;
+- reset maintenance age;
+- invent ammunition feed identity;
+- invent sensor knowledge;
 - complete construction;
 - reset production progress;
 - invent territory/access;
@@ -333,7 +415,7 @@ Economic transfers before save and after load continue through the same ordinary
 
 ---
 
-## 11. Stage-17 institutional persistence
+## 12. Stage-17 institutional persistence
 
 Stage 17 intentionally distributes state across existing authoritative layers rather than creating a separate player-faction save blob.
 
@@ -378,7 +460,7 @@ Effective market access is derived from persistent law/diplomacy on restore; it 
 
 ---
 
-## 12. Stage-17H binary migration guarantee
+## 13. Stage-17H binary migration guarantee
 
 Stage 17H introduces a historical binary acceptance with this shape:
 
@@ -409,7 +491,7 @@ See `Stage17HPreStage17MigrationAcceptanceTest` and `GameStateMigrationTest`.
 
 ---
 
-## 13. Stage-17H full transition guarantee
+## 14. Stage-17H full transition guarantee
 
 The final transition acceptance starts from an actual completed Stage-16 player station and owned fleet, then executes:
 
@@ -432,7 +514,7 @@ See `Stage17HEndToEndTransitionAcceptanceTest`.
 
 ---
 
-## 14. Stage-17.5C engineering / FTL continuation guarantee
+## 15. Stage-17.5C engineering / FTL continuation guarantee
 
 Stage 17.5C adds three persistence guarantees at the physical ship boundary.
 
@@ -473,7 +555,51 @@ See:
 
 ---
 
-## 15. File safety / bounded decoding
+## 16. Stage-17.5H ship-instance continuation guarantee
+
+Stage 17.5H extends the local engineering guarantee across the state introduced by Stage 17.5F/G.
+
+Required production path:
+
+```text
+EngineeringComponent
+→ EntityState core + H extension
+→ ContentBoundSaveCodec envelope v2
+→ decode / migrate
+→ EntityState
+→ EngineeringComponent
+→ recompute capabilities
+```
+
+The path must preserve or conservatively migrate:
+
+- compartment/module integrity;
+- shield reserve/collapse/restart/emitter integrity;
+- maintenance age;
+- weapon feed identity;
+- launcher cooldown;
+- Stage-17.5C energy/heat/consumables/FTL state;
+- system-local sensor knowledge where valid.
+
+It must not persist derived capability caches.
+
+A refit uses the same continuity semantics: retained state is reconciled against surviving mounts and removed modules remain physical handoff state. Refit is not a repair/recharge/rearm/cooldown-reset shortcut.
+
+See:
+
+- `Stage175HPersistenceTest`;
+- `EngineeringPersistenceTest`;
+- `EntityStateMapperTest`;
+- `ShipRefitApplicationServiceTest`;
+- `ShipyardRefitContinuityTest`;
+- `ShipCapabilityServiceTest`;
+- `ShipEngineeringUiProjectionTest`.
+
+Canonical Stage-17.5H closeout: `docs/stage17_5h_capability_ui_persistence.md`.
+
+---
+
+## 17. File safety / bounded decoding
 
 All codecs use deterministic bounded binary parsing.
 
@@ -491,9 +617,11 @@ Decoders reject before live runtime creation:
 
 File replacement uses a temporary sibling file and atomic move where supported, with replacement fallback otherwise.
 
+`ContentBoundSaveCodec` additionally bounds payload size, extension entity/row counts and string lengths, and rejects H extension references to entities absent from the core `GameState`.
+
 ---
 
-## 16. Runtime ownership boundaries
+## 18. Runtime ownership boundaries
 
 ```text
 SimulationSession
@@ -506,11 +634,13 @@ PlayerRuntime
 → owns WorldSimulation + PlayerState playable interaction boundary
 ```
 
-UI remains presentation/read-model layer. Loading replaces authoritative runtime values and rebuilds runtime/presentation references rather than restoring Java object identity.
+`EngineeringComponent` owns the live fitted physical ship-instance state inside a materialized local simulation. `ShipCapabilityService`/UI projections are read-only derived consumers; `ContentBoundSaveCodec` is serialization composition, not a simulation owner.
+
+Loading replaces authoritative runtime values and rebuilds runtime/presentation references rather than restoring Java object identity.
 
 ---
 
-## 17. Required regression guarantees
+## 19. Required regression guarantees
 
 The persistence architecture is considered healthy only while all relevant tests maintain:
 
@@ -529,6 +659,10 @@ The persistence architecture is considered healthy only while all relevant tests
 13. fitted engineering v4 round-trip without derived-stat cache;
 14. v1–v3 → v4 migration never invents engineering capability/resources;
 15. fleet detach/transit/attach preserves engineering state and world `FleetId`;
-16. active fitted FTL save/load preserves committed energy/heat/cooldown without double commit.
+16. active fitted FTL save/load preserves committed energy/heat/cooldown without double commit;
+17. H envelope v2 preserves damage/shield/maintenance/weapon continuity;
+18. legacy envelope/raw saves cannot invent missing H state;
+19. system-local sensor knowledge persistence cannot become omniscient global truth;
+20. refit/materialization cannot silently restore pristine engineering state.
 
-These guarantees are prerequisites for later Stage-17.5 combat/fitting persistence and large-universe materialization.
+These guarantees are prerequisites for Stage-17.5I deterministic tactical/materialization persistence acceptance and later large-universe simulation LOD.

@@ -14,6 +14,7 @@ import com.spacesim.components.MiningComponent;
 import com.spacesim.components.PriceHistoryComponent;
 import com.spacesim.components.ProductionComponent;
 import com.spacesim.components.ReputationComponent;
+import com.spacesim.components.SensorKnowledgeComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TradeAIComponent;
 import com.spacesim.components.TransformComponent;
@@ -32,8 +33,9 @@ import java.util.Objects;
  * <p>Mapper является единственной границей между ECS и persistent DTO. Capture копирует все
  * поддерживаемые mutable поля по значениям. Restore всегда создаёт новый экземпляр Ashley
  * {@link Entity}; persistent-связи TradeAI/Mining остаются {@link EntityId} и позднее разрешаются
- * через {@link EntityRegistry}. Data-driven archetype и Stage-17.5 fit сохраняются через stable
- * content IDs, а derived engineering capabilities не сериализуются.</p>
+ * через {@link EntityRegistry}. Data-driven archetype, Stage-17.5 fit/physical continuity and
+ * system-local sensor knowledge сохраняются через deterministic value state; derived engineering
+ * capabilities не сериализуются.</p>
  */
 public final class EntityStateMapper {
     private EntityStateMapper() {
@@ -71,6 +73,7 @@ public final class EntityStateMapper {
         AsteroidComponent asteroid = entity.getComponent(AsteroidComponent.class);
         ArchetypeComponent archetype = entity.getComponent(ArchetypeComponent.class);
         EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
+        SensorKnowledgeComponent sensorKnowledge = entity.getComponent(SensorKnowledgeComponent.class);
 
         return new EntityState(
                 idComponent.id,
@@ -89,7 +92,8 @@ public final class EntityStateMapper {
                 captureCombat(combat),
                 captureAsteroid(asteroid),
                 archetype == null ? null : new EntityState.ArchetypeState(archetype.contentId),
-                EngineeringStatePersistenceMapper.capture(engineering));
+                EngineeringStatePersistenceMapper.capture(engineering),
+                SensorKnowledgePersistenceMapper.capture(sensorKnowledge));
     }
 
     /**
@@ -165,11 +169,8 @@ public final class EntityStateMapper {
         if (state.asteroid() != null) {
             EntityState.AsteroidState value = state.asteroid();
             AsteroidComponent component = new AsteroidComponent(
-                    value.spawnPointId(),
-                    value.resourceItem(),
-                    value.initialResource());
-            if (value.remainingResource() < 0L
-                    || value.remainingResource() > value.initialResource()) {
+                    value.spawnPointId(), value.resourceItem(), value.initialResource());
+            if (value.remainingResource() < 0L || value.remainingResource() > value.initialResource()) {
                 throw new IllegalArgumentException("Остаток астероида находится вне initialResource");
             }
             component.remainingResource = value.remainingResource();
@@ -181,6 +182,9 @@ public final class EntityStateMapper {
         if (state.engineering() != null) {
             entity.add(EngineeringStatePersistenceMapper.restore(state.engineering()));
         }
+        if (state.sensorKnowledge() != null) {
+            entity.add(SensorKnowledgePersistenceMapper.restore(state.sensorKnowledge()));
+        }
         return entity;
     }
 
@@ -188,9 +192,7 @@ public final class EntityStateMapper {
         if (component == null) {
             return null;
         }
-        return new EntityState.IdentityState(
-                component.name,
-                component.kind == null ? null : component.kind.name());
+        return new EntityState.IdentityState(component.name, component.kind == null ? null : component.kind.name());
     }
 
     private static EntityState.TransformState captureTransform(TransformComponent component) {
@@ -198,10 +200,7 @@ public final class EntityStateMapper {
             return null;
         }
         return new EntityState.TransformState(
-                component.position.x,
-                component.position.y,
-                component.velocity.x,
-                component.velocity.y);
+                component.position.x, component.position.y, component.velocity.x, component.velocity.y);
     }
 
     private static EntityState.InventoryState captureInventory(InventoryComponent component) {
@@ -236,14 +235,8 @@ public final class EntityStateMapper {
             tradable.add(component.tradableItems[itemId]);
         }
         return new EntityState.MarketState(
-                List.copyOf(target),
-                List.copyOf(configuredTarget),
-                List.copyOf(consumption),
-                List.copyOf(sell),
-                List.copyOf(buy),
-                List.copyOf(remainder),
-                List.copyOf(tradable),
-                component.isDirty);
+                List.copyOf(target), List.copyOf(configuredTarget), List.copyOf(consumption),
+                List.copyOf(sell), List.copyOf(buy), List.copyOf(remainder), List.copyOf(tradable), component.isDirty);
     }
 
     private static MarketComponent restoreMarket(EntityState.MarketState value) {
@@ -281,15 +274,9 @@ public final class EntityStateMapper {
                 outputs.add(recipe.getOutputAmount(itemId));
             }
             recipes.add(new EntityState.RecipeState(
-                    recipe.name,
-                    recipe.durationSeconds,
-                    List.copyOf(inputs),
-                    List.copyOf(outputs)));
+                    recipe.name, recipe.durationSeconds, List.copyOf(inputs), List.copyOf(outputs)));
         }
-        return new EntityState.ProductionState(
-                List.copyOf(recipes),
-                component.activeRecipeIndex,
-                component.progressSeconds);
+        return new EntityState.ProductionState(List.copyOf(recipes), component.activeRecipeIndex, component.progressSeconds);
     }
 
     private static ProductionComponent restoreProduction(EntityState.ProductionState value) {
@@ -374,23 +361,15 @@ public final class EntityStateMapper {
         }
         return new EntityState.TradeAiState(
                 component.state == null ? null : component.state.name(),
-                component.buyStationId,
-                component.sellStationId,
-                component.targetStationId,
-                component.targetItem,
-                component.specializedItem,
-                component.targetAmount,
-                component.cargoSpace,
-                component.movementSpeed,
-                component.expectedProfitMilliCredits,
-                component.routeSearchCooldown);
+                component.buyStationId, component.sellStationId, component.targetStationId,
+                component.targetItem, component.specializedItem, component.targetAmount,
+                component.cargoSpace, component.movementSpeed,
+                component.expectedProfitMilliCredits, component.routeSearchCooldown);
     }
 
     private static TradeAIComponent restoreTradeAi(EntityState.TradeAiState value) {
         TradeAIComponent component = new TradeAIComponent();
-        component.state = value.stateName() == null
-                ? null
-                : TradeAIComponent.State.valueOf(value.stateName());
+        component.state = value.stateName() == null ? null : TradeAIComponent.State.valueOf(value.stateName());
         component.buyStationId = value.buyStationId();
         component.sellStationId = value.sellStationId();
         component.targetStationId = value.targetStationId();
@@ -409,18 +388,11 @@ public final class EntityStateMapper {
             return null;
         }
         return new EntityState.MiningState(
-                component.resourceItem,
-                component.extractionPerSecond,
-                component.movementSpeed,
-                component.extractionRange,
-                component.dockingRange,
-                component.extractionRemainder,
-                component.totalMined,
-                component.totalDelivered,
-                component.active,
+                component.resourceItem, component.extractionPerSecond, component.movementSpeed,
+                component.extractionRange, component.dockingRange, component.extractionRemainder,
+                component.totalMined, component.totalDelivered, component.active,
                 component.state == null ? null : component.state.name(),
-                component.targetAsteroidId,
-                component.homeBaseId);
+                component.targetAsteroidId, component.homeBaseId);
     }
 
     private static MiningComponent restoreMining(EntityState.MiningState value) {
@@ -434,9 +406,7 @@ public final class EntityStateMapper {
         component.totalMined = value.totalMined();
         component.totalDelivered = value.totalDelivered();
         component.active = value.active();
-        component.state = value.stateName() == null
-                ? null
-                : MiningComponent.State.valueOf(value.stateName());
+        component.state = value.stateName() == null ? null : MiningComponent.State.valueOf(value.stateName());
         component.targetAsteroidId = value.targetAsteroidId();
         component.homeBaseId = value.homeBaseId();
         return component;
@@ -447,12 +417,8 @@ public final class EntityStateMapper {
             return null;
         }
         return new EntityState.CombatState(
-                component.hull,
-                component.maxHull,
-                component.shields,
-                component.maxShields,
-                component.damagePerSecond,
-                component.weaponRange);
+                component.hull, component.maxHull, component.shields,
+                component.maxShields, component.damagePerSecond, component.weaponRange);
     }
 
     private static CombatComponent restoreCombat(EntityState.CombatState value) {
@@ -471,10 +437,8 @@ public final class EntityStateMapper {
             return null;
         }
         return new EntityState.AsteroidState(
-                component.spawnPointId,
-                component.resourceItem,
-                component.initialResource,
-                component.remainingResource);
+                component.spawnPointId, component.resourceItem,
+                component.initialResource, component.remainingResource);
     }
 
     private static void requireSize(List<?> values, int expected, String label) {
