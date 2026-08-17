@@ -58,7 +58,12 @@ public final class Stage18RefiningCatalog {
         return fingerprint;
     }
 
-    /** @return recipe definition for a stable ID, or {@code null} */
+    /**
+     * Finds one refining recipe by stable ID.
+     *
+     * @param id stable recipe ID
+     * @return recipe definition, or {@code null} when the ID is unknown
+     */
     public RefiningRecipeDefinition findRecipe(String id) {
         return recipesById.get(id);
     }
@@ -90,8 +95,19 @@ public final class Stage18RefiningCatalog {
         }
     }
 
-    /** One feedstock share in a gross refining input batch. */
+    /**
+     * One feedstock share in a gross refining input batch.
+     *
+     * @param commodityId extracted-feedstock commodity ID
+     * @param fractionOfInputMass share of the gross input batch in {@code (0, 1]}
+     */
     public record RecipeInputDefinition(String commodityId, double fractionOfInputMass) {
+        /**
+         * Validates one immutable recipe-input share.
+         *
+         * @param commodityId extracted-feedstock commodity ID
+         * @param fractionOfInputMass share of the gross input batch in {@code (0, 1]}
+         */
         public RecipeInputDefinition {
             requireText(commodityId, "input commodityId");
             requireFraction(fractionOfInputMass, "fractionOfInputMass");
@@ -125,6 +141,20 @@ public final class Stage18RefiningCatalog {
             double maintenanceWorkSecondsPerInputKg) {
         private static final double EPSILON = 1e-9d;
 
+        /**
+         * Validates and freezes one refining recipe.
+         *
+         * @param id stable recipe ID
+         * @param displayName diagnostic/display name
+         * @param inputs extracted-feedstock fractions that sum to one
+         * @param outputCommodityId engineering material or industrial consumable produced
+         * @param outputMassFraction useful output fraction of the gross input batch
+         * @param discardedMassFraction tailings/byproduct mass not retained by this baseline recipe
+         * @param requiredCapabilityTags physical process capabilities required by the recipe
+         * @param energyJPerInputKg process energy per kilogram of gross input
+         * @param workSecondsPerInputKg engineering work-seconds per kilogram of gross input
+         * @param maintenanceWorkSecondsPerInputKg maintenance work-seconds per kilogram of gross input
+         */
         public RefiningRecipeDefinition {
             requireText(id, "recipe id");
             requireText(displayName, "recipe displayName");
