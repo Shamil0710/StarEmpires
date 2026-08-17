@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShipEngineeringGrantServiceTest {
     @Test
-    void incrementalOperationUsesContinuousMarginThenPhysicalSharedStorageAndCommitsHeat() {
+    void operationInsideContinuousMarginCommitsHeatWithoutInventingSharedStorage() {
         ShipEngineeringCatalog catalog = ShipEngineeringCatalogLoader.loadDefault();
         InstalledFit fit = InstalledFit.fromDemonstrator(
                 catalog.findDemonstratorFit("fit.escort_destroyer_schema_v1"));
@@ -26,7 +26,7 @@ class ShipEngineeringGrantServiceTest {
         EngineeringComponent component = new EngineeringComponent(fit, operating, ShipInstanceRuntimeState.legacyNeutral());
         ShipEngineeringGrantService grants = new ShipEngineeringGrantService(catalog);
         double continuousMarginW = runtime.derive(fit, operating, DamageState.pristine()).continuousPowerMarginW();
-        double requestedPowerW = Math.max(0d, continuousMarginW) + 1_000d;
+        double requestedPowerW = continuousMarginW * 0.5d;
         double beforeEnergyJ = operating.sharedBusEnergyJ();
         double beforeHeatJ = operating.localHeatJByMount().getOrDefault("core_drive", 0d);
 
@@ -35,11 +35,17 @@ class ShipEngineeringGrantServiceTest {
 
         assertTrue(result.committed());
         assertEquals(requestedPowerW, result.grant().grantedPowerW(), 0d);
-        assertEquals(2_000d, result.storageDrawJ(), 1e-6,
-                "only demand above surviving continuous margin may leave shared storage");
-        assertEquals(beforeEnergyJ - 2_000d, component.runtimeState.sharedBusEnergyJ(), 1e-6);
+        assertEquals(0d, result.storageDrawJ(), 0d,
+                "continuous reactor margin must not be re-labeled as shared-storage energy");
+        assertEquals(beforeEnergyJ, component.runtimeState.sharedBusEnergyJ(), 0d,
+                "the demonstrator has no ENERGY_STORAGE module and cannot invent a shared battery");
         assertEquals(beforeHeatJ + 200d,
                 component.runtimeState.localHeatJByMount().get("core_drive"), 1e-9);
+
+        ShipEngineeringGrantService.GrantResult aboveMargin = grants.grantAndCommit(
+                component, "core_drive", continuousMarginW + 1_000d, 0d, 1d);
+        assertFalse(aboveMargin.committed(),
+                "a fit without surviving shared ENERGY_STORAGE must reject demand above continuous margin");
     }
 
     @Test
