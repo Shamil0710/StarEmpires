@@ -70,18 +70,18 @@ class Stage175IPostCombatPersistenceAcceptanceTest {
         Entity restoredEntity = EntityStateMapper.restore(decoded.state().entities().get(0));
         EngineeringComponent restored = restoredEntity.getComponent(EngineeringComponent.class);
         assertNotNull(restored);
-        assertEquals(destruction.finalDamage(), restored.instanceState.damage);
+        assertEquals(destruction.finalDamage(), restored.instanceState.damage());
         assertEquals(destruction.finalShield(), restored.instanceState.shieldStatesByMount().get("utility_shield"));
-        assertTrue(restored.instanceState.damage.compartmentIntegrityById().values().stream()
+        assertTrue(restored.instanceState.damage().compartmentIntegrityById().values().stream()
                 .allMatch(value -> value <= 0d));
-        assertTrue(restored.instanceState.damage.moduleDamage().moduleIntegrityByMount().values().stream()
+        assertTrue(restored.instanceState.damage().moduleDamage().moduleIntegrityByMount().values().stream()
                 .allMatch(value -> value <= 0d));
 
         var visual = new Stage175ITacticalVisualProjection()
                 .addShip(
                         shipId.value(),
                         destruction.hull(),
-                        restored.instanceState.damage,
+                        restored.instanceState.damage(),
                         1_000d,
                         700d,
                         0d,
