@@ -30,6 +30,12 @@ public final class Stage18RefiningRuntime {
     private final Stage18ResourceOntologyCatalog ontology;
     private final Stage18RefiningCatalog refiningCatalog;
 
+    /**
+     * Creates the physical refining settlement boundary.
+     *
+     * @param ontology authoritative Stage-18 resource ontology
+     * @param refiningCatalog authoritative Stage-18C refining recipe catalog
+     */
     public Stage18RefiningRuntime(
             Stage18ResourceOntologyCatalog ontology,
             Stage18RefiningCatalog refiningCatalog) {
@@ -39,24 +45,50 @@ public final class Stage18RefiningRuntime {
 
     /** Stable outcome of one requested refining settlement. */
     public enum Status {
+        /** Input mass and process budgets were atomically converted into retained output. */
         REFINED,
+        /** Request amount or runtime state is invalid. */
         INVALID_REQUEST,
+        /** Stable recipe ID is unknown. */
         RECIPE_NOT_FOUND,
+        /** Refining unit lacks one or more required physical process capabilities. */
         MISSING_CAPABILITY,
+        /** One or more required feedstocks are not physically available. */
         INSUFFICIENT_INPUT,
+        /** Interval has insufficient electrical/process energy. */
         INSUFFICIENT_POWER,
+        /** Interval has insufficient engineering work-seconds. */
         INSUFFICIENT_WORK,
+        /** Interval has insufficient maintenance service-work. */
         INSUFFICIENT_MAINTENANCE,
+        /** Compatible physical storage cannot accept the retained output. */
         STORAGE_FULL
     }
 
-    /** Physical process capability projected into one refining interval. */
+    /**
+     * Physical process capability projected into one refining interval.
+     *
+     * @param capabilityId stable refining-unit/facility capability ID
+     * @param capabilityTags installed process capabilities
+     * @param availablePowerW power available to refining during an interval
+     * @param workRate engineering work-seconds completed per simulation second
+     * @param maintenanceWorkRate maintenance work-seconds available per simulation second
+     */
     public record RefiningCapability(
             String capabilityId,
             Set<String> capabilityTags,
             double availablePowerW,
             double workRate,
             double maintenanceWorkRate) {
+        /**
+         * Validates and freezes one refining capability projection.
+         *
+         * @param capabilityId stable refining-unit/facility capability ID
+         * @param capabilityTags installed process capabilities
+         * @param availablePowerW available process power
+         * @param workRate engineering work rate
+         * @param maintenanceWorkRate maintenance service-work rate
+         */
         public RefiningCapability {
             capabilityId = requireText(capabilityId, "capabilityId");
             capabilityTags = immutableTags(capabilityTags, "capabilityTags");
@@ -65,6 +97,12 @@ public final class Stage18RefiningRuntime {
             requireNonNegative(maintenanceWorkRate, "maintenanceWorkRate");
         }
 
+        /**
+         * Opens a shared finite process budget for one simulation interval.
+         *
+         * @param durationSeconds finite positive simulation interval
+         * @return mutable interval budget owned by the caller
+         */
         public IntervalBudget openInterval(double durationSeconds) {
             requirePositive(durationSeconds, "durationSeconds");
             return new IntervalBudget(
@@ -97,22 +135,27 @@ public final class Stage18RefiningRuntime {
             this.remainingMaintenanceWorkSeconds = remainingMaintenanceWorkSeconds;
         }
 
+        /** @return immutable process capability tags available to this interval */
         public Set<String> capabilityTags() {
             return capabilityTags;
         }
 
+        /** @return simulation duration represented by this shared budget */
         public double durationSeconds() {
             return durationSeconds;
         }
 
+        /** @return uncommitted electrical/process energy in joules */
         public double remainingEnergyJ() {
             return remainingEnergyJ;
         }
 
+        /** @return uncommitted engineering work-seconds */
         public double remainingWorkSeconds() {
             return remainingWorkSeconds;
         }
 
+        /** @return uncommitted maintenance work-seconds */
         public double remainingMaintenanceWorkSeconds() {
             return remainingMaintenanceWorkSeconds;
         }
@@ -125,14 +168,19 @@ public final class Stage18RefiningRuntime {
         }
     }
 
-    /**
-     * Physical Stage-18C feedstock/material store measured in kilograms by ontology storage class.
-     */
+    /** Physical Stage-18C feedstock/material store measured in kilograms by ontology storage class. */
     public static final class PhysicalMaterialStore {
         private final Stage18ResourceOntologyCatalog ontology;
         private final Map<String, Double> capacityByStorageClassKg;
         private final Map<String, Double> massByCommodityKg;
 
+        /**
+         * Creates a physical material store or restores one from explicit mass values.
+         *
+         * @param ontology authoritative Stage-18 resource ontology
+         * @param capacityByStorageClassKg non-negative capacity by storage class
+         * @param initialMassByCommodityKg non-negative initial commodity masses
+         */
         public PhysicalMaterialStore(
                 Stage18ResourceOntologyCatalog ontology,
                 Map<String, Double> capacityByStorageClassKg,
@@ -177,6 +225,11 @@ public final class Stage18RefiningRuntime {
         /**
          * Copies the current physical extraction cargo masses into a Stage-18C material store.
          * Storage capacity remains explicit because Stage 18F, not 18B/18C, owns persistent storage.
+         *
+         * @param ontology authoritative Stage-18 resource ontology
+         * @param capacityByStorageClassKg explicit destination capacity by storage class
+         * @param extractionCargo Stage-18B physical extraction cargo to snapshot
+         * @return new independent Stage-18C physical material store
          */
         public static PhysicalMaterialStore fromExtractionCargo(
                 Stage18ResourceOntologyCatalog ontology,
@@ -189,11 +242,23 @@ public final class Stage18RefiningRuntime {
                     extractionCargo.snapshotMassByCommodityKg());
         }
 
+        /**
+         * Returns stored mass of one Stage-18 commodity.
+         *
+         * @param commodityId stable Stage-18 commodity ID
+         * @return non-negative stored mass in kilograms
+         */
         public double massKg(String commodityId) {
             requireText(commodityId, "commodityId");
             return massByCommodityKg.getOrDefault(commodityId, 0d);
         }
 
+        /**
+         * Returns remaining compatible capacity for one Stage-18 commodity.
+         *
+         * @param commodityId stable Stage-18 commodity ID
+         * @return non-negative remaining capacity in kilograms
+         */
         public double remainingCapacityKg(String commodityId) {
             CommodityDefinition commodity = requireMassCommodity(ontology, commodityId);
             Double capacity = capacityByStorageClassKg.get(commodity.storageClassId());
@@ -203,6 +268,7 @@ public final class Stage18RefiningRuntime {
             return Math.max(0d, capacity - usedCapacityKg(commodity.storageClassId()));
         }
 
+        /** @return immutable snapshot of stored mass by commodity ID */
         public Map<String, Double> snapshotMassByCommodityKg() {
             return Collections.unmodifiableMap(new TreeMap<>(massByCommodityKg));
         }
@@ -234,7 +300,18 @@ public final class Stage18RefiningRuntime {
         }
     }
 
-    /** Immutable result of one refining request. */
+    /**
+     * Immutable result of one refining request.
+     *
+     * @param status stable settlement outcome
+     * @param consumedInputMassByCommodityKg committed input mass by commodity ID
+     * @param outputCommodityId retained output commodity ID, or empty on rejection
+     * @param outputMassStoredKg retained output mass stored in kilograms
+     * @param discardedMassKg input mass explicitly discarded as tailings/byproducts
+     * @param energyConsumedJ committed electrical/process energy in joules
+     * @param workConsumedSeconds committed engineering work-seconds
+     * @param maintenanceWorkConsumedSeconds committed maintenance work-seconds
+     */
     public record RefiningResult(
             Status status,
             Map<String, Double> consumedInputMassByCommodityKg,
@@ -244,11 +321,24 @@ public final class Stage18RefiningRuntime {
             double energyConsumedJ,
             double workConsumedSeconds,
             double maintenanceWorkConsumedSeconds) {
+        /**
+         * Freezes one refining result snapshot.
+         *
+         * @param status stable settlement outcome
+         * @param consumedInputMassByCommodityKg committed input mass by commodity ID
+         * @param outputCommodityId retained output commodity ID, or empty on rejection
+         * @param outputMassStoredKg retained output mass stored in kilograms
+         * @param discardedMassKg input mass explicitly discarded as tailings/byproducts
+         * @param energyConsumedJ committed electrical/process energy in joules
+         * @param workConsumedSeconds committed engineering work-seconds
+         * @param maintenanceWorkConsumedSeconds committed maintenance work-seconds
+         */
         public RefiningResult {
             consumedInputMassByCommodityKg = Collections.unmodifiableMap(
                     new TreeMap<>(Objects.requireNonNull(consumedInputMassByCommodityKg, "consumedInputMassByCommodityKg")));
         }
 
+        /** @return {@code true} only when the requested batch was atomically refined */
         public boolean accepted() {
             return status == Status.REFINED;
         }
@@ -261,6 +351,7 @@ public final class Stage18RefiningRuntime {
      * @param requestedInputMassKg gross feedstock batch mass
      * @param store physical input/output store
      * @param intervalBudget shared finite process budget
+     * @return immutable accepted or rejected settlement result
      */
     public RefiningResult refine(
             String recipeId,
