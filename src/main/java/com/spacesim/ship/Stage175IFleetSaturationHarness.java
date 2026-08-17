@@ -206,7 +206,7 @@ public final class Stage175IFleetSaturationHarness {
             if (roundsBefore > 0L) {
                 after = ammunitionRuntime.consumeOne(
                         before, "weapon_primary", launcher, missile.wetMassKg()).consumables();
-                GuidedWeaponBody body = launchThreat(index, missile);
+                GuidedWeaponBody body = launchThreat(index, checked, missile);
                 threats.add(new Threat(
                         body.bodyId(),
                         body.xM(),
@@ -262,12 +262,8 @@ public final class Stage175IFleetSaturationHarness {
                 DamageState.pristine()).totalMassKg();
     }
 
-    private GuidedWeaponBody launchThreat(int index, GuidedWeapon missile) {
-        double yM = centeredOffset(index, 1, 0d);
-        return launchThreatAt(index, missile, yM);
-    }
-
-    private GuidedWeaponBody launchThreatAt(int index, GuidedWeapon missile, double yM) {
+    private GuidedWeaponBody launchThreat(int index, Scenario scenario, GuidedWeapon missile) {
+        double yM = centeredOffset(index, scenario.attackingShips(), scenario.formationSpacingM());
         double dx = TARGET_X_M;
         double dy = -yM;
         double length = Math.hypot(dx, dy);
