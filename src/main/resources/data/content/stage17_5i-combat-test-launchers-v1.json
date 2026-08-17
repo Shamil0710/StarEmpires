@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "profiles": [
+    {
+      "moduleId": "module.ct_kinetic_medium_v1",
+      "family": "KINETIC",
+      "ammunitionInterfaceId": "kinetic_feed",
+      "ammunitionAmountPerShot": 1.0,
+      "cycleTimeSeconds": 2.6,
+      "supportChannelCount": 1,
+      "pointingJitterRad": 0.000035,
+      "maxProjectileMassKg": 80.0,
+      "maxProjectileLengthM": 2.0,
+      "maxProjectileDiameterM": 0.10
+    },
+    {
+      "moduleId": "module.ct_kinetic_large_v1",
+      "family": "KINETIC",
+      "ammunitionInterfaceId": "kinetic_feed",
+      "ammunitionAmountPerShot": 1.0,
+      "cycleTimeSeconds": 5.2,
+      "supportChannelCount": 1,
+      "pointingJitterRad": 0.000018,
+      "maxProjectileMassKg": 260.0,
+      "maxProjectileLengthM": 3.5,
+      "maxProjectileDiameterM": 0.16
+    },
+    {
+      "moduleId": "module.ct_missile_medium_v1",
+      "family": "GUIDED",
+      "ammunitionInterfaceId": "guided_feed",
+      "ammunitionAmountPerShot": 1.0,
+      "cycleTimeSeconds": 7.5,
+      "supportChannelCount": 12,
+      "pointingJitterRad": 0.0005,
+      "maxProjectileMassKg": 4000.0,
+      "maxProjectileLengthM": 8.0,
+      "maxProjectileDiameterM": 0.90
+    },
+    {
+      "moduleId": "module.ct_pd_v1",
+      "family": "GUIDED",
+      "ammunitionInterfaceId": "interceptor_feed",
+      "ammunitionAmountPerShot": 1.0,
+      "cycleTimeSeconds": 1.4,
+      "supportChannelCount": 6,
+      "pointingJitterRad": 0.001,
+      "maxProjectileMassKg": 900.0,
+      "maxProjectileLengthM": 3.5,
+      "maxProjectileDiameterM": 0.45
+    }
+  ]
+}
