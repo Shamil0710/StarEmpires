@@ -189,6 +189,17 @@ public final class Stage18StationStorage {
                 snapshot.productCountById());
     }
 
+    void restore(StationStorageSnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        if (!stationId.equals(snapshot.stationId())) {
+            throw new IllegalArgumentException("Cannot restore storage snapshot for a different station");
+        }
+        if (!capacityByStorageClassKg.equals(snapshot.capacityByStorageClassKg())) {
+            throw new IllegalArgumentException("Cannot change station storage capacity during in-place restore");
+        }
+        replaceContents(snapshot.commodityMassByIdKg(), snapshot.productCountById());
+    }
+
     boolean canAddCommodity(String commodityId, double massKg) {
         CommodityDefinition commodity = requireMassCommodity(commodityId);
         requirePositive(massKg, "massKg");
