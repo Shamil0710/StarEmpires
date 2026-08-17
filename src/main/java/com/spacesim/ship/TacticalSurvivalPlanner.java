@@ -52,7 +52,15 @@ public final class TacticalSurvivalPlanner {
             double reactionMassKg,
             double deltaVMps,
             double accelerationMps2) {
-        /** Validates one own-ship physical readiness snapshot. */
+        /**
+         * Validates one own-ship physical readiness snapshot.
+         *
+         * @param meanCompartmentIntegrity mean local structural integrity in {@code [0,1]}
+         * @param minimumModuleIntegrity lowest installed subsystem integrity in {@code [0,1]}
+         * @param reactionMassKg current physical propulsion reaction mass
+         * @param deltaVMps current physical remaining delta-v
+         * @param accelerationMps2 current physically derived acceleration capability
+         */
         public OwnReadiness {
             requireFraction(meanCompartmentIntegrity, "meanCompartmentIntegrity");
             requireFraction(minimumModuleIntegrity, "minimumModuleIntegrity");
@@ -84,7 +92,16 @@ public final class TacticalSurvivalPlanner {
             double deltaVReserveMps,
             double minimumAccelerationMps2,
             double maximumPursuitTrackAgeSeconds) {
-        /** Validates deterministic non-negative survival policy thresholds. */
+        /**
+         * Validates deterministic non-negative survival policy thresholds.
+         *
+         * @param minimumCompartmentIntegrity retreat below this mean structural integrity
+         * @param minimumModuleIntegrity retreat below this lowest subsystem integrity
+         * @param reactionMassReserveKg retreat below this physical reaction-mass reserve
+         * @param deltaVReserveMps retreat below this physical delta-v reserve
+         * @param minimumAccelerationMps2 retreat below this own-ship acceleration capability
+         * @param maximumPursuitTrackAgeSeconds stop pursuit when the freshest hostile track is older
+         */
         public Policy {
             requireFraction(minimumCompartmentIntegrity, "minimumCompartmentIntegrity");
             requireFraction(minimumModuleIntegrity, "minimumModuleIntegrity");
@@ -103,7 +120,13 @@ public final class TacticalSurvivalPlanner {
      * @param yM y coordinate or canonical zero when unknown
      */
     public record SafePoint(boolean known, double xM, double yM) {
-        /** Validates explicit known/unknown safe-point geometry. */
+        /**
+         * Validates explicit known/unknown safe-point geometry.
+         *
+         * @param known whether the point is known to the actor
+         * @param xM x coordinate or canonical zero when unknown
+         * @param yM y coordinate or canonical zero when unknown
+         */
         public SafePoint {
             requireFinite(xM, "xM");
             requireFinite(yM, "yM");
@@ -135,7 +158,16 @@ public final class TacticalSurvivalPlanner {
             long targetId,
             double movementAxisX,
             double movementAxisY) {
-        /** Validates canonical target and normalized movement semantics. */
+        /**
+         * Validates canonical target and normalized movement semantics.
+         *
+         * @param action selected survival action
+         * @param reason stable decision reason
+         * @param targetSelected whether an actor-visible hostile target remains selected
+         * @param targetId selected target ID or canonical zero
+         * @param movementAxisX normalized horizontal maneuver intent
+         * @param movementAxisY normalized vertical maneuver intent
+         */
         public Decision {
             Objects.requireNonNull(action, "action");
             Objects.requireNonNull(reason, "reason");
