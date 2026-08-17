@@ -33,7 +33,7 @@ class Stage175ITacticalAcceptancePlaybackTest {
         var penetration = first.frames().get(1).snapshot();
         assertTrue(penetration.impacts().stream().anyMatch(value -> value.kind() == ImpactKind.ARMOR));
         assertTrue(penetration.impacts().stream().anyMatch(value -> value.kind() == ImpactKind.PENETRATION));
-        assertTrue(penetration.damage().stream().anyMatch(value -> value.integrity() < 1d));
+        assertTrue(penetration.damage().stream().anyMatch(value -> value.severity() > 0d));
 
         var wreck = first.frames().get(2).snapshot();
         assertTrue(wreck.ships().stream().anyMatch(TacticalPrototypeVisualSnapshot.ShipGlyph::wreck));
