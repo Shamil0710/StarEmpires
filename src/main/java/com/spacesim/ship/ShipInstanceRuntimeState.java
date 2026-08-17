@@ -36,7 +36,15 @@ public record ShipInstanceRuntimeState(
         WeaponLoadoutState weaponLoadout,
         RuntimeState weaponMountRuntime) {
 
-    /** Validates, sorts and freezes one complete physical ship-instance state. */
+    /**
+     * Validates, sorts and freezes one complete physical ship-instance state.
+     *
+     * @param damage local structural/subsystem damage snapshot
+     * @param shieldStatesByMount persistent shield states by physical emitter mount
+     * @param maintenance scheduled-service age by installed mount
+     * @param weaponLoadout ammunition feed identity bindings
+     * @param weaponMountRuntime launcher-cycle cooldown state
+     */
     public ShipInstanceRuntimeState {
         Objects.requireNonNull(damage, "damage");
         Objects.requireNonNull(shieldStatesByMount, "shieldStatesByMount");
