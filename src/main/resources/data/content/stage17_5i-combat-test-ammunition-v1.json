@@ -45,7 +45,7 @@
       "impactPayloadId": null,
       "seekerId": "seeker.ct_interceptor_v1",
       "dryMassKg": 420.0,
-      "propellantMassKg": 280.0,
+      "propellantMassKg": 450.0,
       "thrustN": 360000.0,
       "exhaustVelocityMps": 3100.0,
       "burnTimeSeconds": 3.6,
