@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "responseSurfaces": [
+    {
+      "id": "response.stage17_5i_test_v1",
+      "calibrationDomain": {
+        "minImpactVelocityMps": 1000.0,
+        "maxImpactVelocityMps": 20000.0,
+        "minProjectileMassKg": 1.0,
+        "maxProjectileMassKg": 1500.0,
+        "confidenceLabel": "stage17_5i_content_provisional_test_only"
+      }
+    }
+  ],
+  "materials": [
+    {
+      "id": "material.stage17_5i_test_alloy_v1",
+      "densityKgPerM3": 7800.0,
+      "tags": ["structural", "armor", "content_provisional"],
+      "thermalConductivityWPerMK": 42.0,
+      "specificHeatJPerKgK": 500.0,
+      "emissivity": 0.4,
+      "radarReflectivity": 0.7,
+      "heavyImpactResponseSurfaceId": "response.stage17_5i_test_v1",
+      "constructionMaterialFamilyId": "material_family.structural_metal",
+      "repairMaterialFamilyId": "material_family.structural_metal"
+    }
+  ],
+  "protectionStacks": [
+    {
+      "id": "protection.stage17_5i_test_v1",
+      "mountMassKg": 100000.0,
+      "layers": [
+        {
+          "materialId": "material.stage17_5i_test_alloy_v1",
+          "thicknessM": 0.08,
+          "spacingAfterM": 0.0,
+          "orientationRad": 0.0,
+          "coverageFraction": 1.0,
+          "responseSurfaceId": "response.stage17_5i_test_v1"
+        }
+      ]
+    }
+  ],
+  "hulls": [
+    {
+      "id": "hull.test_corvette_v1",
+      "displayName": "Stage 17.5I Corvette Test Hull",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 110.0, "widthM": 34.0, "heightM": 18.0},
+      "bareHullMassKg": 3500000.0,
+      "internalVolumeM3": 60000.0,
+      "slots": [{"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 30.0, "widthM": 20.0, "heightM": 16.0}, "maxMassKg": 2500000.0}],
+      "hardpoints": [],
+      "compartments": [{"id": "core", "volumeM3": 60000.0, "centerM": {"xM": 0.0, "yM": 0.0, "zM": 0.0}, "protectionStackId": "protection.stage17_5i_test_v1", "tags": ["crew", "engineering"]}],
+      "crewBaseline": 42,
+      "lifeSupportCapacity": 80,
+      "baseSignatureGeometryAreaM2": 1800.0,
+      "structuralProtectionStackId": "protection.stage17_5i_test_v1",
+      "maxOperationalMassKg": 9500000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.test_frigate_v1",
+      "displayName": "Stage 17.5I Frigate Test Hull",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 165.0, "widthM": 48.0, "heightM": 26.0},
+      "bareHullMassKg": 7500000.0,
+      "internalVolumeM3": 115000.0,
+      "slots": [{"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 30.0, "widthM": 20.0, "heightM": 16.0}, "maxMassKg": 2500000.0}],
+      "hardpoints": [],
+      "compartments": [{"id": "core", "volumeM3": 115000.0, "centerM": {"xM": 0.0, "yM": 0.0, "zM": 0.0}, "protectionStackId": "protection.stage17_5i_test_v1", "tags": ["crew", "engineering"]}],
+      "crewBaseline": 90,
+      "lifeSupportCapacity": 140,
+      "baseSignatureGeometryAreaM2": 3200.0,
+      "structuralProtectionStackId": "protection.stage17_5i_test_v1",
+      "maxOperationalMassKg": 16000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.test_destroyer_v1",
+      "displayName": "Stage 17.5I Destroyer Test Hull",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 220.0, "widthM": 72.0, "heightM": 38.0},
+      "bareHullMassKg": 12000000.0,
+      "internalVolumeM3": 210000.0,
+      "slots": [{"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 30.0, "widthM": 20.0, "heightM": 16.0}, "maxMassKg": 2500000.0}],
+      "hardpoints": [],
+      "compartments": [{"id": "core", "volumeM3": 210000.0, "centerM": {"xM": 0.0, "yM": 0.0, "zM": 0.0}, "protectionStackId": "protection.stage17_5i_test_v1", "tags": ["crew", "engineering"]}],
+      "crewBaseline": 180,
+      "lifeSupportCapacity": 240,
+      "baseSignatureGeometryAreaM2": 6200.0,
+      "structuralProtectionStackId": "protection.stage17_5i_test_v1",
+      "maxOperationalMassKg": 26000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.test_cruiser_v1",
+      "displayName": "Stage 17.5I Cruiser Test Hull",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 310.0, "widthM": 96.0, "heightM": 52.0},
+      "bareHullMassKg": 24000000.0,
+      "internalVolumeM3": 390000.0,
+      "slots": [{"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 30.0, "widthM": 20.0, "heightM": 16.0}, "maxMassKg": 2500000.0}],
+      "hardpoints": [],
+      "compartments": [{"id": "core", "volumeM3": 390000.0, "centerM": {"xM": 0.0, "yM": 0.0, "zM": 0.0}, "protectionStackId": "protection.stage17_5i_test_v1", "tags": ["crew", "engineering"]}],
+      "crewBaseline": 340,
+      "lifeSupportCapacity": 440,
+      "baseSignatureGeometryAreaM2": 11000.0,
+      "structuralProtectionStackId": "protection.stage17_5i_test_v1",
+      "maxOperationalMassKg": 48000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.test_bulk_freighter_v1",
+      "displayName": "Stage 17.5I Bulk Freighter Test Hull",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 280.0, "widthM": 88.0, "heightM": 54.0},
+      "bareHullMassKg": 18000000.0,
+      "internalVolumeM3": 520000.0,
+      "slots": [{"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 30.0, "widthM": 20.0, "heightM": 16.0}, "maxMassKg": 2500000.0}],
+      "hardpoints": [],
+      "compartments": [{"id": "core", "volumeM3": 520000.0, "centerM": {"xM": 0.0, "yM": 0.0, "zM": 0.0}, "protectionStackId": "protection.stage17_5i_test_v1", "tags": ["crew", "cargo"]}],
+      "crewBaseline": 120,
+      "lifeSupportCapacity": 220,
+      "baseSignatureGeometryAreaM2": 15000.0,
+      "structuralProtectionStackId": "protection.stage17_5i_test_v1",
+      "maxOperationalMassKg": 52000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    },
+    {
+      "id": "hull.test_tanker_v1",
+      "displayName": "Stage 17.5I Tanker Test Hull",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {"lengthM": 250.0, "widthM": 80.0, "heightM": 50.0},
+      "bareHullMassKg": 16000000.0,
+      "internalVolumeM3": 430000.0,
+      "slots": [{"id": "core_reactor", "category": "CORE", "maxDimensionsM": {"lengthM": 30.0, "widthM": 20.0, "heightM": 16.0}, "maxMassKg": 2500000.0}],
+      "hardpoints": [],
+      "compartments": [{"id": "core", "volumeM3": 430000.0, "centerM": {"xM": 0.0, "yM": 0.0, "zM": 0.0}, "protectionStackId": "protection.stage17_5i_test_v1", "tags": ["crew", "propellant"]}],
+      "crewBaseline": 110,
+      "lifeSupportCapacity": 200,
+      "baseSignatureGeometryAreaM2": 12500.0,
+      "structuralProtectionStackId": "protection.stage17_5i_test_v1",
+      "maxOperationalMassKg": 46000000.0,
+      "thrustMountCompatibility": ["MAIN_DRIVE", "MANEUVER_THRUSTERS"]
+    }
+  ],
+  "modules": [
+    {
+      "id": "module.stage17_5i_test_reactor_v1",
+      "displayName": "Stage 17.5I Baseline Reactor",
+      "family": "REACTOR_POWER",
+      "integrationCategories": ["CORE"],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {"lengthM": 24.0, "widthM": 16.0, "heightM": 12.0},
+      "massKg": 1200000.0,
+      "occupiedVolumeM3": 4608.0,
+      "requiredMountStrengthN": 1000000.0,
+      "continuousPowerSupplyW": 1000000000.0,
+      "continuousPowerDemandW": 0.0,
+      "peakPowerDemandW": 0.0,
+      "storedEnergyCapacityJ": 0.0,
+      "wasteHeatW": 0.0,
+      "localThermalCapacityJ": 1000000000.0,
+      "coolantTransferDemandW": 0.0,
+      "heatRejectionW": 0.0,
+      "crewRequirement": 8,
+      "automationRequirement": 4,
+      "interfaces": [],
+      "signatureContributions": {},
+      "constructionInputs": [
+        {"contentId": "component.heavy", "amount": 100.0},
+        {"contentId": "component.precision", "amount": 50.0}
+      ],
+      "maintenance": {"serviceIntervalSeconds": 172800.0, "maintenanceWorkSeconds": 7200.0, "repairComplexity": 0.5},
+      "capabilityParameters": {"rated_power_w": 1000000000.0}
+    }
+  ],
+  "demonstratorFits": [
+    {"id": "fit.test_corvette_baseline_v1", "hullId": "hull.test_corvette_v1", "installedModules": [{"mountId": "core_reactor", "moduleId": "module.stage17_5i_test_reactor_v1"}]},
+    {"id": "fit.test_frigate_baseline_v1", "hullId": "hull.test_frigate_v1", "installedModules": [{"mountId": "core_reactor", "moduleId": "module.stage17_5i_test_reactor_v1"}]},
+    {"id": "fit.test_destroyer_baseline_v1", "hullId": "hull.test_destroyer_v1", "installedModules": [{"mountId": "core_reactor", "moduleId": "module.stage17_5i_test_reactor_v1"}]},
+    {"id": "fit.test_cruiser_baseline_v1", "hullId": "hull.test_cruiser_v1", "installedModules": [{"mountId": "core_reactor", "moduleId": "module.stage17_5i_test_reactor_v1"}]},
+    {"id": "fit.test_bulk_freighter_baseline_v1", "hullId": "hull.test_bulk_freighter_v1", "installedModules": [{"mountId": "core_reactor", "moduleId": "module.stage17_5i_test_reactor_v1"}]},
+    {"id": "fit.test_tanker_baseline_v1", "hullId": "hull.test_tanker_v1", "installedModules": [{"mountId": "core_reactor", "moduleId": "module.stage17_5i_test_reactor_v1"}]}
+  ]
+}
