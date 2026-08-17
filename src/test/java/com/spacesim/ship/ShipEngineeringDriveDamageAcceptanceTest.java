@@ -8,6 +8,7 @@ import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 import com.spacesim.ship.ShipEngineeringRuntime.TickResult;
 import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
 import com.spacesim.ship.ShipEngineeringState.ConsumableState;
+import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import org.junit.jupiter.api.Test;
 
@@ -24,18 +25,7 @@ class ShipEngineeringDriveDamageAcceptanceTest {
         InstalledFit fit = InstalledFit.fromDemonstrator(
                 catalog.findDemonstratorFit("fit.escort_destroyer_schema_v1"));
         ShipEngineeringRuntime runtime = new ShipEngineeringRuntime(catalog);
-        ConsumableState loads = new ConsumableState(
-                0d,
-                0d,
-                0d,
-                0d,
-                List.of(new ConsumableLoad(
-                        "core_drive",
-                        "propellant_feed",
-                        InterfaceKind.REACTION_MASS,
-                        100_000d,
-                        100_000d,
-                        0L)));
+        ConsumableState loads = reactionMass();
         RuntimeState healthy = runtime.initialize(fit, loads);
         double ratedThrustN = catalog.findModule("module.main_drive_escort_v1")
                 .capabilityParameters().get("thrust_n");
@@ -68,5 +58,46 @@ class ShipEngineeringDriveDamageAcceptanceTest {
                 100_000d - result.massFlowKgPerS(),
                 result.state().consumables().reactionMassKg(),
                 1e-9);
+    }
+
+    @Test
+    void localIntegrityIsAppliedExactlyOnceByAuthoritativeLiveRuntime() {
+        ShipEngineeringCatalog catalog = ShipEngineeringCatalogLoader.loadDefault();
+        InstalledFit fit = InstalledFit.fromDemonstrator(
+                catalog.findDemonstratorFit("fit.escort_destroyer_schema_v1"));
+        ShipEngineeringRuntime runtime = new ShipEngineeringRuntime(catalog);
+        DamageState halfDrive = new DamageState(Map.of("core_drive", 0.5d));
+        RuntimeState initialized = runtime.initialize(fit, reactionMass(), halfDrive);
+        double ratedThrustN = catalog.findModule("module.main_drive_escort_v1")
+                .capabilityParameters().get("thrust_n");
+
+        TickResult result = runtime.advance(
+                fit,
+                initialized,
+                halfDrive,
+                new OperatingCommand(Map.of("core_drive", 1d), Map.of(), Set.of()),
+                1d);
+
+        assertEquals(ratedThrustN, initialized.thrustLimitNByMount().get("core_drive"), 0d,
+                "persistent thrust ceiling must not pre-apply local integrity");
+        assertEquals(ratedThrustN * 0.5d, result.actualThrustN(), 1e-6,
+                "current module integrity must scale live thrust exactly once, not integrity squared");
+        assertEquals(ratedThrustN * 0.5d, result.derivedState().totalThrustN(), 1e-6,
+                "live result and central derived calculator must agree on damaged thrust");
+    }
+
+    private static ConsumableState reactionMass() {
+        return new ConsumableState(
+                0d,
+                0d,
+                0d,
+                0d,
+                List.of(new ConsumableLoad(
+                        "core_drive",
+                        "propellant_feed",
+                        InterfaceKind.REACTION_MASS,
+                        100_000d,
+                        100_000d,
+                        0L)));
     }
 }
