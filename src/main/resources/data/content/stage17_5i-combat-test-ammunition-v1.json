@@ -26,7 +26,7 @@
       "shape": "SHELL",
       "lengthM": 6.8,
       "diameterM": 0.72,
-      "impactPayloadId": "payload.ct_kinetic_fragmentation_v1",
+      "impactPayloadId": null,
       "seekerId": "seeker.ct_multimode_antiship_v1",
       "dryMassKg": 1800.0,
       "propellantMassKg": 1200.0,
