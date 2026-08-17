@@ -122,7 +122,17 @@ public final class ShipEngineeringRuntime {
             Map<String, Double> thrustLimitNByMount,
             double coolantBusCapacityW,
             Map<String, Double> ftlCooldownSecondsByMount) {
-        /** Validates and freezes one persistent-ready operating state. */
+        /**
+         * Validates and freezes one persistent-ready operating state.
+         *
+         * @param consumables physical cargo/stores/ammunition/reaction-mass state
+         * @param sharedBusEnergyJ current shared-bus electrical energy
+         * @param shipHeatStoredJ current heat stored on the ship heat bus
+         * @param localHeatJByMount module-local thermal energy by mount
+         * @param thrustLimitNByMount physical thrust ceilings independent from current integrity
+         * @param coolantBusCapacityW current physical coolant-transfer ceiling
+         * @param ftlCooldownSecondsByMount remaining FTL cooldown by mount
+         */
         public RuntimeState {
             Objects.requireNonNull(consumables, "consumables");
             requireNonNegativeFinite(sharedBusEnergyJ, "sharedBusEnergyJ");
@@ -146,7 +156,13 @@ public final class ShipEngineeringRuntime {
             Map<String, Double> throttleByMount,
             Map<String, Integer> powerPriorityByMount,
             Set<String> disabledMounts) {
-        /** Validates, sorts and freezes one shared player/AI operating command. */
+        /**
+         * Validates, sorts and freezes one shared player/AI operating command.
+         *
+         * @param throttleByMount requested drive throttle in [0,1]
+         * @param powerPriorityByMount deterministic load-shedding priority, larger values shed first
+         * @param disabledMounts explicitly disabled physical mounts
+         */
         public OperatingCommand {
             Objects.requireNonNull(throttleByMount, "throttleByMount");
             TreeMap<String, Double> throttles = new TreeMap<>();
@@ -218,7 +234,23 @@ public final class ShipEngineeringRuntime {
             double radiatorRejectionW,
             ThermalStatus thermalStatus,
             List<String> shedMounts) {
-        /** Validates and freezes one deterministic engineering tick result. */
+        /**
+         * Validates and freezes one deterministic engineering tick result.
+         *
+         * @param state next authoritative operating state
+         * @param derivedState damage-aware derived ship state after physical consumption
+         * @param actualThrustN actual total thrust produced
+         * @param massFlowKgPerS reaction-mass flow rate
+         * @param powerSupplyW surviving active continuous generation
+         * @param powerDemandW surviving active demand after shedding
+         * @param storageDischargeW shared-storage power used during the step
+         * @param powerStatus resulting power-bus condition
+         * @param generatedHeatW active waste-heat generation
+         * @param coolantTransferW heat moved from local modules to the ship bus
+         * @param radiatorRejectionW active heat rejection
+         * @param thermalStatus resulting thermal condition
+         * @param shedMounts deterministic list of shed mounts
+         */
         public TickResult {
             Objects.requireNonNull(state, "state");
             Objects.requireNonNull(derivedState, "derivedState");
@@ -265,7 +297,22 @@ public final class ShipEngineeringRuntime {
             double edgeTransitSeconds,
             double cooldownSeconds,
             double jumpHeatJ) {
-        /** Validates energy closure and immutable scalar values of one jump plan. */
+        /**
+         * Validates energy closure and immutable scalar values of one jump plan.
+         *
+         * @param allowed whether the plan is executable
+         * @param failure stable rejection reason or NONE
+         * @param mountId selected FTL mount, empty when absent
+         * @param translatedMassKg current translated mass
+         * @param requiredEnergyJ total spool energy
+         * @param reactorEnergyContributionJ energy supplied by continuous reactor margin
+         * @param storedEnergyDrawJ energy drawn from shared storage
+         * @param chargePowerW average spool charging power
+         * @param spoolSeconds spool duration
+         * @param edgeTransitSeconds current fixture edge-transit duration
+         * @param cooldownSeconds post-jump cooldown
+         * @param jumpHeatJ local heat deposited by the jump
+         */
         public JumpPlan {
             Objects.requireNonNull(failure, "failure");
             mountId = mountId == null ? "" : mountId;
