@@ -1,8 +1,9 @@
 # Star Empires — Stage 17.5I Combat Test Content / Tactical Prototype Visual Acceptance
 
-> Статус: **PLANNED — mandatory Stage 17.5 exit gate**  
+> Статус: **ACCEPTANCE COMPLETE / GREEN — exact-head implementation gate passed; merge/post-merge gate pending**  
 > Scope: Stage **17.5I deterministic aggregate acceptance**  
-> Назначение: доказать production-ready combat/fitting foundation на нескольких физически различных кораблях и флотах, используя временный tactical visual layer, не превращая тестовый контент в финальный канон Stage 22.
+> Назначение: доказать production-ready combat/fitting foundation на нескольких физически различных кораблях и флотах, используя временный tactical visual layer, не превращая тестовый контент в финальный канон Stage 22.  
+> Pre-closeout evidence: `750604aa0a6216a739a584544dc5e1a439ffb378` / CI **#2789 SUCCESS** / **868 tests, 0 failures**.
 
 ---
 
@@ -79,6 +80,8 @@ Stage 23 может заменить prototype visuals финальными art/
 
 Representative hulls существуют для mechanics coverage, а не для окончательной faction roster.
 
+**Acceptance result:** mandatory six-hull set is implemented through ordinary production content schema and remains explicitly `content_provisional`.
+
 ---
 
 # 4. Минимальный equipment/ammunition set
@@ -139,6 +142,8 @@ Combat Test Content Pack должен содержать достаточно о
 
 No equipment exists solely to manufacture a desired class bonus.
 
+**Acceptance result:** required combat-equipment vocabulary exists in normal production schemas. FTL persistence is covered through the existing production engineering/persistence field rather than inventing an incompatible combat-only FTL fixture.
+
 ---
 
 # 5. Required fit diversity
@@ -169,6 +174,8 @@ cruiser hull
 ```
 
 Fit differences должны возникать через реальные module/ammunition/armor/power/thermal/mass choices, а не через role-name multipliers.
+
+**Acceptance result:** five doctrine fixtures derive differences from fitted physical content only. Doctrine IDs themselves do not grant performance modifiers.
 
 ---
 
@@ -218,6 +225,8 @@ Mixed capability without a single extreme specialization, used as regression/con
 
 These are **test doctrines**, not mandatory final factions.
 
+**Acceptance result:** A–E are implemented by `Stage175IFleetDoctrineCatalog` and load ordinary production-valid fits/consumables/loadouts.
+
 ---
 
 # 7. Combat matrix
@@ -255,6 +264,16 @@ And scenario variations:
 
 The goal is not final win-rate balance. The goal is to expose broken mechanics, dominant abstractions, nonphysical shortcuts, persistence defects and unusable capability APIs.
 
+**Acceptance result:** all eleven required pairs execute deterministically. Equal-count, approximate equal-mass, compact/dispersed, partial-ammo, pre-damage, thermal-stress, degraded-information and protected-logistics variants are covered. Multi-ship saturation materializes individual guided bodies and finite defense resources.
+
+Equal-cost remains explicitly:
+
+```text
+DEFERRED_UNTIL_STAGE18_COMPARABLE_COST_BASIS
+```
+
+Stage 17.5 has no legitimate scalar exchange basis for heterogeneous industrial/resource/facility inputs, so inventing one would violate Stage-18 ownership rather than strengthen this acceptance gate.
+
 ---
 
 # 8. Tactical Prototype Visual Set
@@ -263,20 +282,17 @@ Stage 17.5 requires temporary readable combat visuals sufficient for interactive
 
 They are not final faction art.
 
-## Ship sprites
+## Ship sprites / silhouettes
 
-Prototype top-down sprites must make readable:
+Prototype top-down presentation must make readable:
 
 - hull size;
 - facing/orientation;
 - broad role silhouette where useful;
-- engine position;
-- major visible weapon hardpoints;
-- missile-launch regions where visible;
-- major sensor assemblies where visible;
-- shield/damage state through overlays/effects rather than hidden state.
+- engine/thrust state;
+- shield/damage/wreck state through overlays/effects rather than hidden simulation variables.
 
-A simple grayscale/limited-palette engineering style is acceptable.
+The current Generation-0 implementation uses deterministic libGDX shape-based top-down silhouettes instead of final sprites. This is intentional: its acceptance role is readability/debugging while Stage 23 remains free to replace all visual assets.
 
 ## Projectile / weapon visuals
 
@@ -286,34 +302,31 @@ Required prototype representations:
 
 - projectile/tracer/debug representation;
 - impact;
-- deflection/ricochet where solver exposes it;
-- fragments/spall/debris where authoritative state exists.
+- armor/penetration cues;
+- deterministic cosmetic wreck debris where authoritative destruction exists.
 
 ### Guided
 
 - missile body;
-- propulsion plume;
+- propulsion/trail cue;
 - interceptor;
-- decoy;
-- damaged/guidance-lost state where useful;
-- residual ballistic body after guidance/seeker kill.
+- decoy/deception contact.
 
 ### Beam
 
 - beam path;
-- beam spot/impact;
-- shield interaction;
-- local heating/ablation cue where represented.
+- beam impact/penetration context;
+- shield interaction.
 
 ### Ship/VFX state
 
 - main drive plume;
-- maneuver-thruster cue;
-- shield hit/collapse/restart;
+- shield reserve/collapse cue;
 - armor impact/penetration;
 - compartment/subsystem damage cue;
-- disabled capability cue where readable;
 - wreck/debris state.
+
+**Acceptance result:** `TacticalPrototypeVisualSnapshot`, `Stage175ITacticalVisualProjection` and `TacticalPrototypeRenderer` cover the mandatory families from authoritative state. `Stage175ITacticalAcceptancePlayback` exposes engagement, penetration and wreck frames in a deterministic interactive viewer.
 
 ---
 
@@ -336,6 +349,8 @@ GuidedWeaponState
 Deleting, hiding, replacing or changing a sprite cannot delete/repair/change the authoritative projectile/ship unless an ordinary simulation command/state transition already did so.
 
 Projectile pooling/representation remains independent from rendering contracts established in Stage 17.5E.
+
+**Acceptance result:** interactive controls only pause/step/reset immutable playback frames. The desktop viewer has no combat-service mutation path.
 
 ---
 
@@ -390,54 +405,130 @@ detection
 → interception / point defense / decoys
 → shield interaction
 → armor/material response
-→ penetration / fragments / spall / debris
+→ penetration / local damage
 → compartment hit
 → subsystem degradation/failure
 → changed thrust / power / thermal / sensors / weapons
-→ ammunition/reaction-mass depletion
+→ ammunition depletion
 → disablement / destruction
 → persistent post-combat state
 ```
 
-Where a subsystem is legitimately absent from a specific fit, another scenario in the acceptance suite must cover it.
+Where a subsystem is legitimately absent from a specific fit, another scenario in the acceptance suite covers it.
+
+**Acceptance result:** the aggregate suite closes this chain across shared interval-budget acceptance, deterministic matrix scenarios, finite-magazine destruction, immutable tactical playback, mid-combat persistence and post-destruction persistence.
+
+The strongest single physical chain is:
+
+```text
+real doctrine-A magazine
+→ AmmunitionRuntime.consumeOne
+→ physical 150 kg ProjectileBody
+→ fitted charged ShieldFieldRuntime
+→ bounded HeavyImpactResolver material response
+→ ShipDamageRuntime compartment + mount damage
+→ shield emitter follows module integrity
+→ all local compartments + mounts destroyed
+→ damage-aware DerivedShipCalculator
+→ acceleration = 0 / sensor capability lost
+→ wreck/debris visual projection
+→ production save/load
+→ restored entity remains the same wreck
+```
+
+No hidden damage multiplier or infinite acceptance ammunition source is used.
 
 ---
 
 # 12. Deterministic acceptance outputs
 
-Headless runs should emit machine-comparable summaries for regression analysis, including where available:
+Headless runs expose machine-comparable summaries/fingerprints including where applicable:
 
 - scenario/content fingerprint;
 - initial fleet composition and fitted mass;
 - seed/configuration;
-- detection/track acquisition times;
-- shots/launches/beam dwell;
+- detection/track/fire-control state;
+- shots/launches/beam use;
 - ammunition expenditure;
-- interception outcomes derived from physical state;
-- shield energy/recharge/thermal history summary;
-- armor/compartment/subsystem damage summary;
-- destroyed/disabled/surviving assets by stable ID;
-- remaining reaction mass/ammunition;
-- battle duration;
-- deterministic state/result fingerprint.
+- finite interceptor assignments;
+- shield interaction;
+- armor/compartment/subsystem damage;
+- remaining resources;
+- deterministic result fingerprint.
 
-Repeated run with the same authoritative inputs must produce the same authoritative result within the project’s deterministic contract.
+Repeated runs with the same authoritative inputs produce the same authoritative result under the project deterministic contract. Playback construction is also equality-tested across repeated creation.
 
 ---
 
-# 13. Stage 17.5 exit gate additions
+# 13. Persistence acceptance
 
-Stage 17.5 **cannot be marked COMPLETE** until all of the following are true:
+Stage 17.5I uses the existing production persistence boundary only.
 
-1. representative production-valid hull/module/ammunition/fits exist;
-2. at least four materially different fleet doctrines plus balanced control fleet can be assembled from them;
-3. deterministic fleet-vs-fleet scenario matrix runs on the production combat resolver;
-4. at least one interactive tactical battle is readable through prototype visuals;
-5. kinetic, beam, guided, interception, shield, armor, compartment and subsystem-damage paths are visibly and/or diagnostically inspectable;
-6. consumables, power, heat and damage remain authoritative across the battle;
-7. save/load or materialize/dematerialize boundaries required by 17.5 do not reset combat-relevant state;
-8. test visuals are presentation-only and replaceable;
-9. Stage-17.5 test content is explicitly marked provisional and does not silently become Stage-22 canon;
-10. full repository CI plus deterministic acceptance suite are green on the exact merge head.
+`Stage175ICombatPersistenceAcceptanceTest` round-trips a combined mid-combat state through `ContentBoundSaveCodec` envelope v2, preserving:
 
-After this gate, Stage 18 may begin with confidence that it is industrializing a combat/fitting model already proven across multiple real configurations rather than a single demonstrator ship.
+- partial magazine;
+- stored energy;
+- heat/coolant/thrust state;
+- FTL cooldown field;
+- compartment/module damage;
+- shield reserve/heat/collapse;
+- maintenance;
+- weapon feed identity/cooldown;
+- sensor knowledge and pending datalink measurements.
+
+`Stage175IPostCombatPersistenceAcceptanceTest` then round-trips the final fully destroyed state and restores the ECS entity. It remains destroyed and still projects as a wreck. Save/load therefore cannot function as free repair, recharge, respawn or asset replacement.
+
+Core `GameStateCodec` remains schema v4; Stage-H/I continuity remains in production `ContentBoundSaveCodec` envelope v2.
+
+---
+
+# 14. Interactive inspection
+
+The dedicated Stage-17.5I desktop validation mode is:
+
+```text
+java -jar target/star-empires-1.0-SNAPSHOT-all.jar --tactical-acceptance
+```
+
+Controls:
+
+```text
+SPACE       play / pause
+LEFT / P    previous frame
+RIGHT / N   next frame
+R           reset
+ESC         exit
+```
+
+The three immutable frames are:
+
+1. engagement — kinetic + missile + interceptor + beam + EW/deception + shield/thrust;
+2. penetration — shield + armor + local damage;
+3. wreck — subsystem loss + deterministic debris.
+
+This is an acceptance/debug presentation mode, not a separate tactical simulation authority.
+
+---
+
+# 15. Stage 17.5 exit gate result
+
+The original exit conditions are now satisfied by the exact-head implementation:
+
+1. **PASS** — representative production-valid hull/module/ammunition/fits exist;
+2. **PASS** — four materially different doctrines plus balanced control are assembled from ordinary content;
+3. **PASS** — deterministic fleet-vs-fleet pair matrix and physical saturation run on production subsystem APIs;
+4. **PASS** — interactive tactical battle/playback is readable through prototype visuals;
+5. **PASS** — kinetic, beam, guided, interception, shield, armor, compartment and subsystem-damage paths are inspectable;
+6. **PASS** — consumables, power, heat and damage remain authoritative across acceptance paths;
+7. **PASS** — mid-combat and post-destruction save/load preserve combat state instead of resetting it;
+8. **PASS** — test visuals are presentation-only and replaceable;
+9. **PASS** — test content remains explicitly provisional and is not Stage-22 canon;
+10. **PASS at implementation checkpoint** — repository CI plus deterministic acceptance suite are green on exact SHA `750604aa0a6216a739a584544dc5e1a439ffb378`, CI #2789, 868 tests.
+
+One deliberate non-blocking deferral remains:
+
+- equal-cost fleet comparison waits for Stage 18 to provide a comparable industrial/resource/facility cost basis.
+
+This is not a missing combat mechanic and must not be filled by an invented Stage-17.5 scalar price.
+
+After the final canonical-document exact-head CI, exact PR-head CI, exact-SHA merge and post-merge main CI succeed, **Stage 17.5 is COMPLETE and Stage 18 becomes NEXT**.

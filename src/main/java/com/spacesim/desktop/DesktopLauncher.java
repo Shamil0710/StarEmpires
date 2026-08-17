@@ -9,6 +9,7 @@ import com.spacesim.SpaceSimGame;
 import com.spacesim.presentation.validation.GraphicsValidationApp;
 import com.spacesim.presentation.validation.GraphicsValidationProfile;
 import com.spacesim.presentation.validation.HeavyCorvetteAssetValidationApp;
+import com.spacesim.presentation.validation.Stage175ITacticalAcceptanceApp;
 
 /**
  * Desktop entry point for Star Empires on LWJGL3.
@@ -20,6 +21,7 @@ import com.spacesim.presentation.validation.HeavyCorvetteAssetValidationApp;
 public final class DesktopLauncher {
     private static final String GRAPHICS_SPIKE_ARGUMENT = "--graphics-spike";
     private static final String ASSET_PACK_VALIDATION_ARGUMENT = "--asset-pack-validation";
+    private static final String TACTICAL_ACCEPTANCE_ARGUMENT = "--tactical-acceptance";
     private static final String SPECTATOR_ARGUMENT = "--spectator";
 
     /** Prevents construction of the utility entry-point class. */
@@ -34,6 +36,7 @@ public final class DesktopLauncher {
     public static void main(String[] args) {
         boolean assetPackValidation = containsArgument(args, ASSET_PACK_VALIDATION_ARGUMENT);
         boolean graphicsSpike = containsArgument(args, GRAPHICS_SPIKE_ARGUMENT);
+        boolean tacticalAcceptance = containsArgument(args, TACTICAL_ACCEPTANCE_ARGUMENT);
         boolean spectator = containsArgument(args, SPECTATOR_ARGUMENT);
         Lwjgl3ApplicationConfiguration configuration = new Lwjgl3ApplicationConfiguration();
 
@@ -55,6 +58,14 @@ public final class DesktopLauncher {
             configuration.useVsync(false);
             configuration.setForegroundFPS(0);
             listener = new GraphicsValidationApp();
+        } else if (tacticalAcceptance) {
+            configuration.setTitle("Star Empires — Stage 17.5I Tactical Acceptance");
+            configuration.setWindowedMode(1440, 900);
+            configuration.setWindowSizeLimits(1000, 650, -1, -1);
+            configuration.setResizable(true);
+            configuration.useVsync(true);
+            configuration.setForegroundFPS(60);
+            listener = new Stage175ITacticalAcceptanceApp();
         } else if (spectator) {
             enableLargeDemo();
             configuration.setTitle("Star Empires — 100 System Economy Spectator");

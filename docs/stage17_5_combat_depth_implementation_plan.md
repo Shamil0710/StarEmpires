@@ -1,6 +1,6 @@
 # Star Empires — Stage 17.5 Combat Depth / Ship Fitting Foundation
 
-> Статус: **ACTIVE — 17.5A–17.5H COMPLETE; 17.5I NEXT**  
+> Статус: **COMPLETE — 17.5A–17.5I; Stage 18 NEXT**  
 > Основание: accepted `Ship Mathematics v1.0 Design Baseline` (`docs/ship_mathematics_v1_0_design_baseline.md`)  
 > Machine-readable baseline: `docs/benchmarks/ship_mathematics_v1_0_design_baseline.json`  
 > Назначение: перенести принятую v1.0 инженерную модель из research в authoritative runtime без повторного проектирования fundamental ship/combat architecture.
@@ -23,6 +23,8 @@ Stage 17.5 заменяет Stage-13 combat vertical slice полноценны�
 Production runtime использует ту же парадигму для player, AI, civilian, military и industrial ships.
 
 Stage 17.5 дополнительно обязан закончиться не только subsystem-level acceptance, но и production-valid **Combat Test Content Pack + Tactical Prototype Visual Set**, на которых несколько физически различных флотов проходят deterministic и interactive боевые столкновения. Детальный exit-gate contract: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
+
+**Результат:** эта цель достигнута Stage 17.5I; content pack остаётся production-valid/content-provisional, а tactical visuals — replaceable presentation-only layer.
 
 ---
 
@@ -392,7 +394,7 @@ Hit location/orientation matters; global hull HP is not sole survivability; shie
 
 Canonical implementation record: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.
 
-Stage 17.5H has now consumed the authoritative local `DamageState` and shield state at live engineering/API/persistence boundaries. Production ship-instance code no longer relies on a silent pristine-damage reset for those paths.
+Stage 17.5H consumed the authoritative local `DamageState` and shield state at live engineering/API/persistence boundaries. Production ship-instance code no longer relies on a silent pristine-damage reset for those paths.
 
 ---
 
@@ -472,7 +474,7 @@ getRepairNeed()
 
 Sensor observation, beam operation and shield recharge are composed through a common damage-aware engineering grant boundary so they cannot receive free power or free thermal capacity. The same boundary is ownership-neutral for player and AI.
 
-`EngineeringComponent` now carries the authoritative fitted ship instance across live boundaries: fit, consumables/operating state, compartment/module damage, shield state, maintenance/service age, weapon feed identity and launcher cooldown continuity.
+`EngineeringComponent` carries the authoritative fitted ship instance across live boundaries: fit, consumables/operating state, compartment/module damage, shield state, maintenance/service age, weapon feed identity and launcher cooldown continuity.
 
 UI consumes read-only `ShipCapabilityService` projections and does not mutate ECS directly.
 
@@ -497,72 +499,165 @@ Damage/shield/refit/maintenance state survives live ECS and persistence boundari
 
 # 12. Stage 17.5I — deterministic end-to-end acceptance gate
 
-**NEXT after the Stage-17.5H merge/post-merge gate.**
+**COMPLETE — aggregate content, matrix, persistence, full-chain destruction and interactive tactical acceptance are green.**
 
-Stage 17.5I включает два обязательных слоя acceptance:
+Stage 17.5I includes two mandatory layers:
 
-1. subsystem/end-to-end deterministic scenarios ниже;
-2. production-valid **Combat Test Content Pack + Tactical Prototype Visual Set** по `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
+1. subsystem/end-to-end deterministic scenarios;
+2. production-valid **Combat Test Content Pack + Tactical Prototype Visual Set** per `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
-Тестовый content pack обязан позволять собрать несколько физически различных hull/fits и минимум четыре специализированные fleet doctrines плюс balanced/control fleet. Эти assets используют production schemas/runtime, но остаются **content-provisional**: они не получают автоматический канонический статус Stage 22.
-
-Required scenarios:
-
-### Fit / mass
+The delivered content pack supplies six representative hull families and five physically distinct doctrine fits:
 
 ```text
-same hull empty
-vs loaded cargo
-vs heavy armor
-vs extra ammunition
-→ physically different acceleration/delta-v
+A — kinetic line
+B — missile strike
+C — high-mobility / beam
+D — defensive / EW
+E — balanced control
 ```
 
-### Power/thermal
+These assets use production schemas/runtime and remain **content-provisional**. They do not receive automatic Stage-22 canonical status.
 
-Healthy fit survives expected duty; cooling damage throttles physically.
+## 12.1 Deterministic pair / variant matrix
 
-### Sensor/network
+Required pairs are green:
 
-Recon geometry improves track/fire-control without bonus aura.
+```text
+A-A
+A-B
+A-C
+A-D
+A-E
+B-C
+B-D
+B-E
+C-D
+C-E
+D-E
+```
 
-### Combat saturation
+Covered variants include:
 
-Repeat attacker/escort/spacing/wave matrices on production resolver.
+- equal fleet count;
+- approximately equal fitted mass;
+- compact/dispersed spacing;
+- full vs partial ammunition;
+- fresh vs pre-damaged state;
+- thermal stress;
+- degraded sensor-information state;
+- protected logistics;
+- physical multi-body guided saturation with finite defense resources.
 
-### Shield
+Equal-cost comparison is explicitly `DEFERRED_UNTIL_STAGE18_COMPARABLE_COST_BASIS`. Stage 18 owns the first legitimate comparable industrial/resource/facility cost basis; Stage 17.5I does not invent a fake scalar price.
 
-Finite reserve + power + recharge + heat; repeated hits saturate.
+## 12.2 Shared engineering contention
 
-### Heavy impact
+The Stage-H same-interval risk is closed through one explicit `ShipEngineeringGrantService.IntervalBudget` shared by sensor, beam and shield-recharge operations.
 
-Bounded response lookup + compartment damage + no silent extrapolation.
+```text
+sensor + beam + shield recharge in one interval
+→ one continuous reactor margin
+→ residual demand may use only physical ENERGY_STORAGE
+→ storage discharge power remains bounded
+→ local heat admitted deterministically
+→ denied operation mutates neither budget nor ship
+```
 
-### Civilian
+Acceptance: `Stage175ISharedEngineeringIntervalAcceptanceTest`.  
+Checkpoint: `09556d783955aa7967847b0a7364141390e020a5` / CI #2772 SUCCESS.
 
-Freighter/tanker use same mass/propulsion/power schema.
+## 12.3 Mid-combat persistence
 
-### Economy
+`Stage175ICombatPersistenceAcceptanceTest` uses production `ContentBoundSaveCodec` envelope v2 and Stage-H mappers to preserve a combined state containing:
 
-Build/refit/repair consumes real resources and money through common seams; Stage 18 later expands these into complete industrial chains.
+- partial physical magazine;
+- stored energy;
+- local/ship heat;
+- thrust/coolant state;
+- FTL cooldown field;
+- compartment/module damage;
+- shield reserve/heat/collapse;
+- maintenance;
+- weapon feed identity/cooldowns;
+- sensor tracks/received/pending measurements.
 
-### Persistence
+No test-only save format exists. Core `GameStateCodec` remains schema v4.  
+Checkpoint: `6fcc1843680cfc84bf2c9a3dec4aa2df889d73cf` / CI #2774 SUCCESS.
 
-Save/load at fitted state, mid-combat damage, partial magazine, heated module, shield recharge and FTL lifecycle.
+## 12.4 Finite-magazine destruction
 
-### Multi-fleet combat content
+`Stage175IPhysicalDestructionScenario` plus `Stage175IFullChainDestructionAcceptanceTest` proves:
 
-Required acceptance includes materially different kinetic-line, missile-strike, high-mobility/beam, defensive/EW and balanced-control fleet configurations built from ordinary production-valid hull/module/ammunition/fit definitions.
+```text
+real doctrine-A primary magazine
+→ AmmunitionRuntime.consumeOne
+→ physical 150 kg ProjectileBody
+→ fitted charged ShieldFieldRuntime
+→ HeavyImpactResolver material response
+→ ShipDamageRuntime local compartment/mount damage
+→ shield-emitter integrity follows real module damage
+→ complete local destruction
+→ damage-aware DerivedShipCalculator
+→ acceleration = 0 / sensor capability lost
+→ wreck/debris presentation
+```
 
-The matrix must exercise equal-count/equal-mass style comparisons, formation spacing, ammunition depletion, pre-damage/thermal stress and sensor-information differences. The purpose is mechanics coverage/regression discovery, not final Stage-22 win-rate balance.
+The scenario continues until every compartment and every mount physically located in it reaches zero integrity. The real fitted magazine is sufficient without hidden damage bonuses or infinite acceptance ammunition.
 
-### Tactical prototype visuals
+Checkpoint: `ab8515ababebd669060570d5a078c45d396b35b5` / CI #2775 SUCCESS.
 
-At least one interactive combat scene must be readable with temporary top-down ship sprites plus prototype kinetic, beam, missile/interceptor/decoy, engine/thruster, shield, impact, penetration, damage and wreck/debris representations where authoritative state exists.
+## 12.5 Post-combat persistence
 
-Rendering remains presentation-only. A sprite/VFX replacement cannot mutate authoritative combat state.
+`Stage175IPostCombatPersistenceAcceptanceTest` captures the fully destroyed physical entity, round-trips it through production persistence, restores ECS and reprojects it. It remains destroyed and remains a wreck.
 
-Hard invariants:
+Save/load therefore cannot become free repair, shield recharge, rearm, respawn or asset replacement.
+
+## 12.6 Tactical prototype visuals / interactive gate
+
+The replaceable presentation path is:
+
+```text
+Stage175IPhysicalDestructionScenario authoritative snapshots
+→ Stage175ITacticalAcceptancePlayback immutable frames
+→ TacticalPrototypeVisualSnapshot
+→ TacticalPrototypeRenderer
+→ Stage175ITacticalAcceptanceApp
+```
+
+The three deterministic frames expose:
+
+1. engagement — kinetic projectile, guided missile, interceptor, EW/deception, beam, shield and thrust;
+2. penetration — shield/armor/penetration/local damage;
+3. wreck — subsystem loss and deterministic cosmetic debris.
+
+Interactive launch:
+
+```text
+java -jar target/star-empires-1.0-SNAPSHOT-all.jar --tactical-acceptance
+```
+
+Controls only pause/step/reset/exit. The desktop client has no combat mutation path and cannot fire, repair, replenish, recharge or apply damage.
+
+## 12.7 Exit evidence
+
+Pre-closeout exact implementation checkpoint:
+
+```text
+head: 750604aa0a6216a739a584544dc5e1a439ffb378
+CI:   #2789
+result: SUCCESS
+suite: 868 tests, 0 failures / 0 errors / 0 skipped
+coverage: PASS
+strict Javadoc: PASS
+shaded desktop package: PASS
+```
+
+Canonical records:
+
+- `docs/stage17_5i_implementation_record.md`;
+- `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
+
+Hard invariants remain:
 
 1. no player-only combat physics;
 2. no class-name performance bonus;
@@ -595,9 +690,9 @@ Stage 17.5 не обязан:
 - simulate atom-by-atom materials/CFD/plasma;
 - превращать exotic shields/FTL в реальную современную физику.
 
-При этом Stage 17.5 **обязан** создать минимальный production-valid, content-provisional набор корпусов/оборудования/боеприпасов/fits и временный tactical visual set, достаточные для multi-fleet acceptance. Это test vocabulary, а не финальная Stage-22 энциклопедия контента.
+При этом Stage 17.5 создал минимальный production-valid, content-provisional набор корпусов/оборудования/боеприпасов/fits и временный tactical visual set, достаточные для multi-fleet acceptance. Это test vocabulary, а не финальная Stage-22 энциклопедия контента.
 
-Он обязан реализовать правильные interfaces и authoritative accounting.
+Он реализует правильные interfaces и authoritative accounting.
 
 ---
 
@@ -612,23 +707,25 @@ Stage 17.5 не обязан:
 → 17.5F shields/armor/compartments/damage COMPLETE
 → 17.5G shipyard/refit/repair/maintenance seam COMPLETE
 → 17.5H capability APIs/UI/persistence COMPLETE
-→ 17.5I full acceptance + combat test content + prototype tactical visuals NEXT
+→ 17.5I full acceptance + combat test content + prototype tactical visuals COMPLETE
+→ Stage 17.5 COMPLETE
+→ Stage 18 Resources / Industry / Infrastructure NEXT
 ```
 
-Combat subsystems не должны создавать parallel mass/power/heat state до central calculator.
+Combat subsystems не создают parallel mass/power/heat state до central calculator.
 
 ---
 
 # 15. Stage 17.5 completion definition
 
-Stage 17.5 закрыт, когда:
+Stage 17.5 completion definition is now **satisfied**:
 
 > **любой representative ship — от freighter до battleship — может быть описан одним data-driven fitting model, физически летать, обнаруживать/отслеживать, стрелять, защищаться, получать локальные повреждения, расходовать боеприпасы/реактивную массу, ремонтироваться/переоснащаться через общую economic seam и сохраняться/загружаться; player и AI используют те же capability APIs.**
 
-Дополнительный обязательный exit gate:
+Дополнительный обязательный exit gate также **satisfied**:
 
-> **несколько production-valid, но content-provisional hull/module/ammunition/fits позволяют собрать минимум четыре materially different специализированных флота и balanced control fleet; их deterministic combat matrix проходит production resolver, а минимум одно interactive столкновение полностью читаемо через replaceable Tactical Prototype Visual Set.**
+> **несколько production-valid, но content-provisional hull/module/ammunition/fits позволяют собрать минимум четыре materially different специализированных флота и balanced control fleet; их deterministic combat matrix проходит production subsystem/resolver paths, а interactive столкновение полностью читаемо через replaceable Tactical Prototype Visual Set.**
 
 Эти тестовые корабли, модули, фиты и visuals существуют для проверки mechanics coverage. Stage 22 обязан переработать/заменить/явно принять их по общей technology/faction/content парадигме; prototype visuals позднее заменяются production art без изменения authoritative physics.
 
-После этого активируется **Stage 18 Resources / Industry / Infrastructure**, который превращает construction/repair/material requirements в полноценную физическую производственную экосистему. Только после Stage 18 активируется **Stage 19 strategic warfare / advanced combat behavior**.
+Следующий этап — **Stage 18 Resources / Industry / Infrastructure**. Он превращает уже принятые construction/repair/material requirements в полноценную физическую производственную экосистему и впервые предоставляет сравнимую industrial/resource/facility cost basis, специально не выдуманную Stage 17.5I. Только после Stage 18 активируется **Stage 19 strategic warfare / advanced combat behavior**.

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "profiles": [
+    {
+      "moduleId": "module.test_weapon_kinetic_v1",
+      "family": "KINETIC",
+      "ammunitionInterfaceId": "kinetic_feed",
+      "ammunitionAmountPerShot": 1.0,
+      "cycleTimeSeconds": 4.0,
+      "supportChannelCount": 1,
+      "pointingJitterRad": 0.00002,
+      "maxProjectileMassKg": 200.0,
+      "maxProjectileLengthM": 2.2,
+      "maxProjectileDiameterM": 0.10
+    },
+    {
+      "moduleId": "module.test_weapon_missile_v1",
+      "family": "GUIDED",
+      "ammunitionInterfaceId": "guided_feed",
+      "ammunitionAmountPerShot": 1.0,
+      "cycleTimeSeconds": 6.0,
+      "supportChannelCount": 12,
+      "pointingJitterRad": 0.0005,
+      "maxProjectileMassKg": 2500.0,
+      "maxProjectileLengthM": 7.0,
+      "maxProjectileDiameterM": 0.80
+    },
+    {
+      "moduleId": "module.test_weapon_pd_v1",
+      "family": "KINETIC",
+      "ammunitionInterfaceId": "pd_feed",
+      "ammunitionAmountPerShot": 1.0,
+      "cycleTimeSeconds": 0.20,
+      "supportChannelCount": 4,
+      "pointingJitterRad": 0.00008,
+      "maxProjectileMassKg": 10.0,
+      "maxProjectileLengthM": 0.60,
+      "maxProjectileDiameterM": 0.08
+    }
+  ]
+}
