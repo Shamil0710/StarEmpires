@@ -66,7 +66,19 @@ public record TacticalPrototypeVisualSnapshot(
             double thrustFraction,
             double integrityFraction,
             boolean wreck) {
-        /** Validates one immutable ship glyph. */
+        /**
+         * Validates one immutable ship glyph.
+         *
+         * @param entityId stable authoritative owner identity
+         * @param xM world x position in meters
+         * @param yM world y position in meters
+         * @param headingRad world heading in radians
+         * @param lengthM physical hull length
+         * @param widthM physical hull width
+         * @param thrustFraction presentation fraction [0,1] derived from authoritative thrust command/state
+         * @param integrityFraction mean physical compartment integrity [0,1]
+         * @param wreck whether authoritative damage state has no surviving compartment integrity
+         */
         public ShipGlyph {
             requirePositiveId(entityId, "entityId");
             requireFinite(xM, "xM");
@@ -100,7 +112,18 @@ public record TacticalPrototypeVisualSnapshot(
             double lengthM,
             double widthM,
             double trailLengthM) {
-        /** Validates one immutable body glyph. */
+        /**
+         * Validates one immutable body glyph.
+         *
+         * @param kind visual category
+         * @param bodyId authoritative body/hypothesis identity
+         * @param xM world x position
+         * @param yM world y position
+         * @param headingRad current velocity/apparent heading
+         * @param lengthM physical or presentation marker length
+         * @param widthM physical or presentation marker width
+         * @param trailLengthM presentation trail length; zero is allowed
+         */
         public BodyGlyph {
             Objects.requireNonNull(kind, "kind");
             requirePositiveId(bodyId, "bodyId");
@@ -132,7 +155,17 @@ public record TacticalPrototypeVisualSnapshot(
             double endYM,
             double deliveredEnergyJ,
             double spotRadiusM) {
-        /** Validates one immutable beam glyph. */
+        /**
+         * Validates one immutable beam glyph.
+         *
+         * @param eventId stable presentation/event identity
+         * @param startXM emitter x
+         * @param startYM emitter y
+         * @param endXM target/exposure x
+         * @param endYM target/exposure y
+         * @param deliveredEnergyJ authoritative delivered beam energy
+         * @param spotRadiusM authoritative effective exposure radius
+         */
         public BeamGlyph {
             requirePositiveId(eventId, "eventId");
             requireFinite(startXM, "startXM");
@@ -165,7 +198,18 @@ public record TacticalPrototypeVisualSnapshot(
             double halfArcRad,
             double reserveFraction,
             boolean collapsed) {
-        /** Validates one immutable shield glyph. */
+        /**
+         * Validates one immutable shield glyph.
+         *
+         * @param ownerEntityId authoritative ship identity
+         * @param xM owner x
+         * @param yM owner y
+         * @param radiusM cosmetic display radius around the physical hull
+         * @param centerRad world-space sector center
+         * @param halfArcRad authoritative half coverage arc
+         * @param reserveFraction current field reserve/capacity fraction [0,1]
+         * @param collapsed authoritative collapse state
+         */
         public ShieldGlyph {
             requirePositiveId(ownerEntityId, "ownerEntityId");
             requireFinite(xM, "xM");
@@ -189,7 +233,15 @@ public record TacticalPrototypeVisualSnapshot(
      * @param energyJ authoritative energy associated with the visible event
      */
     public record ImpactGlyph(long eventId, ImpactKind kind, double xM, double yM, double energyJ) {
-        /** Validates one immutable impact glyph. */
+        /**
+         * Validates one immutable impact glyph.
+         *
+         * @param eventId stable event identity
+         * @param kind presentation category derived from authoritative physical result
+         * @param xM world impact x
+         * @param yM world impact y
+         * @param energyJ authoritative energy associated with the visible event
+         */
         public ImpactGlyph {
             requirePositiveId(eventId, "eventId");
             Objects.requireNonNull(kind, "kind");
@@ -214,7 +266,15 @@ public record TacticalPrototypeVisualSnapshot(
             double xM,
             double yM,
             double severity) {
-        /** Validates one immutable damage glyph. */
+        /**
+         * Validates one immutable damage glyph.
+         *
+         * @param ownerEntityId authoritative ship identity
+         * @param compartmentId authoritative compartment ID
+         * @param xM world x of authored compartment center
+         * @param yM world y of authored compartment center
+         * @param severity one minus current authoritative compartment integrity [0,1]
+         */
         public DamageGlyph {
             requirePositiveId(ownerEntityId, "ownerEntityId");
             if (compartmentId == null || compartmentId.isBlank()) {
@@ -226,7 +286,16 @@ public record TacticalPrototypeVisualSnapshot(
         }
     }
 
-    /** Validates, sorts and freezes all visual lists for deterministic rendering/testing. */
+    /**
+     * Validates, sorts and freezes all visual lists for deterministic rendering/testing.
+     *
+     * @param ships projected ship/wreck silhouettes
+     * @param bodies projected kinetic/guided/interceptor/decoy/debris markers
+     * @param beams projected beam segments
+     * @param shields projected energetic shield arcs
+     * @param impacts projected impact/penetration markers
+     * @param damage projected local compartment-damage markers
+     */
     public TacticalPrototypeVisualSnapshot {
         ships = sortedCopy(ships, Comparator.comparingLong(ShipGlyph::entityId));
         bodies = sortedCopy(bodies, Comparator.comparing((BodyGlyph value) -> value.kind().name())
