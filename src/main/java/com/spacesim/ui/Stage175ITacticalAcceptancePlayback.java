@@ -16,7 +16,6 @@ import com.spacesim.ship.TrackCovariance;
 import com.spacesim.ship.TrackState;
 import com.spacesim.ship.WeaponDefinition.BeamWeapon;
 import com.spacesim.ship.WeaponDefinition.Launcher;
-import com.spacesim.ui.TacticalPrototypeVisualSnapshot.BodyKind;
 
 import java.util.List;
 import java.util.Map;
@@ -30,7 +29,6 @@ import java.util.Objects;
  * hypothesis glyphs. Desktop controls can therefore replay or step frames without owning combat
  * state or a mutation path back into simulation.</p>
  */
-@SuppressWarnings("doclint:missing")
 public final class Stage175ITacticalAcceptancePlayback {
     private static final double ATTACKER_X_M = 260d;
     private static final double TARGET_X_M = 1_400d;
@@ -45,6 +43,12 @@ public final class Stage175ITacticalAcceptancePlayback {
 
     /** One immutable labeled playback frame. */
     public record Frame(String title, TacticalPrototypeVisualSnapshot snapshot) {
+        /**
+         * Validates one immutable playback frame.
+         *
+         * @param title non-blank frame title presented by the validation client
+         * @param snapshot immutable tactical presentation snapshot
+         */
         public Frame {
             if (title == null || title.isBlank()) {
                 throw new IllegalArgumentException("title must be non-blank");
@@ -62,6 +66,17 @@ public final class Stage175ITacticalAcceptancePlayback {
             long missileRoundsConsumed,
             int defenseAssignments,
             double finalAccelerationMps2) {
+        /**
+         * Validates the complete immutable tactical acceptance playback.
+         *
+         * @param frames exactly three engagement/penetration/wreck frames
+         * @param initialKineticRounds physical doctrine-A kinetic rounds before the destruction sequence
+         * @param remainingKineticRounds physical doctrine-A kinetic rounds remaining after destruction
+         * @param kineticRoundsConsumed physical kinetic rounds consumed by the destruction sequence
+         * @param missileRoundsConsumed physical doctrine-B missile rounds consumed for presentation
+         * @param defenseAssignments finite-resource interceptor assignments represented in the engagement
+         * @param finalAccelerationMps2 production-derived target acceleration after final local damage
+         */
         public Playback {
             Objects.requireNonNull(frames, "frames");
             frames = List.copyOf(frames);
