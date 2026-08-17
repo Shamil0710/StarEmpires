@@ -25,7 +25,6 @@ import java.util.Objects;
  * Stage-17.5 aggregate acceptance seam; it does not introduce a combat score, hidden damage bonus or
  * alternate projectile model.</p>
  */
-@SuppressWarnings("doclint:missing")
 public final class Stage175IPhysicalDestructionScenario {
     private static final String PRIMARY_MOUNT = "weapon_primary";
     private static final String SHIELD_MOUNT = "utility_shield";
@@ -53,6 +52,26 @@ public final class Stage175IPhysicalDestructionScenario {
             long shotsConsumed,
             double pristineAccelerationMps2,
             double finalAccelerationMps2) {
+        /**
+         * Validates one complete physical destruction result.
+         *
+         * @param hull target hull used by the scenario
+         * @param pristineDamage pristine target damage snapshot
+         * @param fittedShield fitted target shield definition
+         * @param chargedShield initial charged shield state
+         * @param firstProjectile first physical projectile consumed by the scenario
+         * @param firstPenetratingImpact first impact that produced local damage
+         * @param firstPenetrationDamage damage snapshot after the first penetration
+         * @param firstPenetrationShield shield state after the first penetration
+         * @param lastImpact final resolved physical impact
+         * @param finalDamage final fully destroyed local damage snapshot
+         * @param finalShield final shield state after destruction
+         * @param initialPrimaryRounds initial physical primary-magazine round count
+         * @param remainingPrimaryRounds physical primary-magazine rounds remaining after destruction
+         * @param shotsConsumed number of physical rounds consumed
+         * @param pristineAccelerationMps2 production-derived target acceleration before damage
+         * @param finalAccelerationMps2 production-derived target acceleration after final damage
+         */
         public Result {
             Objects.requireNonNull(hull, "hull");
             Objects.requireNonNull(pristineDamage, "pristineDamage");
