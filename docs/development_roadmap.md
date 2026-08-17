@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-17 / Stage 17.5H shared capability APIs / UI / persistence implementation.**  
+> **Последняя синхронизация: 2026-08-17 / Stage 17.5I deterministic aggregate acceptance COMPLETE; Stage 17.5 COMPLETE; Stage 18 NEXT.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -40,7 +40,7 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 17.5I NEXT** |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 18 NEXT** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | PLANNED |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
@@ -187,7 +187,7 @@ Persistence inventory is now synchronized in `docs/persistence_model.md`:
 
 ## 5. Stage 17 → 17.5 transition gate
 
-**UNBLOCKED after Stage-17H merge/post-merge verification.**
+**COMPLETE. Stage 17.5A–I implementation and aggregate exit acceptance are green.**
 
 Accepted research/design prerequisite:
 
@@ -233,16 +233,24 @@ Canonical 17.5G closeout: `docs/stage17_5g_shipyard_refit_repair_maintenance.md`
 
 Canonical 17.5H closeout: `docs/stage17_5h_capability_ui_persistence.md`.
 
-Persistence contract after 17.5H:
+> **Stage 17.5I — COMPLETE: production-valid/content-provisional combat content pack, five physical fleet doctrines, deterministic pair/variant and multi-body saturation matrices, shared interval engineering contention, finite-magazine destruction, mid/post-combat persistence and presentation-only interactive tactical prototype acceptance.**
+
+Canonical 17.5I records:
+
+- `docs/stage17_5i_implementation_record.md`;
+- `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
+
+Persistence contract after Stage 17.5:
 
 - core `GameStateCodec` remains schema v4;
-- production `ContentBoundSaveCodec` envelope v2 carries the H continuity extension;
+- production `ContentBoundSaveCodec` envelope v2 carries the Stage-H/I continuity extension;
 - derived capability state is recomputed, not serialized as a second authority;
-- legacy v1/raw saves migrate only to neutral missing-H state and cannot invent repair, shield charge, ammunition identity, cooldown reset, energy or sensor knowledge.
+- legacy v1/raw saves migrate only to neutral missing-H state and cannot invent repair, shield charge, ammunition identity, cooldown reset, energy or sensor knowledge;
+- mid-combat and fully destroyed states round-trip without free repair/recharge/rearm/respawn.
 
 ## 6. Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-**ACTIVE — 17.5A–17.5H COMPLETE; 17.5I NEXT.**
+**COMPLETE — 17.5A–17.5I.**
 
 Implementation sequence:
 
@@ -254,33 +262,34 @@ Implementation sequence:
 - **17.5F — COMPLETE:** finite shields + bounded armor/material response + compartments/subsystem damage + damage-aware derived/sensor/weapon capabilities;
 - **17.5G — COMPLETE:** shipyard/refit/repair/maintenance capability and physical input/work economy seam with identity/condition continuity;
 - **17.5H — COMPLETE:** capability APIs/UI/full live composition and persistence surfaces, including damage/shield composition, common engineering grants, weapon power/heat commit, binary sensor-knowledge persistence, weapon loadout/launcher-cycle persistence and Stage-17.5G refit/maintenance continuity;
-- **17.5I — NEXT:** deterministic aggregate acceptance **plus mandatory Combat Test Content Pack and Tactical Prototype Visual Set**.
+- **17.5I — COMPLETE:** deterministic aggregate acceptance + mandatory Combat Test Content Pack + Tactical Prototype Visual Set + interactive/post-combat exit gate.
 
-Stage-17.5H closes the former pristine-damage live seam. Current compartment/module damage, shield state and refit/maintenance continuity are consumed at live engineering/API/persistence boundaries; materialization/save/load/refit cannot silently restore a pristine ship.
+Stage-17.5H closed the former pristine-damage live seam. Current compartment/module damage, shield state and refit/maintenance continuity are consumed at live engineering/API/persistence boundaries; materialization/save/load/refit cannot silently restore a pristine ship.
 
-Stage-17.5H also locks ownership-neutral incremental power/heat grants for sensors/beams/shield recharge. Missing physical `ENERGY_STORAGE` is not replaced by a virtual battery, and denied grants do not partially mutate state.
+Stage-17.5I additionally closed the same-interval incremental engineering risk through one shared `IntervalBudget`: overlapping sensor/beam/shield operations cannot reuse the same reactor margin, and only a physical `ENERGY_STORAGE` module may satisfy residual demand within discharge limits.
 
-### Mandatory Stage 17.5 exit content gate
+### Stage 17.5 exit content gate — PASSED
 
-Before Stage 17.5 can be marked COMPLETE, production schemas/runtime must support a compact representative set of hulls, equipment, ammunition and fits sufficient to assemble:
+The aggregate acceptance now provides:
 
-- kinetic line fleet;
-- missile strike fleet;
-- high-mobility / beam fleet;
-- defensive / EW fleet;
-- balanced control fleet.
+- six representative production-schema hull families including civilian freighter/tanker;
+- five materially different doctrine fits A–E without role/class multipliers;
+- all eleven required doctrine-pair scenarios;
+- equal-count, approximate equal-mass, spacing, ammunition, pre-damage, thermal, information and protected-logistics variants;
+- physical multi-body missile saturation with finite defense resources;
+- real hull signature geometry wired into active-radar RCS;
+- finite-magazine `ProjectileBody → shield → material → compartment/mount damage → capability loss → destruction` chain;
+- deterministic mid-combat and post-destruction production persistence;
+- temporary top-down kinetic/missile/interceptor/beam/EW/shield/impact/damage/wreck/debris presentation;
+- dedicated presentation-only desktop validation mode `--tactical-acceptance`.
 
-These test assets are **production-valid but content-provisional**:
+Stage-17.5I test assets remain **production-valid but content-provisional**. Stage 22 must re-author/rebalance/replace them or explicitly promote individual definitions after review.
 
-- they use the same authoritative fitting, mass/volume/power/heat, sensors, weapons, protection, damage, consumable and persistence rules as future production content;
-- their names, faction identity, technology placement, final balance and visual design are not automatically canonical;
-- Stage 22 must re-author/rebalance/replace them according to the accepted technology, industrial, faction and visual paradigms or explicitly promote individual definitions after review.
-
-At least one interactive end-to-end battle must be inspectable using temporary top-down ship sprites plus prototype projectile/missile/beam/interception/shield/impact/damage/wreck visuals. Rendering/VFX remain presentation-only and must be replaceable without changing authoritative simulation state.
+Equal-cost fleet comparison remains deliberately deferred until Stage 18 supplies a comparable industrial/resource/facility cost basis. No fake Stage-17.5 scalar price was introduced.
 
 Canonical detailed acceptance contract: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
-Hard invariants:
+Hard invariants retained:
 
 - no player-only combat physics;
 - no class-name bonuses;
@@ -302,11 +311,12 @@ Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.
 17.5F implementation record: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.  
 17.5G implementation record: `docs/stage17_5g_shipyard_refit_repair_maintenance.md`.  
 17.5H implementation record: `docs/stage17_5h_capability_ui_persistence.md`.  
+17.5I implementation record: `docs/stage17_5i_implementation_record.md`.  
 17.5I combat content / visual acceptance: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
 ## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
 
-**PLANNED after 17.5 COMPLETE.**
+**NEXT — Stage 17.5 aggregate exit gate COMPLETE.**
 
 Stage 18 defines **what physically/economically exists** before world generation decides **where it exists**.
 
@@ -536,8 +546,9 @@ Stage 17 COMPLETE
 → Stage 17.5F shields / armor / compartments / subsystem damage COMPLETE
 → Stage 17.5G shipyard / refit / repair / maintenance seam COMPLETE
 → Stage 17.5H capability APIs / UI / persistence COMPLETE
-→ Stage 17.5I deterministic multi-fleet acceptance + Combat Test Content Pack + Tactical Prototype Visual Set NEXT
-→ Stage 18 Resources / Industry / Infrastructure
+→ Stage 17.5I deterministic multi-fleet acceptance + Combat Test Content Pack + Tactical Prototype Visual Set COMPLETE
+→ Stage 17.5 COMPLETE
+→ Stage 18 Resources / Industry / Infrastructure NEXT
 → Stage 19 Strategic Warfare
 → Stage 20 Physical World Generation
 → Stage 21 Living World
@@ -545,4 +556,4 @@ Stage 17 COMPLETE
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority after the Stage-17.5H merge gate is Stage 17.5I. Stage 17.5 cannot close until the Stage-17.5I combat-content/visual exit gate passes.**
+**Immediate implementation priority is Stage 18. Stage 17.5 is closed by the Stage-17.5I aggregate combat-content/visual/persistence exit gate; Stage 18 now owns the comparable industrial/resource/facility cost basis deliberately not fabricated by Stage 17.5I.**
