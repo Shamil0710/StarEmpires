@@ -1,6 +1,6 @@
 # Star Empires — Stage 17.5 Combat Depth / Ship Fitting Foundation
 
-> Статус: **ACTIVE — 17.5A–17.5G COMPLETE; 17.5H NEXT**  
+> Статус: **ACTIVE — 17.5A–17.5H COMPLETE; 17.5I NEXT**  
 > Основание: accepted `Ship Mathematics v1.0 Design Baseline` (`docs/ship_mathematics_v1_0_design_baseline.md`)  
 > Machine-readable baseline: `docs/benchmarks/ship_mathematics_v1_0_design_baseline.json`  
 > Назначение: перенести принятую v1.0 инженерную модель из research в authoritative runtime без повторного проектирования fundamental ship/combat architecture.
@@ -356,7 +356,7 @@ No authoritative `weaponAccuracy`/`missileHitChance`/`PDChance`; ammunition depl
 
 # 9. Stage 17.5F — shields / armor / compartments / subsystem damage
 
-**COMPLETE — protection/damage runtime implemented; final live composition remains assigned to 17.5H.**
+**COMPLETE — protection/damage runtime implemented; live engineering/API/persistence composition completed by Stage 17.5H.**
 
 Shield state uses:
 
@@ -392,13 +392,13 @@ Hit location/orientation matters; global hull HP is not sole survivability; shie
 
 Canonical implementation record: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.
 
-Explicit integration boundary: Stage 17.5F activates authoritative local `DamageState` and damage-aware central capabilities. The existing Stage-17.5C `ShipEngineeringRuntime` still uses its pre-F pristine-damage live call path; final composition of damage/shield state with live power/thermal/thrust/FTL grants, capability APIs and binary persistence belongs to **Stage 17.5H**. Stage 17.5F does not fork that runtime.
+Stage 17.5H has now consumed the authoritative local `DamageState` and shield state at live engineering/API/persistence boundaries. Production ship-instance code no longer relies on a silent pristine-damage reset for those paths.
 
 ---
 
 # 10. Stage 17.5G — shipyard / fitting / repair / maintenance seam
 
-**COMPLETE — common physical capability/work-order/economy seam implemented; final live ECS/persistence integration remains assigned to 17.5H.**
+**COMPLETE — common physical capability/work-order/economy seam implemented; live ECS/persistence continuity completed by Stage 17.5H.**
 
 Stage 17.5G defines **engineering and runtime requirements**; Stage 18 later supplies the full economic resource/facility graph.
 
@@ -452,37 +452,52 @@ Canonical implementation record: `docs/stage17_5g_shipyard_refit_repair_maintena
 
 # 11. Stage 17.5H — shared capability APIs / UI / persistence
 
-**NEXT after the Stage-17.5G exact-head merge/post-merge gate.**
+**COMPLETE — damage-aware live composition, common engineering grants, read-only capability/UI projection and binary persistence continuity implemented.**
 
 Stage **19** tactical/strategic AI and UI consume capability APIs instead of internal arrays.
 
-Minimum query layer:
+Implemented query/read layer includes:
 
 ```text
 getAccelerationEnvelope()
 getRemainingDeltaV()
-planJump(edge)
-observe(target/channel)
-getTrack(target)
-getFireSolution(weapon,targetTrack)
-getShieldCoverage(direction)
-getThermalEndurance(action)
+planJump(...)
+getShieldCoverage(...)
+getThermalEndurance(...)
 getAmmunitionEndurance()
 getDamageCapabilityState()
 getRepairNeed()
++ fitted sensor / maintenance projections
 ```
 
-UI exposes mass, acceleration, delta-v, power/heat margin, crew, ammo, sensors, protection, signature and operating/maintenance demand without mutating ECS directly.
+Sensor observation, beam operation and shield recharge are composed through a common damage-aware engineering grant boundary so they cannot receive free power or free thermal capacity. The same boundary is ownership-neutral for player and AI.
 
-Persistence saves installed modules, consumables, damage, required thermal/shield/FTL state and persistent tracks where design requires. Derived state recomputes deterministically.
+`EngineeringComponent` now carries the authoritative fitted ship instance across live boundaries: fit, consumables/operating state, compartment/module damage, shield state, maintenance/service age, weapon feed identity and launcher cooldown continuity.
 
-17.5H must consume the Stage-17.5F compartment/module integrity and shield runtime state rather than resetting `DamageState` to pristine at live engineering/API/persistence boundaries.
+UI consumes read-only `ShipCapabilityService` projections and does not mutate ECS directly.
 
-17.5H must also consume the Stage-17.5G `ShipyardRefitContinuity.Completion` and `MaintenanceState` handoff: retained/removed module condition, service age and local hull damage cannot reset during live refit, ECS materialization, save/load or migration. Module-local power/energy/heat/coolant/shield/launcher-cycle state must be reconciled through this same live boundary rather than through a second shipyard runtime.
+Persistence contract is explicit:
+
+- core `GameStateCodec` remains backward-compatible schema v4;
+- production `ContentBoundSaveCodec` envelope v2 adds deterministic Stage-17.5H extension state;
+- derived capability values are recomputed rather than persisted as a second source of truth;
+- legacy v1/raw saves receive only neutral missing-H state, never free shield reserve, ammunition identity, repair, cooldown reset, power or sensor knowledge.
+
+Persistent H extension covers required compartment/module integrity, shields, maintenance, weapon loadout/cooldowns and system-local sensor knowledge. Sensor knowledge remains information-domain state, not omniscient physical truth.
+
+Stage-17.5G refit continuity reaches the live component boundary: retained/removed module condition, service age and local hull damage do not reset; surviving local runtime state is reconciled rather than treating refit as respawn/repair/rearm/recharge.
+
+Canonical implementation record: `docs/stage17_5h_capability_ui_persistence.md`.
+
+## DoD 17.5H
+
+Damage/shield/refit/maintenance state survives live ECS and persistence boundaries; player/AI capability consumers share the same physical API/grant semantics; UI is read-only; no missing physical storage is replaced with virtual energy; exact-head full repository CI is green.
 
 ---
 
 # 12. Stage 17.5I — deterministic end-to-end acceptance gate
+
+**NEXT after the Stage-17.5H merge/post-merge gate.**
 
 Stage 17.5I включает два обязательных слоя acceptance:
 
@@ -596,8 +611,8 @@ Stage 17.5 не обязан:
 → 17.5E weapons/guidance/PD/ammunition COMPLETE
 → 17.5F shields/armor/compartments/damage COMPLETE
 → 17.5G shipyard/refit/repair/maintenance seam COMPLETE
-→ 17.5H capability APIs/UI/persistence NEXT
-→ 17.5I full acceptance + combat test content + prototype tactical visuals
+→ 17.5H capability APIs/UI/persistence COMPLETE
+→ 17.5I full acceptance + combat test content + prototype tactical visuals NEXT
 ```
 
 Combat subsystems не должны создавать parallel mass/power/heat state до central calculator.
