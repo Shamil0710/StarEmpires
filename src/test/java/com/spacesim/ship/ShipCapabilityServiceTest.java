@@ -27,7 +27,7 @@ class ShipCapabilityServiceTest {
         ConsumableState consumables = new ConsumableState(
                 0d, 0d, 0d, 0d,
                 List.of(new ConsumableLoad(
-                        "weapon_1", "primary_feed", InterfaceKind.AMMUNITION,
+                        "weapon_spinal", "kinetic_magazine_feed", InterfaceKind.AMMUNITION,
                         12d, 60d, 12L)));
         ShipEngineeringRuntime runtime = new ShipEngineeringRuntime(catalog);
         RuntimeState operating = runtime.initialize(fit, consumables);
@@ -39,7 +39,7 @@ class ShipCapabilityServiceTest {
                 new MaintenanceState(Map.of("core_drive", 600_000d)),
                 new WeaponLoadoutState(List.of(
                         new WeaponLoadoutState.FeedBinding(
-                                "weapon_1", "primary_feed", "ammo.kinetic_slug_v1"))),
+                                "weapon_spinal", "kinetic_magazine_feed", "ammo.kinetic_slug_v1"))),
                 WeaponMountRuntime.RuntimeState.empty());
         EngineeringComponent component = new EngineeringComponent(fit, operating, instance);
         ShipCapabilityService service = new ShipCapabilityService(catalog);
