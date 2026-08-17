@@ -24,8 +24,10 @@ import java.util.TreeMap;
  *
  * <p>The calculator resolves shared mass, integration volume, power, energy, heat, crew, physical
  * carried mass and propulsion equations from content definitions. Stage 17.5F additionally applies
- * local module integrity produced by the compartment/subsystem damage model. No result depends on
- * {@code ShipType}, doctrine class or player/AI ownership.</p>
+ * local module integrity produced by the compartment/subsystem damage model. Hull base projected
+ * signature geometry seeds the current scalar radar-cross-section channel; Stage 20 may replace that
+ * midpoint seed with aspect/frequency-aware geometry without changing this common signature budget.
+ * No result depends on {@code ShipType}, doctrine class or player/AI ownership.</p>
  */
 public final class DerivedShipCalculator {
     /** Runtime-only installed-capability key exposing local subsystem integrity to specialized adapters. */
@@ -33,6 +35,7 @@ public final class DerivedShipCalculator {
 
     private static final String THRUST_N = "thrust_n";
     private static final String EXHAUST_VELOCITY_MPS = "exhaust_velocity_mps";
+    private static final String RADAR_CROSS_SECTION_M2 = "radar_cross_section_m2";
 
     private final ShipEngineeringCatalog catalog;
     private final ShipFittingValidator validator;
@@ -88,6 +91,7 @@ public final class DerivedShipCalculator {
         double thrustN = 0d;
         double massFlowKgPerS = 0d;
         Map<String, Double> signatures = new TreeMap<>();
+        signatures.put(RADAR_CROSS_SECTION_M2, checkedHull.baseSignatureGeometryAreaM2());
         List<InstalledCapability> capabilities = new ArrayList<>();
         List<MaintenanceDemand> maintenance = new ArrayList<>();
 
