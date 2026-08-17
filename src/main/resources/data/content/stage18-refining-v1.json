@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "recipes": [
+    {
+      "id": "refining.water_purification",
+      "displayName": "Water purification",
+      "inputs": [{"commodityId": "commodity.feedstock.water_ice", "fractionOfInputMass": 1.0}],
+      "outputCommodityId": "commodity.material.purified_water",
+      "outputMassFraction": 0.94,
+      "discardedMassFraction": 0.06,
+      "requiredCapabilityTags": ["capability.process.volatile_processing"],
+      "energyJPerInputKg": 250000.0,
+      "workSecondsPerInputKg": 0.15,
+      "maintenanceWorkSecondsPerInputKg": 0.02
+    },
+    {
+      "id": "refining.volatile_separation",
+      "displayName": "Volatile separation",
+      "inputs": [{"commodityId": "commodity.feedstock.volatile_feedstock", "fractionOfInputMass": 1.0}],
+      "outputCommodityId": "commodity.material.industrial_gases",
+      "outputMassFraction": 0.76,
+      "discardedMassFraction": 0.24,
+      "requiredCapabilityTags": ["capability.process.volatile_processing"],
+      "energyJPerInputKg": 600000.0,
+      "workSecondsPerInputKg": 0.25,
+      "maintenanceWorkSecondsPerInputKg": 0.04
+    },
+    {
+      "id": "refining.industrial_chemicals",
+      "displayName": "Industrial chemical synthesis",
+      "inputs": [
+        {"commodityId": "commodity.feedstock.carbonaceous_feedstock", "fractionOfInputMass": 0.55},
+        {"commodityId": "commodity.feedstock.volatile_feedstock", "fractionOfInputMass": 0.45}
+      ],
+      "outputCommodityId": "commodity.material.industrial_chemicals",
+      "outputMassFraction": 0.66,
+      "discardedMassFraction": 0.34,
+      "requiredCapabilityTags": ["capability.process.chemical_processing"],
+      "energyJPerInputKg": 5000000.0,
+      "workSecondsPerInputKg": 1.2,
+      "maintenanceWorkSecondsPerInputKg": 0.18
+    },
+    {
+      "id": "refining.structural_alloy",
+      "displayName": "Structural alloy refining",
+      "inputs": [{"commodityId": "commodity.feedstock.metallic_ore", "fractionOfInputMass": 1.0}],
+      "outputCommodityId": "commodity.material.structural_alloy",
+      "outputMassFraction": 0.68,
+      "discardedMassFraction": 0.32,
+      "requiredCapabilityTags": ["capability.process.bulk_refining"],
+      "energyJPerInputKg": 4000000.0,
+      "workSecondsPerInputKg": 1.0,
+      "maintenanceWorkSecondsPerInputKg": 0.12
+    },
+    {
+      "id": "refining.light_alloy",
+      "displayName": "Light alloy refining",
+      "inputs": [{"commodityId": "commodity.feedstock.light_metal_minerals", "fractionOfInputMass": 1.0}],
+      "outputCommodityId": "commodity.material.light_alloy",
+      "outputMassFraction": 0.54,
+      "discardedMassFraction": 0.46,
+      "requiredCapabilityTags": ["capability.process.bulk_refining"],
+      "energyJPerInputKg": 6000000.0,
+      "workSecondsPerInputKg": 1.2,
+      "maintenanceWorkSecondsPerInputKg": 0.15
+    },
+    {
+      "id": "refining.conductor_metal",
+      "displayName": "Conductor-metal refining",
+      "inputs": [{"commodityId": "commodity.feedstock.conductor_ore", "fractionOfInputMass": 1.0}],
+      "outputCommodityId": "commodity.material.conductor_metal",
+      "outputMassFraction": 0.63,
+      "discardedMassFraction": 0.37,
+      "requiredCapabilityTags": ["capability.process.bulk_refining"],
+      "energyJPerInputKg": 5000000.0,
+      "workSecondsPerInputKg": 1.1,
+      "maintenanceWorkSecondsPerInputKg": 0.14
+    },
+    {
+      "id": "refining.refractory_alloy",
+      "displayName": "Strategic refractory alloy refining",
+      "inputs": [
+        {"commodityId": "commodity.feedstock.metallic_ore", "fractionOfInputMass": 0.20},
+        {"commodityId": "commodity.feedstock.strategic_metal_ore", "fractionOfInputMass": 0.80}
+      ],
+      "outputCommodityId": "commodity.material.refractory_alloy",
+      "outputMassFraction": 0.52,
+      "discardedMassFraction": 0.48,
+      "requiredCapabilityTags": ["capability.process.advanced_materials", "capability.process.bulk_refining"],
+      "energyJPerInputKg": 12000000.0,
+      "workSecondsPerInputKg": 2.2,
+      "maintenanceWorkSecondsPerInputKg": 0.25
+    },
+    {
+      "id": "refining.ceramic_glass",
+      "displayName": "Ceramic and glass feedstock processing",
+      "inputs": [{"commodityId": "commodity.feedstock.silicate_minerals", "fractionOfInputMass": 1.0}],
+      "outputCommodityId": "commodity.material.ceramic_glass",
+      "outputMassFraction": 0.70,
+      "discardedMassFraction": 0.30,
+      "requiredCapabilityTags": ["capability.process.advanced_materials"],
+      "energyJPerInputKg": 4000000.0,
+      "workSecondsPerInputKg": 0.9,
+      "maintenanceWorkSecondsPerInputKg": 0.10
+    },
+    {
+      "id": "refining.carbon_material",
+      "displayName": "Industrial carbon-material processing",
+      "inputs": [{"commodityId": "commodity.feedstock.carbonaceous_feedstock", "fractionOfInputMass": 1.0}],
+      "outputCommodityId": "commodity.material.carbon_material",
+      "outputMassFraction": 0.58,
+      "discardedMassFraction": 0.42,
+      "requiredCapabilityTags": ["capability.process.chemical_processing"],
+      "energyJPerInputKg": 7000000.0,
+      "workSecondsPerInputKg": 1.4,
+      "maintenanceWorkSecondsPerInputKg": 0.16
+    },
+    {
+      "id": "refining.electronic_grade_material",
+      "displayName": "Electronic-grade material purification",
+      "inputs": [
+        {"commodityId": "commodity.feedstock.conductor_ore", "fractionOfInputMass": 0.20},
+        {"commodityId": "commodity.feedstock.silicate_minerals", "fractionOfInputMass": 0.70},
+        {"commodityId": "commodity.feedstock.strategic_metal_ore", "fractionOfInputMass": 0.10}
+      ],
+      "outputCommodityId": "commodity.material.electronic_grade_material",
+      "outputMassFraction": 0.18,
+      "discardedMassFraction": 0.82,
+      "requiredCapabilityTags": ["capability.process.advanced_materials", "capability.process.chemical_processing"],
+      "energyJPerInputKg": 20000000.0,
+      "workSecondsPerInputKg": 3.0,
+      "maintenanceWorkSecondsPerInputKg": 0.35
+    },
+    {
+      "id": "refining.reactor_fuel",
+      "displayName": "Reactor fuel preparation",
+      "inputs": [{"commodityId": "commodity.feedstock.fissile_minerals", "fractionOfInputMass": 1.0}],
+      "outputCommodityId": "commodity.consumable.reactor_fuel",
+      "outputMassFraction": 0.06,
+      "discardedMassFraction": 0.94,
+      "requiredCapabilityTags": ["capability.process.advanced_materials"],
+      "energyJPerInputKg": 30000000.0,
+      "workSecondsPerInputKg": 4.0,
+      "maintenanceWorkSecondsPerInputKg": 0.50
+    }
+  ]
+}
