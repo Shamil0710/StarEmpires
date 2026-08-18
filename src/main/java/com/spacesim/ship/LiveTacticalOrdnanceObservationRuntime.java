@@ -23,10 +23,11 @@ import java.util.TreeMap;
  * Actor-bounded Stage-19I guided-ordnance observation over ordinary fitted production radar.
  *
  * <p>This runtime advances no combat clock and owns no physical body state. It projects active hostile
- * {@link GuidedWeaponBody} instances through current fitted/damaged ACTIVE_RADAR hardware, the common
- * engineering power/heat grant layer, {@link ShipObservationService} signal equations and
- * {@link ShipSensorRuntime} fusion. Consumers receive only observer-local {@link TrackState} plus a
- * velocity estimate derived from successive observer-local Cartesian track solutions.</p>
+ * strike and, when supplied, physical decoy bodies through current fitted/damaged ACTIVE_RADAR
+ * hardware, the common engineering power/heat grant layer, {@link ShipObservationService} signal
+ * equations and {@link ShipSensorRuntime} fusion. Consumers receive only observer-local
+ * {@link TrackState} plus a velocity estimate derived from successive observer-local Cartesian track
+ * solutions. The observation result deliberately exposes no hidden STRIKE/DECOY role.</p>
  *
  * <p>Ordnance radar work is phase-shifted from the shared ship-target radar scan: ship scans occur on
  * tick 1 and multiples of four, while this runtime scans on ticks congruent to 2 modulo four. Each
@@ -49,6 +50,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     private static final double EPSILON = 1e-9d;
 
     private final LiveTacticalBattleOrdnanceRuntime ordnanceRuntime;
+    private final LiveTacticalBattleDecoyRuntime decoyRuntime;
     private final ShipEngineeringCatalog engineeringCatalog;
     private final WeaponAmmunitionCatalog ammunitionCatalog;
     private final DerivedShipCalculator calculator;
@@ -66,12 +68,28 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     private long lastObservedTick = -1L;
 
     /**
-     * Creates actor-bounded ordnance observation over one authoritative shared ordnance runtime.
+     * Creates actor-bounded observation of offensive guided bodies only.
      *
      * @param ordnanceRuntime physical guided-ordnance runtime; not advanced by this observer
      */
     public LiveTacticalOrdnanceObservationRuntime(LiveTacticalBattleOrdnanceRuntime ordnanceRuntime) {
+        this(ordnanceRuntime, null);
+    }
+
+    /**
+     * Creates actor-bounded observation of offensive guided bodies plus physical decoys.
+     *
+     * @param ordnanceRuntime physical guided-ordnance runtime; not advanced by this observer
+     * @param decoyRuntime physical decoy source sharing the same authoritative ordnance runtime
+     */
+    public LiveTacticalOrdnanceObservationRuntime(
+            LiveTacticalBattleOrdnanceRuntime ordnanceRuntime,
+            LiveTacticalBattleDecoyRuntime decoyRuntime) {
         this.ordnanceRuntime = Objects.requireNonNull(ordnanceRuntime, "ordnanceRuntime");
+        this.decoyRuntime = decoyRuntime;
+        if (decoyRuntime != null && decoyRuntime.ordnanceRuntime() != ordnanceRuntime) {
+            throw new IllegalArgumentException("decoyRuntime must wrap the same ordnanceRuntime instance");
+        }
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         calculator = new DerivedShipCalculator(engineeringCatalog);
@@ -94,7 +112,8 @@ public final class LiveTacticalOrdnanceObservationRuntime {
      * Updates observer-local ordnance information for the current already-advanced battle tick.
      *
      * <p>The call is idempotent within one tick. Known tracks age every new tick; a physical radar
-     * scan is attempted only in the dedicated scan phase.</p>
+     * scan is attempted only in the dedicated scan phase. When a decoy runtime is attached, its body
+     * state must already have been advanced to the current authoritative tick by the caller.</p>
      */
     public void observeCurrentTick() {
         long tick = ordnanceRuntime.tick();
@@ -164,7 +183,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     }
 
     private void scanObserver(CombatantRuntime observer) {
-        List<GuidedWeaponBody> hostileBodies = hostileGuidedBodies(observer);
+        List<GuidedWeaponBody> hostileBodies = hostileSensorBodies(observer);
         if (hostileBodies.isEmpty()) {
             lastScanByObserver.put(observer.spec().entityId(), ScanDiagnostics.none());
             return;
@@ -335,11 +354,16 @@ public final class LiveTacticalOrdnanceObservationRuntime {
         }
     }
 
-    private List<GuidedWeaponBody> hostileGuidedBodies(CombatantRuntime observer) {
-        return ordnanceRuntime.guidedBodies().stream()
-                .filter(body -> battleState().requireCombatant(body.sourceEntityId()).spec().side()
-                        != observer.spec().side())
-                .toList();
+    private List<GuidedWeaponBody> hostileSensorBodies(CombatantRuntime observer) {
+        ArrayList<GuidedWeaponBody> bodies = new ArrayList<>();
+        bodies.addAll(ordnanceRuntime.guidedBodies());
+        if (decoyRuntime != null) {
+            bodies.addAll(decoyRuntime.decoyBodies());
+        }
+        bodies.removeIf(body -> battleState().requireCombatant(body.sourceEntityId()).spec().side()
+                == observer.spec().side());
+        bodies.sort(java.util.Comparator.comparingLong(GuidedWeaponBody::bodyId));
+        return List.copyOf(bodies);
     }
 
     private ShipEngineeringState.DerivedShipState derive(CombatantRuntime combatant) {
