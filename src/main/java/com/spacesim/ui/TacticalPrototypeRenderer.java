@@ -10,34 +10,39 @@ import com.spacesim.ui.TacticalPrototypeVisualSnapshot.DamageGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ImpactGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShieldGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShipGlyph;
+import com.spacesim.ui.TacticalPrototypeVisualSnapshot.TacticalSide;
+import com.spacesim.ui.TacticalSidePalette.Rgba;
 
 import java.util.Objects;
 
 /**
- * Shape-based top-down renderer for the Stage-17.5I Tactical Prototype Visual Set.
+ * Shape-based top-down renderer for the Stage-17.5I/19J Tactical Prototype Visual Set.
  *
  * <p>The renderer consumes only an immutable {@link TacticalPrototypeVisualSnapshot}. It has no
  * reference to simulation engines, entities, combat services or persistence and therefore cannot
  * become combat authority. The complete renderer may be replaced by sprites/VFX in Stage 23 without
- * changing any authoritative Stage-17.5 physics.</p>
+ * changing any authoritative combat physics.</p>
  */
 public final class TacticalPrototypeRenderer {
-    private static final float MIN_SHIP_LENGTH_PX = 14f;
-    private static final float MIN_SHIP_WIDTH_PX = 8f;
-    private static final float MIN_BODY_LENGTH_PX = 5f;
-    private static final float MIN_BODY_WIDTH_PX = 2f;
+    private static final float MIN_SHIP_LENGTH_PX = 18f;
+    private static final float MIN_SHIP_WIDTH_PX = 11f;
+    private static final float MIN_BODY_LENGTH_PX = 7f;
+    private static final float MIN_BODY_WIDTH_PX = 3f;
     private static final float MIN_SHIELD_RADIUS_PX = 12f;
     private static final float IMPACT_RADIUS_PX = 5f;
     private static final float DAMAGE_RADIUS_PX = 4f;
+    private static final float INNER_SHIP_SCALE = 0.72f;
+    private static final float INNER_BODY_SCALE = 0.62f;
 
-    private static final Color SHIP_COLOR = new Color(0.72f, 0.82f, 0.92f, 1f);
-    private static final Color WRECK_COLOR = new Color(0.34f, 0.36f, 0.40f, 1f);
+    private static final Color WRECK_FILL_COLOR = new Color(0.28f, 0.30f, 0.34f, 1f);
+    private static final Color WRECK_OUTLINE_COLOR = new Color(0.62f, 0.64f, 0.68f, 1f);
     private static final Color THRUSTER_COLOR = new Color(0.45f, 0.75f, 1f, 1f);
     private static final Color KINETIC_COLOR = new Color(1f, 0.82f, 0.42f, 1f);
     private static final Color MISSILE_COLOR = new Color(1f, 0.48f, 0.32f, 1f);
     private static final Color INTERCEPTOR_COLOR = new Color(0.46f, 1f, 0.67f, 1f);
     private static final Color DECOY_COLOR = new Color(0.88f, 0.56f, 1f, 0.92f);
     private static final Color DEBRIS_COLOR = new Color(0.48f, 0.46f, 0.43f, 1f);
+    private static final Color BODY_OUTLINE_COLOR = new Color(0.91f, 0.94f, 0.98f, 0.92f);
     private static final Color BEAM_COLOR = new Color(0.42f, 0.94f, 1f, 1f);
     private static final Color SHIELD_COLOR = new Color(0.35f, 0.72f, 1f, 0.9f);
     private static final Color SHIELD_COLLAPSED_COLOR = new Color(0.30f, 0.38f, 0.48f, 0.55f);
@@ -74,6 +79,7 @@ public final class TacticalPrototypeRenderer {
         drawTrailsAndBeams(layout, snapshot);
         drawShields(layout, snapshot);
         drawShipsAndBodies(layout, snapshot);
+        drawSideCues(layout, snapshot);
         drawImpactsAndDamage(layout, snapshot);
     }
 
@@ -116,13 +122,15 @@ public final class TacticalPrototypeRenderer {
             if (!project(layout, shield.xM(), shield.yM(), a)) {
                 continue;
             }
+            float centerX = a.x;
+            float centerY = a.y;
             float radius = Math.max(MIN_SHIELD_RADIUS_PX, screenLength(layout, shield.radiusM()));
             Color base = shield.collapsed() ? SHIELD_COLLAPSED_COLOR : SHIELD_COLOR;
             float alpha = shield.collapsed() ? base.a : (float) (0.25d + 0.75d * shield.reserveFraction());
             shapes.setColor(base.r, base.g, base.b, alpha);
             float startDegrees = (float) Math.toDegrees(shield.centerRad() - shield.halfArcRad());
             float sweepDegrees = (float) Math.toDegrees(shield.halfArcRad() * 2d);
-            shapes.arc(a.x, a.y, radius, startDegrees, sweepDegrees, 48);
+            shapes.arc(centerX, centerY, radius, startDegrees, sweepDegrees, 48);
         }
         shapes.end();
     }
@@ -149,15 +157,10 @@ public final class TacticalPrototypeRenderer {
         float width = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
         float cos = (float) Math.cos(ship.headingRad());
         float sin = (float) Math.sin(ship.headingRad());
-        float noseX = x + cos * length * 0.55f;
-        float noseY = y + sin * length * 0.55f;
         float rearX = x - cos * length * 0.45f;
         float rearY = y - sin * length * 0.45f;
         float sideX = -sin * width * 0.5f;
         float sideY = cos * width * 0.5f;
-
-        shapes.setColor(ship.wreck() ? WRECK_COLOR : SHIP_COLOR);
-        shapes.triangle(noseX, noseY, rearX + sideX, rearY + sideY, rearX - sideX, rearY - sideY);
 
         if (!ship.wreck() && ship.thrustFraction() > 0d) {
             float plume = (float) (length * (0.18d + 0.42d * ship.thrustFraction()));
@@ -171,18 +174,85 @@ public final class TacticalPrototypeRenderer {
                     rearX - cos * plume,
                     rearY - sin * plume);
         }
+
+        if (ship.wreck()) {
+            shapes.setColor(WRECK_OUTLINE_COLOR);
+        } else {
+            setColor(TacticalSidePalette.outline(ship.side()));
+        }
+        drawTriangleHull(x, y, cos, sin, length, width);
+
+        if (ship.wreck()) {
+            shapes.setColor(WRECK_FILL_COLOR);
+        } else {
+            setColor(TacticalSidePalette.fill(ship.side()));
+        }
+        drawTriangleHull(x, y, cos, sin, length * INNER_SHIP_SCALE, width * INNER_SHIP_SCALE);
+    }
+
+    private void drawSideCues(WorldMapLayout layout, TacticalPrototypeVisualSnapshot snapshot) {
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        for (ShipGlyph ship : snapshot.ships()) {
+            if (ship.wreck() || ship.side() == TacticalSide.NEUTRAL
+                    || !project(layout, ship.xM(), ship.yM(), a)) {
+                continue;
+            }
+            float centerX = a.x;
+            float centerY = a.y;
+            float length = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
+            float width = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
+            float cos = (float) Math.cos(ship.headingRad());
+            float sin = (float) Math.sin(ship.headingRad());
+            setColor(TacticalSidePalette.outline(ship.side()));
+            drawTransverseCue(centerX, centerY, cos, sin, length, width, -0.19f);
+            if (ship.side() == TacticalSide.BETA) {
+                drawTransverseCue(centerX, centerY, cos, sin, length, width, -0.05f);
+            }
+        }
+        shapes.end();
+    }
+
+    private void drawTransverseCue(
+            float x,
+            float y,
+            float cos,
+            float sin,
+            float length,
+            float width,
+            float longitudinalFraction) {
+        float centerX = x + cos * length * longitudinalFraction;
+        float centerY = y + sin * length * longitudinalFraction;
+        float sideX = -sin * width * 0.30f;
+        float sideY = cos * width * 0.30f;
+        shapes.line(centerX + sideX, centerY + sideY, centerX - sideX, centerY - sideY);
+    }
+
+    private void drawTriangleHull(float x, float y, float cos, float sin, float length, float width) {
+        float noseX = x + cos * length * 0.55f;
+        float noseY = y + sin * length * 0.55f;
+        float rearX = x - cos * length * 0.45f;
+        float rearY = y - sin * length * 0.45f;
+        float sideX = -sin * width * 0.5f;
+        float sideY = cos * width * 0.5f;
+        shapes.triangle(noseX, noseY, rearX + sideX, rearY + sideY, rearX - sideX, rearY - sideY);
     }
 
     private void drawBody(WorldMapLayout layout, BodyGlyph body, float x, float y) {
         float length = Math.max(MIN_BODY_LENGTH_PX, screenLength(layout, body.lengthM()));
         float width = Math.max(MIN_BODY_WIDTH_PX, screenLength(layout, body.widthM()));
+        shapes.setColor(BODY_OUTLINE_COLOR);
+        drawBodyShape(body, x, y, length, width);
+        shapes.setColor(bodyColor(body));
+        drawBodyShape(body, x, y, length * INNER_BODY_SCALE, width * INNER_BODY_SCALE);
+    }
+
+    private void drawBodyShape(BodyGlyph body, float x, float y, float length, float width) {
         float cos = (float) Math.cos(body.headingRad());
         float sin = (float) Math.sin(body.headingRad());
         float sideX = -sin * width * 0.5f;
         float sideY = cos * width * 0.5f;
-        shapes.setColor(bodyColor(body));
         switch (body.kind()) {
-            case KINETIC_PROJECTILE -> shapes.circle(x, y, Math.max(1.5f, width * 0.5f), 10);
+            case KINETIC_PROJECTILE -> shapes.circle(x, y, Math.max(1.8f, width * 0.5f), 10);
             case GUIDED_MISSILE, INTERCEPTOR -> shapes.triangle(
                     x + cos * length * 0.55f,
                     y + sin * length * 0.55f,
@@ -191,8 +261,8 @@ public final class TacticalPrototypeRenderer {
                     x - cos * length * 0.45f - sideX,
                     y - sin * length * 0.45f - sideY);
             case DECOY -> {
-                shapes.circle(x, y, Math.max(3f, width * 0.45f), 16);
-                shapes.circle(x, y, Math.max(1.5f, width * 0.18f), 12);
+                shapes.circle(x, y, Math.max(3.4f, width * 0.45f), 16);
+                shapes.circle(x, y, Math.max(1.8f, width * 0.18f), 12);
             }
             case DEBRIS -> shapes.rect(
                     x - length * 0.5f,
@@ -229,6 +299,10 @@ public final class TacticalPrototypeRenderer {
             shapes.circle(a.x, a.y, DAMAGE_RADIUS_PX + (float) (3d * marker.severity()), 16);
         }
         shapes.end();
+    }
+
+    private void setColor(Rgba color) {
+        shapes.setColor(color.r(), color.g(), color.b(), color.a());
     }
 
     private static Color bodyColor(BodyGlyph body) {

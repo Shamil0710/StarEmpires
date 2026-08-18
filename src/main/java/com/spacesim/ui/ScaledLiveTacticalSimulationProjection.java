@@ -3,17 +3,19 @@ package com.spacesim.ui;
 import com.spacesim.ship.GuidedWeaponBody;
 import com.spacesim.ship.LiveTacticalBattleDeceptionRuntime;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
+import com.spacesim.ship.LiveTacticalBattleScenario.Side;
 import com.spacesim.ship.ProjectileBody;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.BodyGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.BodyKind;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShipGlyph;
+import com.spacesim.ui.TacticalPrototypeVisualSnapshot.TacticalSide;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Strict read-only presentation projection for the scaled Stage-19I production tactical runtime.
+ * Strict read-only presentation projection for the scaled Stage-19 production tactical runtime.
  *
  * <p>The projection has no clock and performs no mutation. It exposes every materialized ship plus
  * current kinetic/residual, STRIKE, INTERCEPTOR and DECOY bodies through the existing immutable
@@ -66,11 +68,10 @@ public final class ScaledLiveTacticalSimulationProjection {
                 + combatant.transform().velocity.y * combatant.transform().velocity.y;
         double heading = speedSquared > 1e-12d
                 ? Math.atan2(combatant.transform().velocity.y, combatant.transform().velocity.x)
-                : (combatant.spec().side() == com.spacesim.ship.LiveTacticalBattleScenario.Side.ALPHA
-                        ? 0d
-                        : Math.PI);
+                : (combatant.spec().side() == Side.ALPHA ? 0d : Math.PI);
         return new ShipGlyph(
                 combatant.spec().entityId(),
+                tacticalSide(combatant.spec().side()),
                 combatant.transform().position.x,
                 combatant.transform().position.y,
                 heading,
@@ -79,6 +80,13 @@ public final class ScaledLiveTacticalSimulationProjection {
                 0d,
                 integrity,
                 integrity <= 0d);
+    }
+
+    private static TacticalSide tacticalSide(Side side) {
+        return switch (Objects.requireNonNull(side, "side")) {
+            case ALPHA -> TacticalSide.ALPHA;
+            case BETA -> TacticalSide.BETA;
+        };
     }
 
     private static BodyGlyph projectileGlyph(ProjectileBody body) {

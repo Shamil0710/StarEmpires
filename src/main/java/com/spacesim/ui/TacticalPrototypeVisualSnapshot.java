@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Immutable presentation-only snapshot for the Stage-17.5I top-down tactical prototype.
+ * Immutable presentation-only snapshot for the Stage-17.5I/19J top-down tactical prototype.
  *
  * <p>Every record in this snapshot is a visual projection of authoritative simulation state or a
  * presentation-only decoration derived from such state. No field is fed back into combat, guidance,
@@ -27,6 +27,13 @@ public record TacticalPrototypeVisualSnapshot(
         List<ImpactGlyph> impacts,
         List<DamageGlyph> damage) {
 
+    /** Presentation-only side identity used for readable tactical rendering. */
+    public enum TacticalSide {
+        /** Canonical ALPHA battle side. */ ALPHA,
+        /** Canonical BETA battle side. */ BETA,
+        /** Legacy/unspecified presentation state with no inferred combat allegiance. */ NEUTRAL
+    }
+
     /** Visual body categories required by the Stage-17.5I prototype set. */
     public enum BodyKind {
         /** Unguided physical kinetic projectile. */ KINETIC_PROJECTILE,
@@ -47,6 +54,7 @@ public record TacticalPrototypeVisualSnapshot(
      * One top-down ship or wreck silhouette.
      *
      * @param entityId stable authoritative owner identity
+     * @param side presentation-only side projected from authoritative scenario membership
      * @param xM world x position in meters
      * @param yM world y position in meters
      * @param headingRad world heading in radians
@@ -58,6 +66,7 @@ public record TacticalPrototypeVisualSnapshot(
      */
     public record ShipGlyph(
             long entityId,
+            TacticalSide side,
             double xM,
             double yM,
             double headingRad,
@@ -70,6 +79,7 @@ public record TacticalPrototypeVisualSnapshot(
          * Validates one immutable ship glyph.
          *
          * @param entityId stable authoritative owner identity
+         * @param side presentation-only side projected from authoritative scenario membership
          * @param xM world x position in meters
          * @param yM world y position in meters
          * @param headingRad world heading in radians
@@ -81,6 +91,7 @@ public record TacticalPrototypeVisualSnapshot(
          */
         public ShipGlyph {
             requirePositiveId(entityId, "entityId");
+            Objects.requireNonNull(side, "side");
             requireFinite(xM, "xM");
             requireFinite(yM, "yM");
             requireFinite(headingRad, "headingRad");
@@ -88,6 +99,33 @@ public record TacticalPrototypeVisualSnapshot(
             requirePositiveFinite(widthM, "widthM");
             requireUnit(thrustFraction, "thrustFraction");
             requireUnit(integrityFraction, "integrityFraction");
+        }
+
+        /**
+         * Backwards-compatible neutral-side constructor for legacy Stage-17.5 presentation callers.
+         *
+         * @param entityId stable authoritative owner identity
+         * @param xM world x position in meters
+         * @param yM world y position in meters
+         * @param headingRad world heading in radians
+         * @param lengthM physical hull length
+         * @param widthM physical hull width
+         * @param thrustFraction presentation fraction [0,1] derived from authoritative thrust command/state
+         * @param integrityFraction mean physical compartment integrity [0,1]
+         * @param wreck whether authoritative damage state has no surviving compartment integrity
+         */
+        public ShipGlyph(
+                long entityId,
+                double xM,
+                double yM,
+                double headingRad,
+                double lengthM,
+                double widthM,
+                double thrustFraction,
+                double integrityFraction,
+                boolean wreck) {
+            this(entityId, TacticalSide.NEUTRAL, xM, yM, headingRad, lengthM, widthM,
+                    thrustFraction, integrityFraction, wreck);
         }
     }
 
