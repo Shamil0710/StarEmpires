@@ -19,25 +19,21 @@ import com.spacesim.ship.WeaponFireControl.TargetMotionEstimate;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
 /**
  * Stage-19I exact-local layered-defense integration over the shared production guided runtime.
  *
- * <p>This slice converts existing {@link LayeredDefenseScheduler} assignments into real fitted
- * interceptor launches. A defense station is not a virtual PD object: it is one current physical
- * guided mount on one combatant, loaded with authored {@link GuidedEngagementRole#INTERCEPTOR}
- * ammunition. Accepted assignments consume the central itemized round/mass, start the same
- * persistent {@link WeaponMountRuntime} cycle and materialize ordinary {@link GuidedWeaponBody}
- * instances with inherited ship velocity and finite propulsion.</p>
+ * <p>Defense stations are real fitted guided mounts loaded with authored
+ * {@link GuidedEngagementRole#INTERCEPTOR} ammunition. Scheduler assignments consume central
+ * itemized ammunition/mass, persistent launcher cycles and authored support channels before
+ * materializing ordinary {@link GuidedWeaponBody} interceptors. Successful interception requires a
+ * swept physical body-body contact; assignment alone never deletes a threat.</p>
  *
- * <p>The current Stage-19I-C bridge intentionally supplies exact-local active hostile guided-body
- * state to the scheduler and interceptor guidance. This is a temporary acceptance seam, not the final
- * ordnance information model. The later EW/ordnance-sensing slice must replace it with actor-bounded
- * missile/interceptor tracks before Stage 19 can close. No hit probability or deletion-on-assignment
- * is introduced here; physical interceptor/threat collision is the next gate.</p>
+ * <p>The current Stage-19I-C bridge still supplies exact-local hostile guided-body state to the
+ * scheduler and interceptor guidance. This is temporary acceptance plumbing. Actor-bounded ordnance
+ * sensing, EW/ECCM and decoys remain mandatory before Stage 19 can close.</p>
  */
 public final class LiveTacticalBattleDefenseRuntime {
     private static final double TICK_SECONDS = LiveTacticalBattleControlRuntime.TICK_SECONDS;
@@ -55,8 +51,10 @@ public final class LiveTacticalBattleDefenseRuntime {
     private final GuidanceRuntime guidanceRuntime;
     private final AmmunitionRuntime ammunitionRuntime;
     private final WeaponMountRuntime weaponMountRuntime;
+    private final GuidedBodyCollisionResolver collisionResolver;
     private final List<InterceptorRuntime> interceptors = new ArrayList<>();
     private final TreeMap<Long, Long> interceptorLaunchesByDefender = new TreeMap<>();
+    private final TreeMap<Long, Long> successfulInterceptionsByDefender = new TreeMap<>();
 
     private long nextInterceptorBodyId = 198_000L;
 
@@ -76,22 +74,33 @@ public final class LiveTacticalBattleDefenseRuntime {
         guidanceRuntime = new GuidanceRuntime();
         ammunitionRuntime = new AmmunitionRuntime();
         weaponMountRuntime = new WeaponMountRuntime();
+        collisionResolver = new GuidedBodyCollisionResolver();
         for (CombatantRuntime combatant : battleState().combatants()) {
             interceptorLaunchesByDefender.put(combatant.spec().entityId(), 0L);
+            successfulInterceptionsByDefender.put(combatant.spec().entityId(), 0L);
         }
     }
 
     /**
-     * Advances one shared combat tick, then defensive guidance/assignment from the resulting physical state.
+     * Advances one shared combat tick through ordnance, interceptor motion, physical collision and assignment.
      *
-     * <p>The wrapped runtime owns the one battle clock. Existing interceptors then execute one bounded
-     * guidance/propagation step. Finally the scheduler may authorize new launches, which begin moving
-     * on the next fixed tick. This explicit one-control-tick defensive reaction latency avoids
-     * same-tick lookahead into guided-body motion.</p>
+     * <p>Strike/interceptor start positions are captured before either moves. The wrapped ordnance
+     * runtime then advances the one authoritative battle clock and strike bodies. Existing
+     * interceptors execute one bounded guidance/ballistic step. Relative swept body-body collision is
+     * resolved next, and only surviving threats may cause new defensive assignments. Newly launched
+     * interceptors begin moving on the following fixed tick.</p>
+     *
+     * <p>The wrapped ordnance runtime currently resolves guided-body/ship contact before this outer
+     * interceptor collision phase. Therefore a same-tick threat that reaches a ship before this phase
+     * retains ship-impact priority. Final Stage-19 integration must revisit this ordering if scale
+     * evidence exposes materially ambiguous same-tick contacts.</p>
      */
     public void advanceOneTick() {
+        TreeMap<Long, BodyPosition> strikeStarts = snapshotStrikePositions();
+        TreeMap<Long, BodyPosition> interceptorStarts = snapshotInterceptorPositions();
         ordnanceRuntime.advanceOneTick();
         advanceExistingInterceptors();
+        resolvePhysicalInterceptions(strikeStarts, interceptorStarts);
         scheduleAndLaunchInterceptors();
     }
 
@@ -132,6 +141,22 @@ public final class LiveTacticalBattleDefenseRuntime {
     }
 
     /**
+     * Returns swept physical interceptor/threat contacts resolved for one defender.
+     *
+     * @param defenderEntityId stable defender identity
+     * @return non-negative successful physical interception count
+     */
+    public long successfulInterceptions(long defenderEntityId) {
+        battleState().requireCombatant(defenderEntityId);
+        return successfulInterceptionsByDefender.get(defenderEntityId);
+    }
+
+    /** @return total swept physical interceptor/threat contacts resolved */
+    public long totalSuccessfulInterceptions() {
+        return successfulInterceptionsByDefender.values().stream().mapToLong(Long::longValue).sum();
+    }
+
+    /**
      * Equality-friendly whole-defense projection for deterministic acceptance.
      *
      * @return immutable layered-defense fingerprint
@@ -141,6 +166,7 @@ public final class LiveTacticalBattleDefenseRuntime {
                 .map(combatant -> new DefenderFingerprint(
                         combatant.spec().entityId(),
                         interceptorLaunchesByDefender.get(combatant.spec().entityId()),
+                        successfulInterceptionsByDefender.get(combatant.spec().entityId()),
                         interceptorRounds(combatant)))
                 .toList();
         List<InterceptorFingerprint> active = interceptors.stream()
@@ -189,6 +215,94 @@ public final class LiveTacticalBattleDefenseRuntime {
         }
         interceptors.clear();
         interceptors.addAll(survivors);
+    }
+
+    private void resolvePhysicalInterceptions(
+            TreeMap<Long, BodyPosition> strikeStarts,
+            TreeMap<Long, BodyPosition> interceptorStarts) {
+        if (interceptors.isEmpty() || ordnanceRuntime.guidedBodies().isEmpty()) {
+            return;
+        }
+        List<InterceptorRuntime> survivors = new ArrayList<>(interceptors.size());
+        for (InterceptorRuntime interceptor : interceptors) {
+            BodyPosition interceptorStart = interceptorStarts.get(interceptor.body().bodyId());
+            if (interceptorStart == null) {
+                survivors.add(interceptor);
+                continue;
+            }
+            CollisionCandidate collision = firstCollision(interceptor, interceptorStart, strikeStarts);
+            if (collision == null) {
+                survivors.add(interceptor);
+                continue;
+            }
+            GuidedWeaponBody removedThreat = ordnanceRuntime.removeGuidedBody(collision.threat().bodyId());
+            if (removedThreat == null) {
+                survivors.add(interceptor);
+                continue;
+            }
+
+            double interceptorMass = interceptor.body().currentMassKg();
+            double threatMass = removedThreat.currentMassKg();
+            double totalMass = interceptorMass + threatMass;
+            double collisionX = (interceptorMass * collision.interceptorXM()
+                    + threatMass * collision.threatXM()) / totalMass;
+            double collisionY = (interceptorMass * collision.interceptorYM()
+                    + threatMass * collision.threatYM()) / totalMass;
+            GuidedBodyCollisionResolver.ResidualPair result = collisionResolver.resolve(
+                    interceptor.body(),
+                    removedThreat,
+                    collisionX,
+                    collisionY,
+                    tick());
+            for (ProjectileBody residual : result.residuals()) {
+                ordnanceRuntime.weaponRuntime().acceptExternalProjectile(residual);
+            }
+            successfulInterceptionsByDefender.compute(
+                    interceptor.defenderEntityId(),
+                    (ignored, count) -> Math.addExact(Objects.requireNonNull(count, "interception count"), 1L));
+        }
+        interceptors.clear();
+        interceptors.addAll(survivors);
+    }
+
+    private CollisionCandidate firstCollision(
+            InterceptorRuntime interceptor,
+            BodyPosition interceptorStart,
+            TreeMap<Long, BodyPosition> strikeStarts) {
+        CollisionCandidate best = null;
+        GuidedWeaponBody interceptorEnd = interceptor.body();
+        for (GuidedWeaponBody threat : ordnanceRuntime.guidedBodies()) {
+            BodyPosition threatStart = strikeStarts.get(threat.bodyId());
+            if (threatStart == null) {
+                threatStart = new BodyPosition(
+                        threat.xM() - threat.velocityXMps() * TICK_SECONDS,
+                        threat.yM() - threat.velocityYMps() * TICK_SECONDS);
+            }
+            double combinedRadius = bodyRadius(interceptorEnd) + bodyRadius(threat);
+            var fraction = TacticalCollisionGeometry.firstSegmentCircleHitFraction(
+                    interceptorStart.xM() - threatStart.xM(),
+                    interceptorStart.yM() - threatStart.yM(),
+                    interceptorEnd.xM() - threat.xM(),
+                    interceptorEnd.yM() - threat.yM(),
+                    combinedRadius);
+            if (fraction.isEmpty()) {
+                continue;
+            }
+            double value = fraction.getAsDouble();
+            if (best == null
+                    || value < best.fraction() - EPSILON
+                    || (Math.abs(value - best.fraction()) <= EPSILON
+                    && threat.bodyId() < best.threat().bodyId())) {
+                best = new CollisionCandidate(
+                        threat,
+                        value,
+                        interpolate(interceptorStart.xM(), interceptorEnd.xM(), value),
+                        interpolate(interceptorStart.yM(), interceptorEnd.yM(), value),
+                        interpolate(threatStart.xM(), threat.xM(), value),
+                        interpolate(threatStart.yM(), threat.yM(), value));
+            }
+        }
+        return best;
     }
 
     private void scheduleAndLaunchInterceptors() {
@@ -378,6 +492,24 @@ public final class LiveTacticalBattleDefenseRuntime {
                 body.velocityYMps()));
     }
 
+    private TreeMap<Long, BodyPosition> snapshotStrikePositions() {
+        TreeMap<Long, BodyPosition> result = new TreeMap<>();
+        for (GuidedWeaponBody body : ordnanceRuntime.guidedBodies()) {
+            result.put(body.bodyId(), new BodyPosition(body.xM(), body.yM()));
+        }
+        return result;
+    }
+
+    private TreeMap<Long, BodyPosition> snapshotInterceptorPositions() {
+        TreeMap<Long, BodyPosition> result = new TreeMap<>();
+        for (InterceptorRuntime interceptor : interceptors) {
+            result.put(
+                    interceptor.body().bodyId(),
+                    new BodyPosition(interceptor.body().xM(), interceptor.body().yM()));
+        }
+        return result;
+    }
+
     private int activeInterceptors(long defenderEntityId, String mountId) {
         int count = 0;
         for (InterceptorRuntime interceptor : interceptors) {
@@ -424,6 +556,14 @@ public final class LiveTacticalBattleDefenseRuntime {
         return 0.5d * Math.hypot(length, width);
     }
 
+    private static double bodyRadius(GuidedWeaponBody body) {
+        return 0.5d * Math.hypot(body.lengthM(), body.diameterM());
+    }
+
+    private static double interpolate(double start, double end, double fraction) {
+        return start + (end - start) * fraction;
+    }
+
     private static void replaceConsumables(
             EngineeringComponent engineering,
             ShipEngineeringState.ConsumableState consumables) {
@@ -448,6 +588,31 @@ public final class LiveTacticalBattleDefenseRuntime {
                 instance.maintenance(),
                 instance.weaponLoadout(),
                 Objects.requireNonNull(weaponState, "weaponState")));
+    }
+
+    private record BodyPosition(double xM, double yM) {
+        private BodyPosition {
+            if (!Double.isFinite(xM) || !Double.isFinite(yM)) {
+                throw new IllegalArgumentException("body position must be finite");
+            }
+        }
+    }
+
+    private record CollisionCandidate(
+            GuidedWeaponBody threat,
+            double fraction,
+            double interceptorXM,
+            double interceptorYM,
+            double threatXM,
+            double threatYM) {
+        private CollisionCandidate {
+            Objects.requireNonNull(threat, "threat");
+            if (!Double.isFinite(fraction) || fraction < 0d || fraction > 1d
+                    || !Double.isFinite(interceptorXM) || !Double.isFinite(interceptorYM)
+                    || !Double.isFinite(threatXM) || !Double.isFinite(threatYM)) {
+                throw new IllegalArgumentException("invalid physical collision candidate");
+            }
+        }
     }
 
     private record MountStation(
@@ -479,25 +644,29 @@ public final class LiveTacticalBattleDefenseRuntime {
     }
 
     /**
-     * Per-defender physical interceptor stores/launch projection.
+     * Per-defender physical interceptor stores/launch/interception projection.
      *
      * @param entityId stable defender combatant identity
      * @param interceptorLaunches physical interceptor launch count
+     * @param successfulInterceptions swept physical interceptor/threat collision count
      * @param remainingInterceptorRounds current itemized INTERCEPTOR rounds on fitted mounts
      */
     public record DefenderFingerprint(
             long entityId,
             long interceptorLaunches,
+            long successfulInterceptions,
             long remainingInterceptorRounds) {
         /**
          * Validates one defender projection.
          *
          * @param entityId stable defender combatant identity
          * @param interceptorLaunches physical interceptor launch count
+         * @param successfulInterceptions swept physical interceptor/threat collision count
          * @param remainingInterceptorRounds current itemized interceptor rounds
          */
         public DefenderFingerprint {
-            if (entityId <= 0L || interceptorLaunches < 0L || remainingInterceptorRounds < 0L) {
+            if (entityId <= 0L || interceptorLaunches < 0L
+                    || successfulInterceptions < 0L || remainingInterceptorRounds < 0L) {
                 throw new IllegalArgumentException("invalid defender fingerprint");
             }
         }
@@ -563,7 +732,7 @@ public final class LiveTacticalBattleDefenseRuntime {
      *
      * @param tick authoritative shared battle tick
      * @param ordnanceFingerprint wrapped ship/weapon/guided physical state
-     * @param defenders stable per-defender launch/store projections
+     * @param defenders stable per-defender launch/store/interception projections
      * @param activeInterceptors current physical interceptor bodies
      */
     public record BattleDefenseFingerprint(
