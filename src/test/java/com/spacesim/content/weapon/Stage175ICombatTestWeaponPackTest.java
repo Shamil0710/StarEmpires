@@ -1,5 +1,6 @@
 package com.spacesim.content.weapon;
 
+import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedEngagementRole;
 import com.spacesim.ship.WeaponDefinition.Family;
 import org.junit.jupiter.api.Test;
 
@@ -13,11 +14,16 @@ class Stage175ICombatTestWeaponPackTest {
         WeaponAmmunitionCatalog ammunition = Stage175ICombatTestWeaponPack.loadAmmunition();
 
         assertEquals(2, ammunition.getKineticAmmunition().size());
-        assertEquals(2, ammunition.getGuidedAmmunition().size());
+        assertEquals(3, ammunition.getGuidedAmmunition().size());
         assertNotNull(ammunition.findKinetic("ammo.test_kinetic_dart_150kg_v1"));
         assertNotNull(ammunition.findKinetic("ammo.test_pd_slug_5kg_v1"));
         assertNotNull(ammunition.findGuided("ammo.test_anti_ship_missile_2t_v1"));
         assertNotNull(ammunition.findGuided("ammo.test_interceptor_750kg_v1"));
+        var decoy = ammunition.findGuided("ammo.test_radar_repeater_decoy_300kg_v1");
+        assertNotNull(decoy);
+        assertEquals(GuidedEngagementRole.DECOY, decoy.engagementRole());
+        assertEquals(300d, decoy.wetMassKg(), 1e-9d);
+        assertTrue(decoy.signature().radarCrossSectionM2() > 0d);
         assertEquals(64, ammunition.getFingerprint().length());
     }
 
@@ -26,11 +32,14 @@ class Stage175ICombatTestWeaponPackTest {
         WeaponAmmunitionCatalog ammunition = Stage175ICombatTestWeaponPack.loadAmmunition();
         var missile = ammunition.findGuided("ammo.test_anti_ship_missile_2t_v1").toRuntimeWeapon();
         var interceptor = ammunition.findGuided("ammo.test_interceptor_750kg_v1").toRuntimeWeapon();
+        var decoy = ammunition.findGuided("ammo.test_radar_repeater_decoy_300kg_v1").toRuntimeWeapon();
 
         assertTrue(missile.massFlowKgPerS() * missile.burnTimeSeconds() <= missile.propellantMassKg());
         assertTrue(interceptor.massFlowKgPerS() * interceptor.burnTimeSeconds() <= interceptor.propellantMassKg());
+        assertTrue(decoy.massFlowKgPerS() * decoy.burnTimeSeconds() <= decoy.propellantMassKg());
         assertTrue(missile.idealDeltaVMps() > missile.terminalReserveMps());
         assertTrue(interceptor.idealDeltaVMps() > interceptor.terminalReserveMps());
+        assertTrue(decoy.idealDeltaVMps() > decoy.terminalReserveMps());
     }
 
     @Test
