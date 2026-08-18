@@ -14,7 +14,16 @@ public record TacticalScenarioDefinition(
         int betaShips,
         Supplier<LiveTacticalBattleDeceptionRuntime> runtimeFactory) {
 
-    /** Validates immutable scenario metadata without adding combat authority. */
+    /**
+     * Validates immutable scenario metadata without adding combat authority.
+     *
+     * @param id canonical scenario identity
+     * @param displayName human-readable tactical viewer name
+     * @param description short validation-purpose description
+     * @param alphaShips authored ALPHA combatant count
+     * @param betaShips authored BETA combatant count
+     * @param runtimeFactory supplier of fresh authoritative production runtimes
+     */
     public TacticalScenarioDefinition {
         Objects.requireNonNull(id, "id");
         displayName = requireText(displayName, "displayName");
