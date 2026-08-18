@@ -162,6 +162,75 @@ public record LiveTacticalBattleScenario(List<CombatantSpec> combatants) {
         return new LiveTacticalBattleScenario(roster);
     }
 
+    /**
+     * Returns the deterministic 16v16 exact-local roster for the Stage-19I >=32-combatant gate.
+     *
+     * <p>Each side contains four kinetic-line, four missile-strike, two defensive-EW and six balanced
+     * acceptance fits. The counts are identical while vertical doctrine ordering differs. This scales
+     * one authored physical battle to 32 ships without creating a fleet resolver or numerical doctrine
+     * bonus. Saturation-specific feed overrides remain a later gate.</p>
+     *
+     * @return deterministic thirty-two-combatant mixed-doctrine scenario
+     */
+    public static LiveTacticalBattleScenario mixed16v16() {
+        ArrayList<CombatantSpec> roster = new ArrayList<>(32);
+        double[] yPositions = {
+                -40d, 60d, 160d, 260d, 360d, 460d, 560d, 660d,
+                760d, 860d, 960d, 1_060d, 1_160d, 1_260d, 1_360d, 1_460d
+        };
+        DoctrineId[] alphaDoctrines = {
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.D_DEFENSIVE_EW,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.D_DEFENSIVE_EW,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.E_BALANCED_CONTROL
+        };
+        DoctrineId[] betaDoctrines = {
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.D_DEFENSIVE_EW,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.D_DEFENSIVE_EW,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.A_KINETIC_LINE
+        };
+        for (int index = 0; index < yPositions.length; index++) {
+            roster.add(new CombatantSpec(
+                    191_500L + index,
+                    Side.ALPHA,
+                    alphaDoctrines[index],
+                    260d,
+                    yPositions[index]));
+            roster.add(new CombatantSpec(
+                    191_600L + index,
+                    Side.BETA,
+                    betaDoctrines[index],
+                    1_690d,
+                    yPositions[index]));
+        }
+        return new LiveTacticalBattleScenario(roster);
+    }
+
     /** Battle allegiance within one exact local tactical session. */
     public enum Side {
         /** First authored combat side. */
