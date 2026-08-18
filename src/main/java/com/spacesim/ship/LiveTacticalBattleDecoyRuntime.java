@@ -26,8 +26,8 @@ import java.util.TreeMap;
  * combat state; it only advances its decoy bodies to the wrapped authoritative ordnance tick.</p>
  *
  * <p>The current foundation accepts an explicit deployment direction from its caller. It does not yet
- * choose when or where AI should deploy decoys, and it does not yet inject sensor hypotheses. Those are
- * later Stage-19I information/policy slices.</p>
+ * choose when or where AI should deploy decoys. Sensor/defense integration may observe and physically
+ * collide with these bodies, but cannot bypass this owner when a decoy is destroyed.</p>
  */
 public final class LiveTacticalBattleDecoyRuntime {
     private static final double TICK_SECONDS = LiveTacticalBattleControlRuntime.TICK_SECONDS;
@@ -181,6 +181,17 @@ public final class LiveTacticalBattleDecoyRuntime {
     /** @return immutable current physical decoy bodies in launch order */
     public List<GuidedWeaponBody> decoyBodies() {
         return decoys.stream().map(DecoyRuntime::body).toList();
+    }
+
+    GuidedWeaponBody removeDecoyBody(long bodyId) {
+        for (int index = 0; index < decoys.size(); index++) {
+            DecoyRuntime value = decoys.get(index);
+            if (value.body().bodyId() == bodyId) {
+                decoys.remove(index);
+                return value.body();
+            }
+        }
+        return null;
     }
 
     /**
