@@ -11,8 +11,9 @@ import com.spacesim.ship.GuidanceRuntime.TrackSource;
 import com.spacesim.ship.LayeredDefenseScheduler.Assignment;
 import com.spacesim.ship.LayeredDefenseScheduler.DefendedZone;
 import com.spacesim.ship.LayeredDefenseScheduler.DefenseStation;
-import com.spacesim.ship.LayeredDefenseScheduler.Threat;
+import com.spacesim.ship.LayeredDefenseScheduler.ObservedThreatKinematics;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
+import com.spacesim.ship.LiveTacticalOrdnanceObservationRuntime.ObservedOrdnanceTrack;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.WeaponFireControl.TargetMotionEstimate;
@@ -23,7 +24,7 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Stage-19I exact-local layered-defense integration over the shared production guided runtime.
+ * Stage-19I actor-bounded layered-defense integration over the shared production guided runtime.
  *
  * <p>Defense stations are real fitted guided mounts loaded with authored
  * {@link GuidedEngagementRole#INTERCEPTOR} ammunition. Scheduler assignments consume central
@@ -31,17 +32,17 @@ import java.util.TreeMap;
  * materializing ordinary {@link GuidedWeaponBody} interceptors. Successful interception requires a
  * swept physical body-body contact; assignment alone never deletes a threat.</p>
  *
- * <p>The current Stage-19I-C bridge still supplies exact-local hostile guided-body state to the
- * scheduler and interceptor guidance. This is temporary acceptance plumbing. Actor-bounded ordnance
- * sensing, EW/ECCM and decoys remain mandatory before Stage 19 can close.</p>
+ * <p>Scheduling and datalink guidance consume only observer-local ordnance tracks produced by
+ * {@link LiveTacticalOrdnanceObservationRuntime}. Exact guided-body geometry remains authoritative in
+ * the physical collision layer, but it is not exposed to the defense policy. EW/ECCM, passive
+ * ordnance sensing and deception hypotheses remain later Stage-19I-D acceptance work.</p>
  */
 public final class LiveTacticalBattleDefenseRuntime {
     private static final double TICK_SECONDS = LiveTacticalBattleControlRuntime.TICK_SECONDS;
     private static final double EPSILON = 1e-9d;
-    private static final double EXACT_LOCAL_POSITION_VARIANCE_M2 = 1d;
-    private static final double EXACT_LOCAL_BEARING_VARIANCE_RAD2 = 1e-12d;
 
     private final LiveTacticalBattleOrdnanceRuntime ordnanceRuntime;
+    private final LiveTacticalOrdnanceObservationRuntime observationRuntime;
     private final ShipEngineeringCatalog engineeringCatalog;
     private final WeaponAmmunitionCatalog ammunitionCatalog;
     private final WeaponLauncherCatalog launcherCatalog;
@@ -65,6 +66,7 @@ public final class LiveTacticalBattleDefenseRuntime {
      */
     public LiveTacticalBattleDefenseRuntime(LiveTacticalBattleOrdnanceRuntime ordnanceRuntime) {
         this.ordnanceRuntime = Objects.requireNonNull(ordnanceRuntime, "ordnanceRuntime");
+        observationRuntime = new LiveTacticalOrdnanceObservationRuntime(ordnanceRuntime);
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
@@ -82,13 +84,14 @@ public final class LiveTacticalBattleDefenseRuntime {
     }
 
     /**
-     * Advances one shared combat tick through ordnance, interceptor motion, physical collision and assignment.
+     * Advances one shared combat tick through ordnance, observation, interceptor motion, collision and assignment.
      *
      * <p>Strike/interceptor start positions are captured before either moves. The wrapped ordnance
-     * runtime then advances the one authoritative battle clock and strike bodies. Existing
-     * interceptors execute one bounded guidance/ballistic step. Relative swept body-body collision is
-     * resolved next, and only surviving threats may cause new defensive assignments. Newly launched
-     * interceptors begin moving on the following fixed tick.</p>
+     * runtime then advances the one authoritative battle clock and strike bodies. Actor-local ordnance
+     * sensing observes the already-advanced tick. Existing interceptors consume only those observed
+     * tracks for datalink guidance, relative swept body-body collision is resolved next, and only then
+     * may observed threat hypotheses cause new defensive assignments. Newly launched interceptors begin
+     * moving on the following fixed tick.</p>
      *
      * <p>The wrapped ordnance runtime currently resolves guided-body/ship contact before this outer
      * interceptor collision phase. Therefore a same-tick threat that reaches a ship before this phase
@@ -99,6 +102,7 @@ public final class LiveTacticalBattleDefenseRuntime {
         TreeMap<Long, BodyPosition> strikeStarts = snapshotStrikePositions();
         TreeMap<Long, BodyPosition> interceptorStarts = snapshotInterceptorPositions();
         ordnanceRuntime.advanceOneTick();
+        observationRuntime.observeCurrentTick();
         advanceExistingInterceptors();
         resolvePhysicalInterceptions(strikeStarts, interceptorStarts);
         scheduleAndLaunchInterceptors();
@@ -117,6 +121,11 @@ public final class LiveTacticalBattleDefenseRuntime {
     /** @return wrapped shared guided-ordnance runtime */
     public LiveTacticalBattleOrdnanceRuntime ordnanceRuntime() {
         return ordnanceRuntime;
+    }
+
+    /** @return actor-bounded guided-ordnance observation used by defense policy */
+    public LiveTacticalOrdnanceObservationRuntime observationRuntime() {
+        return observationRuntime;
     }
 
     /** @return authoritative materialized combatant state */
@@ -192,25 +201,25 @@ public final class LiveTacticalBattleDefenseRuntime {
     private void advanceExistingInterceptors() {
         List<InterceptorRuntime> survivors = new ArrayList<>(interceptors.size());
         for (InterceptorRuntime interceptor : interceptors) {
-            GuidedWeaponBody threat = strikeBody(interceptor.body().targetId());
-            if (threat == null) {
-                transferOrphanToProjectilePool(interceptor.body());
-                continue;
+            ObservedOrdnanceTrack observed = observationRuntime.track(
+                    interceptor.defenderEntityId(),
+                    interceptor.body().targetId());
+            GuidedWeaponBody guided = interceptor.body();
+            if (actionableTrack(observed)) {
+                GuidanceRuntime.GuidanceCommand command = guidanceRuntime.planLeadPursuit(
+                        guided,
+                        observed.track(),
+                        new TargetMotionEstimate(
+                                observed.estimatedVelocityXMps(),
+                                observed.estimatedVelocityYMps(),
+                                observed.oneSigmaVelocityMps(),
+                                0d),
+                        TrackSource.DATALINK,
+                        TICK_SECONDS);
+                if (command.allowed()) {
+                    guided = guidanceRuntime.execute(guided, command);
+                }
             }
-            TrackState exactLocalTrack = exactLocalThreatTrack(threat);
-            GuidanceRuntime.GuidanceCommand command = guidanceRuntime.planLeadPursuit(
-                    interceptor.body(),
-                    exactLocalTrack,
-                    new TargetMotionEstimate(
-                            threat.velocityXMps(),
-                            threat.velocityYMps(),
-                            0d,
-                            0d),
-                    TrackSource.DATALINK,
-                    TICK_SECONDS);
-            GuidedWeaponBody guided = command.allowed()
-                    ? guidanceRuntime.execute(interceptor.body(), command)
-                    : interceptor.body();
             survivors.add(interceptor.withBody(guided.advanceBallistic(TICK_SECONDS)));
         }
         interceptors.clear();
@@ -314,8 +323,11 @@ public final class LiveTacticalBattleDefenseRuntime {
             if (mounts.isEmpty()) {
                 continue;
             }
-            List<GuidedWeaponBody> hostileBodies = hostileStrikeBodies(defender);
-            if (hostileBodies.isEmpty()) {
+            List<ObservedOrdnanceTrack> observedThreats = observationRuntime
+                    .tracksForObserver(defender.spec().entityId()).stream()
+                    .filter(LiveTacticalBattleDefenseRuntime::actionableTrack)
+                    .toList();
+            if (observedThreats.isEmpty()) {
                 continue;
             }
 
@@ -350,28 +362,20 @@ public final class LiveTacticalBattleDefenseRuntime {
                 stationId = Math.addExact(stationId, 1L);
             }
 
-            List<Threat> threats = hostileBodies.stream()
-                    .map(body -> new Threat(
-                            body.bodyId(),
-                            body.xM(),
-                            body.yM(),
-                            body.velocityXMps(),
-                            body.velocityYMps(),
-                            body.currentMassKg(),
-                            body.guidanceAvailable()))
+            List<ObservedThreatKinematics> threats = observedThreats.stream()
+                    .map(observed -> new ObservedThreatKinematics(
+                            observed.track().targetId(),
+                            observed.track().estimatedXM(),
+                            observed.track().estimatedYM(),
+                            observed.estimatedVelocityXMps(),
+                            observed.estimatedVelocityYMps()))
                     .toList();
-            List<Assignment> assignments = defenseScheduler.schedule(zone, threats, stations);
+            List<Assignment> assignments = defenseScheduler.scheduleObserved(zone, threats, stations);
             for (Assignment assignment : assignments) {
                 MountStation station = Objects.requireNonNull(
                         stationById.get(assignment.stationId()),
                         "defense station mapping");
-                GuidedWeaponBody threat = hostileBodies.stream()
-                        .filter(body -> body.bodyId() == assignment.threatId())
-                        .findFirst()
-                        .orElse(null);
-                if (threat != null) {
-                    launchInterceptor(station.defender(), station.mount(), threat);
-                }
+                launchInterceptor(station.defender(), station.mount(), assignment.threatId());
             }
         }
     }
@@ -379,7 +383,7 @@ public final class LiveTacticalBattleDefenseRuntime {
     private void launchInterceptor(
             CombatantRuntime defender,
             ShipGuidedWeaponEngineeringAdapter.FittedGuidedMount mount,
-            GuidedWeaponBody threat) {
+            long threatId) {
         EngineeringComponent engineering = defender.engineering();
         ShipInstanceRuntimeState instance = engineering.instanceState;
         if (!weaponMountRuntime.ready(instance.weaponMountRuntime(), mount.mountId())) {
@@ -401,7 +405,7 @@ public final class LiveTacticalBattleDefenseRuntime {
         GuidedWeaponBody body = GuidedWeaponBody.launch(
                 nextInterceptorBodyId,
                 defender.spec().entityId(),
-                threat.bodyId(),
+                threatId,
                 mount.ammunition().toRuntimeWeapon(),
                 mount.ammunition().materialId(),
                 mount.ammunition().shape(),
@@ -445,51 +449,12 @@ public final class LiveTacticalBattleDefenseRuntime {
                 GuidedEngagementRole.INTERCEPTOR);
     }
 
-    private List<GuidedWeaponBody> hostileStrikeBodies(CombatantRuntime defender) {
-        return ordnanceRuntime.guidedBodies().stream()
-                .filter(body -> battleState().requireCombatant(body.sourceEntityId()).spec().side()
-                        != defender.spec().side())
-                .toList();
-    }
-
-    private GuidedWeaponBody strikeBody(long bodyId) {
-        return ordnanceRuntime.guidedBodies().stream()
-                .filter(body -> body.bodyId() == bodyId)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private TrackState exactLocalThreatTrack(GuidedWeaponBody threat) {
-        return new TrackState(
-                threat.bodyId(),
-                TrackState.InformationState.FIRE_CONTROL,
-                true,
-                threat.xM(),
-                threat.yM(),
-                new TrackCovariance(
-                        EXACT_LOCAL_POSITION_VARIANCE_M2,
-                        EXACT_LOCAL_BEARING_VARIANCE_RAD2,
-                        EXACT_LOCAL_POSITION_VARIANCE_M2),
-                1d,
-                elapsedSeconds(),
-                1,
-                1);
-    }
-
-    private void transferOrphanToProjectilePool(GuidedWeaponBody body) {
-        ordnanceRuntime.weaponRuntime().acceptExternalProjectile(new ProjectileBody(
-                Math.addExact(1_200_000_000L, body.bodyId()),
-                body.sourceEntityId(),
-                tick(),
-                body.materialId(),
-                body.shape(),
-                body.lengthM(),
-                body.diameterM(),
-                body.currentMassKg(),
-                body.xM(),
-                body.yM(),
-                body.velocityXMps(),
-                body.velocityYMps()));
+    private static boolean actionableTrack(ObservedOrdnanceTrack observed) {
+        if (observed == null || !observed.velocityKnown() || !observed.track().positionKnown()) {
+            return false;
+        }
+        return observed.track().informationState() == TrackState.InformationState.TRACKED
+                || observed.track().informationState() == TrackState.InformationState.FIRE_CONTROL;
     }
 
     private TreeMap<Long, BodyPosition> snapshotStrikePositions() {
@@ -678,7 +643,7 @@ public final class LiveTacticalBattleDefenseRuntime {
      * @param bodyId stable interceptor-body identity
      * @param defenderEntityId launching defender identity
      * @param mountId physical fitted launcher mount
-     * @param targetThreatId physical guided threat body identity
+     * @param targetThreatId observed guided threat hypothesis identity
      * @param xM current x position
      * @param yM current y position
      * @param velocityXMps current x velocity
@@ -703,7 +668,7 @@ public final class LiveTacticalBattleDefenseRuntime {
          * @param bodyId stable interceptor-body identity
          * @param defenderEntityId launching defender identity
          * @param mountId physical fitted launcher mount
-         * @param targetThreatId physical guided threat body identity
+         * @param targetThreatId observed guided threat hypothesis identity
          * @param xM current x position
          * @param yM current y position
          * @param velocityXMps current x velocity
