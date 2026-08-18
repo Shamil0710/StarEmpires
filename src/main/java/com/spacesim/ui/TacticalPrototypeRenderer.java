@@ -122,13 +122,15 @@ public final class TacticalPrototypeRenderer {
             if (!project(layout, shield.xM(), shield.yM(), a)) {
                 continue;
             }
+            float centerX = a.x;
+            float centerY = a.y;
             float radius = Math.max(MIN_SHIELD_RADIUS_PX, screenLength(layout, shield.radiusM()));
             Color base = shield.collapsed() ? SHIELD_COLLAPSED_COLOR : SHIELD_COLOR;
             float alpha = shield.collapsed() ? base.a : (float) (0.25d + 0.75d * shield.reserveFraction());
             shapes.setColor(base.r, base.g, base.b, alpha);
             float startDegrees = (float) Math.toDegrees(shield.centerRad() - shield.halfArcRad());
             float sweepDegrees = (float) Math.toDegrees(shield.halfArcRad() * 2d);
-            shapes.arc(a.x, a.y, radius, startDegrees, sweepDegrees, 48);
+            shapes.arc(centerX, centerY, radius, startDegrees, sweepDegrees, 48);
         }
         shapes.end();
     }
@@ -195,14 +197,16 @@ public final class TacticalPrototypeRenderer {
                     || !project(layout, ship.xM(), ship.yM(), a)) {
                 continue;
             }
+            float centerX = a.x;
+            float centerY = a.y;
             float length = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
             float width = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
             float cos = (float) Math.cos(ship.headingRad());
             float sin = (float) Math.sin(ship.headingRad());
             setColor(TacticalSidePalette.outline(ship.side()));
-            drawTransverseCue(a.x, a.y, cos, sin, length, width, -0.19f);
+            drawTransverseCue(centerX, centerY, cos, sin, length, width, -0.19f);
             if (ship.side() == TacticalSide.BETA) {
-                drawTransverseCue(a.x, a.y, cos, sin, length, width, -0.05f);
+                drawTransverseCue(centerX, centerY, cos, sin, length, width, -0.05f);
             }
         }
         shapes.end();
