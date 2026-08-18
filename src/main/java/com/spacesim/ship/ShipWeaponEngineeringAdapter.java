@@ -124,9 +124,12 @@ public final class ShipWeaponEngineeringAdapter {
             }
             LauncherProfile profile = checkedLaunchers.findByModuleId(capability.moduleId());
             if (profile == null) {
-                // A fitted weapon without an ammunition interface can be a beam emitter rather than
-                // a launcher. Beam derivation is handled by deriveBeamMounts().
-                continue;
+                if (capability.parameters().containsKey("beam_power_w")) {
+                    continue;
+                }
+                throw new IllegalArgumentException(
+                        "Installed weapon module lacks Stage-17.5E launcher/beam definition: "
+                                + capability.moduleId());
             }
             if (profile.family() != Family.KINETIC) {
                 continue;
@@ -206,7 +209,8 @@ public final class ShipWeaponEngineeringAdapter {
             if (module == null) {
                 throw new IllegalArgumentException("Unknown fitted beam module: " + capability.moduleId());
             }
-            double incrementalPowerW = Math.max(0d, module.peakPowerDemandW() - module.continuousPowerDemandW());
+            double incrementalPowerW = module.peakPowerDemandW() - module.continuousPowerDemandW();
+            requirePositiveFinite(incrementalPowerW, capability.moduleId() + ".incrementalBeamPowerW");
             BeamWeapon weapon = new BeamWeapon(
                     "beam." + capability.moduleId(),
                     requirePositiveParameter(parameters, "wavelength_m", capability.moduleId()),
