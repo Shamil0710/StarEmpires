@@ -59,9 +59,9 @@ public final class LiveTacticalBattleControlRuntime {
             new TacticalSurvivalPlanner.Policy(
                     0.15d,
                     0.15d,
-                    0d,
-                    0d,
-                    0d,
+                    EPSILON,
+                    EPSILON,
+                    EPSILON,
                     2d);
 
     private final LiveTacticalBattleRuntimeState battleState;
