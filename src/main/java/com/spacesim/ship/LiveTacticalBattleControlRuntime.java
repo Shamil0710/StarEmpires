@@ -522,14 +522,30 @@ public final class LiveTacticalBattleControlRuntime {
         return new double[]{x / length, y / length};
     }
 
-    /** Latest production policy output for one actor before physical execution. */
+    /**
+     * Latest production policy output for one actor before physical execution.
+     *
+     * @param intent actor-bounded tactical intent
+     * @param survivalDecision survival-policy decision for the current tick
+     * @param fireAuthorized whether survival policy permits the tactical fire request
+     * @param movementAxisX final normalized x maneuver command
+     * @param movementAxisY final normalized y maneuver command
+     */
     public record ActorControlState(
             TacticalIntent intent,
             TacticalSurvivalPlanner.Decision survivalDecision,
             boolean fireAuthorized,
             double movementAxisX,
             double movementAxisY) {
-        /** Validates immutable actor control output. */
+        /**
+         * Validates immutable actor control output.
+         *
+         * @param intent actor-bounded tactical intent
+         * @param survivalDecision survival-policy decision for the current tick
+         * @param fireAuthorized whether survival policy permits the tactical fire request
+         * @param movementAxisX final normalized x maneuver command
+         * @param movementAxisY final normalized y maneuver command
+         */
         public ActorControlState {
             Objects.requireNonNull(intent, "intent");
             Objects.requireNonNull(survivalDecision, "survivalDecision");
@@ -555,7 +571,21 @@ public final class LiveTacticalBattleControlRuntime {
         }
     }
 
-    /** Deterministic per-combatant control/physical projection. */
+    /**
+     * Deterministic per-combatant control/physical projection.
+     *
+     * @param entityId stable combatant identity
+     * @param xM current physical x position
+     * @param yM current physical y position
+     * @param velocityXMps current physical x velocity
+     * @param velocityYMps current physical y velocity
+     * @param reactionMassKg current physical reaction mass
+     * @param visibleTargetIds actor-visible target identities
+     * @param selectedTargetId actor-selected target identity or zero
+     * @param fireRequested tactical fire request
+     * @param fireAuthorized survival-filtered fire authorization
+     * @param survivalAction current survival action
+     */
     public record CombatantControlFingerprint(
             long entityId,
             double xM,
@@ -568,16 +598,40 @@ public final class LiveTacticalBattleControlRuntime {
             boolean fireRequested,
             boolean fireAuthorized,
             SurvivalAction survivalAction) {
-        /** Freezes and validates one combatant fingerprint. */
+        /**
+         * Freezes and validates one combatant fingerprint.
+         *
+         * @param entityId stable combatant identity
+         * @param xM current physical x position
+         * @param yM current physical y position
+         * @param velocityXMps current physical x velocity
+         * @param velocityYMps current physical y velocity
+         * @param reactionMassKg current physical reaction mass
+         * @param visibleTargetIds actor-visible target identities
+         * @param selectedTargetId actor-selected target identity or zero
+         * @param fireRequested tactical fire request
+         * @param fireAuthorized survival-filtered fire authorization
+         * @param survivalAction current survival action
+         */
         public CombatantControlFingerprint {
             visibleTargetIds = List.copyOf(Objects.requireNonNull(visibleTargetIds, "visibleTargetIds"));
             Objects.requireNonNull(survivalAction, "survivalAction");
         }
     }
 
-    /** Equality-friendly whole-battle control fingerprint. */
+    /**
+     * Equality-friendly whole-battle control fingerprint.
+     *
+     * @param tick authoritative shared tactical tick
+     * @param combatants canonical stable-entity control projections
+     */
     public record BattleControlFingerprint(long tick, List<CombatantControlFingerprint> combatants) {
-        /** Freezes and validates the whole-battle fingerprint. */
+        /**
+         * Freezes and validates the whole-battle fingerprint.
+         *
+         * @param tick authoritative shared tactical tick
+         * @param combatants canonical stable-entity control projections
+         */
         public BattleControlFingerprint {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");
@@ -586,9 +640,19 @@ public final class LiveTacticalBattleControlRuntime {
         }
     }
 
-    /** Deterministic per-combatant formation projection. */
+    /**
+     * Deterministic per-combatant formation projection.
+     *
+     * @param entityId stable combatant identity
+     * @param command current actor-local formation command
+     */
     public record CombatantFormationFingerprint(long entityId, Command command) {
-        /** Validates one immutable formation fingerprint. */
+        /**
+         * Validates one immutable formation fingerprint.
+         *
+         * @param entityId stable combatant identity
+         * @param command current actor-local formation command
+         */
         public CombatantFormationFingerprint {
             if (entityId <= 0L) {
                 throw new IllegalArgumentException("entityId must be positive");
@@ -597,9 +661,19 @@ public final class LiveTacticalBattleControlRuntime {
         }
     }
 
-    /** Equality-friendly whole-battle formation fingerprint. */
+    /**
+     * Equality-friendly whole-battle formation fingerprint.
+     *
+     * @param tick authoritative shared tactical tick
+     * @param combatants canonical stable-entity formation projections
+     */
     public record BattleFormationFingerprint(long tick, List<CombatantFormationFingerprint> combatants) {
-        /** Freezes and validates the whole-battle formation fingerprint. */
+        /**
+         * Freezes and validates the whole-battle formation fingerprint.
+         *
+         * @param tick authoritative shared tactical tick
+         * @param combatants canonical stable-entity formation projections
+         */
         public BattleFormationFingerprint {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");
