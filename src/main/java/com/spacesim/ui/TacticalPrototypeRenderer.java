@@ -79,7 +79,7 @@ public final class TacticalPrototypeRenderer {
         drawTrailsAndBeams(layout, snapshot);
         drawShields(layout, snapshot);
         drawShipsAndBodies(layout, snapshot);
-        drawSideCues(layout, snapshot);
+        drawShipCues(layout, snapshot);
         drawImpactsAndDamage(layout, snapshot);
     }
 
@@ -153,8 +153,10 @@ public final class TacticalPrototypeRenderer {
     }
 
     private void drawShip(WorldMapLayout layout, ShipGlyph ship, float x, float y) {
-        float length = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
-        float width = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
+        float baseLength = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
+        float baseWidth = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
+        float length = baseLength * roleLengthScale(ship.role());
+        float width = baseWidth * roleWidthScale(ship.role());
         float cos = (float) Math.cos(ship.headingRad());
         float sin = (float) Math.sin(ship.headingRad());
         float rearX = x - cos * length * 0.45f;
@@ -180,36 +182,128 @@ public final class TacticalPrototypeRenderer {
         } else {
             setColor(TacticalSidePalette.outline(ship.side()));
         }
-        drawTriangleHull(x, y, cos, sin, length, width);
+        drawRoleHull(x, y, cos, sin, length, width, ship.role());
 
         if (ship.wreck()) {
             shapes.setColor(WRECK_FILL_COLOR);
         } else {
             setColor(TacticalSidePalette.fill(ship.side()));
         }
-        drawTriangleHull(x, y, cos, sin, length * INNER_SHIP_SCALE, width * INNER_SHIP_SCALE);
+        drawRoleHull(
+                x,
+                y,
+                cos,
+                sin,
+                length * INNER_SHIP_SCALE,
+                width * INNER_SHIP_SCALE,
+                ship.role());
     }
 
-    private void drawSideCues(WorldMapLayout layout, TacticalPrototypeVisualSnapshot snapshot) {
+    private void drawRoleHull(
+            float x,
+            float y,
+            float cos,
+            float sin,
+            float length,
+            float width,
+            ShipVisualRole role) {
+        switch (role) {
+            case KINETIC -> drawDiamondHull(x, y, cos, sin, length, width * 0.72f);
+            case MISSILE -> {
+                drawTriangleHull(x, y, cos, sin, length * 0.92f, width * 0.78f);
+                drawMissilePods(x, y, cos, sin, length, width);
+            }
+            case BEAM -> {
+                drawDiamondHull(x, y, cos, sin, length, width * 0.62f);
+                drawBeamProngs(x, y, cos, sin, length, width);
+            }
+            case DEFENSIVE_EW -> {
+                drawDiamondHull(x, y, cos, sin, length * 0.78f, width * 0.92f);
+                drawDefensiveNodes(x, y, cos, sin, width);
+            }
+            case BALANCED, UNCLASSIFIED -> drawTriangleHull(x, y, cos, sin, length, width);
+        }
+    }
+
+    private void drawShipCues(WorldMapLayout layout, TacticalPrototypeVisualSnapshot snapshot) {
         shapes.begin(ShapeRenderer.ShapeType.Line);
         for (ShipGlyph ship : snapshot.ships()) {
-            if (ship.wreck() || ship.side() == TacticalSide.NEUTRAL
-                    || !project(layout, ship.xM(), ship.yM(), a)) {
+            if (ship.wreck() || !project(layout, ship.xM(), ship.yM(), a)) {
                 continue;
             }
             float centerX = a.x;
             float centerY = a.y;
-            float length = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
-            float width = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
+            float baseLength = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
+            float baseWidth = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
+            float length = baseLength * roleLengthScale(ship.role());
+            float width = baseWidth * roleWidthScale(ship.role());
             float cos = (float) Math.cos(ship.headingRad());
             float sin = (float) Math.sin(ship.headingRad());
             setColor(TacticalSidePalette.outline(ship.side()));
-            drawTransverseCue(centerX, centerY, cos, sin, length, width, -0.19f);
-            if (ship.side() == TacticalSide.BETA) {
-                drawTransverseCue(centerX, centerY, cos, sin, length, width, -0.05f);
+            if (ship.side() != TacticalSide.NEUTRAL) {
+                drawTransverseCue(centerX, centerY, cos, sin, length, width, -0.19f);
+                if (ship.side() == TacticalSide.BETA) {
+                    drawTransverseCue(centerX, centerY, cos, sin, length, width, -0.05f);
+                }
             }
+            drawRoleCue(centerX, centerY, cos, sin, length, width, ship.role());
         }
         shapes.end();
+    }
+
+    private void drawRoleCue(
+            float x,
+            float y,
+            float cos,
+            float sin,
+            float length,
+            float width,
+            ShipVisualRole role) {
+        float sideX = -sin;
+        float sideY = cos;
+        switch (role) {
+            case KINETIC -> shapes.line(
+                    x + cos * length * 0.12f,
+                    y + sin * length * 0.12f,
+                    x + cos * length * 0.70f,
+                    y + sin * length * 0.70f);
+            case MISSILE -> {
+                float alongX = x - cos * length * 0.02f;
+                float alongY = y - sin * length * 0.02f;
+                shapes.circle(alongX + sideX * width * 0.54f, alongY + sideY * width * 0.54f,
+                        Math.max(1.8f, width * 0.12f), 10);
+                shapes.circle(alongX - sideX * width * 0.54f, alongY - sideY * width * 0.54f,
+                        Math.max(1.8f, width * 0.12f), 10);
+            }
+            case BEAM -> {
+                float startForward = length * 0.12f;
+                float endForward = length * 0.68f;
+                float offset = width * 0.26f;
+                shapes.line(
+                        x + cos * startForward + sideX * offset,
+                        y + sin * startForward + sideY * offset,
+                        x + cos * endForward + sideX * offset,
+                        y + sin * endForward + sideY * offset);
+                shapes.line(
+                        x + cos * startForward - sideX * offset,
+                        y + sin * startForward - sideY * offset,
+                        x + cos * endForward - sideX * offset,
+                        y + sin * endForward - sideY * offset);
+            }
+            case DEFENSIVE_EW -> {
+                float offset = width * 0.58f;
+                float radius = Math.max(2f, width * 0.13f);
+                shapes.circle(x + sideX * offset, y + sideY * offset, radius, 12);
+                shapes.circle(x - sideX * offset, y - sideY * offset, radius, 12);
+            }
+            case BALANCED -> {
+                float radius = Math.max(1.6f, width * 0.09f);
+                shapes.circle(x, y, radius, 10);
+            }
+            case UNCLASSIFIED -> {
+                // No role cue: legacy callers retain the generic silhouette without inferred semantics.
+            }
+        }
     }
 
     private void drawTransverseCue(
@@ -235,6 +329,95 @@ public final class TacticalPrototypeRenderer {
         float sideX = -sin * width * 0.5f;
         float sideY = cos * width * 0.5f;
         shapes.triangle(noseX, noseY, rearX + sideX, rearY + sideY, rearX - sideX, rearY - sideY);
+    }
+
+    private void drawDiamondHull(float x, float y, float cos, float sin, float length, float width) {
+        float noseX = x + cos * length * 0.56f;
+        float noseY = y + sin * length * 0.56f;
+        float rearX = x - cos * length * 0.44f;
+        float rearY = y - sin * length * 0.44f;
+        float sideX = -sin * width * 0.5f;
+        float sideY = cos * width * 0.5f;
+        shapes.triangle(noseX, noseY, x + sideX, y + sideY, x - sideX, y - sideY);
+        shapes.triangle(rearX, rearY, x - sideX, y - sideY, x + sideX, y + sideY);
+    }
+
+    private void drawMissilePods(float x, float y, float cos, float sin, float length, float width) {
+        float sideX = -sin;
+        float sideY = cos;
+        float podCenterX = x - cos * length * 0.03f;
+        float podCenterY = y - sin * length * 0.03f;
+        float podLength = length * 0.42f;
+        float podWidth = Math.max(2.4f, width * 0.20f);
+        float offset = width * 0.48f;
+        drawOrientedBox(
+                podCenterX + sideX * offset,
+                podCenterY + sideY * offset,
+                podLength,
+                podWidth,
+                (float) Math.toDegrees(Math.atan2(sin, cos)));
+        drawOrientedBox(
+                podCenterX - sideX * offset,
+                podCenterY - sideY * offset,
+                podLength,
+                podWidth,
+                (float) Math.toDegrees(Math.atan2(sin, cos)));
+    }
+
+    private void drawBeamProngs(float x, float y, float cos, float sin, float length, float width) {
+        float sideX = -sin;
+        float sideY = cos;
+        float prongLength = length * 0.46f;
+        float prongWidth = Math.max(1.8f, width * 0.12f);
+        float forward = length * 0.32f;
+        float offset = width * 0.26f;
+        float centerX = x + cos * forward;
+        float centerY = y + sin * forward;
+        float rotation = (float) Math.toDegrees(Math.atan2(sin, cos));
+        drawOrientedBox(centerX + sideX * offset, centerY + sideY * offset, prongLength, prongWidth, rotation);
+        drawOrientedBox(centerX - sideX * offset, centerY - sideY * offset, prongLength, prongWidth, rotation);
+    }
+
+    private void drawDefensiveNodes(float x, float y, float cos, float sin, float width) {
+        float sideX = -sin;
+        float sideY = cos;
+        float offset = width * 0.56f;
+        float radius = Math.max(2.4f, width * 0.16f);
+        shapes.circle(x + sideX * offset, y + sideY * offset, radius, 14);
+        shapes.circle(x - sideX * offset, y - sideY * offset, radius, 14);
+    }
+
+    private void drawOrientedBox(float centerX, float centerY, float length, float width, float rotationDeg) {
+        shapes.rect(
+                centerX - length * 0.5f,
+                centerY - width * 0.5f,
+                length * 0.5f,
+                width * 0.5f,
+                length,
+                width,
+                1f,
+                1f,
+                rotationDeg);
+    }
+
+    private static float roleLengthScale(ShipVisualRole role) {
+        return switch (role) {
+            case KINETIC -> 1.18f;
+            case MISSILE -> 0.96f;
+            case BEAM -> 1.22f;
+            case DEFENSIVE_EW -> 0.84f;
+            case BALANCED, UNCLASSIFIED -> 1f;
+        };
+    }
+
+    private static float roleWidthScale(ShipVisualRole role) {
+        return switch (role) {
+            case KINETIC -> 0.72f;
+            case MISSILE -> 1.22f;
+            case BEAM -> 0.74f;
+            case DEFENSIVE_EW -> 1.34f;
+            case BALANCED, UNCLASSIFIED -> 1f;
+        };
     }
 
     private void drawBody(WorldMapLayout layout, BodyGlyph body, float x, float y) {
