@@ -1,30 +1,12 @@
 package com.spacesim.ship;
 
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
-import com.spacesim.ship.LiveTacticalInitialOrdnanceService.FeedLoad;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LiveTacticalSaturationProfilingAcceptanceTest {
-    private static final String STRIKE_ID = "ammo.test_anti_ship_missile_2t_v1";
-    private static final String INTERCEPTOR_ID = "ammo.test_interceptor_750kg_v1";
-    private static final String DECOY_ID = "ammo.test_radar_repeater_decoy_300kg_v1";
-
-    private static final List<Long> STRIKE_DECOY_SPECIALISTS = List.of(
-            191_501L,
-            191_509L,
-            191_601L,
-            191_610L);
-    private static final List<Long> INTERCEPTOR_SPECIALISTS = List.of(
-            191_506L,
-            191_514L,
-            191_605L,
-            191_613L);
-
     @Test
     void denseThirtyTwoShipOrdnanceUsesAllPhysicalBodyClassesAndFiniteStores() {
         Fixture fixture = fixture();
@@ -93,28 +75,7 @@ class LiveTacticalSaturationProfilingAcceptanceTest {
     }
 
     private static Fixture fixture() {
-        LiveTacticalBattleRuntimeState battle =
-                new LiveTacticalBattleRuntimeState(LiveTacticalBattleScenario.mixed16v16());
-        LiveTacticalInitialOrdnanceService initial = new LiveTacticalInitialOrdnanceService();
-        for (long entityId : STRIKE_DECOY_SPECIALISTS) {
-            initial.apply(
-                    battle.requireCombatant(entityId),
-                    List.of(
-                            new FeedLoad("weapon_primary", STRIKE_ID, 8L),
-                            new FeedLoad("weapon_secondary", DECOY_ID, 8L)));
-        }
-        for (long entityId : INTERCEPTOR_SPECIALISTS) {
-            initial.apply(
-                    battle.requireCombatant(entityId),
-                    List.of(
-                            new FeedLoad("weapon_primary", INTERCEPTOR_ID, 8L),
-                            new FeedLoad("weapon_secondary", INTERCEPTOR_ID, 8L)));
-        }
-
-        LiveTacticalBattleOrdnanceRuntime ordnance = new LiveTacticalBattleOrdnanceRuntime(
-                new LiveTacticalBattleWeaponRuntime(
-                        new LiveTacticalBattleControlRuntime(battle)));
-        return new Fixture(new LiveTacticalBattleDeceptionRuntime(ordnance));
+        return new Fixture(Stage19ScaledLiveTacticalFactory.createSaturation32());
     }
 
     private static long totalGuidedRounds(LiveTacticalBattleDeceptionRuntime runtime) {

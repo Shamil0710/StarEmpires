@@ -23,9 +23,16 @@ public final class TacticalSurvivalPlanner {
         /** Cease pursuit/engagement movement because a safe actionable solution is unavailable. */ DISENGAGE
     }
 
+    /** Mission-level directive supplied by authored higher-level tactical objectives. */
+    public enum MissionDirective {
+        /** Use ordinary readiness and pursuit policy. */ NORMAL,
+        /** Leave the engagement using the supplied actor-known safe point when physically possible. */ WITHDRAW
+    }
+
     /** Stable decision reason for tests, telemetry and future UI explanation. */
     public enum DecisionReason {
         /** Own physical readiness remains above policy thresholds. */ READY,
+        /** Higher-level authored mission objective requires withdrawal from the engagement. */ MISSION_WITHDRAWAL,
         /** Local structural integrity crossed the retreat threshold. */ STRUCTURAL_DAMAGE,
         /** Local subsystem integrity crossed the retreat threshold. */ SUBSYSTEM_DAMAGE,
         /** Every operational weapon is finite-ammunition dependent and no physical rounds remain. */ AMMUNITION_DEPLETED,
@@ -159,8 +166,8 @@ public final class TacticalSurvivalPlanner {
          * Validates explicit known/unknown safe-point geometry.
          *
          * @param known whether the point is known to the actor
-         * @param xM x coordinate or canonical zero when unknown
-         * @param yM y coordinate or canonical zero when unknown
+         * @param xM x coordinate or canonical zero
+         * @param yM y coordinate or canonical zero
          */
         public SafePoint {
             requireFinite(xM, "xM");
@@ -199,7 +206,7 @@ public final class TacticalSurvivalPlanner {
          * @param action selected survival action
          * @param reason stable decision reason
          * @param targetSelected whether an actor-visible hostile target remains selected
-         * @param targetId selected target ID or canonical zero
+         * @param targetId target ID or canonical zero
          * @param movementAxisX normalized horizontal maneuver intent
          * @param movementAxisY normalized vertical maneuver intent
          */
@@ -235,7 +242,10 @@ public final class TacticalSurvivalPlanner {
     }
 
     /**
-     * Resolves retreat first, then optional pursuit from actor-visible information.
+     * Resolves readiness retreat first, then optional pursuit from actor-visible information.
+     *
+     * <p>This compatibility overload supplies {@link MissionDirective#NORMAL}; existing callers retain
+     * their previous behavior unless an authored battle objective explicitly selects withdrawal.</p>
      *
      * @param readiness own authoritative physical readiness
      * @param policy behavioral survival thresholds
@@ -260,12 +270,72 @@ public final class TacticalSurvivalPlanner {
             double nowSeconds,
             double tacticalReferenceRangeM,
             double freshnessReferenceSeconds) {
+        return decide(
+                readiness,
+                policy,
+                contacts,
+                actorXM,
+                actorYM,
+                safePoint,
+                MissionDirective.NORMAL,
+                pursueWhetherSafe,
+                nowSeconds,
+                tacticalReferenceRangeM,
+                freshnessReferenceSeconds);
+    }
+
+    /**
+     * Resolves an authored mission directive, then readiness retreat, then optional pursuit.
+     *
+     * <p>{@link MissionDirective#WITHDRAW} is an intent override, not a readiness penalty. A healthy
+     * ship therefore retreats for the stable {@link DecisionReason#MISSION_WITHDRAWAL} reason while
+     * all movement remains bounded by its actual local reaction mass, delta-v and acceleration.</p>
+     *
+     * @param readiness own authoritative physical readiness
+     * @param policy behavioral survival thresholds
+     * @param contacts actor-visible contacts only
+     * @param actorXM own known x position
+     * @param actorYM own known y position
+     * @param safePoint optional actor-known retreat point
+     * @param missionDirective authored higher-level mission directive
+     * @param pursueWhetherSafe whether higher-level mission intent requests pursuit when not withdrawing
+     * @param nowSeconds authoritative current time
+     * @param tacticalReferenceRangeM Stage-19A range normalization scale
+     * @param freshnessReferenceSeconds Stage-19A freshness normalization scale
+     * @return deterministic survival decision
+     */
+    public Decision decide(
+            OwnReadiness readiness,
+            Policy policy,
+            List<ObservedContact> contacts,
+            double actorXM,
+            double actorYM,
+            SafePoint safePoint,
+            MissionDirective missionDirective,
+            boolean pursueWhetherSafe,
+            double nowSeconds,
+            double tacticalReferenceRangeM,
+            double freshnessReferenceSeconds) {
         OwnReadiness checkedReadiness = Objects.requireNonNull(readiness, "readiness");
         Policy checkedPolicy = Objects.requireNonNull(policy, "policy");
         Objects.requireNonNull(contacts, "contacts");
         SafePoint checkedSafePoint = Objects.requireNonNull(safePoint, "safePoint");
+        MissionDirective checkedDirective = Objects.requireNonNull(missionDirective, "missionDirective");
         requireFinite(actorXM, "actorXM");
         requireFinite(actorYM, "actorYM");
+
+        if (checkedDirective == MissionDirective.WITHDRAW) {
+            return retreat(
+                    checkedReadiness,
+                    contacts,
+                    actorXM,
+                    actorYM,
+                    checkedSafePoint,
+                    DecisionReason.MISSION_WITHDRAWAL,
+                    nowSeconds,
+                    tacticalReferenceRangeM,
+                    freshnessReferenceSeconds);
+        }
 
         DecisionReason retreatReason = retreatReason(checkedReadiness, checkedPolicy);
         if (retreatReason != DecisionReason.READY) {
