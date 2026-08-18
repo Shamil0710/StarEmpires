@@ -50,6 +50,8 @@ public record SensorDefinition(
         double eccmPowerDemandW,
         double eccmWasteHeatW) {
 
+    private static final double ENERGY_BALANCE_ROUNDOFF_ULPS = 8d;
+
     /** Sensor measurement mode. */
     public enum Mode {
         /** Passive thermal-band observation. */ PASSIVE_THERMAL,
@@ -115,7 +117,7 @@ public record SensorDefinition(
             if (activeTransmitPowerW > activeModePowerDemandW) {
                 throw new IllegalArgumentException("radiated transmitter power cannot exceed active-mode electrical demand");
             }
-            if (activeTransmitPowerW + activeModeWasteHeatW > activeModePowerDemandW) {
+            if (exceedsEnergyBudget(activeTransmitPowerW + activeModeWasteHeatW, activeModePowerDemandW)) {
                 throw new IllegalArgumentException("active-mode radiated power plus waste heat cannot exceed electrical demand");
             }
         } else if (activeTransmitPowerW != 0d || activeModePowerDemandW != 0d || activeModeWasteHeatW != 0d) {
@@ -137,6 +139,15 @@ public record SensorDefinition(
     /** @return emitted active-radar power when enabled */
     public double emittedPowerW() {
         return mode == Mode.ACTIVE_RADAR ? activeTransmitPowerW : 0d;
+    }
+
+    private static boolean exceedsEnergyBudget(double accountedPowerW, double electricalDemandW) {
+        if (!Double.isFinite(accountedPowerW)) {
+            return true;
+        }
+        double scale = Math.max(Math.abs(accountedPowerW), Math.abs(electricalDemandW));
+        double roundoffAllowance = Math.ulp(scale) * ENERGY_BALANCE_ROUNDOFF_ULPS;
+        return accountedPowerW - electricalDemandW > roundoffAllowance;
     }
 
     private static void requirePositive(double value, String label) {
