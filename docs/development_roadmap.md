@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-17 / Stage 17.5I deterministic aggregate acceptance COMPLETE; Stage 17.5 COMPLETE; Stage 18 NEXT.**  
+> **Последняя синхронизация: 2026-08-18 / Stage 19 COMPLETE pending exact-head merge gate; Stage 20 NEXT.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -31,7 +31,9 @@
 - scripted asset replacement;
 - мгновенное ordinary travel/construction/refit;
 - class-name performance bonuses;
-- UI, напрямую мутирующий authoritative simulation state.
+- UI, напрямую мутирующий authoritative simulation state;
+- отдельная simplified large-battle physics только потому, что в бою много кораблей;
+- viewer-owned movement/targeting/combat authority.
 
 ## 2. Milestones
 
@@ -40,8 +42,8 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 18 NEXT** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | PLANNED |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 20 NEXT** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
@@ -52,7 +54,7 @@ branch from exact green main
 → clean verify on exact PR head
 → inspect exact diff/head SHA
 → merge that exact SHA only
-→ post-merge CI on exact new main SHA
+→ verify resulting main / available post-merge CI
 ```
 
 ## 3. Completed foundation
@@ -118,15 +120,7 @@ physical economy / territory / security state
 
 ### 17F — faction policy / strategic economy
 
-**COMPLETE — 17F.1–17F.7.**
-
-- doctrine;
-- fiscal policy;
-- treasury/station/construction trade-offs;
-- stock/production policy;
-- resilience policy;
-- bounded persistent policy review / anti-oscillation;
-- shared player/AI `FactionPolicyCommand` path.
+**COMPLETE — 17F.1–17F.7.** Doctrine, fiscal policy, treasury/station/construction trade-offs, stock/production policy, resilience policy, bounded persistent review/anti-oscillation and shared player/AI `FactionPolicyCommand` path.
 
 Hard rule:
 
@@ -139,55 +133,19 @@ Policy consequences materialize only through ordinary market/logistics/productio
 
 ### 17G — faction management / strategic projection
 
-**COMPLETE — PR #133.**
+**COMPLETE.** Immutable management/global-map projections and command facade delegate to authoritative treasury, policy, diplomacy and territorial law.
 
 Canonical closeout: `docs/stage17g_faction_management_completion_record.md`.
 
-Implemented immutable management/global-map projections and a command facade delegating to existing authoritative treasury, policy, diplomacy and territorial law.
-
 ### 17H — persistence / migration / final transition gate
 
-**COMPLETE — PR #137 implementation.**
+**COMPLETE.** Existing fleet/station identities survive faction founding, capitalization, policy, diplomacy, territorial state and binary persistence without free resources or ID replacement.
 
-Final acceptance now covers the required chain with a real completed Stage-16 station and real binary persistence boundary:
+Canonical closeout: `docs/stage17h_persistence_transition_completion_record.md`.
 
-```text
-independent player with Stage-16 fleet + completed station
-→ found world-defined faction
-→ affiliate the same FleetId + station EntityId
-→ conserved personal→treasury capitalization
-→ shared fiscal-policy authoring
-→ ordinary station→treasury fiscal transfer
-→ treaty / embargo through shared diplomacy
-→ access changes through ordinary legal resolver
-→ claim begins with zero stabilization and no instant sovereignty
-→ PlayableWorldStateCodec encode/decode/re-encode
-→ restore PlayerRuntime
-→ diplomacy/access/policy/territory/assets persist
-→ no money/cargo/ID duplication or reset
-```
+## 5. Stage 17.5 — Combat Depth / Ship Fitting Foundation
 
-17H additionally locks a real pre-Stage17 migration fixture:
-
-```text
-Playable schema v5
-+ World schema v8 / world file format v2
-→ current Playable v5 + World v9
-```
-
-Migration preserves local physical `GameState`, money, FleetIds, construction/fleet allocator watermarks and independent-player state while adding only neutral/zero Stage-17 defaults. No player faction, treaty, territory, treasury or resource is invented.
-
-Persistence inventory is now synchronized in `docs/persistence_model.md`:
-
-- `GameState` schema v4 with fitted Stage-17.5 engineering state;
-- `WorldState` schema v9 / file format v8;
-- `PlayableWorldState` schema v5 / file format v1.
-
-`PlayableWorldState` remains v5 intentionally because Stage 17.5C adds no new serialized PlayerState field; fitted engineering belongs to local `GameState`, while Stage-17 institutional state remains inside `WorldState`.
-
-## 5. Stage 17 → 17.5 transition gate
-
-**COMPLETE. Stage 17.5A–I implementation and aggregate exit acceptance are green.**
+**COMPLETE — 17.5A–17.5I.**
 
 Accepted research/design prerequisite:
 
@@ -198,96 +156,32 @@ Accepted research/design prerequisite:
 - `docs/flight_dynamics_and_combat_depth_roadmap.md`;
 - `docs/stage17_5_combat_depth_implementation_plan.md`.
 
-Completed production slices:
+Completed slices:
 
-> **Stage 17.5A — COMPLETE: versioned material/hull/module/protection/slot/hardpoint/compartment content schema, strict loader/validation, machine-readable demonstrator fit and stable semantic fingerprint.**
+- **17.5A — COMPLETE:** production material/hull/module/protection/slot/hardpoint/compartment content schema, loader/validation and semantic fingerprint;
+- **17.5B — COMPLETE:** central deterministic derived-ship calculator, fitting validator, physical-load movement bridge and ID-preserving compatibility seam;
+- **17.5C — COMPLETE:** propulsion/reaction mass/power/thermal/FTL runtime, persistent engineering state and single-FSM fitted jump integration;
+- **17.5D — COMPLETE:** signatures/sensors/tracks/datalink/EW, fitted sensor adapter and common player/AI information model;
+- **17.5E — COMPLETE:** kinetic/beam/guided/PD/ammunition, individual physical bodies, deterministic fire control, physical beam geometry/dwell and layered defense;
+- **17.5F — COMPLETE:** finite shields, bounded no-extrapolation material response, compartments/subsystem damage and damage-aware capabilities;
+- **17.5G — COMPLETE:** shipyard/refit/repair/maintenance capability and physical input/work economy seam;
+- **17.5H — COMPLETE:** capability APIs/UI/live composition, common engineering grants and persistence continuity;
+- **17.5I — COMPLETE:** deterministic multi-fleet acceptance, five doctrine fits, saturation matrix, persistence and tactical visual acceptance.
 
-Canonical 17.5A closeout: `docs/stage17_5a_production_ship_content_schema.md`.
+Canonical records:
 
-> **Stage 17.5B — COMPLETE: immutable runtime engineering fit/load state, deterministic fitting validator, central common-budget derived-ship calculator, physical-mass `FlightDynamics` bridge and ID-preserving legacy-archetype compatibility seam.**
-
-Canonical 17.5B closeout: `docs/stage17_5b_derived_ship_calculator_and_fitting_validator.md`.
-
-> **Stage 17.5C — COMPLETE: persistent reaction mass, thrust/jet-power closure, shared power/storage/load shedding, local/coolant/ship/radiator thermal runtime, fitted mass/energy/power/heat/time FTL and composition with the single neighbor-only FleetJumpService FSM.**
-
-Canonical 17.5C closeout: `docs/stage17_5c_propulsion_power_thermal_ftl.md`.
-
-> **Stage 17.5D — COMPLETE: channelized physical signatures, physical sensor measurements without hard range walls, covariance-bearing tracks, geometry/freshness/datalink fusion, active-radar emission, explicit ECM/ECCM/deception mechanics and one shared player/AI information model.**
-
-Canonical 17.5D closeout: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`.
-
-> **Stage 17.5E — COMPLETE: individual physical kinetic/guided bodies, deterministic fire-control without hit-chance or hard-range abstractions, central physical ammunition depletion, beam spot/dwell physics, guided propulsion/seeker/datalink state, formation/resource-limited layered defense and dense deterministic projectile storage independent from rendering/Ashley.**
-
-Canonical 17.5E closeout: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.  
-Projectile representation invariant: `docs/stage17_5e_projectile_representation_invariant.md`.
-
-> **Stage 17.5F — COMPLETE: finite geometry/reserve/power/heat shield runtime, bounded no-extrapolation heavy-impact material response with `STOPPED` / `RICOCHET` / `PERFORATED`, explicit compartment/mount damage topology and damage-aware common ship/sensor/weapon capabilities.**
-
-Canonical 17.5F closeout: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.
-
-> **Stage 17.5G — COMPLETE: data-driven shipyard capability/work requirements, physical input/work settlement, identity-preserving refit/repair, scheduled maintenance and removed-module condition continuity through the common engineering/economy seam.**
-
-Canonical 17.5G closeout: `docs/stage17_5g_shipyard_refit_repair_maintenance.md`.
-
-> **Stage 17.5H — COMPLETE: damage-aware live engineering composition, common power/heat admission for incremental capabilities, ownership-neutral read-only capability/UI projections, refit/maintenance continuity and deterministic persistence of local damage/shields/weapon continuity/system-local sensor knowledge.**
-
-Canonical 17.5H closeout: `docs/stage17_5h_capability_ui_persistence.md`.
-
-> **Stage 17.5I — COMPLETE: production-valid/content-provisional combat content pack, five physical fleet doctrines, deterministic pair/variant and multi-body saturation matrices, shared interval engineering contention, finite-magazine destruction, mid/post-combat persistence and presentation-only interactive tactical prototype acceptance.**
-
-Canonical 17.5I records:
-
+- `docs/stage17_5a_production_ship_content_schema.md`;
+- `docs/stage17_5b_derived_ship_calculator_and_fitting_validator.md`;
+- `docs/stage17_5c_propulsion_power_thermal_ftl.md`;
+- `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`;
+- `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`;
+- `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`;
+- `docs/stage17_5g_shipyard_refit_repair_maintenance.md`;
+- `docs/stage17_5h_capability_ui_persistence.md`;
 - `docs/stage17_5i_implementation_record.md`;
 - `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
 
-Persistence contract after Stage 17.5:
-
-- core `GameStateCodec` remains schema v4;
-- production `ContentBoundSaveCodec` envelope v2 carries the Stage-H/I continuity extension;
-- derived capability state is recomputed, not serialized as a second authority;
-- legacy v1/raw saves migrate only to neutral missing-H state and cannot invent repair, shield charge, ammunition identity, cooldown reset, energy or sensor knowledge;
-- mid-combat and fully destroyed states round-trip without free repair/recharge/rearm/respawn.
-
-## 6. Stage 17.5 — Combat Depth / Ship Fitting Foundation
-
-**COMPLETE — 17.5A–17.5I.**
-
-Implementation sequence:
-
-- **17.5A — COMPLETE:** production `MaterialDefinition` / `HullDefinition` / `ModuleDefinition` / protection/slots/hardpoints/compartments + versioned loader/fingerprint;
-- **17.5B — COMPLETE:** central deterministic derived-ship calculator + fitting validator + physical-load movement bridge + ID-preserving compatibility seam;
-- **17.5C — COMPLETE:** propulsion/reaction mass/power/thermal/FTL runtime + persistent engineering state + single-FSM fitted jump integration;
-- **17.5D — COMPLETE:** signatures/sensors/tracks/datalink/EW + fitted sensor adapter + common player/AI information model;
-- **17.5E — COMPLETE:** kinetic/beam/guided/PD/ammunition + individual physical bodies + linked weapon/ammunition content + deterministic pooled projectile representation;
-- **17.5F — COMPLETE:** finite shields + bounded armor/material response + compartments/subsystem damage + damage-aware derived/sensor/weapon capabilities;
-- **17.5G — COMPLETE:** shipyard/refit/repair/maintenance capability and physical input/work economy seam with identity/condition continuity;
-- **17.5H — COMPLETE:** capability APIs/UI/full live composition and persistence surfaces, including damage/shield composition, common engineering grants, weapon power/heat commit, binary sensor-knowledge persistence, weapon loadout/launcher-cycle persistence and Stage-17.5G refit/maintenance continuity;
-- **17.5I — COMPLETE:** deterministic aggregate acceptance + mandatory Combat Test Content Pack + Tactical Prototype Visual Set + interactive/post-combat exit gate.
-
-Stage-17.5H closed the former pristine-damage live seam. Current compartment/module damage, shield state and refit/maintenance continuity are consumed at live engineering/API/persistence boundaries; materialization/save/load/refit cannot silently restore a pristine ship.
-
-Stage-17.5I additionally closed the same-interval incremental engineering risk through one shared `IntervalBudget`: overlapping sensor/beam/shield operations cannot reuse the same reactor margin, and only a physical `ENERGY_STORAGE` module may satisfy residual demand within discharge limits.
-
-### Stage 17.5 exit content gate — PASSED
-
-The aggregate acceptance now provides:
-
-- six representative production-schema hull families including civilian freighter/tanker;
-- five materially different doctrine fits A–E without role/class multipliers;
-- all eleven required doctrine-pair scenarios;
-- equal-count, approximate equal-mass, spacing, ammunition, pre-damage, thermal, information and protected-logistics variants;
-- physical multi-body missile saturation with finite defense resources;
-- real hull signature geometry wired into active-radar RCS;
-- finite-magazine `ProjectileBody → shield → material → compartment/mount damage → capability loss → destruction` chain;
-- deterministic mid-combat and post-destruction production persistence;
-- temporary top-down kinetic/missile/interceptor/beam/EW/shield/impact/damage/wreck/debris presentation;
-- dedicated presentation-only desktop validation mode `--tactical-acceptance`.
-
-Stage-17.5I test assets remain **production-valid but content-provisional**. Stage 22 must re-author/rebalance/replace them or explicitly promote individual definitions after review.
-
-Equal-cost fleet comparison remains deliberately deferred until Stage 18 supplies a comparable industrial/resource/facility cost basis. No fake Stage-17.5 scalar price was introduced.
-
-Canonical detailed acceptance contract: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
+Stage-17.5 test assets remain **production-valid but content-provisional**. Stage 22 must re-author/rebalance/replace them or explicitly promote individual definitions after review.
 
 Hard invariants retained:
 
@@ -296,29 +190,13 @@ Hard invariants retained:
 - no free ammunition/reaction mass;
 - no final global-HP-only survivability model;
 - every module uses shared mass/volume/power/heat/economy budgets;
-- authoritative fit/consumable/damage state remains persistent and deterministic;
 - persistent ↔ tactical materialization cannot reset state;
 - Combat Test Content Pack cannot use hidden test-only combat stats;
-- Tactical Prototype Visual Set cannot become authoritative combat state;
-- Stage-17.5 test content cannot silently become final Stage-22 canon.
+- tactical presentation cannot become authoritative combat state.
 
-Detailed plan: `docs/stage17_5_combat_depth_implementation_plan.md`.  
-17.5A implementation record: `docs/stage17_5a_production_ship_content_schema.md`.  
-17.5B implementation record: `docs/stage17_5b_derived_ship_calculator_and_fitting_validator.md`.  
-17.5C implementation record: `docs/stage17_5c_propulsion_power_thermal_ftl.md`.  
-17.5D implementation record: `docs/stage17_5d_signatures_sensors_tracks_datalink_ew.md`.  
-17.5E implementation record: `docs/stage17_5e_weapons_ammunition_guidance_layered_defense.md`.  
-17.5F implementation record: `docs/stage17_5f_shields_armor_compartments_subsystem_damage.md`.  
-17.5G implementation record: `docs/stage17_5g_shipyard_refit_repair_maintenance.md`.  
-17.5H implementation record: `docs/stage17_5h_capability_ui_persistence.md`.  
-17.5I implementation record: `docs/stage17_5i_implementation_record.md`.  
-17.5I combat content / visual acceptance: `docs/stage17_5i_combat_test_content_visual_acceptance.md`.
+## 6. Stage 18 — Resources / Industry / Infrastructure Foundation
 
-## 7. Stage 18 — Resources / Industry / Infrastructure Foundation
-
-**NEXT — Stage 17.5 aggregate exit gate COMPLETE.**
-
-Stage 18 defines **what physically/economically exists** before world generation decides **where it exists**.
+**COMPLETE.** Stage 18 defines **what physically/economically exists** before world generation decides **where it exists**.
 
 Canonical material chain:
 
@@ -335,9 +213,22 @@ resource occurrence
 → bounded salvage / recycling
 ```
 
-Baseline intentionally uses realistic but aggregated resource families. A separate commodity/process exists only when it creates a meaningful source, extraction/refining requirement, storage/logistics constraint, strategic bottleneck or substitution/recycling choice.
+Implemented production foundation includes:
 
-Baseline raw families:
+- versioned resource ontology;
+- extraction compatibility and finite feedstocks;
+- refining/material transformation;
+- heavy/electrical/precision component layer;
+- manufacturing recipes for modules/ammunition;
+- facility capability requirements;
+- station infrastructure/storage/logistics;
+- shipyard/refit/repair industrial integration;
+- facility construction;
+- salvage/recycling;
+- deterministic industrial acceptance and persistence;
+- warfare supply integration using ordinary physical stocks rather than hidden replenishment.
+
+Baseline raw families remain:
 
 - `WATER_ICE`;
 - `VOLATILE_FEEDSTOCK`;
@@ -355,45 +246,93 @@ Compact component layer:
 - `ELECTRICAL_COMPONENTS`;
 - `PRECISION_COMPONENTS`.
 
-Implementation:
+Canonical implementation plan: `docs/stage18_resources_industry_infrastructure_plan.md`.
 
-```text
-18A resource/schema ontology
-→ 18B extraction compatibility
-→ 18C refining/materials
-→ 18D components + module/ammunition recipes
-→ 18E facility capabilities
-→ 18F stations/storage/logistics
-→ 18G shipyard/repair/refit industrial integration
-→ 18H salvage/recycling/construction economy
-→ 18I deterministic minimal-industrial-universe acceptance
-```
+Stage 18 supplies the physical cost/replenishment basis consumed by Stage 19 warfare and the ontology consumed by Stage 20 resource geography.
 
-Detailed plan: `docs/stage18_resources_industry_infrastructure_plan.md`.
+## 7. Stage 19 — Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior
 
-## 8. Stage 19 — Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior
+**COMPLETE — strategic warfare + Stage 19I scaled live tactical exit gate.**
 
-**PLANNED after Stage 18 COMPLETE.**
+Canonical acceptance artifacts:
 
-Consumes Stage-17 political state, Stage-17.5 physical ship capability and Stage-18 real industrial/logistics network.
+- `docs/stage19_scaled_live_tactical_ai_acceptance.md`;
+- `docs/stage19i_exit_evidence_matrix.md`.
+
+Stage 19 consumes Stage-17 political state, Stage-17.5 physical ship capability and Stage-18 industrial/logistics network.
 
 ```text
 crisis / war goal
 → mobilization + treasury pressure
 → ammunition / reaction mass / repair / replacement demand
 → physical logistics/readiness
-→ tactical operations
+→ actor-bounded tactical operations
 → real losses/blockades/industrial/territory effects
 → negotiated political/economic outcome
 ```
 
-Mines, depots, water/propellant sources, precision fabs, ammunition plants, shipyards and routes become ordinary physical strategic targets. War cannot apply abstract production penalties instead of actual disruption.
+Strategic warfare is physical rather than an abstract production debuff: interdiction, route disruption, supply consumption, destruction and recovery operate through ordinary state/economy/logistics systems.
 
-## 9. Stage 20 — Physical World Generation / Discovery
+### Stage 19I scaled tactical authority — accepted
 
-**PLANNED after Stage 19.**
+Accepted shared chain:
 
-Answers **where the already-defined world exists**.
+```text
+scenario physical state
+→ actor-bounded AI + TrackState
+→ engineering power / heat / reaction mass
+→ FlightDynamics
+→ fire control
+→ kinetic / fitted beam / guided execution
+→ PD / interceptor / EW / decoy
+→ shield / material / compartment / subsystem damage
+→ changed capability / AI
+→ next fixed tick
+→ read-only live projection
+```
+
+Mandatory scale ladder is green on the same production runtime:
+
+- 1v1 regression;
+- shared 4v4;
+- mixed 8v8;
+- damaged/depleted 8v8;
+- 16v16 / 32 exact-local ships;
+- dense 32-ship saturation with kinetic + STRIKE + interceptor + decoy bodies concurrently.
+
+Accepted behavior/evidence includes:
+
+- actor-local target selection and reassignment;
+- range/pursuit/disengagement behavior;
+- compact/dispersed formation keeping, break and recovery;
+- authored withdrawal objective with formation yielding to survival authority;
+- finite full/partial/depleted ammunition;
+- reaction-mass depletion;
+- power and thermal denial through production engineering→sensor→track causality;
+- fresh/pre-damaged behavior differences;
+- EW/ECCM, passive/datalink missile warning and physical deception;
+- finite interceptor rounds/cooldowns/support channels;
+- no immediate fixed-tick A→B→A target/order/formation churn in the scaled soak;
+- deterministic live/headless parity;
+- pause/resume, exact single-step, deterministic reset and X1/X2/X4/X8 fixed-tick batching;
+- read-only debug projection and runnable `--scaled-live-tactical-sim` viewer;
+- measured body/sensor/AI/ordnance/memory workload.
+
+Final Stage-19 hardening additionally closes:
+
+- fitted C-fit beam emitters through actor-local fire control + physical beam geometry/dwell + real incremental power/heat; no unauthored laser-armor-DPS coefficient is invented;
+- explicit provisional 2,000 kg material-response envelope for the authored strike missile, with 2,001 kg still rejected rather than extrapolated;
+- deterministic same-tick guided impact ordering audit with a non-vacuous detector and accepted scaled evidence of real ship-impact candidates with zero physically earlier interceptor contacts suppressed by current phase ordering.
+
+The Stage-17.5/19 combat content remains provisional. Stage 22 still owns final content re-authoring/balance and may replace the Stage-19 provisional 2 t calibration promotion with final material evidence.
+
+**Stage 19 completion unlocks Stage 20 spatial calibration.**
+
+## 8. Stage 20 — Physical World Generation / Discovery
+
+**NEXT — Stage 19 COMPLETE.**
+
+Stage 20 answers **where the already-defined world exists**. It must calibrate generated geometry around the physical/industrial/tactical behavior now proven by Stages 17.5–19, rather than inventing map distances first and forcing combat/logistics to fit afterward.
 
 Canonical generation contracts:
 
@@ -408,32 +347,32 @@ Must honor:
 - SI physical scale and travel time;
 - propulsion/FTL capability;
 - ship acceleration/braking/delta-v and loaded-mass consequences;
-- Stage-17.5 sensor/signature/track/fire-control behavior;
+- Stage-17.5/19 sensor/signature/track/fire-control behavior;
 - kinetic/beam/guided/PD/formation physical engagement geometry;
 - Stage-18 station/shipyard/infrastructure physical footprint and approach geometry;
 - local star-system space without gameplay map edge or hard movement wall;
 - strict separation of physical coordinate space, generated operational/content envelope and render/materialization window;
-- numerical-precision/floating-origin or equivalent strategy that preserves physical distances at far local coordinates;
+- numerical-precision/floating-origin or equivalent strategy preserving physical distances at far local coordinates;
 - bounded simulation LOD without off-screen state loss/clamp/teleport;
 - Stage-18 resource occurrence rules and finite reserves;
 - extraction compatibility;
 - infrastructure/shipyard requirements;
 - logistics/economic geography;
 - sensor-consistent discovery;
-- Stage-19 strategic response times;
+- Stage-19 tactical and strategic response times;
 - bounded mostly-dormant scalability architecture;
 - sectors as spatial/strategic regions rather than list partitions;
-- explicit neighbor graph with measurable structural diversity instead of a sequential-chain production topology;
-- a mix of hubs, forks, cycles, alternate paths, gateways, remote/frontier pockets and bounded chokepoints;
+- explicit neighbor graph with measurable structural diversity rather than a sequential chain;
+- hubs, forks, cycles, alternate paths, gateways, remote/frontier pockets and bounded chokepoints;
 - machine-readable anti-linearity, route-redundancy, articulation/bridge and gateway-concentration diagnostics;
 - spatially correlated resource geography derived from Stage-18 physical host/environment conditions plus local deterministic variance;
 - regional comparative advantage instead of uniform self-sufficiency or `sector = production bonus` shortcuts;
 - essential economic viability through physically reachable supply chains without requiring every system/sector to produce everything;
-- strategic scarcity and dependency strong enough to create real trade, stockpiling, infrastructure, diplomacy, security, expansion and warfare incentives;
+- strategic scarcity/dependency strong enough to create trade, stockpiling, infrastructure, diplomacy, security, expansion and warfare incentives;
 - faction-start placement after topology/resource generation, with asymmetric but recoverable starts and anti-accidental-monopoly checks;
 - whole-route delivered-cost/dependency analysis over actual neighbor edges;
 - deterministic world-quality gate with `ACCEPT / DETERMINISTIC_REPAIR / REJECT_SEED / EXPLICIT_SCENARIO_OVERRIDE` semantics;
-- bad seeds or bad spatial-scale profiles rejected/recalibrated before materialization, never rescued by runtime hidden supplies/emergency deposits or hidden speed/range shortcuts.
+- bad seeds or spatial profiles rejected/recalibrated before materialization, never rescued by hidden supplies/deposits or speed/range shortcuts.
 
 Locked Stage-20 generation causality:
 
@@ -458,16 +397,16 @@ Stage-17.5 ship/sensor/weapon capability
 
 Generator may place resources/facilities but cannot invent hidden emergency resources to rescue a bad seed. Generated `system extent` may describe where meaningful content is concentrated, but it cannot clamp/delete/teleport ships at a map edge. Ordinary inter-system travel remains explicit neighbor-edge transition even when local space is unbounded.
 
-Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate all of the following simultaneously:
+Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate simultaneously:
 
-- galaxy is connected where ordinary production topology requires it, but not predominantly chain-like;
-- core/developed regions have meaningful alternate-route coverage while chokepoints remain bounded strategic features;
-- generated local distances produce coherent acceleration/braking/delta-v/travel-time differences between representative ships;
-- sensor detection/track/fire-control and weapon/PD/formation envelopes remain physically meaningful and do not collapse into screen-space circles;
+- connected production topology where required, but not predominantly chain-like;
+- meaningful alternate-route coverage in core/developed regions while chokepoints remain bounded strategic features;
+- coherent acceleration/braking/delta-v/travel-time differences between representative ships;
+- sensor detection/track/fire-control and weapon/PD/formation envelopes remain physically meaningful rather than screen-space circles;
 - station size/spacing and jump-arrival stand-off are compatible with traffic, logistics and defensive geometry;
-- ships can move beyond visible/generated activity extents without world-edge clamp/delete/teleport, while far state remains deterministic through LOD;
+- ships can move beyond visible/generated activity extents without world-edge clamp/delete/teleport while far state remains deterministic through LOD;
 - far-coordinate numerical precision remains inside calibrated tolerance;
-- resource clusters are physically plausible and regionally recognizable without becoming uniform sector bonuses;
+- resource clusters are physically plausible and regionally recognizable without uniform sector bonuses;
 - typical starts are viable but meaningfully dependent on external trade/supply for part of growth or advanced industry;
 - critical dependencies and gateway concentration are measurable from authoritative state;
 - no normal seed requires hidden restock, teleport, emergency deposit, hidden movement/range multiplier or faction-only generation exception;
@@ -475,7 +414,7 @@ Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate
 
 Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
 
-## 10. Stage 21 — RPG / Living World
+## 9. Stage 21 — RPG / Living World
 
 **PLANNED after Stage 20.**
 
@@ -483,7 +422,7 @@ NPCs, missions, discovery and reputation consume authoritative physical/economic
 
 Living-world state must use persistent identity, relevance/cadence/event wakeups and deterministic deadlines; no `all NPCs × full AI × every tick` architecture.
 
-## 11. Stage 22 — Content / Technology / Balance Alpha
+## 10. Stage 22 — Content / Technology / Balance Alpha
 
 **PLANNED after Stage 21.**
 
@@ -500,13 +439,13 @@ Expands the accepted physical/manufacturable language:
 - anti-linear-tier-obsolescence validation;
 - deterministic content/performance fingerprints.
 
-Stage 22 explicitly owns the content review of the Stage-17.5 Combat Test Content Pack. Test hulls/modules/ammunition/fits must be re-authored, rebalanced, replaced or explicitly promoted according to the accepted technology ladder, Stage-18 industrial ontology, faction engineering doctrine and faction visual language. **Stage-17.5 prototype identity is never automatic canon.**
+Stage 22 explicitly owns the content review of the Stage-17.5/19 provisional Combat Test Content Pack. Test hulls/modules/ammunition/fits and provisional calibration definitions must be re-authored, rebalanced, replaced or explicitly promoted according to the accepted technology ladder, Stage-18 industrial ontology, faction engineering doctrine and faction visual language. **Prototype identity is never automatic canon.**
 
 No isolated `Mk II = +25% all stats` parallel system.
 
 Detailed plan: `docs/stage22_content_balance_plan.md`.
 
-## 12. Stage 23 — Polish / Release Candidate
+## 11. Stage 23 — Polish / Release Candidate
 
 **PLANNED.**
 
@@ -514,7 +453,7 @@ UX/onboarding/accessibility/performance/content validation/save hardening after 
 
 Stage 23 replaces remaining prototype tactical presentation with production ship/projectile/VFX assets where not already finalized, without creating a new economy/physics model. It closes profiler budgets, migration diagnostics, long-session stability and release hardening.
 
-## 13. Scalability cross-stage contract
+## 12. Scalability cross-stage contract
 
 Canonical scalability document: `docs/simulation_scalability_architecture.md`.
 
@@ -534,26 +473,17 @@ deterministic persistent world
 
 No world-wide tactical/render-rate tick.
 
-## 14. Current immediate sequence
+## 13. Current immediate sequence
 
 ```text
 Stage 17 COMPLETE
-→ Stage 17.5A production ship engineering schema COMPLETE
-→ Stage 17.5B derived-ship calculator + fitting validator COMPLETE
-→ Stage 17.5C propulsion / reaction mass / power / thermal / FTL COMPLETE
-→ Stage 17.5D signatures / sensors / tracks / datalink / EW COMPLETE
-→ Stage 17.5E kinetic / beam / guided / PD / ammunition COMPLETE
-→ Stage 17.5F shields / armor / compartments / subsystem damage COMPLETE
-→ Stage 17.5G shipyard / refit / repair / maintenance seam COMPLETE
-→ Stage 17.5H capability APIs / UI / persistence COMPLETE
-→ Stage 17.5I deterministic multi-fleet acceptance + Combat Test Content Pack + Tactical Prototype Visual Set COMPLETE
-→ Stage 17.5 COMPLETE
-→ Stage 18 Resources / Industry / Infrastructure NEXT
-→ Stage 19 Strategic Warfare
-→ Stage 20 Physical World Generation
-→ Stage 21 Living World
-→ Stage 22 Content / Balance Alpha + re-author/review Stage-17.5 provisional content
+→ Stage 17.5 Combat Depth / Ship Fitting Foundation COMPLETE
+→ Stage 18 Resources / Industry / Infrastructure COMPLETE
+→ Stage 19 Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior COMPLETE
+→ Stage 20 Physical World Generation / Discovery NEXT
+→ Stage 21 RPG / Living World
+→ Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 18. Stage 17.5 is closed by the Stage-17.5I aggregate combat-content/visual/persistence exit gate; Stage 18 now owns the comparable industrial/resource/facility cost basis deliberately not fabricated by Stage 17.5I.**
+**Immediate implementation priority is Stage 20.** Stage 19 has closed the physical tactical/strategic response behavior that Stage 20 must now use to calibrate local distances, topology, resource geography, infrastructure spacing, discovery and route structure. Stage 20 may not introduce hidden movement/range/supply shortcuts to compensate for a bad spatial seed or scale profile.
