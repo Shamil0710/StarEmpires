@@ -41,6 +41,11 @@ import java.util.TreeMap;
  * present the receiver requests ECCM processing; its incremental power and heat are part of the same
  * physical radar-operation grant. If the ECCM request cannot be funded, the receiver may fall back to
  * the ordinary non-ECCM radar operation rather than receiving free processing.</p>
+ *
+ * <p>Velocity continuity is explicitly actor-bounded. When ordinary track aging degrades a hypothesis
+ * below TRACKED, the last Cartesian velocity baseline is discarded. A later reacquisition therefore
+ * needs two temporally distinct new observer-local Cartesian solutions before velocity becomes known
+ * again; one fresh measurement cannot resurrect stale kinematics from a previously lost track.</p>
  */
 public final class LiveTacticalOrdnanceObservationRuntime {
     private static final long SCAN_PERIOD_TICKS = 4L;
@@ -85,6 +90,13 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     public LiveTacticalOrdnanceObservationRuntime(
             LiveTacticalBattleOrdnanceRuntime ordnanceRuntime,
             LiveTacticalBattleDecoyRuntime decoyRuntime) {
+        this(ordnanceRuntime, decoyRuntime, TrackQualityPolicy.defaultPolicy());
+    }
+
+    LiveTacticalOrdnanceObservationRuntime(
+            LiveTacticalBattleOrdnanceRuntime ordnanceRuntime,
+            LiveTacticalBattleDecoyRuntime decoyRuntime,
+            TrackQualityPolicy trackPolicy) {
         this.ordnanceRuntime = Objects.requireNonNull(ordnanceRuntime, "ordnanceRuntime");
         this.decoyRuntime = decoyRuntime;
         if (decoyRuntime != null && decoyRuntime.ordnanceRuntime() != ordnanceRuntime) {
@@ -98,7 +110,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
         observationService = new ShipObservationService();
         grantService = new ShipEngineeringGrantService(engineeringCatalog);
         sensorRuntime = new ShipSensorRuntime();
-        trackPolicy = TrackQualityPolicy.defaultPolicy();
+        this.trackPolicy = Objects.requireNonNull(trackPolicy, "trackPolicy");
         for (CombatantRuntime combatant : battleState().combatants()) {
             long entityId = combatant.spec().entityId();
             measurementsByObserver.put(entityId, new TreeMap<>());
@@ -327,7 +339,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
                     fused.covariance().positionVarianceM2()));
         }
         ObservedOrdnanceTrack old = tracksByObserver.get(observerEntityId).get(fused.targetId());
-        if (!velocityKnown && old != null && old.velocityKnown()) {
+        if (!velocityKnown && supportsVelocityContinuity(fused) && old != null && old.velocityKnown()) {
             velocityKnown = true;
             velocityX = old.estimatedVelocityXMps();
             velocityY = old.estimatedVelocityYMps();
@@ -339,11 +351,23 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     }
 
     private void ageKnownTracks(double nowSeconds) {
-        for (TreeMap<Long, ObservedOrdnanceTrack> observerTracks : tracksByObserver.values()) {
+        for (Map.Entry<Long, TreeMap<Long, ObservedOrdnanceTrack>> observerEntry : tracksByObserver.entrySet()) {
+            long observerEntityId = observerEntry.getKey();
+            TreeMap<Long, ObservedOrdnanceTrack> observerTracks = observerEntry.getValue();
             List<Map.Entry<Long, ObservedOrdnanceTrack>> values = new ArrayList<>(observerTracks.entrySet());
             for (Map.Entry<Long, ObservedOrdnanceTrack> entry : values) {
                 ObservedOrdnanceTrack current = entry.getValue();
                 TrackState aged = sensorRuntime.ageTrack(current.track(), nowSeconds, trackPolicy);
+                if (!supportsVelocityContinuity(aged)) {
+                    latestSamplesByObserver.get(observerEntityId).remove(entry.getKey());
+                    observerTracks.put(entry.getKey(), new ObservedOrdnanceTrack(
+                            aged,
+                            false,
+                            0d,
+                            0d,
+                            0d));
+                    continue;
+                }
                 observerTracks.put(entry.getKey(), new ObservedOrdnanceTrack(
                         aged,
                         current.velocityKnown(),
@@ -352,6 +376,14 @@ public final class LiveTacticalOrdnanceObservationRuntime {
                         current.oneSigmaVelocityMps()));
             }
         }
+    }
+
+    private static boolean supportsVelocityContinuity(TrackState track) {
+        if (!track.positionKnown()) {
+            return false;
+        }
+        return track.informationState() == TrackState.InformationState.TRACKED
+                || track.informationState() == TrackState.InformationState.FIRE_CONTROL;
     }
 
     private List<GuidedWeaponBody> hostileSensorBodies(CombatantRuntime observer) {
