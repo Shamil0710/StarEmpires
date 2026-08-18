@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -150,7 +151,36 @@ class LiveTactical8v8ExactLocalAcceptanceTest {
                 + ", guidedLaunches=" + totalGuidedLaunches(runtime)
                 + ", decoyDeployments=" + totalDecoyDeployments(runtime)
                 + ", interceptorLaunches=" + totalInterceptorLaunches(runtime)
-                + ", impacts=" + runtime.ordnanceRuntime().weaponRuntime().totalImpacts();
+                + ", impacts=" + runtime.ordnanceRuntime().weaponRuntime().totalImpacts()
+                + ", alphaInterceptor={" + interceptorDiagnostics(runtime, ALPHA_INTERCEPTOR) + "}"
+                + ", betaInterceptor={" + interceptorDiagnostics(runtime, BETA_INTERCEPTOR) + "}";
+    }
+
+    private static String interceptorDiagnostics(LiveTacticalBattleDeceptionRuntime runtime, long entityId) {
+        LiveTacticalOrdnanceObservationRuntime observation = runtime.defenseRuntime().observationRuntime();
+        List<LiveTacticalOrdnanceObservationRuntime.ObservedOrdnanceTrack> tracks =
+                observation.tracksForObserver(entityId);
+        long velocityKnown = tracks.stream()
+                .filter(LiveTacticalOrdnanceObservationRuntime.ObservedOrdnanceTrack::velocityKnown)
+                .count();
+        long actionable = tracks.stream().filter(LiveTactical8v8ExactLocalAcceptanceTest::actionable).count();
+        Map<TrackState.InformationState, Long> states = tracks.stream().collect(Collectors.groupingBy(
+                value -> value.track().informationState(),
+                () -> new java.util.EnumMap<>(TrackState.InformationState.class),
+                Collectors.counting()));
+        return "scan=" + observation.lastScanDiagnostics(entityId)
+                + ", tracks=" + tracks.size()
+                + ", velocityKnown=" + velocityKnown
+                + ", actionable=" + actionable
+                + ", states=" + states
+                + ", rounds=" + guidedRounds(runtime.battleState().requireCombatant(entityId));
+    }
+
+    private static boolean actionable(LiveTacticalOrdnanceObservationRuntime.ObservedOrdnanceTrack observed) {
+        return observed.velocityKnown()
+                && observed.track().positionKnown()
+                && (observed.track().informationState() == TrackState.InformationState.TRACKED
+                || observed.track().informationState() == TrackState.InformationState.FIRE_CONTROL);
     }
 
     private static long totalKineticShots(LiveTacticalBattleDeceptionRuntime runtime) {
