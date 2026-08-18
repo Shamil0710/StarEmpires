@@ -13,10 +13,10 @@ import java.util.Objects;
  * Deterministic Stage-17.5E layered-defense assignment scheduler.
  *
  * <p>The scheduler has no PD probability and no arbitrary maximum range. A threat must first have a
- * ballistic intersection with the defended zone. Candidate stations are then constrained by their
- * real position, safe-intercept geometry, launcher readiness, support channels, physical ammunition,
- * thermal availability and interceptor propulsion/time. Assignments are plans only; body propagation
- * and eventual collision remain physical.</p>
+ * ballistic intersection with defended physical geometry. Candidate stations are then constrained by
+ * their real position, safe-intercept geometry, launcher readiness, support channels, physical
+ * ammunition, thermal availability and interceptor propulsion/time. Assignments are plans only;
+ * body propagation and eventual collision remain physical.</p>
  */
 public final class LayeredDefenseScheduler {
     private static final double EPSILON = 1e-9d;
@@ -138,7 +138,7 @@ public final class LayeredDefenseScheduler {
      * @param supportChannelsAvailable currently free guidance/fire-control channels
      * @param ammunitionRounds physical interceptor rounds currently available
      * @param thermalAvailable whether required launcher/emitter thermal duty is currently allowed
-     * @param safeMinimumInterceptDistanceM minimum acceptable intercept distance from defended center
+     * @param safeMinimumInterceptDistanceM minimum acceptable intercept distance from protected geometry
      */
     public record DefenseStation(
             long stationId,
@@ -163,7 +163,7 @@ public final class LayeredDefenseScheduler {
          * @param supportChannelsAvailable currently free support channels
          * @param ammunitionRounds physical interceptor rounds available
          * @param thermalAvailable whether thermal duty permits a launch
-         * @param safeMinimumInterceptDistanceM minimum acceptable intercept distance from defended center
+         * @param safeMinimumInterceptDistanceM minimum acceptable intercept distance from protected geometry
          */
         public DefenseStation {
             requirePositiveIdentity(stationId, "stationId");
@@ -245,11 +245,11 @@ public final class LayeredDefenseScheduler {
                             checked.velocityYMps());
                 })
                 .toList();
-        return scheduleKinematics(zone, kinematics, stations);
+        return scheduleKinematics(List.of(Objects.requireNonNull(zone, "zone")), kinematics, stations);
     }
 
     /**
-     * Assigns defenses using actor-bounded observed target kinematics only.
+     * Assigns defenses using actor-bounded observed target kinematics against one protected zone.
      *
      * @param zone actor-known protected geometry
      * @param threats observer-local target identity/position/velocity estimates
@@ -258,6 +258,27 @@ public final class LayeredDefenseScheduler {
      */
     public List<Assignment> scheduleObserved(
             DefendedZone zone,
+            List<ObservedThreatKinematics> threats,
+            List<DefenseStation> stations) {
+        return scheduleObserved(List.of(Objects.requireNonNull(zone, "zone")), threats, stations);
+    }
+
+    /**
+     * Assigns defenses against the earliest observed ballistic intersection with any friendly
+     * physical protected zone.
+     *
+     * <p>The protected-zone set contains only actor-known friendly geometry. No hidden guided-body
+     * target identity is consumed. A station still receives an assignment only when its physical
+     * interceptor can reach the observed trajectory before the earliest protected-hull entry while
+     * launcher, support-channel, ammunition and thermal constraints remain available.</p>
+     *
+     * @param zones actor-known friendly physical protected geometries
+     * @param threats observer-local target identity/position/velocity estimates
+     * @param stations own authoritative physical defense stations
+     * @return deterministic immutable assignments
+     */
+    public List<Assignment> scheduleObserved(
+            List<DefendedZone> zones,
             List<ObservedThreatKinematics> threats,
             List<DefenseStation> stations) {
         Objects.requireNonNull(threats, "threats");
@@ -272,22 +293,22 @@ public final class LayeredDefenseScheduler {
                             checked.velocityYMps());
                 })
                 .toList();
-        return scheduleKinematics(zone, kinematics, stations);
+        return scheduleKinematics(zones, kinematics, stations);
     }
 
     private List<Assignment> scheduleKinematics(
-            DefendedZone zone,
+            List<DefendedZone> zones,
             List<KinematicThreat> threats,
             List<DefenseStation> stations) {
-        DefendedZone checkedZone = Objects.requireNonNull(zone, "zone");
+        List<DefendedZone> orderedZones = canonicalZones(zones);
         Objects.requireNonNull(stations, "stations");
 
         List<ThreatWithImpact> inbound = new ArrayList<>();
         for (KinematicThreat threat : threats) {
             KinematicThreat checked = Objects.requireNonNull(threat, "threat");
-            double impactSeconds = predictedImpactSeconds(checkedZone, checked);
-            if (Double.isFinite(impactSeconds)) {
-                inbound.add(new ThreatWithImpact(checked, impactSeconds));
+            ZoneImpact impact = earliestImpact(orderedZones, checked);
+            if (impact != null) {
+                inbound.add(new ThreatWithImpact(checked, impact.zone(), impact.impactSeconds()));
             }
         }
         inbound.sort(Comparator.comparingDouble(ThreatWithImpact::impactSeconds)
@@ -315,7 +336,7 @@ public final class LayeredDefenseScheduler {
                     continue;
                 }
                 InterceptSolution solution = findIntercept(
-                        checkedZone,
+                        inboundThreat.zone(),
                         inboundThreat.threat(),
                         inboundThreat.impactSeconds(),
                         station);
@@ -335,6 +356,35 @@ public final class LayeredDefenseScheduler {
             }
         }
         return List.copyOf(assignments);
+    }
+
+    private static List<DefendedZone> canonicalZones(List<DefendedZone> zones) {
+        Objects.requireNonNull(zones, "zones");
+        if (zones.isEmpty()) {
+            throw new IllegalArgumentException("at least one defended zone is required");
+        }
+        ArrayList<DefendedZone> ordered = new ArrayList<>(zones.size());
+        for (DefendedZone zone : zones) {
+            ordered.add(Objects.requireNonNull(zone, "zone"));
+        }
+        ordered.sort(Comparator.comparingDouble(DefendedZone::centerXM)
+                .thenComparingDouble(DefendedZone::centerYM)
+                .thenComparingDouble(DefendedZone::radiusM));
+        return List.copyOf(ordered);
+    }
+
+    private static ZoneImpact earliestImpact(List<DefendedZone> zones, KinematicThreat threat) {
+        ZoneImpact best = null;
+        for (DefendedZone zone : zones) {
+            double impactSeconds = predictedImpactSeconds(zone, threat);
+            if (!Double.isFinite(impactSeconds)) {
+                continue;
+            }
+            if (best == null || impactSeconds < best.impactSeconds() - EPSILON) {
+                best = new ZoneImpact(zone, impactSeconds);
+            }
+        }
+        return best;
     }
 
     private static double predictedImpactSeconds(DefendedZone zone, KinematicThreat threat) {
@@ -373,12 +423,13 @@ public final class LayeredDefenseScheduler {
             KinematicThreat threat,
             double impactSeconds,
             DefenseStation station) {
+        double safeDistance = Math.max(zone.radiusM(), station.safeMinimumInterceptDistanceM());
         for (int step = 1; step < INTERCEPT_SEARCH_STEPS; step++) {
             double time = impactSeconds * step / INTERCEPT_SEARCH_STEPS;
             double threatX = threat.xM() + threat.velocityXMps() * time;
             double threatY = threat.yM() + threat.velocityYMps() * time;
             double distanceFromProtectedCenter = Math.hypot(threatX - zone.centerXM(), threatY - zone.centerYM());
-            if (distanceFromProtectedCenter + EPSILON < station.safeMinimumInterceptDistanceM()) {
+            if (distanceFromProtectedCenter + EPSILON < safeDistance) {
                 continue;
             }
             double requiredDistance = Math.hypot(threatX - station.xM(), threatY - station.yM());
@@ -423,7 +474,10 @@ public final class LayeredDefenseScheduler {
         }
     }
 
-    private record ThreatWithImpact(KinematicThreat threat, double impactSeconds) {
+    private record ZoneImpact(DefendedZone zone, double impactSeconds) {
+    }
+
+    private record ThreatWithImpact(KinematicThreat threat, DefendedZone zone, double impactSeconds) {
     }
 
     private record InterceptSolution(double timeSeconds, double xM, double yM) {
