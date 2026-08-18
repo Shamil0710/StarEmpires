@@ -177,6 +177,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
             int size = debug.combatants().size();
             int canonicalIndex = Math.floorMod(selectedCombatantIndex, size);
             var actor = debug.combatants().get(canonicalIndex);
+            var formation = actor.formation();
             font.draw(batch,
                     String.format(Locale.ROOT,
                             "Actor %d [%s] | tracks %d | target %d | fire req/auth %s/%s | intent (%.2f, %.2f)",
@@ -200,13 +201,24 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                             actor.sharedBusEnergyJ()),
                     22f,
                     top - 72f);
+            String formationText = formation.objectiveKnown()
+                    ? String.format(Locale.ROOT,
+                            "%s %s/%s slot %d/%d err %.1f m",
+                            formation.mode(),
+                            formation.status(),
+                            formation.reason(),
+                            formation.slotIndex() + 1,
+                            formation.slotCount(),
+                            formation.errorM())
+                    : "NONE";
             font.draw(batch,
                     String.format(Locale.ROOT,
-                            "heat ship/local %.3e / %.3e J | integrity mean/min-module %.3f / %.3f | formation objective: NOT AUTHORED",
+                            "heat ship/local %.3e / %.3e J | integrity mean/min-module %.3f / %.3f | formation %s",
                             actor.shipHeatStoredJ(),
                             actor.localHeatStoredJ(),
                             actor.meanCompartmentIntegrity(),
-                            actor.minimumModuleIntegrity()),
+                            actor.minimumModuleIntegrity(),
+                            formationText),
                     22f,
                     top - 96f);
         }

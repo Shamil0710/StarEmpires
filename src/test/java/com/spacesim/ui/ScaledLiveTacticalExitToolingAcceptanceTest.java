@@ -1,10 +1,13 @@
 package com.spacesim.ui;
 
+import com.spacesim.ship.TacticalFormationPlanner.FormationMode;
+import com.spacesim.ship.TacticalFormationPlanner.FormationStatus;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession.SimulationSpeed;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScaledLiveTacticalExitToolingAcceptanceTest {
@@ -68,12 +71,14 @@ class ScaledLiveTacticalExitToolingAcceptanceTest {
     }
 
     @Test
-    void repeatedDebugReadsExposeAuthorityWithoutMutatingIt() {
+    void repeatedDebugReadsExposeAuthorityAndFormationWithoutMutatingIt() {
         ScaledLiveTacticalSimulationSession live = new ScaledLiveTacticalSimulationSession();
         for (int tick = 0; tick < 24; tick++) {
             live.stepOneTick();
         }
         var before = live.fingerprint();
+        var control = live.runtime().ordnanceRuntime().weaponRuntime().controlRuntime();
+        var formationBefore = control.formationFingerprint();
         ScaledTacticalDebugSnapshot debug = null;
 
         for (int read = 0; read < 40; read++) {
@@ -81,6 +86,8 @@ class ScaledLiveTacticalExitToolingAcceptanceTest {
         }
 
         assertEquals(before, live.fingerprint());
+        assertEquals(formationBefore, control.formationFingerprint(),
+                "formation diagnostics must be a strict read-only projection of shared control authority");
         assertEquals(24L, live.tick());
         assertEquals(24L, debug.tick());
         assertEquals(32, debug.combatants().size());
@@ -89,6 +96,13 @@ class ScaledLiveTacticalExitToolingAcceptanceTest {
         assertTrue(debug.combatants().stream().allMatch(value -> value.sharedBusEnergyJ() >= 0d));
         assertTrue(debug.combatants().stream().allMatch(value -> value.shipHeatStoredJ() >= 0d));
         assertTrue(debug.combatants().stream().allMatch(value -> value.localHeatStoredJ() >= 0d));
+        assertTrue(debug.combatants().stream().allMatch(value -> value.formation().objectiveKnown()));
+        assertTrue(debug.combatants().stream().allMatch(value -> value.formation().mode() == FormationMode.COMPACT));
+        assertTrue(debug.combatants().stream().allMatch(value -> value.formation().slotCount() == 16));
+        assertTrue(debug.combatants().stream().allMatch(value -> value.formation().slotIndex() >= 0));
+        assertTrue(debug.combatants().stream().allMatch(
+                value -> value.formation().status() != FormationStatus.NO_OBJECTIVE));
+        assertNotEquals(FormationStatus.NO_OBJECTIVE, debug.combatants().get(0).formation().status());
         assertEquals(
                 live.snapshot().bodies().size(),
                 debug.bodies().total(),

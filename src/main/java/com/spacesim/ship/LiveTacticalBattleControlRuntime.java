@@ -7,6 +7,8 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.flight.FlightDynamics;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
+import com.spacesim.ship.LiveTacticalBattleScenario.CombatantSpec;
+import com.spacesim.ship.LiveTacticalBattleScenario.Side;
 import com.spacesim.ship.ObservedThreatAssessmentService.ContactDisposition;
 import com.spacesim.ship.ObservedThreatAssessmentService.ObservedContact;
 import com.spacesim.ship.ObservedTacticalIntentPlanner.TacticalContext;
@@ -19,12 +21,15 @@ import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.ShipSensorEngineeringAdapter.FittedSensor;
 import com.spacesim.ship.ShipSensorRuntime.Position2d;
 import com.spacesim.ship.ShipSensorRuntime.TrackQualityPolicy;
+import com.spacesim.ship.TacticalFormationPlanner.Command;
+import com.spacesim.ship.TacticalFormationPlanner.Objective;
 import com.spacesim.ship.TacticalSurvivalPlanner.DecisionReason;
 import com.spacesim.ship.TacticalSurvivalPlanner.OwnReadiness;
 import com.spacesim.ship.TacticalSurvivalPlanner.SafePoint;
 import com.spacesim.ship.TacticalSurvivalPlanner.SurvivalAction;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,15 +39,16 @@ import java.util.TreeMap;
 /**
  * Shared Stage-19I production control coordinator for one materialized tactical battle.
  *
- * <p>This class is deliberately not a second combat engine. It coordinates the already existing
- * production observation, track fusion, Stage-19 tactical/survival policy, Stage-17.5 engineering
- * runtime and shared {@link FlightDynamics} integrator for every combatant in one canonical fixed
- * tick. Projectile/guided-body, point-defense, EW and damage resolution remain owned by the existing
- * live combat stack and are not reimplemented here.</p>
+ * <p>This class is deliberately not a second combat engine. It coordinates production observation,
+ * track fusion, Stage-19 tactical/survival/formation policy, Stage-17.5 engineering runtime and the
+ * shared {@link FlightDynamics} integrator for every combatant in one canonical fixed tick.
+ * Projectile/guided-body, point-defense, EW and damage resolution remain owned by the existing live
+ * combat stack and are not reimplemented here.</p>
  *
  * <p>All observers sense before any actor plans, and all actors plan before any physical movement is
- * applied. This removes entity-order geometry bias inside one fixed tick. Tactical planners receive
- * only the actor-bounded {@link ObservedContact} domain materialized by production sensing.</p>
+ * applied. Tactical planners receive only actor-bounded hostile {@link ObservedContact} state. An
+ * optional formation objective uses only the actor's own kinematics plus authored own-side slot
+ * geometry; it never reads hidden hostile transforms or mutates physical state directly.</p>
  */
 public final class LiveTacticalBattleControlRuntime {
     /** Fixed control/flight interval shared with the existing live tactical session. */
@@ -74,18 +80,37 @@ public final class LiveTacticalBattleControlRuntime {
     private final ShipSensorEngineeringAdapter sensorAdapter;
     private final ObservedTacticalIntentPlanner tacticalPlanner;
     private final TacticalSurvivalPlanner survivalPlanner;
+    private final TacticalFormationPlanner formationPlanner;
     private final TreeMap<Long, TreeMap<Long, List<SensorMeasurement>>> measurementsByObserver = new TreeMap<>();
     private final TreeMap<Long, ActorControlState> controlByEntityId = new TreeMap<>();
+    private final TreeMap<Long, FormationSlot> formationSlotByEntityId = new TreeMap<>();
+    private final TreeMap<Long, Command> formationByEntityId = new TreeMap<>();
 
     private long tick;
 
     /**
-     * Creates the shared control coordinator over already materialized production combatants.
+     * Creates the shared coordinator with no authored formation objective.
      *
      * @param battleState authoritative battle-local physical state
      */
     public LiveTacticalBattleControlRuntime(LiveTacticalBattleRuntimeState battleState) {
+        this(battleState, Map.of());
+    }
+
+    /**
+     * Creates the shared coordinator with optional explicit side formation objectives.
+     *
+     * <p>Objectives contain physical scenario geometry only. They do not alter mass, thrust, weapon
+     * performance, sensors or any doctrine statistic.</p>
+     *
+     * @param battleState authoritative battle-local physical state
+     * @param formationObjectives optional authored objective by battle side
+     */
+    public LiveTacticalBattleControlRuntime(
+            LiveTacticalBattleRuntimeState battleState,
+            Map<Side, Objective> formationObjectives) {
         this.battleState = Objects.requireNonNull(battleState, "battleState");
+        Objects.requireNonNull(formationObjectives, "formationObjectives");
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         engineeringRuntime = new ShipEngineeringRuntime(engineeringCatalog);
@@ -95,10 +120,30 @@ public final class LiveTacticalBattleControlRuntime {
         sensorAdapter = new ShipSensorEngineeringAdapter();
         tacticalPlanner = new ObservedTacticalIntentPlanner();
         survivalPlanner = new TacticalSurvivalPlanner();
+        formationPlanner = new TacticalFormationPlanner();
+
+        EnumMap<Side, Objective> checkedObjectives = new EnumMap<>(Side.class);
+        formationObjectives.forEach((side, objective) -> checkedObjectives.put(
+                Objects.requireNonNull(side, "formation objective side"),
+                Objects.requireNonNull(objective, "formation objective")));
 
         for (CombatantRuntime combatant : battleState.combatants()) {
-            measurementsByObserver.put(combatant.spec().entityId(), new TreeMap<>());
-            controlByEntityId.put(combatant.spec().entityId(), ActorControlState.initial());
+            long entityId = combatant.spec().entityId();
+            measurementsByObserver.put(entityId, new TreeMap<>());
+            controlByEntityId.put(entityId, ActorControlState.initial());
+            formationByEntityId.put(entityId, Command.none());
+        }
+        for (Side side : Side.values()) {
+            Objective objective = checkedObjectives.get(side);
+            if (objective == null) {
+                continue;
+            }
+            List<CombatantSpec> sideRoster = battleState.scenario().combatantsFor(side);
+            for (int index = 0; index < sideRoster.size(); index++) {
+                formationSlotByEntityId.put(
+                        sideRoster.get(index).entityId(),
+                        new FormationSlot(objective, index, sideRoster.size()));
+            }
         }
     }
 
@@ -145,6 +190,17 @@ public final class LiveTacticalBattleControlRuntime {
     }
 
     /**
+     * Returns the latest read-only formation policy output for one combatant.
+     *
+     * @param entityId stable combatant identity
+     * @return current formation command, or canonical no-objective state
+     */
+    public Command formationState(long entityId) {
+        battleState.requireCombatant(entityId);
+        return formationByEntityId.get(entityId);
+    }
+
+    /**
      * Returns a deterministic equality-friendly projection for scaled acceptance tests.
      *
      * @return canonical per-combatant physical/control fingerprint
@@ -171,6 +227,20 @@ public final class LiveTacticalBattleControlRuntime {
                 })
                 .toList();
         return new BattleControlFingerprint(tick, combatants);
+    }
+
+    /**
+     * Returns deterministic formation diagnostics without mutating authority.
+     *
+     * @return canonical formation state ordered by stable entity identity
+     */
+    public BattleFormationFingerprint formationFingerprint() {
+        List<CombatantFormationFingerprint> combatants = battleState.combatants().stream()
+                .map(value -> new CombatantFormationFingerprint(
+                        value.spec().entityId(),
+                        formationByEntityId.get(value.spec().entityId())))
+                .toList();
+        return new BattleFormationFingerprint(tick, combatants);
     }
 
     private void scanAllObservers() {
@@ -271,6 +341,19 @@ public final class LiveTacticalBattleControlRuntime {
                     TACTICAL_REFERENCE_RANGE_M,
                     TRACK_FRESHNESS_REFERENCE_SECONDS);
 
+            FormationSlot slot = formationSlotByEntityId.get(entityId);
+            Command formation = slot == null
+                    ? Command.none()
+                    : formationPlanner.plan(
+                            slot.objective(),
+                            slot.slotIndex(),
+                            slot.slotCount(),
+                            combatant.transform().position.y,
+                            combatant.transform().velocity.y,
+                            derived.accelerationMps2(),
+                            survival.action() == SurvivalAction.CONTINUE);
+            formationByEntityId.put(entityId, formation);
+
             double axisX = intent.movementAxisX();
             double axisY = intent.movementAxisY();
             boolean fireAuthorized = intent.fireRequested();
@@ -288,7 +371,11 @@ public final class LiveTacticalBattleControlRuntime {
                     fireAuthorized = false;
                 }
                 case CONTINUE -> {
-                    // Keep the production tactical intent selected above.
+                    if (formation.objectiveKnown()) {
+                        double[] combined = normalizedAxes(axisX, formation.correctionAxisY());
+                        axisX = combined[0];
+                        axisY = combined[1];
+                    }
                 }
             }
             controlByEntityId.put(entityId, new ActorControlState(
@@ -427,14 +514,22 @@ public final class LiveTacticalBattleControlRuntime {
                 .orElse(1d);
     }
 
+    private static double[] normalizedAxes(double x, double y) {
+        double length = Math.hypot(x, y);
+        if (length <= 1d) {
+            return new double[]{x, y};
+        }
+        return new double[]{x / length, y / length};
+    }
+
     /**
      * Latest production policy output for one actor before physical execution.
      *
-     * @param intent Stage-19 actor-bounded tactical intent
-     * @param survivalDecision Stage-19 survival override/continuation decision
-     * @param fireAuthorized whether current policy permits a later weapon request
-     * @param movementAxisX normalized horizontal movement command
-     * @param movementAxisY normalized vertical movement command
+     * @param intent actor-bounded tactical intent
+     * @param survivalDecision survival-policy decision for the current tick
+     * @param fireAuthorized whether survival policy permits the tactical fire request
+     * @param movementAxisX final normalized x maneuver command
+     * @param movementAxisY final normalized y maneuver command
      */
     public record ActorControlState(
             TacticalIntent intent,
@@ -445,11 +540,11 @@ public final class LiveTacticalBattleControlRuntime {
         /**
          * Validates immutable actor control output.
          *
-         * @param intent Stage-19 actor-bounded tactical intent
-         * @param survivalDecision Stage-19 survival override/continuation decision
-         * @param fireAuthorized whether current policy permits a later weapon request
-         * @param movementAxisX normalized horizontal movement command
-         * @param movementAxisY normalized vertical movement command
+         * @param intent actor-bounded tactical intent
+         * @param survivalDecision survival-policy decision for the current tick
+         * @param fireAuthorized whether survival policy permits the tactical fire request
+         * @param movementAxisX final normalized x maneuver command
+         * @param movementAxisY final normalized y maneuver command
          */
         public ActorControlState {
             Objects.requireNonNull(intent, "intent");
@@ -484,10 +579,10 @@ public final class LiveTacticalBattleControlRuntime {
      * @param yM current physical y position
      * @param velocityXMps current physical x velocity
      * @param velocityYMps current physical y velocity
-     * @param reactionMassKg current physical propulsion mass
-     * @param visibleTargetIds actor-visible track identities
-     * @param selectedTargetId currently selected actor-visible target or zero
-     * @param fireRequested production tactical fire request
+     * @param reactionMassKg current physical reaction mass
+     * @param visibleTargetIds actor-visible target identities
+     * @param selectedTargetId actor-selected target identity or zero
+     * @param fireRequested tactical fire request
      * @param fireAuthorized survival-filtered fire authorization
      * @param survivalAction current survival action
      */
@@ -511,10 +606,10 @@ public final class LiveTacticalBattleControlRuntime {
          * @param yM current physical y position
          * @param velocityXMps current physical x velocity
          * @param velocityYMps current physical y velocity
-         * @param reactionMassKg current physical propulsion mass
-         * @param visibleTargetIds actor-visible track identities
-         * @param selectedTargetId currently selected actor-visible target or zero
-         * @param fireRequested production tactical fire request
+         * @param reactionMassKg current physical reaction mass
+         * @param visibleTargetIds actor-visible target identities
+         * @param selectedTargetId actor-selected target identity or zero
+         * @param fireRequested tactical fire request
          * @param fireAuthorized survival-filtered fire authorization
          * @param survivalAction current survival action
          */
@@ -527,21 +622,72 @@ public final class LiveTacticalBattleControlRuntime {
     /**
      * Equality-friendly whole-battle control fingerprint.
      *
-     * @param tick authoritative shared tick
-     * @param combatants canonical stable-entity projections
+     * @param tick authoritative shared tactical tick
+     * @param combatants canonical stable-entity control projections
      */
     public record BattleControlFingerprint(long tick, List<CombatantControlFingerprint> combatants) {
         /**
          * Freezes and validates the whole-battle fingerprint.
          *
-         * @param tick authoritative shared tick
-         * @param combatants canonical stable-entity projections
+         * @param tick authoritative shared tactical tick
+         * @param combatants canonical stable-entity control projections
          */
         public BattleControlFingerprint {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");
             }
             combatants = List.copyOf(Objects.requireNonNull(combatants, "combatants"));
+        }
+    }
+
+    /**
+     * Deterministic per-combatant formation projection.
+     *
+     * @param entityId stable combatant identity
+     * @param command current actor-local formation command
+     */
+    public record CombatantFormationFingerprint(long entityId, Command command) {
+        /**
+         * Validates one immutable formation fingerprint.
+         *
+         * @param entityId stable combatant identity
+         * @param command current actor-local formation command
+         */
+        public CombatantFormationFingerprint {
+            if (entityId <= 0L) {
+                throw new IllegalArgumentException("entityId must be positive");
+            }
+            Objects.requireNonNull(command, "command");
+        }
+    }
+
+    /**
+     * Equality-friendly whole-battle formation fingerprint.
+     *
+     * @param tick authoritative shared tactical tick
+     * @param combatants canonical stable-entity formation projections
+     */
+    public record BattleFormationFingerprint(long tick, List<CombatantFormationFingerprint> combatants) {
+        /**
+         * Freezes and validates the whole-battle formation fingerprint.
+         *
+         * @param tick authoritative shared tactical tick
+         * @param combatants canonical stable-entity formation projections
+         */
+        public BattleFormationFingerprint {
+            if (tick < 0L) {
+                throw new IllegalArgumentException("tick must be non-negative");
+            }
+            combatants = List.copyOf(Objects.requireNonNull(combatants, "combatants"));
+        }
+    }
+
+    private record FormationSlot(Objective objective, int slotIndex, int slotCount) {
+        private FormationSlot {
+            Objects.requireNonNull(objective, "objective");
+            if (slotCount <= 0 || slotIndex < 0 || slotIndex >= slotCount) {
+                throw new IllegalArgumentException("invalid formation slot");
+            }
         }
     }
 }
