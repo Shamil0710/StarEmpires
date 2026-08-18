@@ -92,6 +92,74 @@ public final class LiveTacticalInitialReadinessService {
     }
 
     /**
+     * Retains an exact number of physical ammunition items on one concrete installed feed.
+     *
+     * <p>The method may only remove items from the current load. Interface-native amount and physical
+     * mass are scaled by the same retained-item ratio, preserving the current per-item amount/mass and
+     * the central ship-mass authority. This is initial-state authoring, not a magazine counter and not
+     * a combat-effectiveness multiplier.</p>
+     *
+     * @param combatant materialized physical combatant
+     * @param mountId installed weapon/launcher mount owning the feed
+     * @param interfaceId concrete ammunition interface on that mount
+     * @param retainedItemCount exact physical item count to retain
+     */
+    public void retainAmmunitionItems(
+            CombatantRuntime combatant,
+            String mountId,
+            String interfaceId,
+            long retainedItemCount) {
+        CombatantRuntime checked = Objects.requireNonNull(combatant, "combatant");
+        requireNonBlank(mountId, "mountId");
+        requireNonBlank(interfaceId, "interfaceId");
+        if (retainedItemCount < 0L) {
+            throw new IllegalArgumentException("retainedItemCount must be non-negative");
+        }
+
+        EngineeringComponent engineering = checked.engineering();
+        RuntimeState state = engineering.runtimeState;
+        ConsumableState consumables = state.consumables();
+        ArrayList<ConsumableLoad> loads = new ArrayList<>(consumables.interfaceLoads().size());
+        boolean matched = false;
+        for (ConsumableLoad load : consumables.interfaceLoads()) {
+            if (load.kind() == InterfaceKind.AMMUNITION
+                    && load.mountId().equals(mountId)
+                    && load.interfaceId().equals(interfaceId)) {
+                if (matched) {
+                    throw new IllegalStateException("Duplicate physical ammunition feed: " + mountId + "/" + interfaceId);
+                }
+                matched = true;
+                if (retainedItemCount > load.itemCount()) {
+                    throw new IllegalArgumentException("retainedItemCount cannot exceed current physical item count");
+                }
+                if (load.itemCount() == 0L) {
+                    loads.add(load);
+                } else {
+                    double retainedRatio = retainedItemCount / (double) load.itemCount();
+                    loads.add(new ConsumableLoad(
+                            load.mountId(),
+                            load.interfaceId(),
+                            load.kind(),
+                            canonicalZero(load.amount() * retainedRatio),
+                            canonicalZero(load.massKg() * retainedRatio),
+                            retainedItemCount));
+                }
+            } else {
+                loads.add(load);
+            }
+        }
+        if (!matched) {
+            throw new IllegalArgumentException("Unknown physical ammunition feed: " + mountId + "/" + interfaceId);
+        }
+        engineering.setRuntimeState(withConsumables(state, new ConsumableState(
+                consumables.cargoMassKg(),
+                consumables.storesMassKg(),
+                consumables.missionPayloadMassKg(),
+                consumables.missionIntegrationVolumeM3(),
+                loads)));
+    }
+
+    /**
      * Removes every physically loaded ammunition item while preserving all non-ammunition stores.
      *
      * @param combatant materialized physical combatant
@@ -181,9 +249,7 @@ public final class LiveTacticalInitialReadinessService {
     }
 
     private static void requireInstalledMount(CombatantRuntime combatant, String mountId) {
-        if (mountId == null || mountId.isBlank()) {
-            throw new IllegalArgumentException("mountId must be non-blank");
-        }
+        requireNonBlank(mountId, "mountId");
         boolean installed = combatant.engineering().fit.installedModules().stream()
                 .anyMatch(value -> value.mountId().equals(mountId));
         if (!installed) {
@@ -204,6 +270,12 @@ public final class LiveTacticalInitialReadinessService {
     private static void requireNonNegativeFinite(double value, String label) {
         if (!Double.isFinite(value) || value < 0d) {
             throw new IllegalArgumentException(label + " must be finite and non-negative");
+        }
+    }
+
+    private static void requireNonBlank(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " must be non-blank");
         }
     }
 }
