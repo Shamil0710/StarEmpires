@@ -2,7 +2,10 @@ package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.ShipEngineeringCatalog.Vector3d;
+import com.spacesim.content.ship.ShipProtectionCatalog;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
+import com.spacesim.content.ship.Stage175ICombatTestProtectionPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponLauncherCatalog;
@@ -14,16 +17,19 @@ import com.spacesim.ship.WeaponFireControl.KinematicState;
 import com.spacesim.ship.WeaponFireControl.TargetMotionEstimate;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Shared Stage-19I kinetic weapon-body execution over one multi-combatant control runtime.
+ * Shared Stage-19I kinetic weapon/body/impact execution over one multi-combatant control runtime.
  *
  * <p>This class composes the existing production weapon adapter, fire-control mathematics,
- * ammunition runtime, launcher-cycle runtime and {@link ProjectileBody}. It does not create a new
- * damage model, hit probability, weapon-range wall or abstract fleet-ammunition counter.</p>
+ * ammunition runtime, launcher-cycle runtime, {@link ProjectileBody}, shield/material protection and
+ * local damage runtime. It does not create a hit probability, fleet hit-point pool, weapon-range wall
+ * or abstract ammunition counter.</p>
  *
  * <p>A shot may be materialized only when the Stage-19 control runtime authorizes fire, the selected
  * target exists in that actor's visible {@link TrackState} domain, the fitted launcher is physically
@@ -32,55 +38,77 @@ import java.util.TreeMap;
  * Production TrackState currently has no velocity channel, so this slice uses the same explicit zero
  * target-motion estimate as the established live duel rather than leaking authoritative enemy
  * velocity into actor knowledge.</p>
+ *
+ * <p>Once materialized, bodies are no longer target-owned. Swept collision checks consider every
+ * other physical combatant, including friendlies, using relative body/ship motion and the production
+ * hull footprint. The first geometric intersection wins; allegiance cannot make a physical body pass
+ * through another ship.</p>
  */
 public final class LiveTacticalBattleWeaponRuntime {
+    private static final double EPSILON = 1e-12d;
+
     private final LiveTacticalBattleControlRuntime controlRuntime;
     private final ShipEngineeringCatalog engineeringCatalog;
+    private final ShipProtectionCatalog protectionCatalog;
     private final WeaponAmmunitionCatalog ammunitionCatalog;
     private final WeaponLauncherCatalog launcherCatalog;
     private final DerivedShipCalculator calculator;
     private final ShipWeaponEngineeringAdapter weaponAdapter;
+    private final ShipShieldEngineeringAdapter shieldAdapter;
     private final WeaponFireControl fireControl;
     private final AmmunitionRuntime ammunitionRuntime;
     private final WeaponMountRuntime weaponMountRuntime;
+    private final ShieldFieldRuntime shieldRuntime;
+    private final KineticProtectionRuntime protectionRuntime;
     private final List<ProjectileBody> projectiles = new ArrayList<>();
     private final TreeMap<Long, Long> shotsBySourceEntityId = new TreeMap<>();
+    private final TreeMap<Long, Long> impactsByTargetEntityId = new TreeMap<>();
 
     private long nextProjectileId = 190_000L;
 
     /**
-     * Creates shared weapon execution over one already materialized/control-driven battle.
+     * Creates shared weapon/protection execution over one materialized/control-driven battle.
      *
      * @param controlRuntime production multi-combatant sensing/AI/engineering/flight runtime
      */
     public LiveTacticalBattleWeaponRuntime(LiveTacticalBattleControlRuntime controlRuntime) {
         this.controlRuntime = Objects.requireNonNull(controlRuntime, "controlRuntime");
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        protectionCatalog = Stage175ICombatTestProtectionPack.load();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         weaponAdapter = new ShipWeaponEngineeringAdapter();
+        shieldAdapter = new ShipShieldEngineeringAdapter();
         fireControl = new WeaponFireControl();
         ammunitionRuntime = new AmmunitionRuntime();
         weaponMountRuntime = new WeaponMountRuntime();
+        shieldRuntime = new ShieldFieldRuntime();
+        protectionRuntime = new KineticProtectionRuntime(
+                shieldRuntime,
+                new HeavyImpactResolver(engineeringCatalog, protectionCatalog),
+                new ShipDamageRuntime());
         for (CombatantRuntime combatant : battleState().combatants()) {
             shotsBySourceEntityId.put(combatant.spec().entityId(), 0L);
+            impactsByTargetEntityId.put(combatant.spec().entityId(), 0L);
         }
     }
 
     /**
-     * Advances one complete shared control/flight/kinetic-body tick.
+     * Advances one complete shared control/flight/kinetic-impact tick.
      *
-     * <p>Launcher cycles advance once, then the existing shared control runtime resolves sensing,
-     * actor-local decisions, engineering and movement. Authorized shots are materialized from the
-     * resulting physical shooter state and existing actor-local tracks. Finally every physical body
-     * advances ballistically through the same fixed interval.</p>
+     * <p>Start-of-tick ship positions are retained for relative swept collision. Launcher cycles then
+     * advance once, the existing shared control runtime resolves sensing/decisions/engineering/ship
+     * motion, authorized shots are materialized, and every projectile advances through the same
+     * interval. Existing bodies test against moving ship start/end geometry; newly spawned bodies use
+     * post-movement ship geometry because their muzzle exit occurs after the control/flight phase.</p>
      */
     public void advanceOneTick() {
+        TreeMap<Long, PositionSnapshot> shipStartPositions = snapshotShipPositions();
         advanceLauncherCycles();
         controlRuntime.advanceOneTick();
         fireAllAuthorizedActors();
-        advanceProjectiles();
+        advanceProjectilesAndResolveImpacts(shipStartPositions);
     }
 
     /** @return authoritative shared simulation tick */
@@ -120,7 +148,23 @@ public final class LiveTacticalBattleWeaponRuntime {
     }
 
     /**
-     * Returns an equality-friendly deterministic weapon/body projection.
+     * Returns the number of resolved physical kinetic intersections on one combatant.
+     *
+     * @param targetEntityId stable struck combatant identity
+     * @return non-negative impact count
+     */
+    public long impactsOn(long targetEntityId) {
+        battleState().requireCombatant(targetEntityId);
+        return impactsByTargetEntityId.get(targetEntityId);
+    }
+
+    /** @return total physical kinetic intersections resolved in the battle */
+    public long totalImpacts() {
+        return impactsByTargetEntityId.values().stream().mapToLong(Long::longValue).sum();
+    }
+
+    /**
+     * Returns an equality-friendly deterministic weapon/body/protection projection.
      *
      * @return whole-battle weapon fingerprint
      */
@@ -132,10 +176,18 @@ public final class LiveTacticalBattleWeaponRuntime {
                         ammunitionRounds(combatant.engineering().runtimeState.consumables()),
                         combatant.engineering().instanceState.weaponMountRuntime().cooldownSecondsByMount()))
                 .toList();
+        List<TargetProtectionFingerprint> targets = battleState().combatants().stream()
+                .map(combatant -> new TargetProtectionFingerprint(
+                        combatant.spec().entityId(),
+                        impactsByTargetEntityId.get(combatant.spec().entityId()),
+                        meanIntegrity(combatant),
+                        totalShieldReserveJ(combatant)))
+                .toList();
         return new BattleWeaponFingerprint(
                 tick(),
                 controlRuntime.fingerprint(),
                 sources,
+                targets,
                 List.copyOf(projectiles));
     }
 
@@ -237,19 +289,241 @@ public final class LiveTacticalBattleWeaponRuntime {
                 .orElse(null);
     }
 
-    private void advanceProjectiles() {
-        for (int index = 0; index < projectiles.size(); index++) {
-            projectiles.set(index, projectiles.get(index).advance(LiveTacticalBattleControlRuntime.TICK_SECONDS));
+    private void advanceProjectilesAndResolveImpacts(TreeMap<Long, PositionSnapshot> shipStartPositions) {
+        List<ProjectileBody> survivors = new ArrayList<>(projectiles.size());
+        for (ProjectileBody body : projectiles) {
+            ProjectileBody next = body.advance(LiveTacticalBattleControlRuntime.TICK_SECONDS);
+            ImpactCandidate impact = firstImpact(body, next, shipStartPositions);
+            if (impact == null) {
+                survivors.add(next);
+                continue;
+            }
+
+            ProjectileBody impactBody = atFraction(body, next, impact.fraction);
+            KineticProtectionRuntime.Result result = resolveImpact(
+                    impact.target,
+                    impactBody,
+                    impact.targetPositionAtImpact);
+            impactsByTargetEntityId.compute(
+                    impact.target.spec().entityId(),
+                    (ignored, count) -> Math.addExact(Objects.requireNonNull(count, "impact count"), 1L));
+
+            if (result.postProtectionProjectile() != null) {
+                double remainingSeconds = LiveTacticalBattleControlRuntime.TICK_SECONDS * (1d - impact.fraction);
+                ProjectileBody residual = result.postProtectionProjectile();
+                survivors.add(remainingSeconds > EPSILON ? residual.advance(remainingSeconds) : residual);
+            }
         }
+        projectiles.clear();
+        projectiles.addAll(survivors);
+    }
+
+    private ImpactCandidate firstImpact(
+            ProjectileBody body,
+            ProjectileBody next,
+            TreeMap<Long, PositionSnapshot> shipStartPositions) {
+        ImpactCandidate best = null;
+        boolean newlySpawned = body.spawnTick() == tick();
+        for (CombatantRuntime target : battleState().combatants()) {
+            if (target.spec().entityId() == body.sourceEntityId()) {
+                continue;
+            }
+            PositionSnapshot end = new PositionSnapshot(
+                    target.transform().position.x,
+                    target.transform().position.y);
+            PositionSnapshot start = newlySpawned
+                    ? end
+                    : Objects.requireNonNull(
+                            shipStartPositions.get(target.spec().entityId()),
+                            "target start position");
+            double halfLength = target.hull().boundingDimensionsM().lengthM() * 0.5d;
+            double halfWidth = target.hull().boundingDimensionsM().widthM() * 0.5d;
+            var fraction = TacticalCollisionGeometry.firstSegmentAabbHitFraction(
+                    body.xM() - start.xM,
+                    body.yM() - start.yM,
+                    next.xM() - end.xM,
+                    next.yM() - end.yM,
+                    halfLength,
+                    halfWidth);
+            if (fraction.isEmpty()) {
+                continue;
+            }
+            double value = fraction.getAsDouble();
+            if (best == null
+                    || value < best.fraction - EPSILON
+                    || (Math.abs(value - best.fraction) <= EPSILON
+                    && target.spec().entityId() < best.target.spec().entityId())) {
+                best = new ImpactCandidate(
+                        target,
+                        value,
+                        interpolate(start, end, value));
+            }
+        }
+        return best;
+    }
+
+    private KineticProtectionRuntime.Result resolveImpact(
+            CombatantRuntime target,
+            ProjectileBody impactBody,
+            PositionSnapshot targetPositionAtImpact) {
+        EngineeringComponent engineering = target.engineering();
+        ShipInstanceRuntimeState beforeInstance = engineering.instanceState;
+        DerivedShipState beforeDerived = derive(target);
+        List<ShipShieldEngineeringAdapter.FittedShield> beforeFittedShields = shieldAdapter.derive(beforeDerived);
+        double threatDirectionRad = Math.atan2(-impactBody.velocityYMps(), -impactBody.velocityXMps());
+        ShieldSelection shieldSelection = selectShield(
+                beforeFittedShields,
+                beforeInstance,
+                impactBody,
+                threatDirectionRad);
+        KineticProtectionRuntime.ShieldInput shieldInput = shieldSelection == null
+                ? null
+                : new KineticProtectionRuntime.ShieldInput(
+                        shieldSelection.fitted.definition(),
+                        shieldSelection.state);
+        Vector3d localHitPoint = new Vector3d(
+                impactBody.xM() - targetPositionAtImpact.xM,
+                impactBody.yM() - targetPositionAtImpact.yM,
+                0d);
+        KineticProtectionRuntime.Result result = protectionRuntime.resolve(
+                impactBody,
+                shieldInput,
+                threatDirectionRad,
+                LiveTacticalBattleControlRuntime.TICK_SECONDS,
+                target.hull().structuralProtectionStackId(),
+                0d,
+                target.hull(),
+                engineering.fit,
+                target.damageLayout(),
+                beforeInstance.damage(),
+                localHitPoint);
+        applyProtectionResult(
+                target,
+                beforeInstance,
+                beforeFittedShields,
+                shieldSelection,
+                result);
+        return result;
+    }
+
+    private ShieldSelection selectShield(
+            List<ShipShieldEngineeringAdapter.FittedShield> fittedShields,
+            ShipInstanceRuntimeState instance,
+            ProjectileBody body,
+            double threatDirectionRad) {
+        for (ShipShieldEngineeringAdapter.FittedShield fitted : fittedShields) {
+            ShieldFieldRuntime.State state = instance.shieldStatesByMount().get(fitted.mountId());
+            if (state == null) {
+                continue;
+            }
+            ShieldFieldRuntime.Interaction probe = shieldRuntime.interact(
+                    fitted.definition(),
+                    state,
+                    body.kineticEnergyJ(),
+                    threatDirectionRad,
+                    LiveTacticalBattleControlRuntime.TICK_SECONDS);
+            if (probe.covered()) {
+                return new ShieldSelection(fitted, state);
+            }
+        }
+        return null;
+    }
+
+    private void applyProtectionResult(
+            CombatantRuntime target,
+            ShipInstanceRuntimeState beforeInstance,
+            List<ShipShieldEngineeringAdapter.FittedShield> beforeFittedShields,
+            ShieldSelection shieldSelection,
+            KineticProtectionRuntime.Result result) {
+        TreeMap<String, ShieldFieldRuntime.State> shields =
+                new TreeMap<>(beforeInstance.shieldStatesByMount());
+        if (shieldSelection != null && result.shieldInteraction() != null) {
+            shields.put(shieldSelection.fitted.mountId(), result.shieldInteraction().state());
+        }
+        ShipDamageRuntime.Snapshot damage = result.damageEvent() == null
+                ? beforeInstance.damage()
+                : result.damageEvent().snapshot();
+        if (result.damageEvent() != null) {
+            DerivedShipState afterDerived = deriveWithDamage(target, damage);
+            TreeMap<String, ShipShieldEngineeringAdapter.FittedShield> afterByMount = new TreeMap<>();
+            for (ShipShieldEngineeringAdapter.FittedShield fitted : shieldAdapter.derive(afterDerived)) {
+                afterByMount.put(fitted.mountId(), fitted);
+            }
+            for (ShipShieldEngineeringAdapter.FittedShield before : beforeFittedShields) {
+                ShieldFieldRuntime.State state = shields.get(before.mountId());
+                if (state == null) {
+                    continue;
+                }
+                ShipShieldEngineeringAdapter.FittedShield after = afterByMount.get(before.mountId());
+                double integrity = after == null ? 0d : after.emitterIntegrity();
+                shields.put(
+                        before.mountId(),
+                        shieldRuntime.withEmitterIntegrity(before.definition(), state, integrity));
+            }
+        }
+        target.engineering().setInstanceState(new ShipInstanceRuntimeState(
+                damage,
+                shields,
+                beforeInstance.maintenance(),
+                beforeInstance.weaponLoadout(),
+                beforeInstance.weaponMountRuntime()));
+    }
+
+    private TreeMap<Long, PositionSnapshot> snapshotShipPositions() {
+        TreeMap<Long, PositionSnapshot> result = new TreeMap<>();
+        for (CombatantRuntime combatant : battleState().combatants()) {
+            result.put(
+                    combatant.spec().entityId(),
+                    new PositionSnapshot(
+                            combatant.transform().position.x,
+                            combatant.transform().position.y));
+        }
+        return result;
     }
 
     private DerivedShipState derive(CombatantRuntime combatant) {
+        return deriveWithDamage(combatant, combatant.engineering().instanceState.damage());
+    }
+
+    private DerivedShipState deriveWithDamage(
+            CombatantRuntime combatant,
+            ShipDamageRuntime.Snapshot damage) {
         EngineeringComponent engineering = combatant.engineering();
         return calculator.derive(
                 combatant.hull(),
                 engineering.fit,
                 engineering.runtimeState.consumables(),
-                engineering.instanceState.damage().moduleDamage());
+                Objects.requireNonNull(damage, "damage").moduleDamage());
+    }
+
+    private static ProjectileBody atFraction(
+            ProjectileBody start,
+            ProjectileBody end,
+            double fraction) {
+        double x = start.xM() + (end.xM() - start.xM()) * fraction;
+        double y = start.yM() + (end.yM() - start.yM()) * fraction;
+        return new ProjectileBody(
+                start.projectileId(),
+                start.sourceEntityId(),
+                start.spawnTick(),
+                start.materialId(),
+                start.shape(),
+                start.lengthM(),
+                start.diameterM(),
+                start.massKg(),
+                x,
+                y,
+                start.velocityXMps(),
+                start.velocityYMps());
+    }
+
+    private static PositionSnapshot interpolate(
+            PositionSnapshot start,
+            PositionSnapshot end,
+            double fraction) {
+        return new PositionSnapshot(
+                start.xM + (end.xM - start.xM) * fraction,
+                start.yM + (end.yM - start.yM) * fraction);
     }
 
     private static void replaceConsumables(
@@ -285,6 +559,63 @@ public final class LiveTacticalBattleWeaponRuntime {
                 .sum();
     }
 
+    private static double meanIntegrity(CombatantRuntime combatant) {
+        ShipDamageRuntime.Snapshot damage = combatant.engineering().instanceState.damage();
+        return combatant.hull().compartments().stream()
+                .mapToDouble(compartment -> damage.compartmentIntegrityById()
+                        .getOrDefault(compartment.id(), 1d))
+                .average()
+                .orElse(1d);
+    }
+
+    private static double totalShieldReserveJ(CombatantRuntime combatant) {
+        return combatant.engineering().instanceState.shieldStatesByMount().values().stream()
+                .mapToDouble(ShieldFieldRuntime.State::reserveJ)
+                .sum();
+    }
+
+    private static final class ShieldSelection {
+        private final ShipShieldEngineeringAdapter.FittedShield fitted;
+        private final ShieldFieldRuntime.State state;
+
+        private ShieldSelection(
+                ShipShieldEngineeringAdapter.FittedShield fitted,
+                ShieldFieldRuntime.State state) {
+            this.fitted = Objects.requireNonNull(fitted, "fitted");
+            this.state = Objects.requireNonNull(state, "state");
+        }
+    }
+
+    private static final class ImpactCandidate {
+        private final CombatantRuntime target;
+        private final double fraction;
+        private final PositionSnapshot targetPositionAtImpact;
+
+        private ImpactCandidate(
+                CombatantRuntime target,
+                double fraction,
+                PositionSnapshot targetPositionAtImpact) {
+            this.target = Objects.requireNonNull(target, "target");
+            this.fraction = fraction;
+            this.targetPositionAtImpact = Objects.requireNonNull(
+                    targetPositionAtImpact,
+                    "targetPositionAtImpact");
+        }
+    }
+
+    private static final class PositionSnapshot {
+        private final double xM;
+        private final double yM;
+
+        private PositionSnapshot(double xM, double yM) {
+            if (!Double.isFinite(xM) || !Double.isFinite(yM)) {
+                throw new IllegalArgumentException("position snapshot must be finite");
+            }
+            this.xM = xM;
+            this.yM = yM;
+        }
+    }
+
     /**
      * Per-source finite-ammunition and launcher-continuity projection.
      *
@@ -297,7 +628,7 @@ public final class LiveTacticalBattleWeaponRuntime {
             long entityId,
             long shotsFired,
             long ammunitionRounds,
-            java.util.Map<String, Double> cooldownSecondsByMount) {
+            Map<String, Double> cooldownSecondsByMount) {
         /**
          * Validates and freezes one source weapon projection.
          *
@@ -310,23 +641,56 @@ public final class LiveTacticalBattleWeaponRuntime {
             if (entityId <= 0L || shotsFired < 0L || ammunitionRounds < 0L) {
                 throw new IllegalArgumentException("weapon fingerprint counters/identity must be valid");
             }
-            cooldownSecondsByMount = java.util.Map.copyOf(
-                    Objects.requireNonNull(cooldownSecondsByMount, "cooldownSecondsByMount"));
+            cooldownSecondsByMount = Collections.unmodifiableMap(new TreeMap<>(
+                    Objects.requireNonNull(cooldownSecondsByMount, "cooldownSecondsByMount")));
         }
     }
 
     /**
-     * Whole-battle deterministic kinetic weapon/body fingerprint.
+     * Per-target physical protection projection.
+     *
+     * @param entityId stable target combatant identity
+     * @param impactsResolved physical kinetic intersections resolved on this target
+     * @param meanCompartmentIntegrity current mean production compartment integrity
+     * @param totalShieldReserveJ current summed persistent fitted shield reserve
+     */
+    public record TargetProtectionFingerprint(
+            long entityId,
+            long impactsResolved,
+            double meanCompartmentIntegrity,
+            double totalShieldReserveJ) {
+        /**
+         * Validates one target protection projection.
+         *
+         * @param entityId stable target combatant identity
+         * @param impactsResolved physical kinetic intersections resolved on this target
+         * @param meanCompartmentIntegrity current mean production compartment integrity
+         * @param totalShieldReserveJ current summed persistent fitted shield reserve
+         */
+        public TargetProtectionFingerprint {
+            if (entityId <= 0L || impactsResolved < 0L
+                    || !Double.isFinite(meanCompartmentIntegrity)
+                    || meanCompartmentIntegrity < 0d || meanCompartmentIntegrity > 1d
+                    || !Double.isFinite(totalShieldReserveJ) || totalShieldReserveJ < 0d) {
+                throw new IllegalArgumentException("invalid target protection fingerprint");
+            }
+        }
+    }
+
+    /**
+     * Whole-battle deterministic kinetic weapon/body/protection fingerprint.
      *
      * @param tick authoritative shared tick
      * @param controlFingerprint production control/flight fingerprint
      * @param sources canonical stable-entity weapon projections
+     * @param targets canonical stable-entity protection projections
      * @param projectiles current independent physical projectile bodies
      */
     public record BattleWeaponFingerprint(
             long tick,
             LiveTacticalBattleControlRuntime.BattleControlFingerprint controlFingerprint,
             List<SourceWeaponFingerprint> sources,
+            List<TargetProtectionFingerprint> targets,
             List<ProjectileBody> projectiles) {
         /**
          * Validates and freezes the whole-battle weapon projection.
@@ -334,6 +698,7 @@ public final class LiveTacticalBattleWeaponRuntime {
          * @param tick authoritative shared tick
          * @param controlFingerprint production control/flight fingerprint
          * @param sources canonical stable-entity weapon projections
+         * @param targets canonical stable-entity protection projections
          * @param projectiles current independent physical projectile bodies
          */
         public BattleWeaponFingerprint {
@@ -342,6 +707,7 @@ public final class LiveTacticalBattleWeaponRuntime {
             }
             Objects.requireNonNull(controlFingerprint, "controlFingerprint");
             sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
+            targets = List.copyOf(Objects.requireNonNull(targets, "targets"));
             projectiles = List.copyOf(Objects.requireNonNull(projectiles, "projectiles"));
         }
     }
