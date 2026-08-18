@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LiveTacticalOrdnanceElectronicWarfareTest {
@@ -73,7 +74,7 @@ class LiveTacticalOrdnanceElectronicWarfareTest {
         LiveTacticalOrdnanceObservationRuntime observation =
                 new LiveTacticalOrdnanceObservationRuntime(ordnance);
 
-        ScanDiagnostics representative = ScanDiagnostics.noneForTest();
+        ScanDiagnostics representative = null;
         for (int index = 0; index < 800; index++) {
             ordnance.advanceOneTick();
             observation.observeCurrentTick();
@@ -92,8 +93,9 @@ class LiveTacticalOrdnanceElectronicWarfareTest {
         }
         assertTrue(ordnance.guidedLaunches(ATTACKER_ID) > 0L,
                 "acceptance fixture must materialize a real hostile guided body");
-        assertTrue(representative.committedPowerW() > 0d,
-                "acceptance fixture must reach a physically admitted radar scan");
+        assertNotNull(representative,
+                "acceptance fixture must reach a physically admitted representative radar scan");
+        assertTrue(representative.committedPowerW() > 0d);
         return new ObservationCase(observation, representative);
     }
 
