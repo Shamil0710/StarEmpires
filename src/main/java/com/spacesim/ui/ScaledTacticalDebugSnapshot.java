@@ -51,20 +51,17 @@ public record ScaledTacticalDebugSnapshot(
      * @param targetId observed target identity
      * @param informationState current actor-local information quality
      * @param positionKnown whether Cartesian position is currently known to this actor
-     * @param velocityKnown whether velocity is currently known to this actor
      */
     public record TrackDebug(
             long targetId,
             InformationState informationState,
-            boolean positionKnown,
-            boolean velocityKnown) {
+            boolean positionKnown) {
         /**
          * Validates one actor-local track diagnostic.
          *
          * @param targetId observed target identity
          * @param informationState current actor-local information quality
          * @param positionKnown whether Cartesian position is currently known to this actor
-         * @param velocityKnown whether velocity is currently known to this actor
          */
         public TrackDebug {
             if (targetId <= 0L) {
