@@ -216,7 +216,7 @@ public final class LiveTacticalBattleControlRuntime {
     }
 
     /**
-     * Returns the latest actor-local production policy output.
+     * Returns the latest production policy output.
      *
      * @param entityId stable combatant identity
      * @return current control state
@@ -322,17 +322,20 @@ public final class LiveTacticalBattleControlRuntime {
             }
         }
 
+        DatalinkState localLink = DatalinkState.local();
+        TrackQualityPolicy qualityPolicy = TrackQualityPolicy.defaultPolicy();
+        double nowSeconds = elapsedSeconds();
         List<ObservedContact> contacts = new ArrayList<>();
         for (Map.Entry<Long, List<SensorMeasurement>> entry : history.entrySet()) {
-            if (entry.getValue().isEmpty()) {
+            if (!hasDeliveredFreshMeasurement(entry.getKey(), entry.getValue(), localLink, nowSeconds)) {
                 continue;
             }
             TrackState track = sensorRuntime.fuse(
                     entry.getKey(),
                     entry.getValue(),
-                    DatalinkState.local(),
-                    TrackQualityPolicy.defaultPolicy(),
-                    elapsedSeconds());
+                    localLink,
+                    qualityPolicy,
+                    nowSeconds);
             contacts.add(new ObservedContact(track, ContactDisposition.HOSTILE));
         }
         battleState.replaceVisibleContacts(observer.spec().entityId(), contacts);
@@ -524,6 +527,18 @@ public final class LiveTacticalBattleControlRuntime {
         history.put(targetId, List.copyOf(values));
     }
 
+    private static boolean hasDeliveredFreshMeasurement(
+            long targetId,
+            List<SensorMeasurement> measurements,
+            DatalinkState link,
+            double nowSeconds) {
+        return measurements.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(value -> value.targetId() == targetId
+                        && value.timestampSeconds() + link.latencySeconds() <= nowSeconds
+                        && nowSeconds - value.timestampSeconds() <= link.maxMeasurementAgeSeconds());
+    }
+
     private static long ammunitionCount(ShipEngineeringState.ConsumableState state) {
         return state.interfaceLoads().stream()
                 .filter(value -> value.kind() == InterfaceKind.AMMUNITION)
@@ -646,8 +661,8 @@ public final class LiveTacticalBattleControlRuntime {
          * @param entityId stable combatant identity
          * @param xM current physical x position
          * @param yM current physical y position
-         * @param velocityXMps current physical x velocity
-         * @param velocityYMps current physical y velocity
+         * @param velocityXMps current x velocity
+         * @param velocityYMps current y velocity
          * @param reactionMassKg current physical reaction mass
          * @param visibleTargetIds actor-visible target identities
          * @param selectedTargetId actor-selected target identity or zero
