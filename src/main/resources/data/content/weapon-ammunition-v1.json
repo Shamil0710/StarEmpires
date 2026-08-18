@@ -17,6 +17,14 @@
       "materialId": "material.high_strength_steel_v1",
       "shape": "SHELL",
       "engagementRole": "INTERCEPTOR",
+      "signature": {
+        "thermalRadiantPowerW": 800000.0,
+        "enginePlumeRadiantPowerW": 150000000.0,
+        "radarCrossSectionM2": 0.3,
+        "reflectedOpticalPowerW": 120000.0,
+        "activeRadioEmissionPowerW": 250.0,
+        "jammerEmissionPowerW": 0.0
+      },
       "lengthM": 3.2,
       "diameterM": 0.48,
       "impactPayloadId": null,
