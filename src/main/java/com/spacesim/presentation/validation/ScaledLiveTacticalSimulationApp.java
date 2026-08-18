@@ -13,12 +13,14 @@ import com.spacesim.ui.ScaledLiveTacticalSimulationSession;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession.SimulationSpeed;
 import com.spacesim.ui.ScaledTacticalDebugSnapshot;
 import com.spacesim.ui.TacticalPrototypeRenderer;
+import com.spacesim.ui.TacticalScenarioId;
 import com.spacesim.ui.WorldMapLayout;
 
 import java.util.Locale;
+import java.util.Objects;
 
 /**
- * Runnable desktop viewer for the exact Stage-19I 32-ship saturation runtime.
+ * Runnable Stage-19J desktop viewer over one selected exact-local production tactical scenario.
  *
  * <p>Wall-clock time and input own presentation scheduling only. The viewer never advances partial
  * simulation intervals and never owns movement, AI, sensors, weapons, ammunition, damage, power,
@@ -29,6 +31,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private static final double MAX_FRAME_SECONDS = 0.25d;
     private static final int MAX_BATCHES_PER_RENDER = 64;
 
+    private final TacticalScenarioId scenarioId;
     private ScaledLiveTacticalSimulationSession session;
     private TacticalPrototypeRenderer tacticalRenderer;
     private OrthographicCamera camera;
@@ -39,10 +42,20 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private int selectedCombatantIndex;
     private double accumulatedWallSeconds;
 
-    /** Allocates presentation resources and creates the shared-factory 32-ship live session. */
+    /** Creates the historical saturation viewer for backwards-compatible launch paths. */
+    public ScaledLiveTacticalSimulationApp() {
+        this(TacticalScenarioId.SATURATION_16V16);
+    }
+
+    /** Creates a viewer that will own only presentation state for the selected canonical scenario. */
+    public ScaledLiveTacticalSimulationApp(TacticalScenarioId scenarioId) {
+        this.scenarioId = Objects.requireNonNull(scenarioId, "scenarioId");
+    }
+
+    /** Allocates presentation resources and creates the selected shared-factory live session. */
     @Override
     public void create() {
-        session = new ScaledLiveTacticalSimulationSession();
+        session = new ScaledLiveTacticalSimulationSession(scenarioId);
         tacticalRenderer = new TacticalPrototypeRenderer();
         camera = new OrthographicCamera();
         batch = new SpriteBatch();
@@ -160,7 +173,14 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         batch.begin();
         font.setColor(new Color(0.82f, 0.92f, 1f, 1f));
         float top = camera.viewportHeight - 18f;
-        font.draw(batch, "STAGE 19I — SCALED LIVE TACTICAL SIMULATION (32 SHIPS)", 22f, top);
+        font.draw(batch,
+                String.format(Locale.ROOT,
+                        "STAGE 19J — %s | %d SHIPS | key=%s",
+                        session.scenario().displayName(),
+                        session.scenario().totalShips(),
+                        session.scenario().id().cliKey()),
+                22f,
+                top);
         font.draw(batch,
                 String.format(Locale.ROOT,
                         "Tick %d | %s | %s | bodies K/G/I/D %d/%d/%d/%d",
@@ -223,7 +243,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                     top - 96f);
         }
         font.draw(batch,
-                "SPACE pause | N/RIGHT single tick | R deterministic reset | 1/2/4/8 speed | UP/DOWN actor | F1 HUD | ESC exit",
+                "SPACE pause | N/RIGHT single tick | R reset CURRENT scenario | 1/2/4/8 speed | UP/DOWN actor | F1 HUD | ESC exit",
                 22f,
                 18f);
         batch.end();
