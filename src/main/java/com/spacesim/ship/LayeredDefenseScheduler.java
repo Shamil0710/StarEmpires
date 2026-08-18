@@ -45,7 +45,11 @@ public final class LayeredDefenseScheduler {
     }
 
     /**
-     * One incoming physical-body threat hypothesis.
+     * Legacy exact-local incoming physical-body threat hypothesis.
+     *
+     * <p>Stage 19I-D defense policy should prefer {@link ObservedThreatKinematics}. The physical mass
+     * and guidance flags remain here for compatibility with older Stage-17.5 acceptance fixtures;
+     * assignment geometry has never consumed them.</p>
      *
      * @param threatId stable deterministic physical/body identity
      * @param xM current x position in meters
@@ -75,14 +79,50 @@ public final class LayeredDefenseScheduler {
          * @param guidanceAvailable whether active guidance remains available
          */
         public Threat {
-            if (threatId <= 0L) {
-                throw new IllegalArgumentException("threatId must be positive");
-            }
+            requirePositiveIdentity(threatId, "threatId");
             requireFinite(xM, "xM");
             requireFinite(yM, "yM");
             requireFinite(velocityXMps, "velocityXMps");
             requireFinite(velocityYMps, "velocityYMps");
             requirePositiveFinite(physicalMassKg, "physicalMassKg");
+        }
+    }
+
+    /**
+     * Actor-bounded threat kinematics accepted by Stage-19I defense policy.
+     *
+     * <p>The record deliberately contains no physical mass, guidance health, source fit or hidden
+     * target capability. It is sufficient because the scheduler's assignment mathematics depends
+     * only on observed identity/position/velocity. Physical body state is consulted later only by the
+     * simulation layer after an actor has selected an observed target identity.</p>
+     *
+     * @param threatId observer-local target identity hypothesis
+     * @param xM observer-estimated x position
+     * @param yM observer-estimated y position
+     * @param velocityXMps observer-estimated x velocity
+     * @param velocityYMps observer-estimated y velocity
+     */
+    public record ObservedThreatKinematics(
+            long threatId,
+            double xM,
+            double yM,
+            double velocityXMps,
+            double velocityYMps) {
+        /**
+         * Validates one actor-bounded threat kinematic estimate.
+         *
+         * @param threatId observer-local target identity hypothesis
+         * @param xM observer-estimated x position
+         * @param yM observer-estimated y position
+         * @param velocityXMps observer-estimated x velocity
+         * @param velocityYMps observer-estimated y velocity
+         */
+        public ObservedThreatKinematics {
+            requirePositiveIdentity(threatId, "threatId");
+            requireFinite(xM, "xM");
+            requireFinite(yM, "yM");
+            requireFinite(velocityXMps, "velocityXMps");
+            requireFinite(velocityYMps, "velocityYMps");
         }
     }
 
@@ -126,9 +166,7 @@ public final class LayeredDefenseScheduler {
          * @param safeMinimumInterceptDistanceM minimum acceptable intercept distance from defended center
          */
         public DefenseStation {
-            if (stationId <= 0L) {
-                throw new IllegalArgumentException("stationId must be positive");
-            }
+            requirePositiveIdentity(stationId, "stationId");
             requireFinite(xM, "xM");
             requireFinite(yM, "yM");
             requireNonNegativeFinite(launchVelocityMps, "launchVelocityMps");
@@ -171,9 +209,8 @@ public final class LayeredDefenseScheduler {
          * @param interceptYM predicted intercept y coordinate
          */
         public Assignment {
-            if (threatId <= 0L || stationId <= 0L) {
-                throw new IllegalArgumentException("assignment identities must be positive");
-            }
+            requirePositiveIdentity(threatId, "threatId");
+            requirePositiveIdentity(stationId, "stationId");
             requirePositiveFinite(predictedImpactSeconds, "predictedImpactSeconds");
             requirePositiveFinite(plannedInterceptSeconds, "plannedInterceptSeconds");
             requireFinite(interceptXM, "interceptXM");
@@ -185,10 +222,10 @@ public final class LayeredDefenseScheduler {
     }
 
     /**
-     * Assigns physically feasible defenses in deterministic impact-time order.
+     * Legacy exact-local assignment entry point retained for Stage-17.5 fixtures.
      *
      * @param zone protected geometry
-     * @param threats incoming physical bodies
+     * @param threats incoming exact-local physical bodies
      * @param stations available defense stations
      * @return deterministic immutable assignments
      */
@@ -196,13 +233,58 @@ public final class LayeredDefenseScheduler {
             DefendedZone zone,
             List<Threat> threats,
             List<DefenseStation> stations) {
-        DefendedZone checkedZone = Objects.requireNonNull(zone, "zone");
         Objects.requireNonNull(threats, "threats");
+        List<KinematicThreat> kinematics = threats.stream()
+                .map(value -> {
+                    Threat checked = Objects.requireNonNull(value, "threat");
+                    return new KinematicThreat(
+                            checked.threatId(),
+                            checked.xM(),
+                            checked.yM(),
+                            checked.velocityXMps(),
+                            checked.velocityYMps());
+                })
+                .toList();
+        return scheduleKinematics(zone, kinematics, stations);
+    }
+
+    /**
+     * Assigns defenses using actor-bounded observed target kinematics only.
+     *
+     * @param zone actor-known protected geometry
+     * @param threats observer-local target identity/position/velocity estimates
+     * @param stations own authoritative physical defense stations
+     * @return deterministic immutable assignments
+     */
+    public List<Assignment> scheduleObserved(
+            DefendedZone zone,
+            List<ObservedThreatKinematics> threats,
+            List<DefenseStation> stations) {
+        Objects.requireNonNull(threats, "threats");
+        List<KinematicThreat> kinematics = threats.stream()
+                .map(value -> {
+                    ObservedThreatKinematics checked = Objects.requireNonNull(value, "threat");
+                    return new KinematicThreat(
+                            checked.threatId(),
+                            checked.xM(),
+                            checked.yM(),
+                            checked.velocityXMps(),
+                            checked.velocityYMps());
+                })
+                .toList();
+        return scheduleKinematics(zone, kinematics, stations);
+    }
+
+    private List<Assignment> scheduleKinematics(
+            DefendedZone zone,
+            List<KinematicThreat> threats,
+            List<DefenseStation> stations) {
+        DefendedZone checkedZone = Objects.requireNonNull(zone, "zone");
         Objects.requireNonNull(stations, "stations");
 
         List<ThreatWithImpact> inbound = new ArrayList<>();
-        for (Threat threat : threats) {
-            Threat checked = Objects.requireNonNull(threat, "threat");
+        for (KinematicThreat threat : threats) {
+            KinematicThreat checked = Objects.requireNonNull(threat, "threat");
             double impactSeconds = predictedImpactSeconds(checkedZone, checked);
             if (Double.isFinite(impactSeconds)) {
                 inbound.add(new ThreatWithImpact(checked, impactSeconds));
@@ -255,7 +337,7 @@ public final class LayeredDefenseScheduler {
         return List.copyOf(assignments);
     }
 
-    private static double predictedImpactSeconds(DefendedZone zone, Threat threat) {
+    private static double predictedImpactSeconds(DefendedZone zone, KinematicThreat threat) {
         double rx = threat.xM() - zone.centerXM();
         double ry = threat.yM() - zone.centerYM();
         double vx = threat.velocityXMps();
@@ -288,7 +370,7 @@ public final class LayeredDefenseScheduler {
 
     private static InterceptSolution findIntercept(
             DefendedZone zone,
-            Threat threat,
+            KinematicThreat threat,
             double impactSeconds,
             DefenseStation station) {
         for (int step = 1; step < INTERCEPT_SEARCH_STEPS; step++) {
@@ -326,10 +408,31 @@ public final class LayeredDefenseScheduler {
         return poweredDistance + coastSpeed * coastTime;
     }
 
-    private record ThreatWithImpact(Threat threat, double impactSeconds) {
+    private record KinematicThreat(
+            long threatId,
+            double xM,
+            double yM,
+            double velocityXMps,
+            double velocityYMps) {
+        private KinematicThreat {
+            requirePositiveIdentity(threatId, "threatId");
+            requireFinite(xM, "xM");
+            requireFinite(yM, "yM");
+            requireFinite(velocityXMps, "velocityXMps");
+            requireFinite(velocityYMps, "velocityYMps");
+        }
+    }
+
+    private record ThreatWithImpact(KinematicThreat threat, double impactSeconds) {
     }
 
     private record InterceptSolution(double timeSeconds, double xM, double yM) {
+    }
+
+    private static void requirePositiveIdentity(long value, String label) {
+        if (value <= 0L) {
+            throw new IllegalArgumentException(label + " must be positive");
+        }
     }
 
     private static void requirePositiveFinite(double value, String label) {
