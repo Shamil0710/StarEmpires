@@ -16,6 +16,7 @@
       "id": "ammo.interceptor_1t_v1",
       "materialId": "material.high_strength_steel_v1",
       "shape": "SHELL",
+      "engagementRole": "INTERCEPTOR",
       "lengthM": 3.2,
       "diameterM": 0.48,
       "impactPayloadId": null,
