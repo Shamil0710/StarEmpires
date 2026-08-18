@@ -110,6 +110,28 @@ public final class LiveTacticalBattleOrdnanceRuntime {
     }
 
     /**
+     * Removes one physically intercepted guided body and releases its launcher support-channel ownership.
+     *
+     * <p>This package-local seam performs no collision or probability test. It may be called only by
+     * exact-local physical defense integration after a swept body-body intersection has already been
+     * established. Launch/ship-impact counters remain historical and are not rewritten.</p>
+     *
+     * @param bodyId stable guided-body identity
+     * @return removed physical body, or {@code null} when it is no longer active
+     */
+    GuidedWeaponBody removeGuidedBody(long bodyId) {
+        for (int index = 0; index < guidedBodies.size(); index++) {
+            GuidedWeaponBody body = guidedBodies.get(index);
+            if (body.bodyId() == bodyId) {
+                guidedBodies.remove(index);
+                releaseGuidedBody(bodyId);
+                return body;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns guided bodies launched by one combatant.
      *
      * @param sourceEntityId stable launching combatant identity
@@ -420,7 +442,9 @@ public final class LiveTacticalBattleOrdnanceRuntime {
         for (CombatantRuntime combatant : battleState().combatants()) {
             result.put(
                     combatant.spec().entityId(),
-                    new PositionSnapshot(combatant.transform().position.x, combatant.transform().position.y));
+                    new PositionSnapshot(
+                            combatant.transform().position.x,
+                            combatant.transform().position.y));
         }
         return result;
     }
@@ -488,7 +512,9 @@ public final class LiveTacticalBattleOrdnanceRuntime {
                 PositionSnapshot targetPositionAtImpact) {
             this.target = Objects.requireNonNull(target, "target");
             this.fraction = fraction;
-            this.targetPositionAtImpact = Objects.requireNonNull(targetPositionAtImpact, "targetPositionAtImpact");
+            this.targetPositionAtImpact = Objects.requireNonNull(
+                    targetPositionAtImpact,
+                    "targetPositionAtImpact");
         }
     }
 
@@ -512,7 +538,10 @@ public final class LiveTacticalBattleOrdnanceRuntime {
      * @param guidedLaunches physically materialized guided launches
      * @param guidedAmmunitionRounds current itemized guided-feed rounds
      */
-    public record SourceGuidedFingerprint(long entityId, long guidedLaunches, long guidedAmmunitionRounds) {
+    public record SourceGuidedFingerprint(
+            long entityId,
+            long guidedLaunches,
+            long guidedAmmunitionRounds) {
         /**
          * Validates one per-source guided projection.
          *
