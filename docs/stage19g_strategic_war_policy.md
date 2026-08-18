@@ -17,12 +17,26 @@ StrategicWarPolicyService
 HOLD / ESCALATE / OFFER_SETTLEMENT /
 SEEK_SETTLEMENT / ACCEPT_SETTLEMENT / DE_ESCALATE
         ↓
-ordinary fleet orders / logistics / diplomacy application by later owners
+existing Stage-17 diplomatic commands / ordinary fleet-logistics orders
 ```
 
 The result is policy only. It cannot damage ships, refill ammunition, alter storage, spawn replacements, change route topology or grant combat statistics.
 
-## 2. Named objectives instead of war score
+## 2. Stage-17 diplomacy remains authoritative
+
+Repository inspection confirmed that institutional diplomacy already has a production owner in Stage 17:
+
+- `FactionDiplomacyRuntime` owns persistent directed standings, grievances, treaties and embargoes;
+- `WorldSimulation.applyDiplomaticTreatyCommand(...)` is the common player/AI treaty lifecycle boundary;
+- `WorldSimulation.applyDiplomaticEmbargoCommand(...)` is the common unilateral embargo boundary;
+- `DiplomaticTreatyEvaluator` already evaluates incoming proposals from observed/estimated diagnostics and persistent directed trust/credibility;
+- `FactionStrategicPolicyEngine` owns persistent stock/production policy projection and does not create resources directly.
+
+Stage 19G therefore does **not** persist treaty state and does **not** directly apply a settlement. `StrategicWarPolicyService` decides war-specific political posture only. If a caller chooses to materialize `OFFER_SETTLEMENT`, `ACCEPT_SETTLEMENT` or another diplomatic action, it must translate the chosen named objectives into existing Stage-17 treaty clauses/commands and submit those commands through `WorldSimulation`. The exact treaty clauses cannot be invented by this service because they are content/legal terms, not physical war evidence.
+
+This keeps one authoritative diplomacy aggregate and one legal transition path.
+
+## 3. Named objectives instead of war score
 
 Every conflict input contains explicit `WarObjective` entries with stable IDs and real subject identities such as a route, system, facility or asset. Objectives may be mandatory or optional.
 
@@ -35,7 +49,7 @@ Each objective has an actor-bounded `ObjectiveEvidence` state:
 
 No objective may become satisfied because an unrelated numeric score crossed a threshold. A mandatory objective is satisfied only by observed evidence or by explicit visible settlement terms granting that exact objective ID.
 
-## 3. Physical sustainment evidence
+## 4. Physical sustainment evidence
 
 `PhysicalWarEvidence` carries physical quantities rather than an abstract readiness meter:
 
@@ -52,7 +66,7 @@ Own data may be authoritative to the actor. Opponent quantities must already hav
 
 `Policy` contains explicit political thresholds for sustainment and coercive offers. These thresholds do not alter physical state. They only decide what political action the actor is willing to take given measured consequences.
 
-## 4. Decision precedence
+## 5. Decision precedence
 
 The deterministic decision order is:
 
@@ -65,7 +79,7 @@ The deterministic decision order is:
 
 This is not a prediction of rational behavior for every future faction personality. It is the minimum inspectable production policy language required before Stage 19H persistence and later content/doctrine expansion.
 
-## 5. Actor isolation
+## 6. Actor isolation
 
 Two factions may make different strategic decisions in the same authoritative universe because their observations differ.
 
@@ -79,7 +93,7 @@ physical enemy loss exists
 
 A hidden blockade, hidden loss or hidden shortage therefore cannot create diplomatic pressure for an actor that does not know about it.
 
-## 6. Relationship to Stage 19F
+## 7. Relationship to Stage 19F
 
 Stage 19G consumes results from the existing physical owners rather than replacing them:
 
@@ -91,7 +105,7 @@ Stage 19G consumes results from the existing physical owners rather than replaci
 
 Strategic policy cannot resolve a shortage by changing a scalar.
 
-## 7. Acceptance
+## 8. Acceptance
 
 Stage 19G acceptance requires:
 
@@ -104,8 +118,9 @@ Stage 19G acceptance requires:
 7. observed opponent physical losses may justify a coercive offer only through explicit physical thresholds;
 8. the same physical universe may yield different decisions for actors with different observed evidence;
 9. maximum represented escalation cannot increase beyond `GENERAL_WAR`;
-10. strategic evaluation is read-only and grants no physical capability.
+10. strategic evaluation is read-only and grants no physical capability;
+11. any legal settlement/treaty/embargo mutation remains on the existing Stage-17 `WorldSimulation` diplomatic-command path.
 
-## 8. Transition to Stage 19H
+## 9. Transition to Stage 19H
 
-Stage 19H owns persistence and aggregate warfare acceptance. It should persist the conflict's named objectives, escalation state and strategic decisions without duplicating physical economy/combat state, then prove deterministic save/load continuation across the full causal chain.
+Stage 19H owns persistence and aggregate warfare acceptance. It should persist only Stage-19 conflict-specific state such as named objectives and escalation while referencing, not duplicating, Stage-17 diplomacy. The aggregate acceptance must prove deterministic save/load continuation across the full warfare causal chain while Stage-17 treaty state, Stage-18 economy and Stage-17.5 physical combat remain owned by their existing persistence boundaries.
