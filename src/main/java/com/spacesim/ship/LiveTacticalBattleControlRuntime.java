@@ -48,7 +48,8 @@ import java.util.TreeMap;
  * <p>All observers sense before any actor plans, and all actors plan before any physical movement is
  * applied. Tactical planners receive only actor-bounded hostile {@link ObservedContact} state. An
  * optional formation objective uses only the actor's own kinematics plus authored own-side slot
- * geometry; it never reads hidden hostile transforms or mutates physical state directly.</p>
+ * geometry; an optional battle objective contributes only own-side mission intent/safe-point geometry.
+ * Neither objective reads hidden hostile transforms or mutates physical state directly.</p>
  */
 public final class LiveTacticalBattleControlRuntime {
     /** Fixed control/flight interval shared with the existing live tactical session. */
@@ -85,32 +86,52 @@ public final class LiveTacticalBattleControlRuntime {
     private final TreeMap<Long, ActorControlState> controlByEntityId = new TreeMap<>();
     private final TreeMap<Long, FormationSlot> formationSlotByEntityId = new TreeMap<>();
     private final TreeMap<Long, Command> formationByEntityId = new TreeMap<>();
+    private final EnumMap<Side, TacticalBattleObjective> battleObjectiveBySide = new EnumMap<>(Side.class);
 
     private long tick;
 
     /**
-     * Creates the shared coordinator with no authored formation objective.
+     * Creates the shared coordinator with no authored formation or withdrawal objective.
      *
      * @param battleState authoritative battle-local physical state
      */
     public LiveTacticalBattleControlRuntime(LiveTacticalBattleRuntimeState battleState) {
-        this(battleState, Map.of());
+        this(battleState, Map.of(), Map.of());
     }
 
     /**
      * Creates the shared coordinator with optional explicit side formation objectives.
      *
-     * <p>Objectives contain physical scenario geometry only. They do not alter mass, thrust, weapon
-     * performance, sensors or any doctrine statistic.</p>
+     * <p>Formation objectives contain physical scenario geometry only. They do not alter mass, thrust,
+     * weapon performance, sensors or any doctrine statistic.</p>
      *
      * @param battleState authoritative battle-local physical state
-     * @param formationObjectives optional authored objective by battle side
+     * @param formationObjectives optional authored formation objective by battle side
      */
     public LiveTacticalBattleControlRuntime(
             LiveTacticalBattleRuntimeState battleState,
             Map<Side, Objective> formationObjectives) {
+        this(battleState, formationObjectives, Map.of());
+    }
+
+    /**
+     * Creates the shared coordinator with optional formation and mission-level battle objectives.
+     *
+     * <p>Battle objectives carry only mission intent and own-side safe-point geometry. A withdrawal
+     * objective is routed through the existing {@link TacticalSurvivalPlanner} and therefore cannot
+     * manufacture thrust, reaction mass or target information.</p>
+     *
+     * @param battleState authoritative battle-local physical state
+     * @param formationObjectives optional authored formation objective by battle side
+     * @param battleObjectives optional authored mission objective by battle side
+     */
+    public LiveTacticalBattleControlRuntime(
+            LiveTacticalBattleRuntimeState battleState,
+            Map<Side, Objective> formationObjectives,
+            Map<Side, TacticalBattleObjective> battleObjectives) {
         this.battleState = Objects.requireNonNull(battleState, "battleState");
         Objects.requireNonNull(formationObjectives, "formationObjectives");
+        Objects.requireNonNull(battleObjectives, "battleObjectives");
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         engineeringRuntime = new ShipEngineeringRuntime(engineeringCatalog);
@@ -122,10 +143,16 @@ public final class LiveTacticalBattleControlRuntime {
         survivalPlanner = new TacticalSurvivalPlanner();
         formationPlanner = new TacticalFormationPlanner();
 
-        EnumMap<Side, Objective> checkedObjectives = new EnumMap<>(Side.class);
-        formationObjectives.forEach((side, objective) -> checkedObjectives.put(
+        EnumMap<Side, Objective> checkedFormationObjectives = new EnumMap<>(Side.class);
+        formationObjectives.forEach((side, objective) -> checkedFormationObjectives.put(
                 Objects.requireNonNull(side, "formation objective side"),
                 Objects.requireNonNull(objective, "formation objective")));
+        for (Side side : Side.values()) {
+            battleObjectiveBySide.put(side, TacticalBattleObjective.engage());
+        }
+        battleObjectives.forEach((side, objective) -> battleObjectiveBySide.put(
+                Objects.requireNonNull(side, "battle objective side"),
+                Objects.requireNonNull(objective, "battle objective")));
 
         for (CombatantRuntime combatant : battleState.combatants()) {
             long entityId = combatant.spec().entityId();
@@ -134,7 +161,7 @@ public final class LiveTacticalBattleControlRuntime {
             formationByEntityId.put(entityId, Command.none());
         }
         for (Side side : Side.values()) {
-            Objective objective = checkedObjectives.get(side);
+            Objective objective = checkedFormationObjectives.get(side);
             if (objective == null) {
                 continue;
             }
@@ -176,6 +203,16 @@ public final class LiveTacticalBattleControlRuntime {
     /** @return materialized battle state driven by this coordinator */
     public LiveTacticalBattleRuntimeState battleState() {
         return battleState;
+    }
+
+    /**
+     * Returns the authored mission objective for one side.
+     *
+     * @param side battle side
+     * @return canonical engagement or explicit withdrawal objective
+     */
+    public TacticalBattleObjective battleObjective(Side side) {
+        return battleObjectiveBySide.get(Objects.requireNonNull(side, "side"));
     }
 
     /**
@@ -329,13 +366,18 @@ public final class LiveTacticalBattleControlRuntime {
                     derived.accelerationMps2(),
                     finiteAmmunitionDependent(combatant, damage.moduleDamage()),
                     ammunitionCount(combatant.engineering().runtimeState.consumables()));
+            TacticalBattleObjective battleObjective = battleObjectiveBySide.get(combatant.spec().side());
+            SafePoint retreatPoint = battleObjective.withdrawalPoint().known()
+                    ? battleObjective.withdrawalPoint()
+                    : new SafePoint(true, combatant.spec().xM(), combatant.spec().yM());
             TacticalSurvivalPlanner.Decision survival = survivalPlanner.decide(
                     readiness,
                     SURVIVAL_POLICY,
                     contacts,
                     combatant.transform().position.x,
                     combatant.transform().position.y,
-                    new SafePoint(true, combatant.spec().xM(), combatant.spec().yM()),
+                    retreatPoint,
+                    battleObjective.survivalDirective(),
                     false,
                     elapsedSeconds(),
                     TACTICAL_REFERENCE_RANGE_M,
