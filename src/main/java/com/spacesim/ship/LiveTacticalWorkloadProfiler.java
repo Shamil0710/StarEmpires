@@ -240,7 +240,30 @@ public final class LiveTacticalWorkloadProfiler {
             long interceptorLaunches,
             long protectionImpacts,
             long physicalInterceptions) {
-        /** Validates non-negative deterministic workload evidence. */
+        /**
+         * Validates non-negative deterministic workload evidence.
+         *
+         * @param finalTick authoritative tick after the interval
+         * @param activeShips materialized physical ships
+         * @param profiledTicks fixed ticks executed by the profiler
+         * @param tacticalAiDecisions expected production actor decisions
+         * @param cumulativeShipTrackHypotheses cumulative actor-local ship-track entries
+         * @param cumulativeOrdnanceTrackHypotheses cumulative actor-local ordnance-track entries
+         * @param peakShipTrackHypotheses peak simultaneous ship-track entries
+         * @param peakOrdnanceTrackHypotheses peak simultaneous ordnance-track entries
+         * @param peakKineticBodies peak projectile/residual bodies
+         * @param peakGuidedBodies peak STRIKE guided bodies
+         * @param peakInterceptorBodies peak interceptor bodies
+         * @param peakDecoyBodies peak physical decoy bodies
+         * @param peakTotalOrdnanceBodies peak simultaneous non-ship bodies
+         * @param allBodyKindsConcurrent whether all four body classes were concurrent
+         * @param kineticShots physical kinetic shots during the interval
+         * @param guidedLaunches physical STRIKE launches during the interval
+         * @param decoyDeployments physical DECOY deployments during the interval
+         * @param interceptorLaunches physical INTERCEPTOR launches during the interval
+         * @param protectionImpacts physical ship-protection interactions
+         * @param physicalInterceptions swept interceptor/threat contacts
+         */
         public DeterministicWorkload {
             if (finalTick < 0L || activeShips <= 0 || profiledTicks <= 0 || tacticalAiDecisions < 0L
                     || cumulativeShipTrackHypotheses < 0L || cumulativeOrdnanceTrackHypotheses < 0L
@@ -279,7 +302,20 @@ public final class LiveTacticalWorkloadProfiler {
             long finalHeapBytes,
             long peakHeapBytes,
             long heapGrowthBytes) {
-        /** Validates one diagnostic report without imposing a performance threshold. */
+        /**
+         * Validates one diagnostic report without imposing a performance threshold.
+         *
+         * @param workload deterministic authoritative workload projection
+         * @param wallElapsedNanos wall-clock duration of the profiled interval
+         * @param ticksPerRealSecond fixed ticks processed per wall-clock second
+         * @param meanTickMillis arithmetic mean tick duration
+         * @param p95TickMillis 95th-percentile tick duration
+         * @param maxTickMillis maximum tick duration
+         * @param initialHeapBytes sampled used heap before profiling
+         * @param finalHeapBytes sampled used heap after profiling
+         * @param peakHeapBytes peak sampled used heap
+         * @param heapGrowthBytes signed final-minus-initial used-heap delta
+         */
         public ProfileReport {
             Objects.requireNonNull(workload, "workload");
             if (wallElapsedNanos <= 0L
