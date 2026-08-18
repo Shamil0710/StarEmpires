@@ -1,16 +1,16 @@
 package com.spacesim.ui;
 
 import com.spacesim.ship.LiveTacticalBattleDeceptionRuntime;
-import com.spacesim.ship.Stage19ScaledLiveTacticalFactory;
 
 import java.util.Objects;
 
 /**
  * Thin live/presentation session over the exact same scaled authoritative runtime used headlessly.
  *
- * <p>The session owns presentation scheduling state only: pause and fixed-tick batching. It never owns
- * movement, AI, sensing, weapons, ammunition, damage, power, heat or body state. Every authoritative
- * advance delegates to the same production runtime, while visual/debug reads are strictly read-only.</p>
+ * <p>The session owns presentation scheduling state and selected validation-scenario identity only.
+ * It never owns movement, AI, sensing, weapons, ammunition, damage, power, heat or body state. Every
+ * authoritative advance delegates to the same production runtime, while visual/debug reads are
+ * strictly read-only.</p>
  */
 public final class ScaledLiveTacticalSimulationSession {
     /** Fixed-tick batches used only to change presentation-time simulation speed. */
@@ -33,16 +33,36 @@ public final class ScaledLiveTacticalSimulationSession {
     }
 
     private LiveTacticalBattleDeceptionRuntime runtime;
+    private final TacticalScenarioDefinition scenario;
     private final ScaledLiveTacticalSimulationProjection projection;
     private final ScaledTacticalDebugProjection debugProjection;
     private boolean paused;
     private SimulationSpeed simulationSpeed = SimulationSpeed.X1;
 
-    /** Creates a fresh 32-ship saturation live session from the shared Stage-19 factory. */
+    /** Creates the historical 32-ship saturation session for backwards compatibility. */
     public ScaledLiveTacticalSimulationSession() {
-        this(Stage19ScaledLiveTacticalFactory.createSaturation32(),
+        this(TacticalScenarioId.SATURATION_16V16);
+    }
+
+    /**
+     * Creates a fresh live session for one canonical Stage-19J validation scenario.
+     *
+     * @param scenarioId canonical Stage-19J tactical validation scenario identity
+     */
+    public ScaledLiveTacticalSimulationSession(TacticalScenarioId scenarioId) {
+        this(TacticalScenarioCatalog.require(scenarioId),
                 new ScaledLiveTacticalSimulationProjection(),
                 new ScaledTacticalDebugProjection());
+    }
+
+    private ScaledLiveTacticalSimulationSession(
+            TacticalScenarioDefinition scenario,
+            ScaledLiveTacticalSimulationProjection projection,
+            ScaledTacticalDebugProjection debugProjection) {
+        this.scenario = Objects.requireNonNull(scenario, "scenario");
+        this.runtime = scenario.createRuntime();
+        this.projection = Objects.requireNonNull(projection, "projection");
+        this.debugProjection = Objects.requireNonNull(debugProjection, "debugProjection");
     }
 
     ScaledLiveTacticalSimulationSession(
@@ -56,6 +76,7 @@ public final class ScaledLiveTacticalSimulationSession {
             ScaledLiveTacticalSimulationProjection projection,
             ScaledTacticalDebugProjection debugProjection) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
+        this.scenario = TacticalScenarioCatalog.require(TacticalScenarioId.SATURATION_16V16);
         this.projection = Objects.requireNonNull(projection, "projection");
         this.debugProjection = Objects.requireNonNull(debugProjection, "debugProjection");
     }
@@ -120,14 +141,19 @@ public final class ScaledLiveTacticalSimulationSession {
         return simulationSpeed;
     }
 
+    /** @return immutable metadata for the scenario this session owns */
+    public TacticalScenarioDefinition scenario() {
+        return scenario;
+    }
+
     /**
-     * Recreates the authoritative saturation scenario from the same shared factory.
+     * Recreates the currently selected authoritative scenario from its canonical shared factory.
      *
      * <p>Reset also restores canonical presentation scheduling state. It does not restore by copying
-     * a previously mutated combat snapshot.</p>
+     * a previously mutated combat snapshot and never silently switches scenario identity.</p>
      */
     public void reset() {
-        runtime = Stage19ScaledLiveTacticalFactory.createSaturation32();
+        runtime = scenario.createRuntime();
         paused = false;
         simulationSpeed = SimulationSpeed.X1;
     }
