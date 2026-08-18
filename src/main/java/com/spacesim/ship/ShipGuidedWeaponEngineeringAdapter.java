@@ -21,9 +21,10 @@ import java.util.Objects;
  * Projects ordinary fitted Stage-17.5 engineering capability into physical guided-weapon launchers.
  *
  * <p>The adapter resolves one production fit, current module damage, launcher profile and feed
- * identity into guided ammunition that can be consumed by common runtime. Authored
- * {@link GuidedEngagementRole} is an explicit routing semantic only; it grants no accuracy,
- * propulsion, damage, range or launcher-performance modifier.</p>
+ * identity into guided ammunition that can be consumed by common runtime. Explicit fitted beam
+ * emitters are routed by {@link ShipWeaponEngineeringAdapter} instead of being misclassified as a
+ * missing guided launcher. Authored {@link GuidedEngagementRole} is an explicit routing semantic only;
+ * it grants no accuracy, propulsion, damage, range or launcher-performance modifier.</p>
  */
 public final class ShipGuidedWeaponEngineeringAdapter {
     private static final double MIN_OPERATIONAL_INTEGRITY = 1e-6d;
@@ -121,6 +122,9 @@ public final class ShipGuidedWeaponEngineeringAdapter {
             }
             LauncherProfile profile = checkedLaunchers.findByModuleId(capability.moduleId());
             if (profile == null) {
+                if (capability.parameters().containsKey("beam_power_w")) {
+                    continue;
+                }
                 throw new IllegalArgumentException(
                         "Installed weapon module lacks Stage-17.5E launcher profile: " + capability.moduleId());
             }
