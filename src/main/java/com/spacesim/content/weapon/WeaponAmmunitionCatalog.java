@@ -100,7 +100,8 @@ public final class WeaponAmmunitionCatalog {
     /** Authored tactical purpose of one guided ammunition body. */
     public enum GuidedEngagementRole {
         /** Guided body is intended to engage ship/large-object targets. */ STRIKE,
-        /** Guided body is intended to engage incoming ordnance bodies. */ INTERCEPTOR
+        /** Guided body is intended to engage incoming ordnance bodies. */ INTERCEPTOR,
+        /** Guided body is a finite physical deception/repeater decoy, not an attack weapon. */ DECOY
     }
 
     /**
@@ -262,7 +263,7 @@ public final class WeaponAmmunitionCatalog {
          * @param exhaustVelocityMps effective exhaust velocity in meters per second
          * @param burnTimeSeconds maximum powered burn duration in seconds
          * @param seekerAngularSigmaRad one-sigma seeker angular uncertainty
-         * @param terminalReserveMps delta-v reserved for terminal maneuver policy
+         * @param terminalReserveMps delta-v reserved by guidance policy for terminal maneuver
          */
         public GuidedAmmunitionDefinition {
             requireNonBlank(id, "id");
