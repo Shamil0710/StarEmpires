@@ -30,6 +30,19 @@ public final class ShipBeamEngineeringService {
     }
 
     /**
+     * Opens one shared engineering reservation interval for simultaneous fitted beam operations.
+     *
+     * @param engineering authoritative firing ship engineering component
+     * @param intervalSeconds deterministic operation interval duration
+     * @return physical shared reservation ledger
+     */
+    public IntervalBudget beginInterval(EngineeringComponent engineering, double intervalSeconds) {
+        return grants.beginInterval(
+                Objects.requireNonNull(engineering, "engineering"),
+                intervalSeconds);
+    }
+
+    /**
      * Plans a physical non-overlapping beam dwell and atomically commits its electrical/thermal cost.
      *
      * @param engineering authoritative firing ship engineering component
