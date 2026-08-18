@@ -47,6 +47,11 @@ class LiveTacticalSaturationProfilingAcceptanceTest {
                 consumedGuidedRounds,
                 "every STRIKE/DECOY/INTERCEPTOR materialization must consume one real guided-feed item");
 
+        assertTrue(fixture.runtime().auditedShipImpactCandidates() > 0L,
+                "ordering evidence must observe actual previously-active guided ship-impact paths");
+        assertEquals(0L, fixture.runtime().orderingAmbiguities(),
+                "accepted saturation must not suppress an interceptor contact physically earlier than ship impact");
+
         assertTrue(report.wallElapsedNanos() > 0L);
         assertTrue(report.ticksPerRealSecond() > 0d);
         assertTrue(report.meanTickMillis() >= 0d);
@@ -57,6 +62,9 @@ class LiveTacticalSaturationProfilingAcceptanceTest {
         assertTrue(report.peakHeapBytes() >= report.finalHeapBytes());
 
         System.out.println("STAGE19_SATURATION_PROFILE=" + report);
+        System.out.println("STAGE19_ORDERING_AUDIT=shipCandidates="
+                + fixture.runtime().auditedShipImpactCandidates()
+                + ",earlierInterceptorContacts=" + fixture.runtime().orderingAmbiguities());
     }
 
     @Test

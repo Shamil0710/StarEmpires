@@ -19,19 +19,14 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Stage-19I actor-bounded deception coordinator over the accepted physical decoy and defense runtimes.
+ * Stage-19I actor-bounded deception coordinator over the accepted physical combat runtimes.
  *
- * <p>This class owns policy ordering only. It never creates a sensor hypothesis, ammunition item,
- * launcher cycle or physical body directly. Automatic deployment is delegated to
- * {@link LiveTacticalBattleDecoyRuntime#deployOne(long, String, double, double)}, so finite stores,
- * physical launcher readiness, damage-aware fitted capability and body materialization remain owned by
- * the existing production paths.</p>
- *
- * <p>A combatant may automatically accompany an already-active own STRIKE body with one physical
- * decoy only when its production tactical controller currently has an actor-local selected target and
- * that target has an actor-local TRACKED/FIRE_CONTROL Cartesian solution. Hostile authoritative
- * transforms are never read by deployment policy. One active decoy per source is the provisional
- * Stage-19I anti-spam policy; later doctrine work may replace that choice without changing physics.</p>
+ * <p>This class owns top-level policy ordering only. It never creates a sensor hypothesis,
+ * ammunition item, launcher cycle, kinetic/guided body or beam solution directly. Automatic decoy
+ * deployment remains delegated to {@link LiveTacticalBattleDecoyRuntime}; fitted directed-energy
+ * execution is delegated to {@link LiveTacticalBattleBeamRuntime}. The known outer interceptor phase
+ * ordering is observed by {@link Stage19GuidedImpactOrderingAudit}, which is read-only and cannot
+ * affect physical outcomes.</p>
  */
 public final class LiveTacticalBattleDeceptionRuntime {
     private static final double EPSILON = 1e-9d;
@@ -39,6 +34,8 @@ public final class LiveTacticalBattleDeceptionRuntime {
     private final LiveTacticalBattleOrdnanceRuntime ordnanceRuntime;
     private final LiveTacticalBattleDecoyRuntime decoyRuntime;
     private final LiveTacticalBattleDefenseRuntime defenseRuntime;
+    private final LiveTacticalBattleBeamRuntime beamRuntime;
+    private final Stage19GuidedImpactOrderingAudit orderingAudit;
     private final ShipEngineeringCatalog engineeringCatalog;
     private final WeaponAmmunitionCatalog ammunitionCatalog;
     private final WeaponLauncherCatalog launcherCatalog;
@@ -46,8 +43,12 @@ public final class LiveTacticalBattleDeceptionRuntime {
     private final ShipGuidedWeaponEngineeringAdapter guidedAdapter;
     private final TreeMap<Long, Long> automaticDeploymentsByEntityId = new TreeMap<>();
 
+    private long auditedShipImpactCandidates;
+    private long orderingAmbiguities;
+    private Stage19GuidedImpactOrderingAudit.Result lastOrderingAudit;
+
     /**
-     * Creates automatic deception over one authoritative shared battle/ordnance runtime.
+     * Creates automatic deception, beam execution and read-only ordering audit over one authority.
      *
      * @param ordnanceRuntime authoritative shared physical ordnance runtime
      */
@@ -55,6 +56,8 @@ public final class LiveTacticalBattleDeceptionRuntime {
         this.ordnanceRuntime = Objects.requireNonNull(ordnanceRuntime, "ordnanceRuntime");
         decoyRuntime = new LiveTacticalBattleDecoyRuntime(ordnanceRuntime);
         defenseRuntime = new LiveTacticalBattleDefenseRuntime(ordnanceRuntime, decoyRuntime);
+        beamRuntime = new LiveTacticalBattleBeamRuntime(ordnanceRuntime.weaponRuntime());
+        orderingAudit = new Stage19GuidedImpactOrderingAudit();
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
@@ -66,15 +69,29 @@ public final class LiveTacticalBattleDeceptionRuntime {
     }
 
     /**
-     * Advances one authoritative battle tick with actor-bounded automatic decoy policy.
+     * Advances one authoritative battle tick with actor-bounded deception and directed-energy policy.
      *
-     * <p>Deployment policy executes at the start of the tick from information and own physical bodies
-     * established by previous authoritative ticks. The shared defense runtime then advances ordnance,
-     * decoys, sensing, interceptor guidance and physical collisions exactly once.</p>
+     * <p>Decoy deployment policy executes from information and own physical bodies established by
+     * previous ticks. A read-only ordering snapshot is then captured. The shared defense runtime
+     * advances ordnance, sensing, interceptor guidance and physical collisions exactly once. The
+     * audit compares that completed motion for any physically earlier interceptor contact suppressed
+     * by ship-priority phase ordering. Finally fitted beams execute from the same tick's actor-local
+     * fire-control state without advancing a second clock.</p>
      */
     public void advanceOneTick() {
         deployFromCurrentActorKnowledge();
+        Stage19GuidedImpactOrderingAudit.Snapshot orderingStart = orderingAudit.capture(
+                ordnanceRuntime,
+                defenseRuntime);
         defenseRuntime.advanceOneTick();
+        lastOrderingAudit = orderingAudit.evaluate(orderingStart, ordnanceRuntime, defenseRuntime);
+        auditedShipImpactCandidates = Math.addExact(
+                auditedShipImpactCandidates,
+                lastOrderingAudit.shipImpactCandidates());
+        orderingAmbiguities = Math.addExact(
+                orderingAmbiguities,
+                lastOrderingAudit.ambiguityCount());
+        beamRuntime.executeCurrentTick();
     }
 
     /** @return authoritative shared battle tick */
@@ -97,6 +114,26 @@ public final class LiveTacticalBattleDeceptionRuntime {
         return defenseRuntime;
     }
 
+    /** @return fitted actor-bounded physical beam execution runtime */
+    public LiveTacticalBattleBeamRuntime beamRuntime() {
+        return beamRuntime;
+    }
+
+    /** @return cumulative previously-active guided paths audited as same-tick ship impacts */
+    public long auditedShipImpactCandidates() {
+        return auditedShipImpactCandidates;
+    }
+
+    /** @return cumulative physically earlier interceptor contacts suppressed by current ordering */
+    public long orderingAmbiguities() {
+        return orderingAmbiguities;
+    }
+
+    /** @return latest read-only ordering result, or {@code null} before the first tick */
+    public Stage19GuidedImpactOrderingAudit.Result lastOrderingAudit() {
+        return lastOrderingAudit;
+    }
+
     /** @return authoritative materialized combatant state */
     public LiveTacticalBattleRuntimeState battleState() {
         return ordnanceRuntime.battleState();
@@ -114,7 +151,7 @@ public final class LiveTacticalBattleDeceptionRuntime {
     }
 
     /**
-     * Equality-friendly deterministic deception/defense projection.
+     * Equality-friendly deterministic whole-combat projection.
      *
      * @return immutable whole-runtime fingerprint
      */
@@ -123,7 +160,11 @@ public final class LiveTacticalBattleDeceptionRuntime {
                 tick(),
                 new TreeMap<>(automaticDeploymentsByEntityId),
                 decoyRuntime.fingerprint(),
-                defenseRuntime.fingerprint());
+                defenseRuntime.fingerprint(),
+                beamRuntime.fingerprint(),
+                auditedShipImpactCandidates,
+                orderingAmbiguities,
+                lastOrderingAudit);
     }
 
     private void deployFromCurrentActorKnowledge() {
@@ -208,34 +249,47 @@ public final class LiveTacticalBattleDeceptionRuntime {
     }
 
     /**
-     * Whole-runtime deterministic deception projection.
+     * Whole-runtime deterministic deception/defense/beam/ordering projection.
      *
      * @param tick authoritative shared battle tick
      * @param automaticDeploymentsByEntityId automatic physical deployment counts by combatant
      * @param decoyFingerprint authoritative physical decoy state
      * @param defenseFingerprint actor-bounded physical defense/ordnance state
+     * @param beamFingerprint fitted directed-energy execution state
+     * @param auditedShipImpactCandidates cumulative ordering-audited ship-impact paths
+     * @param orderingAmbiguities cumulative physically earlier interceptor contacts
+     * @param lastOrderingAudit latest tick ordering evidence, nullable before first advancement
      */
     public record DeceptionFingerprint(
             long tick,
             Map<Long, Long> automaticDeploymentsByEntityId,
             LiveTacticalBattleDecoyRuntime.DecoyFingerprint decoyFingerprint,
-            LiveTacticalBattleDefenseRuntime.BattleDefenseFingerprint defenseFingerprint) {
+            LiveTacticalBattleDefenseRuntime.BattleDefenseFingerprint defenseFingerprint,
+            LiveTacticalBattleBeamRuntime.BeamFingerprint beamFingerprint,
+            long auditedShipImpactCandidates,
+            long orderingAmbiguities,
+            Stage19GuidedImpactOrderingAudit.Result lastOrderingAudit) {
         /**
-         * Validates and freezes one deterministic deception projection.
+         * Validates and freezes one deterministic whole-combat projection.
          *
          * @param tick authoritative shared battle tick
          * @param automaticDeploymentsByEntityId automatic deployment counts by combatant
          * @param decoyFingerprint physical decoy projection
          * @param defenseFingerprint physical defense projection
+         * @param beamFingerprint fitted directed-energy execution projection
+         * @param auditedShipImpactCandidates cumulative audited ship-impact paths
+         * @param orderingAmbiguities cumulative earlier interceptor contacts
+         * @param lastOrderingAudit latest ordering evidence, nullable before first advancement
          */
         public DeceptionFingerprint {
-            if (tick < 0L) {
-                throw new IllegalArgumentException("tick must be non-negative");
+            if (tick < 0L || auditedShipImpactCandidates < 0L || orderingAmbiguities < 0L) {
+                throw new IllegalArgumentException("invalid deception/ordering fingerprint counters");
             }
             automaticDeploymentsByEntityId = Map.copyOf(new TreeMap<>(Objects.requireNonNull(
                     automaticDeploymentsByEntityId, "automaticDeploymentsByEntityId")));
             Objects.requireNonNull(decoyFingerprint, "decoyFingerprint");
             Objects.requireNonNull(defenseFingerprint, "defenseFingerprint");
+            Objects.requireNonNull(beamFingerprint, "beamFingerprint");
         }
     }
 }

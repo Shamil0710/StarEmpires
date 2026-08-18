@@ -1,5 +1,7 @@
 package com.spacesim.ship;
 
+import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.KineticAmmunitionDefinition;
@@ -7,6 +9,7 @@ import com.spacesim.content.weapon.WeaponLauncherCatalog;
 import com.spacesim.content.weapon.WeaponLauncherCatalog.LauncherProfile;
 import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.ShipEngineeringState.InstalledCapability;
+import com.spacesim.ship.WeaponDefinition.BeamWeapon;
 import com.spacesim.ship.WeaponDefinition.Family;
 import com.spacesim.ship.WeaponDefinition.KineticRound;
 import com.spacesim.ship.WeaponDefinition.Launcher;
@@ -22,8 +25,11 @@ import java.util.Objects;
  *
  * <p>Stage 17.5F consumes local mount integrity from the central derived state. A destroyed mount is
  * absent; a damaged kinetic mount retains the authored projectile body/muzzle energy but pays a
- * longer physical cycle and worse pointing uncertainty. This avoids the dangerous generic pattern
- * of scaling every parameter, which could accidentally make lower-is-better values improve.</p>
+ * longer physical cycle and worse pointing uncertainty. Beam mounts likewise retain authored
+ * emitter geometry and output while physical engineering admission decides whether the requested
+ * dwell can actually receive incremental power and thermal capacity. This avoids the dangerous
+ * generic pattern of scaling every parameter, which could accidentally make lower-is-better values
+ * improve.</p>
  */
 public final class ShipWeaponEngineeringAdapter {
     private static final double RELATIVE_TOLERANCE = 1e-9d;
@@ -67,6 +73,28 @@ public final class ShipWeaponEngineeringAdapter {
     }
 
     /**
+     * One fitted directed-energy emitter ready for physical beam/engineering execution.
+     *
+     * @param mountId physical fitted weapon mount
+     * @param moduleId weapon module content ID
+     * @param weapon authored physical beam definition
+     */
+    public record FittedBeamMount(String mountId, String moduleId, BeamWeapon weapon) {
+        /**
+         * Validates one immutable fitted beam emitter.
+         *
+         * @param mountId physical fitted weapon mount
+         * @param moduleId weapon module content ID
+         * @param weapon authored physical beam definition
+         */
+        public FittedBeamMount {
+            requireNonBlank(mountId, "mountId");
+            requireNonBlank(moduleId, "moduleId");
+            Objects.requireNonNull(weapon, "weapon");
+        }
+    }
+
+    /**
      * Resolves all loaded kinetic weapon mounts from one accepted fitted ship.
      *
      * @param derived central derived fitted ship state
@@ -96,8 +124,12 @@ public final class ShipWeaponEngineeringAdapter {
             }
             LauncherProfile profile = checkedLaunchers.findByModuleId(capability.moduleId());
             if (profile == null) {
+                if (capability.parameters().containsKey("beam_power_w")) {
+                    continue;
+                }
                 throw new IllegalArgumentException(
-                        "Installed weapon module lacks Stage-17.5E launcher profile: " + capability.moduleId());
+                        "Installed weapon module lacks Stage-17.5E launcher/beam definition: "
+                                + capability.moduleId());
             }
             if (profile.family() != Family.KINETIC) {
                 continue;
@@ -146,6 +178,54 @@ public final class ShipWeaponEngineeringAdapter {
         return List.copyOf(result);
     }
 
+    /**
+     * Resolves all operational fitted beam emitters from the central derived state.
+     *
+     * <p>The beam content stores optical/output parameters on the installed capability while the
+     * module definition owns the actual electrical and thermal integration budgets. Because the
+     * module's continuous demand is already included in the ship's standing engineering load, beam
+     * execution requests only the incremental rise from continuous to peak demand.</p>
+     *
+     * @param derived central derived fitted ship state
+     * @param engineeringCatalog production engineering definitions
+     * @return deterministic fitted beam emitter list
+     */
+    public List<FittedBeamMount> deriveBeamMounts(
+            DerivedShipState derived,
+            ShipEngineeringCatalog engineeringCatalog) {
+        DerivedShipState checkedDerived = Objects.requireNonNull(derived, "derived");
+        ShipEngineeringCatalog checkedCatalog = Objects.requireNonNull(engineeringCatalog, "engineeringCatalog");
+        List<FittedBeamMount> result = new ArrayList<>();
+        for (InstalledCapability capability : checkedDerived.installedCapabilities()) {
+            if (capability.family() != ModuleFamily.WEAPON_AMMUNITION
+                    || runtimeIntegrity(capability.parameters()) <= MIN_OPERATIONAL_INTEGRITY) {
+                continue;
+            }
+            Map<String, Double> parameters = capability.parameters();
+            if (!parameters.containsKey("beam_power_w")) {
+                continue;
+            }
+            ModuleDefinition module = checkedCatalog.findModule(capability.moduleId());
+            if (module == null) {
+                throw new IllegalArgumentException("Unknown fitted beam module: " + capability.moduleId());
+            }
+            double incrementalPowerW = module.peakPowerDemandW() - module.continuousPowerDemandW();
+            requirePositiveFinite(incrementalPowerW, capability.moduleId() + ".incrementalBeamPowerW");
+            BeamWeapon weapon = new BeamWeapon(
+                    "beam." + capability.moduleId(),
+                    requirePositiveParameter(parameters, "wavelength_m", capability.moduleId()),
+                    requirePositiveParameter(parameters, "aperture_diameter_m", capability.moduleId()),
+                    requireNonNegativeParameter(parameters, "pointing_jitter_rad", capability.moduleId()),
+                    requirePositiveParameter(parameters, "beam_power_w", capability.moduleId()),
+                    incrementalPowerW,
+                    module.wasteHeatW(),
+                    requirePositiveParameter(parameters, "max_continuous_dwell_s", capability.moduleId()));
+            result.add(new FittedBeamMount(capability.mountId(), capability.moduleId(), weapon));
+        }
+        result.sort(Comparator.comparing(FittedBeamMount::mountId).thenComparing(FittedBeamMount::moduleId));
+        return List.copyOf(result);
+    }
+
     private static double runtimeIntegrity(Map<String, Double> parameters) {
         double value = parameters.getOrDefault(DerivedShipCalculator.RUNTIME_INTEGRITY, 1d);
         if (!Double.isFinite(value) || value < 0d || value > 1d) {
@@ -167,6 +247,14 @@ public final class ShipWeaponEngineeringAdapter {
         Double value = parameters.get(key);
         if (value == null || !Double.isFinite(value) || value <= 0d) {
             throw new IllegalArgumentException("Weapon module lacks positive " + key + ": " + moduleId);
+        }
+        return value;
+    }
+
+    private static double requireNonNegativeParameter(Map<String, Double> parameters, String key, String moduleId) {
+        Double value = parameters.get(key);
+        if (value == null || !Double.isFinite(value) || value < 0d) {
+            throw new IllegalArgumentException("Weapon module lacks non-negative " + key + ": " + moduleId);
         }
         return value;
     }

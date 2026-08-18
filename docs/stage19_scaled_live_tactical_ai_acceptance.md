@@ -1,8 +1,8 @@
 # Stage 19 — Scaled Live Tactical AI Acceptance Contract
 
-> Status: **ACCEPTED FUTURE STAGE-19 EXIT REQUIREMENT**  
-> Applies after production tactical AI / advanced combat behavior exists.  
-> This contract does not pull Stage-19 implementation ahead of Stage 18.
+> Status: **ACCEPTED AND SATISFIED — STAGE 19 COMPLETE PENDING FINAL EXACT-HEAD MERGE GATE**  
+> Completion evidence: `docs/stage19i_exit_evidence_matrix.md`.  
+> The requirements below remain the canonical Stage-19 acceptance contract and regression boundary.
 
 ## 1. Purpose
 
@@ -23,7 +23,7 @@ persistent / scenario physical state
 → production flight dynamics
 → production engineering power / heat / reaction-mass budgets
 → production fire control
-→ physical kinetic / beam / guided bodies
+→ physical kinetic / beam / guided execution
 → production PD / interceptor / EW / decoy behavior
 → shields / armor / compartments / subsystem damage
 → changed capability and AI decisions
@@ -162,6 +162,8 @@ Stage 19 cannot be marked COMPLETE until all of the following are true simultane
 - damage, ammunition, heat, power and reaction-mass state materially affect AI decisions;
 - measured performance and memory behavior are recorded and acceptable for continuing to Stage 20 spatial calibration;
 - no hidden large-battle bonuses, free resources, omniscience or viewer-owned combat logic are introduced.
+
+**Exit decision:** all rows above have direct production evidence in `docs/stage19i_exit_evidence_matrix.md`. The final status-synchronized PR must still pass the exact-head Java-17 merge gate; a red result reopens Stage 19 automatically.
 
 This scaled live gate is a **mandatory Stage-19 acceptance artifact**, not optional presentation polish.
 
