@@ -19,7 +19,7 @@ class LiveTacticalInitialOrdnanceServiceTest {
         LiveTacticalBattleRuntimeState battle = battle(entityId, DoctrineId.B_MISSILE_STRIKE);
         var combatant = battle.requireCombatant(entityId);
         var service = new LiveTacticalInitialOrdnanceService();
-        String fitIdBefore = combatant.engineering().fit.fitId();
+        String hullIdBefore = combatant.engineering().fit.hullId();
         List<String> modulesBefore = combatant.engineering().fit.installedModules().stream()
                 .map(value -> value.mountId() + "=" + value.moduleId())
                 .toList();
@@ -28,7 +28,7 @@ class LiveTacticalInitialOrdnanceServiceTest {
                 new FeedLoad("weapon_primary", "ammo.test_interceptor_750kg_v1", 8L),
                 new FeedLoad("weapon_secondary", "ammo.test_interceptor_750kg_v1", 6L)));
 
-        assertEquals(fitIdBefore, combatant.engineering().fit.fitId());
+        assertEquals(hullIdBefore, combatant.engineering().fit.hullId());
         assertEquals(modulesBefore, combatant.engineering().fit.installedModules().stream()
                 .map(value -> value.mountId() + "=" + value.moduleId())
                 .toList());
