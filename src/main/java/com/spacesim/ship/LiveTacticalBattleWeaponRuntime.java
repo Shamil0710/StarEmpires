@@ -24,25 +24,11 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Shared Stage-19I kinetic weapon/body/impact execution over one multi-combatant control runtime.
+ * Shared Stage-19I physical weapon/body/protection execution over one multi-combatant runtime.
  *
- * <p>This class composes the existing production weapon adapter, fire-control mathematics,
- * ammunition runtime, launcher-cycle runtime, {@link ProjectileBody}, shield/material protection and
- * local damage runtime. It does not create a hit probability, fleet hit-point pool, weapon-range wall
- * or abstract ammunition counter.</p>
- *
- * <p>A shot may be materialized only when the Stage-19 control runtime authorizes fire, the selected
- * target exists in that actor's visible {@link TrackState} domain, the fitted launcher is physically
- * ready, the central consumable state contains a round, and production fire control yields a valid
- * intercept solution. The actual target transform/velocity is never read to improve that solution.
- * Production TrackState currently has no velocity channel, so this slice uses the same explicit zero
- * target-motion estimate as the established live duel rather than leaking authoritative enemy
- * velocity into actor knowledge.</p>
- *
- * <p>Once materialized, bodies are no longer target-owned. Swept collision checks consider every
- * other physical combatant, including friendlies, using relative body/ship motion and the production
- * hull footprint. The first geometric intersection wins; allegiance cannot make a physical body pass
- * through another ship.</p>
+ * <p>The runtime owns the production kinetic body pool and the common shield → material → local
+ * damage composition. External physical ordnance may enter through the package-private impact/body
+ * seams, so guided weapons do not need a second protection model or residual projectile pool.</p>
  */
 public final class LiveTacticalBattleWeaponRuntime {
     private static final double EPSILON = 1e-12d;
@@ -97,10 +83,7 @@ public final class LiveTacticalBattleWeaponRuntime {
     /**
      * Advances one complete shared control/flight/kinetic-impact tick.
      *
-     * <p>Start-of-tick ship positions are retained for relative swept collision. Launcher cycles then
-     * advance once, the existing shared control runtime resolves sensing/decisions/engineering/ship
-     * motion, authorized shots are materialized, and every projectile advances through the same
-     * interval. Existing bodies test against moving ship start/end geometry; newly spawned bodies use
+     * <p>Existing projectile bodies use relative swept body/ship motion. Newly spawned projectiles use
      * post-movement ship geometry because their muzzle exit occurs after the control/flight phase.</p>
      */
     public void advanceOneTick() {
@@ -137,10 +120,10 @@ public final class LiveTacticalBattleWeaponRuntime {
     }
 
     /**
-     * Returns the number of physically materialized shots from one combatant.
+     * Returns the number of physically materialized kinetic shots from one combatant.
      *
      * @param sourceEntityId stable firing combatant identity
-     * @return non-negative shot count
+     * @return non-negative kinetic shot count
      */
     public long shotsFired(long sourceEntityId) {
         battleState().requireCombatant(sourceEntityId);
@@ -148,19 +131,58 @@ public final class LiveTacticalBattleWeaponRuntime {
     }
 
     /**
-     * Returns the number of resolved physical kinetic intersections on one combatant.
+     * Returns the number of physical-body protection interactions on one combatant.
+     *
+     * <p>The counter includes both native kinetic bodies and external guided/residual bodies routed
+     * through the shared protection seam.</p>
      *
      * @param targetEntityId stable struck combatant identity
-     * @return non-negative impact count
+     * @return non-negative physical impact count
      */
     public long impactsOn(long targetEntityId) {
         battleState().requireCombatant(targetEntityId);
         return impactsByTargetEntityId.get(targetEntityId);
     }
 
-    /** @return total physical kinetic intersections resolved in the battle */
+    /** @return total physical-body protection interactions resolved in the battle */
     public long totalImpacts() {
         return impactsByTargetEntityId.values().stream().mapToLong(Long::longValue).sum();
+    }
+
+    /**
+     * Routes one already-detected external physical-body impact through the exact production
+     * shield/material/local-damage path owned by this runtime.
+     *
+     * <p>This package seam performs no hit test and grants no damage. The caller supplies the physical
+     * body at its swept intersection and the target position at that same instant. The impact is
+     * counted exactly once here, alongside native kinetic impacts.</p>
+     *
+     * @param targetEntityId physically intersected combatant
+     * @param impactBody physical body at the intersection point
+     * @param targetXM target x position at the intersection instant
+     * @param targetYM target y position at the intersection instant
+     * @return ordinary production protection result
+     */
+    KineticProtectionRuntime.Result resolveExternalPhysicalImpact(
+            long targetEntityId,
+            ProjectileBody impactBody,
+            double targetXM,
+            double targetYM) {
+        CombatantRuntime target = battleState().requireCombatant(targetEntityId);
+        ProjectileBody checkedBody = Objects.requireNonNull(impactBody, "impactBody");
+        PositionSnapshot targetPosition = new PositionSnapshot(targetXM, targetYM);
+        KineticProtectionRuntime.Result result = resolveImpact(target, checkedBody, targetPosition);
+        recordImpact(targetEntityId);
+        return result;
+    }
+
+    /**
+     * Transfers an external surviving physical residual into the single production projectile pool.
+     *
+     * @param body surviving physical projectile/debris body
+     */
+    void acceptExternalProjectile(ProjectileBody body) {
+        projectiles.add(Objects.requireNonNull(body, "body"));
     }
 
     /**
@@ -304,9 +326,7 @@ public final class LiveTacticalBattleWeaponRuntime {
                     impact.target,
                     impactBody,
                     impact.targetPositionAtImpact);
-            impactsByTargetEntityId.compute(
-                    impact.target.spec().entityId(),
-                    (ignored, count) -> Math.addExact(Objects.requireNonNull(count, "impact count"), 1L));
+            recordImpact(impact.target.spec().entityId());
 
             if (result.postProtectionProjectile() != null) {
                 double remainingSeconds = LiveTacticalBattleControlRuntime.TICK_SECONDS * (1d - impact.fraction);
@@ -353,10 +373,7 @@ public final class LiveTacticalBattleWeaponRuntime {
                     || value < best.fraction - EPSILON
                     || (Math.abs(value - best.fraction) <= EPSILON
                     && target.spec().entityId() < best.target.spec().entityId())) {
-                best = new ImpactCandidate(
-                        target,
-                        value,
-                        interpolate(start, end, value));
+                best = new ImpactCandidate(target, value, interpolate(start, end, value));
             }
         }
         return best;
@@ -467,6 +484,12 @@ public final class LiveTacticalBattleWeaponRuntime {
                 beforeInstance.maintenance(),
                 beforeInstance.weaponLoadout(),
                 beforeInstance.weaponMountRuntime()));
+    }
+
+    private void recordImpact(long targetEntityId) {
+        impactsByTargetEntityId.compute(
+                targetEntityId,
+                (ignored, count) -> Math.addExact(Objects.requireNonNull(count, "impact count"), 1L));
     }
 
     private TreeMap<Long, PositionSnapshot> snapshotShipPositions() {
@@ -619,8 +642,8 @@ public final class LiveTacticalBattleWeaponRuntime {
     /**
      * Per-source finite-ammunition and launcher-continuity projection.
      *
-     * @param entityId stable firing combatant identity
-     * @param shotsFired physically materialized shot count
+     * @param entityId stable combatant identity
+     * @param shotsFired physically materialized kinetic shot count
      * @param ammunitionRounds current itemized physical ammunition rounds
      * @param cooldownSecondsByMount physical launcher cycle state
      */
@@ -632,8 +655,8 @@ public final class LiveTacticalBattleWeaponRuntime {
         /**
          * Validates and freezes one source weapon projection.
          *
-         * @param entityId stable firing combatant identity
-         * @param shotsFired physically materialized shot count
+         * @param entityId stable combatant identity
+         * @param shotsFired physically materialized kinetic shot count
          * @param ammunitionRounds current itemized physical ammunition rounds
          * @param cooldownSecondsByMount physical launcher cycle state
          */
@@ -650,7 +673,7 @@ public final class LiveTacticalBattleWeaponRuntime {
      * Per-target physical protection projection.
      *
      * @param entityId stable target combatant identity
-     * @param impactsResolved physical kinetic intersections resolved on this target
+     * @param impactsResolved physical body interactions resolved on this target
      * @param meanCompartmentIntegrity current mean production compartment integrity
      * @param totalShieldReserveJ current summed persistent fitted shield reserve
      */
@@ -663,7 +686,7 @@ public final class LiveTacticalBattleWeaponRuntime {
          * Validates one target protection projection.
          *
          * @param entityId stable target combatant identity
-         * @param impactsResolved physical kinetic intersections resolved on this target
+         * @param impactsResolved physical body interactions resolved on this target
          * @param meanCompartmentIntegrity current mean production compartment integrity
          * @param totalShieldReserveJ current summed persistent fitted shield reserve
          */
@@ -678,7 +701,7 @@ public final class LiveTacticalBattleWeaponRuntime {
     }
 
     /**
-     * Whole-battle deterministic kinetic weapon/body/protection fingerprint.
+     * Whole-battle deterministic physical weapon/body/protection fingerprint.
      *
      * @param tick authoritative shared tick
      * @param controlFingerprint production control/flight fingerprint
