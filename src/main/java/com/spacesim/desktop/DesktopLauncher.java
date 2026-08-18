@@ -12,6 +12,9 @@ import com.spacesim.presentation.validation.HeavyCorvetteAssetValidationApp;
 import com.spacesim.presentation.validation.LiveTacticalSimulationApp;
 import com.spacesim.presentation.validation.ScaledLiveTacticalSimulationApp;
 import com.spacesim.presentation.validation.Stage175ITacticalAcceptanceApp;
+import com.spacesim.ui.TacticalScenarioCatalog;
+import com.spacesim.ui.TacticalScenarioDefinition;
+import com.spacesim.ui.TacticalScenarioId;
 
 /**
  * Desktop entry point for Star Empires on LWJGL3.
@@ -26,6 +29,7 @@ public final class DesktopLauncher {
     private static final String TACTICAL_ACCEPTANCE_ARGUMENT = "--tactical-acceptance";
     private static final String LIVE_TACTICAL_SIM_ARGUMENT = "--live-tactical-sim";
     private static final String SCALED_LIVE_TACTICAL_SIM_ARGUMENT = "--scaled-live-tactical-sim";
+    private static final String TACTICAL_SIM_ARGUMENT_PREFIX = "--tactical-sim=";
     private static final String SPECTATOR_ARGUMENT = "--spectator";
 
     /** Prevents construction of the utility entry-point class. */
@@ -44,6 +48,10 @@ public final class DesktopLauncher {
         boolean scaledLiveTacticalSimulation = containsArgument(args, SCALED_LIVE_TACTICAL_SIM_ARGUMENT);
         boolean liveTacticalSimulation = containsArgument(args, LIVE_TACTICAL_SIM_ARGUMENT);
         boolean spectator = containsArgument(args, SPECTATOR_ARGUMENT);
+        String tacticalScenarioKey = argumentValue(args, TACTICAL_SIM_ARGUMENT_PREFIX);
+        TacticalScenarioDefinition tacticalScenario = tacticalScenarioKey == null
+                ? null
+                : TacticalScenarioCatalog.requireByCliKey(tacticalScenarioKey);
         Lwjgl3ApplicationConfiguration configuration = new Lwjgl3ApplicationConfiguration();
 
         ApplicationListener listener;
@@ -72,14 +80,17 @@ public final class DesktopLauncher {
             configuration.useVsync(true);
             configuration.setForegroundFPS(60);
             listener = new Stage175ITacticalAcceptanceApp();
-        } else if (scaledLiveTacticalSimulation) {
-            configuration.setTitle("Star Empires — Stage 19I Scaled Live Tactical Simulation");
+        } else if (tacticalScenario != null || scaledLiveTacticalSimulation) {
+            TacticalScenarioDefinition selected = tacticalScenario != null
+                    ? tacticalScenario
+                    : TacticalScenarioCatalog.require(TacticalScenarioId.SATURATION_16V16);
+            configuration.setTitle("Star Empires — Stage 19J Tactical Validation — " + selected.displayName());
             configuration.setWindowedMode(1600, 1000);
             configuration.setWindowSizeLimits(1100, 700, -1, -1);
             configuration.setResizable(true);
             configuration.useVsync(true);
             configuration.setForegroundFPS(60);
-            listener = new ScaledLiveTacticalSimulationApp();
+            listener = new ScaledLiveTacticalSimulationApp(selected.id());
         } else if (liveTacticalSimulation) {
             configuration.setTitle("Star Empires — Live Tactical Simulation");
             configuration.setWindowedMode(1440, 900);
@@ -125,5 +136,17 @@ public final class DesktopLauncher {
             }
         }
         return false;
+    }
+
+    private static String argumentValue(String[] args, String prefix) {
+        if (args == null) {
+            return null;
+        }
+        for (String argument : args) {
+            if (argument != null && argument.startsWith(prefix)) {
+                return argument.substring(prefix.length());
+            }
+        }
+        return null;
     }
 }
