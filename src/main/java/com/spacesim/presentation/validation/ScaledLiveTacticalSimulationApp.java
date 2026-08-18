@@ -13,7 +13,10 @@ import com.spacesim.ui.ScaledLiveTacticalSimulationSession;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession.SimulationSpeed;
 import com.spacesim.ui.ScaledTacticalDebugSnapshot;
 import com.spacesim.ui.TacticalPrototypeRenderer;
+import com.spacesim.ui.TacticalPrototypeVisualSnapshot;
+import com.spacesim.ui.TacticalPrototypeVisualSnapshot.TacticalSide;
 import com.spacesim.ui.TacticalScenarioId;
+import com.spacesim.ui.TacticalSidePalette;
 import com.spacesim.ui.WorldMapLayout;
 
 import java.util.Locale;
@@ -30,6 +33,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private static final float VIEW_PADDING_PX = 28f;
     private static final double MAX_FRAME_SECONDS = 0.25d;
     private static final int MAX_BATCHES_PER_RENDER = 64;
+    private static final Color HUD_COLOR = new Color(0.82f, 0.92f, 1f, 1f);
 
     private final TacticalScenarioId scenarioId;
     private ScaledLiveTacticalSimulationSession session;
@@ -76,8 +80,9 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
 
         Gdx.gl.glClearColor(0.006f, 0.010f, 0.020f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-        tacticalRenderer.render(camera.combined, layout, session.snapshot());
-        drawHud(session.debugSnapshot());
+        TacticalPrototypeVisualSnapshot snapshot = session.snapshot();
+        tacticalRenderer.render(camera.combined, layout, snapshot);
+        drawHud(session.debugSnapshot(), snapshot);
     }
 
     /** Rebuilds only presentation-space mapping after a window resize. */
@@ -172,10 +177,10 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         }
     }
 
-    private void drawHud(ScaledTacticalDebugSnapshot debug) {
+    private void drawHud(ScaledTacticalDebugSnapshot debug, TacticalPrototypeVisualSnapshot snapshot) {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        font.setColor(new Color(0.82f, 0.92f, 1f, 1f));
+        font.setColor(HUD_COLOR);
         float top = camera.viewportHeight - 18f;
         font.draw(batch,
                 String.format(Locale.ROOT,
@@ -197,6 +202,21 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                         debug.bodies().decoy()),
                 22f,
                 top - 24f);
+
+        setFontColor(TacticalSidePalette.outline(TacticalSide.ALPHA));
+        font.draw(batch,
+                String.format(Locale.ROOT, "ALPHA ALIVE %d/%d",
+                        aliveCount(snapshot, TacticalSide.ALPHA), session.scenario().alphaShips()),
+                22f,
+                top - 48f);
+        setFontColor(TacticalSidePalette.outline(TacticalSide.BETA));
+        font.draw(batch,
+                String.format(Locale.ROOT, "BETA ALIVE %d/%d",
+                        aliveCount(snapshot, TacticalSide.BETA), session.scenario().betaShips()),
+                180f,
+                top - 48f);
+        font.setColor(HUD_COLOR);
+
         if (debugHud && !debug.combatants().isEmpty()) {
             int size = debug.combatants().size();
             int canonicalIndex = Math.floorMod(selectedCombatantIndex, size);
@@ -204,7 +224,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
             var formation = actor.formation();
             font.draw(batch,
                     String.format(Locale.ROOT,
-                            "Actor %d [%s] | tracks %d | target %d | fire req/auth %s/%s | intent (%.2f, %.2f)",
+                            "DEBUG ACTOR %d [%s] | tracks %d | target %d | fire req/auth %s/%s | intent (%.2f, %.2f)",
                             actor.entityId(),
                             actor.side(),
                             actor.tracks().size(),
@@ -214,7 +234,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                             actor.movementAxisX(),
                             actor.movementAxisY()),
                     22f,
-                    top - 48f);
+                    top - 72f);
             font.draw(batch,
                     String.format(Locale.ROOT,
                             "AI %s / %s | ammo %d | reaction mass %.1f kg | bus %.3e J",
@@ -224,7 +244,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                             actor.reactionMassKg(),
                             actor.sharedBusEnergyJ()),
                     22f,
-                    top - 72f);
+                    top - 96f);
             String formationText = formation.objectiveKnown()
                     ? String.format(Locale.ROOT,
                             "%s %s/%s slot %d/%d err %.1f m",
@@ -244,12 +264,22 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                             actor.minimumModuleIntegrity(),
                             formationText),
                     22f,
-                    top - 96f);
+                    top - 120f);
         }
         font.draw(batch,
-                "SPACE pause | N/RIGHT single tick | R reset CURRENT scenario | 1/2/4/8 speed | UP/DOWN actor | F1 HUD | ESC exit",
+                "SPACE pause | N/RIGHT single tick | R reset CURRENT scenario | 1/2/4/8 speed | UP/DOWN debug actor | F1 HUD | ESC exit",
                 22f,
                 18f);
         batch.end();
+    }
+
+    private static long aliveCount(TacticalPrototypeVisualSnapshot snapshot, TacticalSide side) {
+        return snapshot.ships().stream()
+                .filter(ship -> ship.side() == side && !ship.wreck())
+                .count();
+    }
+
+    private void setFontColor(TacticalSidePalette.Rgba color) {
+        font.setColor(color.r(), color.g(), color.b(), color.a());
     }
 }
