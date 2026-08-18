@@ -43,15 +43,15 @@ class LiveTacticalDecoySensingDefenseTest {
                         || observed.track().informationState() == TrackState.InformationState.FIRE_CONTROL);
         assertTrue(fixture.defense().interceptorLaunches(DEFENDER_ID) > 0L,
                 "a convincing inbound decoy must consume a real defensive assignment without a hidden type label");
-        assertTrue(fixture.defense().interceptorBodies().stream()
-                        .anyMatch(body -> body.targetId() == decoyBodyId),
-                "materialized interceptor target identity must be the observed decoy body hypothesis");
+        GuidedWeaponBody interceptorAtLaunch = fixture.defense().interceptorBodies().stream()
+                .filter(body -> body.targetId() == decoyBodyId)
+                .findFirst()
+                .orElseThrow();
         assertEquals(
                 initialInterceptorRounds - fixture.defense().interceptorLaunches(DEFENDER_ID),
                 guidedRounds(fixture.battle().requireCombatant(DEFENDER_ID)),
                 "decoy diversion must consume finite itemized interceptor stores");
 
-        int projectileCountBefore = fixture.ordnance().weaponRuntime().projectiles().size();
         while (fixture.defense().tick() < 2_400L
                 && fixture.defense().successfulInterceptions(DEFENDER_ID) == 0L) {
             fixture.defense().advanceOneTick();
@@ -61,8 +61,21 @@ class LiveTacticalDecoySensingDefenseTest {
                 "diversion is not complete until interceptor and decoy physically make swept contact");
         assertFalse(fixture.decoys().decoyBodies().stream().anyMatch(body -> body.bodyId() == decoyBodyId),
                 "physically intercepted decoy must be removed through its authoritative body owner");
-        assertTrue(fixture.ordnance().weaponRuntime().projectiles().size() >= projectileCountBefore + 2,
-                "interceptor/decoy mass must survive as ordinary residual projectile bodies");
+        long collisionTick = fixture.defense().tick();
+        List<ProjectileBody> collisionResiduals = fixture.ordnance().weaponRuntime().projectiles().stream()
+                .filter(body -> body.spawnTick() == collisionTick)
+                .filter(body -> body.massKg() > 100d)
+                .toList();
+        assertTrue(collisionResiduals.stream().anyMatch(body ->
+                        body.sourceEntityId() == DEFENDER_ID
+                                && body.lengthM() == interceptorAtLaunch.lengthM()
+                                && body.diameterM() == interceptorAtLaunch.diameterM()),
+                "interceptor physical identity/material geometry must survive as a residual body");
+        assertTrue(collisionResiduals.stream().anyMatch(body ->
+                        body.sourceEntityId() == DECOY_SOURCE_ID
+                                && body.lengthM() == 2.4d
+                                && body.diameterM() == 0.36d),
+                "decoy physical identity/material geometry must survive as a residual body");
     }
 
     @Test
