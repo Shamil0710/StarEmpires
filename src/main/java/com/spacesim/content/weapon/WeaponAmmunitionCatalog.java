@@ -96,6 +96,12 @@ public final class WeaponAmmunitionCatalog {
         return guidedById.get(id);
     }
 
+    /** Authored tactical purpose of one guided ammunition body. */
+    public enum GuidedEngagementRole {
+        /** Guided body is intended to engage ship/large-object targets. */ STRIKE,
+        /** Guided body is intended to engage incoming ordnance bodies. */ INTERCEPTOR
+    }
+
     /**
      * Physical kinetic ammunition body independent from launcher muzzle hardware.
      *
@@ -149,6 +155,7 @@ public final class WeaponAmmunitionCatalog {
      * @param id stable ammunition content ID
      * @param materialId stable engineering material content ID of residual missile body
      * @param shape physical residual-body shape
+     * @param engagementRole authored tactical purpose used for explicit strike/interceptor routing
      * @param lengthM body length in meters
      * @param diameterM body diameter in meters
      * @param impactPayloadId optional future Stage-17.5F warhead/impact payload content seam
@@ -165,6 +172,7 @@ public final class WeaponAmmunitionCatalog {
             String id,
             String materialId,
             ProjectileShape shape,
+            GuidedEngagementRole engagementRole,
             double lengthM,
             double diameterM,
             String impactPayloadId,
@@ -182,6 +190,7 @@ public final class WeaponAmmunitionCatalog {
          * @param id stable ammunition content ID
          * @param materialId stable engineering material content ID
          * @param shape physical residual-body shape
+         * @param engagementRole authored tactical purpose
          * @param lengthM body length in meters
          * @param diameterM body diameter in meters
          * @param impactPayloadId optional future warhead/impact payload content seam
@@ -198,13 +207,13 @@ public final class WeaponAmmunitionCatalog {
             requireNonBlank(id, "id");
             requireNonBlank(materialId, "materialId");
             Objects.requireNonNull(shape, "shape");
+            Objects.requireNonNull(engagementRole, "engagementRole");
             requirePositiveFinite(lengthM, "lengthM");
             requirePositiveFinite(diameterM, "diameterM");
             if (impactPayloadId != null && impactPayloadId.isBlank()) {
                 throw new IllegalArgumentException("impactPayloadId must be null or non-blank");
             }
             requireNonBlank(seekerId, "seekerId");
-            // Reuse the runtime definition's physical validation, including burn-time and reserve closure.
             new GuidedWeapon(
                     id,
                     seekerId,
@@ -252,6 +261,7 @@ public final class WeaponAmmunitionCatalog {
             out.append("guided|").append(value.id()).append('|')
                     .append(value.materialId()).append('|')
                     .append(value.shape()).append('|')
+                    .append(value.engagementRole()).append('|')
                     .append(bits(value.lengthM())).append('|')
                     .append(bits(value.diameterM())).append('|')
                     .append(value.impactPayloadId() == null ? "~" : value.impactPayloadId()).append('|')
