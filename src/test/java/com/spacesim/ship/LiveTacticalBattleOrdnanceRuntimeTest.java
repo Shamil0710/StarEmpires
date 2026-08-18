@@ -66,9 +66,10 @@ class LiveTacticalBattleOrdnanceRuntimeTest {
     }
 
     @Test
-    void physicalLauncherCycleAndSupportChannelsBoundGuidedSalvoGrowth() {
+    void physicalLauncherCycleAndSupportChannelsBoundOnlyActiveGuidedBodies() {
         LiveTacticalBattleRuntimeState battle = new LiveTacticalBattleRuntimeState(missile4v4());
         LiveTacticalBattleOrdnanceRuntime runtime = runtime(battle);
+        Map<Long, Long> initialGuidedRounds = guidedRoundsByEntity(battle);
 
         for (int index = 0; index < 2_000; index++) {
             runtime.advanceOneTick();
@@ -81,10 +82,14 @@ class LiveTacticalBattleOrdnanceRuntimeTest {
         }
         assertFalse(activeBySourceAndMount.isEmpty());
         assertTrue(activeBySourceAndMount.values().stream().allMatch(count -> count <= 12),
-                "authored launcher support channels must cap simultaneous datalink-guided bodies per mount");
+                "authored support channels must cap simultaneous datalink-guided bodies per physical mount");
         for (var combatant : battle.combatants()) {
-            assertTrue(runtime.guidedLaunches(combatant.spec().entityId()) <= 24L,
-                    "two 12-channel missile mounts cannot accumulate unlimited supported guided bodies");
+            long entityId = combatant.spec().entityId();
+            assertTrue(runtime.guidedLaunches(entityId) <= initialGuidedRounds.get(entityId),
+                    "total launches are bounded by finite physical ammunition after impact releases support channels");
+            assertEquals(initialGuidedRounds.get(entityId) - runtime.guidedLaunches(entityId),
+                    guidedRounds(combatant),
+                    "released guidance channels must never create replacement ammunition");
             assertFalse(combatant.engineering().instanceState.weaponMountRuntime()
                     .cooldownSecondsByMount().isEmpty(),
                     "guided launch must use persistent production launcher-cycle continuity");
