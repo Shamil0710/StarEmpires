@@ -9,7 +9,6 @@ import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.ShipEngineeringState.DamageState;
 
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
@@ -17,13 +16,13 @@ import java.util.TreeMap;
  * Validated Stage-19I seam for authored damaged/depleted tactical initial conditions.
  *
  * <p>The service does not derive or cache combat performance. It changes only authoritative physical
- * inputs that already belong to the ship instance: local module integrity and interface-bound reaction
- * mass. Every capability, delta-v, acceleration, sensor/datalink output and later AI readiness decision
- * is still re-derived by the normal production owners.</p>
+ * inputs that already belong to the ship instance: local module integrity, interface-bound consumables,
+ * shared stored electrical energy and local stored heat. Every capability, delta-v, acceleration,
+ * sensor/datalink output and later AI readiness decision is still re-derived by production owners.</p>
  *
  * <p>This is intentionally narrower than a combat-damage API. Live impacts must continue to use
  * {@link ShipDamageRuntime} and the accepted protection pipeline. This seam exists for deterministic
- * acceptance/scenario starts where a ship enters the battle already damaged or depleted.</p>
+ * acceptance/scenario starts where a ship enters the battle already damaged or resource-constrained.</p>
  */
 public final class LiveTacticalInitialReadinessService {
     /**
@@ -36,14 +35,7 @@ public final class LiveTacticalInitialReadinessService {
     public void setModuleIntegrity(CombatantRuntime combatant, String mountId, double integrity) {
         CombatantRuntime checked = Objects.requireNonNull(combatant, "combatant");
         requireFraction(integrity, "integrity");
-        if (mountId == null || mountId.isBlank()) {
-            throw new IllegalArgumentException("mountId must be non-blank");
-        }
-        boolean installed = checked.engineering().fit.installedModules().stream()
-                .anyMatch(value -> value.mountId().equals(mountId));
-        if (!installed) {
-            throw new IllegalArgumentException("Unknown installed module mount: " + mountId);
-        }
+        requireInstalledMount(checked, mountId);
 
         EngineeringComponent engineering = checked.engineering();
         ShipInstanceRuntimeState instance = engineering.instanceState;
@@ -91,20 +83,112 @@ public final class LiveTacticalInitialReadinessService {
                 loads.add(load);
             }
         }
-        ConsumableState nextConsumables = new ConsumableState(
+        engineering.setRuntimeState(withConsumables(state, new ConsumableState(
                 consumables.cargoMassKg(),
                 consumables.storesMassKg(),
                 consumables.missionPayloadMassKg(),
                 consumables.missionIntegrationVolumeM3(),
-                loads);
+                loads)));
+    }
+
+    /**
+     * Removes every physically loaded ammunition item while preserving all non-ammunition stores.
+     *
+     * @param combatant materialized physical combatant
+     */
+    public void clearAmmunition(CombatantRuntime combatant) {
+        CombatantRuntime checked = Objects.requireNonNull(combatant, "combatant");
+        EngineeringComponent engineering = checked.engineering();
+        RuntimeState state = engineering.runtimeState;
+        ConsumableState consumables = state.consumables();
+        ArrayList<ConsumableLoad> loads = new ArrayList<>(consumables.interfaceLoads().size());
+        for (ConsumableLoad load : consumables.interfaceLoads()) {
+            if (load.kind() == InterfaceKind.AMMUNITION) {
+                loads.add(new ConsumableLoad(
+                        load.mountId(),
+                        load.interfaceId(),
+                        load.kind(),
+                        0d,
+                        0d,
+                        0L));
+            } else {
+                loads.add(load);
+            }
+        }
+        engineering.setRuntimeState(withConsumables(state, new ConsumableState(
+                consumables.cargoMassKg(),
+                consumables.storesMassKg(),
+                consumables.missionPayloadMassKg(),
+                consumables.missionIntegrationVolumeM3(),
+                loads)));
+    }
+
+    /**
+     * Authors current shared stored electrical energy for a constrained battle start.
+     *
+     * @param combatant materialized physical combatant
+     * @param sharedBusEnergyJ current non-negative shared bus energy in joules
+     */
+    public void setSharedBusEnergyJ(CombatantRuntime combatant, double sharedBusEnergyJ) {
+        CombatantRuntime checked = Objects.requireNonNull(combatant, "combatant");
+        requireNonNegativeFinite(sharedBusEnergyJ, "sharedBusEnergyJ");
+        EngineeringComponent engineering = checked.engineering();
+        RuntimeState state = engineering.runtimeState;
         engineering.setRuntimeState(new RuntimeState(
-                nextConsumables,
-                state.sharedBusEnergyJ(),
+                state.consumables(),
+                sharedBusEnergyJ,
                 state.shipHeatStoredJ(),
                 state.localHeatJByMount(),
                 state.thrustLimitNByMount(),
                 state.coolantBusCapacityW(),
                 state.ftlCooldownSecondsByMount()));
+    }
+
+    /**
+     * Authors current local stored heat on one actually installed module mount.
+     *
+     * @param combatant materialized physical combatant
+     * @param mountId installed physical mount
+     * @param localHeatJ current non-negative local stored heat in joules
+     */
+    public void setLocalHeatJ(CombatantRuntime combatant, String mountId, double localHeatJ) {
+        CombatantRuntime checked = Objects.requireNonNull(combatant, "combatant");
+        requireNonNegativeFinite(localHeatJ, "localHeatJ");
+        requireInstalledMount(checked, mountId);
+        EngineeringComponent engineering = checked.engineering();
+        RuntimeState state = engineering.runtimeState;
+        TreeMap<String, Double> localHeat = new TreeMap<>(state.localHeatJByMount());
+        localHeat.put(mountId, localHeatJ);
+        engineering.setRuntimeState(new RuntimeState(
+                state.consumables(),
+                state.sharedBusEnergyJ(),
+                state.shipHeatStoredJ(),
+                localHeat,
+                state.thrustLimitNByMount(),
+                state.coolantBusCapacityW(),
+                state.ftlCooldownSecondsByMount()));
+    }
+
+    private static RuntimeState withConsumables(RuntimeState state, ConsumableState consumables) {
+        return new RuntimeState(
+                consumables,
+                state.sharedBusEnergyJ(),
+                state.shipHeatStoredJ(),
+                state.localHeatJByMount(),
+                state.thrustLimitNByMount(),
+                state.coolantBusCapacityW(),
+                state.ftlCooldownSecondsByMount());
+    }
+
+    private static void requireInstalledMount(CombatantRuntime combatant, String mountId) {
+        if (mountId == null || mountId.isBlank()) {
+            throw new IllegalArgumentException("mountId must be non-blank");
+        }
+        boolean installed = combatant.engineering().fit.installedModules().stream()
+                .anyMatch(value -> value.mountId().equals(mountId));
+        if (!installed) {
+            throw new IllegalArgumentException("Unknown installed module mount: " + mountId);
+        }
     }
 
     private static double canonicalZero(double value) {
@@ -114,6 +198,12 @@ public final class LiveTacticalInitialReadinessService {
     private static void requireFraction(double value, String label) {
         if (!Double.isFinite(value) || value < 0d || value > 1d) {
             throw new IllegalArgumentException(label + " must be finite in [0,1]");
+        }
+    }
+
+    private static void requireNonNegativeFinite(double value, String label) {
+        if (!Double.isFinite(value) || value < 0d) {
+            throw new IllegalArgumentException(label + " must be finite and non-negative");
         }
     }
 }
