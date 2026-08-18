@@ -20,9 +20,14 @@ class Stage18ManufacturingCatalogTest {
 
         assertEquals(3, catalog.getComponentRecipes().size());
         assertEquals(13, catalog.getProductProfiles().size());
-        assertEquals(29, catalog.getProductBindings().size());
-        assertEquals(29, products.getProducts().size());
+        assertEquals(30, catalog.getProductBindings().size());
+        assertEquals(30, products.getProducts().size());
         assertEquals(64, catalog.getFingerprint().length());
+
+        var decoyBinding = catalog.findProductBinding("ammo.test_radar_repeater_decoy_300kg_v1");
+        assertNotNull(decoyBinding);
+        assertEquals("manufacturing.profile.guided_ammunition", decoyBinding.profileId(),
+                "finite Stage-19I decoys must remain ordinary Stage-18 manufacturable guided ordnance");
 
         Set<String> bound = new HashSet<>();
         catalog.getProductBindings().forEach(binding -> {
@@ -50,6 +55,11 @@ class Stage18ManufacturingCatalogTest {
         var provisional = products.findProduct("ammo.test_anti_ship_missile_2t_v1");
         assertEquals(2_000d, provisional.unitMassKg());
         assertEquals(Provenance.STAGE17_5I_CONTENT_PROVISIONAL, provisional.provenance());
+
+        var decoy = products.findProduct("ammo.test_radar_repeater_decoy_300kg_v1");
+        assertEquals(ProductKind.AMMUNITION, decoy.kind());
+        assertEquals(300d, decoy.unitMassKg());
+        assertEquals(Provenance.STAGE17_5I_CONTENT_PROVISIONAL, decoy.provenance());
     }
 
     @Test
