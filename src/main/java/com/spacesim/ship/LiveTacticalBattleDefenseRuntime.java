@@ -37,6 +37,11 @@ import java.util.TreeMap;
  * {@link LiveTacticalOrdnanceObservationRuntime}. When a physical decoy runtime is attached, decoys
  * enter the same sensor/track/scheduler domain with no hidden role label. Exact strike/decoy geometry
  * remains authoritative only in the physical collision layer.</p>
+ *
+ * <p>In multi-ship battles an interceptor station protects the separate physical hull zones of all
+ * friendly combatants. Policy does not read a missile's hidden authored target ID: the scheduler asks
+ * only whether the observer-local trajectory geometrically intersects a friendly hull and whether the
+ * real interceptor can reach that trajectory before the earliest hull entry.</p>
  */
 public final class LiveTacticalBattleDefenseRuntime {
     private static final double TICK_SECONDS = LiveTacticalBattleControlRuntime.TICK_SECONDS;
@@ -353,10 +358,7 @@ public final class LiveTacticalBattleDefenseRuntime {
             }
 
             double hullRadiusM = hullCircumscribedRadius(defender);
-            DefendedZone zone = new DefendedZone(
-                    defender.transform().position.x,
-                    defender.transform().position.y,
-                    hullRadiusM);
+            List<DefendedZone> zones = defendedZonesFor(defender);
             TreeMap<Long, MountStation> stationById = new TreeMap<>();
             List<DefenseStation> stations = new ArrayList<>();
             long stationId = 1L;
@@ -391,7 +393,7 @@ public final class LiveTacticalBattleDefenseRuntime {
                             observed.estimatedVelocityXMps(),
                             observed.estimatedVelocityYMps()))
                     .toList();
-            List<Assignment> assignments = defenseScheduler.scheduleObserved(zone, threats, stations);
+            List<Assignment> assignments = defenseScheduler.scheduleObserved(zones, threats, stations);
             for (Assignment assignment : assignments) {
                 MountStation station = Objects.requireNonNull(
                         stationById.get(assignment.stationId()),
@@ -552,6 +554,16 @@ public final class LiveTacticalBattleDefenseRuntime {
                 engineering.fit,
                 engineering.runtimeState.consumables(),
                 engineering.instanceState.damage().moduleDamage());
+    }
+
+    private List<DefendedZone> defendedZonesFor(CombatantRuntime defender) {
+        return battleState().combatants().stream()
+                .filter(ally -> ally.spec().side() == defender.spec().side())
+                .map(ally -> new DefendedZone(
+                        ally.transform().position.x,
+                        ally.transform().position.y,
+                        hullCircumscribedRadius(ally)))
+                .toList();
     }
 
     private static double hullCircumscribedRadius(CombatantRuntime combatant) {

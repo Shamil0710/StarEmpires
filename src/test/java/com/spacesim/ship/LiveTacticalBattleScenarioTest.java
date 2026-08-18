@@ -6,6 +6,8 @@ import com.spacesim.ship.Stage175IFleetDoctrineCatalog.DoctrineId;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -53,6 +55,27 @@ class LiveTacticalBattleScenarioTest {
     }
 
     @Test
+    void mixed8v8AuthoredRosterIsDeterministicBalancedByCountAndActuallyMixed() {
+        LiveTacticalBattleScenario first = LiveTacticalBattleScenario.mixed8v8();
+        LiveTacticalBattleScenario second = LiveTacticalBattleScenario.mixed8v8();
+
+        assertEquals(first, second);
+        assertEquals(16, first.combatants().size());
+        assertEquals(8, first.combatantsFor(Side.ALPHA).size());
+        assertEquals(8, first.combatantsFor(Side.BETA).size());
+        assertEquals(16L, first.combatants().stream().map(CombatantSpec::entityId).distinct().count());
+        assertEquals(4L, first.combatants().stream().map(CombatantSpec::doctrineId).distinct().count(),
+                "8v8 scale fixture must exercise several existing physical fit/store families");
+
+        Map<DoctrineId, Long> alphaCounts = doctrineCounts(first.combatantsFor(Side.ALPHA));
+        Map<DoctrineId, Long> betaCounts = doctrineCounts(first.combatantsFor(Side.BETA));
+        assertEquals(alphaCounts, betaCounts,
+                "side geometry/order may differ but authored doctrine counts must stay comparable");
+        assertTrue(first.combatants().stream()
+                .allMatch(value -> Double.isFinite(value.xM()) && Double.isFinite(value.yM())));
+    }
+
+    @Test
     void legacyDuelPreservesExistingStableViewerIdentities() {
         LiveTacticalBattleScenario scenario = LiveTacticalBattleScenario.legacyDuel();
 
@@ -61,5 +84,12 @@ class LiveTacticalBattleScenarioTest {
                 scenario.combatantsFor(Side.ALPHA).get(0).entityId());
         assertEquals(LiveTacticalSimulationSession.TARGET_ENTITY_ID,
                 scenario.combatantsFor(Side.BETA).get(0).entityId());
+    }
+
+    private static Map<DoctrineId, Long> doctrineCounts(List<CombatantSpec> combatants) {
+        return combatants.stream().collect(Collectors.groupingBy(
+                CombatantSpec::doctrineId,
+                () -> new java.util.EnumMap<>(DoctrineId.class),
+                Collectors.counting()));
     }
 }
