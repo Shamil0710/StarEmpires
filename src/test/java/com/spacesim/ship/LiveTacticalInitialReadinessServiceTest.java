@@ -1,7 +1,9 @@
 package com.spacesim.ship;
 
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.ship.LiveTacticalBattleScenario.CombatantSpec;
 import com.spacesim.ship.LiveTacticalBattleScenario.Side;
+import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
 import com.spacesim.ship.Stage175IFleetDoctrineCatalog.DoctrineId;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +39,53 @@ class LiveTacticalInitialReadinessServiceTest {
     }
 
     @Test
+    void exactPartialAmmunitionRetainsItemMassAndNativeAmountConsistency() {
+        LiveTacticalBattleRuntimeState battle = battle();
+        var combatant = battle.requireCombatant(199_971L);
+        LiveTacticalInitialReadinessService service = new LiveTacticalInitialReadinessService();
+        ConsumableLoad original = ammunitionLoad(combatant, "weapon_primary");
+        long retainedItems = Math.max(1L, original.itemCount() / 2L);
+
+        service.retainAmmunitionItems(
+                combatant,
+                original.mountId(),
+                original.interfaceId(),
+                retainedItems);
+
+        ConsumableLoad retained = ammunitionLoad(combatant, "weapon_primary");
+        double ratio = retainedItems / (double) original.itemCount();
+        assertEquals(retainedItems, retained.itemCount());
+        assertEquals(original.amount() * ratio, retained.amount(), 1e-9d);
+        assertEquals(original.massKg() * ratio, retained.massKg(), 1e-6d);
+        assertEquals(
+                original.massKg() / original.itemCount(),
+                retained.massKg() / retained.itemCount(),
+                1e-9d,
+                "partial authoring must preserve physical mass per item");
+    }
+
+    @Test
+    void partialAmmunitionCannotManufactureRoundsOrTargetUnknownFeed() {
+        LiveTacticalBattleRuntimeState battle = battle();
+        var combatant = battle.requireCombatant(199_971L);
+        LiveTacticalInitialReadinessService service = new LiveTacticalInitialReadinessService();
+        ConsumableLoad original = ammunitionLoad(combatant, "weapon_primary");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.retainAmmunitionItems(
+                        combatant,
+                        original.mountId(),
+                        original.interfaceId(),
+                        original.itemCount() + 1L));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.retainAmmunitionItems(
+                        combatant,
+                        original.mountId(),
+                        "missing_feed",
+                        0L));
+    }
+
+    @Test
     void invalidMountAndInvalidFractionAreRejected() {
         LiveTacticalBattleRuntimeState battle = battle();
         var combatant = battle.requireCombatant(199_971L);
@@ -48,6 +97,16 @@ class LiveTacticalInitialReadinessServiceTest {
                 () -> service.setModuleIntegrity(combatant, "utility_datalink", -0.1d));
         assertThrows(IllegalArgumentException.class,
                 () -> service.retainReactionMassFraction(combatant, 1.1d));
+    }
+
+    private static ConsumableLoad ammunitionLoad(
+            LiveTacticalBattleRuntimeState.CombatantRuntime combatant,
+            String mountId) {
+        return combatant.engineering().runtimeState.consumables().interfaceLoads().stream()
+                .filter(value -> value.kind() == InterfaceKind.AMMUNITION)
+                .filter(value -> value.mountId().equals(mountId))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static LiveTacticalBattleRuntimeState battle() {
