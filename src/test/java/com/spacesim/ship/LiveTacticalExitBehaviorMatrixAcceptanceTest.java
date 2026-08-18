@@ -149,13 +149,12 @@ class LiveTacticalExitBehaviorMatrixAcceptanceTest {
                 OrderSignature a = orders.get(index - 2);
                 OrderSignature b = orders.get(index - 1);
                 OrderSignature c = orders.get(index);
+                String tickRange = " at ticks " + (index - 1) + ".." + (index + 1);
                 assertFalse(a.equals(c) && !a.equals(b),
-                        () -> "uncontrolled fixed-tick A-B-A order churn for entity " + entry.getKey()
-                                + " at ticks " + (index - 1) + ".." + (index + 1));
+                        "uncontrolled fixed-tick A-B-A order churn for entity " + entry.getKey() + tickRange);
                 assertFalse(strictFormationPingPong(a.formationCorrectionSign(),
                                 b.formationCorrectionSign(), c.formationCorrectionSign()),
-                        () -> "per-tick formation correction ping-pong for entity " + entry.getKey()
-                                + " at ticks " + (index - 1) + ".." + (index + 1));
+                        "per-tick formation correction ping-pong for entity " + entry.getKey() + tickRange);
             }
         }
     }
