@@ -112,6 +112,56 @@ public record LiveTacticalBattleScenario(List<CombatantSpec> combatants) {
         return new LiveTacticalBattleScenario(roster);
     }
 
+    /**
+     * Returns the first deterministic mixed-doctrine 8v8 exact-local Stage-19I roster.
+     *
+     * <p>The roster deliberately mixes kinetic-line, missile-strike, defensive-EW and balanced
+     * acceptance fits while keeping equal doctrine counts on both sides. Doctrine IDs select only
+     * existing authored physical fits/stores; they grant no hidden combat multiplier. The two sides
+     * use different vertical ordering so the fleet case is not eight duplicated mirror duels.</p>
+     *
+     * @return deterministic sixteen-combatant mixed-doctrine scenario
+     */
+    public static LiveTacticalBattleScenario mixed8v8() {
+        ArrayList<CombatantSpec> roster = new ArrayList<>(16);
+        double[] yPositions = {280d, 400d, 520d, 640d, 760d, 880d, 1_000d, 1_120d};
+        DoctrineId[] alphaDoctrines = {
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.D_DEFENSIVE_EW,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.E_BALANCED_CONTROL
+        };
+        DoctrineId[] betaDoctrines = {
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.E_BALANCED_CONTROL,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.D_DEFENSIVE_EW,
+                DoctrineId.A_KINETIC_LINE,
+                DoctrineId.B_MISSILE_STRIKE,
+                DoctrineId.E_BALANCED_CONTROL
+        };
+        for (int index = 0; index < yPositions.length; index++) {
+            roster.add(new CombatantSpec(
+                    191_300L + index,
+                    Side.ALPHA,
+                    alphaDoctrines[index],
+                    260d,
+                    yPositions[index]));
+            roster.add(new CombatantSpec(
+                    191_400L + index,
+                    Side.BETA,
+                    betaDoctrines[index],
+                    1_690d,
+                    yPositions[index]));
+        }
+        return new LiveTacticalBattleScenario(roster);
+    }
+
     /** Battle allegiance within one exact local tactical session. */
     public enum Side {
         /** First authored combat side. */
