@@ -1,0 +1,349 @@
+package com.spacesim.ship;
+
+import com.spacesim.components.EngineeringComponent;
+import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.Stage175ICombatTestContentPack;
+import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
+import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
+import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
+import com.spacesim.ship.SensorDefinition.Mode;
+import com.spacesim.ship.ShipObservationService.OperationPlan;
+import com.spacesim.ship.ShipSensorEngineeringAdapter.FittedSensor;
+import com.spacesim.ship.ShipSensorRuntime.Position2d;
+import com.spacesim.ship.ShipSensorRuntime.TrackQualityPolicy;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/**
+ * Actor-bounded Stage-19I guided-ordnance observation over ordinary fitted production radar.
+ *
+ * <p>This runtime advances no combat clock and owns no physical body state. It projects active hostile
+ * {@link GuidedWeaponBody} instances through current fitted/damaged ACTIVE_RADAR hardware, the common
+ * engineering power/heat grant layer, {@link ShipObservationService} signal equations and
+ * {@link ShipSensorRuntime} fusion. Consumers receive only observer-local {@link TrackState} plus a
+ * velocity estimate derived from successive observer-local Cartesian track solutions.</p>
+ *
+ * <p>Ordnance radar work is phase-shifted from the shared ship-target radar scan: ship scans occur on
+ * tick 1 and multiples of four, while this runtime scans on ticks congruent to 2 modulo four. Each
+ * ordnance scan represents one 0.05 s radar operation. A fitted radar receives one physical
+ * engineering grant for that operation and the emitted search operation is then evaluated against
+ * every current hostile guided body. This avoids both a free simultaneous second radar operation and
+ * transmitter-power multiplication per target.</p>
+ *
+ * <p>This slice intentionally uses ACTIVE_RADAR only. The authored guided thermal/plume/optical/radio
+ * signatures remain available for later passive/EW integration. Target EW is currently empty; the
+ * next Stage-19I-D slice must replace that with actual jammer/decoy state.</p>
+ */
+public final class LiveTacticalOrdnanceObservationRuntime {
+    private static final long SCAN_PERIOD_TICKS = 4L;
+    private static final long SCAN_PHASE_TICK = 2L;
+    private static final double OPERATION_SECONDS = LiveTacticalBattleControlRuntime.TICK_SECONDS;
+    private static final int MAX_MEASUREMENTS_PER_TARGET = 12;
+    private static final double EPSILON = 1e-9d;
+
+    private final LiveTacticalBattleOrdnanceRuntime ordnanceRuntime;
+    private final ShipEngineeringCatalog engineeringCatalog;
+    private final WeaponAmmunitionCatalog ammunitionCatalog;
+    private final DerivedShipCalculator calculator;
+    private final ShipSensorEngineeringAdapter sensorAdapter;
+    private final ShipObservationService observationService;
+    private final ShipEngineeringGrantService grantService;
+    private final ShipSensorRuntime sensorRuntime;
+    private final TrackQualityPolicy trackPolicy;
+    private final TreeMap<Long, TreeMap<Long, List<SensorMeasurement>>> measurementsByObserver = new TreeMap<>();
+    private final TreeMap<Long, TreeMap<Long, ObservedOrdnanceTrack>> tracksByObserver = new TreeMap<>();
+    private final TreeMap<Long, TreeMap<Long, PositionSample>> latestSamplesByObserver = new TreeMap<>();
+
+    private long lastObservedTick = -1L;
+
+    /**
+     * Creates actor-bounded ordnance observation over one authoritative shared ordnance runtime.
+     *
+     * @param ordnanceRuntime physical guided-ordnance runtime; not advanced by this observer
+     */
+    public LiveTacticalOrdnanceObservationRuntime(LiveTacticalBattleOrdnanceRuntime ordnanceRuntime) {
+        this.ordnanceRuntime = Objects.requireNonNull(ordnanceRuntime, "ordnanceRuntime");
+        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
+        calculator = new DerivedShipCalculator(engineeringCatalog);
+        sensorAdapter = new ShipSensorEngineeringAdapter();
+        observationService = new ShipObservationService();
+        grantService = new ShipEngineeringGrantService(engineeringCatalog);
+        sensorRuntime = new ShipSensorRuntime();
+        trackPolicy = TrackQualityPolicy.defaultPolicy();
+        for (CombatantRuntime combatant : battleState().combatants()) {
+            long entityId = combatant.spec().entityId();
+            measurementsByObserver.put(entityId, new TreeMap<>());
+            tracksByObserver.put(entityId, new TreeMap<>());
+            latestSamplesByObserver.put(entityId, new TreeMap<>());
+        }
+    }
+
+    /**
+     * Updates observer-local ordnance information for the current already-advanced battle tick.
+     *
+     * <p>The call is idempotent within one tick. Known tracks age every new tick; a physical radar
+     * scan is attempted only in the dedicated scan phase.</p>
+     */
+    public void observeCurrentTick() {
+        long tick = ordnanceRuntime.tick();
+        if (tick <= 0L) {
+            return;
+        }
+        if (tick == lastObservedTick) {
+            return;
+        }
+        if (lastObservedTick > tick) {
+            throw new IllegalStateException("ordnance observation tick moved backwards");
+        }
+        ageKnownTracks(ordnanceRuntime.elapsedSeconds());
+        if (tick % SCAN_PERIOD_TICKS == SCAN_PHASE_TICK) {
+            scanAllObservers();
+        }
+        lastObservedTick = tick;
+    }
+
+    /**
+     * Returns current observer-local ordnance tracks in deterministic target-ID order.
+     *
+     * @param observerEntityId stable observing combatant identity
+     * @return immutable track projections; empty when nothing has been observed
+     */
+    public List<ObservedOrdnanceTrack> tracksForObserver(long observerEntityId) {
+        battleState().requireCombatant(observerEntityId);
+        return List.copyOf(tracksByObserver.get(observerEntityId).values());
+    }
+
+    /**
+     * Returns one observer-local guided-body track.
+     *
+     * @param observerEntityId stable observing combatant identity
+     * @param bodyId guided-body identity hypothesis
+     * @return current actor-bounded track or {@code null}
+     */
+    public ObservedOrdnanceTrack track(long observerEntityId, long bodyId) {
+        battleState().requireCombatant(observerEntityId);
+        return tracksByObserver.get(observerEntityId).get(bodyId);
+    }
+
+    /** @return wrapped physical guided-ordnance runtime */
+    public LiveTacticalBattleOrdnanceRuntime ordnanceRuntime() {
+        return ordnanceRuntime;
+    }
+
+    private LiveTacticalBattleRuntimeState battleState() {
+        return ordnanceRuntime.battleState();
+    }
+
+    private void scanAllObservers() {
+        for (CombatantRuntime observer : battleState().combatants()) {
+            scanObserver(observer);
+        }
+    }
+
+    private void scanObserver(CombatantRuntime observer) {
+        List<GuidedWeaponBody> hostileBodies = hostileGuidedBodies(observer);
+        if (hostileBodies.isEmpty()) {
+            return;
+        }
+        List<FittedSensor> radars = sensorAdapter.derive(derive(observer)).sensors().stream()
+                .filter(sensor -> sensor.definition().mode() == Mode.ACTIVE_RADAR)
+                .toList();
+        if (radars.isEmpty()) {
+            return;
+        }
+
+        EngineeringComponent engineering = observer.engineering();
+        var budget = grantService.beginInterval(engineering, OPERATION_SECONDS);
+        TreeMap<Long, Integer> measurementsBefore = new TreeMap<>();
+        TreeMap<Long, List<SensorMeasurement>> observerHistory = measurementsByObserver.get(observer.spec().entityId());
+        for (GuidedWeaponBody body : hostileBodies) {
+            measurementsBefore.put(body.bodyId(), observerHistory.getOrDefault(body.bodyId(), List.of()).size());
+        }
+
+        for (FittedSensor radar : radars) {
+            OperationPlan plan = observationService.planOperation(
+                    radar.definition(),
+                    SensorRuntimeState.nominal(),
+                    OPERATION_SECONDS);
+            var grant = grantService.grantAndCommit(
+                    engineering,
+                    radar.mountId(),
+                    plan.requiredElectricalPowerW(),
+                    plan.generatedHeatW(),
+                    OPERATION_SECONDS,
+                    budget);
+            if (!grant.committed()) {
+                continue;
+            }
+            for (GuidedWeaponBody body : hostileBodies) {
+                var ammunition = ammunitionCatalog.findGuided(body.definition().id());
+                if (ammunition == null) {
+                    throw new IllegalStateException("active guided body lacks ammunition content: " + body.definition().id());
+                }
+                var measurement = observationService.execute(
+                        plan,
+                        radar.definition(),
+                        observer.spec().entityId(),
+                        body.bodyId(),
+                        new Position2d(observer.transform().position.x, observer.transform().position.y),
+                        new Position2d(body.xM(), body.yM()),
+                        ammunition.signature().toRuntimeSignature(),
+                        ElectronicWarfareState.empty(),
+                        ordnanceRuntime.elapsedSeconds(),
+                        grant.grant());
+                measurement.ifPresent(value -> appendMeasurement(observerHistory, body.bodyId(), value));
+            }
+        }
+
+        for (GuidedWeaponBody body : hostileBodies) {
+            List<SensorMeasurement> history = observerHistory.getOrDefault(body.bodyId(), List.of());
+            int before = measurementsBefore.getOrDefault(body.bodyId(), 0);
+            if (history.size() <= before) {
+                continue;
+            }
+            TrackState fused = sensorRuntime.fuse(
+                    body.bodyId(),
+                    history,
+                    DatalinkState.local(),
+                    trackPolicy,
+                    ordnanceRuntime.elapsedSeconds());
+            updateObservedTrack(observer.spec().entityId(), fused);
+        }
+    }
+
+    private void updateObservedTrack(long observerEntityId, TrackState fused) {
+        TreeMap<Long, PositionSample> samples = latestSamplesByObserver.get(observerEntityId);
+        PositionSample previous = samples.get(fused.targetId());
+        boolean velocityKnown = false;
+        double velocityX = 0d;
+        double velocityY = 0d;
+        double velocitySigma = 0d;
+        if (fused.positionKnown() && previous != null) {
+            double deltaSeconds = fused.lastMeasurementSeconds() - previous.timestampSeconds();
+            if (deltaSeconds > EPSILON) {
+                velocityKnown = true;
+                velocityX = (fused.estimatedXM() - previous.xM()) / deltaSeconds;
+                velocityY = (fused.estimatedYM() - previous.yM()) / deltaSeconds;
+                double variance = fused.covariance().positionVarianceM2()
+                        + previous.positionVarianceM2();
+                velocitySigma = Math.sqrt(Math.max(0d, variance)) / deltaSeconds;
+            }
+        }
+        if (fused.positionKnown()) {
+            samples.put(fused.targetId(), new PositionSample(
+                    fused.lastMeasurementSeconds(),
+                    fused.estimatedXM(),
+                    fused.estimatedYM(),
+                    fused.covariance().positionVarianceM2()));
+        }
+        ObservedOrdnanceTrack old = tracksByObserver.get(observerEntityId).get(fused.targetId());
+        if (!velocityKnown && old != null && old.velocityKnown()) {
+            velocityKnown = true;
+            velocityX = old.estimatedVelocityXMps();
+            velocityY = old.estimatedVelocityYMps();
+            velocitySigma = old.oneSigmaVelocityMps();
+        }
+        tracksByObserver.get(observerEntityId).put(
+                fused.targetId(),
+                new ObservedOrdnanceTrack(fused, velocityKnown, velocityX, velocityY, velocitySigma));
+    }
+
+    private void ageKnownTracks(double nowSeconds) {
+        for (TreeMap<Long, ObservedOrdnanceTrack> observerTracks : tracksByObserver.values()) {
+            List<Map.Entry<Long, ObservedOrdnanceTrack>> values = new ArrayList<>(observerTracks.entrySet());
+            for (Map.Entry<Long, ObservedOrdnanceTrack> entry : values) {
+                ObservedOrdnanceTrack current = entry.getValue();
+                TrackState aged = sensorRuntime.ageTrack(current.track(), nowSeconds, trackPolicy);
+                observerTracks.put(entry.getKey(), new ObservedOrdnanceTrack(
+                        aged,
+                        current.velocityKnown(),
+                        current.estimatedVelocityXMps(),
+                        current.estimatedVelocityYMps(),
+                        current.oneSigmaVelocityMps()));
+            }
+        }
+    }
+
+    private List<GuidedWeaponBody> hostileGuidedBodies(CombatantRuntime observer) {
+        return ordnanceRuntime.guidedBodies().stream()
+                .filter(body -> battleState().requireCombatant(body.sourceEntityId()).spec().side()
+                        != observer.spec().side())
+                .toList();
+    }
+
+    private ShipEngineeringState.DerivedShipState derive(CombatantRuntime combatant) {
+        EngineeringComponent engineering = combatant.engineering();
+        return calculator.derive(
+                combatant.hull(),
+                engineering.fit,
+                engineering.runtimeState.consumables(),
+                engineering.instanceState.damage().moduleDamage());
+    }
+
+    private static void appendMeasurement(
+            TreeMap<Long, List<SensorMeasurement>> historyByTarget,
+            long targetId,
+            SensorMeasurement measurement) {
+        ArrayList<SensorMeasurement> values = new ArrayList<>(historyByTarget.getOrDefault(targetId, List.of()));
+        values.add(Objects.requireNonNull(measurement, "measurement"));
+        while (values.size() > MAX_MEASUREMENTS_PER_TARGET) {
+            values.remove(0);
+        }
+        historyByTarget.put(targetId, List.copyOf(values));
+    }
+
+    /**
+     * Observer-local ordnance track plus velocity inferred only from successive observed positions.
+     *
+     * @param track ordinary production fused target track
+     * @param velocityKnown whether two temporally distinct Cartesian observer-local solutions exist
+     * @param estimatedVelocityXMps actor-bounded x velocity estimate or canonical zero
+     * @param estimatedVelocityYMps actor-bounded y velocity estimate or canonical zero
+     * @param oneSigmaVelocityMps scalar one-sigma velocity uncertainty or canonical zero
+     */
+    public record ObservedOrdnanceTrack(
+            TrackState track,
+            boolean velocityKnown,
+            double estimatedVelocityXMps,
+            double estimatedVelocityYMps,
+            double oneSigmaVelocityMps) {
+        /**
+         * Validates one immutable observer-local ordnance track.
+         *
+         * @param track ordinary production fused target track
+         * @param velocityKnown whether velocity is supported by observation history
+         * @param estimatedVelocityXMps actor-bounded x velocity estimate or zero
+         * @param estimatedVelocityYMps actor-bounded y velocity estimate or zero
+         * @param oneSigmaVelocityMps non-negative velocity uncertainty or zero
+         */
+        public ObservedOrdnanceTrack {
+            Objects.requireNonNull(track, "track");
+            if (!Double.isFinite(estimatedVelocityXMps) || !Double.isFinite(estimatedVelocityYMps)
+                    || !Double.isFinite(oneSigmaVelocityMps) || oneSigmaVelocityMps < 0d) {
+                throw new IllegalArgumentException("observed ordnance velocity state must be finite/non-negative");
+            }
+            if (!velocityKnown
+                    && (estimatedVelocityXMps != 0d || estimatedVelocityYMps != 0d || oneSigmaVelocityMps != 0d)) {
+                throw new IllegalArgumentException("unknown velocity must use canonical zero values");
+            }
+        }
+    }
+
+    private record PositionSample(
+            double timestampSeconds,
+            double xM,
+            double yM,
+            double positionVarianceM2) {
+        private PositionSample {
+            if (!Double.isFinite(timestampSeconds) || !Double.isFinite(xM) || !Double.isFinite(yM)
+                    || !Double.isFinite(positionVarianceM2) || positionVarianceM2 <= 0d) {
+                throw new IllegalArgumentException("position sample must be finite with positive variance");
+            }
+        }
+    }
+}
