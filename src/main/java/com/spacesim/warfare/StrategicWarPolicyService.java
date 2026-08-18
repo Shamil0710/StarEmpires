@@ -16,6 +16,11 @@ import java.util.TreeSet;
  * an abstract war-score currency. Callers provide only evidence already available to the deciding
  * actor plus physical consequences measured by their owning Stage-17.5/18/19E-F systems. Explicit
  * policy thresholds translate those measurements into a political decision.</p>
+ *
+ * <p>Persistent diplomacy remains owned by the existing Stage-17 world layer. In particular, this
+ * service does not replace {@code FactionDiplomacyRuntime}, treaty evaluation or treaty/embargo
+ * commands. A caller that turns a strategic decision into a legal diplomatic transition must do so
+ * through the existing {@code WorldSimulation} diplomatic-command boundary.</p>
  */
 public final class StrategicWarPolicyService {
     /** Escalation state; the enum itself grants no physical capability. */
@@ -51,7 +56,13 @@ public final class StrategicWarPolicyService {
      * @param mandatory whether settlement must satisfy this objective for automatic acceptance
      */
     public record WarObjective(String id, String subjectId, boolean mandatory) {
-        /** Validates one immutable named objective. */
+        /**
+         * Validates one immutable named objective.
+         *
+         * @param id stable objective identity used by settlement terms
+         * @param subjectId stable real political subject identity
+         * @param mandatory whether the objective is mandatory for settlement acceptance
+         */
         public WarObjective {
             id = requireText(id, "id");
             subjectId = requireText(subjectId, "subjectId");
@@ -65,7 +76,12 @@ public final class StrategicWarPolicyService {
      * @param evidence actor-bounded evidence state
      */
     public record ObjectiveAssessment(WarObjective objective, ObjectiveEvidence evidence) {
-        /** Validates one immutable objective assessment. */
+        /**
+         * Validates one immutable objective assessment.
+         *
+         * @param objective named political objective
+         * @param evidence actor-bounded evidence state
+         */
         public ObjectiveAssessment {
             Objects.requireNonNull(objective, "objective");
             Objects.requireNonNull(evidence, "evidence");
@@ -97,7 +113,18 @@ public final class StrategicWarPolicyService {
             double confirmedOwnUndeliveredCargoKg,
             double observedOpponentDestroyedMassKg,
             double observedOpponentUndeliveredCargoKg) {
-        /** Validates non-negative physical evidence. */
+        /**
+         * Validates non-negative physical evidence.
+         *
+         * @param ownOperationalCombatShips physical operational own combat ships
+         * @param ownReactionMassKg own physical reaction mass in kilograms
+         * @param ownRepairDemandKg current physical repair-material demand in kilograms
+         * @param ownRepairMaterialAvailableKg compatible physical repair material available in kilograms
+         * @param confirmedOwnDestroyedMassKg confirmed destroyed own constructed mass in kilograms
+         * @param confirmedOwnUndeliveredCargoKg confirmed own undelivered cargo mass in kilograms
+         * @param observedOpponentDestroyedMassKg observed opponent destroyed constructed mass in kilograms
+         * @param observedOpponentUndeliveredCargoKg observed opponent denied or undelivered cargo mass in kilograms
+         */
         public PhysicalWarEvidence {
             if (ownOperationalCombatShips < 0) {
                 throw new IllegalArgumentException("ownOperationalCombatShips must be non-negative");
@@ -127,7 +154,15 @@ public final class StrategicWarPolicyService {
             boolean requireRepairMaterialCoverage,
             double opponentDestroyedMassKgForCoerciveOffer,
             double opponentUndeliveredCargoKgForCoerciveOffer) {
-        /** Validates one explicit strategic policy. */
+        /**
+         * Validates one explicit strategic policy.
+         *
+         * @param minimumOperationalCombatShipsToSustain minimum physical operational combat ships
+         * @param minimumReactionMassKgToSustain minimum physical reaction mass in kilograms
+         * @param requireRepairMaterialCoverage whether compatible repair stock must cover current repair demand
+         * @param opponentDestroyedMassKgForCoerciveOffer observed destroyed opponent mass threshold in kilograms
+         * @param opponentUndeliveredCargoKgForCoerciveOffer observed denied opponent cargo threshold in kilograms
+         */
         public Policy {
             if (minimumOperationalCombatShipsToSustain < 0) {
                 throw new IllegalArgumentException("minimumOperationalCombatShipsToSustain must be non-negative");
@@ -147,7 +182,12 @@ public final class StrategicWarPolicyService {
      * @param objectiveIdsGrantedToActor exact objective IDs the offer explicitly grants to the actor
      */
     public record SettlementOffer(boolean present, Set<String> objectiveIdsGrantedToActor) {
-        /** Freezes deterministic settlement terms. */
+        /**
+         * Freezes deterministic settlement terms.
+         *
+         * @param present whether an actual settlement offer exists
+         * @param objectiveIdsGrantedToActor exact objective IDs explicitly granted to the actor
+         */
         public SettlementOffer {
             Objects.requireNonNull(objectiveIdsGrantedToActor, "objectiveIdsGrantedToActor");
             TreeSet<String> copy = new TreeSet<>();
@@ -181,7 +221,15 @@ public final class StrategicWarPolicyService {
             PhysicalWarEvidence physicalEvidence,
             Policy policy,
             SettlementOffer settlementOffer) {
-        /** Validates and deterministically orders one decision input. */
+        /**
+         * Validates and deterministically orders one decision input.
+         *
+         * @param escalation current political escalation authorization
+         * @param objectives actor-visible named objective assessments
+         * @param physicalEvidence actor-bounded physical consequences and own sustainment
+         * @param policy explicit political thresholds
+         * @param settlementOffer currently visible settlement offer
+         */
         public Input {
             Objects.requireNonNull(escalation, "escalation");
             Objects.requireNonNull(objectives, "objectives");
@@ -217,7 +265,14 @@ public final class StrategicWarPolicyService {
             boolean canSustainCurrentOperations,
             boolean observedOpponentMaterialPressure,
             Set<String> unresolvedMandatoryObjectiveIds) {
-        /** Freezes one deterministic result. */
+        /**
+         * Freezes one deterministic result.
+         *
+         * @param decision selected political posture
+         * @param canSustainCurrentOperations whether physical sustainment requirements are met
+         * @param observedOpponentMaterialPressure whether observed opponent pressure crosses a policy threshold
+         * @param unresolvedMandatoryObjectiveIds mandatory objective IDs not yet observed as met
+         */
         public Result {
             Objects.requireNonNull(decision, "decision");
             Objects.requireNonNull(unresolvedMandatoryObjectiveIds, "unresolvedMandatoryObjectiveIds");
