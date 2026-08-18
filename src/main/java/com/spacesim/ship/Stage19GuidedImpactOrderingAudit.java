@@ -19,7 +19,8 @@ import java.util.TreeMap;
  * ordering suppresses a physically earlier interceptor contact in accepted scaled scenarios. The
  * audit snapshots only already-active strike/interceptor bodies at tick start, reproduces the same
  * deterministic guidance equations from actor-bounded tracks after sensing, and compares swept
- * contact fractions. It never deletes, moves, damages or retargets a body.</p>
+ * contact fractions with the exact same circumscribed body radius used by production interception.
+ * It never deletes, moves, damages or retargets a body.</p>
  */
 public final class Stage19GuidedImpactOrderingAudit {
     private static final double TICK_SECONDS = LiveTacticalBattleControlRuntime.TICK_SECONDS;
@@ -217,7 +218,7 @@ public final class Stage19GuidedImpactOrderingAudit {
     }
 
     private static double bodyRadius(GuidedWeaponBody body) {
-        return Math.max(body.lengthM(), body.diameterM()) * 0.5d;
+        return 0.5d * Math.hypot(body.lengthM(), body.diameterM());
     }
 
     private static Map<Long, GuidedWeaponBody> indexBodies(List<GuidedWeaponBody> bodies) {
@@ -292,8 +293,8 @@ public final class Stage19GuidedImpactOrderingAudit {
             if (threatBodyId <= 0L || interceptorBodyId <= 0L || shipTargetEntityId <= 0L
                     || !Double.isFinite(shipImpactFraction)
                     || !Double.isFinite(interceptorContactFraction)
-                    || interceptorContactFraction < 0d
-                    || shipImpactFraction > 1d
+                    || shipImpactFraction < 0d || shipImpactFraction > 1d
+                    || interceptorContactFraction < 0d || interceptorContactFraction > 1d
                     || interceptorContactFraction >= shipImpactFraction) {
                 throw new IllegalArgumentException("invalid earlier interceptor contact");
             }
