@@ -6,6 +6,7 @@ import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
 import com.spacesim.ship.ShipEngineeringState;
 import com.spacesim.ui.ScaledTacticalDebugSnapshot.BodyCounts;
 import com.spacesim.ui.ScaledTacticalDebugSnapshot.CombatantDebug;
+import com.spacesim.ui.ScaledTacticalDebugSnapshot.FormationDebug;
 import com.spacesim.ui.ScaledTacticalDebugSnapshot.TrackDebug;
 
 import java.util.List;
@@ -41,6 +42,7 @@ public final class ScaledTacticalDebugProjection {
             CombatantRuntime combatant) {
         long entityId = combatant.spec().entityId();
         var control = controlRuntime.controlState(entityId);
+        var formation = controlRuntime.formationState(entityId);
         var engineering = combatant.engineering();
         var consumables = engineering.runtimeState.consumables();
         List<TrackDebug> tracks = runtime.battleState().visibleContacts(entityId).stream()
@@ -60,6 +62,15 @@ public final class ScaledTacticalDebugProjection {
                 control.movementAxisY(),
                 control.survivalDecision().action(),
                 control.survivalDecision().reason(),
+                new FormationDebug(
+                        formation.objectiveKnown(),
+                        formation.mode(),
+                        formation.slotIndex(),
+                        formation.slotCount(),
+                        formation.desiredYM(),
+                        formation.errorM(),
+                        formation.status(),
+                        formation.reason()),
                 ammunitionCount(consumables),
                 reactionMassKg(consumables),
                 engineering.runtimeState.sharedBusEnergyJ(),
