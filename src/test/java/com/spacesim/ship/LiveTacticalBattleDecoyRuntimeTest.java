@@ -78,6 +78,24 @@ class LiveTacticalBattleDecoyRuntimeTest {
     }
 
     @Test
+    void lateDeploymentDoesNotReplayTicksThatPredateLaunch() {
+        LiveTacticalBattleRuntimeState battle = decoyBattle();
+        LiveTacticalBattleOrdnanceRuntime ordnance = ordnanceRuntime(battle);
+        LiveTacticalBattleDecoyRuntime decoys = new LiveTacticalBattleDecoyRuntime(ordnance);
+        for (int index = 0; index < 40; index++) {
+            ordnance.advanceOneTick();
+        }
+
+        assertTrue(decoys.deployOne(SOURCE_ID, "weapon_primary", 0d, 1d));
+        GuidedWeaponBody atLaunch = decoys.decoyBodies().get(0);
+
+        assertEquals(atLaunch.definition().propellantMassKg(), atLaunch.remainingPropellantKg(), 1e-9d,
+                "new body must retain full authored propellant at its actual late launch tick");
+        assertEquals(atLaunch.definition().burnTimeSeconds(), atLaunch.remainingPoweredBurnSeconds(), 1e-9d,
+                "pre-launch authoritative ticks must never age a newly materialized body");
+    }
+
+    @Test
     void identicalDecoyDeploymentSequenceReplaysDeterministically() {
         LiveTacticalBattleDecoyRuntime first = decoyRuntime(decoyBattle());
         LiveTacticalBattleDecoyRuntime second = decoyRuntime(decoyBattle());
