@@ -5,6 +5,7 @@ import com.badlogic.gdx.utils.JsonValue;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedAmmunitionDefinition;
+import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedEngagementRole;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.KineticAmmunitionDefinition;
 import com.spacesim.ship.WeaponDefinition.ProjectileShape;
 
@@ -147,6 +148,7 @@ public final class WeaponAmmunitionCatalogLoader {
                     id,
                     materialId,
                     requireEnum(node, "shape", ProjectileShape.class),
+                    optionalEnum(node, "engagementRole", GuidedEngagementRole.class, GuidedEngagementRole.STRIKE),
                     requirePositiveFinite(node, "lengthM"),
                     requirePositiveFinite(node, "diameterM"),
                     optionalContentId(node, "impactPayloadId"),
@@ -298,5 +300,17 @@ public final class WeaponAmmunitionCatalogLoader {
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("Unknown " + name + ": " + value, exception);
         }
+    }
+
+    private static <E extends Enum<E>> E optionalEnum(
+            JsonValue parent,
+            String name,
+            Class<E> type,
+            E defaultValue) {
+        JsonValue node = parent.get(name);
+        if (node == null || node.isNull()) {
+            return Objects.requireNonNull(defaultValue, "defaultValue");
+        }
+        return requireEnum(parent, name, type);
     }
 }
