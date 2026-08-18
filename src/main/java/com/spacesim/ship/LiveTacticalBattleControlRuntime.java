@@ -412,7 +412,15 @@ public final class LiveTacticalBattleControlRuntime {
             boolean fireAuthorized,
             double movementAxisX,
             double movementAxisY) {
-        /** Validates immutable actor control output. */
+        /**
+         * Validates immutable actor control output.
+         *
+         * @param intent Stage-19 actor-bounded tactical intent
+         * @param survivalDecision Stage-19 survival override/continuation decision
+         * @param fireAuthorized whether current policy permits a later weapon request
+         * @param movementAxisX normalized horizontal movement command
+         * @param movementAxisY normalized vertical movement command
+         */
         public ActorControlState {
             Objects.requireNonNull(intent, "intent");
             Objects.requireNonNull(survivalDecision, "survivalDecision");
@@ -465,7 +473,21 @@ public final class LiveTacticalBattleControlRuntime {
             boolean fireRequested,
             boolean fireAuthorized,
             SurvivalAction survivalAction) {
-        /** Freezes actor-visible identity ordering. */
+        /**
+         * Freezes and validates one combatant fingerprint.
+         *
+         * @param entityId stable combatant identity
+         * @param xM current physical x position
+         * @param yM current physical y position
+         * @param velocityXMps current physical x velocity
+         * @param velocityYMps current physical y velocity
+         * @param reactionMassKg current physical propulsion mass
+         * @param visibleTargetIds actor-visible track identities
+         * @param selectedTargetId currently selected actor-visible target or zero
+         * @param fireRequested production tactical fire request
+         * @param fireAuthorized survival-filtered fire authorization
+         * @param survivalAction current survival action
+         */
         public CombatantControlFingerprint {
             visibleTargetIds = List.copyOf(Objects.requireNonNull(visibleTargetIds, "visibleTargetIds"));
             Objects.requireNonNull(survivalAction, "survivalAction");
@@ -479,7 +501,12 @@ public final class LiveTacticalBattleControlRuntime {
      * @param combatants canonical stable-entity projections
      */
     public record BattleControlFingerprint(long tick, List<CombatantControlFingerprint> combatants) {
-        /** Freezes canonical combatant projections. */
+        /**
+         * Freezes and validates the whole-battle fingerprint.
+         *
+         * @param tick authoritative shared tick
+         * @param combatants canonical stable-entity projections
+         */
         public BattleControlFingerprint {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");
