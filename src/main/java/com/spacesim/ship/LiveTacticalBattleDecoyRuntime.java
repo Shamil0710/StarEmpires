@@ -12,6 +12,7 @@ import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
@@ -58,6 +59,7 @@ public final class LiveTacticalBattleDecoyRuntime {
         guidedAdapter = new ShipGuidedWeaponEngineeringAdapter();
         ammunitionRuntime = new AmmunitionRuntime();
         weaponMountRuntime = new WeaponMountRuntime();
+        lastAdvancedTick = ordnanceRuntime.tick();
         for (CombatantRuntime combatant : battleState().combatants()) {
             deploymentsByEntityId.put(combatant.spec().entityId(), 0L);
         }
@@ -67,7 +69,9 @@ public final class LiveTacticalBattleDecoyRuntime {
      * Attempts one physical decoy deployment from an explicitly selected fitted mount.
      *
      * <p>The direction is caller policy only; the physical burn remains bounded by the authored decoy
-     * propulsion state. A denied deployment consumes no ammunition and changes no launcher cycle.</p>
+     * propulsion state. A denied deployment consumes no ammunition and changes no launcher cycle.
+     * Existing decoys are first synchronized to the current authoritative tick, so a newly launched
+     * body can never be retroactively advanced through time that occurred before its deployment.</p>
      *
      * @param sourceEntityId deploying combatant identity
      * @param mountId fitted guided mount selected for deployment
@@ -90,6 +94,7 @@ public final class LiveTacticalBattleDecoyRuntime {
         }
         double unitX = directionX / magnitude;
         double unitY = directionY / magnitude;
+        advanceToCurrentTick();
 
         ShipGuidedWeaponEngineeringAdapter.FittedGuidedMount mount = decoyMounts(source).stream()
                 .filter(value -> value.mountId().equals(mountId))
@@ -331,7 +336,19 @@ public final class LiveTacticalBattleDecoyRuntime {
             double velocityYMps,
             double remainingPropellantKg,
             double remainingPoweredBurnSeconds) {
-        /** Validates one immutable physical decoy projection. */
+        /**
+         * Validates one immutable physical decoy projection.
+         *
+         * @param bodyId stable body identity
+         * @param sourceEntityId launching combatant identity
+         * @param mountId physical launcher mount
+         * @param xM current x position
+         * @param yM current y position
+         * @param velocityXMps current x velocity
+         * @param velocityYMps current y velocity
+         * @param remainingPropellantKg remaining physical propellant
+         * @param remainingPoweredBurnSeconds remaining powered-burn lifetime
+         */
         public BodyFingerprint {
             if (bodyId <= 0L || sourceEntityId <= 0L) {
                 throw new IllegalArgumentException("decoy identities must be positive");
@@ -357,15 +374,21 @@ public final class LiveTacticalBattleDecoyRuntime {
      */
     public record DecoyFingerprint(
             long tick,
-            TreeMap<Long, Long> deploymentsByEntityId,
+            Map<Long, Long> deploymentsByEntityId,
             List<BodyFingerprint> bodies) {
-        /** Validates and freezes one deterministic decoy projection. */
+        /**
+         * Validates and freezes one deterministic decoy projection.
+         *
+         * @param tick wrapped authoritative battle tick
+         * @param deploymentsByEntityId total physical deployments by combatant
+         * @param bodies current physical decoy bodies
+         */
         public DecoyFingerprint {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");
             }
-            deploymentsByEntityId = new TreeMap<>(Objects.requireNonNull(
-                    deploymentsByEntityId, "deploymentsByEntityId"));
+            deploymentsByEntityId = Map.copyOf(new TreeMap<>(Objects.requireNonNull(
+                    deploymentsByEntityId, "deploymentsByEntityId")));
             bodies = List.copyOf(Objects.requireNonNull(bodies, "bodies"));
         }
     }
