@@ -3,6 +3,7 @@ package com.spacesim.ship;
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedAmmunitionDefinition;
+import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedEngagementRole;
 import com.spacesim.content.weapon.WeaponLauncherCatalog;
 import com.spacesim.content.weapon.WeaponLauncherCatalog.LauncherProfile;
 import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
@@ -19,12 +20,10 @@ import java.util.Objects;
 /**
  * Projects ordinary fitted Stage-17.5 engineering capability into physical guided-weapon launchers.
  *
- * <p>The adapter is intentionally parallel only to the existing kinetic projection seam, not to the
- * combat runtime. It resolves one production fit, its current module damage, launcher profile and
- * weapon-feed identity into guided ammunition that can be consumed by the existing
- * {@link AmmunitionRuntime}, cycled by {@link WeaponMountRuntime} and materialized as
- * {@link GuidedWeaponBody}. No ammunition quantity, guidance result or combat outcome is stored
- * here.</p>
+ * <p>The adapter resolves one production fit, current module damage, launcher profile and feed
+ * identity into guided ammunition that can be consumed by common runtime. Authored
+ * {@link GuidedEngagementRole} is an explicit routing semantic only; it grants no accuracy,
+ * propulsion, damage, range or launcher-performance modifier.</p>
  */
 public final class ShipGuidedWeaponEngineeringAdapter {
     private static final double MIN_OPERATIONAL_INTEGRITY = 1e-6d;
@@ -63,23 +62,53 @@ public final class ShipGuidedWeaponEngineeringAdapter {
     }
 
     /**
-     * Resolves all loaded guided weapon mounts from one current damage-aware fitted ship.
+     * Resolves offensive ship-target guided mounts only.
+     *
+     * <p>This compatibility/default path is intentionally STRIKE-only so an interceptor loaded into a
+     * compatible guided launcher can never be silently consumed by ordinary ship-target fire logic.
+     * Defensive code must request {@link GuidedEngagementRole#INTERCEPTOR} explicitly through the
+     * overload below.</p>
      *
      * @param derived central derived fitted ship state
      * @param ammunition physical ammunition content catalog
      * @param launcherCatalog launcher profiles linked to engineering module IDs
      * @param loadout physical feed-to-ammunition identity bindings
-     * @return deterministic mount-sorted guided launcher projections
+     * @return deterministic mount-sorted STRIKE launcher projections
      */
     public List<FittedGuidedMount> deriveGuidedMounts(
             DerivedShipState derived,
             WeaponAmmunitionCatalog ammunition,
             WeaponLauncherCatalog launcherCatalog,
             WeaponLoadoutState loadout) {
+        return deriveGuidedMounts(
+                derived,
+                ammunition,
+                launcherCatalog,
+                loadout,
+                GuidedEngagementRole.STRIKE);
+    }
+
+    /**
+     * Resolves guided mounts loaded for one explicit authored engagement role.
+     *
+     * @param derived central derived fitted ship state
+     * @param ammunition physical ammunition content catalog
+     * @param launcherCatalog launcher profiles linked to engineering module IDs
+     * @param loadout physical feed-to-ammunition identity bindings
+     * @param engagementRole required authored guided-ammunition role
+     * @return deterministic mount-sorted launcher projections with matching role
+     */
+    public List<FittedGuidedMount> deriveGuidedMounts(
+            DerivedShipState derived,
+            WeaponAmmunitionCatalog ammunition,
+            WeaponLauncherCatalog launcherCatalog,
+            WeaponLoadoutState loadout,
+            GuidedEngagementRole engagementRole) {
         DerivedShipState checkedDerived = Objects.requireNonNull(derived, "derived");
         WeaponAmmunitionCatalog checkedAmmunition = Objects.requireNonNull(ammunition, "ammunition");
         WeaponLauncherCatalog checkedLaunchers = Objects.requireNonNull(launcherCatalog, "launcherCatalog");
         WeaponLoadoutState checkedLoadout = Objects.requireNonNull(loadout, "loadout");
+        GuidedEngagementRole checkedRole = Objects.requireNonNull(engagementRole, "engagementRole");
 
         List<FittedGuidedMount> result = new ArrayList<>();
         for (InstalledCapability capability : checkedDerived.installedCapabilities()) {
@@ -106,6 +135,9 @@ public final class ShipGuidedWeaponEngineeringAdapter {
             if (guided == null) {
                 throw new IllegalArgumentException(
                         "Guided launcher feed references non-guided/unknown ammunition: " + ammunitionId);
+            }
+            if (guided.engagementRole() != checkedRole) {
+                continue;
             }
             validateEnvelope(profile, guided);
             Launcher launcher = new Launcher(
