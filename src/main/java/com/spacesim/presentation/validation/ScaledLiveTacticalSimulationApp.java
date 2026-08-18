@@ -47,7 +47,11 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         this(TacticalScenarioId.SATURATION_16V16);
     }
 
-    /** Creates a viewer that will own only presentation state for the selected canonical scenario. */
+    /**
+     * Creates a viewer that will own only presentation state for the selected canonical scenario.
+     *
+     * @param scenarioId canonical Stage-19J tactical validation scenario identity
+     */
     public ScaledLiveTacticalSimulationApp(TacticalScenarioId scenarioId) {
         this.scenarioId = Objects.requireNonNull(scenarioId, "scenarioId");
     }
