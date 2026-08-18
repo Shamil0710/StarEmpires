@@ -14,9 +14,7 @@ import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.WeaponFireControl.TargetMotionEstimate;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
@@ -24,19 +22,14 @@ import java.util.TreeMap;
  * Shared Stage-19I guided-ordnance coordinator layered on the production multi-combatant runtime.
  *
  * <p>The wrapped {@link LiveTacticalBattleWeaponRuntime} remains authoritative for the shared combat
- * clock, sensing/AI, ship engineering/flight, fitted kinetic weapons and kinetic protection. This
- * coordinator adds only the existing Stage-17.5E guided path: fitted guided launchers, finite central
- * ammunition, physical launcher cycles/support channels, {@link GuidedWeaponBody},
- * {@link GuidanceRuntime} and real propellant consumption. It does not create missile hit chance,
- * abstract salvo damage, virtual ammunition or a second ship-motion/combat engine.</p>
- *
- * <p>Until the later EW/seeker slice, guidance consumes the launching actor's existing visible target
- * track through the explicit DATALINK path. Production {@link TrackState} has no target-velocity
- * estimate channel yet, so guidance uses a zero velocity estimate rather than reading authoritative
- * enemy transform velocity. Missing/insufficient actor-visible tracks leave the body ballistic.</p>
+ * clock, ship-local combat state and the one production protection/residual-projectile path. Guided
+ * launch, guidance and physical body propagation reuse Stage-17.5E content/runtime only; a missile
+ * hit is never converted into hit probability or abstract salvo damage.</p>
  */
 public final class LiveTacticalBattleOrdnanceRuntime {
     private static final double TICK_SECONDS = LiveTacticalBattleControlRuntime.TICK_SECONDS;
+    private static final double EPSILON = 1e-12d;
+    private static final long GUIDED_RESIDUAL_PROJECTILE_NAMESPACE = 1_000_000_000L;
 
     private final LiveTacticalBattleWeaponRuntime weaponRuntime;
     private final ShipEngineeringCatalog engineeringCatalog;
@@ -49,14 +42,16 @@ public final class LiveTacticalBattleOrdnanceRuntime {
     private final WeaponMountRuntime weaponMountRuntime;
     private final List<GuidedWeaponBody> guidedBodies = new ArrayList<>();
     private final TreeMap<Long, String> launchMountByBodyId = new TreeMap<>();
+    private final TreeMap<Long, Long> spawnTickByBodyId = new TreeMap<>();
     private final TreeMap<Long, Long> guidedLaunchesBySourceEntityId = new TreeMap<>();
+    private final TreeMap<Long, Long> guidedImpactsByTargetEntityId = new TreeMap<>();
 
     private long nextGuidedBodyId = 195_000L;
 
     /**
-     * Creates guided-ordnance execution over one existing shared kinetic/control runtime.
+     * Creates guided-ordnance execution over one existing shared physical-combat runtime.
      *
-     * @param weaponRuntime authoritative shared battle weapon runtime
+     * @param weaponRuntime authoritative shared battle weapon/protection runtime
      */
     public LiveTacticalBattleOrdnanceRuntime(LiveTacticalBattleWeaponRuntime weaponRuntime) {
         this.weaponRuntime = Objects.requireNonNull(weaponRuntime, "weaponRuntime");
@@ -70,21 +65,23 @@ public final class LiveTacticalBattleOrdnanceRuntime {
         weaponMountRuntime = new WeaponMountRuntime();
         for (CombatantRuntime combatant : battleState().combatants()) {
             guidedLaunchesBySourceEntityId.put(combatant.spec().entityId(), 0L);
+            guidedImpactsByTargetEntityId.put(combatant.spec().entityId(), 0L);
         }
     }
 
     /**
-     * Advances one complete shared battle tick including guided launch, guidance and propagation.
+     * Advances one complete shared battle tick including guided launch, guidance and physical impact.
      *
-     * <p>The wrapped runtime first advances the one authoritative combat clock and all ship-local
-     * production systems. Guided launch requests then consume that same tick's actor-bounded tactical
-     * authorization and already-advanced launcher continuity. Finally every active guided body gets
-     * at most one production guidance burn and one ballistic propagation step.</p>
+     * <p>Ship start positions are retained before the wrapped runtime advances the authoritative
+     * ship/kinetic tick. Existing guided bodies therefore use the same relative swept ship motion as
+     * kinetic bodies. Newly launched guided bodies use post-movement ship geometry, matching the
+     * established muzzle-exit ordering.</p>
      */
     public void advanceOneTick() {
+        TreeMap<Long, PositionSnapshot> shipStartPositions = snapshotShipPositions();
         weaponRuntime.advanceOneTick();
         launchAllAuthorizedGuidedWeapons();
-        guideAndAdvanceBodies();
+        guideAdvanceAndResolveBodies(shipStartPositions);
     }
 
     /** @return authoritative shared battle tick */
@@ -97,7 +94,7 @@ public final class LiveTacticalBattleOrdnanceRuntime {
         return weaponRuntime.elapsedSeconds();
     }
 
-    /** @return wrapped production kinetic/control runtime */
+    /** @return wrapped production kinetic/protection runtime */
     public LiveTacticalBattleWeaponRuntime weaponRuntime() {
         return weaponRuntime;
     }
@@ -124,6 +121,22 @@ public final class LiveTacticalBattleOrdnanceRuntime {
     }
 
     /**
+     * Returns physical guided-body intersections resolved on one combatant.
+     *
+     * @param targetEntityId stable struck combatant identity
+     * @return non-negative guided impact count
+     */
+    public long guidedImpactsOn(long targetEntityId) {
+        battleState().requireCombatant(targetEntityId);
+        return guidedImpactsByTargetEntityId.get(targetEntityId);
+    }
+
+    /** @return total guided-body/ship physical intersections resolved */
+    public long totalGuidedImpacts() {
+        return guidedImpactsByTargetEntityId.values().stream().mapToLong(Long::longValue).sum();
+    }
+
+    /**
      * Returns an equality-friendly whole-battle guided-ordnance projection.
      *
      * @return deterministic guided state fingerprint
@@ -135,17 +148,24 @@ public final class LiveTacticalBattleOrdnanceRuntime {
                         guidedLaunchesBySourceEntityId.get(combatant.spec().entityId()),
                         guidedAmmunitionRounds(combatant.engineering().runtimeState.consumables())))
                 .toList();
+        List<TargetGuidedFingerprint> targets = battleState().combatants().stream()
+                .map(combatant -> new TargetGuidedFingerprint(
+                        combatant.spec().entityId(),
+                        guidedImpactsByTargetEntityId.get(combatant.spec().entityId())))
+                .toList();
         List<GuidedBodyFingerprint> bodies = guidedBodies.stream()
                 .map(body -> new GuidedBodyFingerprint(
                         body.bodyId(),
                         body.sourceEntityId(),
                         body.targetId(),
                         launchMountByBodyId.get(body.bodyId()),
+                        spawnTickByBodyId.get(body.bodyId()),
                         body.xM(),
                         body.yM(),
                         body.velocityXMps(),
                         body.velocityYMps(),
                         body.remainingPropellantKg(),
+                        body.remainingPoweredBurnSeconds(),
                         body.seekerAvailable(),
                         body.guidanceAvailable()))
                 .toList();
@@ -153,6 +173,7 @@ public final class LiveTacticalBattleOrdnanceRuntime {
                 tick(),
                 weaponRuntime.fingerprint(),
                 sources,
+                targets,
                 bodies);
     }
 
@@ -224,6 +245,7 @@ public final class LiveTacticalBattleOrdnanceRuntime {
             replaceWeaponRuntime(engineering, nextWeaponState);
             guidedBodies.add(body);
             launchMountByBodyId.put(body.bodyId(), mount.mountId());
+            spawnTickByBodyId.put(body.bodyId(), tick());
             nextGuidedBodyId = Math.addExact(nextGuidedBodyId, 1L);
             guidedLaunchesBySourceEntityId.compute(
                     shooter.spec().entityId(),
@@ -231,24 +253,139 @@ public final class LiveTacticalBattleOrdnanceRuntime {
         }
     }
 
-    private void guideAndAdvanceBodies() {
-        for (int index = 0; index < guidedBodies.size(); index++) {
-            GuidedWeaponBody body = guidedBodies.get(index);
-            TrackState track = visibleTrackForSource(body.sourceEntityId(), body.targetId());
-            GuidedWeaponBody guided = body;
-            if (track != null) {
-                GuidanceRuntime.GuidanceCommand command = guidanceRuntime.planLeadPursuit(
-                        body,
-                        track,
-                        new TargetMotionEstimate(0d, 0d, 0d, 0d),
-                        TrackSource.DATALINK,
-                        TICK_SECONDS);
-                if (command.allowed()) {
-                    guided = guidanceRuntime.execute(body, command);
-                }
+    private void guideAdvanceAndResolveBodies(TreeMap<Long, PositionSnapshot> shipStartPositions) {
+        List<GuidedWeaponBody> survivors = new ArrayList<>(guidedBodies.size());
+        for (GuidedWeaponBody body : guidedBodies) {
+            GuidedWeaponBody guided = guide(body);
+            GuidedWeaponBody next = guided.advanceBallistic(TICK_SECONDS);
+            ImpactCandidate impact = firstImpact(guided, next, shipStartPositions);
+            if (impact == null) {
+                survivors.add(next);
+                continue;
             }
-            guidedBodies.set(index, guided.advanceBallistic(TICK_SECONDS));
+
+            GuidedWeaponBody impactBody = atFraction(guided, next, impact.fraction);
+            long spawnTick = Objects.requireNonNull(spawnTickByBodyId.get(body.bodyId()), "guided spawn tick");
+            ProjectileBody physicalImpact = toProjectileBody(impactBody, spawnTick);
+            KineticProtectionRuntime.Result result = weaponRuntime.resolveExternalPhysicalImpact(
+                    impact.target.spec().entityId(),
+                    physicalImpact,
+                    impact.targetPositionAtImpact.xM,
+                    impact.targetPositionAtImpact.yM);
+            guidedImpactsByTargetEntityId.compute(
+                    impact.target.spec().entityId(),
+                    (ignored, count) -> Math.addExact(Objects.requireNonNull(count, "guided impact count"), 1L));
+            releaseGuidedBody(body.bodyId());
+
+            if (result.postProtectionProjectile() != null) {
+                double remainingSeconds = TICK_SECONDS * (1d - impact.fraction);
+                ProjectileBody residual = result.postProtectionProjectile();
+                if (remainingSeconds > EPSILON) {
+                    residual = residual.advance(remainingSeconds);
+                }
+                weaponRuntime.acceptExternalProjectile(residual);
+            }
         }
+        guidedBodies.clear();
+        guidedBodies.addAll(survivors);
+    }
+
+    private GuidedWeaponBody guide(GuidedWeaponBody body) {
+        TrackState track = visibleTrackForSource(body.sourceEntityId(), body.targetId());
+        if (track == null) {
+            return body;
+        }
+        GuidanceRuntime.GuidanceCommand command = guidanceRuntime.planLeadPursuit(
+                body,
+                track,
+                new TargetMotionEstimate(0d, 0d, 0d, 0d),
+                TrackSource.DATALINK,
+                TICK_SECONDS);
+        return command.allowed() ? guidanceRuntime.execute(body, command) : body;
+    }
+
+    private ImpactCandidate firstImpact(
+            GuidedWeaponBody body,
+            GuidedWeaponBody next,
+            TreeMap<Long, PositionSnapshot> shipStartPositions) {
+        ImpactCandidate best = null;
+        boolean newlySpawned = Objects.requireNonNull(spawnTickByBodyId.get(body.bodyId()), "guided spawn tick") == tick();
+        for (CombatantRuntime target : battleState().combatants()) {
+            if (target.spec().entityId() == body.sourceEntityId()) {
+                continue;
+            }
+            PositionSnapshot end = new PositionSnapshot(
+                    target.transform().position.x,
+                    target.transform().position.y);
+            PositionSnapshot start = newlySpawned
+                    ? end
+                    : Objects.requireNonNull(shipStartPositions.get(target.spec().entityId()), "target start position");
+            double halfLength = target.hull().boundingDimensionsM().lengthM() * 0.5d;
+            double halfWidth = target.hull().boundingDimensionsM().widthM() * 0.5d;
+            var fraction = TacticalCollisionGeometry.firstSegmentAabbHitFraction(
+                    body.xM() - start.xM,
+                    body.yM() - start.yM,
+                    next.xM() - end.xM,
+                    next.yM() - end.yM,
+                    halfLength,
+                    halfWidth);
+            if (fraction.isEmpty()) {
+                continue;
+            }
+            double value = fraction.getAsDouble();
+            if (best == null
+                    || value < best.fraction - EPSILON
+                    || (Math.abs(value - best.fraction) <= EPSILON
+                    && target.spec().entityId() < best.target.spec().entityId())) {
+                best = new ImpactCandidate(target, value, interpolate(start, end, value));
+            }
+        }
+        return best;
+    }
+
+    private ProjectileBody toProjectileBody(GuidedWeaponBody body, long spawnTick) {
+        return new ProjectileBody(
+                Math.addExact(GUIDED_RESIDUAL_PROJECTILE_NAMESPACE, body.bodyId()),
+                body.sourceEntityId(),
+                spawnTick,
+                body.materialId(),
+                body.shape(),
+                body.lengthM(),
+                body.diameterM(),
+                body.currentMassKg(),
+                body.xM(),
+                body.yM(),
+                body.velocityXMps(),
+                body.velocityYMps());
+    }
+
+    private static GuidedWeaponBody atFraction(
+            GuidedWeaponBody start,
+            GuidedWeaponBody end,
+            double fraction) {
+        return new GuidedWeaponBody(
+                start.bodyId(),
+                start.sourceEntityId(),
+                start.targetId(),
+                start.definition(),
+                start.materialId(),
+                start.shape(),
+                start.lengthM(),
+                start.diameterM(),
+                start.impactPayloadId(),
+                start.xM() + (end.xM() - start.xM()) * fraction,
+                start.yM() + (end.yM() - start.yM()) * fraction,
+                start.velocityXMps(),
+                start.velocityYMps(),
+                start.remainingPropellantKg(),
+                start.remainingPoweredBurnSeconds(),
+                start.seekerAvailable(),
+                start.guidanceAvailable());
+    }
+
+    private void releaseGuidedBody(long bodyId) {
+        launchMountByBodyId.remove(bodyId);
+        spawnTickByBodyId.remove(bodyId);
     }
 
     private int activeSupportChannels(long sourceEntityId, String mountId) {
@@ -278,6 +415,16 @@ public final class LiveTacticalBattleOrdnanceRuntime {
                 .orElse(null);
     }
 
+    private TreeMap<Long, PositionSnapshot> snapshotShipPositions() {
+        TreeMap<Long, PositionSnapshot> result = new TreeMap<>();
+        for (CombatantRuntime combatant : battleState().combatants()) {
+            result.put(
+                    combatant.spec().entityId(),
+                    new PositionSnapshot(combatant.transform().position.x, combatant.transform().position.y));
+        }
+        return result;
+    }
+
     private DerivedShipState derive(CombatantRuntime combatant) {
         EngineeringComponent engineering = combatant.engineering();
         return calculator.derive(
@@ -285,6 +432,15 @@ public final class LiveTacticalBattleOrdnanceRuntime {
                 engineering.fit,
                 engineering.runtimeState.consumables(),
                 engineering.instanceState.damage().moduleDamage());
+    }
+
+    private static PositionSnapshot interpolate(
+            PositionSnapshot start,
+            PositionSnapshot end,
+            double fraction) {
+        return new PositionSnapshot(
+                start.xM + (end.xM - start.xM) * fraction,
+                start.yM + (end.yM - start.yM) * fraction);
     }
 
     private static void replaceConsumables(
@@ -321,6 +477,34 @@ public final class LiveTacticalBattleOrdnanceRuntime {
                 .sum();
     }
 
+    private static final class ImpactCandidate {
+        private final CombatantRuntime target;
+        private final double fraction;
+        private final PositionSnapshot targetPositionAtImpact;
+
+        private ImpactCandidate(
+                CombatantRuntime target,
+                double fraction,
+                PositionSnapshot targetPositionAtImpact) {
+            this.target = Objects.requireNonNull(target, "target");
+            this.fraction = fraction;
+            this.targetPositionAtImpact = Objects.requireNonNull(targetPositionAtImpact, "targetPositionAtImpact");
+        }
+    }
+
+    private static final class PositionSnapshot {
+        private final double xM;
+        private final double yM;
+
+        private PositionSnapshot(double xM, double yM) {
+            if (!Double.isFinite(xM) || !Double.isFinite(yM)) {
+                throw new IllegalArgumentException("position snapshot must be finite");
+            }
+            this.xM = xM;
+            this.yM = yM;
+        }
+    }
+
     /**
      * Per-source finite guided ammunition projection.
      *
@@ -328,10 +512,7 @@ public final class LiveTacticalBattleOrdnanceRuntime {
      * @param guidedLaunches physically materialized guided launches
      * @param guidedAmmunitionRounds current itemized guided-feed rounds
      */
-    public record SourceGuidedFingerprint(
-            long entityId,
-            long guidedLaunches,
-            long guidedAmmunitionRounds) {
+    public record SourceGuidedFingerprint(long entityId, long guidedLaunches, long guidedAmmunitionRounds) {
         /**
          * Validates one per-source guided projection.
          *
@@ -347,17 +528,39 @@ public final class LiveTacticalBattleOrdnanceRuntime {
     }
 
     /**
+     * Per-target guided physical-impact projection.
+     *
+     * @param entityId stable target identity
+     * @param guidedImpactsResolved guided-body intersections resolved on the target
+     */
+    public record TargetGuidedFingerprint(long entityId, long guidedImpactsResolved) {
+        /**
+         * Validates one guided target projection.
+         *
+         * @param entityId stable target identity
+         * @param guidedImpactsResolved non-negative guided impact count
+         */
+        public TargetGuidedFingerprint {
+            if (entityId <= 0L || guidedImpactsResolved < 0L) {
+                throw new IllegalArgumentException("invalid guided target fingerprint");
+            }
+        }
+    }
+
+    /**
      * Equality-friendly projection of one active guided physical body.
      *
-     * @param bodyId stable simulation-local guided body identity
+     * @param bodyId stable guided body identity
      * @param sourceEntityId launching combatant identity
      * @param targetId current target hypothesis identity
-     * @param launchMountId physical launcher mount that owns the support channel
+     * @param launchMountId physical launcher mount owning its support channel
+     * @param spawnTick deterministic physical launch tick
      * @param xM current x position
      * @param yM current y position
      * @param velocityXMps current x velocity
      * @param velocityYMps current y velocity
      * @param remainingPropellantKg current physical propellant mass
+     * @param remainingPoweredBurnSeconds current physical powered-burn lifetime
      * @param seekerAvailable current seeker availability
      * @param guidanceAvailable current guidance availability
      */
@@ -366,39 +569,44 @@ public final class LiveTacticalBattleOrdnanceRuntime {
             long sourceEntityId,
             long targetId,
             String launchMountId,
+            long spawnTick,
             double xM,
             double yM,
             double velocityXMps,
             double velocityYMps,
             double remainingPropellantKg,
+            double remainingPoweredBurnSeconds,
             boolean seekerAvailable,
             boolean guidanceAvailable) {
         /**
          * Validates one guided body projection.
          *
-         * @param bodyId stable simulation-local guided body identity
+         * @param bodyId stable guided body identity
          * @param sourceEntityId launching combatant identity
          * @param targetId current target hypothesis identity
-         * @param launchMountId physical launcher mount that owns the support channel
+         * @param launchMountId physical launcher mount owning its support channel
+         * @param spawnTick deterministic physical launch tick
          * @param xM current x position
          * @param yM current y position
          * @param velocityXMps current x velocity
          * @param velocityYMps current y velocity
          * @param remainingPropellantKg current physical propellant mass
+         * @param remainingPoweredBurnSeconds current physical powered-burn lifetime
          * @param seekerAvailable current seeker availability
          * @param guidanceAvailable current guidance availability
          */
         public GuidedBodyFingerprint {
-            if (bodyId <= 0L || sourceEntityId <= 0L || targetId <= 0L) {
-                throw new IllegalArgumentException("guided body identities must be positive");
+            if (bodyId <= 0L || sourceEntityId <= 0L || targetId <= 0L || spawnTick < 0L) {
+                throw new IllegalArgumentException("guided body identities/tick must be valid");
             }
             if (launchMountId == null || launchMountId.isBlank()) {
                 throw new IllegalArgumentException("launchMountId must be non-blank");
             }
             if (!Double.isFinite(xM) || !Double.isFinite(yM)
                     || !Double.isFinite(velocityXMps) || !Double.isFinite(velocityYMps)
-                    || !Double.isFinite(remainingPropellantKg) || remainingPropellantKg < 0d) {
-                throw new IllegalArgumentException("guided body physical projection must be finite");
+                    || !Double.isFinite(remainingPropellantKg) || remainingPropellantKg < 0d
+                    || !Double.isFinite(remainingPoweredBurnSeconds) || remainingPoweredBurnSeconds < 0d) {
+                throw new IllegalArgumentException("guided body physical projection must be finite/non-negative");
             }
         }
     }
@@ -407,21 +615,24 @@ public final class LiveTacticalBattleOrdnanceRuntime {
      * Whole-battle deterministic guided-ordnance fingerprint.
      *
      * @param tick authoritative shared battle tick
-     * @param weaponFingerprint wrapped kinetic/control/protection fingerprint
+     * @param weaponFingerprint wrapped physical weapon/protection fingerprint
      * @param sources canonical per-source guided ammunition projections
+     * @param targets canonical per-target guided impact projections
      * @param bodies current active guided physical bodies
      */
     public record BattleOrdnanceFingerprint(
             long tick,
             LiveTacticalBattleWeaponRuntime.BattleWeaponFingerprint weaponFingerprint,
             List<SourceGuidedFingerprint> sources,
+            List<TargetGuidedFingerprint> targets,
             List<GuidedBodyFingerprint> bodies) {
         /**
          * Validates and freezes one whole-battle guided projection.
          *
          * @param tick authoritative shared battle tick
-         * @param weaponFingerprint wrapped kinetic/control/protection fingerprint
+         * @param weaponFingerprint wrapped physical weapon/protection fingerprint
          * @param sources canonical per-source guided ammunition projections
+         * @param targets canonical per-target guided impact projections
          * @param bodies current active guided physical bodies
          */
         public BattleOrdnanceFingerprint {
@@ -430,6 +641,7 @@ public final class LiveTacticalBattleOrdnanceRuntime {
             }
             Objects.requireNonNull(weaponFingerprint, "weaponFingerprint");
             sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
+            targets = List.copyOf(Objects.requireNonNull(targets, "targets"));
             bodies = List.copyOf(Objects.requireNonNull(bodies, "bodies"));
         }
     }
