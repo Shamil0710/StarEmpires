@@ -19,6 +19,7 @@ import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.WeaponFireControl.TargetMotionEstimate;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.TreeMap;
@@ -33,15 +34,16 @@ import java.util.TreeMap;
  * swept physical body-body contact; assignment alone never deletes a threat.</p>
  *
  * <p>Scheduling and datalink guidance consume only observer-local ordnance tracks produced by
- * {@link LiveTacticalOrdnanceObservationRuntime}. Exact guided-body geometry remains authoritative in
- * the physical collision layer, but it is not exposed to the defense policy. EW/ECCM, passive
- * ordnance sensing and deception hypotheses remain later Stage-19I-D acceptance work.</p>
+ * {@link LiveTacticalOrdnanceObservationRuntime}. When a physical decoy runtime is attached, decoys
+ * enter the same sensor/track/scheduler domain with no hidden role label. Exact strike/decoy geometry
+ * remains authoritative only in the physical collision layer.</p>
  */
 public final class LiveTacticalBattleDefenseRuntime {
     private static final double TICK_SECONDS = LiveTacticalBattleControlRuntime.TICK_SECONDS;
     private static final double EPSILON = 1e-9d;
 
     private final LiveTacticalBattleOrdnanceRuntime ordnanceRuntime;
+    private final LiveTacticalBattleDecoyRuntime decoyRuntime;
     private final LiveTacticalOrdnanceObservationRuntime observationRuntime;
     private final ShipEngineeringCatalog engineeringCatalog;
     private final WeaponAmmunitionCatalog ammunitionCatalog;
@@ -60,13 +62,29 @@ public final class LiveTacticalBattleDefenseRuntime {
     private long nextInterceptorBodyId = 198_000L;
 
     /**
-     * Creates layered-defense execution over one authoritative shared ordnance runtime.
+     * Creates layered-defense execution over offensive guided bodies only.
      *
      * @param ordnanceRuntime production guided/kinetic/ship runtime
      */
     public LiveTacticalBattleDefenseRuntime(LiveTacticalBattleOrdnanceRuntime ordnanceRuntime) {
+        this(ordnanceRuntime, null);
+    }
+
+    /**
+     * Creates layered-defense execution over offensive guided bodies plus physical decoys.
+     *
+     * @param ordnanceRuntime production guided/kinetic/ship runtime
+     * @param decoyRuntime optional physical decoy runtime sharing the same ordnance runtime
+     */
+    public LiveTacticalBattleDefenseRuntime(
+            LiveTacticalBattleOrdnanceRuntime ordnanceRuntime,
+            LiveTacticalBattleDecoyRuntime decoyRuntime) {
         this.ordnanceRuntime = Objects.requireNonNull(ordnanceRuntime, "ordnanceRuntime");
-        observationRuntime = new LiveTacticalOrdnanceObservationRuntime(ordnanceRuntime);
+        this.decoyRuntime = decoyRuntime;
+        if (decoyRuntime != null && decoyRuntime.ordnanceRuntime() != ordnanceRuntime) {
+            throw new IllegalArgumentException("decoyRuntime must wrap the same ordnanceRuntime instance");
+        }
+        observationRuntime = new LiveTacticalOrdnanceObservationRuntime(ordnanceRuntime, decoyRuntime);
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
@@ -84,27 +102,30 @@ public final class LiveTacticalBattleDefenseRuntime {
     }
 
     /**
-     * Advances one shared combat tick through ordnance, observation, interceptor motion, collision and assignment.
+     * Advances one shared combat tick through ordnance, decoys, observation, interceptor motion and collision.
      *
-     * <p>Strike/interceptor start positions are captured before either moves. The wrapped ordnance
-     * runtime then advances the one authoritative battle clock and strike bodies. Actor-local ordnance
-     * sensing observes the already-advanced tick. Existing interceptors consume only those observed
-     * tracks for datalink guidance, relative swept body-body collision is resolved next, and only then
-     * may observed threat hypotheses cause new defensive assignments. Newly launched interceptors begin
-     * moving on the following fixed tick.</p>
+     * <p>Threat/interceptor start positions are captured before movement. The wrapped ordnance runtime
+     * advances the authoritative battle clock and strike bodies; attached decoys then catch up to that
+     * same tick without owning the clock. Actor-local sensing sees the resulting physical state.
+     * Existing interceptors consume only observed tracks for datalink guidance, relative swept
+     * body-body collision is resolved next, and only surviving observed hypotheses may cause new
+     * defensive assignments. Newly launched interceptors begin moving on the following fixed tick.</p>
      *
-     * <p>The wrapped ordnance runtime currently resolves guided-body/ship contact before this outer
-     * interceptor collision phase. Therefore a same-tick threat that reaches a ship before this phase
-     * retains ship-impact priority. Final Stage-19 integration must revisit this ordering if scale
+     * <p>The wrapped ordnance runtime currently resolves strike-body/ship contact before this outer
+     * interceptor collision phase. Therefore a same-tick strike threat that reaches a ship before this
+     * phase retains ship-impact priority. Final Stage-19 integration must revisit this ordering if scale
      * evidence exposes materially ambiguous same-tick contacts.</p>
      */
     public void advanceOneTick() {
-        TreeMap<Long, BodyPosition> strikeStarts = snapshotStrikePositions();
+        TreeMap<Long, BodyPosition> threatStarts = snapshotThreatPositions();
         TreeMap<Long, BodyPosition> interceptorStarts = snapshotInterceptorPositions();
         ordnanceRuntime.advanceOneTick();
+        if (decoyRuntime != null) {
+            decoyRuntime.advanceToCurrentTick();
+        }
         observationRuntime.observeCurrentTick();
         advanceExistingInterceptors();
-        resolvePhysicalInterceptions(strikeStarts, interceptorStarts);
+        resolvePhysicalInterceptions(threatStarts, interceptorStarts);
         scheduleAndLaunchInterceptors();
     }
 
@@ -227,9 +248,9 @@ public final class LiveTacticalBattleDefenseRuntime {
     }
 
     private void resolvePhysicalInterceptions(
-            TreeMap<Long, BodyPosition> strikeStarts,
+            TreeMap<Long, BodyPosition> threatStarts,
             TreeMap<Long, BodyPosition> interceptorStarts) {
-        if (interceptors.isEmpty() || ordnanceRuntime.guidedBodies().isEmpty()) {
+        if (interceptors.isEmpty() || physicalThreatBodies().isEmpty()) {
             return;
         }
         List<InterceptorRuntime> survivors = new ArrayList<>(interceptors.size());
@@ -239,12 +260,12 @@ public final class LiveTacticalBattleDefenseRuntime {
                 survivors.add(interceptor);
                 continue;
             }
-            CollisionCandidate collision = firstCollision(interceptor, interceptorStart, strikeStarts);
+            CollisionCandidate collision = firstCollision(interceptor, interceptorStart, threatStarts);
             if (collision == null) {
                 survivors.add(interceptor);
                 continue;
             }
-            GuidedWeaponBody removedThreat = ordnanceRuntime.removeGuidedBody(collision.threat().bodyId());
+            GuidedWeaponBody removedThreat = removePhysicalThreat(collision.threat().bodyId());
             if (removedThreat == null) {
                 survivors.add(interceptor);
                 continue;
@@ -277,11 +298,11 @@ public final class LiveTacticalBattleDefenseRuntime {
     private CollisionCandidate firstCollision(
             InterceptorRuntime interceptor,
             BodyPosition interceptorStart,
-            TreeMap<Long, BodyPosition> strikeStarts) {
+            TreeMap<Long, BodyPosition> threatStarts) {
         CollisionCandidate best = null;
         GuidedWeaponBody interceptorEnd = interceptor.body();
-        for (GuidedWeaponBody threat : ordnanceRuntime.guidedBodies()) {
-            BodyPosition threatStart = strikeStarts.get(threat.bodyId());
+        for (GuidedWeaponBody threat : physicalThreatBodies()) {
+            BodyPosition threatStart = threatStarts.get(threat.bodyId());
             if (threatStart == null) {
                 threatStart = new BodyPosition(
                         threat.xM() - threat.velocityXMps() * TICK_SECONDS,
@@ -315,7 +336,7 @@ public final class LiveTacticalBattleDefenseRuntime {
     }
 
     private void scheduleAndLaunchInterceptors() {
-        if (ordnanceRuntime.guidedBodies().isEmpty()) {
+        if (physicalThreatBodies().isEmpty()) {
             return;
         }
         for (CombatantRuntime defender : battleState().combatants()) {
@@ -457,9 +478,27 @@ public final class LiveTacticalBattleDefenseRuntime {
                 || observed.track().informationState() == TrackState.InformationState.FIRE_CONTROL;
     }
 
-    private TreeMap<Long, BodyPosition> snapshotStrikePositions() {
+    private List<GuidedWeaponBody> physicalThreatBodies() {
+        ArrayList<GuidedWeaponBody> result = new ArrayList<>();
+        result.addAll(ordnanceRuntime.guidedBodies());
+        if (decoyRuntime != null) {
+            result.addAll(decoyRuntime.decoyBodies());
+        }
+        result.sort(Comparator.comparingLong(GuidedWeaponBody::bodyId));
+        return List.copyOf(result);
+    }
+
+    private GuidedWeaponBody removePhysicalThreat(long bodyId) {
+        GuidedWeaponBody strike = ordnanceRuntime.removeGuidedBody(bodyId);
+        if (strike != null) {
+            return strike;
+        }
+        return decoyRuntime == null ? null : decoyRuntime.removeDecoyBody(bodyId);
+    }
+
+    private TreeMap<Long, BodyPosition> snapshotThreatPositions() {
         TreeMap<Long, BodyPosition> result = new TreeMap<>();
-        for (GuidedWeaponBody body : ordnanceRuntime.guidedBodies()) {
+        for (GuidedWeaponBody body : physicalThreatBodies()) {
             result.put(body.bodyId(), new BodyPosition(body.xM(), body.yM()));
         }
         return result;
