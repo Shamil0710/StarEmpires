@@ -71,14 +71,14 @@ class LayeredDefenseSchedulerTest {
     void observedThreatMayBeAssignedForAlliedHullWithoutHiddenMissileTargetIdentity() {
         LayeredDefenseScheduler scheduler = new LayeredDefenseScheduler();
         DefendedZone self = new DefendedZone(0d, 0d, 1_000d);
-        DefendedZone ally = new DefendedZone(20_000d, 0d, 1_000d);
+        DefendedZone ally = new DefendedZone(20_000d, 10_000d, 1_000d);
         ObservedThreatKinematics observed = new ObservedThreatKinematics(
                 55L,
                 30_000d,
-                0d,
+                10_000d,
                 -1_000d,
                 0d);
-        DefenseStation escort = station(6L, 18_000d, 0d, 1, 1L, true);
+        DefenseStation escort = station(6L, 26_000d, 10_000d, 1, 1L, true);
 
         assertEquals(0, scheduler.scheduleObserved(self, List.of(observed), List.of(escort)).size(),
                 "observed trajectory misses the escort's own hull zone");
