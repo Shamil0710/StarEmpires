@@ -1,5 +1,6 @@
 package com.spacesim.ship;
 
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.ship.LiveTacticalBattleScenario.CombatantSpec;
 import com.spacesim.ship.LiveTacticalBattleScenario.Side;
 import com.spacesim.ship.ObservedThreatAssessmentService.ContactDisposition;
@@ -9,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,6 +40,51 @@ class LiveTacticalBattleRuntimeStateTest {
         assertEquals(secondXBefore, second.transform().position.x, 0f,
                 "each materialized combatant must own an independent physical transform");
         assertEquals(0f, second.transform().velocity.x, 0f);
+    }
+
+    @Test
+    void balanced4v4MaterializesProductionFitDamageShieldsAndFiniteStoresPerCombatant() {
+        LiveTacticalBattleScenario scenario = LiveTacticalBattleScenario.balanced4v4();
+        LiveTacticalBattleRuntimeState state = new LiveTacticalBattleRuntimeState(scenario);
+
+        for (var combatant : state.combatants()) {
+            var engineering = combatant.engineering();
+            var instance = engineering.instanceState;
+
+            assertEquals(combatant.spec().doctrineId(), combatant.doctrine().id());
+            assertEquals(combatant.hull().id(), engineering.fit.hullId());
+            assertEquals(combatant.hull().id(), combatant.damageLayout().hullId());
+            assertEquals(combatant.doctrine().initialConsumables(), engineering.runtimeState.consumables(),
+                    "scenario doctrine must materialize physical production stores without hidden grants");
+            assertEquals(combatant.doctrine().weaponLoadout(), instance.weaponLoadout());
+            assertTrue(instance.damage().compartmentIntegrityById().values().stream()
+                    .allMatch(value -> value == 1d));
+            assertTrue(reactionMassKg(engineering.runtimeState.consumables()) > 0d,
+                    "each combatant must own finite physical reaction mass");
+            assertTrue(ammunitionRounds(engineering.runtimeState.consumables()) > 0L,
+                    "balanced-control combatants must own finite physical ammunition");
+            assertFalse(instance.shieldStatesByMount().isEmpty(),
+                    "fitted production shields must materialize into authoritative instance state");
+            assertTrue(instance.shieldStatesByMount().values().stream()
+                    .allMatch(value -> value.reserveJ() > 0d && !value.collapsed()),
+                    "new combatants must begin with their fitted shield state physically charged");
+        }
+    }
+
+    @Test
+    void productionRuntimeObjectsAreIndependentBetweenCombatants() {
+        LiveTacticalBattleRuntimeState state =
+                new LiveTacticalBattleRuntimeState(LiveTacticalBattleScenario.balanced4v4());
+        var first = state.combatants().get(0);
+        var second = state.combatants().get(1);
+
+        assertNotSame(first.engineering(), second.engineering());
+        assertNotSame(first.engineering().runtimeState, second.engineering().runtimeState);
+        assertNotSame(first.engineering().instanceState, second.engineering().instanceState);
+        assertNotSame(
+                first.engineering().instanceState.damage(),
+                second.engineering().instanceState.damage(),
+                "damage continuity must be independently replaceable for every physical combatant");
     }
 
     @Test
@@ -85,6 +133,20 @@ class LiveTacticalBattleRuntimeStateTest {
         assertThrows(IllegalArgumentException.class, () -> state.visibleContacts(999_999L));
         assertThrows(IllegalArgumentException.class,
                 () -> state.replaceVisibleContacts(999_999L, List.of()));
+    }
+
+    private static double reactionMassKg(ShipEngineeringState.ConsumableState state) {
+        return state.interfaceLoads().stream()
+                .filter(value -> value.kind() == InterfaceKind.REACTION_MASS)
+                .mapToDouble(ShipEngineeringState.ConsumableLoad::massKg)
+                .sum();
+    }
+
+    private static long ammunitionRounds(ShipEngineeringState.ConsumableState state) {
+        return state.interfaceLoads().stream()
+                .filter(value -> value.kind() == InterfaceKind.AMMUNITION)
+                .mapToLong(ShipEngineeringState.ConsumableLoad::itemCount)
+                .sum();
     }
 
     private static ObservedContact hostileTrack(long targetId, double xM, double yM) {
