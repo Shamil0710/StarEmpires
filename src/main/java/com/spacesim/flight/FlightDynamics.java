@@ -100,6 +100,68 @@ public final class FlightDynamics {
     }
 
     /**
+     * Advances a Stage-17.5 physical ship using externally resolved mass and actually produced thrust.
+     *
+     * <p>This overload exists so Stage-19 tactical control can reuse the authoritative inertial
+     * integrator without routing Stage-17.5 kilogram-native state through the legacy
+     * {@link InventoryComponent} normalization in {@link #profile(Entity, float)}. The supplied
+     * thrust must already have been resolved by the physical engineering runtime, including power,
+     * thermal, damage and reaction-mass limits. A zero-thrust step preserves inertial drift and does
+     * not manufacture acceleration. The speed cap is only the assisted command envelope used by this
+     * game-friendly flight controller; it cannot increase the supplied physical thrust.</p>
+     *
+     * @param transform authoritative physical transform
+     * @param totalMassKg current Stage-17.5 physical ship mass in kilograms
+     * @param actualThrustN actual thrust produced by the engineering runtime in newtons
+     * @param speedCap assisted command-speed envelope in meters per second
+     * @param axisX desired normalized horizontal movement axis
+     * @param axisY desired normalized vertical movement axis
+     * @param deltaSeconds authoritative fixed-tick duration
+     */
+    public static void advancePhysical(
+            TransformComponent transform,
+            double totalMassKg,
+            double actualThrustN,
+            float speedCap,
+            float axisX,
+            float axisY,
+            float deltaSeconds) {
+        TransformComponent checkedTransform = Objects.requireNonNull(transform, "Transform not set");
+        if (!Double.isFinite(totalMassKg) || totalMassKg <= 0d
+                || !Double.isFinite(actualThrustN) || actualThrustN < 0d
+                || totalMassKg > Float.MAX_VALUE || actualThrustN > Float.MAX_VALUE
+                || !Float.isFinite(speedCap) || speedCap <= 0f
+                || !Float.isFinite(axisX) || !Float.isFinite(axisY)
+                || !Float.isFinite(deltaSeconds) || deltaSeconds < 0f) {
+            throw new IllegalArgumentException("Physical flight inputs must be finite and physically valid");
+        }
+        if (deltaSeconds == 0f) {
+            return;
+        }
+        if (actualThrustN == 0d) {
+            checkedTransform.position.mulAdd(checkedTransform.velocity, deltaSeconds);
+            return;
+        }
+
+        float mass = (float) totalMassKg;
+        float thrust = (float) actualThrustN;
+        float acceleration = thrust / mass;
+        if (!Float.isFinite(acceleration) || acceleration <= 0f) {
+            throw new IllegalArgumentException("Physical thrust/mass ratio is outside supported float range");
+        }
+        Profile profile = new Profile(
+                mass,
+                0f,
+                mass,
+                thrust,
+                thrust,
+                speedCap,
+                acceleration,
+                acceleration);
+        advance(checkedTransform, profile, axisX, axisY, deltaSeconds);
+    }
+
+    /**
      * Advances toward an explicit desired velocity, useful for AI navigation/formation executors.
      *
      * @param transform authoritative physical transform
