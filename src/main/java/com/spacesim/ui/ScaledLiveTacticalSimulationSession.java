@@ -44,7 +44,11 @@ public final class ScaledLiveTacticalSimulationSession {
         this(TacticalScenarioId.SATURATION_16V16);
     }
 
-    /** Creates a fresh live session for one canonical Stage-19J validation scenario. */
+    /**
+     * Creates a fresh live session for one canonical Stage-19J validation scenario.
+     *
+     * @param scenarioId canonical Stage-19J tactical validation scenario identity
+     */
     public ScaledLiveTacticalSimulationSession(TacticalScenarioId scenarioId) {
         this(TacticalScenarioCatalog.require(scenarioId),
                 new ScaledLiveTacticalSimulationProjection(),
