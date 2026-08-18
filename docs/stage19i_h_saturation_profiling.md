@@ -80,13 +80,53 @@ No hard performance threshold is authored in advance. The Stage-19 contract expl
 
 ## Current profiling granularity
 
-The v1 workload report counts track hypotheses rather than every individual sensor-equation invocation, and it records materializations/impacts/interceptions rather than every broad-phase collision candidate. This is sufficient to establish the first required Stage-19 workload evidence and identify which state populations grow under saturation. If the measured profile indicates a bottleneck, lower-level per-subsystem counters can be added without changing simulation authority.
+The v1 workload report counts track hypotheses rather than every individual sensor-equation invocation, and it records materializations/impacts/interceptions rather than every broad-phase collision candidate. This is sufficient to establish the first required Stage-19 workload evidence and identify which state populations grow under saturation. If later representative profiles identify a subsystem bottleneck, lower-level per-subsystem counters can be added without changing simulation authority.
+
+## Measured CI saturation profile
+
+The first functional GitHub Actions Java 17 run of this slice executed the 240-tick saturation profile successfully before the build reached the strict Javadoc documentation gate. The simulation tests themselves were fully green: 1,112 tests, zero failures/errors/skips.
+
+Authoritative workload for 32 ships / 240 fixed ticks:
+
+- tactical AI decisions: **7,680**;
+- cumulative actor-local ship-track hypotheses: **122,880**;
+- peak simultaneous ship-track hypotheses: **512**;
+- cumulative actor-local ordnance-track hypotheses: **106,944**;
+- peak simultaneous ordnance-track hypotheses: **576**;
+- peak kinetic projectile/residual bodies: **164**;
+- peak STRIKE guided bodies: **31**;
+- peak interceptor bodies: **15**;
+- peak physical decoys: **4**;
+- peak total simultaneous non-ship bodies: **208**;
+- all four body classes concurrent on at least one tick: **yes**;
+- kinetic shots materialized: **2,940**;
+- STRIKE launches: **32**;
+- DECOY deployments: **4**;
+- INTERCEPTOR launches: **16**;
+- physical ship-protection impacts: **2,969**;
+- swept physical interceptor/threat contacts: **4**.
+
+This is materially above the relative density gate: peak non-ship bodies were **6.5×** the 32 combatant ships while all four required body classes coexisted.
+
+Environment-dependent measurements from that GitHub-hosted runner (run `32145725230`, first functional head before Javadoc-only cleanup):
+
+- wall interval: **2,032,165,721 ns** (~2.032 s);
+- authoritative throughput: **118.10 ticks/s**;
+- mean tick: **8.436 ms**;
+- p95 tick: **19.312 ms**;
+- maximum sampled tick: **29.676 ms**;
+- used heap before interval: **224,986,128 B** (~214.6 MiB);
+- used heap after interval: **28,354,320 B** (~27.0 MiB);
+- peak sampled used heap: **357,704,528 B** (~341.1 MiB);
+- signed final-minus-initial heap delta: **-196,631,808 B**.
+
+The negative final heap delta reflects JVM/GC timing and is exactly why heap measurements are treated as diagnostics rather than deterministic state or a leak assertion. Peak sampled heap is the more useful first capacity indicator. These values characterize one hosted CI environment only; they are **not** frozen performance requirements for target player hardware.
 
 ## Acceptance run
 
 The primary saturation/profile test executes 240 fixed ticks (12 seconds of authoritative tactical time at the current 0.05 s fixed step). A second pair of identical fixtures executes 60 ticks each and requires exact equality of deterministic workload and whole-runtime fingerprints, while deliberately not comparing wall-clock or heap values.
 
-The first green CI profile will be copied into this document before the PR is merged, followed by a final exact-head Java 17 `clean verify`.
+After the functional profile completed, the only remaining build failure was strict Javadoc documentation for the new public profiling records. That documentation has now been completed. A final exact-head Java 17 `clean verify` is required on the combined code + measured-profile documentation head before merge.
 
 ## Remaining Stage 19I after this gate
 
