@@ -10,7 +10,8 @@ import java.util.Objects;
  *
  * <p>Guidance and seeker availability are capabilities of the body, not its existence. Destroying
  * guidance therefore never deletes the physical mass, geometry, position, velocity or residual
- * kinetic energy. Propulsion consumes real propellant and changes velocity through the rocket equation.</p>
+ * kinetic energy. Propulsion consumes real propellant, consumes the authored powered-burn lifetime
+ * and changes velocity through the rocket equation.</p>
  *
  * @param bodyId stable simulation-local guided-body identity
  * @param sourceEntityId local identity of the launching entity
@@ -26,6 +27,7 @@ import java.util.Objects;
  * @param velocityXMps current x velocity in meters per second
  * @param velocityYMps current y velocity in meters per second
  * @param remainingPropellantKg remaining onboard propellant in kilograms
+ * @param remainingPoweredBurnSeconds remaining authored powered-burn lifetime in seconds
  * @param seekerAvailable whether the seeker can currently produce measurements
  * @param guidanceAvailable whether guidance/control can currently command maneuvers
  */
@@ -44,6 +46,7 @@ public record GuidedWeaponBody(
         double velocityXMps,
         double velocityYMps,
         double remainingPropellantKg,
+        double remainingPoweredBurnSeconds,
         boolean seekerAvailable,
         boolean guidanceAvailable) {
     private static final double EPSILON = 1e-9d;
@@ -65,6 +68,7 @@ public record GuidedWeaponBody(
      * @param velocityXMps current x velocity in meters per second
      * @param velocityYMps current y velocity in meters per second
      * @param remainingPropellantKg remaining onboard propellant in kilograms
+     * @param remainingPoweredBurnSeconds remaining authored powered-burn lifetime in seconds
      * @param seekerAvailable whether the seeker can currently produce measurements
      * @param guidanceAvailable whether guidance/control can currently command maneuvers
      */
@@ -91,13 +95,17 @@ public record GuidedWeaponBody(
         requireFinite(velocityXMps, "velocityXMps");
         requireFinite(velocityYMps, "velocityYMps");
         requireNonNegativeFinite(remainingPropellantKg, "remainingPropellantKg");
+        requireNonNegativeFinite(remainingPoweredBurnSeconds, "remainingPoweredBurnSeconds");
         if (remainingPropellantKg > definition.propellantMassKg() + EPSILON) {
             throw new IllegalArgumentException("remaining propellant exceeds authored capacity");
+        }
+        if (remainingPoweredBurnSeconds > definition.burnTimeSeconds() + EPSILON) {
+            throw new IllegalArgumentException("remaining powered burn exceeds authored duration");
         }
     }
 
     /**
-     * Creates a freshly launched body with a full authored propellant load.
+     * Creates a freshly launched body with full authored propellant and powered-burn lifetime.
      *
      * @param bodyId new guided-body identity
      * @param sourceEntityId launching entity identity
@@ -144,6 +152,7 @@ public record GuidedWeaponBody(
                 velocityXMps,
                 velocityYMps,
                 checked.propellantMassKg(),
+                checked.burnTimeSeconds(),
                 true,
                 true);
     }
@@ -164,13 +173,23 @@ public record GuidedWeaponBody(
         return 0.5d * currentMassKg() * speed * speed;
     }
 
-    /** @return ideal remaining propulsion delta-v in meters per second */
+    /**
+     * Returns physically deliverable remaining propulsion delta-v inside both fuel and burn-time limits.
+     *
+     * @return remaining deliverable delta-v in meters per second
+     */
     public double remainingDeltaVMps() {
-        if (remainingPropellantKg <= EPSILON) {
+        if (remainingPropellantKg <= EPSILON || remainingPoweredBurnSeconds <= EPSILON) {
             return 0d;
         }
-        return definition.exhaustVelocityMps()
-                * Math.log(currentMassKg() / definition.dryMassKg());
+        double burnablePropellantKg = Math.min(
+                remainingPropellantKg,
+                definition.massFlowKgPerS() * remainingPoweredBurnSeconds);
+        if (burnablePropellantKg <= EPSILON) {
+            return 0d;
+        }
+        double finalMassKg = currentMassKg() - burnablePropellantKg;
+        return definition.exhaustVelocityMps() * Math.log(currentMassKg() / finalMassKg);
     }
 
     /**
@@ -179,7 +198,15 @@ public record GuidedWeaponBody(
      * @return body with guidance disabled and all physical state preserved
      */
     public GuidedWeaponBody disableGuidance() {
-        return copyWith(seekerAvailable, false, xM, yM, velocityXMps, velocityYMps, remainingPropellantKg);
+        return copyWith(
+                seekerAvailable,
+                false,
+                xM,
+                yM,
+                velocityXMps,
+                velocityYMps,
+                remainingPropellantKg,
+                remainingPoweredBurnSeconds);
     }
 
     /**
@@ -188,26 +215,36 @@ public record GuidedWeaponBody(
      * @return body with seeker disabled and all physical state preserved
      */
     public GuidedWeaponBody disableSeeker() {
-        return copyWith(false, guidanceAvailable, xM, yM, velocityXMps, velocityYMps, remainingPropellantKg);
+        return copyWith(
+                false,
+                guidanceAvailable,
+                xM,
+                yM,
+                velocityXMps,
+                velocityYMps,
+                remainingPropellantKg,
+                remainingPoweredBurnSeconds);
     }
 
     /**
      * Executes a propulsion burn in an explicitly supplied unit direction.
      *
-     * <p>The method consumes only the propellant available during the requested interval and applies
-     * rocket-equation delta-v. It does not choose a guidance law; Stage-17.5E guidance supplies the
-     * direction through the same player/AI-neutral path.</p>
+     * <p>The method consumes only propellant and powered-burn lifetime physically available during
+     * the requested interval and applies rocket-equation delta-v. It does not choose a guidance law;
+     * Stage-17.5E guidance supplies the direction through the same player/AI-neutral path.</p>
      *
      * @param directionX x component of requested thrust direction
      * @param directionY y component of requested thrust direction
      * @param deltaSeconds positive commanded burn interval
-     * @return body after physical propellant consumption and velocity change
+     * @return body after physical propellant/burn-time consumption and velocity change
      */
     public GuidedWeaponBody burn(double directionX, double directionY, double deltaSeconds) {
         requireFinite(directionX, "directionX");
         requireFinite(directionY, "directionY");
         requirePositiveFinite(deltaSeconds, "deltaSeconds");
-        if (!guidanceAvailable || remainingPropellantKg <= EPSILON) {
+        if (!guidanceAvailable
+                || remainingPropellantKg <= EPSILON
+                || remainingPoweredBurnSeconds <= EPSILON) {
             return this;
         }
         double magnitude = Math.hypot(directionX, directionY);
@@ -217,11 +254,14 @@ public record GuidedWeaponBody(
         double unitX = directionX / magnitude;
         double unitY = directionY / magnitude;
         double massFlow = definition.massFlowKgPerS();
-        double requestedPropellant = massFlow * deltaSeconds;
-        double consumed = Math.min(remainingPropellantKg, requestedPropellant);
-        if (consumed <= EPSILON) {
+        double fuelLimitedSeconds = remainingPropellantKg / massFlow;
+        double actualBurnSeconds = Math.min(
+                deltaSeconds,
+                Math.min(remainingPoweredBurnSeconds, fuelLimitedSeconds));
+        if (actualBurnSeconds <= EPSILON) {
             return this;
         }
+        double consumed = massFlow * actualBurnSeconds;
         double initialMass = currentMassKg();
         double finalPropellant = Math.max(0d, remainingPropellantKg - consumed);
         double finalMass = definition.dryMassKg() + finalPropellant;
@@ -233,14 +273,15 @@ public record GuidedWeaponBody(
                 yM,
                 velocityXMps + unitX * deltaV,
                 velocityYMps + unitY * deltaV,
-                finalPropellant);
+                finalPropellant,
+                Math.max(0d, remainingPoweredBurnSeconds - actualBurnSeconds));
     }
 
     /**
      * Advances the current body ballistically without inventing a guidance correction.
      *
      * @param deltaSeconds positive simulation interval
-     * @return advanced body with unchanged velocity and subsystem availability
+     * @return advanced body with unchanged velocity and subsystem/propulsion availability
      */
     public GuidedWeaponBody advanceBallistic(double deltaSeconds) {
         requirePositiveFinite(deltaSeconds, "deltaSeconds");
@@ -251,7 +292,8 @@ public record GuidedWeaponBody(
                 yM + velocityYMps * deltaSeconds,
                 velocityXMps,
                 velocityYMps,
-                remainingPropellantKg);
+                remainingPropellantKg,
+                remainingPoweredBurnSeconds);
     }
 
     private GuidedWeaponBody copyWith(
@@ -261,7 +303,8 @@ public record GuidedWeaponBody(
             double nextYM,
             double nextVelocityXMps,
             double nextVelocityYMps,
-            double nextRemainingPropellantKg) {
+            double nextRemainingPropellantKg,
+            double nextRemainingPoweredBurnSeconds) {
         return new GuidedWeaponBody(
                 bodyId,
                 sourceEntityId,
@@ -277,6 +320,7 @@ public record GuidedWeaponBody(
                 nextVelocityXMps,
                 nextVelocityYMps,
                 nextRemainingPropellantKg,
+                nextRemainingPoweredBurnSeconds,
                 nextSeekerAvailable,
                 nextGuidanceAvailable);
     }
