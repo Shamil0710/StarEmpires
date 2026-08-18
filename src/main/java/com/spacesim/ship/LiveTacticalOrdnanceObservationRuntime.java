@@ -5,6 +5,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
+import com.spacesim.ship.ElectronicWarfareState.NoiseJammer;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
 import com.spacesim.ship.SensorDefinition.Mode;
 import com.spacesim.ship.ShipObservationService.OperationPlan;
@@ -34,9 +35,11 @@ import java.util.TreeMap;
  * every current hostile guided body. This avoids both a free simultaneous second radar operation and
  * transmitter-power multiplication per target.</p>
  *
- * <p>This slice intentionally uses ACTIVE_RADAR only. The authored guided thermal/plume/optical/radio
- * signatures remain available for later passive/EW integration. Target EW is currently empty; the
- * next Stage-19I-D slice must replace that with actual jammer/decoy state.</p>
+ * <p>Noise jammers are projected from the same damage-aware fitted engineering state as all other
+ * capabilities and propagate through the ordinary sensor solver. If external in-band interference is
+ * present the receiver requests ECCM processing; its incremental power and heat are part of the same
+ * physical radar-operation grant. If the ECCM request cannot be funded, the receiver may fall back to
+ * the ordinary non-ECCM radar operation rather than receiving free processing.</p>
  */
 public final class LiveTacticalOrdnanceObservationRuntime {
     private static final long SCAN_PERIOD_TICKS = 4L;
@@ -50,6 +53,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     private final WeaponAmmunitionCatalog ammunitionCatalog;
     private final DerivedShipCalculator calculator;
     private final ShipSensorEngineeringAdapter sensorAdapter;
+    private final ShipElectronicWarfareEngineeringAdapter ewAdapter;
     private final ShipObservationService observationService;
     private final ShipEngineeringGrantService grantService;
     private final ShipSensorRuntime sensorRuntime;
@@ -57,6 +61,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     private final TreeMap<Long, TreeMap<Long, List<SensorMeasurement>>> measurementsByObserver = new TreeMap<>();
     private final TreeMap<Long, TreeMap<Long, ObservedOrdnanceTrack>> tracksByObserver = new TreeMap<>();
     private final TreeMap<Long, TreeMap<Long, PositionSample>> latestSamplesByObserver = new TreeMap<>();
+    private final TreeMap<Long, ScanDiagnostics> lastScanByObserver = new TreeMap<>();
 
     private long lastObservedTick = -1L;
 
@@ -71,6 +76,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         sensorAdapter = new ShipSensorEngineeringAdapter();
+        ewAdapter = new ShipElectronicWarfareEngineeringAdapter();
         observationService = new ShipObservationService();
         grantService = new ShipEngineeringGrantService(engineeringCatalog);
         sensorRuntime = new ShipSensorRuntime();
@@ -80,6 +86,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
             measurementsByObserver.put(entityId, new TreeMap<>());
             tracksByObserver.put(entityId, new TreeMap<>());
             latestSamplesByObserver.put(entityId, new TreeMap<>());
+            lastScanByObserver.put(entityId, ScanDiagnostics.none());
         }
     }
 
@@ -130,6 +137,17 @@ public final class LiveTacticalOrdnanceObservationRuntime {
         return tracksByObserver.get(observerEntityId).get(bodyId);
     }
 
+    /**
+     * Returns diagnostics for the most recent physical ordnance-radar scan of one combatant.
+     *
+     * @param observerEntityId stable observing combatant identity
+     * @return immutable receiver-local diagnostic projection
+     */
+    public ScanDiagnostics lastScanDiagnostics(long observerEntityId) {
+        battleState().requireCombatant(observerEntityId);
+        return lastScanByObserver.get(observerEntityId);
+    }
+
     /** @return wrapped physical guided-ordnance runtime */
     public LiveTacticalBattleOrdnanceRuntime ordnanceRuntime() {
         return ordnanceRuntime;
@@ -148,15 +166,18 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     private void scanObserver(CombatantRuntime observer) {
         List<GuidedWeaponBody> hostileBodies = hostileGuidedBodies(observer);
         if (hostileBodies.isEmpty()) {
+            lastScanByObserver.put(observer.spec().entityId(), ScanDiagnostics.none());
             return;
         }
         List<FittedSensor> radars = sensorAdapter.derive(derive(observer)).sensors().stream()
                 .filter(sensor -> sensor.definition().mode() == Mode.ACTIVE_RADAR)
                 .toList();
         if (radars.isEmpty()) {
+            lastScanByObserver.put(observer.spec().entityId(), ScanDiagnostics.none());
             return;
         }
 
+        ElectronicWarfareState ewState = electronicWarfareState(observer);
         EngineeringComponent engineering = observer.engineering();
         var budget = grantService.beginInterval(engineering, OPERATION_SECONDS);
         TreeMap<Long, Integer> measurementsBefore = new TreeMap<>();
@@ -165,8 +186,13 @@ public final class LiveTacticalOrdnanceObservationRuntime {
             measurementsBefore.put(body.bodyId(), observerHistory.getOrDefault(body.bodyId(), List.of()).size());
         }
 
-        SensorRuntimeState sensorState = SensorRuntimeState.nominal();
+        boolean eccmRequested = !ewState.noiseJammers().isEmpty();
+        boolean eccmCommitted = false;
+        int measurementsProduced = 0;
+        double committedPowerW = 0d;
+        double committedHeatW = 0d;
         for (FittedSensor radar : radars) {
+            SensorRuntimeState sensorState = new SensorRuntimeState(true, eccmRequested, 1d, 1d);
             OperationPlan plan = observationService.planOperation(radar, sensorState);
             var grant = grantService.grantAndCommit(
                     engineering,
@@ -175,9 +201,23 @@ public final class LiveTacticalOrdnanceObservationRuntime {
                     plan.requiredHeatW(),
                     OPERATION_SECONDS,
                     budget);
+            if (!grant.committed() && eccmRequested) {
+                sensorState = SensorRuntimeState.nominal();
+                plan = observationService.planOperation(radar, sensorState);
+                grant = grantService.grantAndCommit(
+                        engineering,
+                        radar.mountId(),
+                        plan.requiredPowerW(),
+                        plan.requiredHeatW(),
+                        OPERATION_SECONDS,
+                        budget);
+            }
             if (!grant.committed()) {
                 continue;
             }
+            eccmCommitted |= sensorState.eccmEnabled();
+            committedPowerW += plan.requiredPowerW();
+            committedHeatW += plan.requiredHeatW();
             for (GuidedWeaponBody body : hostileBodies) {
                 var ammunition = ammunitionCatalog.findGuided(body.definition().id());
                 if (ammunition == null) {
@@ -194,14 +234,22 @@ public final class LiveTacticalOrdnanceObservationRuntime {
                         new Position2d(observer.transform().position.x, observer.transform().position.y),
                         new Position2d(body.xM(), body.yM()),
                         ammunition.signature().toRuntimeSignature(),
-                        ElectronicWarfareState.empty(),
+                        ewState,
                         ordnanceRuntime.elapsedSeconds());
-                execution.measurement().ifPresent(value -> appendMeasurement(
-                        observerHistory,
-                        body.bodyId(),
-                        value));
+                if (execution.measurement().isPresent()) {
+                    measurementsProduced = Math.addExact(measurementsProduced, 1);
+                    appendMeasurement(observerHistory, body.bodyId(), execution.measurement().orElseThrow());
+                }
             }
         }
+
+        lastScanByObserver.put(observer.spec().entityId(), new ScanDiagnostics(
+                ewState.noiseJammers().size(),
+                eccmRequested,
+                eccmCommitted,
+                measurementsProduced,
+                committedPowerW,
+                committedHeatW));
 
         for (GuidedWeaponBody body : hostileBodies) {
             List<SensorMeasurement> history = observerHistory.getOrDefault(body.bodyId(), List.of());
@@ -217,6 +265,21 @@ public final class LiveTacticalOrdnanceObservationRuntime {
                     ordnanceRuntime.elapsedSeconds());
             updateObservedTrack(observer.spec().entityId(), fused);
         }
+    }
+
+    private ElectronicWarfareState electronicWarfareState(CombatantRuntime observer) {
+        List<NoiseJammer> jammers = new ArrayList<>();
+        for (CombatantRuntime emitter : battleState().combatants()) {
+            if (emitter.spec().entityId() == observer.spec().entityId()) {
+                continue;
+            }
+            ewAdapter.deriveNoiseJammer(
+                    emitter.spec().entityId(),
+                    emitter.transform().position.x,
+                    emitter.transform().position.y,
+                    derive(emitter)).ifPresent(jammers::add);
+        }
+        return new ElectronicWarfareState(jammers, List.of());
     }
 
     private void updateObservedTrack(long observerEntityId, TrackState fused) {
@@ -298,6 +361,49 @@ public final class LiveTacticalOrdnanceObservationRuntime {
             values.remove(0);
         }
         historyByTarget.put(targetId, List.copyOf(values));
+    }
+
+    /**
+     * Receiver-local diagnostic state from the latest ordnance radar scan.
+     *
+     * @param noiseJammerCount physical external noise emitters included in the receiver environment
+     * @param eccmRequested whether receiver policy requested fitted ECCM processing
+     * @param eccmCommitted whether the engineering layer physically admitted an ECCM radar operation
+     * @param measurementsProduced true-target measurements emitted by the accepted operations
+     * @param committedPowerW total incremental radar/ECCM power admitted for this scan
+     * @param committedHeatW total incremental radar/ECCM heat admitted for this scan
+     */
+    public record ScanDiagnostics(
+            int noiseJammerCount,
+            boolean eccmRequested,
+            boolean eccmCommitted,
+            int measurementsProduced,
+            double committedPowerW,
+            double committedHeatW) {
+        /**
+         * Validates deterministic non-negative scan diagnostics.
+         *
+         * @param noiseJammerCount physical external noise emitters included in the receiver environment
+         * @param eccmRequested whether receiver policy requested fitted ECCM processing
+         * @param eccmCommitted whether engineering physically admitted an ECCM radar operation
+         * @param measurementsProduced true-target measurements emitted by accepted operations
+         * @param committedPowerW total incremental radar/ECCM power admitted for this scan
+         * @param committedHeatW total incremental radar/ECCM heat admitted for this scan
+         */
+        public ScanDiagnostics {
+            if (noiseJammerCount < 0 || measurementsProduced < 0
+                    || !Double.isFinite(committedPowerW) || committedPowerW < 0d
+                    || !Double.isFinite(committedHeatW) || committedHeatW < 0d) {
+                throw new IllegalArgumentException("invalid ordnance scan diagnostics");
+            }
+            if (eccmCommitted && !eccmRequested) {
+                throw new IllegalArgumentException("ECCM cannot be committed when it was not requested");
+            }
+        }
+
+        private static ScanDiagnostics none() {
+            return new ScanDiagnostics(0, false, false, 0, 0d, 0d);
+        }
     }
 
     /**
