@@ -55,6 +55,7 @@ public record TacticalPrototypeVisualSnapshot(
      *
      * @param entityId stable authoritative owner identity
      * @param side presentation-only side projected from authoritative scenario membership
+     * @param role presentation-only role projected from authored doctrine/fit identity
      * @param xM world x position in meters
      * @param yM world y position in meters
      * @param headingRad world heading in radians
@@ -67,6 +68,7 @@ public record TacticalPrototypeVisualSnapshot(
     public record ShipGlyph(
             long entityId,
             TacticalSide side,
+            ShipVisualRole role,
             double xM,
             double yM,
             double headingRad,
@@ -80,6 +82,7 @@ public record TacticalPrototypeVisualSnapshot(
          *
          * @param entityId stable authoritative owner identity
          * @param side presentation-only side projected from authoritative scenario membership
+         * @param role presentation-only role projected from authored doctrine/fit identity
          * @param xM world x position in meters
          * @param yM world y position in meters
          * @param headingRad world heading in radians
@@ -92,6 +95,7 @@ public record TacticalPrototypeVisualSnapshot(
         public ShipGlyph {
             requirePositiveId(entityId, "entityId");
             Objects.requireNonNull(side, "side");
+            Objects.requireNonNull(role, "role");
             requireFinite(xM, "xM");
             requireFinite(yM, "yM");
             requireFinite(headingRad, "headingRad");
@@ -99,6 +103,35 @@ public record TacticalPrototypeVisualSnapshot(
             requirePositiveFinite(widthM, "widthM");
             requireUnit(thrustFraction, "thrustFraction");
             requireUnit(integrityFraction, "integrityFraction");
+        }
+
+        /**
+         * Side-aware compatibility constructor for Stage-19J callers that do not yet classify role.
+         *
+         * @param entityId stable authoritative owner identity
+         * @param side presentation-only side projected from authoritative scenario membership
+         * @param xM world x position in meters
+         * @param yM world y position in meters
+         * @param headingRad world heading in radians
+         * @param lengthM physical hull length
+         * @param widthM physical hull width
+         * @param thrustFraction presentation fraction [0,1] derived from authoritative thrust command/state
+         * @param integrityFraction mean physical compartment integrity [0,1]
+         * @param wreck whether authoritative damage state has no surviving compartment integrity
+         */
+        public ShipGlyph(
+                long entityId,
+                TacticalSide side,
+                double xM,
+                double yM,
+                double headingRad,
+                double lengthM,
+                double widthM,
+                double thrustFraction,
+                double integrityFraction,
+                boolean wreck) {
+            this(entityId, side, ShipVisualRole.UNCLASSIFIED, xM, yM, headingRad, lengthM, widthM,
+                    thrustFraction, integrityFraction, wreck);
         }
 
         /**
@@ -124,8 +157,8 @@ public record TacticalPrototypeVisualSnapshot(
                 double thrustFraction,
                 double integrityFraction,
                 boolean wreck) {
-            this(entityId, TacticalSide.NEUTRAL, xM, yM, headingRad, lengthM, widthM,
-                    thrustFraction, integrityFraction, wreck);
+            this(entityId, TacticalSide.NEUTRAL, ShipVisualRole.UNCLASSIFIED,
+                    xM, yM, headingRad, lengthM, widthM, thrustFraction, integrityFraction, wreck);
         }
     }
 
