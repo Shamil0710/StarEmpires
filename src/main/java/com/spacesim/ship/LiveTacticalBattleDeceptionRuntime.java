@@ -19,13 +19,13 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Stage-19I actor-bounded deception coordinator over the accepted physical decoy and defense runtimes.
+ * Stage-19I actor-bounded deception coordinator over the accepted physical combat runtimes.
  *
- * <p>This class owns policy ordering only. It never creates a sensor hypothesis, ammunition item,
- * launcher cycle or physical body directly. Automatic deployment is delegated to
- * {@link LiveTacticalBattleDecoyRuntime#deployOne(long, String, double, double)}, so finite stores,
- * physical launcher readiness, damage-aware fitted capability and body materialization remain owned by
- * the existing production paths.</p>
+ * <p>This class owns top-level policy ordering only. It never creates a sensor hypothesis,
+ * ammunition item, launcher cycle, kinetic/guided body or beam solution directly. Automatic decoy
+ * deployment remains delegated to {@link LiveTacticalBattleDecoyRuntime}; fitted directed-energy
+ * execution is delegated to {@link LiveTacticalBattleBeamRuntime} after the shared authoritative
+ * control/ordnance/defense tick has established the current actor-local fire-control state.</p>
  *
  * <p>A combatant may automatically accompany an already-active own STRIKE body with one physical
  * decoy only when its production tactical controller currently has an actor-local selected target and
@@ -39,6 +39,7 @@ public final class LiveTacticalBattleDeceptionRuntime {
     private final LiveTacticalBattleOrdnanceRuntime ordnanceRuntime;
     private final LiveTacticalBattleDecoyRuntime decoyRuntime;
     private final LiveTacticalBattleDefenseRuntime defenseRuntime;
+    private final LiveTacticalBattleBeamRuntime beamRuntime;
     private final ShipEngineeringCatalog engineeringCatalog;
     private final WeaponAmmunitionCatalog ammunitionCatalog;
     private final WeaponLauncherCatalog launcherCatalog;
@@ -47,7 +48,7 @@ public final class LiveTacticalBattleDeceptionRuntime {
     private final TreeMap<Long, Long> automaticDeploymentsByEntityId = new TreeMap<>();
 
     /**
-     * Creates automatic deception over one authoritative shared battle/ordnance runtime.
+     * Creates automatic deception and fitted beam execution over one authoritative shared runtime.
      *
      * @param ordnanceRuntime authoritative shared physical ordnance runtime
      */
@@ -55,6 +56,7 @@ public final class LiveTacticalBattleDeceptionRuntime {
         this.ordnanceRuntime = Objects.requireNonNull(ordnanceRuntime, "ordnanceRuntime");
         decoyRuntime = new LiveTacticalBattleDecoyRuntime(ordnanceRuntime);
         defenseRuntime = new LiveTacticalBattleDefenseRuntime(ordnanceRuntime, decoyRuntime);
+        beamRuntime = new LiveTacticalBattleBeamRuntime(ordnanceRuntime.weaponRuntime());
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
@@ -66,15 +68,18 @@ public final class LiveTacticalBattleDeceptionRuntime {
     }
 
     /**
-     * Advances one authoritative battle tick with actor-bounded automatic decoy policy.
+     * Advances one authoritative battle tick with actor-bounded deception and directed-energy policy.
      *
-     * <p>Deployment policy executes at the start of the tick from information and own physical bodies
-     * established by previous authoritative ticks. The shared defense runtime then advances ordnance,
-     * decoys, sensing, interceptor guidance and physical collisions exactly once.</p>
+     * <p>Decoy deployment policy executes at the start of the tick from information and own physical
+     * bodies established by previous authoritative ticks. The shared defense runtime then advances
+     * ordnance, decoys, sensing, interceptor guidance and physical collisions exactly once. Finally
+     * fitted beams execute from that same tick's actor-local fire-control state without advancing a
+     * second clock.</p>
      */
     public void advanceOneTick() {
         deployFromCurrentActorKnowledge();
         defenseRuntime.advanceOneTick();
+        beamRuntime.executeCurrentTick();
     }
 
     /** @return authoritative shared battle tick */
@@ -97,6 +102,11 @@ public final class LiveTacticalBattleDeceptionRuntime {
         return defenseRuntime;
     }
 
+    /** @return fitted actor-bounded physical beam execution runtime */
+    public LiveTacticalBattleBeamRuntime beamRuntime() {
+        return beamRuntime;
+    }
+
     /** @return authoritative materialized combatant state */
     public LiveTacticalBattleRuntimeState battleState() {
         return ordnanceRuntime.battleState();
@@ -114,7 +124,7 @@ public final class LiveTacticalBattleDeceptionRuntime {
     }
 
     /**
-     * Equality-friendly deterministic deception/defense projection.
+     * Equality-friendly deterministic whole-combat projection.
      *
      * @return immutable whole-runtime fingerprint
      */
@@ -123,7 +133,8 @@ public final class LiveTacticalBattleDeceptionRuntime {
                 tick(),
                 new TreeMap<>(automaticDeploymentsByEntityId),
                 decoyRuntime.fingerprint(),
-                defenseRuntime.fingerprint());
+                defenseRuntime.fingerprint(),
+                beamRuntime.fingerprint());
     }
 
     private void deployFromCurrentActorKnowledge() {
@@ -208,25 +219,28 @@ public final class LiveTacticalBattleDeceptionRuntime {
     }
 
     /**
-     * Whole-runtime deterministic deception projection.
+     * Whole-runtime deterministic deception/defense/beam projection.
      *
      * @param tick authoritative shared battle tick
      * @param automaticDeploymentsByEntityId automatic physical deployment counts by combatant
      * @param decoyFingerprint authoritative physical decoy state
      * @param defenseFingerprint actor-bounded physical defense/ordnance state
+     * @param beamFingerprint fitted directed-energy execution state
      */
     public record DeceptionFingerprint(
             long tick,
             Map<Long, Long> automaticDeploymentsByEntityId,
             LiveTacticalBattleDecoyRuntime.DecoyFingerprint decoyFingerprint,
-            LiveTacticalBattleDefenseRuntime.BattleDefenseFingerprint defenseFingerprint) {
+            LiveTacticalBattleDefenseRuntime.BattleDefenseFingerprint defenseFingerprint,
+            LiveTacticalBattleBeamRuntime.BeamFingerprint beamFingerprint) {
         /**
-         * Validates and freezes one deterministic deception projection.
+         * Validates and freezes one deterministic whole-combat projection.
          *
          * @param tick authoritative shared battle tick
          * @param automaticDeploymentsByEntityId automatic deployment counts by combatant
          * @param decoyFingerprint physical decoy projection
          * @param defenseFingerprint physical defense projection
+         * @param beamFingerprint fitted directed-energy execution projection
          */
         public DeceptionFingerprint {
             if (tick < 0L) {
@@ -236,6 +250,7 @@ public final class LiveTacticalBattleDeceptionRuntime {
                     automaticDeploymentsByEntityId, "automaticDeploymentsByEntityId")));
             Objects.requireNonNull(decoyFingerprint, "decoyFingerprint");
             Objects.requireNonNull(defenseFingerprint, "defenseFingerprint");
+            Objects.requireNonNull(beamFingerprint, "beamFingerprint");
         }
     }
 }
