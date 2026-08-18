@@ -36,7 +36,8 @@ class LiveTactical8v8ExactLocalAcceptanceTest {
         assertEquals(8, fixture.battle().scenario().combatantsFor(Side.ALPHA).size());
         assertEquals(8, fixture.battle().scenario().combatantsFor(Side.BETA).size());
         assertTrue(physicalFeatureSetObserved(fixture.runtime()),
-                "8v8 must reach kinetic/guided/decoy/interceptor/impact activity in one exact-local runtime");
+                () -> "8v8 physical feature set incomplete at tick " + fixture.runtime().tick()
+                        + ": " + physicalFeatureDiagnostics(fixture.runtime()));
 
         for (var combatant : fixture.battle().combatants()) {
             long entityId = combatant.spec().entityId();
@@ -137,23 +138,43 @@ class LiveTactical8v8ExactLocalAcceptanceTest {
     }
 
     private static boolean physicalFeatureSetObserved(LiveTacticalBattleDeceptionRuntime runtime) {
-        long kineticShots = runtime.battleState().combatants().stream()
+        return totalKineticShots(runtime) > 0L
+                && totalGuidedLaunches(runtime) > 0L
+                && totalDecoyDeployments(runtime) > 0L
+                && totalInterceptorLaunches(runtime) > 0L
+                && runtime.ordnanceRuntime().weaponRuntime().totalImpacts() > 0L;
+    }
+
+    private static String physicalFeatureDiagnostics(LiveTacticalBattleDeceptionRuntime runtime) {
+        return "kineticShots=" + totalKineticShots(runtime)
+                + ", guidedLaunches=" + totalGuidedLaunches(runtime)
+                + ", decoyDeployments=" + totalDecoyDeployments(runtime)
+                + ", interceptorLaunches=" + totalInterceptorLaunches(runtime)
+                + ", impacts=" + runtime.ordnanceRuntime().weaponRuntime().totalImpacts();
+    }
+
+    private static long totalKineticShots(LiveTacticalBattleDeceptionRuntime runtime) {
+        return runtime.battleState().combatants().stream()
                 .mapToLong(value -> runtime.ordnanceRuntime().weaponRuntime().shotsFired(value.spec().entityId()))
                 .sum();
-        long guidedLaunches = runtime.battleState().combatants().stream()
+    }
+
+    private static long totalGuidedLaunches(LiveTacticalBattleDeceptionRuntime runtime) {
+        return runtime.battleState().combatants().stream()
                 .mapToLong(value -> runtime.ordnanceRuntime().guidedLaunches(value.spec().entityId()))
                 .sum();
-        long decoyDeployments = runtime.battleState().combatants().stream()
+    }
+
+    private static long totalDecoyDeployments(LiveTacticalBattleDeceptionRuntime runtime) {
+        return runtime.battleState().combatants().stream()
                 .mapToLong(value -> runtime.automaticDeployments(value.spec().entityId()))
                 .sum();
-        long interceptorLaunches = runtime.battleState().combatants().stream()
+    }
+
+    private static long totalInterceptorLaunches(LiveTacticalBattleDeceptionRuntime runtime) {
+        return runtime.battleState().combatants().stream()
                 .mapToLong(value -> runtime.defenseRuntime().interceptorLaunches(value.spec().entityId()))
                 .sum();
-        return kineticShots > 0L
-                && guidedLaunches > 0L
-                && decoyDeployments > 0L
-                && interceptorLaunches > 0L
-                && runtime.ordnanceRuntime().weaponRuntime().totalImpacts() > 0L;
     }
 
     private static long distinctSelectedTargets(Fixture fixture, Side side) {
