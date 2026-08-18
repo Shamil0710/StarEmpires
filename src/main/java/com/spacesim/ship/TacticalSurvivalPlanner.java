@@ -28,6 +28,7 @@ public final class TacticalSurvivalPlanner {
         /** Own physical readiness remains above policy thresholds. */ READY,
         /** Local structural integrity crossed the retreat threshold. */ STRUCTURAL_DAMAGE,
         /** Local subsystem integrity crossed the retreat threshold. */ SUBSYSTEM_DAMAGE,
+        /** Every operational weapon is finite-ammunition dependent and no physical rounds remain. */ AMMUNITION_DEPLETED,
         /** Physical reaction-mass reserve crossed the retreat threshold. */ REACTION_MASS_RESERVE,
         /** Remaining physical delta-v crossed the retreat threshold. */ DELTA_V_RESERVE,
         /** Available own-ship acceleration crossed the retreat threshold. */ PROPULSION_DEGRADED,
@@ -45,13 +46,17 @@ public final class TacticalSurvivalPlanner {
      * @param reactionMassKg current physical propulsion reaction mass
      * @param deltaVMps current physical remaining delta-v
      * @param accelerationMps2 current physically derived acceleration capability
+     * @param finiteAmmunitionDependent whether all currently operational weapons require physical ammunition
+     * @param ammunitionCount current total physical ammunition item count across installed interfaces
      */
     public record OwnReadiness(
             double meanCompartmentIntegrity,
             double minimumModuleIntegrity,
             double reactionMassKg,
             double deltaVMps,
-            double accelerationMps2) {
+            double accelerationMps2,
+            boolean finiteAmmunitionDependent,
+            long ammunitionCount) {
         /**
          * Validates one own-ship physical readiness snapshot.
          *
@@ -60,6 +65,8 @@ public final class TacticalSurvivalPlanner {
          * @param reactionMassKg current physical propulsion reaction mass
          * @param deltaVMps current physical remaining delta-v
          * @param accelerationMps2 current physically derived acceleration capability
+         * @param finiteAmmunitionDependent whether all currently operational weapons require physical ammunition
+         * @param ammunitionCount current total physical ammunition item count across installed interfaces
          */
         public OwnReadiness {
             requireFraction(meanCompartmentIntegrity, "meanCompartmentIntegrity");
@@ -67,6 +74,34 @@ public final class TacticalSurvivalPlanner {
             requireNonNegativeFinite(reactionMassKg, "reactionMassKg");
             requireNonNegativeFinite(deltaVMps, "deltaVMps");
             requireNonNegativeFinite(accelerationMps2, "accelerationMps2");
+            if (ammunitionCount < 0L) {
+                throw new IllegalArgumentException("ammunitionCount must be non-negative");
+            }
+        }
+
+        /**
+         * Backward-compatible readiness constructor for callers that do not model ammunition dependence.
+         *
+         * @param meanCompartmentIntegrity mean local structural integrity in {@code [0,1]}
+         * @param minimumModuleIntegrity lowest installed subsystem integrity in {@code [0,1]}
+         * @param reactionMassKg current physical propulsion reaction mass
+         * @param deltaVMps current physical remaining delta-v
+         * @param accelerationMps2 current physically derived acceleration capability
+         */
+        public OwnReadiness(
+                double meanCompartmentIntegrity,
+                double minimumModuleIntegrity,
+                double reactionMassKg,
+                double deltaVMps,
+                double accelerationMps2) {
+            this(
+                    meanCompartmentIntegrity,
+                    minimumModuleIntegrity,
+                    reactionMassKg,
+                    deltaVMps,
+                    accelerationMps2,
+                    false,
+                    0L);
         }
 
         /** @return whether the own ship can currently create a non-zero propulsive maneuver */
@@ -385,6 +420,9 @@ public final class TacticalSurvivalPlanner {
         }
         if (readiness.minimumModuleIntegrity() < policy.minimumModuleIntegrity()) {
             return DecisionReason.SUBSYSTEM_DAMAGE;
+        }
+        if (readiness.finiteAmmunitionDependent() && readiness.ammunitionCount() == 0L) {
+            return DecisionReason.AMMUNITION_DEPLETED;
         }
         if (readiness.reactionMassKg() < policy.reactionMassReserveKg()) {
             return DecisionReason.REACTION_MASS_RESERVE;

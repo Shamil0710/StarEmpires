@@ -256,7 +256,9 @@ public final class LiveTacticalBattleControlRuntime {
                     minimumModuleIntegrity(combatant.engineering().fit, damage.moduleDamage()),
                     reactionMassKg(combatant.engineering().runtimeState.consumables()),
                     derived.deltaVMps(),
-                    derived.accelerationMps2());
+                    derived.accelerationMps2(),
+                    finiteAmmunitionDependent(combatant, damage.moduleDamage()),
+                    ammunitionCount(combatant.engineering().runtimeState.consumables()));
             TacticalSurvivalPlanner.Decision survival = survivalPlanner.decide(
                     readiness,
                     SURVIVAL_POLICY,
@@ -360,6 +362,27 @@ public final class LiveTacticalBattleControlRuntime {
         return Map.copyOf(result);
     }
 
+    private boolean finiteAmmunitionDependent(CombatantRuntime combatant, DamageState damage) {
+        boolean hasOperationalAmmoWeapon = false;
+        boolean hasOperationalNonAmmoWeapon = false;
+        for (ShipEngineeringCatalog.InstalledModuleDefinition installed : combatant.engineering().fit.installedModules()) {
+            ShipEngineeringCatalog.ModuleDefinition module = engineeringCatalog.findModule(installed.moduleId());
+            if (module == null
+                    || module.family() != ModuleFamily.WEAPON_AMMUNITION
+                    || damage.moduleIntegrityByMount().getOrDefault(installed.mountId(), 1d) <= EPSILON) {
+                continue;
+            }
+            boolean requiresAmmunition = module.interfaces().stream()
+                    .anyMatch(value -> value.kind() == InterfaceKind.AMMUNITION);
+            if (requiresAmmunition) {
+                hasOperationalAmmoWeapon = true;
+            } else {
+                hasOperationalNonAmmoWeapon = true;
+            }
+        }
+        return hasOperationalAmmoWeapon && !hasOperationalNonAmmoWeapon;
+    }
+
     private static void appendMeasurement(
             TreeMap<Long, List<SensorMeasurement>> history,
             long targetId,
@@ -370,6 +393,13 @@ public final class LiveTacticalBattleControlRuntime {
             values.remove(0);
         }
         history.put(targetId, List.copyOf(values));
+    }
+
+    private static long ammunitionCount(ShipEngineeringState.ConsumableState state) {
+        return state.interfaceLoads().stream()
+                .filter(value -> value.kind() == InterfaceKind.AMMUNITION)
+                .mapToLong(ShipEngineeringState.ConsumableLoad::itemCount)
+                .sum();
     }
 
     private static double reactionMassKg(ShipEngineeringState.ConsumableState state) {
