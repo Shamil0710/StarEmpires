@@ -6,6 +6,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedAmmunitionDefinition;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedEngagementRole;
+import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedSignatureDefinition;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.KineticAmmunitionDefinition;
 import com.spacesim.ship.WeaponDefinition.ProjectileShape;
 
@@ -149,6 +150,7 @@ public final class WeaponAmmunitionCatalogLoader {
                     materialId,
                     requireEnum(node, "shape", ProjectileShape.class),
                     optionalEnum(node, "engagementRole", GuidedEngagementRole.class, GuidedEngagementRole.STRIKE),
+                    parseGuidedSignature(node),
                     requirePositiveFinite(node, "lengthM"),
                     requirePositiveFinite(node, "diameterM"),
                     optionalContentId(node, "impactPayloadId"),
@@ -162,6 +164,22 @@ public final class WeaponAmmunitionCatalogLoader {
                     requireNonNegativeFinite(node, "terminalReserveMps")));
         }
         return values;
+    }
+
+    private static GuidedSignatureDefinition parseGuidedSignature(JsonValue guidedNode) {
+        JsonValue signature = guidedNode.get("signature");
+        if (signature == null || signature.isNull()) {
+            return GuidedSignatureDefinition.zero();
+        }
+        requireObject(signature, "guided ammunition signature");
+        rejectForbiddenAbstractions(signature, "guided ammunition signature");
+        return new GuidedSignatureDefinition(
+                requireNonNegativeFinite(signature, "thermalRadiantPowerW"),
+                requireNonNegativeFinite(signature, "enginePlumeRadiantPowerW"),
+                requireNonNegativeFinite(signature, "radarCrossSectionM2"),
+                requireNonNegativeFinite(signature, "reflectedOpticalPowerW"),
+                requireNonNegativeFinite(signature, "activeRadioEmissionPowerW"),
+                requireNonNegativeFinite(signature, "jammerEmissionPowerW"));
     }
 
     private static void ensureUniqueAcrossFamilies(

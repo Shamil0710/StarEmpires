@@ -1,5 +1,6 @@
 package com.spacesim.content.weapon;
 
+import com.spacesim.ship.SignatureState;
 import com.spacesim.ship.WeaponDefinition.GuidedWeapon;
 import com.spacesim.ship.WeaponDefinition.KineticRound;
 import com.spacesim.ship.WeaponDefinition.ProjectileShape;
@@ -150,12 +151,70 @@ public final class WeaponAmmunitionCatalog {
     }
 
     /**
+     * Authored physical observability of one guided ammunition body.
+     *
+     * <p>These are source strengths used by the ordinary production sensor equations. They are not
+     * detection ranges or target-priority bonuses. Dynamic burn/jammer state may later add to this
+     * static body signature but cannot replace these content-authored physical terms.</p>
+     *
+     * @param thermalRadiantPowerW passive thermal radiant source power
+     * @param enginePlumeRadiantPowerW authored powered-plume radiant source power
+     * @param radarCrossSectionM2 active-radar cross section
+     * @param reflectedOpticalPowerW passive reflected-optical source power
+     * @param activeRadioEmissionPowerW active radio/seeker emission source power
+     * @param jammerEmissionPowerW authored jammer emission source power
+     */
+    public record GuidedSignatureDefinition(
+            double thermalRadiantPowerW,
+            double enginePlumeRadiantPowerW,
+            double radarCrossSectionM2,
+            double reflectedOpticalPowerW,
+            double activeRadioEmissionPowerW,
+            double jammerEmissionPowerW) {
+        /**
+         * Validates one non-negative physical signature definition.
+         *
+         * @param thermalRadiantPowerW passive thermal radiant source power
+         * @param enginePlumeRadiantPowerW powered-plume radiant source power
+         * @param radarCrossSectionM2 active-radar cross section
+         * @param reflectedOpticalPowerW passive reflected-optical source power
+         * @param activeRadioEmissionPowerW active radio/seeker emission source power
+         * @param jammerEmissionPowerW jammer emission source power
+         */
+        public GuidedSignatureDefinition {
+            requireNonNegativeFinite(thermalRadiantPowerW, "thermalRadiantPowerW");
+            requireNonNegativeFinite(enginePlumeRadiantPowerW, "enginePlumeRadiantPowerW");
+            requireNonNegativeFinite(radarCrossSectionM2, "radarCrossSectionM2");
+            requireNonNegativeFinite(reflectedOpticalPowerW, "reflectedOpticalPowerW");
+            requireNonNegativeFinite(activeRadioEmissionPowerW, "activeRadioEmissionPowerW");
+            requireNonNegativeFinite(jammerEmissionPowerW, "jammerEmissionPowerW");
+        }
+
+        /** @return legacy-safe zero signature for schema-v1 content that predates ordnance sensing */
+        public static GuidedSignatureDefinition zero() {
+            return new GuidedSignatureDefinition(0d, 0d, 0d, 0d, 0d, 0d);
+        }
+
+        /** @return ordinary production sensor signature state */
+        public SignatureState toRuntimeSignature() {
+            return new SignatureState(
+                    thermalRadiantPowerW,
+                    enginePlumeRadiantPowerW,
+                    radarCrossSectionM2,
+                    reflectedOpticalPowerW,
+                    activeRadioEmissionPowerW,
+                    jammerEmissionPowerW);
+        }
+    }
+
+    /**
      * Physical guided ammunition body and self-propulsion/seeker content.
      *
      * @param id stable ammunition content ID
      * @param materialId stable engineering material content ID of residual missile body
      * @param shape physical residual-body shape
      * @param engagementRole authored tactical purpose used for explicit strike/interceptor routing
+     * @param signature authored physical sensor signature source strengths
      * @param lengthM body length in meters
      * @param diameterM body diameter in meters
      * @param impactPayloadId optional future Stage-17.5F warhead/impact payload content seam
@@ -173,6 +232,7 @@ public final class WeaponAmmunitionCatalog {
             String materialId,
             ProjectileShape shape,
             GuidedEngagementRole engagementRole,
+            GuidedSignatureDefinition signature,
             double lengthM,
             double diameterM,
             String impactPayloadId,
@@ -191,6 +251,7 @@ public final class WeaponAmmunitionCatalog {
          * @param materialId stable engineering material content ID
          * @param shape physical residual-body shape
          * @param engagementRole authored tactical purpose
+         * @param signature authored physical sensor signature source strengths
          * @param lengthM body length in meters
          * @param diameterM body diameter in meters
          * @param impactPayloadId optional future warhead/impact payload content seam
@@ -208,6 +269,7 @@ public final class WeaponAmmunitionCatalog {
             requireNonBlank(materialId, "materialId");
             Objects.requireNonNull(shape, "shape");
             Objects.requireNonNull(engagementRole, "engagementRole");
+            Objects.requireNonNull(signature, "signature");
             requirePositiveFinite(lengthM, "lengthM");
             requirePositiveFinite(diameterM, "diameterM");
             if (impactPayloadId != null && impactPayloadId.isBlank()) {
@@ -258,10 +320,17 @@ public final class WeaponAmmunitionCatalog {
                     .append(bits(value.massKg())).append('\n');
         }
         for (GuidedAmmunitionDefinition value : guidedAmmunition) {
+            GuidedSignatureDefinition signature = value.signature();
             out.append("guided|").append(value.id()).append('|')
                     .append(value.materialId()).append('|')
                     .append(value.shape()).append('|')
                     .append(value.engagementRole()).append('|')
+                    .append(bits(signature.thermalRadiantPowerW())).append('|')
+                    .append(bits(signature.enginePlumeRadiantPowerW())).append('|')
+                    .append(bits(signature.radarCrossSectionM2())).append('|')
+                    .append(bits(signature.reflectedOpticalPowerW())).append('|')
+                    .append(bits(signature.activeRadioEmissionPowerW())).append('|')
+                    .append(bits(signature.jammerEmissionPowerW())).append('|')
                     .append(bits(value.lengthM())).append('|')
                     .append(bits(value.diameterM())).append('|')
                     .append(value.impactPayloadId() == null ? "~" : value.impactPayloadId()).append('|')
@@ -316,6 +385,12 @@ public final class WeaponAmmunitionCatalog {
     private static void requirePositiveFinite(double value, String label) {
         if (!Double.isFinite(value) || value <= 0d) {
             throw new IllegalArgumentException(label + " must be finite and positive");
+        }
+    }
+
+    private static void requireNonNegativeFinite(double value, String label) {
+        if (!Double.isFinite(value) || value < 0d) {
+            throw new IllegalArgumentException(label + " must be finite and non-negative");
         }
     }
 }
