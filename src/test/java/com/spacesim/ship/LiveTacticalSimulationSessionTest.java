@@ -43,6 +43,39 @@ class LiveTacticalSimulationSessionTest {
     }
 
     @Test
+    void productionAiMovementConsumesPhysicalReactionMass() {
+        LiveTacticalSimulationSession session = new LiveTacticalSimulationSession();
+        var initial = session.snapshot();
+
+        assertTrue(initial.attackerReactionMassKg() > 0d,
+                "the production live fit must start with finite physical reaction mass");
+        assertTrue(!initial.attackerIntent().targetSelected(),
+                "the AI must not begin with an omniscient preselected target");
+        assertTrue(!initial.attackerFireAuthorized(),
+                "fire cannot be authorized before the production information model has observed a target");
+
+        for (int index = 0; index < 80; index++) {
+            session.advanceOneTick();
+        }
+
+        var after = session.snapshot();
+        assertNotNull(after.attackerTrack(),
+                "production sensing should establish actor-visible target information");
+        assertTrue(after.attackerIntent().targetSelected(),
+                "production Stage-19 tactical AI should select the observed hostile contact");
+        assertTrue(Math.hypot(
+                        after.attackerXM() - initial.attackerXM(),
+                        after.attackerYM() - initial.attackerYM()) > 0d,
+                "tactical intent must move the authoritative physical transform rather than only set a label");
+        assertTrue(Math.hypot(after.attackerVelocityXMps(), after.attackerVelocityYMps()) > 0d,
+                "AI maneuvering must produce real inertial velocity through the shared flight integrator");
+        assertTrue(after.attackerReactionMassKg() < initial.attackerReactionMassKg(),
+                "AI-requested thrust must consume finite Stage-17.5 reaction mass");
+        assertTrue(after.attackerReactionMassKg() >= 0d,
+                "physical maneuvering may not create a negative reaction-mass inventory");
+    }
+
+    @Test
     void physicalProjectileMovesAcrossMultipleLiveTicks() {
         LiveTacticalSimulationSession session = new LiveTacticalSimulationSession();
         ProjectileBody observed = null;
