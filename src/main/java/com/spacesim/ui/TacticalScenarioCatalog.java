@@ -66,7 +66,12 @@ public final class TacticalScenarioCatalog {
         return DEFINITIONS;
     }
 
-    /** @return canonical definition for an enum identity */
+    /**
+     * Resolves the canonical definition for an enum identity.
+     *
+     * @param id canonical Stage-19J scenario identity
+     * @return canonical immutable scenario definition
+     */
     public static TacticalScenarioDefinition require(TacticalScenarioId id) {
         TacticalScenarioDefinition definition = BY_ID.get(Objects.requireNonNull(id, "id"));
         if (definition == null) {
@@ -75,7 +80,12 @@ public final class TacticalScenarioCatalog {
         return definition;
     }
 
-    /** Resolves a stable CLI key case-insensitively after trimming surrounding whitespace. */
+    /**
+     * Resolves a stable CLI key case-insensitively after trimming surrounding whitespace.
+     *
+     * @param cliKey candidate stable scenario command-line key
+     * @return matching canonical definition, or empty when no key matches
+     */
     public static Optional<TacticalScenarioDefinition> findByCliKey(String cliKey) {
         if (cliKey == null) {
             return Optional.empty();
@@ -86,7 +96,12 @@ public final class TacticalScenarioCatalog {
                 .findFirst();
     }
 
-    /** Resolves a CLI key or throws a message that enumerates every accepted value. */
+    /**
+     * Resolves a CLI key or throws a message that enumerates every accepted value.
+     *
+     * @param cliKey candidate stable scenario command-line key
+     * @return matching canonical immutable scenario definition
+     */
     public static TacticalScenarioDefinition requireByCliKey(String cliKey) {
         return findByCliKey(cliKey).orElseThrow(() -> new IllegalArgumentException(
                 "Unknown tactical scenario '" + cliKey + "'. Valid values: " + validCliKeys()));
