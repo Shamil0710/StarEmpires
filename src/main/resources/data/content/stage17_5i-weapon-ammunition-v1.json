@@ -25,6 +25,14 @@
       "materialId": "material.stage17_5i_doctrine_alloy_v1",
       "shape": "SHELL",
       "engagementRole": "STRIKE",
+      "signature": {
+        "thermalRadiantPowerW": 1500000.0,
+        "enginePlumeRadiantPowerW": 250000000.0,
+        "radarCrossSectionM2": 0.65,
+        "reflectedOpticalPowerW": 200000.0,
+        "activeRadioEmissionPowerW": 500.0,
+        "jammerEmissionPowerW": 0.0
+      },
       "lengthM": 5.8,
       "diameterM": 0.65,
       "impactPayloadId": null,
@@ -42,6 +50,14 @@
       "materialId": "material.stage17_5i_doctrine_alloy_v1",
       "shape": "SHELL",
       "engagementRole": "INTERCEPTOR",
+      "signature": {
+        "thermalRadiantPowerW": 600000.0,
+        "enginePlumeRadiantPowerW": 120000000.0,
+        "radarCrossSectionM2": 0.25,
+        "reflectedOpticalPowerW": 100000.0,
+        "activeRadioEmissionPowerW": 200.0,
+        "jammerEmissionPowerW": 0.0
+      },
       "lengthM": 3.4,
       "diameterM": 0.42,
       "impactPayloadId": null,
