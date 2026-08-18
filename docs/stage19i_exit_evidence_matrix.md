@@ -2,7 +2,7 @@
 
 > Status: **COMPLETE — STAGE 19 EXIT REQUIREMENTS SATISFIED**  
 > Canonical contract: `docs/stage19_scaled_live_tactical_ai_acceptance.md`.  
-> Stage 20 may begin only from a green final Stage-19 closeout head.
+> Final closeout PR: **#209**, merged to `main` as `c23d7be3e0dfbc73aa64294e08017aa00309cb24`.
 
 ## 1. Purpose
 
@@ -126,7 +126,7 @@ The accepted runtime currently resolves guided ship impact inside the ordnance p
 
 `Stage19GuidedImpactOrderingAuditTest` proves the detector is non-vacuous with an artificial earlier body-body crossing.
 
-The final 32-ship / 240-tick saturation technical verification observed:
+The final 32-ship / 240-tick saturation verification observed:
 
 - **12** previously-active guided ship-impact candidates;
 - **0** physically earlier interceptor contacts suppressed by current ordering.
@@ -149,7 +149,7 @@ The final 32-ship / 240-tick saturation technical verification observed:
 
 ## 8. Performance / scalability evidence
 
-Final technical closeout profile, 32 ships / 240 authoritative ticks:
+Final exact-head closeout profile, 32 ships / 240 authoritative ticks:
 
 - active ships: **32**;
 - tactical AI decisions: **7,680**;
@@ -170,13 +170,12 @@ Final technical closeout profile, 32 ships / 240 authoritative ticks:
 - protection impacts: **2,969**;
 - physical interceptions: **4**.
 
-Hosted-runner diagnostics for the technical closeout run:
+Hosted-runner diagnostics from final exact-head CI #3293:
 
-- ~**85.5 authoritative ticks/s**;
-- mean ~**11.65 ms/tick**;
-- p95 ~**26.16 ms/tick**;
-- max ~**28.44 ms/tick**;
-- peak sampled used heap ~**370 MB**.
+- ~**115.4 authoritative ticks/s**;
+- mean ~**8.63 ms/tick**;
+- p95 ~**19.52 ms/tick**;
+- peak sampled used heap ~**402 MB**.
 
 These measurements are diagnostics, not authoritative constants or invented target-hardware thresholds. Wall time and heap never enter simulation state/fingerprints. Representative-hardware tuning remains a later optimization/content-calibration concern, but the measured Stage-19 scale is acceptable for proceeding to Stage-20 spatial calibration.
 
@@ -197,26 +196,26 @@ The accepted Stage-19 runtime contains no:
 
 ## 10. Final verification
 
-The final technical closeout head passed Java 17:
+The exact status-synchronized PR #209 head `2c80835e46fe5eb989275b15eaa014f20d7eded8` passed Java 17 CI #3293 / run `32165247892`, job `95803208482` with:
 
 ```text
 ./mvnw --batch-mode --no-transfer-progress clean verify
 ```
 
-Technical closeout result before the final status-only synchronization commit:
+Result:
 
 - **1,141 tests**;
 - **0 failures**;
 - **0 errors**;
 - **0 skipped**;
-- Javadocs: PASS;
-- JaCoCo thresholds: PASS;
-- desktop/package build: PASS.
+- Javadocs: **PASS**;
+- JaCoCo thresholds: **PASS**;
+- desktop/package build: **PASS**.
 
-The final merge gate repeats the same full command on the exact status-synchronized PR head. Any red result reopens Stage 19.
+PR #209 was then merged without moving its head. `main` advanced to merge SHA `c23d7be3e0dfbc73aa64294e08017aa00309cb24`.
 
 ## 11. Exit decision
 
 All mandatory rows of `docs/stage19_scaled_live_tactical_ai_acceptance.md` have direct production evidence.
 
-**Stage 19 is accepted as COMPLETE once this status-synchronized closeout head passes the final exact-head Java-17 verification and is merged. Stage 20 — Physical World Generation / Discovery — is NEXT.**
+**STAGE 19 IS COMPLETE. STAGE 20 — PHYSICAL WORLD GENERATION / DISCOVERY — IS NEXT.**

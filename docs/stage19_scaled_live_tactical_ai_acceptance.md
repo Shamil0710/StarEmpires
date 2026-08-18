@@ -1,6 +1,6 @@
 # Stage 19 — Scaled Live Tactical AI Acceptance Contract
 
-> Status: **ACCEPTED AND SATISFIED — STAGE 19 COMPLETE PENDING FINAL EXACT-HEAD MERGE GATE**  
+> Status: **ACCEPTED AND SATISFIED — STAGE 19 COMPLETE**  
 > Completion evidence: `docs/stage19i_exit_evidence_matrix.md`.  
 > The requirements below remain the canonical Stage-19 acceptance contract and regression boundary.
 
@@ -163,14 +163,14 @@ Stage 19 cannot be marked COMPLETE until all of the following are true simultane
 - measured performance and memory behavior are recorded and acceptable for continuing to Stage 20 spatial calibration;
 - no hidden large-battle bonuses, free resources, omniscience or viewer-owned combat logic are introduced.
 
-**Exit decision:** all rows above have direct production evidence in `docs/stage19i_exit_evidence_matrix.md`. The final status-synchronized PR must still pass the exact-head Java-17 merge gate; a red result reopens Stage 19 automatically.
+**Exit decision:** all rows above have direct production evidence in `docs/stage19i_exit_evidence_matrix.md`. PR #209 passed the exact-head Java-17 merge gate and was merged without moving its validated head. Stage 19 is COMPLETE.
 
-This scaled live gate is a **mandatory Stage-19 acceptance artifact**, not optional presentation polish.
+This scaled live gate remains a **mandatory Stage-19 regression artifact**, not optional presentation polish.
 
 ## 10. Relationship to later stages
 
 - **Stage 18** supplies the real industrial/logistical cost and replenishment basis consumed by warfare.
 - **Stage 19** owns tactical/strategic combat behavior and this scaled live AI validation.
-- **Stage 20** then calibrates the physical generated-space geometry around proven Stage-19 maneuver/engagement behavior.
+- **Stage 20** now calibrates the physical generated-space geometry around proven Stage-19 maneuver/engagement behavior.
 - **Stage 22** re-authors/rebalances provisional combat content and repeats representative fleet-scale soak/balance cases with production content.
 - **Stage 23** may replace prototype visuals and optimize presentation, but may not replace the authoritative tactical simulation model.

@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-18 / Stage 19 COMPLETE pending exact-head merge gate; Stage 20 NEXT.**  
+> **Последняя синхронизация: 2026-08-18 / Stage 19 COMPLETE; Stage 20 NEXT.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -253,6 +253,8 @@ Stage 18 supplies the physical cost/replenishment basis consumed by Stage 19 war
 ## 7. Stage 19 — Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior
 
 **COMPLETE — strategic warfare + Stage 19I scaled live tactical exit gate.**
+
+Final closeout: PR **#209**, merged as `c23d7be3e0dfbc73aa64294e08017aa00309cb24` after exact-head Java-17 verification.
 
 Canonical acceptance artifacts:
 
