@@ -103,7 +103,8 @@ class LiveTacticalInitialOrdnanceServiceTest {
 
     private static LiveTacticalBattleRuntimeState battle(long entityId, DoctrineId doctrineId) {
         return new LiveTacticalBattleRuntimeState(new LiveTacticalBattleScenario(List.of(
-                new CombatantSpec(entityId, Side.ALPHA, doctrineId, 0d, 0d))));
+                new CombatantSpec(entityId, Side.ALPHA, doctrineId, 0d, 0d),
+                new CombatantSpec(entityId + 10_000L, Side.BETA, DoctrineId.A_KINETIC_LINE, 10_000d, 0d))));
     }
 
     private static long rounds(
