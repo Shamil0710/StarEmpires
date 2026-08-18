@@ -8,39 +8,47 @@ import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.ship.ElectronicWarfareState.NoiseJammer;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
 import com.spacesim.ship.SensorDefinition.Mode;
+import com.spacesim.ship.ShipObservationService.EngineeringGrant;
 import com.spacesim.ship.ShipObservationService.OperationPlan;
 import com.spacesim.ship.ShipSensorEngineeringAdapter.FittedSensor;
 import com.spacesim.ship.ShipSensorRuntime.Position2d;
 import com.spacesim.ship.ShipSensorRuntime.TrackQualityPolicy;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * Actor-bounded Stage-19I guided-ordnance observation over ordinary fitted production radar.
+ * Actor-bounded Stage-19I guided-ordnance observation over fitted production sensors and datalinks.
  *
- * <p>This runtime advances no combat clock and owns no physical body state. It projects active hostile
- * strike and, when supplied, physical decoy bodies through current fitted/damaged ACTIVE_RADAR
- * hardware, the common engineering power/heat grant layer, {@link ShipObservationService} signal
- * equations and {@link ShipSensorRuntime} fusion. Consumers receive only observer-local
- * {@link TrackState} plus a velocity estimate derived from successive observer-local Cartesian track
- * solutions. The observation result deliberately exposes no hidden STRIKE/DECOY role.</p>
+ * <p>This runtime advances no combat clock and owns no physical body state. Active hostile strike and
+ * physical decoy bodies are projected through current fitted/damaged sensor hardware and the common
+ * {@link ShipSensorRuntime} fusion model. Local ACTIVE_RADAR still uses the shared engineering
+ * power/heat grant path and real EW interference. In addition, fitted passive-thermal receivers may
+ * contribute bearing-only missile-warning measurements to same-side ships through operational fitted
+ * fleet datalinks. A single passive bearing never manufactures range; Cartesian position exists only
+ * when ordinary production fusion has real ranging evidence or non-parallel multi-observer geometry.</p>
  *
- * <p>Ordnance radar work is phase-shifted from the shared ship-target radar scan: ship scans occur on
- * tick 1 and multiples of four, while this runtime scans on ticks congruent to 2 modulo four. Each
- * ordnance scan represents one 0.05 s radar operation. A fitted radar receives one physical
- * engineering grant for that operation and the emitted search operation is then evaluated against
- * every current hostile guided body. This avoids both a free simultaneous second radar operation and
- * transmitter-power multiplication per target.</p>
+ * <p>Stage-17.5I currently authors datalink support channels but no separate network latency, range or
+ * transport-noise surface. Formation sharing therefore uses zero additional latency/variance at this
+ * exact-local acceptance scale and is limited by the damage-aware simultaneous support-channel counts
+ * of both sender and recipient. No measurement is shared by side membership alone when either physical
+ * datalink is destroyed.</p>
  *
- * <p>Noise jammers are projected from the same damage-aware fitted engineering state as all other
- * capabilities and propagate through the ordinary sensor solver. If external in-band interference is
- * present the receiver requests ECCM processing; its incremental power and heat are part of the same
- * physical radar-operation grant. If the ECCM request cannot be funded, the receiver may fall back to
- * the ordinary non-ECCM radar operation rather than receiving free processing.</p>
+ * <p>Ordnance sensing is phase-shifted from the shared ship-target radar scan: ship scans occur on tick
+ * 1 and multiples of four, while this runtime scans on ticks congruent to 2 modulo four. Active radar
+ * receives one physical engineering grant for the 0.05 s operation. Passive-thermal observation has no
+ * incremental mode demand in the authored sensor definitions; its module's continuous electrical and
+ * thermal loads are already present in the common derived engineering budget.</p>
+ *
+ * <p>The current {@link NoiseJammer} projection is the radar-band noise source used by the Stage-19I
+ * ACTIVE_RADAR/ECCM acceptance. It is therefore applied to active radar here, while passive thermal
+ * sensing uses its distinct physical thermal channel. Future multiband jammer content may replace this
+ * provisional channel boundary without changing the fusion/datalink authority model.</p>
  *
  * <p>Velocity continuity is explicitly actor-bounded. When ordinary track aging degrades a hypothesis
  * below TRACKED, the last Cartesian velocity baseline is discarded. A later reacquisition therefore
@@ -61,6 +69,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     private final DerivedShipCalculator calculator;
     private final ShipSensorEngineeringAdapter sensorAdapter;
     private final ShipElectronicWarfareEngineeringAdapter ewAdapter;
+    private final ShipDatalinkEngineeringAdapter datalinkAdapter;
     private final ShipObservationService observationService;
     private final ShipEngineeringGrantService grantService;
     private final ShipSensorRuntime sensorRuntime;
@@ -107,6 +116,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
         calculator = new DerivedShipCalculator(engineeringCatalog);
         sensorAdapter = new ShipSensorEngineeringAdapter();
         ewAdapter = new ShipElectronicWarfareEngineeringAdapter();
+        datalinkAdapter = new ShipDatalinkEngineeringAdapter();
         observationService = new ShipObservationService();
         grantService = new ShipEngineeringGrantService(engineeringCatalog);
         sensorRuntime = new ShipSensorRuntime();
@@ -123,9 +133,9 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     /**
      * Updates observer-local ordnance information for the current already-advanced battle tick.
      *
-     * <p>The call is idempotent within one tick. Known tracks age every new tick; a physical radar
-     * scan is attempted only in the dedicated scan phase. When a decoy runtime is attached, its body
-     * state must already have been advanced to the current authoritative tick by the caller.</p>
+     * <p>The call is idempotent within one tick. Known tracks age every new tick; physical sensor work
+     * is attempted only in the dedicated scan phase. When a decoy runtime is attached, its body state
+     * must already have been advanced to the current authoritative tick by the caller.</p>
      */
     public void observeCurrentTick() {
         long tick = ordnanceRuntime.tick();
@@ -169,10 +179,14 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     }
 
     /**
-     * Returns diagnostics for the most recent physical ordnance-radar scan of one combatant.
+     * Returns diagnostics for the most recent physical ordnance active-radar scan of one combatant.
+     *
+     * <p>Passive/datalink evidence is deliberately not folded into {@code measurementsProduced}; that
+     * counter retains its existing meaning so EW tests can still prove that active radar itself was
+     * suppressed even when formation passive evidence later reconstructs a track.</p>
      *
      * @param observerEntityId stable observing combatant identity
-     * @return immutable receiver-local diagnostic projection
+     * @return immutable receiver-local active-radar diagnostic projection
      */
     public ScanDiagnostics lastScanDiagnostics(long observerEntityId) {
         battleState().requireCombatant(observerEntityId);
@@ -189,34 +203,38 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     }
 
     private void scanAllObservers() {
+        TreeMap<Long, List<SensorMeasurement>> passiveMeasurementsBySource = new TreeMap<>();
         for (CombatantRuntime observer : battleState().combatants()) {
-            scanObserver(observer);
+            passiveMeasurementsBySource.put(observer.spec().entityId(), scanObserver(observer));
         }
+        sharePassiveMeasurements(passiveMeasurementsBySource);
+        fuseFreshEvidence();
     }
 
-    private void scanObserver(CombatantRuntime observer) {
+    private List<SensorMeasurement> scanObserver(CombatantRuntime observer) {
         List<GuidedWeaponBody> hostileBodies = hostileSensorBodies(observer);
         if (hostileBodies.isEmpty()) {
             lastScanByObserver.put(observer.spec().entityId(), ScanDiagnostics.none());
-            return;
+            return List.of();
         }
-        List<FittedSensor> radars = sensorAdapter.derive(derive(observer)).sensors().stream()
+        var fittedSensors = sensorAdapter.derive(derive(observer)).sensors();
+        List<FittedSensor> radars = fittedSensors.stream()
                 .filter(sensor -> sensor.definition().mode() == Mode.ACTIVE_RADAR)
                 .toList();
-        if (radars.isEmpty()) {
-            lastScanByObserver.put(observer.spec().entityId(), ScanDiagnostics.none());
-            return;
-        }
+        List<FittedSensor> passiveThermal = fittedSensors.stream()
+                .filter(sensor -> sensor.definition().mode() == Mode.PASSIVE_THERMAL)
+                .toList();
+
+        TreeMap<Long, List<SensorMeasurement>> observerHistory = measurementsByObserver.get(observer.spec().entityId());
+        List<SensorMeasurement> passiveProduced = scanPassiveThermal(
+                observer,
+                hostileBodies,
+                passiveThermal,
+                observerHistory);
 
         ElectronicWarfareState ewState = electronicWarfareState(observer);
         EngineeringComponent engineering = observer.engineering();
         var budget = grantService.beginInterval(engineering, OPERATION_SECONDS);
-        TreeMap<Long, Integer> measurementsBefore = new TreeMap<>();
-        TreeMap<Long, List<SensorMeasurement>> observerHistory = measurementsByObserver.get(observer.spec().entityId());
-        for (GuidedWeaponBody body : hostileBodies) {
-            measurementsBefore.put(body.bodyId(), observerHistory.getOrDefault(body.bodyId(), List.of()).size());
-        }
-
         boolean eccmRequested = !ewState.noiseJammers().isEmpty();
         boolean eccmCommitted = false;
         int measurementsProduced = 0;
@@ -250,11 +268,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
             committedPowerW += plan.requiredPowerW();
             committedHeatW += plan.requiredHeatW();
             for (GuidedWeaponBody body : hostileBodies) {
-                var ammunition = ammunitionCatalog.findGuided(body.definition().id());
-                if (ammunition == null) {
-                    throw new IllegalStateException(
-                            "active guided body lacks ammunition content: " + body.definition().id());
-                }
+                var ammunition = requireAmmunition(body);
                 var execution = observationService.execute(
                         plan,
                         grant.grant(),
@@ -281,21 +295,115 @@ public final class LiveTacticalOrdnanceObservationRuntime {
                 measurementsProduced,
                 committedPowerW,
                 committedHeatW));
+        return passiveProduced;
+    }
 
-        for (GuidedWeaponBody body : hostileBodies) {
-            List<SensorMeasurement> history = observerHistory.getOrDefault(body.bodyId(), List.of());
-            int before = measurementsBefore.getOrDefault(body.bodyId(), 0);
-            if (history.size() <= before) {
+    private List<SensorMeasurement> scanPassiveThermal(
+            CombatantRuntime observer,
+            List<GuidedWeaponBody> hostileBodies,
+            List<FittedSensor> sensors,
+            TreeMap<Long, List<SensorMeasurement>> observerHistory) {
+        if (sensors.isEmpty()) {
+            return List.of();
+        }
+        List<SensorMeasurement> produced = new ArrayList<>();
+        for (FittedSensor sensor : sensors) {
+            SensorRuntimeState state = SensorRuntimeState.nominal();
+            OperationPlan plan = observationService.planOperation(sensor, state);
+            EngineeringGrant grant = new EngineeringGrant(0d, 0d);
+            for (GuidedWeaponBody body : hostileBodies) {
+                var ammunition = requireAmmunition(body);
+                var execution = observationService.execute(
+                        plan,
+                        grant,
+                        sensor,
+                        state,
+                        observer.spec().entityId(),
+                        body.bodyId(),
+                        new Position2d(observer.transform().position.x, observer.transform().position.y),
+                        new Position2d(body.xM(), body.yM()),
+                        ammunition.signature().toRuntimeSignature(),
+                        ElectronicWarfareState.empty(),
+                        ordnanceRuntime.elapsedSeconds());
+                execution.measurement().ifPresent(measurement -> {
+                    appendMeasurement(observerHistory, body.bodyId(), measurement);
+                    produced.add(measurement);
+                });
+            }
+        }
+        produced.sort(java.util.Comparator.comparingLong(SensorMeasurement::targetId)
+                .thenComparingLong(SensorMeasurement::observerId)
+                .thenComparing(value -> value.channel().name()));
+        return List.copyOf(produced);
+    }
+
+    private void sharePassiveMeasurements(TreeMap<Long, List<SensorMeasurement>> passiveMeasurementsBySource) {
+        for (CombatantRuntime recipient : battleState().combatants()) {
+            int recipientChannels = datalinkAdapter.totalSupportChannels(derive(recipient));
+            if (recipientChannels <= 0) {
                 continue;
             }
-            TrackState fused = sensorRuntime.fuse(
-                    body.bodyId(),
-                    history,
-                    DatalinkState.local(),
-                    trackPolicy,
-                    ordnanceRuntime.elapsedSeconds());
-            updateObservedTrack(observer.spec().entityId(), fused);
+            Set<Long> recipientTargetChannels = new HashSet<>();
+            TreeMap<Long, List<SensorMeasurement>> recipientHistory = measurementsByObserver.get(
+                    recipient.spec().entityId());
+            for (CombatantRuntime source : battleState().combatants()) {
+                if (source.spec().entityId() == recipient.spec().entityId()
+                        || source.spec().side() != recipient.spec().side()) {
+                    continue;
+                }
+                int sourceChannels = datalinkAdapter.totalSupportChannels(derive(source));
+                if (sourceChannels <= 0) {
+                    continue;
+                }
+                Set<Long> sourceTargetChannels = new HashSet<>();
+                for (SensorMeasurement measurement : passiveMeasurementsBySource.getOrDefault(
+                        source.spec().entityId(), List.of())) {
+                    long targetId = measurement.targetId();
+                    if (!sourceTargetChannels.contains(targetId)
+                            && sourceTargetChannels.size() >= sourceChannels) {
+                        continue;
+                    }
+                    if (!recipientTargetChannels.contains(targetId)
+                            && recipientTargetChannels.size() >= recipientChannels) {
+                        continue;
+                    }
+                    sourceTargetChannels.add(targetId);
+                    recipientTargetChannels.add(targetId);
+                    appendMeasurement(recipientHistory, targetId, measurement);
+                }
+            }
         }
+    }
+
+    private void fuseFreshEvidence() {
+        double nowSeconds = ordnanceRuntime.elapsedSeconds();
+        for (Map.Entry<Long, TreeMap<Long, List<SensorMeasurement>>> observerEntry
+                : measurementsByObserver.entrySet()) {
+            long observerEntityId = observerEntry.getKey();
+            for (Map.Entry<Long, List<SensorMeasurement>> targetEntry : observerEntry.getValue().entrySet()) {
+                List<SensorMeasurement> fresh = targetEntry.getValue().stream()
+                        .filter(value -> Math.abs(value.timestampSeconds() - nowSeconds) <= EPSILON)
+                        .toList();
+                if (fresh.isEmpty()) {
+                    continue;
+                }
+                TrackState fused = sensorRuntime.fuse(
+                        targetEntry.getKey(),
+                        fresh,
+                        DatalinkState.local(),
+                        trackPolicy,
+                        nowSeconds);
+                updateObservedTrack(observerEntityId, fused);
+            }
+        }
+    }
+
+    private WeaponAmmunitionCatalog.GuidedAmmunitionDefinition requireAmmunition(GuidedWeaponBody body) {
+        var ammunition = ammunitionCatalog.findGuided(body.definition().id());
+        if (ammunition == null) {
+            throw new IllegalStateException("active guided body lacks ammunition content: " + body.definition().id());
+        }
+        return ammunition;
     }
 
     private ElectronicWarfareState electronicWarfareState(CombatantRuntime observer) {
@@ -420,12 +528,12 @@ public final class LiveTacticalOrdnanceObservationRuntime {
     }
 
     /**
-     * Receiver-local diagnostic state from the latest ordnance radar scan.
+     * Receiver-local diagnostic state from the latest ordnance active-radar scan.
      *
-     * @param noiseJammerCount physical external noise emitters included in the receiver environment
+     * @param noiseJammerCount physical external noise emitters included in the radar receiver environment
      * @param eccmRequested whether receiver policy requested fitted ECCM processing
      * @param eccmCommitted whether the engineering layer physically admitted an ECCM radar operation
-     * @param measurementsProduced true-target measurements emitted by the accepted operations
+     * @param measurementsProduced active-radar true-target measurements emitted by accepted operations
      * @param committedPowerW total incremental radar/ECCM power admitted for this scan
      * @param committedHeatW total incremental radar/ECCM heat admitted for this scan
      */
@@ -442,7 +550,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
          * @param noiseJammerCount physical external noise emitters included in the receiver environment
          * @param eccmRequested whether receiver policy requested fitted ECCM processing
          * @param eccmCommitted whether engineering physically admitted an ECCM radar operation
-         * @param measurementsProduced true-target measurements emitted by accepted operations
+         * @param measurementsProduced active-radar true-target measurements emitted by accepted operations
          * @param committedPowerW total incremental radar/ECCM power admitted for this scan
          * @param committedHeatW total incremental radar/ECCM heat admitted for this scan
          */
