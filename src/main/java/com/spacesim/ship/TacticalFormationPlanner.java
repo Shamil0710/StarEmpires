@@ -57,7 +57,15 @@ public final class TacticalFormationPlanner {
             double spacingM,
             double slotToleranceM,
             double breakDistanceM) {
-        /** Validates explicit physical formation geometry. */
+        /**
+         * Validates explicit physical formation geometry.
+         *
+         * @param mode scenario formation variant
+         * @param centerYM authored center of the line in meters
+         * @param spacingM center-to-center slot spacing in meters
+         * @param slotToleranceM allowed absolute cross-axis slot error in meters
+         * @param breakDistanceM error above which formation is observably broken
+         */
         public Objective {
             Objects.requireNonNull(mode, "mode");
             requireFinite(centerYM, "centerYM");
@@ -93,7 +101,19 @@ public final class TacticalFormationPlanner {
             FormationStatus status,
             FormationReason reason,
             double correctionAxisY) {
-        /** Validates one immutable command. */
+        /**
+         * Validates one immutable actor-local formation command.
+         *
+         * @param objectiveKnown whether a side objective exists
+         * @param mode formation mode, or {@code null} when no objective exists
+         * @param slotIndex zero-based stable slot index
+         * @param slotCount number of ships assigned to the line
+         * @param desiredYM authored slot center on the cross axis
+         * @param errorM signed desired-minus-current cross-axis error
+         * @param status observable formation state
+         * @param reason diagnostic reason for that state
+         * @param correctionAxisY normalized cross-axis acceleration request in [-1, 1]
+         */
         public Command {
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(reason, "reason");
