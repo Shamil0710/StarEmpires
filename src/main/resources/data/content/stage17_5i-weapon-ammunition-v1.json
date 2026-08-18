@@ -69,6 +69,31 @@
       "burnTimeSeconds": 40.0,
       "seekerAngularSigmaRad": 0.00045,
       "terminalReserveMps": 500.0
+    },
+    {
+      "id": "ammo.test_radar_repeater_decoy_300kg_v1",
+      "materialId": "material.stage17_5i_doctrine_alloy_v1",
+      "shape": "SHELL",
+      "engagementRole": "DECOY",
+      "signature": {
+        "thermalRadiantPowerW": 300000.0,
+        "enginePlumeRadiantPowerW": 50000000.0,
+        "radarCrossSectionM2": 6.0,
+        "reflectedOpticalPowerW": 150000.0,
+        "activeRadioEmissionPowerW": 20000000.0,
+        "jammerEmissionPowerW": 50000000.0
+      },
+      "lengthM": 2.4,
+      "diameterM": 0.36,
+      "impactPayloadId": null,
+      "seekerId": "seeker.test_decoy_autopilot_v1",
+      "dryMassKg": 260.0,
+      "propellantMassKg": 40.0,
+      "thrustN": 8000.0,
+      "exhaustVelocityMps": 4000.0,
+      "burnTimeSeconds": 20.0,
+      "seekerAngularSigmaRad": 0.002,
+      "terminalReserveMps": 0.0
     }
   ]
 }
