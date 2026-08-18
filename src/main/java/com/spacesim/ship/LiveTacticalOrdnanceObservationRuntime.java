@@ -165,16 +165,14 @@ public final class LiveTacticalOrdnanceObservationRuntime {
             measurementsBefore.put(body.bodyId(), observerHistory.getOrDefault(body.bodyId(), List.of()).size());
         }
 
+        SensorRuntimeState sensorState = SensorRuntimeState.nominal();
         for (FittedSensor radar : radars) {
-            OperationPlan plan = observationService.planOperation(
-                    radar.definition(),
-                    SensorRuntimeState.nominal(),
-                    OPERATION_SECONDS);
+            OperationPlan plan = observationService.planOperation(radar, sensorState);
             var grant = grantService.grantAndCommit(
                     engineering,
                     radar.mountId(),
-                    plan.requiredElectricalPowerW(),
-                    plan.generatedHeatW(),
+                    plan.requiredPowerW(),
+                    plan.requiredHeatW(),
                     OPERATION_SECONDS,
                     budget);
             if (!grant.committed()) {
@@ -183,20 +181,25 @@ public final class LiveTacticalOrdnanceObservationRuntime {
             for (GuidedWeaponBody body : hostileBodies) {
                 var ammunition = ammunitionCatalog.findGuided(body.definition().id());
                 if (ammunition == null) {
-                    throw new IllegalStateException("active guided body lacks ammunition content: " + body.definition().id());
+                    throw new IllegalStateException(
+                            "active guided body lacks ammunition content: " + body.definition().id());
                 }
-                var measurement = observationService.execute(
+                var execution = observationService.execute(
                         plan,
-                        radar.definition(),
+                        grant.grant(),
+                        radar,
+                        sensorState,
                         observer.spec().entityId(),
                         body.bodyId(),
                         new Position2d(observer.transform().position.x, observer.transform().position.y),
                         new Position2d(body.xM(), body.yM()),
                         ammunition.signature().toRuntimeSignature(),
                         ElectronicWarfareState.empty(),
-                        ordnanceRuntime.elapsedSeconds(),
-                        grant.grant());
-                measurement.ifPresent(value -> appendMeasurement(observerHistory, body.bodyId(), value));
+                        ordnanceRuntime.elapsedSeconds());
+                execution.measurement().ifPresent(value -> appendMeasurement(
+                        observerHistory,
+                        body.bodyId(),
+                        value));
             }
         }
 
