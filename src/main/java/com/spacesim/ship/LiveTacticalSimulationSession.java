@@ -1,14 +1,22 @@
 package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
+import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
+import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import com.spacesim.content.ship.ShipEngineeringCatalog.Vector3d;
 import com.spacesim.content.ship.ShipProtectionCatalog;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.ship.Stage175ICombatTestProtectionPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
+import com.spacesim.flight.FlightDynamics;
+import com.spacesim.ship.ObservedThreatAssessmentService.ContactDisposition;
+import com.spacesim.ship.ObservedThreatAssessmentService.ObservedContact;
+import com.spacesim.ship.ObservedTacticalIntentPlanner.TacticalContext;
+import com.spacesim.ship.ObservedTacticalIntentPlanner.TacticalIntent;
+import com.spacesim.ship.ObservedTacticalIntentPlanner.TacticalPosture;
 import com.spacesim.ship.SensorDefinition.Mode;
 import com.spacesim.ship.ShipEngineeringRuntime.OperatingCommand;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
@@ -20,21 +28,35 @@ import com.spacesim.ship.ShipSensorRuntime.Position2d;
 import com.spacesim.ship.ShipSensorRuntime.TrackQualityPolicy;
 import com.spacesim.ship.Stage175IFleetDoctrineCatalog.Doctrine;
 import com.spacesim.ship.Stage175IFleetDoctrineCatalog.DoctrineId;
+import com.spacesim.ship.TacticalSurvivalPlanner.DecisionReason;
+import com.spacesim.ship.TacticalSurvivalPlanner.OwnReadiness;
+import com.spacesim.ship.TacticalSurvivalPlanner.SafePoint;
+import com.spacesim.ship.TacticalSurvivalPlanner.SurvivalAction;
 import com.spacesim.ship.WeaponFireControl.KinematicState;
 import com.spacesim.ship.WeaponFireControl.TargetMotionEstimate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Fixed-step headless tactical simulation used by the post-17.5 live viewer.
  *
  * <p>The session advances authoritative Stage-17.5 runtime state only when
  * {@link #advanceOneTick()} is called. It uses production radar observation, track fusion,
- * kinetic fire control, finite ammunition, independent projectile motion, fitted shields,
- * bounded heavy-impact material response and local subsystem damage. It has no libGDX dependency
- * and therefore cannot obtain combat results from renderer state or frame timing.</p>
+ * Stage-19 actor-bounded tactical intent/survival policy, Stage-17.5 physical propulsion and
+ * reaction-mass consumption, the shared inertial flight integrator, kinetic fire control, finite
+ * ammunition, independent projectile motion, fitted shields, bounded heavy-impact material response
+ * and local subsystem damage. It has no libGDX renderer dependency and therefore cannot obtain
+ * combat results from presentation state or frame timing.</p>
+ *
+ * <p>This class remains the focused live 1v1 foundation. Stage 19I-A connects production AI and
+ * physical flight; the later Stage-19I scale gate must generalize the same authority chain to
+ * symmetric 4v4, 8v8 and 32+ combatants rather than treating this single-attacker scenario as the
+ * completed Stage-19 exit gate.</p>
  */
 public final class LiveTacticalSimulationSession {
     /** Fixed authoritative simulation interval in seconds. */
@@ -46,15 +68,26 @@ public final class LiveTacticalSimulationSession {
 
     private static final String PRIMARY_MOUNT = "weapon_primary";
     private static final String SHIELD_MOUNT = "utility_shield";
-    private static final double ATTACKER_X_M = 260d;
+    private static final double ATTACKER_INITIAL_X_M = 260d;
     private static final double TARGET_X_M = 1_690d;
     private static final double CENTER_Y_M = 700d;
     private static final double SENSOR_INTERVAL_SECONDS = 0.20d;
     private static final long SENSOR_INTERVAL_TICKS = Math.round(SENSOR_INTERVAL_SECONDS / TICK_SECONDS);
+    private static final double TACTICAL_REFERENCE_RANGE_M = 5_000d;
+    private static final double TRACK_FRESHNESS_REFERENCE_SECONDS = 3d;
+    private static final float LIVE_COMMAND_SPEED_CAP_MPS = 500f;
     private static final int MAX_TRACK_MEASUREMENTS = 8;
     private static final int IMPACT_VISIBILITY_TICKS = 8;
     private static final double MAX_BODY_DISTANCE_M = 5_000d;
     private static final double EPSILON = 1e-9d;
+    private static final TacticalSurvivalPlanner.Policy SURVIVAL_POLICY =
+            new TacticalSurvivalPlanner.Policy(
+                    0.15d,
+                    0.15d,
+                    0d,
+                    0d,
+                    0d,
+                    2d);
 
     private final ShipEngineeringCatalog engineeringCatalog;
     private final ShipProtectionCatalog protectionCatalog;
@@ -71,6 +104,8 @@ public final class LiveTacticalSimulationSession {
     private final KineticProtectionRuntime protectionRuntime;
     private final ShipSensorEngineeringAdapter sensorAdapter;
     private final ShipWeaponEngineeringAdapter weaponAdapter;
+    private final ObservedTacticalIntentPlanner tacticalPlanner;
+    private final TacticalSurvivalPlanner survivalPlanner;
     private final Doctrine attackerDoctrine;
     private final Doctrine targetDoctrine;
     private final InstalledFit attackerFit;
@@ -78,7 +113,9 @@ public final class LiveTacticalSimulationSession {
     private final HullDefinition attackerHull;
     private final HullDefinition targetHull;
     private final ShipProtectionCatalog.HullDamageLayout targetDamageLayout;
+    private final ShipDamageRuntime.Snapshot attackerDamage;
     private final EngineeringComponent attackerEngineering;
+    private final TransformComponent attackerTransform;
     private final FittedSensor attackerRadar;
     private final ShipShieldEngineeringAdapter.FittedShield targetFittedShield;
     private final List<SensorMeasurement> trackMeasurements = new ArrayList<>();
@@ -87,6 +124,17 @@ public final class LiveTacticalSimulationSession {
     private ShipDamageRuntime.Snapshot targetDamage;
     private ShieldFieldRuntime.State targetShield;
     private TrackState attackerTrack;
+    private TacticalIntent attackerIntent = TacticalIntent.noTarget(TacticalPosture.INTERCEPT);
+    private TacticalSurvivalPlanner.Decision attackerSurvivalDecision = new TacticalSurvivalPlanner.Decision(
+            SurvivalAction.CONTINUE,
+            DecisionReason.READY,
+            false,
+            0L,
+            0d,
+            0d);
+    private double attackerMovementAxisX;
+    private double attackerMovementAxisY;
+    private boolean attackerFireAuthorized;
     private KineticProtectionRuntime.Result recentImpact;
     private long recentImpactTick = Long.MIN_VALUE;
     private long tick;
@@ -100,7 +148,9 @@ public final class LiveTacticalSimulationSession {
      * Creates a fresh deterministic balanced-control versus balanced-control live scenario.
      *
      * <p>Doctrine IDs select only production-valid test fits and stores; they grant no numeric combat
-     * modifiers.</p>
+     * modifiers. The Stage-19I-A attacker starts at a fixed scenario position, but all subsequent
+     * attacker position/velocity changes come from production AI intent, engineering-limited thrust
+     * and {@link FlightDynamics}.</p>
      */
     public LiveTacticalSimulationSession() {
         engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
@@ -117,6 +167,8 @@ public final class LiveTacticalSimulationSession {
         shieldRuntime = new ShieldFieldRuntime();
         sensorAdapter = new ShipSensorEngineeringAdapter();
         weaponAdapter = new ShipWeaponEngineeringAdapter();
+        tacticalPlanner = new ObservedTacticalIntentPlanner();
+        survivalPlanner = new TacticalSurvivalPlanner();
 
         attackerDoctrine = Stage175IFleetDoctrineCatalog.get(DoctrineId.E_BALANCED_CONTROL);
         targetDoctrine = Stage175IFleetDoctrineCatalog.get(DoctrineId.E_BALANCED_CONTROL);
@@ -127,17 +179,18 @@ public final class LiveTacticalSimulationSession {
         attackerHull = engineeringCatalog.findHull(attackerFit.hullId());
         targetHull = engineeringCatalog.findHull(targetFit.hullId());
         targetDamageLayout = protectionCatalog.findHullDamageLayout(targetHull.id());
+        attackerDamage = ShipDamageRuntime.Snapshot.pristine(
+                attackerHull,
+                protectionCatalog.findHullDamageLayout(attackerHull.id()));
 
         RuntimeState attackerRuntime = engineeringRuntime.initialize(
-                attackerFit, attackerDoctrine.initialConsumables(), DamageState.pristine());
+                attackerFit, attackerDoctrine.initialConsumables(), attackerDamage.moduleDamage());
         attackerEngineering = new EngineeringComponent(
                 attackerFit, attackerRuntime, ShipInstanceRuntimeState.legacyNeutral());
+        attackerTransform = new TransformComponent();
+        attackerTransform.position.set((float) ATTACKER_INITIAL_X_M, (float) CENTER_Y_M);
 
-        DerivedShipState attackerDerived = calculator.derive(
-                attackerHull,
-                attackerFit,
-                attackerEngineering.runtimeState.consumables(),
-                DamageState.pristine());
+        DerivedShipState attackerDerived = deriveAttacker();
         attackerRadar = sensorAdapter.derive(attackerDerived).sensors().stream()
                 .filter(value -> value.definition().mode() == Mode.ACTIVE_RADAR)
                 .findFirst()
@@ -162,15 +215,18 @@ public final class LiveTacticalSimulationSession {
     /**
      * Advances exactly one fixed authoritative simulation tick.
      *
-     * <p>Calling presentation methods does not advance this clock.</p>
+     * <p>Calling presentation methods does not advance this clock. Sensing occurs before the current
+     * tactical decision; engineering then resolves any requested thrust and consumes physical
+     * reaction mass before the shared flight integrator changes the attacker transform.</p>
      */
     public void advanceOneTick() {
         tick++;
-        stepAttackerEngineering();
         kineticCooldownSeconds = Math.max(0d, kineticCooldownSeconds - TICK_SECONDS);
         if (tick == 1L || tick % SENSOR_INTERVAL_TICKS == 0L) {
             scanTarget();
         }
+        planAttackerAi();
+        stepAttackerEngineeringAndFlight();
         tryFireKinetic();
         advanceProjectiles();
         if (recentImpact != null && tick - recentImpactTick > IMPACT_VISIBILITY_TICKS) {
@@ -189,13 +245,19 @@ public final class LiveTacticalSimulationSession {
                 elapsedSeconds(),
                 attackerHull,
                 targetHull,
-                ShipDamageRuntime.Snapshot.pristine(
-                        attackerHull,
-                        protectionCatalog.findHullDamageLayout(attackerHull.id())),
+                attackerDamage,
                 targetDamage,
                 targetFittedShield.definition(),
                 targetShield,
                 attackerTrack,
+                attackerIntent,
+                attackerSurvivalDecision,
+                attackerFireAuthorized,
+                attackerTransform.position.x,
+                attackerTransform.position.y,
+                attackerTransform.velocity.x,
+                attackerTransform.velocity.y,
+                reactionMassKg(attackerEngineering.runtimeState.consumables()),
                 List.copyOf(projectiles),
                 recentImpact,
                 recentImpactTick,
@@ -220,7 +282,7 @@ public final class LiveTacticalSimulationSession {
     /**
      * Returns a compact deterministic state fingerprint for regression comparisons.
      *
-     * @return immutable physical-state fingerprint
+     * @return immutable physical/AI-state fingerprint
      */
     public StateFingerprint fingerprint() {
         double projectilePositionSum = projectiles.stream()
@@ -241,17 +303,123 @@ public final class LiveTacticalSimulationSession {
                 targetShield.collapsed(),
                 meanCompartmentIntegrity,
                 targetAccelerationMps2,
-                attackerTrack == null ? null : attackerTrack.informationState());
+                attackerTrack == null ? null : attackerTrack.informationState(),
+                attackerTransform.position.x,
+                attackerTransform.position.y,
+                attackerTransform.velocity.x,
+                attackerTransform.velocity.y,
+                reactionMassKg(attackerEngineering.runtimeState.consumables()),
+                attackerIntent.targetSelected(),
+                attackerIntent.fireRequested(),
+                attackerFireAuthorized,
+                attackerSurvivalDecision.action());
     }
 
-    private void stepAttackerEngineering() {
+    private void planAttackerAi() {
+        List<ObservedContact> contacts = attackerTrack == null
+                ? List.of()
+                : List.of(new ObservedContact(attackerTrack, ContactDisposition.HOSTILE));
+        double now = elapsedSeconds();
+        attackerIntent = tacticalPlanner.plan(
+                contacts,
+                new TacticalContext(
+                        TacticalPosture.INTERCEPT,
+                        attackerTransform.position.x,
+                        attackerTransform.position.y,
+                        false,
+                        0d,
+                        0d,
+                        0d,
+                        now,
+                        TACTICAL_REFERENCE_RANGE_M,
+                        TRACK_FRESHNESS_REFERENCE_SECONDS));
+
+        DerivedShipState derived = deriveAttacker();
+        OwnReadiness readiness = new OwnReadiness(
+                meanIntegrity(attackerHull, attackerDamage),
+                minimumModuleIntegrity(attackerFit, attackerDamage.moduleDamage()),
+                reactionMassKg(attackerEngineering.runtimeState.consumables()),
+                derived.deltaVMps(),
+                derived.accelerationMps2());
+        attackerSurvivalDecision = survivalPlanner.decide(
+                readiness,
+                SURVIVAL_POLICY,
+                contacts,
+                attackerTransform.position.x,
+                attackerTransform.position.y,
+                new SafePoint(true, ATTACKER_INITIAL_X_M, CENTER_Y_M),
+                false,
+                now,
+                TACTICAL_REFERENCE_RANGE_M,
+                TRACK_FRESHNESS_REFERENCE_SECONDS);
+
+        attackerFireAuthorized = attackerIntent.fireRequested();
+        switch (attackerSurvivalDecision.action()) {
+            case RETREAT, PURSUE -> {
+                attackerMovementAxisX = attackerSurvivalDecision.movementAxisX();
+                attackerMovementAxisY = attackerSurvivalDecision.movementAxisY();
+                if (attackerSurvivalDecision.action() == SurvivalAction.RETREAT) {
+                    attackerFireAuthorized = false;
+                }
+            }
+            case DISENGAGE -> {
+                attackerMovementAxisX = 0d;
+                attackerMovementAxisY = 0d;
+                attackerFireAuthorized = false;
+            }
+            case CONTINUE -> {
+                attackerMovementAxisX = attackerIntent.movementAxisX();
+                attackerMovementAxisY = attackerIntent.movementAxisY();
+            }
+        }
+    }
+
+    private void stepAttackerEngineeringAndFlight() {
+        boolean maneuverRequested = attackerMovementAxisX * attackerMovementAxisX
+                + attackerMovementAxisY * attackerMovementAxisY > EPSILON;
+        boolean brakingRequested = attackerTransform.velocity.len2() > 1e-8f && !maneuverRequested;
+        double throttle = maneuverRequested || brakingRequested ? 1d : 0d;
+        OperatingCommand command = new OperatingCommand(
+                driveThrottleByMount(throttle),
+                Map.of(),
+                Set.of());
         var result = engineeringRuntime.advance(
                 attackerFit,
                 attackerEngineering.runtimeState,
-                DamageState.pristine(),
-                OperatingCommand.idle(),
+                attackerDamage.moduleDamage(),
+                command,
                 TICK_SECONDS);
         attackerEngineering.setRuntimeState(result.state());
+        FlightDynamics.advancePhysical(
+                attackerTransform,
+                result.derivedState().totalMassKg(),
+                result.actualThrustN(),
+                LIVE_COMMAND_SPEED_CAP_MPS,
+                (float) attackerMovementAxisX,
+                (float) attackerMovementAxisY,
+                (float) TICK_SECONDS);
+    }
+
+    private Map<String, Double> driveThrottleByMount(double throttle) {
+        if (throttle <= 0d) {
+            return Map.of();
+        }
+        Set<String> loadedReactionMassMounts = attackerEngineering.runtimeState.consumables().interfaceLoads().stream()
+                .filter(value -> value.kind() == InterfaceKind.REACTION_MASS)
+                .filter(value -> value.massKg() > EPSILON)
+                .map(ShipEngineeringState.ConsumableLoad::mountId)
+                .collect(java.util.stream.Collectors.toSet());
+        TreeMap<String, Double> result = new TreeMap<>();
+        for (ShipEngineeringCatalog.InstalledModuleDefinition installed : attackerFit.installedModules()) {
+            var module = engineeringCatalog.findModule(installed.moduleId());
+            if (module != null
+                    && (module.family() == ModuleFamily.MAIN_DRIVE
+                    || module.family() == ModuleFamily.MANEUVER_THRUSTERS)
+                    && loadedReactionMassMounts.contains(installed.mountId())) {
+                result.put(installed.mountId(), throttle);
+            }
+        }
+        return Map.copyOf(result);
     }
 
     private void scanTarget() {
@@ -265,7 +433,7 @@ public final class LiveTacticalSimulationSession {
                 SENSOR_INTERVAL_SECONDS,
                 ATTACKER_ENTITY_ID,
                 TARGET_ENTITY_ID,
-                new Position2d(ATTACKER_X_M, CENTER_Y_M),
+                new Position2d(attackerTransform.position.x, attackerTransform.position.y),
                 new Position2d(TARGET_X_M, CENTER_Y_M),
                 targetSignature,
                 ElectronicWarfareState.empty(),
@@ -286,22 +454,15 @@ public final class LiveTacticalSimulationSession {
     }
 
     private void tryFireKinetic() {
-        if (attackerTrack == null || kineticCooldownSeconds > EPSILON) {
-            return;
-        }
-        if (attackerTrack.informationState() != TrackState.InformationState.TRACKED
-                && attackerTrack.informationState() != TrackState.InformationState.FIRE_CONTROL) {
-            return;
-        }
-        if (roundsOnMount(attackerEngineering.runtimeState.consumables(), PRIMARY_MOUNT) <= 0L) {
+        if (!attackerFireAuthorized
+                || attackerTrack == null
+                || attackerIntent.targetId() != TARGET_ENTITY_ID
+                || kineticCooldownSeconds > EPSILON
+                || roundsOnMount(attackerEngineering.runtimeState.consumables(), PRIMARY_MOUNT) <= 0L) {
             return;
         }
 
-        DerivedShipState attackerDerived = calculator.derive(
-                attackerHull,
-                attackerFit,
-                attackerEngineering.runtimeState.consumables(),
-                DamageState.pristine());
+        DerivedShipState attackerDerived = deriveAttacker();
         var mount = weaponAdapter.deriveKineticMounts(
                         attackerDerived,
                         ammunitionCatalog,
@@ -311,10 +472,15 @@ public final class LiveTacticalSimulationSession {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "Stage 17.5I balanced live fit lost its primary kinetic mount"));
+        KinematicState attackerMotion = new KinematicState(
+                attackerTransform.position.x,
+                attackerTransform.position.y,
+                attackerTransform.velocity.x,
+                attackerTransform.velocity.y);
         var solution = fireControl.planKinetic(
                 mount.round(),
                 attackerTrack,
-                new KinematicState(ATTACKER_X_M, CENTER_Y_M, 0d, 0d),
+                attackerMotion,
                 new TargetMotionEstimate(0d, 0d, 0d, 0d),
                 mount.pointingJitterRad(),
                 elapsedSeconds());
@@ -333,7 +499,7 @@ public final class LiveTacticalSimulationSession {
                 ATTACKER_ENTITY_ID,
                 tick,
                 mount.round(),
-                new KinematicState(ATTACKER_X_M, CENTER_Y_M, 0d, 0d),
+                attackerMotion,
                 solution);
         projectiles.add(body);
         shotsFired++;
@@ -353,7 +519,7 @@ public final class LiveTacticalSimulationSession {
             if (segmentIntersectsCircle(
                     body.xM(), body.yM(), next.xM(), next.yM(), TARGET_X_M, CENTER_Y_M, collisionRadius)) {
                 resolveTargetImpact(next);
-            } else if (Math.hypot(next.xM() - ATTACKER_X_M, next.yM() - CENTER_Y_M) <= MAX_BODY_DISTANCE_M) {
+            } else if (Math.hypot(next.xM() - TARGET_X_M, next.yM() - CENTER_Y_M) <= MAX_BODY_DISTANCE_M) {
                 survivors.add(next);
             }
         }
@@ -393,6 +559,14 @@ public final class LiveTacticalSimulationSession {
         impactsResolved++;
     }
 
+    private DerivedShipState deriveAttacker() {
+        return calculator.derive(
+                attackerHull,
+                attackerFit,
+                attackerEngineering.runtimeState.consumables(),
+                attackerDamage.moduleDamage());
+    }
+
     private DerivedShipState deriveTarget() {
         return calculator.derive(
                 targetHull,
@@ -419,6 +593,27 @@ public final class LiveTacticalSimulationSession {
                 .filter(value -> value.mountId().equals(mountId))
                 .mapToLong(ShipEngineeringState.ConsumableLoad::itemCount)
                 .sum();
+    }
+
+    private static double reactionMassKg(ShipEngineeringState.ConsumableState state) {
+        return state.interfaceLoads().stream()
+                .filter(value -> value.kind() == InterfaceKind.REACTION_MASS)
+                .mapToDouble(ShipEngineeringState.ConsumableLoad::massKg)
+                .sum();
+    }
+
+    private static double meanIntegrity(HullDefinition hull, ShipDamageRuntime.Snapshot damage) {
+        return hull.compartments().stream()
+                .mapToDouble(value -> damage.compartmentIntegrityById().getOrDefault(value.id(), 1d))
+                .average()
+                .orElse(1d);
+    }
+
+    private static double minimumModuleIntegrity(InstalledFit fit, DamageState damage) {
+        return fit.installedModules().stream()
+                .mapToDouble(value -> damage.moduleIntegrityByMount().getOrDefault(value.mountId(), 1d))
+                .min()
+                .orElse(1d);
     }
 
     private static boolean segmentIntersectsCircle(
@@ -454,6 +649,14 @@ public final class LiveTacticalSimulationSession {
      * @param targetShieldDefinition fitted target shield definition
      * @param targetShieldState current target shield state
      * @param attackerTrack current target track, or null before detection
+     * @param attackerIntent current production Stage-19 tactical intent
+     * @param attackerSurvivalDecision current production Stage-19 survival decision
+     * @param attackerFireAuthorized whether survival policy permits the current tactical fire request
+     * @param attackerXM current authoritative attacker x position
+     * @param attackerYM current authoritative attacker y position
+     * @param attackerVelocityXMps current authoritative attacker x velocity
+     * @param attackerVelocityYMps current authoritative attacker y velocity
+     * @param attackerReactionMassKg current physical reaction mass carried by attacker interfaces
      * @param projectiles current independent physical kinetic bodies
      * @param recentImpact most recent production protection result, or null
      * @param recentImpactTick tick on which the recent impact occurred
@@ -474,6 +677,14 @@ public final class LiveTacticalSimulationSession {
             ShieldFieldRuntime.Definition targetShieldDefinition,
             ShieldFieldRuntime.State targetShieldState,
             TrackState attackerTrack,
+            TacticalIntent attackerIntent,
+            TacticalSurvivalPlanner.Decision attackerSurvivalDecision,
+            boolean attackerFireAuthorized,
+            double attackerXM,
+            double attackerYM,
+            double attackerVelocityXMps,
+            double attackerVelocityYMps,
+            double attackerReactionMassKg,
             List<ProjectileBody> projectiles,
             KineticProtectionRuntime.Result recentImpact,
             long recentImpactTick,
@@ -495,13 +706,21 @@ public final class LiveTacticalSimulationSession {
          * @param targetShieldDefinition fitted target shield definition
          * @param targetShieldState current target shield state
          * @param attackerTrack current target track, or null
+         * @param attackerIntent current production tactical intent
+         * @param attackerSurvivalDecision current production survival decision
+         * @param attackerFireAuthorized whether survival policy permits firing
+         * @param attackerXM attacker x position
+         * @param attackerYM attacker y position
+         * @param attackerVelocityXMps attacker x velocity
+         * @param attackerVelocityYMps attacker y velocity
+         * @param attackerReactionMassKg current physical reaction mass
          * @param projectiles current physical kinetic bodies
          * @param recentImpact recent protection result, or null
          * @param recentImpactTick recent impact tick
          * @param primaryRoundsRemaining physical ammunition remaining
          * @param shotsFired physical shots fired
          * @param impactsResolved physical impacts resolved
-         * @param targetAccelerationMps2 current derived acceleration capability
+         * @param targetAccelerationMps2 current derived target acceleration capability
          * @param attackerSharedBusEnergyJ current stored electrical energy
          * @param attackerShipHeatStoredJ current ship-bus heat
          */
@@ -515,14 +734,19 @@ public final class LiveTacticalSimulationSession {
             Objects.requireNonNull(targetDamage, "targetDamage");
             Objects.requireNonNull(targetShieldDefinition, "targetShieldDefinition");
             Objects.requireNonNull(targetShieldState, "targetShieldState");
+            Objects.requireNonNull(attackerIntent, "attackerIntent");
+            Objects.requireNonNull(attackerSurvivalDecision, "attackerSurvivalDecision");
             projectiles = List.copyOf(Objects.requireNonNull(projectiles, "projectiles"));
             if (primaryRoundsRemaining < 0L || shotsFired < 0L || impactsResolved < 0L) {
                 throw new IllegalArgumentException("live snapshot counters must be non-negative");
             }
-            if (!Double.isFinite(targetAccelerationMps2) || targetAccelerationMps2 < 0d
+            if (!Double.isFinite(attackerXM) || !Double.isFinite(attackerYM)
+                    || !Double.isFinite(attackerVelocityXMps) || !Double.isFinite(attackerVelocityYMps)
+                    || !Double.isFinite(attackerReactionMassKg) || attackerReactionMassKg < 0d
+                    || !Double.isFinite(targetAccelerationMps2) || targetAccelerationMps2 < 0d
                     || !Double.isFinite(attackerSharedBusEnergyJ) || attackerSharedBusEnergyJ < 0d
                     || !Double.isFinite(attackerShipHeatStoredJ) || attackerShipHeatStoredJ < 0d) {
-                throw new IllegalArgumentException("live snapshot physical scalars must be finite and non-negative");
+                throw new IllegalArgumentException("live snapshot physical scalars must be finite and valid");
             }
         }
     }
@@ -541,6 +765,15 @@ public final class LiveTacticalSimulationSession {
      * @param meanTargetCompartmentIntegrity current mean local compartment integrity
      * @param targetAccelerationMps2 current derived target acceleration
      * @param trackState current attacker information state, or null before detection
+     * @param attackerXM current attacker x position
+     * @param attackerYM current attacker y position
+     * @param attackerVelocityXMps current attacker x velocity
+     * @param attackerVelocityYMps current attacker y velocity
+     * @param attackerReactionMassKg current physical attacker reaction mass
+     * @param tacticalTargetSelected whether production tactical AI currently selected a target
+     * @param tacticalFireRequested whether production tactical AI currently requests fire
+     * @param fireAuthorized whether survival policy currently permits tactical fire
+     * @param survivalAction current production survival action
      */
     public record StateFingerprint(
             long tick,
@@ -553,6 +786,42 @@ public final class LiveTacticalSimulationSession {
             boolean targetShieldCollapsed,
             double meanTargetCompartmentIntegrity,
             double targetAccelerationMps2,
-            TrackState.InformationState trackState) {
+            TrackState.InformationState trackState,
+            double attackerXM,
+            double attackerYM,
+            double attackerVelocityXMps,
+            double attackerVelocityYMps,
+            double attackerReactionMassKg,
+            boolean tacticalTargetSelected,
+            boolean tacticalFireRequested,
+            boolean fireAuthorized,
+            SurvivalAction survivalAction) {
+        /**
+         * Validates the production-AI fingerprint fields that are not already constrained by live state.
+         *
+         * @param tick authoritative tick
+         * @param primaryRoundsRemaining physical primary ammunition remaining
+         * @param shotsFired number of materialized shots
+         * @param impactsResolved number of resolved target impacts
+         * @param projectileCount active physical projectile count
+         * @param projectilePositionSum deterministic aggregate of projectile positions
+         * @param targetShieldReserveJ current target shield reserve
+         * @param targetShieldCollapsed current target shield state
+         * @param meanTargetCompartmentIntegrity current mean target compartment integrity
+         * @param targetAccelerationMps2 current target acceleration capability
+         * @param trackState current attacker information state or null
+         * @param attackerXM attacker x position
+         * @param attackerYM attacker y position
+         * @param attackerVelocityXMps attacker x velocity
+         * @param attackerVelocityYMps attacker y velocity
+         * @param attackerReactionMassKg physical attacker reaction mass
+         * @param tacticalTargetSelected whether tactical AI selected a target
+         * @param tacticalFireRequested whether tactical AI requested fire
+         * @param fireAuthorized whether survival policy permits fire
+         * @param survivalAction current survival action
+         */
+        public StateFingerprint {
+            Objects.requireNonNull(survivalAction, "survivalAction");
+        }
     }
 }
