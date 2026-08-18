@@ -1,6 +1,9 @@
 package com.spacesim.ui;
 
 import com.spacesim.ship.LiveTacticalBattleScenario.Side;
+import com.spacesim.ship.TacticalFormationPlanner.FormationMode;
+import com.spacesim.ship.TacticalFormationPlanner.FormationReason;
+import com.spacesim.ship.TacticalFormationPlanner.FormationStatus;
 import com.spacesim.ship.TacticalSurvivalPlanner.DecisionReason;
 import com.spacesim.ship.TacticalSurvivalPlanner.SurvivalAction;
 import com.spacesim.ship.TrackState.InformationState;
@@ -72,6 +75,61 @@ public record ScaledTacticalDebugSnapshot(
     }
 
     /**
+     * Read-only tactical formation diagnostic for one actor.
+     *
+     * @param objectiveKnown whether an authored formation objective exists
+     * @param mode authored formation mode, or {@code null} when no objective exists
+     * @param slotIndex zero-based stable formation slot, or -1 when no objective exists
+     * @param slotCount number of actors in the authored formation line
+     * @param desiredYM authored cross-axis slot center in meters
+     * @param errorM signed desired-minus-current cross-axis error in meters
+     * @param status current observable formation status
+     * @param reason diagnostic reason for the current formation status
+     */
+    public record FormationDebug(
+            boolean objectiveKnown,
+            FormationMode mode,
+            int slotIndex,
+            int slotCount,
+            double desiredYM,
+            double errorM,
+            FormationStatus status,
+            FormationReason reason) {
+        /**
+         * Validates one immutable formation diagnostic.
+         *
+         * @param objectiveKnown whether an authored formation objective exists
+         * @param mode authored formation mode, or {@code null} when no objective exists
+         * @param slotIndex zero-based stable formation slot, or -1 when no objective exists
+         * @param slotCount number of actors in the authored formation line
+         * @param desiredYM authored cross-axis slot center in meters
+         * @param errorM signed desired-minus-current cross-axis error in meters
+         * @param status current observable formation status
+         * @param reason diagnostic reason for the current formation status
+         */
+        public FormationDebug {
+            Objects.requireNonNull(status, "status");
+            Objects.requireNonNull(reason, "reason");
+            if (!Double.isFinite(desiredYM) || !Double.isFinite(errorM)) {
+                throw new IllegalArgumentException("formation geometry must be finite");
+            }
+            if (!objectiveKnown) {
+                if (mode != null || slotIndex != -1 || slotCount != 0
+                        || desiredYM != 0d || errorM != 0d
+                        || status != FormationStatus.NO_OBJECTIVE
+                        || reason != FormationReason.NO_OBJECTIVE) {
+                    throw new IllegalArgumentException("no-objective formation diagnostic must be canonical");
+                }
+            } else {
+                Objects.requireNonNull(mode, "mode");
+                if (slotCount <= 0 || slotIndex < 0 || slotIndex >= slotCount) {
+                    throw new IllegalArgumentException("formation slot must be inside the authored roster");
+                }
+            }
+        }
+    }
+
+    /**
      * One combatant's current actor/control/engineering diagnostic row.
      *
      * @param entityId stable physical combatant identity
@@ -84,6 +142,7 @@ public record ScaledTacticalDebugSnapshot(
      * @param movementAxisY current normalized y maneuver intent
      * @param survivalAction current high-level survival action
      * @param survivalReason current high-level survival reason
+     * @param formation current read-only authored formation state/objective
      * @param ammunitionCount total physically loaded ammunition items
      * @param reactionMassKg current physical reaction mass
      * @param sharedBusEnergyJ current shared stored electrical energy
@@ -103,6 +162,7 @@ public record ScaledTacticalDebugSnapshot(
             double movementAxisY,
             SurvivalAction survivalAction,
             DecisionReason survivalReason,
+            FormationDebug formation,
             long ammunitionCount,
             double reactionMassKg,
             double sharedBusEnergyJ,
@@ -123,6 +183,7 @@ public record ScaledTacticalDebugSnapshot(
          * @param movementAxisY current normalized y maneuver intent
          * @param survivalAction current high-level survival action
          * @param survivalReason current high-level survival reason
+         * @param formation current read-only authored formation state/objective
          * @param ammunitionCount total physically loaded ammunition items
          * @param reactionMassKg current physical reaction mass
          * @param sharedBusEnergyJ current shared stored electrical energy
@@ -147,6 +208,7 @@ public record ScaledTacticalDebugSnapshot(
             requireNormalized(movementAxisX, movementAxisY);
             Objects.requireNonNull(survivalAction, "survivalAction");
             Objects.requireNonNull(survivalReason, "survivalReason");
+            Objects.requireNonNull(formation, "formation");
             requireNonNegativeFinite(reactionMassKg, "reactionMassKg");
             requireNonNegativeFinite(sharedBusEnergyJ, "sharedBusEnergyJ");
             requireNonNegativeFinite(shipHeatStoredJ, "shipHeatStoredJ");
