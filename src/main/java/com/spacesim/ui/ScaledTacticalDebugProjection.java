@@ -43,13 +43,11 @@ public final class ScaledTacticalDebugProjection {
         var control = controlRuntime.controlState(entityId);
         var engineering = combatant.engineering();
         var consumables = engineering.runtimeState.consumables();
-        var damage = engineering.instanceState.damage();
         List<TrackDebug> tracks = runtime.battleState().visibleContacts(entityId).stream()
                 .map(value -> new TrackDebug(
                         value.track().targetId(),
                         value.track().informationState(),
-                        value.track().positionKnown(),
-                        value.track().velocityKnown()))
+                        value.track().positionKnown()))
                 .toList();
         return new CombatantDebug(
                 entityId,
