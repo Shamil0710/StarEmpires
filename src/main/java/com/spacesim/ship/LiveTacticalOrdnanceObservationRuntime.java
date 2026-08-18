@@ -380,7 +380,16 @@ public final class LiveTacticalOrdnanceObservationRuntime {
             int measurementsProduced,
             double committedPowerW,
             double committedHeatW) {
-        /** Validates deterministic non-negative scan diagnostics. */
+        /**
+         * Validates deterministic non-negative scan diagnostics.
+         *
+         * @param noiseJammerCount physical external noise emitters included in the receiver environment
+         * @param eccmRequested whether receiver policy requested fitted ECCM processing
+         * @param eccmCommitted whether engineering physically admitted an ECCM radar operation
+         * @param measurementsProduced true-target measurements emitted by accepted operations
+         * @param committedPowerW total incremental radar/ECCM power admitted for this scan
+         * @param committedHeatW total incremental radar/ECCM heat admitted for this scan
+         */
         public ScanDiagnostics {
             if (noiseJammerCount < 0 || measurementsProduced < 0
                     || !Double.isFinite(committedPowerW) || committedPowerW < 0d
