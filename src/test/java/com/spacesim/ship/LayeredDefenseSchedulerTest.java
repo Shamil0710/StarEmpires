@@ -3,6 +3,7 @@ package com.spacesim.ship;
 import com.spacesim.ship.LayeredDefenseScheduler.Assignment;
 import com.spacesim.ship.LayeredDefenseScheduler.DefendedZone;
 import com.spacesim.ship.LayeredDefenseScheduler.DefenseStation;
+import com.spacesim.ship.LayeredDefenseScheduler.ObservedThreatKinematics;
 import com.spacesim.ship.LayeredDefenseScheduler.Threat;
 import com.spacesim.ship.WeaponDefinition.GuidedWeapon;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,31 @@ class LayeredDefenseSchedulerTest {
 
         assertEquals(0, centralAssignments.size());
         assertEquals(1, forwardAssignments.size());
+    }
+
+    @Test
+    void observedThreatMayBeAssignedForAlliedHullWithoutHiddenMissileTargetIdentity() {
+        LayeredDefenseScheduler scheduler = new LayeredDefenseScheduler();
+        DefendedZone self = new DefendedZone(0d, 0d, 1_000d);
+        DefendedZone ally = new DefendedZone(20_000d, 0d, 1_000d);
+        ObservedThreatKinematics observed = new ObservedThreatKinematics(
+                55L,
+                30_000d,
+                0d,
+                -1_000d,
+                0d);
+        DefenseStation escort = station(6L, 18_000d, 0d, 1, 1L, true);
+
+        assertEquals(0, scheduler.scheduleObserved(self, List.of(observed), List.of(escort)).size(),
+                "observed trajectory misses the escort's own hull zone");
+        List<Assignment> formation = scheduler.scheduleObserved(
+                List.of(self, ally),
+                List.of(observed),
+                List.of(escort));
+
+        assertEquals(1, formation.size(),
+                "same actor-bounded trajectory must be defendable when it intersects an allied physical hull");
+        assertEquals(55L, formation.get(0).threatId());
     }
 
     @Test
