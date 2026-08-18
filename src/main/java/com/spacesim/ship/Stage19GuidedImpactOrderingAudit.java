@@ -27,7 +27,13 @@ public final class Stage19GuidedImpactOrderingAudit {
     private static final double EPSILON = 1e-9d;
     private final GuidanceRuntime guidanceRuntime = new GuidanceRuntime();
 
-    /** Captures the physical bodies/ship positions needed to audit the next authoritative tick. */
+    /**
+     * Captures the physical bodies and ship positions needed to audit the next authoritative tick.
+     *
+     * @param ordnanceRuntime authoritative offensive guided-body runtime before advancement
+     * @param defenseRuntime authoritative interceptor runtime before advancement
+     * @return immutable start-of-tick ordering snapshot
+     */
     public Snapshot capture(
             LiveTacticalBattleOrdnanceRuntime ordnanceRuntime,
             LiveTacticalBattleDefenseRuntime defenseRuntime) {
@@ -246,7 +252,14 @@ public final class Stage19GuidedImpactOrderingAudit {
             List<GuidedWeaponBody> threats,
             List<GuidedWeaponBody> interceptors,
             Map<Long, Position> shipStartPositions) {
-        /** Validates and freezes one ordering snapshot. */
+        /**
+         * Validates and freezes one ordering snapshot.
+         *
+         * @param tick authoritative tick before advancement
+         * @param threats active offensive guided bodies
+         * @param interceptors active physical interceptor bodies
+         * @param shipStartPositions physical ship positions at tick start
+         */
         public Snapshot {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");
@@ -265,7 +278,12 @@ public final class Stage19GuidedImpactOrderingAudit {
      * @param yM y position in meters
      */
     public record Position(double xM, double yM) {
-        /** Validates one finite position. */
+        /**
+         * Validates one finite position.
+         *
+         * @param xM x position in meters
+         * @param yM y position in meters
+         */
         public Position {
             if (!Double.isFinite(xM) || !Double.isFinite(yM)) {
                 throw new IllegalArgumentException("ordering audit position must be finite");
@@ -288,7 +306,15 @@ public final class Stage19GuidedImpactOrderingAudit {
             long shipTargetEntityId,
             double shipImpactFraction,
             double interceptorContactFraction) {
-        /** Validates one ordering ambiguity. */
+        /**
+         * Validates one ordering ambiguity.
+         *
+         * @param threatBodyId strike body identity
+         * @param interceptorBodyId interceptor body identity
+         * @param shipTargetEntityId ship reached later in the same tick
+         * @param shipImpactFraction ship contact fraction
+         * @param interceptorContactFraction earlier body-body contact fraction
+         */
         public EarlierInterceptorContact {
             if (threatBodyId <= 0L || interceptorBodyId <= 0L || shipTargetEntityId <= 0L
                     || !Double.isFinite(shipImpactFraction)
@@ -312,7 +338,13 @@ public final class Stage19GuidedImpactOrderingAudit {
             long tick,
             int shipImpactCandidates,
             List<EarlierInterceptorContact> earlierInterceptorContacts) {
-        /** Validates and freezes one audit result. */
+        /**
+         * Validates and freezes one audit result.
+         *
+         * @param tick completed authoritative tick
+         * @param shipImpactCandidates number of previously active strike paths ending in ship contact
+         * @param earlierInterceptorContacts physically earlier contacts suppressed by current ordering
+         */
         public Result {
             if (tick <= 0L || shipImpactCandidates < 0) {
                 throw new IllegalArgumentException("invalid ordering audit result counters");
