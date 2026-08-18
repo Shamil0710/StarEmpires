@@ -76,6 +76,27 @@ class LiveTacticalBattleScenarioTest {
     }
 
     @Test
+    void mixed16v16AuthoredRosterIsDeterministicBalancedAndExactlyThirtyTwoShips() {
+        LiveTacticalBattleScenario first = LiveTacticalBattleScenario.mixed16v16();
+        LiveTacticalBattleScenario second = LiveTacticalBattleScenario.mixed16v16();
+
+        assertEquals(first, second);
+        assertEquals(32, first.combatants().size());
+        assertEquals(16, first.combatantsFor(Side.ALPHA).size());
+        assertEquals(16, first.combatantsFor(Side.BETA).size());
+        assertEquals(32L, first.combatants().stream().map(CombatantSpec::entityId).distinct().count());
+        assertEquals(4L, first.combatants().stream().map(CombatantSpec::doctrineId).distinct().count());
+        assertEquals(doctrineCounts(first.combatantsFor(Side.ALPHA)),
+                doctrineCounts(first.combatantsFor(Side.BETA)));
+        assertEquals(Map.of(
+                        DoctrineId.A_KINETIC_LINE, 4L,
+                        DoctrineId.B_MISSILE_STRIKE, 4L,
+                        DoctrineId.D_DEFENSIVE_EW, 2L,
+                        DoctrineId.E_BALANCED_CONTROL, 6L),
+                doctrineCounts(first.combatantsFor(Side.ALPHA)));
+    }
+
+    @Test
     void legacyDuelPreservesExistingStableViewerIdentities() {
         LiveTacticalBattleScenario scenario = LiveTacticalBattleScenario.legacyDuel();
 
