@@ -12,7 +12,8 @@ import java.util.Optional;
  * <p>The gate does not turn every unresolved calibration note into a blocker. It separates physical
  * information required before Stage 20B can author local system geometry from content promotion work
  * explicitly permitted to remain provisional until Stage 22 and world data intentionally owned by
- * later Stage-20 slices.</p>
+ * later Stage-20 slices. The requirement set also audits the complete accepted Stage-20A DoD rather
+ * than treating implementation of A.1-A.9 seams as sufficient by itself.</p>
  *
  * @param version stable readiness-profile version
  * @param overallStatus aggregate Stage-20B entry status
@@ -51,10 +52,14 @@ public record Stage20ACalibrationReadinessProfile(
     public enum RequirementId {
         /** Required civilian/military representative propulsion roles are covered. */
         REPRESENTATIVE_PROPULSION_COVERAGE,
+        /** Representative stores/endurance and sustained-vs-maximum-thrust consequences are calibrated. */
+        REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE,
         /** At least one accepted civilian logistics representative can execute ordinary neighbor-edge FTL. */
         CIVILIAN_ORDINARY_FTL_COVERAGE,
         /** Ordinary jump topology semantics are explicit and neighbor-only. */
         FTL_TOPOLOGY_SEMANTICS,
+        /** System-neighbor, regional 3-5-hop and fleet-reinforcement cadence bands are calibrated. */
+        INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
         /** Production FTL content replaces/absorbs the accepted reference drive. */
         PRODUCTION_FTL_MODULE_PROMOTION,
         /** Generated one-edge transit distributions are authored by Stage 20D. */
@@ -63,14 +68,30 @@ public record Stage20ACalibrationReadinessProfile(
         FTL_HEAT_COEFFICIENT,
         /** Representative sensor observer/target class coverage is sufficient for world scale. */
         SENSOR_TARGET_CLASS_COVERAGE,
+        /** Fused TRACKED/FIRE_CONTROL policy is closed against accepted weapon geometry. */
+        FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
         /** Weapon/PD runtime geometry produces deterministic spatial evidence. */
         WEAPON_PD_SPATIAL_EVIDENCE,
+        /** Weapon effectiveness/time-of-flight is covered against representative target classes. */
+        WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
+        /** PD safe-intercept geometry is physically derived rather than a scheduler probe input. */
+        PD_SAFE_INTERCEPT_GEOMETRY,
         /** Formation runtime produces deterministic frontage/recovery spatial evidence. */
         FORMATION_SPATIAL_EVIDENCE,
+        /** Formation-spacing bands are accepted beyond provisional Stage-19 fixture geometry. */
+        FORMATION_SPACING_BAND_CLOSURE,
         /** All Stage-18 station archetypes have explicit footprint/docking/traffic physical closure. */
         STATION_PHYSICAL_GEOMETRY,
+        /** Station defensive/sensor capability has explicit spatial geometry for placement calibration. */
+        STATION_DEFENSIVE_SENSOR_GEOMETRY,
         /** Station-specific jump-arrival stand-off can be derived without fallback radius. */
         STATION_JUMP_ARRIVAL_STANDOFF,
+        /** Named local route classes required by DoD 20A have calibrated physical bands. */
+        LOCAL_ROUTE_SEMANTIC_BANDS,
+        /** Stage-20A topology-quality acceptance bands are machine-readable before topology generation. */
+        TOPOLOGY_QUALITY_CALIBRATION_BANDS,
+        /** Major-infrastructure extent bands are physically closed for system placement calibration. */
+        MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
         /** Far local coordinates satisfy the accepted precision strategy. */
         FAR_COORDINATE_PRECISION,
         /** Materialization lifecycle and numeric activation bands are physically/wake-latency closed. */
