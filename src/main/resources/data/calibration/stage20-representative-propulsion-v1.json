@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "version": "stage20a.representative-propulsion.v1",
+  "status": "PROVISIONAL_ACCEPTED_REFERENCE",
+  "sourceBaselineId": "ship_mathematics_v1_0_design_baseline",
+  "sourceEvidence": "ShipMathematicsV10DesignBaselineHarness.representativeShips",
+  "stage22ReviewRequired": true,
+  "references": [
+    {
+      "id": "reference.torpedo_corvette.v1",
+      "representativeClass": "TORPEDO_CORVETTE",
+      "designDryMassKg": 1316000.0,
+      "ammunitionMassKg": 204000.0,
+      "missionCargoStoresMassKg": 20000.0,
+      "reactionMassKg": 600000.0,
+      "departureMassKg": 2140000.0,
+      "thrustN": 2200000.0,
+      "exhaustVelocityMps": 100000.0,
+      "expectedAccelerationMps2": 1.02803738317757,
+      "expectedDeltaVMps": 32902.34126082223
+    },
+    {
+      "id": "reference.escort_destroyer.v1",
+      "representativeClass": "ESCORT_DESTROYER",
+      "designDryMassKg": 14305000.0,
+      "ammunitionMassKg": 372000.0,
+      "missionCargoStoresMassKg": 250000.0,
+      "reactionMassKg": 7000000.0,
+      "departureMassKg": 21927000.0,
+      "thrustN": 13200000.0,
+      "exhaustVelocityMps": 100000.0,
+      "expectedAccelerationMps2": 0.601997537282802,
+      "expectedDeltaVMps": 38454.71005152617
+    },
+    {
+      "id": "reference.battleship.v1",
+      "representativeClass": "BATTLESHIP",
+      "designDryMassKg": 338789000.0,
+      "ammunitionMassKg": 976000.0,
+      "missionCargoStoresMassKg": 6000000.0,
+      "reactionMassKg": 200000000.0,
+      "departureMassKg": 545765000.0,
+      "thrustN": 137500000.0,
+      "exhaustVelocityMps": 100000.0,
+      "expectedAccelerationMps2": 0.2519399375188955,
+      "expectedDeltaVMps": 45642.912661282484
+    },
+    {
+      "id": "reference.bulk_freighter_loaded.v1",
+      "representativeClass": "BULK_FREIGHTER_LOADED",
+      "designDryMassKg": 28000000.0,
+      "ammunitionMassKg": 0.0,
+      "missionCargoStoresMassKg": 90000000.0,
+      "reactionMassKg": 25000000.0,
+      "departureMassKg": 143000000.0,
+      "thrustN": 12000000.0,
+      "exhaustVelocityMps": 80000.0,
+      "expectedAccelerationMps2": 0.08391608391608392,
+      "expectedDeltaVMps": 15372.800463539408
+    },
+    {
+      "id": "reference.fleet_tanker_loaded.v1",
+      "representativeClass": "FLEET_TANKER_LOADED",
+      "designDryMassKg": 40000000.0,
+      "ammunitionMassKg": 0.0,
+      "missionCargoStoresMassKg": 100000000.0,
+      "reactionMassKg": 30000000.0,
+      "departureMassKg": 170000000.0,
+      "thrustN": 25000000.0,
+      "exhaustVelocityMps": 100000.0,
+      "expectedAccelerationMps2": 0.14705882352941177,
+      "expectedDeltaVMps": 19415.60144409574
+    }
+  ]
+}
