@@ -64,7 +64,17 @@ public record Stage20SensorTargetClassCoverageProfile(
         /** Large fleet-aviation carrier reference. */ FLEET_CARRIER
     }
 
-    /** Validates and deterministically freezes the closure profile. */
+    /**
+     * Validates and deterministically freezes the closure profile.
+     *
+     * @param version stable closure-profile version
+     * @param observerRepresentativeId representative production observer identity
+     * @param observerAuthority authority of the observer sensor engineering
+     * @param observerProvenanceId exact observer fit provenance
+     * @param observerModes production sensor modes consumed by this closure
+     * @param targets representative physical target-signature references
+     * @param samples measured production-runtime information-state envelopes
+     */
     public Stage20SensorTargetClassCoverageProfile {
         requireNonBlank(version, "version");
         requireNonBlank(observerRepresentativeId, "observerRepresentativeId");
@@ -180,7 +190,13 @@ public record Stage20SensorTargetClassCoverageProfile(
         return everyTargetHasThermalDetection && radarDetectedTargets >= 2L && authorityVisible;
     }
 
-    /** Returns the unique observation sample for one representative target and physical sensor mode. */
+    /**
+     * Returns the unique observation sample for one representative target and physical sensor mode.
+     *
+     * @param targetClass representative target class
+     * @param mode physical sensor mode
+     * @return matching production-runtime observation sample
+     */
     public TargetObservationSample sample(TargetClass targetClass, Mode mode) {
         Objects.requireNonNull(targetClass, "targetClass");
         Objects.requireNonNull(mode, "mode");
@@ -252,7 +268,15 @@ public record Stage20SensorTargetClassCoverageProfile(
             String provenanceId,
             boolean stage22ReviewRequired,
             SignatureState signature) {
-        /** Validates one representative target reference. */
+        /**
+         * Validates one representative target reference.
+         *
+         * @param targetClass representative target class
+         * @param authority production or provisional accepted-reference authority
+         * @param provenanceId exact numeric/engineering source
+         * @param stage22ReviewRequired whether content promotion must be revisited in Stage 22
+         * @param signature physical channelized target signature
+         */
         public TargetSignatureReference {
             Objects.requireNonNull(targetClass, "targetClass");
             Objects.requireNonNull(authority, "authority");
@@ -287,7 +311,16 @@ public record Stage20SensorTargetClassCoverageProfile(
             String mountId,
             Mode mode,
             ThresholdDistances thresholds) {
-        /** Validates one target observation sample. */
+        /**
+         * Validates one target observation sample.
+         *
+         * @param targetClass representative target class
+         * @param sensorId physical production sensor definition ID
+         * @param moduleId fitted production module ID
+         * @param mountId fitted production mount ID
+         * @param mode physical sensor mode
+         * @param thresholds measured physical information-state separation boundaries
+         */
         public TargetObservationSample {
             Objects.requireNonNull(targetClass, "targetClass");
             requireNonBlank(sensorId, "sensorId");
