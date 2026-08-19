@@ -1,6 +1,6 @@
 # Stage 20A Closure — Readiness Refresh after Fire-Control Policy Acceptance
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — implementation head passed exact-head Java-17 CI; final status-only merge gate pending  
 **Parent:** Stage 20A Closure / Readiness Remediation  
 **Date:** 2026-08-19
 
@@ -70,7 +70,7 @@ In particular, this refresh does **not** close:
 
 ## Regression requirement
 
-`Stage20ACalibrationReadinessProfileTest` must prove simultaneously that:
+`Stage20ACalibrationReadinessProfileTest` proves simultaneously that:
 
 1. blocker count is exactly 15;
 2. `FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE` is `SATISFIED`;
@@ -78,6 +78,10 @@ In particular, this refresh does **not** close:
 4. all four currently missing representative roles remain explicit;
 5. all other previously blocking requirements remain blocking.
 
+## Acceptance evidence
+
+Implementation head `b63b23c7954cda2e728cc3e1d2ff457ef0664948` passed the complete Java-17 CI gate with the readiness calculator consuming the accepted fire-control closure and the regression suite requiring exactly fifteen remaining Stage-20B blockers.
+
 ## Immediate next work
 
-After exact-head CI and merge, continue Stage-20A closure from the remaining physical dependencies. Representative ship/endurance/civilian-FTL coverage remains the primary unresolved dependency; old `ship_reference_designs_v0_2.json` is `authoring-benchmark-only`, contains cruiser/carrier seeds but no mining ship or early civilian freighter, and must not be silently promoted to production authority.
+After final status-only exact-head CI and merge, continue Stage-20A closure from the remaining physical dependencies. Representative ship/endurance/civilian-FTL coverage remains the primary unresolved dependency; old `ship_reference_designs_v0_2.json` is `authoring-benchmark-only`, contains cruiser/carrier seeds but no mining ship or early civilian freighter, and must not be silently promoted to production authority.
