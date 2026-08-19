@@ -1,0 +1,39 @@
+name: Stage 19J Long Soak
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    name: Stage 19J six-scenario long soak
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/stage19j7-runtime-soak'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Run Stage 19J long tactical soak
+        run: ./mvnw --batch-mode --no-transfer-progress -Dstage19j.soak=true -Dtest=Stage19JLongSoakTest test
+
+      - name: Upload failed soak reports
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage19j-soak-failure-${{ github.sha }}
+          path: target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
