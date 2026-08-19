@@ -33,7 +33,6 @@ class Stage20ACalibrationReadinessProfileTest {
                         RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE,
                         RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
                         RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
-                        RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
                         RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
                         RequirementId.FORMATION_SPACING_BAND_CLOSURE,
@@ -47,7 +46,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(16, first.blockingRequirements().size());
+        assertEquals(15, first.blockingRequirements().size());
     }
 
     @Test
@@ -78,6 +77,7 @@ class Stage20ACalibrationReadinessProfileTest {
 
         assertStatus(byId, RequirementStatus.SATISFIED,
                 RequirementId.FTL_TOPOLOGY_SEMANTICS,
+                RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
                 RequirementId.WEAPON_PD_SPATIAL_EVIDENCE,
                 RequirementId.FORMATION_SPATIAL_EVIDENCE,
                 RequirementId.FAR_COORDINATE_PRECISION);
@@ -101,7 +101,9 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
                 .contains("regional_3_5_hop"));
         assertTrue(byId.get(RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE).evidence()
-                .contains("remains_provisional"));
+                .contains("historical_stage20a4_pending=true"));
+        assertTrue(byId.get(RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE).evidence()
+                .contains(Stage20FireControlPolicyClosureProfile.CURRENT_VERSION));
         assertTrue(byId.get(RequirementId.PD_SAFE_INTERCEPT_GEOMETRY).evidence()
                 .contains("scheduler_probe_input"));
         assertTrue(byId.get(RequirementId.FORMATION_SPACING_BAND_CLOSURE).evidence()
