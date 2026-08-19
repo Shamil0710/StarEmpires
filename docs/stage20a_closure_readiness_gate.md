@@ -1,6 +1,6 @@
 # Stage 20A — Closure / Readiness Gate
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — exact-head implementation CI green; final merge gate pending  
 **Parent:** Stage 20 — Physical World Generation / Discovery  
 **Date:** 2026-08-19
 
