@@ -1,6 +1,6 @@
 # Stage 20A.5 — Weapon / PD Spatial Calibration
 
-**Status:** IMPLEMENTED — CI acceptance pending  
+**Status:** ACCEPTED  
 **Parent:** Stage 20A — Representative-Ship Scale Calibration  
 **Authority boundary:** production Stage-17.5 weapon/defense runtimes + Stage-17.5I provisional combat-test content
 
@@ -123,6 +123,8 @@ None of these gaps is hidden with an arbitrary Stage-20 constant.
 - layered-defense assignments to respect configured safe-intercept geometry and impact timing;
 - every sample to retain its production runtime provenance.
 
+The implementation passed the exact-head Java-17 `clean verify` gate before this closeout record was marked accepted. The final documentation head remains subject to the same mandatory PR CI gate before merge.
+
 ## 9. Next Stage-20A slice
 
-After 20A.5 acceptance, Stage 20A should continue with formation spacing and station physical footprint/spacing, then jump-arrival stand-off, far-coordinate precision and materialization/LOD calibration before Stage 20B begins star-system physical geometry generation.
+Stage 20A now continues with formation spacing and station physical footprint/spacing. Jump-arrival stand-off, far-coordinate precision and materialization/LOD calibration remain subsequent Stage-20A slices before Stage 20B begins star-system physical geometry generation.
