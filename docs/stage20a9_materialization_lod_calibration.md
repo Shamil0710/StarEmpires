@@ -1,6 +1,6 @@
 # Stage 20A.9 — Materialization / LOD Distance-Band Calibration
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — exact-head Java-17 implementation CI green; final merge gate pending  
 **Parent:** Stage 20A — Representative-Ship Scale Calibration  
 **Date:** 2026-08-19
 
@@ -207,7 +207,7 @@ The machine-readable decision contains:
 ```text
 requiredRepresentationLevel
 rendered
- authoritativeStateRetained = true
+authoritativeStateRetained = true
 ```
 
 Thus the same `TACTICAL` interaction may be rendered or culled without changing its required simulation representation.
@@ -244,9 +244,11 @@ The profile exposes:
 - render/culling independence;
 - unresolved materialization lifecycle constraints.
 
-## 11. Sensitivity and invariants
+## 11. Acceptance evidence
 
-Regression tests require that:
+Exact-head Java-17 CI on implementation head `91337e3a6096b496bd62af65d8b10e802e60f570` completed successfully before this status finalization.
+
+The accepted regression evidence proves that:
 
 - identical accepted inputs produce identical profile output;
 - canonical representation order is stable;
