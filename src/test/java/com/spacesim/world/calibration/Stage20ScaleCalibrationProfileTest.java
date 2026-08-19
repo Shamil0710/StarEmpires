@@ -26,14 +26,14 @@ class Stage20ScaleCalibrationProfileTest {
     private static final String LOAD_CASE_ID = "load.test";
 
     @Test
-    void currentProfileIsVersionedDeterministicAndKeepsReferenceAuthorityVisible() {
+    void currentProfileIsVersionedDeterministicAndCoversAllNineRolesWithVisibleAuthority() {
         Stage20ScaleCalibrationProfile first = Stage20ScaleCalibrationProfile.deriveCurrent();
         Stage20ScaleCalibrationProfile second = Stage20ScaleCalibrationProfile.deriveCurrent();
 
         assertEquals(first, second);
-        assertEquals(Stage20ScaleCalibrationProfile.CURRENT_VERSION, first.version());
-        assertEquals(5, first.representativeShips().size());
-        assertEquals(20, first.routeSamples().size());
+        assertEquals("stage20a.representative-routes.v3", first.version());
+        assertEquals(9, first.representativeShips().size());
+        assertEquals(36, first.routeSamples().size());
         assertEquals(4, first.routeBands().size());
 
         Set<String> representativeIds = first.representativeShips().stream()
@@ -44,12 +44,13 @@ class Stage20ScaleCalibrationProfileTest {
                 "ESCORT_DESTROYER",
                 "BATTLESHIP",
                 "BULK_FREIGHTER_LOADED",
-                "FLEET_TANKER_LOADED"), representativeIds);
+                "FLEET_TANKER_LOADED",
+                "EARLY_CIVILIAN_FREIGHTER",
+                "MINING_SHIP",
+                "CRUISER",
+                "CARRIER_AVIATION_GROUP"), representativeIds);
 
-        RepresentativeShipPropulsionEnvelope escort = first.representativeShips().stream()
-                .filter(value -> REPRESENTATIVE_ID.equals(value.representativeId()))
-                .findFirst()
-                .orElseThrow();
+        RepresentativeShipPropulsionEnvelope escort = find(first, REPRESENTATIVE_ID);
         assertEquals(CalibrationAuthority.PRODUCTION_ENGINEERING, escort.authority());
         assertEquals(FIT_ID, escort.provenanceId());
         assertEquals("load.escort_destroyer.full_reaction_mass_v1", escort.loadCaseId());
@@ -68,13 +69,30 @@ class Stage20ScaleCalibrationProfileTest {
         assertTrue(escort.terminalAccelerationMps2() > escort.initialAccelerationMps2());
         assertTrue(escort.accelerationDistanceM() > escort.brakingDistanceM());
 
+        long productionCount = first.representativeShips().stream()
+                .filter(value -> value.authority() == CalibrationAuthority.PRODUCTION_ENGINEERING)
+                .count();
         long provisionalCount = first.representativeShips().stream()
                 .filter(value -> value.authority() == CalibrationAuthority.PROVISIONAL_ACCEPTED_REFERENCE)
                 .count();
-        assertEquals(4L, provisionalCount);
+        assertEquals(1L, productionCount);
+        assertEquals(8L, provisionalCount);
         assertTrue(first.representativeShips().stream()
                 .filter(value -> value.authority() == CalibrationAuthority.PROVISIONAL_ACCEPTED_REFERENCE)
-                .allMatch(value -> value.provenanceId().startsWith("ship_mathematics_v1_0_design_baseline:")));
+                .allMatch(value -> !value.provenanceId().isBlank()));
+
+        RepresentativeShipPropulsionEnvelope early = find(first, "EARLY_CIVILIAN_FREIGHTER");
+        RepresentativeShipPropulsionEnvelope miner = find(first, "MINING_SHIP");
+        RepresentativeShipPropulsionEnvelope cruiser = find(first, "CRUISER");
+        RepresentativeShipPropulsionEnvelope carrier = find(first, "CARRIER_AVIATION_GROUP");
+        assertEquals(28_000_000d, early.wetMassKg(), 0d);
+        assertEquals(0.2d, early.initialAccelerationMps2(), 0d);
+        assertTrue(early.provenanceId().contains("stage20a_representative_propulsion_v2.md"));
+        assertEquals(56_000_000d, miner.wetMassKg(), 0d);
+        assertEquals(0.125d, miner.initialAccelerationMps2(), 0d);
+        assertTrue(miner.provenanceId().contains("stage20a_representative_propulsion_v2.md"));
+        assertTrue(cruiser.provenanceId().contains("ship_reference_designs_v0_2.json"));
+        assertTrue(carrier.provenanceId().contains("ship_reference_designs_v0_2.json"));
 
         first.routeBands().forEach(band -> {
             assertTrue(band.distanceM() > 0d);
@@ -83,6 +101,26 @@ class Stage20ScaleCalibrationProfileTest {
             assertTrue(band.minBrakingDistanceM() <= band.maxBrakingDistanceM());
             assertTrue(band.minReactionMassFractionConsumed() <= band.maxReactionMassFractionConsumed());
         });
+    }
+
+    @Test
+    void newCivilianAndMiningSeedsProducePhysicalRouteConsequences() {
+        Stage20ScaleCalibrationProfile profile = Stage20ScaleCalibrationProfile.deriveCurrent();
+        var early100Mm = profile.routeSamples().stream()
+                .filter(value -> value.representativeId().equals("EARLY_CIVILIAN_FREIGHTER"))
+                .filter(value -> value.distanceM() == 100_000_000d)
+                .findFirst().orElseThrow();
+        var miner100Mm = profile.routeSamples().stream()
+                .filter(value -> value.representativeId().equals("MINING_SHIP"))
+                .filter(value -> value.distanceM() == 100_000_000d)
+                .findFirst().orElseThrow();
+
+        assertTrue(early100Mm.totalTravelTimeS() > 0d);
+        assertTrue(miner100Mm.totalTravelTimeS() > early100Mm.totalTravelTimeS());
+        assertTrue(early100Mm.requiredDeltaVMps() > 0d);
+        assertTrue(miner100Mm.requiredDeltaVMps() > 0d);
+        assertTrue(early100Mm.reactionMassConsumedKg() > 0d);
+        assertTrue(miner100Mm.reactionMassConsumedKg() > 0d);
     }
 
     @Test
@@ -140,6 +178,13 @@ class Stage20ScaleCalibrationProfileTest {
                 () -> new Stage20ScaleCalibrationProfile("", List.of(), List.of(), List.of()));
         assertThrows(NullPointerException.class,
                 () -> new Stage20ScaleCalibrationProfile("v", null, List.of(), List.of()));
+    }
+
+    private static RepresentativeShipPropulsionEnvelope find(Stage20ScaleCalibrationProfile profile, String id) {
+        return profile.representativeShips().stream()
+                .filter(value -> id.equals(value.representativeId()))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static DerivedShipState deriveLoadedEscort(double reactionMassKg) {
