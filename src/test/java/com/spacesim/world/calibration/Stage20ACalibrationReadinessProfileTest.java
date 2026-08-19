@@ -28,7 +28,6 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(
                 Set.of(
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
-                        RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
                         RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
                         RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
                         RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
@@ -36,7 +35,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(6, first.blockingRequirements().size());
+        assertEquals(5, first.blockingRequirements().size());
     }
 
     @Test
@@ -73,6 +72,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.FORMATION_SPACING_BAND_CLOSURE,
                 RequirementId.STATION_PHYSICAL_GEOMETRY,
                 RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
+                RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
                 RequirementId.FAR_COORDINATE_PRECISION);
         assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
@@ -146,6 +146,17 @@ class Stage20ACalibrationReadinessProfileTest {
     }
 
     @Test
+    void stationJumpArrivalStandOffIsClosedByEightDerivedPhysicalSamples() {
+        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
+        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult standOff = byId.get(RequirementId.STATION_JUMP_ARRIVAL_STANDOFF);
+
+        assertEquals(RequirementStatus.SATISFIED, standOff.status());
+        assertEquals("closed_station_stand_offs=8/8", standOff.evidence());
+    }
+
+    @Test
     void currentPhysicalAndCalibrationGapsCannotBeHiddenByFallbackConstants() {
         Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
         Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
@@ -176,7 +187,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 "placement_ready_stations=8/8",
                 byId.get(RequirementId.STATION_PHYSICAL_GEOMETRY).evidence());
         assertEquals(
-                "closed_station_stand_offs=0/8",
+                "closed_station_stand_offs=8/8",
                 byId.get(RequirementId.STATION_JUMP_ARRIVAL_STANDOFF).evidence());
         assertTrue(byId.get(RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS).evidence()
                 .contains("station_geometry_is_closed"));

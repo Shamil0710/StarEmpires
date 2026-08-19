@@ -10,8 +10,9 @@ import java.util.OptionalDouble;
  * Versioned Stage-20A.7 evidence for jump-arrival placement and infrastructure stand-off.
  *
  * <p>The profile separates accepted neighbor-edge FTL semantics from local materialization
- * coordinates. Legacy viewport anchors are recorded as compatibility evidence only. Missing station
- * geometry remains unresolved instead of being replaced by a universal jump radius.</p>
+ * coordinates. Legacy viewport anchors remain compatibility evidence only. Station-specific
+ * stand-offs may be closed by explicit Stage-20 physical geometry and defensive exclusion references
+ * without promoting either reference into final Stage-22 production content.</p>
  *
  * @param version stable profile version
  * @param runtimeArrivalPolicy current production/runtime materialization policy evidence
@@ -28,7 +29,7 @@ public record Stage20JumpArrivalSpatialCalibrationProfile(
         TacticalResponseEvidence tacticalResponseEvidence,
         List<String> unresolvedConstraints) {
     /** Current Stage-20A.7 profile version. */
-    public static final String CURRENT_VERSION = "stage20a.jump-arrival-spatial.v1";
+    public static final String CURRENT_VERSION = "stage20a.jump-arrival-spatial.v2";
 
     /**
      * Creates one immutable deterministically ordered profile.
@@ -63,6 +64,8 @@ public record Stage20JumpArrivalSpatialCalibrationProfile(
         LEGACY_BOUNDED_VIEWPORT_COMPATIBILITY,
         /** Accepted Stage-20 calibration probe retained only as scale evidence. */
         PROVISIONAL_CALIBRATION_PROBE,
+        /** Explicit Stage-20 design reference derived from accepted physical inputs pending Stage-22 review. */
+        PROVISIONAL_STAGE20_DESIGN_REFERENCE,
         /** Required generated-world physical closure is absent. */
         UNRESOLVED
     }
@@ -152,12 +155,14 @@ public record Stage20JumpArrivalSpatialCalibrationProfile(
      *
      * @param stationArchetypeId Stage-18 station archetype ID
      * @param authority current stand-off authority
+     * @param provenance exact geometry/defense/arrival provenance when closed
      * @param centerStandOffM center-to-arrival stand-off when physically closed
      * @param unresolvedReasons explicit reasons stand-off cannot yet be authored
      */
     public record StationStandOffSample(
             String stationArchetypeId,
             ArrivalSpatialAuthority authority,
+            String provenance,
             OptionalDouble centerStandOffM,
             List<String> unresolvedReasons) {
         /**
@@ -165,17 +170,27 @@ public record Stage20JumpArrivalSpatialCalibrationProfile(
          *
          * @param stationArchetypeId Stage-18 station archetype ID
          * @param authority current stand-off authority
+         * @param provenance exact physical/design provenance
          * @param centerStandOffM center-to-arrival stand-off when physically closed
          * @param unresolvedReasons explicit unresolved reasons
          */
         public StationStandOffSample {
             requireText(stationArchetypeId, "stationArchetypeId");
             Objects.requireNonNull(authority, "authority");
+            requireText(provenance, "provenance");
             Objects.requireNonNull(centerStandOffM, "centerStandOffM");
             if (centerStandOffM.isPresent()) {
                 requirePositive(centerStandOffM.getAsDouble(), "centerStandOffM");
+                if (authority == ArrivalSpatialAuthority.UNRESOLVED) {
+                    throw new IllegalArgumentException("closed station stand-off cannot have UNRESOLVED authority");
+                }
+            } else if (authority != ArrivalSpatialAuthority.UNRESOLVED) {
+                throw new IllegalArgumentException("non-UNRESOLVED station stand-off must contain a distance");
             }
             unresolvedReasons = sortedStrings(unresolvedReasons, "unresolvedReasons");
+            if (centerStandOffM.isPresent() && !unresolvedReasons.isEmpty()) {
+                throw new IllegalArgumentException("closed station stand-off must not retain unresolved reasons");
+            }
         }
     }
 
@@ -224,8 +239,8 @@ public record Stage20JumpArrivalSpatialCalibrationProfile(
      * @param infrastructureId stable infrastructure/station ID
      * @param provenance accepted geometry/defense provenance
      * @param operationalRadiusM explicit infrastructure operational radius
-     * @param trafficClearanceM explicit additional arrival/traffic clearance
-     * @param defensiveEnvelopeFromCenterM explicit accepted defensive envelope from infrastructure center
+     * @param trafficClearanceM explicit additional arrival/traffic clearance beyond the supplied operational radius
+     * @param defensiveEnvelopeFromCenterM explicit accepted defensive/exclusion envelope from infrastructure center
      * @param arrivalSpeedMps explicit materialization/approach speed requiring stopping clearance
      * @param brakingAccelerationMps2 physical braking acceleration
      */
@@ -243,8 +258,8 @@ public record Stage20JumpArrivalSpatialCalibrationProfile(
          * @param infrastructureId stable infrastructure/station ID
          * @param provenance accepted geometry/defense provenance
          * @param operationalRadiusM explicit operational radius
-         * @param trafficClearanceM explicit traffic clearance
-         * @param defensiveEnvelopeFromCenterM explicit center-based defensive envelope
+         * @param trafficClearanceM explicit additional traffic clearance beyond operational radius
+         * @param defensiveEnvelopeFromCenterM explicit center-based defensive/exclusion envelope
          * @param arrivalSpeedMps explicit arrival/approach speed
          * @param brakingAccelerationMps2 physical braking acceleration
          */
@@ -265,9 +280,9 @@ public record Stage20JumpArrivalSpatialCalibrationProfile(
      * @param infrastructureId stable infrastructure/station ID
      * @param provenance exact accepted input provenance
      * @param brakingDistanceM stopping distance implied by sampled speed/acceleration
-     * @param trafficLimitedCenterDistanceM infrastructure radius plus traffic clearance
+     * @param trafficLimitedCenterDistanceM infrastructure radius plus any additional traffic clearance
      * @param brakingLimitedCenterDistanceM infrastructure radius plus stopping distance
-     * @param defensiveLimitedCenterDistanceM center-based defensive envelope
+     * @param defensiveLimitedCenterDistanceM center-based defensive/exclusion envelope
      * @param requiredCenterStandOffM maximum of all physical constraints
      */
     public record DerivedStandOffEnvelope(
@@ -284,9 +299,9 @@ public record Stage20JumpArrivalSpatialCalibrationProfile(
          * @param infrastructureId stable infrastructure/station ID
          * @param provenance exact accepted input provenance
          * @param brakingDistanceM stopping distance implied by speed/acceleration
-         * @param trafficLimitedCenterDistanceM radius plus traffic clearance
+         * @param trafficLimitedCenterDistanceM radius plus any additional traffic clearance
          * @param brakingLimitedCenterDistanceM radius plus stopping distance
-         * @param defensiveLimitedCenterDistanceM center-based defensive envelope
+         * @param defensiveLimitedCenterDistanceM center-based defensive/exclusion envelope
          * @param requiredCenterStandOffM maximum physical constraint
          */
         public DerivedStandOffEnvelope {
