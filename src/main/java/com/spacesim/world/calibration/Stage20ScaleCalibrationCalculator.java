@@ -1,18 +1,19 @@
 package com.spacesim.world.calibration;
 
 import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
+import com.spacesim.world.calibration.Stage20RepresentativePropulsionCatalog.CalibrationAuthority;
+import com.spacesim.world.calibration.Stage20RepresentativePropulsionCatalog.ReferenceDefinition;
 import com.spacesim.world.calibration.Stage20ScaleCalibrationProfile.RepresentativeShipPropulsionEnvelope;
 
 import java.util.Objects;
 
 /**
- * Converts authoritative ship-engineering output into Stage-20 spatial calibration measurements.
+ * Converts authoritative or explicitly provisional ship capability into Stage-20 spatial measurements.
  *
- * <p>This class deliberately does not recalculate ship mass, thrust, mass flow or rocket-equation
- * delta-v. Those values remain owned by the Stage-17.5 engineering pipeline and arrive through
- * {@link DerivedShipState}. The only equations here describe a calibration manoeuvre: all available
- * reaction mass is split between maximum-thrust acceleration and braking so that both legs spend the
- * same delta-v and the ship finishes at rest.</p>
+ * <p>Production mass, thrust, mass flow and rocket-equation delta-v remain owned by the Stage-17.5
+ * engineering pipeline and arrive through {@link DerivedShipState}. Accepted design-baseline
+ * references are handled by a separate entry point and retain provisional provenance in the result.
+ * The equations owned here describe only the variable-mass calibration manoeuvre.</p>
  */
 public final class Stage20ScaleCalibrationCalculator {
     private Stage20ScaleCalibrationCalculator() {
@@ -20,38 +21,91 @@ public final class Stage20ScaleCalibrationCalculator {
     }
 
     /**
-     * Derives one deterministic local-propulsion calibration envelope.
+     * Derives one production local-propulsion calibration envelope.
      *
-     * <p>For a constant-thrust drive with constant mass flow, equal acceleration/braking delta-v is
-     * obtained by changing thrust direction at the geometric-mean mass
-     * {@code sqrt(wetMass * dryAfterReactionMass)}. This preserves the already-authoritative total
-     * delta-v while accounting for the changing ship mass during both burn legs.</p>
-     *
-     * @param sourceFitId stable engineering fit ID used to produce {@code state}
+     * @param representativeId stable Stage-20 representative class/role ID
+     * @param provenanceId production engineering fit/content provenance ID
      * @param loadCaseId stable Stage-20 calibration load-case ID
      * @param state authoritative derived ship state
      * @return immutable propulsion envelope in SI units
      */
-    public static RepresentativeShipPropulsionEnvelope derive(
-            String sourceFitId,
+    public static RepresentativeShipPropulsionEnvelope deriveProduction(
+            String representativeId,
+            String provenanceId,
             String loadCaseId,
             DerivedShipState state) {
-        requireNonBlank(sourceFitId, "sourceFitId");
+        requireNonBlank(representativeId, "representativeId");
+        requireNonBlank(provenanceId, "provenanceId");
         requireNonBlank(loadCaseId, "loadCaseId");
         DerivedShipState checked = Objects.requireNonNull(state, "state");
         if (!checked.validation().isValid()) {
             throw new IllegalArgumentException("calibration requires a valid authoritative ship state");
         }
 
-        double wetMassKg = requirePositiveFinite(checked.totalMassKg(), "totalMassKg");
-        double reactionMassKg = requirePositiveFinite(checked.reactionMassKg(), "reactionMassKg");
-        double thrustN = requirePositiveFinite(checked.availableThrustN(), "availableThrustN");
-        double massFlowKgPerS = requirePositiveFinite(checked.massFlowKgPerS(), "massFlowKgPerS");
-        double initialAccelerationMps2 = requirePositiveFinite(checked.accelerationMps2(), "accelerationMps2");
-        double exhaustVelocityMps = requirePositiveFinite(
-                checked.effectiveExhaustVelocityMps(), "effectiveExhaustVelocityMps");
-        double deltaVMps = requirePositiveFinite(checked.deltaVMps(), "deltaVMps");
+        return derivePhysical(
+                representativeId,
+                CalibrationAuthority.PRODUCTION_ENGINEERING,
+                provenanceId,
+                loadCaseId,
+                requirePositiveFinite(checked.totalMassKg(), "totalMassKg"),
+                requirePositiveFinite(checked.reactionMassKg(), "reactionMassKg"),
+                requirePositiveFinite(checked.availableThrustN(), "availableThrustN"),
+                requirePositiveFinite(checked.massFlowKgPerS(), "massFlowKgPerS"),
+                requirePositiveFinite(checked.accelerationMps2(), "accelerationMps2"),
+                requirePositiveFinite(checked.effectiveExhaustVelocityMps(), "effectiveExhaustVelocityMps"),
+                requirePositiveFinite(checked.deltaVMps(), "deltaVMps"));
+    }
 
+    /**
+     * Derives a calibration envelope from one accepted but explicitly provisional reference design.
+     *
+     * <p>The loader has already closed the reference's mass, acceleration and delta-v against the
+     * accepted v1.0 baseline. This method consumes those accepted outputs and only derives Stage-20
+     * manoeuvre geometry from them.</p>
+     *
+     * @param catalog owning versioned reference catalog
+     * @param reference accepted reference definition contained by {@code catalog}
+     * @return immutable provisional propulsion envelope in SI units
+     */
+    public static RepresentativeShipPropulsionEnvelope deriveReference(
+            Stage20RepresentativePropulsionCatalog catalog,
+            ReferenceDefinition reference) {
+        Stage20RepresentativePropulsionCatalog checkedCatalog = Objects.requireNonNull(catalog, "catalog");
+        ReferenceDefinition checked = Objects.requireNonNull(reference, "reference");
+        if (checkedCatalog.status() != CalibrationAuthority.PROVISIONAL_ACCEPTED_REFERENCE) {
+            throw new IllegalArgumentException("reference calibration requires provisional accepted-reference authority");
+        }
+        if (!checkedCatalog.references().contains(checked)) {
+            throw new IllegalArgumentException("reference is not owned by the supplied Stage-20 catalog");
+        }
+
+        double massFlowKgPerS = checked.thrustN() / checked.exhaustVelocityMps();
+        return derivePhysical(
+                checked.representativeClass(),
+                checkedCatalog.status(),
+                checkedCatalog.sourceBaselineId() + ":" + checked.id(),
+                "load." + checked.id() + ".full_reaction_mass",
+                checked.departureMassKg(),
+                checked.reactionMassKg(),
+                checked.thrustN(),
+                massFlowKgPerS,
+                checked.expectedAccelerationMps2(),
+                checked.exhaustVelocityMps(),
+                checked.expectedDeltaVMps());
+    }
+
+    private static RepresentativeShipPropulsionEnvelope derivePhysical(
+            String representativeId,
+            CalibrationAuthority authority,
+            String provenanceId,
+            String loadCaseId,
+            double wetMassKg,
+            double reactionMassKg,
+            double thrustN,
+            double massFlowKgPerS,
+            double initialAccelerationMps2,
+            double exhaustVelocityMps,
+            double deltaVMps) {
         double dryMassAfterReactionKg = wetMassKg - reactionMassKg;
         if (!(dryMassAfterReactionKg > 0d) || !Double.isFinite(dryMassAfterReactionKg)) {
             throw new IllegalArgumentException("reaction mass must be smaller than total ship mass");
@@ -74,7 +128,9 @@ public final class Stage20ScaleCalibrationCalculator {
         double characteristicRestToRestDistanceM = accelerationDistanceM + brakingDistanceM;
 
         return new RepresentativeShipPropulsionEnvelope(
-                sourceFitId,
+                representativeId,
+                authority,
+                provenanceId,
                 loadCaseId,
                 wetMassKg,
                 dryMassAfterReactionKg,
@@ -95,11 +151,10 @@ public final class Stage20ScaleCalibrationCalculator {
                 characteristicRestToRestDistanceM);
     }
 
-    private static String requireNonBlank(String value, String field) {
+    private static void requireNonBlank(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " must not be blank");
         }
-        return value;
     }
 
     private static double requirePositiveFinite(double value, String field) {
