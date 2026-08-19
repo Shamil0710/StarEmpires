@@ -6,6 +6,9 @@ import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfil
 import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfile.StandOffGeometryInput;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,11 +37,20 @@ class Stage20JumpArrivalSpatialCalibrationProfileTest {
     }
 
     @Test
-    void currentRuntimeZeroSpeedProducesZeroPostJumpBrakingForEveryRepresentative() {
+    void currentRuntimeZeroSpeedProducesZeroPostJumpBrakingForEveryCurrentRepresentative() {
         Stage20JumpArrivalSpatialCalibrationProfile profile =
                 Stage20JumpArrivalSpatialCalibrationCalculator.calibrate();
+        Stage20ScaleCalibrationProfile scale = Stage20ScaleCalibrationProfile.deriveCurrent();
 
-        assertEquals(5, profile.representativeArrivalSamples().size());
+        assertEquals(scale.representativeShips().size(), profile.representativeArrivalSamples().size());
+        assertEquals(
+                scale.representativeShips().stream()
+                        .map(Stage20ScaleCalibrationProfile.RepresentativeShipPropulsionEnvelope::representativeId)
+                        .collect(Collectors.toSet()),
+                profile.representativeArrivalSamples().stream()
+                        .map(Stage20JumpArrivalSpatialCalibrationProfile.RepresentativeArrivalSample::representativeId)
+                        .collect(Collectors.toSet()));
+        assertEquals(9, profile.representativeArrivalSamples().size());
         assertTrue(profile.representativeArrivalSamples().stream()
                 .allMatch(value -> value.arrivalSpeedMps() == 0d));
         assertTrue(profile.representativeArrivalSamples().stream()
