@@ -230,21 +230,48 @@ The profile retains deterministic provenance and records missing physical closur
 
 Detailed implementation/authority record: `docs/stage20a5_weapon_pd_spatial_calibration.md`.
 
-## 12. Immediate next implementation slice
+## 12. Stage 20A.6 — formation / station spatial calibration — ACCEPTED
 
-Stage 20A.6 should calibrate **formation spacing and station physical footprint/spacing** from existing production/runtime evidence before world geometry is authored.
+The sixth implementation slice separates Stage-19 tactical probe geometry from Stage-20 world authority and inventories what station geometry Stage 18 actually owns.
+
+`Stage20FormationStationSpatialCalibrationCalculator` now derives:
+
+- measurable formation line span and outer-slot offset from explicit Stage-19 ship count + slot spacing;
+- a physical ideal rest-to-tolerance recovery-time lower bound from the current production escort acceleration rather than a map constant;
+- deterministic station-geometry entries for all eight current Stage-18F station archetypes;
+- explicit `UNRESOLVED` station footprint, docking-approach and traffic-clearance fields where Stage 18 has no physical dimensions;
+- the existing Stage-18G `yard.orbital_escort_v1` 300 × 120 × 70 m berth as separate production-authoritative physical evidence;
+- a minimum explicit station-placement geometry seam that requires real footprint/clearance values with provenance before any conservative placement envelope can be derived.
+
+The current Stage-19 formation spacings remain `PROVISIONAL_STAGE19_TACTICAL_PROBE`. They are not promoted to world-generation constants. Storage capacity, facility count, cargo throughput and maximum handled unit mass are explicitly not permitted as station-size fallbacks.
+
+Detailed implementation/authority record: `docs/stage20a6_formation_station_spatial_calibration.md`.
+
+Open machine-readable gaps after 20A.6:
+
+- full Stage-18 station footprint dimensions are not authored;
+- docking-approach clearance is not authored;
+- station traffic-clearance geometry is not authored;
+- the physical shipyard berth is only a berth envelope and cannot stand in for the containing station footprint;
+- missing representative ship roles from earlier Stage-20A slices remain unresolved.
+
+Stage 20B must not treat unresolved station archetypes as physically closed placement objects. An accepted physical geometry source must populate the minimum station-placement schema first.
+
+## 13. Immediate next implementation slice
+
+Stage 20A.7 should calibrate **jump-arrival stand-off** from existing FTL semantics and already measured physical response envelopes before world geometry is authored.
 
 Required work:
 
-1. identify current Stage-19 formation objectives as authored tactical probe geometry, not canonical world spacing;
-2. derive measurable fleet frontage/slot/recovery envelopes from physical ship count, spacing, acceleration and formation-control behavior where production runtime owns them;
-3. inventory Stage-18 station/facility infrastructure for actual physical dimensions, docking/transfer approach geometry and traffic-clearance inputs;
-4. keep any absent station footprint/docking dimensions machine-visible rather than inventing a final radius from storage capacity or facility count;
-5. define only the minimum accepted physical geometry schema needed by later Stage-20 system placement if current Stage-18 content lacks it, preserving Stage-18 industry authority and Stage-20 placement authority separation;
-6. produce deterministic profile/tests proving that changed physical footprint or formation capability changes spacing evidence rather than being hidden by a fixed map constant.
+1. preserve ordinary FTL `NEIGHBOR_EDGE_ONLY` authority and distinguish topology edge transition from local arrival placement;
+2. inventory any already-authored arrival/departure geometry without promoting scenario/demo offsets to universal constants;
+3. derive stand-off evidence from physical braking/reaction capability, station/traffic geometry where physically closed, and sensor/weapon/PD response envelopes;
+4. keep station-dependent stand-off unresolved where Stage-20A.6 station footprint/traffic geometry remains unresolved;
+5. do not invent one universal jump radius, safety bubble or teleport buffer to hide missing geometry;
+6. produce deterministic sensitivity tests proving that changed physical braking, response or explicit infrastructure geometry changes the derived arrival evidence.
 
-After formation/station geometry, subsequent Stage-20A slices still own jump-arrival stand-off, far-coordinate numerical precision and materialization/LOD bands before Stage 20B star-system physical geometry begins.
+After jump-arrival stand-off, subsequent Stage-20A slices still own far-coordinate numerical precision and materialization/LOD bands before Stage 20B star-system physical geometry begins.
 
 Missing representative ship roles continue to remain explicit gaps until production content or accepted reference physics exists. Stage 20A cannot be declared complete while required representative coverage or required calibration domains remain unresolved.
 
-Acceptance continues to require that identical content + profile version produces identical output and that changing physical capability changes derived spatial/travel/FTL/sensor/weapon/formation/station bands rather than being hidden by fixed map constants.
+Acceptance continues to require that identical content + profile version produces identical output and that changing physical capability changes derived spatial/travel/FTL/sensor/weapon/formation/station/arrival bands rather than being hidden by fixed map constants.
