@@ -99,7 +99,14 @@ class Stage20WeaponSpatialCalibrationProfileTest {
         assertTrue(assigned.stream().allMatch(value ->
                 value.interceptDistanceFromProtectedCenterM() + 1e-9d
                         >= Math.max(1_500d, value.safeMinimumInterceptDistanceM())));
-        assertTrue(profile.unresolvedConstraints().stream()
+        assertFalse(profile.unresolvedConstraints().stream()
                 .anyMatch(value -> value.contains("safe_intercept_distance_is_scheduler_input")));
+        assertTrue(profile.unresolvedConstraints().stream()
+                .anyMatch(value -> value.contains("safe_intercept_distance_superseded_by="
+                        + Stage20PdSafeInterceptCalibrationProfile.CURRENT_VERSION)));
+        assertTrue(profile.unresolvedConstraints().stream()
+                .anyMatch(value -> value.contains("scheduler_input_m=100000.0")));
+        assertTrue(profile.unresolvedConstraints().stream()
+                .anyMatch(value -> value.contains("residual_risk_zero=false")));
     }
 }
