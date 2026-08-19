@@ -49,6 +49,7 @@ public final class Stage20ACalibrationReadinessCalculator {
         Stage20ScaleCalibrationProfile scale = Stage20ScaleCalibrationProfile.deriveCurrent();
         Stage20FtlCalibrationProfile ftl = Stage20FtlCalibrationProfile.deriveCurrent();
         Stage20SensorCalibrationProfile sensor = Stage20SensorCalibrationProfile.deriveCurrent();
+        Stage20FireControlPolicyClosureProfile fireControl = Stage20FireControlPolicyClosureProfile.deriveCurrent();
         Stage20WeaponSpatialCalibrationProfile weapons = Stage20WeaponSpatialCalibrationCalculator.calibrate();
         Stage20FormationStationSpatialCalibrationProfile formationStation =
                 Stage20FormationStationSpatialCalibrationCalculator.calibrate();
@@ -130,14 +131,18 @@ public final class Stage20ACalibrationReadinessCalculator {
                                 + sensor.targetRepresentativeId() + ";representative_class_coverage_incomplete"
                         : "representative_sensor_target_coverage_closed"));
 
-        boolean fusedTrackPolicyOpen = sensor.unresolvedGaps().stream()
+        boolean historicalFusedTrackPolicyGap = sensor.unresolvedGaps().stream()
                 .anyMatch(value -> value.contains("final_fused_track_quality_policy_pending_weapon_geometry"));
+        boolean fusedTrackPolicyClosed = fireControl.closesStage20FireControlPolicy();
         requirements.add(result(
                 RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
-                !fusedTrackPolicyOpen,
-                fusedTrackPolicyOpen
-                        ? "stage20a4_track_policy_remains_provisional_after_stage20a5_weapon_geometry"
-                        : "fused_track_fire_control_policy_closed_against_weapon_geometry"));
+                fusedTrackPolicyClosed,
+                fusedTrackPolicyClosed
+                        ? "historical_stage20a4_pending=" + historicalFusedTrackPolicyGap
+                                + ";superseded_by=" + fireControl.version()
+                                + ";minimum_shared_weapon_track_state="
+                                + fireControl.minimumSharedWeaponTrackState().name()
+                        : "stage20a4_track_policy_remains_provisional_after_stage20a5_weapon_geometry"));
 
         boolean weaponEvidence = !weapons.kineticSamples().isEmpty()
                 && !weapons.beamSamples().isEmpty()
