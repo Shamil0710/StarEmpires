@@ -3,8 +3,8 @@ package com.spacesim.world.calibration;
 import com.spacesim.ship.SensorDefinition.Mode;
 import com.spacesim.world.calibration.Stage20RepresentativePropulsionCatalog.CalibrationAuthority;
 import com.spacesim.world.calibration.Stage20SensorCalibrationCalculator.ThresholdDistances;
-import com.spacesim.world.calibration.Stage20SensorTargetClassCoverageProfile.TargetObservationSample;
 import com.spacesim.world.calibration.Stage20SensorTargetClassCoverageProfile.TargetClass;
+import com.spacesim.world.calibration.Stage20SensorTargetClassCoverageProfile.TargetObservationSample;
 import com.spacesim.world.calibration.Stage20WeaponTargetClassCoverageProfile.KineticP50Sample;
 
 import java.util.ArrayList;
@@ -17,12 +17,17 @@ import java.util.stream.Collectors;
 /**
  * Versioned Stage-20A station defensive/sensor spatial-geometry authority.
  *
- * <p>This profile does not invent a new station sensor equation or a station-only weapon model.
- * Station sensor warning geometry reuses the production escort observation runtime as a conservative
- * minimum reference. Defensive-response geometry reuses already accepted v0.3 kinetic P50 rows.
- * The only new Stage-20 design decision is which accepted reference tier each Stage-18 station
- * archetype consumes. Stage 22 must replace or explicitly promote these provisional capability
- * references when final station modules and faction doctrine are authored.</p>
+ * <p>This profile does not invent a station-only sensor equation, weapon equation or range
+ * multiplier. Sensor warning/track geometry reuses the production escort observation runtime as a
+ * conservative reference floor. Defensive exclusion geometry reuses accepted v0.3 kinetic P50
+ * interaction rows as a separate provisional world-placement reference. Those two references are
+ * intentionally not asserted to form one end-to-end station firing solution: final station sensors,
+ * weapon mounts and fire-control coupling belong to Stage 22 content promotion.</p>
+ *
+ * <p>The only new Stage-20 design decision is which accepted reference tier each Stage-18 station
+ * archetype consumes. Stage 20B may use the defensive exclusion reference for placement/arrival
+ * geometry, but must not reinterpret it as a hard weapon range or as proof of a production station
+ * combat capability.</p>
  *
  * @param version stable profile version
  * @param authority authority of the station capability-tier assignment
@@ -53,9 +58,9 @@ public record Stage20StationDefensiveSensorGeometryProfile(
 
     /** Provisional station-security tier expressed only as a reference selection. */
     public enum SecurityTier {
-        /** Basic local security using the accepted corvette direct-fire reference. */ BASIC_SECURITY,
-        /** Hardened civil/industrial security using the accepted frigate direct-fire reference. */ HARDENED_SECURITY,
-        /** Strategic naval site using the accepted capital direct-fire reference. */ NAVAL_FORTIFIED
+        /** Basic local security using the accepted corvette direct-fire interaction reference. */ BASIC_SECURITY,
+        /** Hardened civil/industrial security using the accepted frigate interaction reference. */ HARDENED_SECURITY,
+        /** Strategic naval site using the accepted capital interaction reference. */ NAVAL_FORTIFIED
     }
 
     /**
@@ -163,10 +168,15 @@ public record Stage20StationDefensiveSensorGeometryProfile(
     }
 
     /**
-     * Returns whether every required station has usable warning, track, fire-control and defensive
-     * response geometry with visible provisional authority.
+     * Returns whether every required station has usable sensor geometry and an explicit defensive
+     * exclusion reference with visible provisional authority.
      *
-     * @return true when this profile closes the Stage-20B station defensive/sensor entry requirement
+     * <p>Closure is a world-geometry contract, not an end-to-end combat-capability claim. In
+     * particular, an escort-derived fire-control reference is not required to reach the independent
+     * P50-derived defensive exclusion reference. Final station fire-control integration remains a
+     * Stage-22 content responsibility.</p>
+     *
+     * @return true when this profile closes the Stage-20B station defensive/sensor geometry entry requirement
      */
     public boolean closesStage20BEntryCoverage() {
         Set<String> actualIds = stations.stream()
@@ -177,7 +187,8 @@ public record Stage20StationDefensiveSensorGeometryProfile(
                 && sensorReferenceProfileVersion.equals(Stage20SensorTargetClassCoverageProfile.CURRENT_VERSION)
                 && weaponReferenceProfileVersion.equals(Stage20WeaponTargetClassCoverageProfile.CURRENT_VERSION)
                 && actualIds.equals(REQUIRED_STATION_IDS)
-                && stations.stream().allMatch(StationDefensiveSensorGeometry::isOperationallyNested);
+                && stations.stream().allMatch(StationDefensiveSensorGeometry::sensorGeometryNested)
+                && stations.stream().allMatch(value -> value.defensiveExclusionReferenceM() > 0d);
     }
 
     /**
@@ -241,21 +252,21 @@ public record Stage20StationDefensiveSensorGeometryProfile(
     }
 
     /**
-     * One station-specific spatial capability row built from accepted sensor and weapon references.
+     * One station-specific spatial capability row built from independent accepted sensor and weapon references.
      *
      * @param stationArchetypeId stable Stage-18 station archetype ID
      * @param securityTier provisional security tier
-     * @param sensorReferenceTarget representative target used to measure the minimum sensor geometry
+     * @param sensorReferenceTarget representative target used to measure sensor geometry
      * @param sensorProvenance exact sensor-profile provenance
      * @param passiveDetectionWarningM passive-thermal detection warning envelope
      * @param activeDetectionWarningM active-radar detection envelope
      * @param activeClassificationM active-radar classification envelope
      * @param activeTrackM active-radar tracked envelope
-     * @param activeFireControlM active-radar fire-control envelope
-     * @param defenseReferenceTarget authored target class behind the direct-fire response reference
-     * @param defenseReferenceWeaponId authored benchmark weapon behind the response reference
+     * @param activeFireControlM active-radar fire-control reference envelope
+     * @param defenseReferenceTarget authored target class behind the exclusion reference
+     * @param defenseReferenceWeaponId authored benchmark weapon behind the exclusion reference
      * @param defenseProvenance exact accepted weapon benchmark provenance
-     * @param defensiveResponseEnvelopeM accepted P50 direct-fire response envelope
+     * @param defensiveExclusionReferenceM accepted P50 interaction scale used only as provisional exclusion geometry
      */
     public record StationDefensiveSensorGeometry(
             String stationArchetypeId,
@@ -270,9 +281,9 @@ public record Stage20StationDefensiveSensorGeometryProfile(
             Stage20WeaponTargetClassCoverageProfile.TargetClass defenseReferenceTarget,
             String defenseReferenceWeaponId,
             String defenseProvenance,
-            double defensiveResponseEnvelopeM) {
+            double defensiveExclusionReferenceM) {
         /**
-         * Validates one station-specific capability row.
+         * Validates one station-specific spatial-reference row.
          *
          * @param stationArchetypeId stable Stage-18 station archetype ID
          * @param securityTier provisional security tier
@@ -282,11 +293,11 @@ public record Stage20StationDefensiveSensorGeometryProfile(
          * @param activeDetectionWarningM active detection envelope
          * @param activeClassificationM active classification envelope
          * @param activeTrackM active track envelope
-         * @param activeFireControlM active fire-control envelope
+         * @param activeFireControlM active fire-control reference envelope
          * @param defenseReferenceTarget representative weapon target
          * @param defenseReferenceWeaponId accepted benchmark weapon ID
          * @param defenseProvenance exact weapon provenance
-         * @param defensiveResponseEnvelopeM accepted response envelope
+         * @param defensiveExclusionReferenceM accepted provisional exclusion reference
          */
         public StationDefensiveSensorGeometry {
             requireText(stationArchetypeId, "stationArchetypeId");
@@ -301,44 +312,42 @@ public record Stage20StationDefensiveSensorGeometryProfile(
             Objects.requireNonNull(defenseReferenceTarget, "defenseReferenceTarget");
             requireText(defenseReferenceWeaponId, "defenseReferenceWeaponId");
             requireText(defenseProvenance, "defenseProvenance");
-            requirePositive(defensiveResponseEnvelopeM, "defensiveResponseEnvelopeM");
-            if (!isOperationallyNestedValues(
+            requirePositive(defensiveExclusionReferenceM, "defensiveExclusionReferenceM");
+            if (!sensorGeometryNestedValues(
                     activeDetectionWarningM,
                     activeClassificationM,
                     activeTrackM,
-                    activeFireControlM,
-                    defensiveResponseEnvelopeM)) {
-                throw new IllegalArgumentException(
-                        "station sensor/defense envelopes must remain nested and cover defensive response");
+                    activeFireControlM)) {
+                throw new IllegalArgumentException("station sensor evidence states must remain nested");
             }
         }
 
         /**
-         * Returns whether stronger sensor states remain inside weaker ones and fire control covers the
-         * selected defensive response reference.
+         * Returns whether stronger active-sensor information states remain inside weaker states.
          *
-         * @return true when the physical envelopes are operationally nested
+         * <p>This deliberately does not compare the independent defensive exclusion reference to the
+         * escort-derived sensor floor; such a comparison would falsely claim an authored station
+         * fire-control chain that does not yet exist.</p>
+         *
+         * @return true when active sensor evidence-state geometry is physically nested
          */
-        public boolean isOperationallyNested() {
-            return isOperationallyNestedValues(
+        public boolean sensorGeometryNested() {
+            return sensorGeometryNestedValues(
                     activeDetectionWarningM,
                     activeClassificationM,
                     activeTrackM,
-                    activeFireControlM,
-                    defensiveResponseEnvelopeM);
+                    activeFireControlM);
         }
     }
 
-    private static boolean isOperationallyNestedValues(
+    private static boolean sensorGeometryNestedValues(
             double detection,
             double classification,
             double track,
-            double fireControl,
-            double defense) {
+            double fireControl) {
         return detection >= classification
                 && classification >= track
-                && track >= fireControl
-                && fireControl >= defense;
+                && track >= fireControl;
     }
 
     private static String requireText(String value, String field) {
