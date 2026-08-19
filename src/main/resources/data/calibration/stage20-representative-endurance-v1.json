@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "version": "stage20a.representative-endurance.v1",
+  "status": "PROVISIONAL_ACCEPTED_REFERENCE",
+  "stage22ReviewRequired": true,
+  "policyEvidence": "Sustained-thrust values retain explicit source/authoring provenance; missionStoresEnduranceS is a Stage-20 nominal operational-policy seed for calibration only, not a mass-derived crew-survival equation or production content commitment.",
+  "references": [
+    {
+      "representativeClass": "TORPEDO_CORVETTE",
+      "sustainedThrustN": 600000.0,
+      "sustainedThrustSourceEvidenceId": "docs/benchmarks/ship_reference_designs_v0_2.json:benchmark.ship.torpedo_corvette_v0_2/sustainedForwardThrustN|accepted_by=docs/stage20a_representative_endurance_v1.md",
+      "missionStoresEnduranceS": 604800.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/TORPEDO_CORVETTE"
+    },
+    {
+      "representativeClass": "ESCORT_DESTROYER",
+      "sustainedThrustN": 3300000.0,
+      "sustainedThrustSourceEvidenceId": "docs/benchmarks/ship_reference_designs_v0_2.json:benchmark.ship.escort_destroyer_v0_2/sustainedForwardThrustN|accepted_by=docs/stage20a_representative_endurance_v1.md",
+      "missionStoresEnduranceS": 2592000.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/ESCORT_DESTROYER"
+    },
+    {
+      "representativeClass": "BATTLESHIP",
+      "sustainedThrustN": 33000000.0,
+      "sustainedThrustSourceEvidenceId": "docs/benchmarks/ship_reference_designs_v0_2.json:benchmark.ship.battleship_v0_2/sustainedForwardThrustN|accepted_by=docs/stage20a_representative_endurance_v1.md",
+      "missionStoresEnduranceS": 10368000.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/BATTLESHIP"
+    },
+    {
+      "representativeClass": "BULK_FREIGHTER_LOADED",
+      "sustainedThrustN": 4000000.0,
+      "sustainedThrustSourceEvidenceId": "docs/benchmarks/ship_reference_designs_v0_2.json:benchmark.ship.bulk_freighter_v0_2/sustainedForwardThrustN|accepted_by=docs/stage20a_representative_endurance_v1.md",
+      "missionStoresEnduranceS": 3888000.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/BULK_FREIGHTER_LOADED"
+    },
+    {
+      "representativeClass": "FLEET_TANKER_LOADED",
+      "sustainedThrustN": 8000000.0,
+      "sustainedThrustSourceEvidenceId": "docs/benchmarks/ship_reference_designs_v0_2.json:benchmark.ship.fleet_tanker_v0_2/sustainedForwardThrustN|accepted_by=docs/stage20a_representative_endurance_v1.md",
+      "missionStoresEnduranceS": 5184000.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/FLEET_TANKER_LOADED"
+    },
+    {
+      "representativeClass": "CRUISER",
+      "sustainedThrustN": 7000000.0,
+      "sustainedThrustSourceEvidenceId": "docs/benchmarks/ship_reference_designs_v0_2.json:benchmark.ship.general_cruiser_v0_2/sustainedForwardThrustN|accepted_by=docs/stage20a_representative_endurance_v1.md",
+      "missionStoresEnduranceS": 7776000.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/CRUISER"
+    },
+    {
+      "representativeClass": "CARRIER_AVIATION_GROUP",
+      "sustainedThrustN": 25000000.0,
+      "sustainedThrustSourceEvidenceId": "docs/benchmarks/ship_reference_designs_v0_2.json:benchmark.ship.fleet_carrier_v0_2/sustainedForwardThrustN|accepted_by=docs/stage20a_representative_endurance_v1.md",
+      "missionStoresEnduranceS": 10368000.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/CARRIER_AVIATION_GROUP"
+    },
+    {
+      "representativeClass": "EARLY_CIVILIAN_FREIGHTER",
+      "sustainedThrustN": 1800000.0,
+      "sustainedThrustSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:bounded_authoring/EARLY_CIVILIAN_FREIGHTER",
+      "missionStoresEnduranceS": 1209600.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/EARLY_CIVILIAN_FREIGHTER"
+    },
+    {
+      "representativeClass": "MINING_SHIP",
+      "sustainedThrustN": 2100000.0,
+      "sustainedThrustSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:bounded_authoring/MINING_SHIP",
+      "missionStoresEnduranceS": 3888000.0,
+      "missionStoresSourceEvidenceId": "docs/stage20a_representative_endurance_v1.md:operational_policy/MINING_SHIP"
+    }
+  ]
+}

@@ -47,6 +47,7 @@ public final class Stage20ACalibrationReadinessCalculator {
      */
     public static Stage20ACalibrationReadinessProfile deriveCurrent() {
         Stage20ScaleCalibrationProfile scale = Stage20ScaleCalibrationProfile.deriveCurrent();
+        Stage20RepresentativeEnduranceProfile endurance = Stage20RepresentativeEnduranceProfile.deriveCurrent();
         Stage20FtlCalibrationProfile ftl = Stage20FtlCalibrationProfile.deriveCurrent();
         Stage20SensorCalibrationProfile sensor = Stage20SensorCalibrationProfile.deriveCurrent();
         Stage20FireControlPolicyClosureProfile fireControl = Stage20FireControlPolicyClosureProfile.deriveCurrent();
@@ -75,10 +76,26 @@ public final class Stage20ACalibrationReadinessCalculator {
                                 .map(value -> value.role().name())
                                 .collect(Collectors.joining(","))));
 
-        requirements.add(new RequirementResult(
+        Set<String> propulsionIds = scale.representativeShips().stream()
+                .map(RepresentativeShipPropulsionEnvelope::representativeId)
+                .collect(Collectors.toSet());
+        Set<String> enduranceIds = endurance.samples().stream()
+                .map(Stage20RepresentativeEnduranceProfile.EnduranceSample::representativeId)
+                .collect(Collectors.toSet());
+        boolean enduranceClosed = propulsionIds.size() == 9
+                && enduranceIds.equals(propulsionIds)
+                && endurance.samples().stream().allMatch(value ->
+                        value.sustainedThrustN() > 0d
+                                && value.sustainedThrustN() <= value.maxThrustN()
+                                && value.missionStoresEnduranceS() > 0d
+                                && !value.sustainedThrustSourceEvidenceId().isBlank()
+                                && !value.missionStoresSourceEvidenceId().isBlank());
+        requirements.add(result(
                 RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE,
-                RequirementStatus.BLOCKING_STAGE20B_ENTRY,
-                "current_scale_profile_has_propulsion_route_outputs_but_no_machine_readable_stores_endurance_or_sustained_vs_max_thrust_consequence_matrix"));
+                enduranceClosed,
+                "endurance_samples=" + endurance.samples().size() + "/" + scale.representativeShips().size()
+                        + ";profile=" + endurance.version()
+                        + ";stage22_review_required=" + endurance.stage22ReviewRequired()));
 
         List<String> compatibleCivilianFtl = ftl.samples().stream()
                 .filter(value -> CIVILIAN_LOGISTICS_REPRESENTATIVES.contains(value.representativeId()))
