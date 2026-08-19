@@ -93,7 +93,11 @@ public record Stage20LocalRouteSemanticCalibrationProfile(
         samples = List.copyOf(sampleCopy);
     }
 
-    /** Derives the current four-band, nine-role, two-thrust-policy calibration matrix. */
+    /**
+     * Derives the current four-band, nine-role, two-thrust-policy calibration matrix.
+     *
+     * @return deterministic current Stage-20A local-route semantic calibration profile
+     */
     public static Stage20LocalRouteSemanticCalibrationProfile deriveCurrent() {
         Stage20LocalRouteSemanticBandCatalog distanceCatalog =
                 Stage20LocalRouteSemanticBandCatalogLoader.loadDefault();
@@ -165,7 +169,28 @@ public record Stage20LocalRouteSemanticCalibrationProfile(
                 : RepresentativeGroup.MILITARY;
     }
 
-    /** One physical route consequence at an authored semantic band endpoint. */
+    /**
+     * One physical route consequence at an authored semantic band endpoint.
+     *
+     * @param bandId semantic route band
+     * @param endpoint band endpoint
+     * @param representativeGroup civilian/logistics or military population
+     * @param representativeId stable representative ID
+     * @param thrustPolicy physical thrust policy
+     * @param distanceM authored endpoint distance
+     * @param distanceSourceEvidenceId distance authoring provenance
+     * @param propulsionAuthority baseline propulsion authority
+     * @param propulsionProvenanceId baseline propulsion provenance
+     * @param appliedThrustN physical thrust used by the route solver
+     * @param thrustPolicyProvenanceId applied-thrust provenance
+     * @param regime resulting route regime
+     * @param totalTravelTimeS physical rest-to-rest travel time
+     * @param requiredDeltaVMps physical route delta-v
+     * @param reactionMassConsumedKg physical reaction mass consumed
+     * @param reactionMassFractionConsumed fraction of represented reaction mass consumed
+     * @param brakingDistanceM physical braking distance
+     * @param peakSpeedMps route peak speed
+     */
     public record SemanticRouteSample(
             BandId bandId,
             BandEndpoint endpoint,
