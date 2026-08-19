@@ -1,7 +1,6 @@
 package com.spacesim.world.calibration;
 
 import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.GateStatus;
-import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.RequiredRepresentativeRole;
 import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.RequirementId;
 import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.RequirementResult;
 import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.RequirementStatus;
@@ -28,9 +27,7 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(RequirementId.values().length, first.requirements().size());
         assertEquals(
                 Set.of(
-                        RequirementId.REPRESENTATIVE_PROPULSION_COVERAGE,
                         RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE,
-                        RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE,
                         RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
                         RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
                         RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
@@ -46,27 +43,21 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(15, first.blockingRequirements().size());
+        assertEquals(13, first.blockingRequirements().size());
     }
 
     @Test
-    void representativeCoverageKeepsFiveCurrentRolesAndFourMissingRolesExplicit() {
+    void representativeCoverageNowContainsAllNineRequiredRolesWithExplicitAuthority() {
         Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
 
         assertEquals(9, profile.representativeCoverage().size());
-        assertEquals(5, profile.representativeCoverage().stream().filter(value -> value.present()).count());
-        assertEquals(
-                Set.of(
-                        RequiredRepresentativeRole.EARLY_CIVILIAN_FREIGHTER,
-                        RequiredRepresentativeRole.MINING_SHIP,
-                        RequiredRepresentativeRole.CRUISER,
-                        RequiredRepresentativeRole.CARRIER_AVIATION),
-                profile.missingRepresentativeRoles().stream()
-                        .map(Stage20ACalibrationReadinessProfile.RepresentativeRoleCoverage::role)
-                        .collect(Collectors.toSet()));
+        assertEquals(9, profile.representativeCoverage().stream().filter(value -> value.present()).count());
+        assertTrue(profile.missingRepresentativeRoles().isEmpty());
         assertTrue(profile.representativeCoverage().stream()
-                .filter(value -> value.present())
                 .allMatch(value -> value.authority().isPresent() && value.provenance().isPresent()));
+        assertEquals(1, profile.representativeCoverage().stream()
+                .filter(value -> value.authority().orElseThrow().equals("PRODUCTION_ENGINEERING"))
+                .count());
     }
 
     @Test
@@ -76,6 +67,8 @@ class Stage20ACalibrationReadinessProfileTest {
                 .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
 
         assertStatus(byId, RequirementStatus.SATISFIED,
+                RequirementId.REPRESENTATIVE_PROPULSION_COVERAGE,
+                RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE,
                 RequirementId.FTL_TOPOLOGY_SEMANTICS,
                 RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
                 RequirementId.WEAPON_PD_SPATIAL_EVIDENCE,
@@ -94,8 +87,9 @@ class Stage20ACalibrationReadinessProfileTest {
         Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
                 .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
 
-        assertTrue(byId.get(RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE).evidence()
-                .contains("no_current_civilian_logistics_representative"));
+        assertEquals(
+                "compatible_civilian_representatives=EARLY_CIVILIAN_FREIGHTER,MINING_SHIP",
+                byId.get(RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE).evidence());
         assertTrue(byId.get(RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE).evidence()
                 .contains("no_machine_readable_stores_endurance"));
         assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
