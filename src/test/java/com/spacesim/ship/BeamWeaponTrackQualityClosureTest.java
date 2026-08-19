@@ -9,13 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BeamWeaponTrackQualityClosureTest {
     private static final BeamWeapon BEAM = new BeamWeapon(
-            5_000_000d,
-            0.85d,
-            5e-7d,
+            "weapon.stage20_track_quality_closure_beam_v1",
+            1.06e-6d,
+            4d,
             2e-6d,
-            2d,
-            6_000_000d,
-            1_000_000d);
+            500_000_000d,
+            700_000_000d,
+            220_000_000d,
+            3d);
 
     @Test
     void trackedCartesianSolutionIsAdmittedWithoutGlobalFireControlThreshold() {
