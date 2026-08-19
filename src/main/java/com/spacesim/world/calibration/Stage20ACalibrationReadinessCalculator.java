@@ -6,7 +6,6 @@ import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.Requir
 import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.RequirementId;
 import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.RequirementResult;
 import com.spacesim.world.calibration.Stage20ACalibrationReadinessProfile.RequirementStatus;
-import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.SpatialAuthority;
 import com.spacesim.world.calibration.Stage20FtlCalibrationProfile.ReferenceDriveCompatibility;
 import com.spacesim.world.calibration.Stage20FtlCalibrationReference.CalibrationGap;
 import com.spacesim.world.calibration.Stage20FtlCalibrationReference.JumpTopologyMode;
@@ -60,6 +59,8 @@ public final class Stage20ACalibrationReadinessCalculator {
                 Stage20WeaponTargetClassCoverageProfile.deriveCurrent();
         Stage20FormationStationSpatialCalibrationProfile formationStation =
                 Stage20FormationStationSpatialCalibrationCalculator.calibrate();
+        Stage20FormationSpacingCalibrationProfile formationSpacing =
+                Stage20FormationSpacingCalibrationProfile.deriveCurrent();
         Stage20JumpArrivalSpatialCalibrationProfile jumpArrival =
                 Stage20JumpArrivalSpatialCalibrationCalculator.calibrate();
         Stage20FarCoordinatePrecisionCalibrationProfile precision =
@@ -223,14 +224,15 @@ public final class Stage20ACalibrationReadinessCalculator {
                 "formation_probe_count=" + formationStation.formationSamples().size()
                         + ";authority_remains_probe_not_world_constant"));
 
-        boolean acceptedFormationBand = formationStation.formationSamples().stream()
-                .anyMatch(value -> value.authority() == SpatialAuthority.PRODUCTION_AUTHORITATIVE);
+        boolean acceptedFormationBand = formationSpacing.closesStage20BEntryCoverage();
         requirements.add(result(
                 RequirementId.FORMATION_SPACING_BAND_CLOSURE,
                 acceptedFormationBand,
-                acceptedFormationBand
-                        ? "production_authoritative_formation_spacing_band_present"
-                        : "all_current_formation_spacing_values_are_provisional_stage19_tactical_probes"));
+                "profile=" + formationSpacing.version()
+                        + ";bands=" + formationSpacing.bands().stream()
+                                .map(value -> value.id().name()).sorted().collect(Collectors.joining(","))
+                        + ";source_samples=" + formationSpacing.sourceSamples().size()
+                        + ";stage22_review_required=" + formationSpacing.stage22ReviewRequired()));
 
         long readyStations = formationStation.stationGeometrySamples().stream()
                 .filter(Stage20FormationStationSpatialCalibrationProfile.StationGeometrySample::placementReady)
