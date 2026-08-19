@@ -27,7 +27,16 @@ public record Stage20WeaponSpatialCalibrationProfile(
     /** Current Stage-20A.5 weapon/defense spatial calibration profile version. */
     public static final String CURRENT_VERSION = "stage20a.weapon-pd-spatial.v1";
 
-    /** Creates one immutable validated profile. */
+    /**
+     * Creates one immutable validated calibration profile.
+     *
+     * @param version stable calibration profile version
+     * @param kineticSamples production fire-control/kinetic-body geometry samples
+     * @param beamSamples production beam geometry/dwell samples
+     * @param guidedSamples production guided-navigation samples
+     * @param defenseSamples production layered-defense assignment samples
+     * @param unresolvedConstraints physical closures not yet represented by production runtime
+     */
     public Stage20WeaponSpatialCalibrationProfile {
         requireNonBlank(version, "version");
         kineticSamples = immutable(kineticSamples, "kineticSamples");
@@ -62,6 +71,20 @@ public record Stage20WeaponSpatialCalibrationProfile(
             double maneuverEnvelopeRadiusM,
             double projectileKineticEnergyJ,
             String source) {
+        /**
+         * Creates one validated kinetic probe result.
+         *
+         * @param rangeM current target range
+         * @param targetLateralVelocityMps controlled lateral-velocity probe input
+         * @param velocitySigmaMps controlled one-sigma target-velocity uncertainty input
+         * @param maneuverAccelerationMps2 controlled bounded target-maneuver input
+         * @param allowed whether production fire control formed a physical intercept
+         * @param timeOfFlightSeconds production constant-velocity intercept time
+         * @param oneSigmaAimUncertaintyM propagated production uncertainty envelope
+         * @param maneuverEnvelopeRadiusM production bounded maneuver displacement envelope
+         * @param projectileKineticEnergyJ fitted projectile launch-frame kinetic energy
+         * @param source production seam that owns the measurement
+         */
         public KineticSample {
             requirePositiveFinite(rangeM, "rangeM");
             requireFinite(targetLateralVelocityMps, "targetLateralVelocityMps");
@@ -78,7 +101,17 @@ public record Stage20WeaponSpatialCalibrationProfile(
         }
     }
 
-    /** One production beam spot/dwell probe at a finite geometry sample. */
+    /**
+     * One production beam spot/dwell probe at a finite geometry sample.
+     *
+     * @param rangeM current target range
+     * @param allowed whether production beam planning admitted the dwell
+     * @param dwellSeconds requested beam dwell duration
+     * @param effectiveSpotRadiusM production effective beam/track spot radius
+     * @param meanIrradianceWPerM2 production mean irradiance over the effective spot
+     * @param deliveredBeamEnergyJ beam energy delivered during the requested dwell
+     * @param source production seam that owns the measurement
+     */
     public record BeamSample(
             double rangeM,
             boolean allowed,
@@ -87,6 +120,17 @@ public record Stage20WeaponSpatialCalibrationProfile(
             double meanIrradianceWPerM2,
             double deliveredBeamEnergyJ,
             String source) {
+        /**
+         * Creates one validated beam probe result.
+         *
+         * @param rangeM current target range
+         * @param allowed whether production beam planning admitted the dwell
+         * @param dwellSeconds requested beam dwell duration
+         * @param effectiveSpotRadiusM production effective beam/track spot radius
+         * @param meanIrradianceWPerM2 production mean irradiance over the effective spot
+         * @param deliveredBeamEnergyJ beam energy delivered during the requested dwell
+         * @param source production seam that owns the measurement
+         */
         public BeamSample {
             requirePositiveFinite(rangeM, "rangeM");
             requirePositiveFinite(dwellSeconds, "dwellSeconds");
@@ -97,7 +141,20 @@ public record Stage20WeaponSpatialCalibrationProfile(
         }
     }
 
-    /** One production lead-pursuit/propulsion probe for an authored guided body. */
+    /**
+     * One production lead-pursuit/propulsion probe for an authored guided body.
+     *
+     * @param ammunitionId exact authored guided-ammunition content ID
+     * @param rangeM current target range
+     * @param targetLateralVelocityMps controlled lateral-velocity probe input
+     * @param guidanceAllowed whether production guidance admitted a command
+     * @param predictedInterceptSeconds production predicted intercept horizon
+     * @param initialRemainingDeltaVMps guided body's pre-command remaining delta-v
+     * @param terminalReserveMps authored delta-v reserve protected by guidance policy
+     * @param commandedBurnSeconds production bounded commanded burn duration
+     * @param propellantConsumedKg physical propellant consumed by command execution
+     * @param source production seam that owns the measurement
+     */
     public record GuidedSample(
             String ammunitionId,
             double rangeM,
@@ -109,6 +166,20 @@ public record Stage20WeaponSpatialCalibrationProfile(
             double commandedBurnSeconds,
             double propellantConsumedKg,
             String source) {
+        /**
+         * Creates one validated guided-weapon probe result.
+         *
+         * @param ammunitionId exact authored guided-ammunition content ID
+         * @param rangeM current target range
+         * @param targetLateralVelocityMps controlled lateral-velocity probe input
+         * @param guidanceAllowed whether production guidance admitted a command
+         * @param predictedInterceptSeconds production predicted intercept horizon
+         * @param initialRemainingDeltaVMps guided body's pre-command remaining delta-v
+         * @param terminalReserveMps authored delta-v reserve protected by guidance policy
+         * @param commandedBurnSeconds production bounded commanded burn duration
+         * @param propellantConsumedKg physical propellant consumed by command execution
+         * @param source production seam that owns the measurement
+         */
         public GuidedSample {
             requireNonBlank(ammunitionId, "ammunitionId");
             requirePositiveFinite(rangeM, "rangeM");
@@ -125,7 +196,18 @@ public record Stage20WeaponSpatialCalibrationProfile(
         }
     }
 
-    /** One production layered-defense assignment probe. */
+    /**
+     * One production layered-defense assignment probe.
+     *
+     * @param threatStartRangeM controlled observed threat starting range
+     * @param threatClosingSpeedMps controlled observed threat closing speed
+     * @param safeMinimumInterceptDistanceM configured safe-intercept policy probe
+     * @param assigned whether production layered defense assigned an interceptor
+     * @param predictedImpactSeconds production predicted threat impact horizon
+     * @param plannedInterceptSeconds production planned interceptor contact horizon
+     * @param interceptDistanceFromProtectedCenterM planned intercept distance from protected center
+     * @param source production seam that owns the measurement
+     */
     public record DefenseSample(
             double threatStartRangeM,
             double threatClosingSpeedMps,
@@ -135,6 +217,18 @@ public record Stage20WeaponSpatialCalibrationProfile(
             double plannedInterceptSeconds,
             double interceptDistanceFromProtectedCenterM,
             String source) {
+        /**
+         * Creates one validated layered-defense probe result.
+         *
+         * @param threatStartRangeM controlled observed threat starting range
+         * @param threatClosingSpeedMps controlled observed threat closing speed
+         * @param safeMinimumInterceptDistanceM configured safe-intercept policy probe
+         * @param assigned whether production layered defense assigned an interceptor
+         * @param predictedImpactSeconds production predicted threat impact horizon
+         * @param plannedInterceptSeconds production planned interceptor contact horizon
+         * @param interceptDistanceFromProtectedCenterM planned intercept distance from protected center
+         * @param source production seam that owns the measurement
+         */
         public DefenseSample {
             requirePositiveFinite(threatStartRangeM, "threatStartRangeM");
             requirePositiveFinite(threatClosingSpeedMps, "threatClosingSpeedMps");
