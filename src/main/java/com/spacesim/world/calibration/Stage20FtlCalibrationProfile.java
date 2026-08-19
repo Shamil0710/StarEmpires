@@ -25,7 +25,7 @@ public record Stage20FtlCalibrationProfile(
         Stage20FtlCalibrationReference reference,
         List<JumpEdgeCalibrationSample> samples) {
     /** Current Stage-20A FTL edge-cadence profile version. */
-    public static final String CURRENT_VERSION = "stage20a.ftl-edge-cadence.v1";
+    public static final String CURRENT_VERSION = "stage20a.ftl-edge-cadence.v2";
 
     /** Reference-drive compatibility of one translated-mass sample. */
     public enum ReferenceDriveCompatibility {

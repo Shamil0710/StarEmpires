@@ -17,9 +17,9 @@ import java.util.Set;
 /** Loads and physically validates the versioned Stage-20 propulsion-reference calibration catalog. */
 public final class Stage20RepresentativePropulsionCatalogLoader {
     /** Current supported resource schema. */
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
     /** Default production-packaged calibration evidence resource. */
-    public static final String DEFAULT_RESOURCE = "data/calibration/stage20-representative-propulsion-v1.json";
+    public static final String DEFAULT_RESOURCE = "data/calibration/stage20-representative-propulsion-v2.json";
 
     private static final String ACCEPTED_BASELINE_ID = "ship_mathematics_v1_0_design_baseline";
 
@@ -47,7 +47,7 @@ public final class Stage20RepresentativePropulsionCatalogLoader {
                 throw new IllegalStateException("Default Stage-20 references must require Stage-22 review");
             }
             if (!ACCEPTED_BASELINE_ID.equals(catalog.sourceBaselineId())) {
-                throw new IllegalStateException("Unexpected Stage-20 propulsion reference baseline");
+                throw new IllegalStateException("Unexpected Stage-20 propulsion architecture baseline");
             }
             return catalog;
         } catch (IOException exception) {
@@ -103,6 +103,7 @@ public final class Stage20RepresentativePropulsionCatalogLoader {
             ReferenceDefinition reference = new ReferenceDefinition(
                     requireString(node, "id"),
                     requireString(node, "representativeClass"),
+                    requireString(node, "sourceEvidenceId"),
                     requireNonNegativeDouble(node, "designDryMassKg"),
                     requireNonNegativeDouble(node, "ammunitionMassKg"),
                     requireNonNegativeDouble(node, "missionCargoStoresMassKg"),

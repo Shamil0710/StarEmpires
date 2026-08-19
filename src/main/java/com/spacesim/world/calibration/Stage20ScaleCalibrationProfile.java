@@ -35,7 +35,7 @@ public record Stage20ScaleCalibrationProfile(
         List<RouteTravelSample> routeSamples,
         List<RouteCalibrationBand> routeBands) {
     /** Current Stage-20A representative-route calibration profile version. */
-    public static final String CURRENT_VERSION = "stage20a.representative-routes.v2";
+    public static final String CURRENT_VERSION = "stage20a.representative-routes.v3";
 
     private static final String ESCORT_REPRESENTATIVE_ID = "ESCORT_DESTROYER";
     private static final String ESCORT_FIT_ID = "fit.escort_destroyer_schema_v1";
@@ -78,9 +78,9 @@ public record Stage20ScaleCalibrationProfile(
     /**
      * Derives the current Stage-20A profile from production engineering plus accepted references.
      *
-     * <p>The current production escort-destroyer supersedes the older escort benchmark reference.
-     * The corvette, battleship, loaded bulk freighter and loaded fleet tanker remain provisional
-     * calibration evidence and explicitly require Stage-22 content review.</p>
+     * <p>The current production escort-destroyer supersedes the matching provisional escort reference.
+     * All other required representative roles currently use explicitly provisional calibration evidence
+     * with per-reference provenance and mandatory Stage-22 content review.</p>
      *
      * @return deterministic current calibration profile
      */
