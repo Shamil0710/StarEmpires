@@ -28,13 +28,12 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(
                 Set.of(
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
-                        RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
                         RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
                         RequirementId.MATERIALIZATION_LOD_CLOSURE),
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(4, first.blockingRequirements().size());
+        assertEquals(3, first.blockingRequirements().size());
     }
 
     @Test
@@ -73,6 +72,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
                 RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
                 RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
+                RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
                 RequirementId.FAR_COORDINATE_PRECISION);
         assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
@@ -172,6 +172,26 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(routes.evidence().contains("samples=144"));
         assertTrue(routes.evidence().contains("max_station_standoff_m="));
         assertTrue(routes.evidence().contains("stage22_review_required=true"));
+    }
+
+    @Test
+    void topologyQualityBandsAreClosedByVersionedGenerationBudgets() {
+        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
+        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult topology = byId.get(RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS);
+
+        assertEquals(RequirementStatus.SATISFIED, topology.status());
+        assertTrue(topology.evidence().contains(Stage20TopologyQualityCalibrationProfile.CURRENT_VERSION));
+        assertTrue(topology.evidence().contains("maxLinearCorridorLength=3"));
+        assertTrue(topology.evidence().contains("maxDegreeOneFraction=0.2"));
+        assertTrue(topology.evidence().contains("minRegionalCycleCoverage=0.5"));
+        assertTrue(topology.evidence().contains("minCoreRouteRedundancy=2"));
+        assertTrue(topology.evidence().contains("maxSingleGatewayDependency=0.45"));
+        assertTrue(topology.evidence().contains("sectorExitBand=2-4"));
+        assertTrue(topology.evidence().contains("hubDegreeBand=3-6"));
+        assertTrue(topology.evidence().contains("regionalHopDistanceBand=3-5"));
+        assertTrue(topology.evidence().contains("stage22_review_required=true"));
     }
 
     @Test
