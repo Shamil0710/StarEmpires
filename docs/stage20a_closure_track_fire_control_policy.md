@@ -1,6 +1,6 @@
 # Stage 20A Closure — Track / Fire-Control Policy
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — implementation head passed exact-head Java-17 CI; final status-only merge gate pending  
 **Parent:** Stage 20A Closure / Readiness Remediation  
 **Workstream:** 3 — Sensor / weapon / formation closure  
 **Date:** 2026-08-19
@@ -120,18 +120,18 @@ with explicit runtime provenance.
 
 ## 5. Historical A.4 gap handling
 
-The A.4 calibration artifact should remain historically truthful: at the time A.4 was accepted, final fused fire-control policy genuinely was pending weapon geometry.
+The A.4 calibration artifact remains historically truthful: at the time A.4 was accepted, final fused fire-control policy genuinely was pending weapon geometry.
 
 This closure therefore **supersedes** that historical pending item rather than rewriting the A.4 record as if the answer had already existed.
 
-After this slice passes the merge gate, the readiness calculator should consume `Stage20FireControlPolicyClosureProfile` as later accepted closure evidence and mark:
+The readiness calculator should consume `Stage20FireControlPolicyClosureProfile` as later accepted closure evidence and mark:
 
 ```text
 FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE
 = SATISFIED
 ```
 
-in a narrow follow-up readiness refresh.
+in the narrow follow-up readiness refresh.
 
 ## 6. Regression invariants
 
@@ -141,12 +141,19 @@ Tests require:
 - a merely `CLASSIFIED` target is still rejected;
 - worse TRACKED covariance increases effective beam spot;
 - worse covariance lowers irradiance;
+- physical dwell-duty remains enforced for TRACKED beam solutions;
 - the closure profile rejects one universal sensor-side FIRE_CONTROL permission threshold;
 - kinetic, beam and guided families are all represented in the closure provenance.
 
-## 7. Immediate next action
+## 7. Acceptance evidence
 
-After exact-head CI and merge acceptance:
+The implementation head `bec77b23b4302cb65ef9b92156678a0dd6ef46f5` passed the complete Java-17 `clean verify` gate after the historical beam regression was deliberately updated from the superseded `FIRE_CONTROL-only` rule to the accepted Stage-20 `TRACKED Cartesian floor` rule.
+
+The first failed CI attempt exposed an invalid new test fixture missing the required beam ID. The second failed attempt exposed exactly one old regression asserting the provisional rule being replaced. Neither failure was bypassed: the fixture was corrected and the existing regression was rewritten to retain rejection below TRACKED plus the physical dwell-duty invariant.
+
+## 8. Immediate next action
+
+After the final status-only exact-head CI and merge gate:
 
 1. refresh the Stage-20A readiness gate to consume this later closure profile and remove exactly `FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE` from the blocker set;
 2. continue Workstream 3 only where accepted physics exists;
