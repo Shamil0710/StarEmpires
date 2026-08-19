@@ -114,15 +114,58 @@ The profile currently probes `10 Mm`, `100 Mm`, `1 Gm` and `10 Gm`. These distan
 
 The versioned profile emits both per-representative route samples and aggregate route bands across the current representative set. Production versus provisional authority and exact provenance remain machine-visible in every propulsion envelope.
 
-## 9. Immediate next implementation slice
+## 9. Stage 20A.3 — FTL translated-mass compatibility and one-edge cadence
 
-Stage 20A.3 should close the next capability layers that already have accepted physical authority:
+The third implementation slice adds a separate versioned FTL calibration layer because a production `FTL_JUMP` module has not yet replaced the accepted Ship Mathematics v1.0 reference drive.
 
-1. jump spool / transit / cooldown cadence and translated-mass compatibility;
-2. passive detection, active detection/classification/track/fire-control geometry;
-3. weapon time-of-flight, effectiveness and PD/interceptor geometry;
-4. formation, station stand-off and jump-arrival geometry derived from the above rather than arbitrary screen-space distances.
+`data/calibration/stage20-ftl-jump-reference-v1.json` preserves the accepted reference-drive inputs and closure evidence:
 
-Missing representative ship roles should continue to remain explicit gaps until production content or accepted reference physics exists. They must not block reuse of already-authoritative FTL/sensor/combat capability, but Stage 20A cannot be declared complete while required representative coverage or required calibration domains remain unresolved.
+```text
+max translated mass       100,000,000 kg
+translation energy        25,000 J/kg
+charge input power        5,000,000,000 W
+charge efficiency         0.80
+cooldown                  90 s
+reference destroyer mass  21,927,000 kg
+reference energy          548,175,000,000 J
+reference spool           137.04375 s
+example edge transit      30 s
+```
 
-Acceptance continues to require that identical content + profile version produces identical output and that changing physical ship capability changes the derived spatial/travel bands rather than being hidden by fixed map constants.
+`Stage20FtlCalibrationReferenceLoader` closes energy and spool against those accepted equations before use. `Stage20FtlCalibrationProfile` then evaluates every current representative departure mass against one reference drive while keeping ship-mass provenance and FTL-law provenance separate.
+
+Ordinary FTL semantics are machine-recorded as `NEIGHBOR_EDGE_ONLY`: one jump traverses one neighboring-system topology edge. The 30-second value is an accepted **example edge transit**, not a universal range/time law and not permission for direct multi-hop travel. Generated edge-transit distributions remain Stage-20 world data to be authored/calibrated later.
+
+The current reference drive is mass-compatible with:
+
+- `TORPEDO_CORVETTE`;
+- current production `ESCORT_DESTROYER`.
+
+It is explicitly incompatible with the current representative departure masses for:
+
+- `BATTLESHIP`;
+- `BULK_FREIGHTER_LOADED`;
+- `FLEET_TANKER_LOADED`.
+
+Stage 20 does not hide that result by assuming drive multiplicity, mass bypass, special civilian rules or an increased mass limit. Compatible samples expose translation energy, spool and `spool + edge transit + cooldown` ready-again cadence; incompatible samples keep those derived fields absent instead of extrapolating the accepted drive outside its domain.
+
+The FTL resource also keeps three unresolved gaps explicit:
+
+- production FTL module not yet authored;
+- generated edge-transit distribution not yet world-authored;
+- numeric FTL heat coefficient absent from the v1.0 reference despite the architectural requirement that FTL pays heat.
+
+## 10. Immediate next implementation slice
+
+Stage 20A.4 should connect already-production-authoritative sensing/signature logic to spatial calibration before inventing any new sensor-range abstraction:
+
+1. passive detection geometry against representative physical signatures;
+2. active radar detection/classification/track geometry;
+3. fire-control-quality track geometry and uncertainty/time sensitivity;
+4. damage/EW sensitivity where the production observation runtime already owns the behavior.
+
+After the sensing layer is closed, Stage 20A should continue into weapon time-of-flight/effectiveness, PD/interceptor geometry, formation/station stand-off and jump-arrival geometry.
+
+Missing representative ship roles continue to remain explicit gaps until production content or accepted reference physics exists. Stage 20A cannot be declared complete while required representative coverage or required calibration domains remain unresolved.
+
+Acceptance continues to require that identical content + profile version produces identical output and that changing physical capability changes derived spatial/travel/FTL bands rather than being hidden by fixed map constants.

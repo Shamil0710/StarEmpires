@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "version": "stage20a.ftl-jump-reference.v1",
+  "status": "PROVISIONAL_ACCEPTED_REFERENCE",
+  "sourceBaselineId": "ship_mathematics_v1_0_design_baseline",
+  "sourceEvidence": "ShipMathematicsV10DesignBaselineHarness.planReferenceJump",
+  "stage22ReviewRequired": true,
+  "topologyMode": "NEIGHBOR_EDGE_ONLY",
+  "referenceDrive": {
+    "id": "reference.jump_drive.v1",
+    "maxTranslatedMassKg": 100000000.0,
+    "translationEnergyPerKgJ": 25000.0,
+    "chargePowerW": 5000000000.0,
+    "chargeEfficiency": 0.80,
+    "cooldownS": 90.0
+  },
+  "referenceClosure": {
+    "translatedMassKg": 21927000.0,
+    "requiredTranslationEnergyJ": 548175000000.0,
+    "spoolTimeS": 137.04375,
+    "exampleEdgeTransitTimeS": 30.0
+  },
+  "unresolvedGaps": [
+    "PRODUCTION_FTL_MODULE_NOT_AUTHORED",
+    "EDGE_TRANSIT_DISTRIBUTION_NOT_YET_WORLD_AUTHORED",
+    "DRIVE_HEAT_COEFFICIENT_NOT_NUMERIC_IN_V1_BASELINE"
+  ]
+}
