@@ -94,6 +94,49 @@ public final class Stage20ScaleCalibrationCalculator {
                 checked.expectedDeltaVMps());
     }
 
+    /**
+     * Re-derives one accepted representative at an explicit lower physical thrust while preserving
+     * the same wet mass, reaction-mass load, exhaust velocity and therefore ideal delta-v.
+     *
+     * <p>This is used for Stage-20 sustained-thrust route calibration. It does not mutate or replace
+     * the baseline propulsion authority; callers preserve separate thrust-policy provenance.</p>
+     *
+     * @param baseline current accepted representative propulsion envelope
+     * @param authority authority of the supplied thrust policy
+     * @param provenanceId exact thrust-policy provenance
+     * @param loadCaseId stable derived throttle/load case ID
+     * @param thrustN explicit positive thrust not exceeding the baseline maximum/reference thrust
+     * @return a new variable-mass envelope using the same physical mass/exhaust state
+     */
+    public static RepresentativeShipPropulsionEnvelope deriveAtThrust(
+            RepresentativeShipPropulsionEnvelope baseline,
+            CalibrationAuthority authority,
+            String provenanceId,
+            String loadCaseId,
+            double thrustN) {
+        RepresentativeShipPropulsionEnvelope checked = Objects.requireNonNull(baseline, "baseline");
+        Objects.requireNonNull(authority, "authority");
+        requireNonBlank(provenanceId, "provenanceId");
+        requireNonBlank(loadCaseId, "loadCaseId");
+        requirePositiveFinite(thrustN, "thrustN");
+        if (thrustN > checked.thrustN()) {
+            throw new IllegalArgumentException("derived thrust cannot exceed baseline thrust");
+        }
+        double massFlowKgPerS = thrustN / checked.effectiveExhaustVelocityMps();
+        return derivePhysical(
+                checked.representativeId(),
+                authority,
+                provenanceId,
+                loadCaseId,
+                checked.wetMassKg(),
+                checked.reactionMassKg(),
+                thrustN,
+                massFlowKgPerS,
+                thrustN / checked.wetMassKg(),
+                checked.effectiveExhaustVelocityMps(),
+                checked.deltaVMps());
+    }
+
     private static RepresentativeShipPropulsionEnvelope derivePhysical(
             String representativeId,
             CalibrationAuthority authority,
