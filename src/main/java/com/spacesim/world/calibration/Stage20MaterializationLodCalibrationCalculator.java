@@ -62,12 +62,14 @@ public final class Stage20MaterializationLodCalibrationCalculator {
                         false,
                         "direct_tactical_sensor_weapon_combat_or_docking_interaction"));
 
+        double localFixedStepSeconds = Double.parseDouble(
+                Float.toString(SimulationSession.DEFAULT_FIXED_STEP_SECONDS));
         RuntimeCadenceEvidence cadence = new RuntimeCadenceEvidence(
                 LiveTacticalSimulationSession.TICK_SECONDS,
-                SimulationSession.DEFAULT_FIXED_STEP_SECONDS,
+                localFixedStepSeconds,
                 true,
                 "LiveTacticalSimulationSession.TICK_SECONDS",
-                "SimulationSession.DEFAULT_FIXED_STEP_SECONDS",
+                "SimulationSession.DEFAULT_FIXED_STEP_SECONDS+SimulationClock decimal canonicalization semantics",
                 "SimulationClock.advanceStrategicSteps");
 
         List<DistanceBandClosure> closures = List.of(
