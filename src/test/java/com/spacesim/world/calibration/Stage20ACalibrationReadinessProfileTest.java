@@ -27,7 +27,6 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(RequirementId.values().length, first.requirements().size());
         assertEquals(
                 Set.of(
-                        RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
                         RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
                         RequirementId.FORMATION_SPACING_BAND_CLOSURE,
@@ -41,7 +40,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(11, first.blockingRequirements().size());
+        assertEquals(10, first.blockingRequirements().size());
     }
 
     @Test
@@ -70,6 +69,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE,
                 RequirementId.FTL_TOPOLOGY_SEMANTICS,
                 RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
+                RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
                 RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
                 RequirementId.WEAPON_PD_SPATIAL_EVIDENCE,
                 RequirementId.FORMATION_SPATIAL_EVIDENCE,
@@ -79,6 +79,21 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.FTL_HEAT_COEFFICIENT);
         assertStatus(byId, RequirementStatus.OWNED_BY_LATER_STAGE20,
                 RequirementId.FTL_EDGE_TRANSIT_DISTRIBUTION);
+    }
+
+    @Test
+    void sensorTargetClassCoverageIsClosedByVersionedPhysicalEvidence() {
+        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
+        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult sensorCoverage = byId.get(RequirementId.SENSOR_TARGET_CLASS_COVERAGE);
+
+        assertEquals(RequirementStatus.SATISFIED, sensorCoverage.status());
+        assertTrue(sensorCoverage.evidence().contains(Stage20SensorTargetClassCoverageProfile.CURRENT_VERSION));
+        assertTrue(sensorCoverage.evidence().contains("PASSIVE_THERMAL"));
+        assertTrue(sensorCoverage.evidence().contains("ACTIVE_RADAR"));
+        assertTrue(sensorCoverage.evidence().contains("targets=7"));
+        assertTrue(sensorCoverage.evidence().contains("provisional_stage22=6"));
     }
 
     @Test
