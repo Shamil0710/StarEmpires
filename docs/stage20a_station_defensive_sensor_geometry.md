@@ -7,21 +7,21 @@
 
 ## Purpose
 
-Stage 20 needs station-specific warning and defensive-response geometry before generated jump-arrival, traffic and infrastructure placement can be considered physically closed.
+Stage 20 needs station-specific sensor geometry and a defensive exclusion scale before generated jump-arrival, traffic and infrastructure placement can be considered physically closed.
 
-Stage 18 station archetypes define industry/storage/transfer semantics but do not author station sensors or weapons. Stage 22 owns final technology/content promotion. Therefore Stage 20A must not fabricate production station modules merely to obtain map radii.
+Stage 18 station archetypes define industry/storage/transfer semantics but do not author station sensors or weapons. Stage 22 owns final technology/content promotion. Therefore Stage 20A must not fabricate production station modules merely to obtain world-placement radii.
 
 This profile closes the geometry gap by selecting only already accepted physical references:
 
 - **sensor floor:** production escort observation runtime consumed through `Stage20SensorTargetClassCoverageProfile`;
-- **defensive response:** accepted v0.3 kinetic P50 rows consumed through `Stage20WeaponTargetClassCoverageProfile`;
+- **defensive exclusion reference:** accepted v0.3 kinetic P50 interaction rows consumed through `Stage20WeaponTargetClassCoverageProfile`;
 - **new Stage-20 authoring:** only the mapping from each station archetype to one provisional security/reference tier.
 
 No new station-only sensor equation, weapon equation or hidden range multiplier is introduced.
 
 ## Sensor geometry
 
-For ordinary stations the conservative minimum reference target is `TORPEDO_CORVETTE`, because it has both accepted thermal output and authored non-zero RCS in the Stage-20 target matrix. The naval ordnance depot uses `BATTLESHIP` as its strategic reference target.
+For ordinary stations the conservative reference target is `TORPEDO_CORVETTE`, because it has both accepted thermal output and authored non-zero RCS in the Stage-20 target matrix. The naval ordnance depot uses `BATTLESHIP` as its strategic reference target.
 
 For each selected target the profile records:
 
@@ -35,21 +35,27 @@ active radar FIRE_CONTROL
 
 The values are measured by the production observation runtime; the profile does not copy or hand-author numeric sensor distances.
 
-## Defensive-response geometry
+The active sensor states must remain physically nested:
 
-The defensive response envelope is an accepted v0.3 P50 direct-fire range, not a hard weapon range wall and not final station lethality content.
+```text
+DETECTED >= CLASSIFIED >= TRACKED >= FIRE_CONTROL
+```
+
+## Defensive exclusion geometry
+
+The defensive exclusion reference is an accepted v0.3 P50 direct-fire interaction scale. It is used as a **provisional world-placement / stand-off reference only**. It is not a hard weapon range wall, not final station lethality content and not proof that a production station already mounts the referenced weapon.
 
 Security tiers:
 
 | Tier | Accepted weapon/target reference | Meaning |
 |---|---|---|
-| `BASIC_SECURITY` | M coilgun vs corvette | local outpost / depot security reference |
-| `HARDENED_SECURITY` | M coilgun vs frigate | hardened civil / industrial security reference |
-| `NAVAL_FORTIFIED` | XL capital kinetic vs battleship | strategic naval-site reference |
+| `BASIC_SECURITY` | M coilgun vs corvette | local outpost / depot exclusion reference |
+| `HARDENED_SECURITY` | M coilgun vs frigate | hardened civil / industrial exclusion reference |
+| `NAVAL_FORTIFIED` | XL capital kinetic vs battleship | strategic naval-site exclusion reference |
 
 Current archetype mapping:
 
-| Stage-18 station | Tier | Sensor target | Defensive target |
+| Stage-18 station | Tier | Sensor target | Defensive reference target |
 |---|---|---|---|
 | Mining outpost | BASIC | Torpedo corvette | Corvette |
 | Volatile/water depot | BASIC | Torpedo corvette | Corvette |
@@ -60,7 +66,24 @@ Current archetype mapping:
 | Naval ordnance depot | NAVAL_FORTIFIED | Battleship | Battleship |
 | Frontier multipurpose station | HARDENED | Torpedo corvette | Frigate |
 
-The profile additionally requires the selected active-radar FIRE_CONTROL envelope to cover the selected P50 defensive-response envelope. A station assignment therefore cannot claim an engagement stand-off larger than the accepted sensor reference can support.
+## Important separation discovered by exact-head CI
+
+The first implementation incorrectly required:
+
+```text
+escort-derived FIRE_CONTROL >= P50 defensive reference
+```
+
+Exact-head CI rejected that assumption: the accepted physical references do not guarantee such an end-to-end relation. That failure is useful evidence, not a test to weaken away.
+
+The corrected contract keeps the two geometries independent:
+
+1. the escort-derived runtime provides a conservative **sensor information-state floor**;
+2. the accepted P50 benchmark provides a separate **defensive exclusion / placement scale**;
+3. Stage 20B may consume both for spatial generation;
+4. Stage 22 must author/promote real station sensor modules, weapon mounts and fire-control coupling before production combat capability is claimed.
+
+Therefore Stage 20A explicitly does **not** assert that the escort-derived FIRE_CONTROL range reaches the defensive exclusion reference.
 
 ## Authority boundary
 
@@ -69,12 +92,13 @@ authority = PROVISIONAL_ACCEPTED_REFERENCE
 stage22ReviewRequired = true
 ```
 
-This does **not** mean the production station already contains the referenced escort sensor module or benchmark gun. It means Stage 20 world geometry may use these accepted envelopes as provisional physical capability floors until Stage 22 authors or promotes actual station modules.
+This does **not** mean the production station already contains the referenced escort sensor module or benchmark gun. It means Stage 20 world geometry may use these independent accepted envelopes as provisional spatial references until Stage 22 authors or promotes actual station modules.
 
 Stage 22 may:
 
-- promote the reference;
-- replace it with station-specific modules;
+- promote the references;
+- replace them with station-specific modules;
+- author the actual sensor → fire-control → weapon coupling;
 - split one archetype into doctrine/faction variants;
 - change the capability tier and therefore require a new profile version.
 
@@ -99,4 +123,4 @@ The following remain separate blockers:
 - `MAJOR_INFRASTRUCTURE_EXTENT_BANDS`;
 - `MATERIALIZATION_LOD_CLOSURE`.
 
-The immediate dependent next step is `STATION_JUMP_ARRIVAL_STANDOFF`, because its existing physical formula can now consume both the accepted station operational radius and the station defensive-response envelope.
+The immediate dependent next step is `STATION_JUMP_ARRIVAL_STANDOFF`. Its existing physical formula can consume the accepted station operational radius plus the independent defensive exclusion reference without claiming that the exclusion reference is a production firing range.
