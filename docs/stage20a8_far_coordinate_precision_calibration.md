@@ -1,6 +1,6 @@
 # Stage 20A.8 — Far-Coordinate Numerical Precision Calibration
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — exact-head Java-17 implementation CI green; final merge gate pending  
 **Parent:** Stage 20A — Representative-Ship Scale Calibration  
 **Date:** 2026-08-19
 
@@ -239,7 +239,7 @@ This preserves existing stages without pretending their bounded float coordinate
 
 ## 12. Acceptance criteria
 
-Stage 20A.8 is accepted when exact-head CI proves simultaneously:
+Stage 20A.8 is accepted because exact-head implementation CI proved simultaneously:
 
 - calibration output is deterministic;
 - hierarchical normalized-offset worst-case quantization remains inside the 1 cm budget;
@@ -250,9 +250,11 @@ Stage 20A.8 is accepted when exact-head CI proves simultaneously:
 - changing only presentation origin does not mutate authoritative physical state;
 - unresolved legacy float runtime migration remains machine-visible rather than hidden.
 
+The full Java-17 `clean verify` gate passed 1212 tests with zero failures and zero errors; Javadoc and JaCoCo checks also passed.
+
 ## 13. Next slice
 
-After Stage 20A.8 passes the merge gate, the next implementation slice is **Stage 20A.9 — materialization / LOD distance-band calibration**.
+After Stage 20A.8 passes the final merge gate, the next implementation slice is **Stage 20A.9 — materialization / LOD distance-band calibration**.
 
 A.9 must use the now-separated physical coordinate domain and presentation frame to define when objects are:
 
