@@ -27,7 +27,6 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(RequirementId.values().length, first.requirements().size());
         assertEquals(
                 Set.of(
-                        RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
                         RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
                         RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
@@ -42,7 +41,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(12, first.blockingRequirements().size());
+        assertEquals(11, first.blockingRequirements().size());
     }
 
     @Test
@@ -70,6 +69,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE,
                 RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE,
                 RequirementId.FTL_TOPOLOGY_SEMANTICS,
+                RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
                 RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
                 RequirementId.WEAPON_PD_SPATIAL_EVIDENCE,
                 RequirementId.FORMATION_SPATIAL_EVIDENCE,
@@ -97,7 +97,11 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(byId.get(RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE).evidence()
                 .contains("stage22_review_required=true"));
         assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
-                .contains("regional_3_5_hop"));
+                .contains(Stage20IntersystemCadenceCalibrationProfile.CURRENT_VERSION));
+        assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
+                .contains("FLEET_REINFORCEMENT_3_HOP"));
+        assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
+                .contains("CARRIER_AVIATION_GROUP"));
         assertTrue(byId.get(RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE).evidence()
                 .contains("historical_stage20a4_pending=true"));
         assertTrue(byId.get(RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE).evidence()
