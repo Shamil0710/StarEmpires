@@ -12,7 +12,7 @@ The generator must not invent arbitrary map scale and later compensate with hidd
 
 ## 2. Immediate implementation target
 
-The first Stage-20A implementation slice will build a deterministic calibration pipeline that evaluates representative civilian and military hull/fit profiles across canonical route and tactical geometries.
+The Stage-20A implementation builds a deterministic calibration pipeline that evaluates representative civilian and military hull/fit profiles across canonical route and tactical geometries.
 
 The resulting profile must become the input to later Stage-20 topology, system-geometry, resource-geography and world-quality gates.
 
@@ -77,20 +77,52 @@ Stage 20 may introduce diagnostic maps, calibration tables and minimal interacti
 
 ## 7. Stage 20A.1 — representative local propulsion envelope
 
-The first implementation slice introduces:
+The first implementation slice introduced:
 
 - `Stage20ScaleCalibrationProfile`, a versioned and deterministically ordered machine-readable calibration profile;
-- `Stage20ScaleCalibrationCalculator`, which consumes `DerivedShipState` rather than duplicating mass, thrust, mass-flow or rocket-equation calculations;
+- `Stage20ScaleCalibrationCalculator`, which consumes `DerivedShipState` rather than duplicating production mass, thrust, mass-flow or rocket-equation calculations;
 - the current production escort-destroyer fit with its accepted full reaction-mass load as the first directly authored representative profile;
 - a mass-varying equal-delta-v rest-to-rest calibration manoeuvre exposing reaction-mass fraction, burn cadence, peak speed, acceleration distance, braking distance and characteristic no-coast transfer distance;
 - deterministic and physical-sensitivity tests proving that changed reaction-mass capability changes the resulting spatial envelope.
 
-The characteristic rest-to-rest measurement is a calibration scale, not a maximum reachable distance. Longer transfers may add coast time; later Stage-20A slices will turn propulsion measurements plus authored pacing targets into route-distance bands.
+The characteristic rest-to-rest measurement is a calibration scale, not a maximum reachable distance. Longer transfers may add coast time.
 
-## 8. Immediate next implementation slice
+## 8. Stage 20A.2 — provisional representative set and local route bands
 
-Stage 20A.2 should expand the representative set without pretending provisional calibration hulls are production content. Existing accepted engineering reference ranges may be promoted into explicitly provisional Stage-20 calibration inputs where no authored hull exists yet.
+The second implementation slice expands propulsion calibration without promoting benchmark seeds into production ship content.
 
-That slice should then derive deterministic local route-time / braking / delta-v bands across the representative set. Sensor/combat reach, FTL cadence and spatial precision/LOD remain subsequent Stage-20A layers.
+`data/calibration/stage20-representative-propulsion-v1.json` packages the five already accepted Ship Mathematics v1.0 reference designs with explicit provenance, schema/version metadata, `PROVISIONAL_ACCEPTED_REFERENCE` status and mandatory Stage-22 review. The loader physically closes each reference against its accepted departure mass, acceleration and delta-v before it may enter Stage-20 calibration.
 
-Acceptance continues to require that identical content + profile version produces identical calibration output and that changing physical ship capability changes the derived spatial/travel bands rather than being hidden by fixed map constants.
+The effective current representative set is:
+
+- `ESCORT_DESTROYER` — current production engineering fit; this deliberately supersedes the older v1.0 escort reference;
+- `TORPEDO_CORVETTE` — provisional accepted reference;
+- `BATTLESHIP` — provisional accepted reference;
+- `BULK_FREIGHTER_LOADED` — provisional accepted reference;
+- `FLEET_TANKER_LOADED` — provisional accepted reference.
+
+Early civilian freighter, mining ship, cruiser and carrier/aviation profiles remain unresolved rather than fabricated. They may enter Stage 20 only when backed by accepted production content or an explicitly accepted physical reference.
+
+`Stage20RouteCalibrationCalculator` replaces the older constant-acceleration world-scale approximation with a variable-mass route calculation consistent with the Stage-20A.1 propulsion envelope:
+
+- short routes solve the partial reaction-mass load needed for accelerate/flip/brake with no coast;
+- the flip occurs at the geometric-mean mass so acceleration and braking spend equal delta-v;
+- long routes use the full symmetric burn and add only physical coast time at the resulting peak speed;
+- travel time, braking geometry, required delta-v and consumed reaction-mass fraction remain measurable outputs.
+
+The profile currently probes `10 Mm`, `100 Mm`, `1 Gm` and `10 Gm`. These distances are inherited sensitivity probes from the accepted v0.9/v1.0 world-scale evidence. They are **not** fixed future system sizes or generator constants. Stage 20B+ will use calibrated capability/pacing constraints to choose generated geometry.
+
+The versioned profile emits both per-representative route samples and aggregate route bands across the current representative set. Production versus provisional authority and exact provenance remain machine-visible in every propulsion envelope.
+
+## 9. Immediate next implementation slice
+
+Stage 20A.3 should close the next capability layers that already have accepted physical authority:
+
+1. jump spool / transit / cooldown cadence and translated-mass compatibility;
+2. passive detection, active detection/classification/track/fire-control geometry;
+3. weapon time-of-flight, effectiveness and PD/interceptor geometry;
+4. formation, station stand-off and jump-arrival geometry derived from the above rather than arbitrary screen-space distances.
+
+Missing representative ship roles should continue to remain explicit gaps until production content or accepted reference physics exists. They must not block reuse of already-authoritative FTL/sensor/combat capability, but Stage 20A cannot be declared complete while required representative coverage or required calibration domains remain unresolved.
+
+Acceptance continues to require that identical content + profile version produces identical output and that changing physical ship capability changes the derived spatial/travel bands rather than being hidden by fixed map constants.
