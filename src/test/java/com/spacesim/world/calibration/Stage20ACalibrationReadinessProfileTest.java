@@ -27,7 +27,6 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(RequirementId.values().length, first.requirements().size());
         assertEquals(
                 Set.of(
-                        RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE,
                         RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
                         RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
                         RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
@@ -43,7 +42,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(13, first.blockingRequirements().size());
+        assertEquals(12, first.blockingRequirements().size());
     }
 
     @Test
@@ -68,6 +67,7 @@ class Stage20ACalibrationReadinessProfileTest {
 
         assertStatus(byId, RequirementStatus.SATISFIED,
                 RequirementId.REPRESENTATIVE_PROPULSION_COVERAGE,
+                RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE,
                 RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE,
                 RequirementId.FTL_TOPOLOGY_SEMANTICS,
                 RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
@@ -91,7 +91,11 @@ class Stage20ACalibrationReadinessProfileTest {
                 "compatible_civilian_representatives=EARLY_CIVILIAN_FREIGHTER,MINING_SHIP",
                 byId.get(RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE).evidence());
         assertTrue(byId.get(RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE).evidence()
-                .contains("no_machine_readable_stores_endurance"));
+                .contains("endurance_samples=9/9"));
+        assertTrue(byId.get(RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE).evidence()
+                .contains(Stage20RepresentativeEnduranceProfile.CURRENT_VERSION));
+        assertTrue(byId.get(RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE).evidence()
+                .contains("stage22_review_required=true"));
         assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
                 .contains("regional_3_5_hop"));
         assertTrue(byId.get(RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE).evidence()
