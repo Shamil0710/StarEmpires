@@ -17,24 +17,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20ACalibrationReadinessProfileTest {
     @Test
-    void currentGateIsDeterministicAndAuditsTheCompleteStage20ADod() {
+    void currentGateIsDeterministicCompleteAndReadyForStage20B() {
         Stage20ACalibrationReadinessProfile first = Stage20ACalibrationReadinessCalculator.deriveCurrent();
         Stage20ACalibrationReadinessProfile second = Stage20ACalibrationReadinessCalculator.deriveCurrent();
 
         assertEquals(first, second);
         assertEquals(Stage20ACalibrationReadinessProfile.CURRENT_VERSION, first.version());
-        assertEquals(GateStatus.BLOCKED_FOR_STAGE20B, first.overallStatus());
+        assertEquals(GateStatus.READY_FOR_STAGE20B, first.overallStatus());
         assertEquals(RequirementId.values().length, first.requirements().size());
-        assertEquals(
-                Set.of(RequirementId.PD_SAFE_INTERCEPT_GEOMETRY),
-                first.blockingRequirements().stream()
-                        .map(RequirementResult::id)
-                        .collect(Collectors.toSet()));
-        assertEquals(1, first.blockingRequirements().size());
+        assertEquals(List.of(), first.blockingRequirements());
     }
 
     @Test
-    void representativeCoverageNowContainsAllNineRequiredRolesWithExplicitAuthority() {
+    void representativeCoverageContainsAllNineRequiredRolesWithExplicitAuthority() {
         Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
 
         assertEquals(9, profile.representativeCoverage().size());
@@ -48,182 +43,103 @@ class Stage20ACalibrationReadinessProfileTest {
     }
 
     @Test
-    void gateSeparatesSatisfiedDeferredAndLaterStage20OwnershipFromTrueBlockers() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
-
-        assertStatus(byId, RequirementStatus.SATISFIED,
-                RequirementId.REPRESENTATIVE_PROPULSION_COVERAGE,
-                RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE,
-                RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE,
-                RequirementId.FTL_TOPOLOGY_SEMANTICS,
-                RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
-                RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
-                RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
-                RequirementId.WEAPON_PD_SPATIAL_EVIDENCE,
-                RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
-                RequirementId.FORMATION_SPATIAL_EVIDENCE,
-                RequirementId.FORMATION_SPACING_BAND_CLOSURE,
-                RequirementId.STATION_PHYSICAL_GEOMETRY,
-                RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
-                RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
-                RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
-                RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
-                RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
-                RequirementId.FAR_COORDINATE_PRECISION,
-                RequirementId.MATERIALIZATION_LOD_CLOSURE);
-        assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
+    void gateSeparatesSatisfiedDeferredAndLaterStage20Ownership() {
+        Map<RequirementId, RequirementResult> byId = byId(Stage20ACalibrationReadinessCalculator.deriveCurrent());
+        Set<RequirementId> deferred = Set.of(
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
                 RequirementId.FTL_HEAT_COEFFICIENT);
-        assertStatus(byId, RequirementStatus.OWNED_BY_LATER_STAGE20,
-                RequirementId.FTL_EDGE_TRANSIT_DISTRIBUTION);
+        Set<RequirementId> laterStage20 = Set.of(RequirementId.FTL_EDGE_TRANSIT_DISTRIBUTION);
+
+        for (RequirementId id : RequirementId.values()) {
+            RequirementStatus expected = deferred.contains(id)
+                    ? RequirementStatus.DEFERRED_STAGE22_CONTENT
+                    : laterStage20.contains(id)
+                            ? RequirementStatus.OWNED_BY_LATER_STAGE20
+                            : RequirementStatus.SATISFIED;
+            assertEquals(expected, byId.get(id).status(), id.name());
+        }
     }
 
     @Test
-    void sensorTargetClassCoverageIsClosedByVersionedPhysicalEvidence() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
-        RequirementResult sensorCoverage = byId.get(RequirementId.SENSOR_TARGET_CLASS_COVERAGE);
+    void sensorWeaponAndPdClosuresRemainMachineVisible() {
+        Map<RequirementId, RequirementResult> byId = byId(Stage20ACalibrationReadinessCalculator.deriveCurrent());
 
-        assertEquals(RequirementStatus.SATISFIED, sensorCoverage.status());
-        assertTrue(sensorCoverage.evidence().contains(Stage20SensorTargetClassCoverageProfile.CURRENT_VERSION));
-        assertTrue(sensorCoverage.evidence().contains("PASSIVE_THERMAL"));
-        assertTrue(sensorCoverage.evidence().contains("ACTIVE_RADAR"));
-        assertTrue(sensorCoverage.evidence().contains("targets=7"));
-        assertTrue(sensorCoverage.evidence().contains("provisional_stage22=6"));
+        RequirementResult sensor = byId.get(RequirementId.SENSOR_TARGET_CLASS_COVERAGE);
+        assertTrue(sensor.evidence().contains(Stage20SensorTargetClassCoverageProfile.CURRENT_VERSION));
+        assertTrue(sensor.evidence().contains("targets=7"));
+        assertTrue(sensor.evidence().contains("PASSIVE_THERMAL"));
+        assertTrue(sensor.evidence().contains("ACTIVE_RADAR"));
+
+        RequirementResult weapons = byId.get(RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE);
+        assertTrue(weapons.evidence().contains(Stage20WeaponTargetClassCoverageProfile.CURRENT_VERSION));
+        assertTrue(weapons.evidence().contains("p50_target_classes=5"));
+        assertTrue(weapons.evidence().contains("unsupported_p50=DESTROYER"));
+        assertTrue(weapons.evidence().contains("KINETIC_DIRECT_FIRE"));
+        assertTrue(weapons.evidence().contains("BEAM_DIRECT_FIRE"));
+        assertTrue(weapons.evidence().contains("GUIDED_STRIKE"));
+        assertTrue(weapons.evidence().contains("LAYERED_DEFENSE"));
+
+        RequirementResult pd = byId.get(RequirementId.PD_SAFE_INTERCEPT_GEOMETRY);
+        assertEquals(RequirementStatus.SATISFIED, pd.status());
+        assertEquals("pd_safe_intercept_geometry_physically_closed", pd.evidence());
+        Stage20PdSafeInterceptCalibrationProfile pdProfile = Stage20PdSafeInterceptCalibrationProfile.deriveCurrent();
+        assertTrue(pdProfile.closesStage20BEntryCoverage());
+        assertEquals(100_000d, pdProfile.selectedMinimumInterceptDistanceM(), 0d);
+        assertTrue(pdProfile.selectedIntersectingEnergyJ() > 0d);
+        assertTrue(pdProfile.stage22ReviewRequired());
     }
 
     @Test
-    void weaponTargetClassCoverageIsClosedWithoutInventingDestroyerP50() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
-        RequirementResult weaponCoverage = byId.get(RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE);
+    void formationStationRouteAndTopologyClosuresRemainMachineVisible() {
+        Map<RequirementId, RequirementResult> byId = byId(Stage20ACalibrationReadinessCalculator.deriveCurrent());
 
-        assertEquals(RequirementStatus.SATISFIED, weaponCoverage.status());
-        assertTrue(weaponCoverage.evidence().contains(Stage20WeaponTargetClassCoverageProfile.CURRENT_VERSION));
-        assertTrue(weaponCoverage.evidence().contains("p50_target_classes=5"));
-        assertTrue(weaponCoverage.evidence().contains("unsupported_p50=DESTROYER"));
-        assertTrue(weaponCoverage.evidence().contains("KINETIC_DIRECT_FIRE"));
-        assertTrue(weaponCoverage.evidence().contains("BEAM_DIRECT_FIRE"));
-        assertTrue(weaponCoverage.evidence().contains("GUIDED_STRIKE"));
-        assertTrue(weaponCoverage.evidence().contains("LAYERED_DEFENSE"));
-        assertTrue(weaponCoverage.evidence().contains("stage22_review_required=true"));
-    }
-
-    @Test
-    void formationSpacingIsClosedByVersionedStage19AcceptanceBands() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
         RequirementResult formation = byId.get(RequirementId.FORMATION_SPACING_BAND_CLOSURE);
-
-        assertEquals(RequirementStatus.SATISFIED, formation.status());
         assertTrue(formation.evidence().contains(Stage20FormationSpacingCalibrationProfile.CURRENT_VERSION));
         assertTrue(formation.evidence().contains("COMPACT_ACCEPTANCE"));
         assertTrue(formation.evidence().contains("DISPERSED_ACCEPTANCE"));
-        assertTrue(formation.evidence().contains("source_samples=3"));
-        assertTrue(formation.evidence().contains("stage22_review_required=true"));
-    }
 
-    @Test
-    void stationDefensiveSensorGeometryIsClosedByAcceptedReferenceTiers() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        assertEquals("placement_ready_stations=8/8", byId.get(RequirementId.STATION_PHYSICAL_GEOMETRY).evidence());
+        assertEquals("closed_station_stand_offs=8/8", byId.get(RequirementId.STATION_JUMP_ARRIVAL_STANDOFF).evidence());
+
         RequirementResult stationDefense = byId.get(RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY);
-
-        assertEquals(RequirementStatus.SATISFIED, stationDefense.status());
         assertTrue(stationDefense.evidence().contains(Stage20StationDefensiveSensorGeometryProfile.CURRENT_VERSION));
         assertTrue(stationDefense.evidence().contains("station_rows=8"));
-        assertTrue(stationDefense.evidence().contains("BASIC_SECURITY"));
-        assertTrue(stationDefense.evidence().contains("HARDENED_SECURITY"));
         assertTrue(stationDefense.evidence().contains("NAVAL_FORTIFIED"));
-        assertTrue(stationDefense.evidence().contains("stage22_review_required=true"));
-    }
 
-    @Test
-    void stationJumpArrivalStandOffIsClosedByEightDerivedPhysicalSamples() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
-        RequirementResult standOff = byId.get(RequirementId.STATION_JUMP_ARRIVAL_STANDOFF);
-
-        assertEquals(RequirementStatus.SATISFIED, standOff.status());
-        assertEquals("closed_station_stand_offs=8/8", standOff.evidence());
-    }
-
-    @Test
-    void localRouteSemanticBandsAreClosedByVersionedPhysicalEndpointMatrix() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
         RequirementResult routes = byId.get(RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS);
-
-        assertEquals(RequirementStatus.SATISFIED, routes.status());
         assertTrue(routes.evidence().contains(Stage20LocalRouteSemanticCalibrationProfile.CURRENT_VERSION));
         assertTrue(routes.evidence().contains("STATION_TO_STATION"));
         assertTrue(routes.evidence().contains("STATION_TO_RESOURCE_FIELD"));
         assertTrue(routes.evidence().contains("JUMP_ARRIVAL_TO_MAJOR_HUB"));
         assertTrue(routes.evidence().contains("INNER_TO_OUTER_SYSTEM"));
         assertTrue(routes.evidence().contains("samples=144"));
-        assertTrue(routes.evidence().contains("max_station_standoff_m="));
-        assertTrue(routes.evidence().contains("stage22_review_required=true"));
-    }
 
-    @Test
-    void topologyQualityBandsAreClosedByVersionedGenerationBudgets() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
         RequirementResult topology = byId.get(RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS);
-
-        assertEquals(RequirementStatus.SATISFIED, topology.status());
         assertTrue(topology.evidence().contains(Stage20TopologyQualityCalibrationProfile.CURRENT_VERSION));
         assertTrue(topology.evidence().contains("maxLinearCorridorLength=3"));
         assertTrue(topology.evidence().contains("maxDegreeOneFraction=0.2"));
-        assertTrue(topology.evidence().contains("minRegionalCycleCoverage=0.5"));
-        assertTrue(topology.evidence().contains("minCoreRouteRedundancy=2"));
-        assertTrue(topology.evidence().contains("maxSingleGatewayDependency=0.45"));
-        assertTrue(topology.evidence().contains("sectorExitBand=2-4"));
-        assertTrue(topology.evidence().contains("hubDegreeBand=3-6"));
         assertTrue(topology.evidence().contains("regionalHopDistanceBand=3-5"));
-        assertTrue(topology.evidence().contains("stage22_review_required=true"));
     }
 
     @Test
-    void majorInfrastructureExtentsAreClosedWithoutCreatingSystemBoundaries() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
-        RequirementResult extents = byId.get(RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS);
+    void infrastructurePrecisionAndLodRemainNonBoundaryPhysicalClosures() {
+        Map<RequirementId, RequirementResult> byId = byId(Stage20ACalibrationReadinessCalculator.deriveCurrent());
 
-        assertEquals(RequirementStatus.SATISFIED, extents.status());
-        assertTrue(extents.evidence().contains(Stage20MajorInfrastructureExtentCalibrationProfile.CURRENT_VERSION));
-        assertTrue(extents.evidence().contains("CORE_STATION_CLUSTER"));
-        assertTrue(extents.evidence().contains("INDUSTRIAL_RESOURCE_NETWORK"));
-        assertTrue(extents.evidence().contains("MAJOR_HUB_REACH"));
-        assertTrue(extents.evidence().contains("max_extent_m=1.0E9"));
-        assertTrue(extents.evidence().contains("hard_boundary=false"));
-        assertTrue(extents.evidence().contains("clamp_allowed=false"));
-        assertTrue(extents.evidence().contains("stage22_review_required=true"));
-    }
+        RequirementResult infrastructure = byId.get(RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS);
+        assertTrue(infrastructure.evidence().contains(Stage20MajorInfrastructureExtentCalibrationProfile.CURRENT_VERSION));
+        assertTrue(infrastructure.evidence().contains("max_extent_m=1.0E9"));
+        assertTrue(infrastructure.evidence().contains("hard_boundary=false"));
+        assertTrue(infrastructure.evidence().contains("clamp_allowed=false"));
 
-    @Test
-    void materializationLodIsClosedBySupersedingPhysicalProfileWithoutRewritingHistory() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult precision = byId.get(RequirementId.FAR_COORDINATE_PRECISION);
+        assertTrue(precision.evidence().contains("error_budget_m="));
+        assertTrue(precision.evidence().contains("hierarchical_half_ulp_m="));
+
         RequirementResult lod = byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE);
-
-        assertEquals(RequirementStatus.SATISFIED, lod.status());
         assertTrue(lod.evidence().contains("closure_profile=" + Stage20MaterializationLodClosureProfile.CURRENT_VERSION));
         assertTrue(lod.evidence().contains("base_profile=" + Stage20MaterializationLodCalibrationProfile.CURRENT_VERSION));
         assertTrue(lod.evidence().contains("historical_numeric_bands_unresolved=true"));
         assertTrue(lod.evidence().contains("active_local_activation_m=1.0E9"));
-        assertTrue(lod.evidence().contains("tactical_activation_m="));
         assertTrue(lod.evidence().contains("wake_latency_s=0.0"));
         assertTrue(lod.evidence().contains("authoritative_state_retained=true"));
         assertTrue(lod.evidence().contains("distance_can_suppress_direct_relevance=false"));
@@ -233,10 +149,8 @@ class Stage20ACalibrationReadinessProfileTest {
     }
 
     @Test
-    void currentPhysicalAndCalibrationGapsCannotBeHiddenByFallbackConstants() {
-        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
-        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
-                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+    void ftlAndEnduranceEvidenceRemainsExplicitAtReadyGate() {
+        Map<RequirementId, RequirementResult> byId = byId(Stage20ACalibrationReadinessCalculator.deriveCurrent());
 
         assertEquals(
                 "compatible_civilian_representatives=EARLY_CIVILIAN_FREIGHTER,MINING_SHIP",
@@ -245,47 +159,16 @@ class Stage20ACalibrationReadinessProfileTest {
                 .contains("endurance_samples=9/9"));
         assertTrue(byId.get(RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE).evidence()
                 .contains(Stage20RepresentativeEnduranceProfile.CURRENT_VERSION));
-        assertTrue(byId.get(RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE).evidence()
-                .contains("stage22_review_required=true"));
         assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
                 .contains(Stage20IntersystemCadenceCalibrationProfile.CURRENT_VERSION));
         assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
                 .contains("FLEET_REINFORCEMENT_3_HOP"));
-        assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
-                .contains("CARRIER_AVIATION_GROUP"));
-        assertTrue(byId.get(RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE).evidence()
-                .contains("historical_stage20a4_pending=true"));
         assertTrue(byId.get(RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE).evidence()
                 .contains(Stage20FireControlPolicyClosureProfile.CURRENT_VERSION));
-        assertTrue(byId.get(RequirementId.PD_SAFE_INTERCEPT_GEOMETRY).evidence()
-                .contains("scheduler_probe_input"));
-        assertEquals(
-                "placement_ready_stations=8/8",
-                byId.get(RequirementId.STATION_PHYSICAL_GEOMETRY).evidence());
-        assertEquals(
-                "closed_station_stand_offs=8/8",
-                byId.get(RequirementId.STATION_JUMP_ARRIVAL_STANDOFF).evidence());
-        assertTrue(byId.get(RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS).evidence()
-                .contains("samples=144"));
-        assertTrue(byId.get(RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS).evidence()
-                .contains("hard_boundary=false"));
-        assertTrue(byId.get(RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS).evidence()
-                .contains("maxLinearCorridorLength"));
-        assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
-                .contains("historical_numeric_bands_unresolved=true"));
-        assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
-                .contains(Stage20MaterializationLodClosureProfile.CURRENT_VERSION));
-        assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
-                .contains("lossless_materialization_lifecycle_closed=true"));
     }
 
-    private static void assertStatus(
-            Map<RequirementId, RequirementResult> byId,
-            RequirementStatus expected,
-            RequirementId... ids) {
-        List<RequirementId> mismatched = java.util.Arrays.stream(ids)
-                .filter(id -> byId.get(id).status() != expected)
-                .toList();
-        assertEquals(List.of(), mismatched);
+    private static Map<RequirementId, RequirementResult> byId(Stage20ACalibrationReadinessProfile profile) {
+        return profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
     }
 }

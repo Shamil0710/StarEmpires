@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "version": "stage20a.pd-safe-intercept.v1",
+  "status": "PROVISIONAL_ACCEPTED_REFERENCE",
+  "stage22ReviewRequired": true,
+  "sourceBenchmark": "docs/benchmarks/protection_debris_reference_v0_7.json",
+  "sourceBenchmarkStatus": "authoring-benchmark-only",
+  "sourceThreat": "M_ANTI_SHIP_MISSILE",
+  "sourceThreatKineticEnergyJ": 1944000000000.0,
+  "projectedTarget": "REFERENCE_BATTLESHIP_NOSE_ON",
+  "policyEvidence": "docs/stage20a_pd_safe_intercept_closure.md:provisional_policy/maxProjectedHitFraction",
+  "maxProjectedHitFraction": 0.02,
+  "samples": [
+    {"lateralSigmaMps":50.0,"standOffM":10000.0,"shipHitFraction":0.8322912662272479,"intersectingEnergyJ":1617974221545.77},
+    {"lateralSigmaMps":50.0,"standOffM":20000.0,"shipHitFraction":0.3766872129155317,"intersectingEnergyJ":732279941907.7936},
+    {"lateralSigmaMps":50.0,"standOffM":50000.0,"shipHitFraction":0.07401645401990709,"intersectingEnergyJ":143887986614.69937},
+    {"lateralSigmaMps":50.0,"standOffM":100000.0,"shipHitFraction":0.01908598986265913,"intersectingEnergyJ":37103164293.009346},
+    {"lateralSigmaMps":200.0,"standOffM":10000.0,"shipHitFraction":0.1130267742080761,"intersectingEnergyJ":219724049060.49994},
+    {"lateralSigmaMps":200.0,"standOffM":20000.0,"shipHitFraction":0.029648284673255892,"intersectingEnergyJ":57636265404.809456},
+    {"lateralSigmaMps":200.0,"standOffM":50000.0,"shipHitFraction":0.004808902419802274,"intersectingEnergyJ":9348506304.095621},
+    {"lateralSigmaMps":200.0,"standOffM":100000.0,"shipHitFraction":0.0012045830508669343,"intersectingEnergyJ":2341709450.88532},
+    {"lateralSigmaMps":500.0,"standOffM":10000.0,"shipHitFraction":0.01908598986265913,"intersectingEnergyJ":37103164293.009346},
+    {"lateralSigmaMps":500.0,"standOffM":20000.0,"shipHitFraction":0.004808902419802274,"intersectingEnergyJ":9348506304.095621},
+    {"lateralSigmaMps":500.0,"standOffM":50000.0,"shipHitFraction":0.000771114872763064,"intersectingEnergyJ":1499047312.6513965},
+    {"lateralSigmaMps":500.0,"standOffM":100000.0,"shipHitFraction":0.00019283948893820203,"intersectingEnergyJ":374879966.49586475}
+  ]
+}
