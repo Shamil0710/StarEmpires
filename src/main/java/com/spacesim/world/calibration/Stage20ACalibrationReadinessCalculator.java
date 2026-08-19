@@ -217,12 +217,12 @@ public final class Stage20ACalibrationReadinessCalculator {
                 RequirementStatus.BLOCKING_STAGE20B_ENTRY,
                 "required_maxLinearCorridorLength_maxDegreeOneFraction_cycle_redundancy_gateway_sector_exit_hub_and_hop_bands_are_not_yet_machine_readable"));
 
-        requirements.add(result(
+        requirements.add(new RequirementResult(
                 RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
-                stationGeometryClosed,
+                RequirementStatus.BLOCKING_STAGE20B_ENTRY,
                 stationGeometryClosed
-                        ? "all_station_geometry_closed_extent_bands_can_be_derived"
-                        : "major_infrastructure_extent_bands_cannot_close_while_station_footprints_are_unresolved"));
+                        ? "station_geometry_is_closed_but_no_separate_machine_readable_major_infrastructure_extent_band_profile_exists"
+                        : "major_infrastructure_extent_bands_cannot_close_while_station_footprints_are_unresolved_and_no_extent_band_profile_exists"));
 
         boolean precisionClosed = precision.policy().hierarchicalPhysicalCoordinatesRequired()
                 && !precision.policy().legacyGlobalFloatPhysicalAuthorityAllowed()
