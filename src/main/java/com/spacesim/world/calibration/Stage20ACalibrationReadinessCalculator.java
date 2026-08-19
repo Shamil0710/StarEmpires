@@ -49,6 +49,8 @@ public final class Stage20ACalibrationReadinessCalculator {
         Stage20ScaleCalibrationProfile scale = Stage20ScaleCalibrationProfile.deriveCurrent();
         Stage20RepresentativeEnduranceProfile endurance = Stage20RepresentativeEnduranceProfile.deriveCurrent();
         Stage20FtlCalibrationProfile ftl = Stage20FtlCalibrationProfile.deriveCurrent();
+        Stage20IntersystemCadenceCalibrationProfile intersystemCadence =
+                Stage20IntersystemCadenceCalibrationProfile.deriveCurrent();
         Stage20SensorCalibrationProfile sensor = Stage20SensorCalibrationProfile.deriveCurrent();
         Stage20FireControlPolicyClosureProfile fireControl = Stage20FireControlPolicyClosureProfile.deriveCurrent();
         Stage20WeaponSpatialCalibrationProfile weapons = Stage20WeaponSpatialCalibrationCalculator.calibrate();
@@ -116,10 +118,22 @@ public final class Stage20ACalibrationReadinessCalculator {
                 neighborOnly,
                 "topology_mode=" + ftl.reference().topologyMode().name()));
 
-        requirements.add(new RequirementResult(
+        Set<Stage20IntersystemCadenceCalibrationProfile.BandId> cadenceBandIds =
+                intersystemCadence.bands().stream()
+                        .map(Stage20IntersystemCadenceCalibrationProfile.CadenceBand::id)
+                        .collect(Collectors.toSet());
+        boolean cadenceClosed = cadenceBandIds.equals(Set.of(
+                Stage20IntersystemCadenceCalibrationProfile.BandId.NEIGHBOR_EDGE,
+                Stage20IntersystemCadenceCalibrationProfile.BandId.REGIONAL_3_HOP,
+                Stage20IntersystemCadenceCalibrationProfile.BandId.REGIONAL_5_HOP,
+                Stage20IntersystemCadenceCalibrationProfile.BandId.FLEET_REINFORCEMENT_3_HOP))
+                && !intersystemCadence.samples().isEmpty();
+        requirements.add(result(
                 RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
-                RequirementStatus.BLOCKING_STAGE20B_ENTRY,
-                "ftl_profile_has_one_edge_reference_cadence_but_no_machine_readable_system_neighbor_regional_3_5_hop_or_fleet_reinforcement_acceptance_bands"));
+                cadenceClosed,
+                "profile=" + intersystemCadence.version()
+                        + ";bands=" + cadenceBandIds.stream().map(Enum::name).sorted().collect(Collectors.joining(","))
+                        + ";excluded_overmass=" + String.join(",", intersystemCadence.excludedRepresentatives())));
 
         requirements.add(gapRequirement(
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
