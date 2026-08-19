@@ -42,7 +42,7 @@ class BeamAndGuidanceRuntimeTest {
     }
 
     @Test
-    void beamRequiresFireControlAndRespectsPhysicalDwellDuty() {
+    void beamRequiresTrackedCartesianStateAndRespectsPhysicalDwellDuty() {
         BeamWeapon weapon = new BeamWeapon(
                 "weapon.laser_test_v1", 1e-6d, 2d, 1e-6d,
                 100_000_000d, 150_000_000d, 50_000_000d, 2d);
@@ -50,10 +50,12 @@ class BeamAndGuidanceRuntimeTest {
 
         assertEquals(
                 Failure.FIRE_CONTROL_INSUFFICIENT,
-                runtime.plan(weapon, track(10_000d, 0d, InformationState.TRACKED, 1d), 0d, 0d, 1d).failure());
+                runtime.plan(weapon, track(10_000d, 0d, InformationState.CLASSIFIED, 1d), 0d, 0d, 1d).failure());
+        assertTrue(
+                runtime.plan(weapon, track(10_000d, 0d, InformationState.TRACKED, 1d), 0d, 0d, 1d).allowed());
         assertEquals(
                 Failure.DWELL_LIMIT_EXCEEDED,
-                runtime.plan(weapon, track(10_000d, 0d, InformationState.FIRE_CONTROL, 1d), 0d, 0d, 3d).failure());
+                runtime.plan(weapon, track(10_000d, 0d, InformationState.TRACKED, 1d), 0d, 0d, 3d).failure());
     }
 
     @Test
