@@ -24,11 +24,12 @@ public final class Stage20MaterializationLodCalibrationCalculator {
     /**
      * Builds the deterministic current materialization/LOD calibration profile.
      *
-     * <p>Production provides fixed local/tactical cadence evidence and strategic reduced stepping,
-     * plus a lossless Stage-20 runtime/persistence materialization boundary. It does not yet provide
-     * a relevance scheduler with an accepted maximum wake latency. Therefore current numeric
-     * ACTIVE_LOCAL/TACTICAL distance bands remain absent rather than receiving a viewport- or
-     * weapon-probe-derived fallback radius.</p>
+     * <p>Production provides fixed local/tactical cadence evidence, strategic reduced stepping, a
+     * lossless Stage-20 runtime/persistence materialization boundary and a synchronous relevance
+     * scheduler with zero simulation-time wake latency once promotion is requested. Current generic
+     * ACTIVE_LOCAL/TACTICAL numeric bands remain absent because the accepted physical interaction
+     * envelopes are context/target dependent and several representative/station closure blockers
+     * remain open. No viewport or weapon-probe fallback radius is introduced.</p>
      *
      * @return current immutable Stage-20A.9 calibration profile
      */
@@ -47,7 +48,7 @@ public final class Stage20MaterializationLodCalibrationCalculator {
                         false,
                         false,
                         false,
-                        "strategic_relevance_or_due_authoritative_event"),
+                        "strategic_relevance_or_due_authoritative_event_live_persistent_ecs_reduced_rate"),
                 new RepresentationPolicy(
                         RepresentationLevel.ACTIVE_LOCAL,
                         true,
@@ -78,12 +79,12 @@ public final class Stage20MaterializationLodCalibrationCalculator {
                         RepresentationLevel.ACTIVE_LOCAL,
                         DistanceBandAuthority.UNRESOLVED,
                         OptionalDouble.empty(),
-                        "no_accepted_local_relevance_envelope_or_materialization_wake_latency"),
+                        "scheduler_wake_latency_is_zero_but_no_accepted_generic_local_operational_interaction_envelope_exists"),
                 new DistanceBandClosure(
                         RepresentationLevel.TACTICAL,
                         DistanceBandAuthority.UNRESOLVED,
                         OptionalDouble.empty(),
-                        "sensor_weapon_docking_interaction_envelopes_are_context_dependent_and_no_materialization_wake_latency_is_authored"));
+                        "scheduler_wake_latency_is_zero_but_sensor_weapon_docking_interaction_envelopes_remain_context_dependent_or_physically_unclosed"));
 
         return new Stage20MaterializationLodCalibrationProfile(
                 Stage20MaterializationLodCalibrationProfile.CURRENT_VERSION,
@@ -91,7 +92,7 @@ public final class Stage20MaterializationLodCalibrationCalculator {
                 cadence,
                 closures,
                 List.of(
-                        "no_production_persistent_to_local_materialization_scheduler_with_bounded_wake_latency",
+                        "numeric_active_local_tactical_activation_bands_wait_on_context_specific_physical_interaction_envelope_closure",
                         "entity_lifecycle_remove_is_structural_deletion_not_dematerialization_and_must_not_be_reused_for_lod",
                         "stage20a4_sensor_and_stage20a5_weapon_probe_distances_are_not_universal_materialization_radii",
                         "beam_and_passive_sensor_interaction_envelopes_are_target_state_dependent_not_hard_range_walls",
