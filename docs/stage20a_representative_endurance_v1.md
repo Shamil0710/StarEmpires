@@ -1,6 +1,6 @@
 # Stage 20A Closure — Representative Endurance / Sustained-Thrust v1
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — implementation head passed exact-head Java-17 CI; final status-only merge gate pending  
 **Parent:** Stage 20A representative-ship scale calibration / closure remediation  
 **Date:** 2026-08-19
 
@@ -236,7 +236,7 @@ so later code cannot confuse historical thrust evidence with newly authored miss
 
 ## 9. Readiness impact
 
-If exact-head tests accept the profile, exactly one blocker changes:
+Exactly one blocker changes:
 
 ```text
 REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE
@@ -254,7 +254,7 @@ No route/topology/station/sensor/weapon/PD/materialization blocker is removed by
 
 ## 10. Regression requirements
 
-Tests must prove:
+Tests prove:
 
 - all nine current Stage-20 propulsion representatives have exactly one endurance entry;
 - every entry has explicit sustained-thrust and mission-stores provenance;
@@ -267,7 +267,11 @@ Tests must prove:
 - current production escort retains production max-thrust/mass/exhaust authority while only its sustained-thrust policy remains provisional;
 - readiness removes exactly one blocker, producing 12 remaining Stage-20B blockers.
 
-## 11. Deferred work
+## 11. Acceptance evidence
+
+Implementation head `360aab855256bb99ad4a04d826599182fdb6b209` passed the complete Java-17 CI gate, including the full test, coverage, Javadoc and packaging verification. The readiness acceptance test requires exactly twelve remaining Stage-20B blockers.
+
+## 12. Deferred work
 
 This slice does not define:
 
