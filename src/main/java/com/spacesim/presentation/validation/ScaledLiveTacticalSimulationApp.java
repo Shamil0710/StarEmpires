@@ -12,6 +12,8 @@ import com.spacesim.ship.LiveTacticalBattleControlRuntime;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession.SimulationSpeed;
 import com.spacesim.ui.ScaledTacticalDebugSnapshot;
+import com.spacesim.ui.ShipInspectionPanelRenderer;
+import com.spacesim.ui.ShipInspectionSnapshot;
 import com.spacesim.ui.ShipSelectionController;
 import com.spacesim.ui.TacticalPrototypeRenderer;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot;
@@ -23,13 +25,14 @@ import com.spacesim.ui.WorldMapLayout;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Runnable Stage-19J desktop viewer over one selected exact-local production tactical scenario.
  *
  * <p>Wall-clock time and input own presentation scheduling only. The viewer never advances partial
  * simulation intervals and never owns movement, AI, sensors, weapons, ammunition, damage, power,
- * heat or body state. Rendering, selection and diagnostics consume immutable read-only projections.</p>
+ * heat or body state. Rendering, selection, inspection and diagnostics consume read-only projections.</p>
  */
 public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private static final float VIEW_PADDING_PX = 28f;
@@ -41,6 +44,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private ScaledLiveTacticalSimulationSession session;
     private TacticalPrototypeRenderer tacticalRenderer;
     private TacticalSelectionOverlayRenderer selectionRenderer;
+    private ShipInspectionPanelRenderer inspectionRenderer;
     private ShipSelectionController selectionController;
     private OrthographicCamera camera;
     private SpriteBatch batch;
@@ -70,6 +74,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         session = new ScaledLiveTacticalSimulationSession(scenarioId);
         tacticalRenderer = new TacticalPrototypeRenderer();
         selectionRenderer = new TacticalSelectionOverlayRenderer();
+        inspectionRenderer = new ShipInspectionPanelRenderer();
         selectionController = new ShipSelectionController();
         camera = new OrthographicCamera();
         batch = new SpriteBatch();
@@ -88,16 +93,22 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         TacticalPrototypeVisualSnapshot snapshot = session.snapshot();
         selectionController.reconcile(snapshot);
+        long selectedEntityId = selectionController.selectedEntityId().orElse(-1L);
+        Optional<ShipInspectionSnapshot> inspection = selectedEntityId > 0L
+                ? session.inspectionSnapshot(selectedEntityId)
+                : Optional.empty();
+
         tacticalRenderer.render(camera.combined, layout, snapshot);
-        selectionRenderer.render(
-                camera.combined,
-                layout,
-                snapshot,
-                selectionController.selectedEntityId().orElse(-1L));
+        selectionRenderer.render(camera.combined, layout, snapshot, selectedEntityId);
         drawHud(session.debugSnapshot(), snapshot);
+        inspectionRenderer.render(
+                camera.combined,
+                camera.viewportWidth,
+                camera.viewportHeight,
+                inspection);
     }
 
-    /** Rebuilds only presentation-space mapping after a window resize. */
+    /** Rebuilds presentation-space mapping while reserving a stable right inspection column. */
     @Override
     public void resize(int width, int height) {
         if (camera == null || width <= 0 || height <= 0) {
@@ -105,10 +116,12 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         }
         camera.setToOrtho(false, width, height);
         camera.update();
+        float panelWidth = ShipInspectionPanelRenderer.panelWidth(width);
+        float mapWidth = Math.max(320f, width - panelWidth);
         layout = new WorldMapLayout(
                 0f,
                 0f,
-                width,
+                mapWidth,
                 height,
                 VIEW_PADDING_PX,
                 WorldMapLayout.WORLD_WIDTH * 0.5f,
@@ -119,6 +132,9 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     /** Releases presentation-only resources. */
     @Override
     public void dispose() {
+        if (inspectionRenderer != null) {
+            inspectionRenderer.dispose();
+        }
         if (selectionRenderer != null) {
             selectionRenderer.dispose();
         }
@@ -180,7 +196,9 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             float screenX = Gdx.input.getX();
             float screenY = Gdx.graphics.getHeight() - 1f - Gdx.input.getY();
-            selectionController.selectAt(screenX, screenY, layout, session.snapshot());
+            if (layout.containsMapPoint(screenX, screenY)) {
+                selectionController.selectAt(screenX, screenY, layout, session.snapshot());
+            }
         }
     }
 
