@@ -6,13 +6,11 @@
 
 ## 1. Purpose
 
-Stage 20A.1–A.9 established the calibration seams required before procedural physical geometry is authored. Those slices deliberately left unsupported physical capability unresolved instead of filling gaps with map, sensor, weapon, station or LOD constants.
+Stage 20A.1–A.9 established the principal calibration seams required before procedural physical geometry is authored. They deliberately retained unsupported capability as unresolved instead of filling gaps with arbitrary map, sensor, weapon, station or LOD constants.
 
-The closure/readiness gate answers a narrower question:
+The closure/readiness gate answers:
 
-> **Can the accepted Stage-20A calibration output serve as sufficient physical input for Stage 20B star-system geometry without inventing hidden capability or fallback distances?**
-
-The gate is machine-readable and derives its answer from current accepted calibration profiles rather than from a manually maintained checklist.
+> **Does current Stage-20A output satisfy the complete accepted DoD 20A strongly enough for Stage 20B to author star-system physical geometry without inventing missing physics, route bands, topology thresholds or fallback radii?**
 
 Current result:
 
@@ -20,11 +18,11 @@ Current result:
 BLOCKED_FOR_STAGE20B
 ```
 
-## 2. Classification policy
+The first draft of this gate checked only unresolved A.1–A.9 implementation seams and found six blockers. A direct audit against `docs/stage20_physical_world_generation_plan.md` showed that this was too narrow: DoD 20A additionally requires semantic local/inter-system route bands, topology-quality bands, representative-target effectiveness, endurance/thrust consequences and other machine-readable calibration closure. The accepted gate therefore audits the full DoD, not merely the existence of A.1–A.9 classes.
 
-Not every unresolved note is a Stage-20B blocker.
+## 2. Requirement classification
 
-The gate separates four states:
+Every requirement is classified as one of:
 
 ```text
 SATISFIED
@@ -33,37 +31,53 @@ DEFERRED_STAGE22_CONTENT
 OWNED_BY_LATER_STAGE20
 ```
 
-### SATISFIED
+- `SATISFIED` — current accepted calibration is sufficient for Stage-20B entry.
+- `BLOCKING_STAGE20B_ENTRY` — Stage 20B would otherwise have to guess a physical/cadence/quality value or consume an inappropriate legacy/probe constant.
+- `DEFERRED_STAGE22_CONTENT` — Stage 20A explicitly permits a provisional accepted physical reference while final production/faction content promotion remains a Stage-22 responsibility.
+- `OWNED_BY_LATER_STAGE20` — the datum is generated world data owned by a later Stage-20 slice; Stage 20A calibrates its acceptance band rather than fabricating the generated distribution itself.
 
-Current accepted calibration already provides enough authority for Stage-20B entry.
+## 3. Complete current blocker set
 
-### BLOCKING_STAGE20B_ENTRY
+The machine-readable gate currently expects **16 Stage-20B entry blockers**:
 
-Physical/calibration information is missing and Stage 20B would otherwise have to invent it, silently substitute a legacy constant or produce geometry that cannot be validated against the intended world model.
+```text
+1.  REPRESENTATIVE_PROPULSION_COVERAGE
+2.  REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE
+3.  CIVILIAN_ORDINARY_FTL_COVERAGE
+4.  INTERSYSTEM_CADENCE_CALIBRATION_BANDS
+5.  SENSOR_TARGET_CLASS_COVERAGE
+6.  FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE
+7.  WEAPON_REPRESENTATIVE_TARGET_COVERAGE
+8.  PD_SAFE_INTERCEPT_GEOMETRY
+9.  FORMATION_SPACING_BAND_CLOSURE
+10. STATION_PHYSICAL_GEOMETRY
+11. STATION_DEFENSIVE_SENSOR_GEOMETRY
+12. STATION_JUMP_ARRIVAL_STANDOFF
+13. LOCAL_ROUTE_SEMANTIC_BANDS
+14. TOPOLOGY_QUALITY_CALIBRATION_BANDS
+15. MAJOR_INFRASTRUCTURE_EXTENT_BANDS
+16. MATERIALIZATION_LOD_CLOSURE
+```
 
-### DEFERRED_STAGE22_CONTENT
+Several blockers are dependency-related and may clear together; they are still represented separately because each corresponds to a distinct DoD 20A output that must not disappear behind a single umbrella flag.
 
-Stage 20A explicitly permits an accepted provisional physical reference to calibrate world scale while final faction/production content promotion remains a Stage-22 review item.
+## 4. Representative physical coverage
 
-### OWNED_BY_LATER_STAGE20
+The accepted plan requires nine representative roles:
 
-The datum is world data intentionally authored by a later Stage-20 slice and therefore must not be fabricated during Stage 20A merely to make the gate green.
+```text
+early civilian freighter
+loaded bulk freighter
+mining ship
+patrol/corvette
+escort destroyer
+cruiser
+capital combatant
+fleet tanker/logistics support
+carrier/aviation group where relevant
+```
 
-## 3. Representative propulsion coverage
-
-The accepted Stage-20 plan requires nine functional representative roles:
-
-1. early civilian freighter;
-2. loaded bulk freighter;
-3. mining ship;
-4. patrol/corvette;
-5. escort destroyer;
-6. cruiser;
-7. capital combatant;
-8. fleet tanker/logistics support;
-9. carrier/aviation group where relevant.
-
-The current `Stage20ScaleCalibrationProfile` covers five:
+Current scale calibration physically covers five:
 
 ```text
 BULK_FREIGHTER_LOADED
@@ -73,7 +87,7 @@ BATTLESHIP
 FLEET_TANKER_LOADED
 ```
 
-and keeps four missing rather than fabricating them:
+Missing:
 
 ```text
 EARLY_CIVILIAN_FREIGHTER
@@ -82,16 +96,21 @@ CRUISER
 CARRIER_AVIATION_GROUP
 ```
 
-Gate result:
+Therefore:
 
 ```text
-REPRESENTATIVE_PROPULSION_COVERAGE
-= BLOCKING_STAGE20B_ENTRY
+REPRESENTATIVE_PROPULSION_COVERAGE = BLOCKING_STAGE20B_ENTRY
 ```
 
-The existence of the legacy functional enum `ShipType.MINING_SHIP` does not close this requirement: it defines cargo/role behavior, not a physical engineering mass/thrust/delta-v representative.
+The legacy `ShipType.MINING_SHIP` enum is not physical closure: it describes role/cargo behavior, not mass, thrust, delta-v, reaction mass, signature or endurance.
 
-## 4. Civilian ordinary FTL coverage
+DoD 20A also requires representative stores/endurance and sustained-vs-maximum-thrust consequences. Current `Stage20ScaleCalibrationProfile` exposes propulsion/route measurements but no complete machine-readable endurance/stores/sustained-thrust matrix, so:
+
+```text
+REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE = BLOCKING_STAGE20B_ENTRY
+```
+
+## 5. Civilian FTL and inter-system cadence
 
 The accepted reference jump drive supports:
 
@@ -99,234 +118,227 @@ The accepted reference jump drive supports:
 max translated mass = 100,000,000 kg
 ```
 
-Current civilian/logistics representatives include:
+Current civilian/logistics references include:
 
 ```text
 BULK_FREIGHTER_LOADED = 143,000,000 kg
 FLEET_TANKER_LOADED   = 170,000,000 kg
 ```
 
-Both exceed the accepted one-drive translated-mass envelope. The missing early civilian freighter and mining representative provide no alternative current civilian FTL closure.
+Both exceed the one-drive envelope; missing early freighter/miner references provide no alternative current civilian closure. The generator may not assume hidden drive multiplicity, mass bypass, enlarged civilian drives, gates or teleport rules.
 
-Stage 20 must not silently assume:
-
-- multiple drives combine translated-mass capacity;
-- civilian mass bypass;
-- a larger invisible drive;
-- special freight gates;
-- non-neighbor teleport travel.
-
-Gate result:
+Therefore:
 
 ```text
-CIVILIAN_ORDINARY_FTL_COVERAGE
-= BLOCKING_STAGE20B_ENTRY
+CIVILIAN_ORDINARY_FTL_COVERAGE = BLOCKING_STAGE20B_ENTRY
 ```
 
-This is distinct from final production FTL-module promotion. The provisional reference drive is allowed for Stage-20 calibration, but the current calibration still needs at least one physically valid civilian/logistics ordinary-FTL path before generated logistics geography can be trusted.
-
-## 5. FTL items that are not Stage-20B blockers
-
-### Neighbor-only topology
-
-Current accepted semantics are explicit:
-
-```text
-NEIGHBOR_EDGE_ONLY
-```
-
-Result:
+Neighbor-edge semantics themselves are explicit and accepted:
 
 ```text
 FTL_TOPOLOGY_SEMANTICS = SATISFIED
+NEIGHBOR_EDGE_ONLY
 ```
 
-### Production FTL module
-
-No final production `FTL_JUMP` module has yet replaced the accepted reference drive.
-
-Stage 20A already allows explicitly provisional accepted references when authority/provenance remain visible and Stage-22 review is mandatory.
-
-Result:
+However DoD 20A requires calibrated machine-readable cadence for:
 
 ```text
-PRODUCTION_FTL_MODULE_PROMOTION
-= DEFERRED_STAGE22_CONTENT
+system → neighboring system
+regional 3–5 hop route
+fleet reinforcement route
 ```
 
-### Numeric FTL heat coefficient
-
-The accepted reference requires heat accounting but lacks the final numeric production coefficient.
-
-This remains production/content promotion debt rather than permission to invent a world-scale distance.
-
-Result:
+The current FTL profile contains one accepted-reference edge cadence, not semantic acceptance bands for those route classes. Therefore:
 
 ```text
-FTL_HEAT_COEFFICIENT
-= DEFERRED_STAGE22_CONTENT
+INTERSYSTEM_CADENCE_CALIBRATION_BANDS = BLOCKING_STAGE20B_ENTRY
 ```
 
-### Edge-transit distribution
-
-Generated neighboring-edge transit distributions are world data to be authored/calibrated by the later inter-system topology work.
-
-Result:
+The eventual generated edge-transit distribution remains later Stage-20 world data:
 
 ```text
-FTL_EDGE_TRANSIT_DISTRIBUTION
-= OWNED_BY_LATER_STAGE20
+FTL_EDGE_TRANSIT_DISTRIBUTION = OWNED_BY_LATER_STAGE20
 ```
 
-## 6. Sensor / target coverage
+Final production FTL-module promotion and the numeric production heat coefficient remain explicitly deferred content work:
 
-The accepted A.4 production matrix currently measures the production escort destroyer as both observer and target and keeps the explicit gap:
+```text
+PRODUCTION_FTL_MODULE_PROMOTION = DEFERRED_STAGE22_CONTENT
+FTL_HEAT_COEFFICIENT            = DEFERRED_STAGE22_CONTENT
+```
+
+## 6. Sensor / track closure
+
+A.4 currently uses the production escort destroyer as both observer and target and explicitly reports:
 
 ```text
 representative_sensor_and_target_class_coverage_incomplete
 ```
 
-One production-quality military target is insufficient to calibrate world geometry around all required visibility/use cases such as civilian freight, mining, small craft and larger combatants.
-
-Gate result:
+Therefore:
 
 ```text
-SENSOR_TARGET_CLASS_COVERAGE
-= BLOCKING_STAGE20B_ENTRY
+SENSOR_TARGET_CLASS_COVERAGE = BLOCKING_STAGE20B_ENTRY
 ```
 
-The gate does not require a universal `sensorRange`; it requires enough representative target/signature coverage that Stage 20B does not place world objects based on one destroyer-only visibility case.
+A.4 also retained:
 
-## 7. Weapon / PD and formation evidence
+```text
+final_fused_track_quality_policy_pending_weapon_geometry
+```
 
-A.5 provides deterministic production-runtime probes for:
+A.5 weapon geometry now exists, but the final fused TRACKED/FIRE_CONTROL policy has not yet been re-derived/accepted against it. Therefore:
 
-- kinetic fire-control/time-of-flight;
-- beam spot/dwell/irradiance;
-- guided navigation/propellant use;
-- layered-defense intercept geometry.
+```text
+FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE = BLOCKING_STAGE20B_ENTRY
+```
 
-A.6 provides deterministic formation frontage and recovery evidence while retaining authored Stage-19 spacing only as provisional tactical probes.
+This does not request a universal sensor radius. It requests enough representative physical signatures and track-quality closure to author world scale without calibrating the entire universe around one destroyer-only measurement case.
 
-Results:
+## 7. Weapon / PD / formation closure
+
+A.5 provides real production-runtime evidence for kinetic, beam, guided and layered-defense geometry:
 
 ```text
 WEAPON_PD_SPATIAL_EVIDENCE = SATISFIED
+```
+
+But DoD 20A requires weapon time-of-flight/effectiveness **by representative target**. Current A.5 samples do not close an explicit representative-target/material-response matrix, so:
+
+```text
+WEAPON_REPRESENTATIVE_TARGET_COVERAGE = BLOCKING_STAGE20B_ENTRY
+```
+
+A.5 also deliberately retained safe-intercept distance as a scheduler probe input until fragmentation/blast/debris physics derives it. Therefore:
+
+```text
+PD_SAFE_INTERCEPT_GEOMETRY = BLOCKING_STAGE20B_ENTRY
+```
+
+A.6 proves formation frontage/recovery sensitivity:
+
+```text
 FORMATION_SPATIAL_EVIDENCE = SATISFIED
 ```
 
-These results do not promote the probe distances into universal world constants.
-
-## 8. Station physical geometry
-
-A.6 inventories all eight current Stage-18 station archetypes.
-
-Current result:
+but all current spacing values remain `PROVISIONAL_STAGE19_TACTICAL_PROBE`, not accepted Stage-20 formation bands. Therefore:
 
 ```text
-placement-ready stations = 0 / 8
+FORMATION_SPACING_BAND_CLOSURE = BLOCKING_STAGE20B_ENTRY
 ```
 
-Missing authority includes:
+## 8. Station / infrastructure closure
 
-- footprint length/width;
-- docking-approach clearance;
-- traffic clearance.
-
-The physical `300 × 120 × 70 m` escort-yard berth remains useful infrastructure evidence but cannot stand in for the containing station footprint.
-
-Gate result:
+A.6 inventories all eight Stage-18 station archetypes. Current placement-ready result:
 
 ```text
-STATION_PHYSICAL_GEOMETRY
-= BLOCKING_STAGE20B_ENTRY
+0 / 8
 ```
 
-This follows the accepted A.6 rule that Stage 20B must not place full stations as physically closed objects until the minimum explicit geometry schema is populated by accepted physical content/reference data.
+Missing fields include footprint, docking-approach and traffic geometry. The physical `300 × 120 × 70 m` escort-yard berth cannot be promoted to the containing station footprint.
 
-## 9. Jump-arrival station stand-off
+```text
+STATION_PHYSICAL_GEOMETRY = BLOCKING_STAGE20B_ENTRY
+```
 
-Because station geometry remains unresolved, A.7 correctly retains all current station-specific stand-offs as absent:
+DoD 20A also requires station defensive/sensor spatial capability. Current Stage-18/A.6 station archetypes do not author this per station class:
+
+```text
+STATION_DEFENSIVE_SENSOR_GEOMETRY = BLOCKING_STAGE20B_ENTRY
+```
+
+A.7 therefore correctly has no physically closed station-specific jump stand-off:
 
 ```text
 closed station stand-offs = 0 / 8
+STATION_JUMP_ARRIVAL_STANDOFF = BLOCKING_STAGE20B_ENTRY
 ```
 
-No viewport center, weapon probe, shipyard berth or universal jump radius may fill that gap.
-
-Gate result:
+Because whole-station footprints remain absent, calibrated major-infrastructure extents also cannot be closed:
 
 ```text
-STATION_JUMP_ARRIVAL_STANDOFF
-= BLOCKING_STAGE20B_ENTRY
+MAJOR_INFRASTRUCTURE_EXTENT_BANDS = BLOCKING_STAGE20B_ENTRY
 ```
 
-This blocker is downstream of station geometry: once accepted station footprint/traffic/defense inputs exist, A.7 already provides the deterministic stand-off derivation seam.
+## 9. Required semantic local-route bands
 
-## 10. Far-coordinate numerical precision
+A.2 has valuable physical route probes at several SI distances, but DoD 20A specifically requires semantic machine-readable calibration for:
 
-A.8 established:
+```text
+station → station
+station → resource field
+jump arrival → major hub
+inner → outer system
+```
 
-- hierarchical `long numerical cell + double local offset` physical positions;
-- 1 cm versioned local numerical error budget;
-- camera-relative float projection only after physical subtraction;
-- cell-boundary continuity;
-- presentation rebasing without physical mutation.
+Those semantic acceptance bands do not yet exist. Raw `10 Mm / 100 Mm / 1 Gm / 10 Gm` sensitivity probes may not silently become them.
 
-Gate result:
+```text
+LOCAL_ROUTE_SEMANTIC_BANDS = BLOCKING_STAGE20B_ENTRY
+```
+
+## 10. Topology-quality acceptance bands
+
+DoD 20A requires versioned calibration bands for topology quality before Stage 20D generates topology, including at minimum:
+
+```text
+maxLinearCorridorLength
+maxDegreeOneFraction
+minRegionalCycleCoverage
+minCoreRouteRedundancy
+maxSingleGatewayDependency
+sectorExitBand
+hubDegreeBand
+regionalHopDistanceBand
+```
+
+No current Stage-20A machine-readable profile owns these thresholds.
+
+```text
+TOPOLOGY_QUALITY_CALIBRATION_BANDS = BLOCKING_STAGE20B_ENTRY
+```
+
+This is distinct from generating the topology itself. Stage 20A must calibrate the quality envelope; Stage 20D later generates/repairs/rejects seeds against that envelope.
+
+## 11. Far-coordinate precision
+
+A.8 established hierarchical `long numerical cell + double local offset` physical coordinates, a 1 cm local numerical-error budget and camera-relative float presentation after physical subtraction.
 
 ```text
 FAR_COORDINATE_PRECISION = SATISFIED
 ```
 
-Legacy global-float ECS flight remains migration work and is not allowed to become the Stage-20B far-coordinate physical authority.
+Legacy global-float ECS flight remains migration work and cannot become Stage-20B far-coordinate physical authority.
 
-## 11. Materialization / LOD closure
+## 12. Materialization / LOD closure
 
-A.9 establishes the canonical representation hierarchy and physical formula for future promotion look-ahead, but current production lacks:
+A.9 established the canonical relevance hierarchy and physical promotion-look-ahead formula, but production still lacks:
 
-- persistent→local materialization scheduler with accepted bounded wake latency;
-- lossless local→persistent dematerialization service;
+- persistent→local materialization with accepted bounded wake latency;
+- lossless local→persistent dematerialization;
 - physically closed numeric `ACTIVE_LOCAL` / `TACTICAL` activation bands.
 
-Current result:
+Therefore:
 
 ```text
-numeric activation bands closed = false
-lossless materialization lifecycle closed = false
+MATERIALIZATION_LOD_CLOSURE = BLOCKING_STAGE20B_ENTRY
 ```
 
-Gate result:
+`EntityLifecycleService.remove(...)` is real structural deletion/reference invalidation and must never be repurposed as reversible LOD dematerialization.
 
-```text
-MATERIALIZATION_LOD_CLOSURE
-= BLOCKING_STAGE20B_ENTRY
-```
+## 13. Dependency-ordered remediation
 
-`EntityLifecycleService.remove(...)` cannot satisfy this requirement because it performs real structural deletion and reference invalidation rather than reversible LOD representation change.
+The 16 blocker flags do not imply 16 independent projects. The preferred order is:
 
-## 12. Current exact blocker set
+### Workstream 1 — code-first physical continuity
 
-The readiness calculator currently expects exactly six Stage-20B blockers:
+Implement lossless persistent ↔ local/tactical materialization with explicit Stage-20 physical-coordinate snapshot and measured bounded wake latency. Then derive numeric A.9 activation bands.
 
-```text
-1. REPRESENTATIVE_PROPULSION_COVERAGE
-2. CIVILIAN_ORDINARY_FTL_COVERAGE
-3. SENSOR_TARGET_CLASS_COVERAGE
-4. STATION_PHYSICAL_GEOMETRY
-5. STATION_JUMP_ARRIVAL_STANDOFF
-6. MATERIALIZATION_LOD_CLOSURE
-```
+This work can proceed without inventing ship or station physical numbers.
 
-The regression suite locks this set so a future change cannot accidentally declare Stage 20A ready while one of these inputs remains absent.
+### Workstream 2 — representative ship/endurance/FTL coverage
 
-## 13. Recommended remediation order
-
-The blockers have dependencies and should not be attacked in arbitrary order.
-
-### Closure Workstream 1 — representative physical coverage
-
-Close the missing functional representatives with production content or explicitly accepted physical references:
+Close:
 
 ```text
 EARLY_CIVILIAN_FREIGHTER
@@ -335,38 +347,40 @@ CRUISER
 CARRIER_AVIATION_GROUP
 ```
 
-At the same time, obtain at least one valid ordinary-FTL civilian/logistics representative under explicit accepted FTL semantics.
+using production content or explicitly accepted physical references only. Add stores/endurance and sustained-vs-max-thrust calibration. Ensure at least one civilian/logistics ordinary-FTL path is physically valid.
 
-Do not invent numbers merely to satisfy the gate.
+### Workstream 3 — sensor/weapon/formation closure
 
-### Closure Workstream 2 — sensor/target matrix
+Use the expanded representative set to close:
 
-Expand A.4 across the representative signatures made available by Workstream 1.
+- sensor/target class matrix;
+- fused TRACKED/FIRE_CONTROL policy against A.5 weapon geometry;
+- representative-target weapon effectiveness;
+- physical PD safe-intercept geometry;
+- accepted formation-spacing bands beyond Stage-19 fixture distances.
 
-This should close civilian/miner/small/large target visibility without introducing a scalar sensor radius.
+### Workstream 4 — station geometry
 
-### Closure Workstream 3 — station geometry and jump stand-off
+Author/accept physical station footprint, docking, traffic and defensive/sensor geometry. Then derive A.6 placement, A.7 arrival stand-off and major-infrastructure extent bands.
 
-Author/accept explicit physical footprint, docking-approach and traffic geometry for the eight Stage-18 station archetypes.
+### Workstream 5 — semantic route/cadence/topology calibration
 
-Then rerun A.6 placement envelopes and A.7 station-specific arrival stand-off derivation.
+With representative capability and infrastructure closure available, publish machine-readable bands for:
 
-### Closure Workstream 4 — lossless materialization lifecycle
+- local route classes;
+- system-neighbor / 3–5 hop / reinforcement cadence;
+- topology-quality metrics required by DoD 20A.
 
-Implement reversible persistent ↔ local/tactical representation transitions with bounded measured wake latency and no economic/physical mutation.
+### Workstream 6 — rerun gate
 
-Use that measured wake latency plus explicit interaction envelopes/closing capability to populate A.9 numeric activation bands.
-
-### Closure Workstream 5 — rerun gate
-
-Only after all six blockers clear may:
+Only after every `BLOCKING_STAGE20B_ENTRY` requirement becomes satisfied may:
 
 ```text
 BLOCKED_FOR_STAGE20B
 → READY_FOR_STAGE20B
 ```
 
-be accepted.
+be accepted and Stage 20B begin.
 
 ## 14. Machine-readable implementation
 
@@ -376,18 +390,16 @@ Added:
 - `Stage20ACalibrationReadinessCalculator`;
 - `Stage20ACalibrationReadinessProfileTest`.
 
-Current profile version:
+Current version:
 
 ```text
 stage20a.closure-readiness.v1
 ```
 
-The gate consumes A.1–A.9 outputs directly and preserves provenance/status classification for each requirement.
+The test suite locks all current requirement classifications and the exact 16-blocker result, preventing later documentation drift or accidental readiness through fallback constants.
 
 ## 15. Immediate next action
 
-After this readiness gate itself passes the merge gate, Stage 20 remains in **Stage 20A closure**, not Stage 20B.
+After this gate itself passes exact-head CI and merge review, Stage 20 remains in **Stage 20A closure**.
 
-The next implementation work should begin with a blocker that can be closed without fabricated physical content. Where representative/station numbers require new accepted design data, they remain blocked until that data exists rather than being guessed.
-
-A lossless materialization lifecycle is currently the strongest code-first blocker candidate because its semantics can be implemented and tested from existing authoritative persistence/state contracts without inventing station sizes or missing ship physics.
+The next implementation slice should begin with **Workstream 1 — lossless materialization lifecycle**, because it can be closed using existing persistence/state contracts plus A.8 physical coordinates without fabricating missing ship or station design data.
