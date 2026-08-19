@@ -3,14 +3,15 @@ package com.spacesim.ui;
 import com.spacesim.ship.LiveTacticalBattleDeceptionRuntime;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Thin live/presentation session over the exact same scaled authoritative runtime used headlessly.
  *
  * <p>The session owns presentation scheduling state and selected validation-scenario identity only.
  * It never owns movement, AI, sensing, weapons, ammunition, damage, power, heat or body state. Every
- * authoritative advance delegates to the same production runtime, while visual/debug reads are
- * strictly read-only.</p>
+ * authoritative advance delegates to the same production runtime, while visual/debug/inspection
+ * reads are strictly read-only.</p>
  */
 public final class ScaledLiveTacticalSimulationSession {
     /** Fixed-tick batches used only to change presentation-time simulation speed. */
@@ -36,6 +37,7 @@ public final class ScaledLiveTacticalSimulationSession {
     private final TacticalScenarioDefinition scenario;
     private final ScaledLiveTacticalSimulationProjection projection;
     private final ScaledTacticalDebugProjection debugProjection;
+    private final ShipInspectionProjection inspectionProjection;
     private boolean paused;
     private SimulationSpeed simulationSpeed = SimulationSpeed.X1;
 
@@ -52,17 +54,20 @@ public final class ScaledLiveTacticalSimulationSession {
     public ScaledLiveTacticalSimulationSession(TacticalScenarioId scenarioId) {
         this(TacticalScenarioCatalog.require(scenarioId),
                 new ScaledLiveTacticalSimulationProjection(),
-                new ScaledTacticalDebugProjection());
+                new ScaledTacticalDebugProjection(),
+                new ShipInspectionProjection());
     }
 
     private ScaledLiveTacticalSimulationSession(
             TacticalScenarioDefinition scenario,
             ScaledLiveTacticalSimulationProjection projection,
-            ScaledTacticalDebugProjection debugProjection) {
+            ScaledTacticalDebugProjection debugProjection,
+            ShipInspectionProjection inspectionProjection) {
         this.scenario = Objects.requireNonNull(scenario, "scenario");
         this.runtime = scenario.createRuntime();
         this.projection = Objects.requireNonNull(projection, "projection");
         this.debugProjection = Objects.requireNonNull(debugProjection, "debugProjection");
+        this.inspectionProjection = Objects.requireNonNull(inspectionProjection, "inspectionProjection");
     }
 
     ScaledLiveTacticalSimulationSession(
@@ -79,6 +84,7 @@ public final class ScaledLiveTacticalSimulationSession {
         this.scenario = TacticalScenarioCatalog.require(TacticalScenarioId.SATURATION_16V16);
         this.projection = Objects.requireNonNull(projection, "projection");
         this.debugProjection = Objects.requireNonNull(debugProjection, "debugProjection");
+        this.inspectionProjection = new ShipInspectionProjection();
     }
 
     /**
@@ -179,6 +185,18 @@ public final class ScaledLiveTacticalSimulationSession {
      */
     public ScaledTacticalDebugSnapshot debugSnapshot() {
         return debugProjection.project(runtime);
+    }
+
+    /**
+     * Reads the current authoritative/read-only inspection card for one selected entity.
+     *
+     * @param entityId stable selected combatant identity
+     * @return immutable inspection card, or empty when the entity is not currently represented
+     */
+    public Optional<ShipInspectionSnapshot> inspectionSnapshot(long entityId) {
+        TacticalPrototypeVisualSnapshot visual = projection.project(runtime);
+        ScaledTacticalDebugSnapshot debug = debugProjection.project(runtime);
+        return inspectionProjection.project(runtime, visual, debug, entityId);
     }
 
     /**
