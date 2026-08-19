@@ -56,6 +56,8 @@ public final class Stage20ACalibrationReadinessCalculator {
                 Stage20SensorTargetClassCoverageProfile.deriveCurrent();
         Stage20FireControlPolicyClosureProfile fireControl = Stage20FireControlPolicyClosureProfile.deriveCurrent();
         Stage20WeaponSpatialCalibrationProfile weapons = Stage20WeaponSpatialCalibrationCalculator.calibrate();
+        Stage20WeaponTargetClassCoverageProfile weaponTargetCoverage =
+                Stage20WeaponTargetClassCoverageProfile.deriveCurrent();
         Stage20FormationStationSpatialCalibrationProfile formationStation =
                 Stage20FormationStationSpatialCalibrationCalculator.calibrate();
         Stage20JumpArrivalSpatialCalibrationProfile jumpArrival =
@@ -193,10 +195,17 @@ public final class Stage20ACalibrationReadinessCalculator {
                         + ";guided=" + weapons.guidedSamples().size()
                         + ";defense=" + weapons.defenseSamples().size()));
 
-        requirements.add(new RequirementResult(
+        boolean weaponTargetCoverageComplete = weaponTargetCoverage.closesStage20BEntryCoverage();
+        requirements.add(result(
                 RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
-                RequirementStatus.BLOCKING_STAGE20B_ENTRY,
-                "stage20a5_measures_weapon_runtime_geometry_but_samples_do_not_identify_or_close_effectiveness_against_required_representative_target_classes"));
+                weaponTargetCoverageComplete,
+                "profile=" + weaponTargetCoverage.version()
+                        + ";p50_target_classes=" + weaponTargetCoverage.kineticP50Samples().size()
+                        + ";unsupported_p50=" + weaponTargetCoverage.unsupportedP50Targets().stream()
+                                .map(Enum::name).collect(Collectors.joining(","))
+                        + ";production_spatial_families=" + weaponTargetCoverage.productionSpatialFamilies().stream()
+                                .map(Enum::name).sorted().collect(Collectors.joining(","))
+                        + ";stage22_review_required=" + weaponTargetCoverage.stage22ReviewRequired()));
 
         boolean safeInterceptStillInput = weapons.unresolvedConstraints().stream()
                 .anyMatch(value -> value.contains("safe_intercept_distance_is_scheduler_input"));
