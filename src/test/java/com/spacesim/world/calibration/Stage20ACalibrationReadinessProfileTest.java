@@ -27,7 +27,6 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(RequirementId.values().length, first.requirements().size());
         assertEquals(
                 Set.of(
-                        RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
                         RequirementId.FORMATION_SPACING_BAND_CLOSURE,
                         RequirementId.STATION_PHYSICAL_GEOMETRY,
@@ -40,7 +39,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(10, first.blockingRequirements().size());
+        assertEquals(9, first.blockingRequirements().size());
     }
 
     @Test
@@ -72,6 +71,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
                 RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
                 RequirementId.WEAPON_PD_SPATIAL_EVIDENCE,
+                RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
                 RequirementId.FORMATION_SPATIAL_EVIDENCE,
                 RequirementId.FAR_COORDINATE_PRECISION);
         assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
@@ -94,6 +94,24 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(sensorCoverage.evidence().contains("ACTIVE_RADAR"));
         assertTrue(sensorCoverage.evidence().contains("targets=7"));
         assertTrue(sensorCoverage.evidence().contains("provisional_stage22=6"));
+    }
+
+    @Test
+    void weaponTargetClassCoverageIsClosedWithoutInventingDestroyerP50() {
+        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
+        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult weaponCoverage = byId.get(RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE);
+
+        assertEquals(RequirementStatus.SATISFIED, weaponCoverage.status());
+        assertTrue(weaponCoverage.evidence().contains(Stage20WeaponTargetClassCoverageProfile.CURRENT_VERSION));
+        assertTrue(weaponCoverage.evidence().contains("p50_target_classes=5"));
+        assertTrue(weaponCoverage.evidence().contains("unsupported_p50=DESTROYER"));
+        assertTrue(weaponCoverage.evidence().contains("KINETIC_DIRECT_FIRE"));
+        assertTrue(weaponCoverage.evidence().contains("BEAM_DIRECT_FIRE"));
+        assertTrue(weaponCoverage.evidence().contains("GUIDED_STRIKE"));
+        assertTrue(weaponCoverage.evidence().contains("LAYERED_DEFENSE"));
+        assertTrue(weaponCoverage.evidence().contains("stage22_review_required=true"));
     }
 
     @Test
