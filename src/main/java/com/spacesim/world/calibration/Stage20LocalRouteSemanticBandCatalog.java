@@ -7,7 +7,16 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-/** Versioned Stage-20 operational local-route distance-band authoring catalog. */
+/**
+ * Versioned Stage-20 operational local-route distance-band authoring catalog.
+ *
+ * @param schemaVersion resource schema version
+ * @param version stable content version
+ * @param status calibration authority
+ * @param stage22ReviewRequired whether later balance/content review remains required
+ * @param policyEvidence catalog-level authority statement
+ * @param bands semantic distance bands
+ */
 public record Stage20LocalRouteSemanticBandCatalog(
         int schemaVersion,
         String version,
@@ -50,7 +59,14 @@ public record Stage20LocalRouteSemanticBandCatalog(
         bands = List.copyOf(copy);
     }
 
-    /** One authored operational distance interval. */
+    /**
+     * One authored operational distance interval.
+     *
+     * @param id semantic route ID
+     * @param minDistanceM lower operational distance in meters
+     * @param maxDistanceM upper operational distance in meters
+     * @param sourceEvidenceId exact authoring provenance
+     */
     public record BandDefinition(
             BandId id,
             double minDistanceM,
