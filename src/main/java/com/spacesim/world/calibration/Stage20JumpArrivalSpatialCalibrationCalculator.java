@@ -1,7 +1,7 @@
 package com.spacesim.world.calibration;
 
 import com.spacesim.world.LocalSystemCoordinates;
-import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.StationGeometrySample;
+import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.StationPlacementEnvelope;
 import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfile.ArrivalSpatialAuthority;
 import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfile.DerivedStandOffEnvelope;
 import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfile.RepresentativeArrivalSample;
@@ -10,6 +10,7 @@ import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfil
 import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfile.StationStandOffSample;
 import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfile.TacticalResponseEvidence;
 import com.spacesim.world.calibration.Stage20ScaleCalibrationProfile.RepresentativeShipPropulsionEnvelope;
+import com.spacesim.world.calibration.Stage20StationPhysicalGeometryProfile.StationGeometryDesign;
 import com.spacesim.world.calibration.Stage20WeaponSpatialCalibrationProfile.BeamSample;
 import com.spacesim.world.calibration.Stage20WeaponSpatialCalibrationProfile.DefenseSample;
 import com.spacesim.world.calibration.Stage20WeaponSpatialCalibrationProfile.GuidedSample;
@@ -23,6 +24,7 @@ import java.util.OptionalDouble;
 public final class Stage20JumpArrivalSpatialCalibrationCalculator {
     private static final String ORDINARY_TOPOLOGY_SEMANTICS = "NEIGHBOR_EDGE_ONLY";
     private static final double CURRENT_RUNTIME_ARRIVAL_SPEED_MPS = 0d;
+    private static final double ADDITIONAL_TRAFFIC_CLEARANCE_BEYOND_OPERATIONAL_RADIUS_M = 0d;
 
     private Stage20JumpArrivalSpatialCalibrationCalculator() {
         throw new AssertionError("No instances");
@@ -31,9 +33,16 @@ public final class Stage20JumpArrivalSpatialCalibrationCalculator {
     /**
      * Builds the current deterministic Stage-20A.7 profile.
      *
-     * <p>The legacy local arrival anchor remains explicitly classified as bounded-viewport
-     * compatibility geometry. Current station-specific stand-off remains unresolved because Stage
-     * 20A.6 found no authoritative station footprint/docking/traffic dimensions.</p>
+     * <p>The legacy local arrival anchor remains bounded-viewport compatibility geometry. Station
+     * stand-off is derived from the accepted Stage-20 station operational radius and the independent
+     * provisional defensive exclusion reference. The station operational radius already includes
+     * the larger of docking and traffic clearance, so this calculation deliberately supplies zero
+     * additional traffic clearance rather than counting the same clearance twice.</p>
+     *
+     * <p>The current runtime materializes at zero speed, therefore the braking term is zero for every
+     * representative. A positive conservative braking acceleration is still preserved in provenance
+     * and input validation so a future non-zero arrival-speed revision immediately activates the
+     * physical stopping-distance term instead of introducing a second formula.</p>
      *
      * @return immutable current jump-arrival calibration profile
      */
@@ -59,20 +68,43 @@ public final class Stage20JumpArrivalSpatialCalibrationCalculator {
                     envelope.initialAccelerationMps2(),
                     brakingDistance(CURRENT_RUNTIME_ARRIVAL_SPEED_MPS, envelope.initialAccelerationMps2())));
         }
+        double conservativeBrakingAccelerationMps2 = representatives.stream()
+                .mapToDouble(RepresentativeArrivalSample::accelerationMps2)
+                .min()
+                .orElseThrow(() -> new IllegalStateException("Stage-20 scale profile has no representative acceleration"));
 
-        Stage20FormationStationSpatialCalibrationProfile stationProfile =
-                Stage20FormationStationSpatialCalibrationCalculator.calibrate();
+        Stage20StationPhysicalGeometryProfile stationPhysical = Stage20StationPhysicalGeometryProfile.deriveCurrent();
+        Stage20StationDefensiveSensorGeometryProfile stationDefensive =
+                Stage20StationDefensiveSensorGeometryProfile.deriveCurrent();
+        if (!stationPhysical.closesStage20BEntryCoverage() || !stationDefensive.closesStage20BEntryCoverage()) {
+            throw new IllegalStateException("Station stand-off requires closed Stage-20 station geometry references");
+        }
+
         List<StationStandOffSample> stationStandOff = new ArrayList<>();
-        for (StationGeometrySample station : stationProfile.stationGeometrySamples()) {
+        for (StationGeometryDesign station : stationPhysical.stationDesigns()) {
+            StationPlacementEnvelope placement = stationPhysical.placementEnvelope(station.stationArchetypeId());
+            Stage20StationDefensiveSensorGeometryProfile.StationDefensiveSensorGeometry defensive =
+                    stationDefensive.station(station.stationArchetypeId());
+            String provenance = "Stage20StationPhysicalGeometryProfile:" + stationPhysical.version()
+                    + ":" + station.provenanceId()
+                    + ";Stage20StationDefensiveSensorGeometryProfile:" + stationDefensive.version()
+                    + ":" + defensive.defenseProvenance()
+                    + ";arrival_policy=" + runtimePolicy.source()
+                    + ";braking_acceleration_source=min(Stage20ScaleCalibrationProfile:" + scale.version() + ")";
+            DerivedStandOffEnvelope derived = deriveStandOff(new StandOffGeometryInput(
+                    station.stationArchetypeId(),
+                    provenance,
+                    placement.operationalRadiusM(),
+                    ADDITIONAL_TRAFFIC_CLEARANCE_BEYOND_OPERATIONAL_RADIUS_M,
+                    defensive.defensiveExclusionReferenceM(),
+                    runtimePolicy.arrivalVelocityMps(),
+                    conservativeBrakingAccelerationMps2));
             stationStandOff.add(new StationStandOffSample(
                     station.stationArchetypeId(),
-                    ArrivalSpatialAuthority.UNRESOLVED,
-                    OptionalDouble.empty(),
-                    List.of(
-                            "stage20a6_station_operational_radius_unresolved",
-                            "stage20a6_docking_approach_clearance_unresolved",
-                            "stage20a6_traffic_clearance_unresolved",
-                            "stage20a5_weapon_pd_distances_are_calibration_probes_not_station_defense_radius")));
+                    ArrivalSpatialAuthority.PROVISIONAL_STAGE20_DESIGN_REFERENCE,
+                    provenance,
+                    OptionalDouble.of(derived.requiredCenterStandOffM()),
+                    List.of()));
         }
 
         Stage20WeaponSpatialCalibrationProfile weapons = Stage20WeaponSpatialCalibrationCalculator.calibrate();
@@ -86,8 +118,9 @@ public final class Stage20JumpArrivalSpatialCalibrationCalculator {
                 tactical,
                 List.of(
                         "legacy_viewport_arrival_anchor_is_not_stage20_physical_world_geometry",
-                        "station_specific_center_standoff_unresolved_until_station_geometry_closes",
-                        "stage20a5_tactical_probe_ranges_cannot_be_promoted_to_station_defense_radius",
+                        "station_center_standoff_is_provisional_stage20_design_geometry_pending_stage22_station_content",
+                        "defensive_exclusion_reference_is_not_a_production_station_weapon_range",
+                        "station_operational_radius_already_contains_authored_docking_or_traffic_clearance_no_double_counting",
                         "current_runtime_materializes_at_zero_speed_so_post_jump_braking_distance_is_zero",
                         "generated_arrival_to_hub_distance_distribution_remains_stage20_world_authoring"));
     }
@@ -95,11 +128,12 @@ public final class Stage20JumpArrivalSpatialCalibrationCalculator {
     /**
      * Derives one conservative infrastructure-centered stand-off from explicit physical inputs.
      *
-     * <p>The required center distance is the maximum of traffic clearance, stopping clearance and an
-     * explicit center-based defensive envelope. Stage-20A.5 probe maxima are never inserted
-     * automatically; a caller must supply an accepted defensive envelope with provenance.</p>
+     * <p>The required center distance is the maximum of operational/traffic clearance, stopping
+     * clearance and an explicit center-based defensive/exclusion reference. Stage-20A.5 probe
+     * maxima are never inserted automatically; a caller must supply an accepted exclusion reference
+     * with provenance.</p>
      *
-     * @param input explicit physical infrastructure, defense and arrival-response geometry
+     * @param input explicit physical infrastructure, exclusion and arrival-response geometry
      * @return conservative derived stand-off envelope
      */
     public static DerivedStandOffEnvelope deriveStandOff(StandOffGeometryInput input) {
