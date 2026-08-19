@@ -98,6 +98,8 @@ public final class Stage20WeaponSpatialCalibrationCalculator {
         GuidedAmmunitionDefinition strikeAmmunition = requireGuided(ammunition, STRIKE_AMMUNITION_ID);
         GuidedAmmunitionDefinition interceptorAmmunition = requireGuided(ammunition, INTERCEPTOR_AMMUNITION_ID);
 
+        Stage20PdSafeInterceptCalibrationProfile pdClosure =
+                Stage20PdSafeInterceptCalibrationProfile.deriveCurrent();
         return new Stage20WeaponSpatialCalibrationProfile(
                 Stage20WeaponSpatialCalibrationProfile.CURRENT_VERSION,
                 kineticSamples(kineticMount),
@@ -106,7 +108,9 @@ public final class Stage20WeaponSpatialCalibrationCalculator {
                 defenseSamples(interceptorAmmunition.toRuntimeWeapon()),
                 List.of(
                         "beam_runtime_has_no_hard_range_wall_effectiveness_requires_target_material_response",
-                        "safe_intercept_distance_is_scheduler_input_until_fragmentation_blast_debris_closure_exists",
+                        "safe_intercept_distance_superseded_by=" + pdClosure.version()
+                                + ";scheduler_input_m=" + pdClosure.selectedMinimumInterceptDistanceM()
+                                + ";residual_risk_zero=" + pdClosure.residualRiskZero(),
                         "kinetic_point_defense_has_no_separate_range_owning_scheduler_stage20a5_uses_guided_layered_defense_geometry",
                         "fire_control_track_age_and_uncertainty_limits_remain_weapon_target_motion_dependent_not_global_thresholds"));
     }
