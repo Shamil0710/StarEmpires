@@ -1,6 +1,6 @@
 # Stage 20A Closure — Lossless Materialization Lifecycle Core
 
-**Status:** IMPLEMENTED — runtime-core acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — exact-head runtime-core CI green; final merge gate pending  
 **Parent:** Stage 20A Closure / Readiness Remediation  
 **Workstream:** 1 — Code-first physical continuity  
 **Date:** 2026-08-19
