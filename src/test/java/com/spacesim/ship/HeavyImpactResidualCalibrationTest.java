@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,6 +43,83 @@ class HeavyImpactResidualCalibrationTest {
 
         assertEquals("response.synthetic_heavy_v1", failure.getResponseSurfaceId());
         assertTrue(failure.getMessage().contains("velocityMps="));
+    }
+
+    @Test
+    void combatRoutingTerminatesSubCalibrationResidualWithoutHeavyImpactExtrapolation() {
+        ShipEngineeringCatalog engineering = Stage175ICombatTestContentPack.loadDoctrines();
+        ShipProtectionCatalog protection = Stage175ICombatTestProtectionPack.load();
+        HeavyImpactResolver resolver = new HeavyImpactResolver(engineering, protection);
+        ProjectileBody lowEnergyResidual = new ProjectileBody(
+                504L,
+                101L,
+                12L,
+                "material.stage17_5i_doctrine_alloy_v1",
+                ProjectileShape.SHELL,
+                0.12d,
+                0.02d,
+                5d,
+                0d,
+                0d,
+                54.362643882028635d,
+                0d);
+
+        HeavyImpactResolver.ImpactResult result = resolver.resolveForCombat(
+                lowEnergyResidual,
+                "protection.stage17_5i_doctrine_v1",
+                0d);
+
+        assertEquals(HeavyImpactResolver.Outcome.SUB_CALIBRATION_STOPPED, result.outcome());
+        assertFalse(result.penetrated());
+        assertNull(result.residualProjectile());
+        assertEquals(0d, result.residualProjectileEnergyJ(), 0d);
+        assertEquals(0d, result.internalDamageEnergyJ(), 0d);
+        assertEquals(lowEnergyResidual.kineticEnergyJ(), result.absorbedEnergyJ(), 1e-9d);
+        assertTrue(result.layerInteractions().isEmpty(),
+                "no uncalibrated material layer interaction may be invented");
+    }
+
+    @Test
+    void combatRoutingStillRejectsUnsupportedMassAndAboveMaximumVelocity() {
+        ShipEngineeringCatalog engineering = Stage175ICombatTestContentPack.loadDoctrines();
+        ShipProtectionCatalog protection = Stage175ICombatTestProtectionPack.load();
+        HeavyImpactResolver resolver = new HeavyImpactResolver(engineering, protection);
+
+        ProjectileBody excessMass = new ProjectileBody(
+                505L,
+                101L,
+                12L,
+                "material.stage17_5i_doctrine_alloy_v1",
+                ProjectileShape.SHELL,
+                4.0d,
+                0.65d,
+                2_001d,
+                0d,
+                0d,
+                5_000d,
+                0d);
+        ProjectileBody excessVelocity = new ProjectileBody(
+                506L,
+                101L,
+                12L,
+                "material.stage17_5i_doctrine_alloy_v1",
+                ProjectileShape.SHELL,
+                0.2d,
+                0.02d,
+                5d,
+                0d,
+                0d,
+                20_001d,
+                0d);
+
+        assertThrows(OutsideCalibrationDomainException.class, () -> resolver.resolveForCombat(
+                excessMass,
+                "protection.stage17_5i_doctrine_v1",
+                0d));
+        assertThrows(OutsideCalibrationDomainException.class, () -> resolver.resolveForCombat(
+                excessVelocity,
+                "protection.stage17_5i_doctrine_v1",
+                0d));
     }
 
     @Test
