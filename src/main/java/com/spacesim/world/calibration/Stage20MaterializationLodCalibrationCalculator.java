@@ -25,9 +25,10 @@ public final class Stage20MaterializationLodCalibrationCalculator {
      * Builds the deterministic current materialization/LOD calibration profile.
      *
      * <p>Production provides fixed local/tactical cadence evidence and strategic reduced stepping,
-     * but it does not yet provide a persistent↔local materialization scheduler with an accepted
-     * maximum wake latency. Therefore current numeric ACTIVE_LOCAL/TACTICAL distance bands remain
-     * absent rather than receiving a viewport- or weapon-probe-derived fallback radius.</p>
+     * plus a lossless Stage-20 runtime/persistence materialization boundary. It does not yet provide
+     * a relevance scheduler with an accepted maximum wake latency. Therefore current numeric
+     * ACTIVE_LOCAL/TACTICAL distance bands remain absent rather than receiving a viewport- or
+     * weapon-probe-derived fallback radius.</p>
      *
      * @return current immutable Stage-20A.9 calibration profile
      */
@@ -91,7 +92,6 @@ public final class Stage20MaterializationLodCalibrationCalculator {
                 closures,
                 List.of(
                         "no_production_persistent_to_local_materialization_scheduler_with_bounded_wake_latency",
-                        "no_production_lossless_local_to_persistent_dematerialization_service",
                         "entity_lifecycle_remove_is_structural_deletion_not_dematerialization_and_must_not_be_reused_for_lod",
                         "stage20a4_sensor_and_stage20a5_weapon_probe_distances_are_not_universal_materialization_radii",
                         "beam_and_passive_sensor_interaction_envelopes_are_target_state_dependent_not_hard_range_walls",

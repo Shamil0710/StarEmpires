@@ -26,9 +26,8 @@ import java.util.Optional;
  *
  * <p>Authoritative Stage-20 physical kinematics are retained in the accepted hierarchical/double
  * representation rather than being reconstructed from legacy global-float {@code TransformComponent}
- * values. This slice provides a lossless in-memory runtime round-trip and a complete persistent-entity
- * snapshot seam. Binary save/load persistence of physical kinematics remains a separate closure
- * requirement and is intentionally not claimed here.</p>
+ * values. This slice provides a lossless in-memory runtime round-trip and deterministic persistence
+ * seams for both ECS and Stage-20 physical state.</p>
  */
 public final class Stage20MaterializationService {
     /** Synchronous materialization completes within the calling simulation boundary. */
@@ -204,9 +203,6 @@ public final class Stage20MaterializationService {
     /**
      * Returns every persistent ECS EntityState, combining live runtime entities and retained dormant snapshots.
      *
-     * <p>The result is the persistence seam required by the next closure slice. It deliberately does
-     * not serialize the separate Stage-20 physical kinematics yet.</p>
-     *
      * @return deterministic EntityId-sorted full persistent entity set
      */
     public List<EntityState> snapshotAllPersistentEntities() {
@@ -220,6 +216,27 @@ public final class Stage20MaterializationService {
         }
         List<EntityState> result = new ArrayList<>(all.values());
         result.sort(Comparator.comparingLong(value -> value.id().value()));
+        return List.copyOf(result);
+    }
+
+    /**
+     * Returns every registered Stage-20 physical state in deterministic persistent-ID order.
+     *
+     * <p>The snapshot contains live and dematerialized physical entities alike. Representation level
+     * is intentionally absent because it is computational relevance, not causal persistent state.</p>
+     *
+     * @return immutable sorted physical-state snapshot list
+     */
+    public List<PhysicalStateSnapshot> snapshotPhysicalStates() {
+        List<PhysicalStateSnapshot> result = new ArrayList<>();
+        for (Map.Entry<EntityId, LocalPhysicalKinematics> entry : physicalStates.entrySet()) {
+            EntityId id = entry.getKey();
+            if (!registry.contains(id) && !dematerializedStates.containsKey(id)) {
+                throw new IllegalStateException("Physical state has no persistent entity representation: " + id);
+            }
+            result.add(new PhysicalStateSnapshot(id, entry.getValue()));
+        }
+        result.sort(Comparator.comparing(PhysicalStateSnapshot::id));
         return List.copyOf(result);
     }
 
@@ -241,6 +258,25 @@ public final class Stage20MaterializationService {
         public DematerializedEntitySnapshot {
             Objects.requireNonNull(entityState, "entityState");
             Objects.requireNonNull(entityState.id(), "entityState.id");
+            Objects.requireNonNull(physicalState, "physicalState");
+        }
+    }
+
+    /**
+     * Persistent-ID keyed Stage-20 physical kinematic snapshot.
+     *
+     * @param id stable persistent entity ID
+     * @param physicalState authoritative Stage-20 physical kinematics
+     */
+    public record PhysicalStateSnapshot(EntityId id, LocalPhysicalKinematics physicalState) {
+        /**
+         * Validates one physical snapshot.
+         *
+         * @param id stable persistent entity ID
+         * @param physicalState authoritative physical kinematics
+         */
+        public PhysicalStateSnapshot {
+            Objects.requireNonNull(id, "id");
             Objects.requireNonNull(physicalState, "physicalState");
         }
     }
