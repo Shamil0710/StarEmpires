@@ -52,6 +52,8 @@ public final class Stage20ACalibrationReadinessCalculator {
         Stage20IntersystemCadenceCalibrationProfile intersystemCadence =
                 Stage20IntersystemCadenceCalibrationProfile.deriveCurrent();
         Stage20SensorCalibrationProfile sensor = Stage20SensorCalibrationProfile.deriveCurrent();
+        Stage20SensorTargetClassCoverageProfile sensorTargetCoverage =
+                Stage20SensorTargetClassCoverageProfile.deriveCurrent();
         Stage20FireControlPolicyClosureProfile fireControl = Stage20FireControlPolicyClosureProfile.deriveCurrent();
         Stage20WeaponSpatialCalibrationProfile weapons = Stage20WeaponSpatialCalibrationCalculator.calibrate();
         Stage20FormationStationSpatialCalibrationProfile formationStation =
@@ -152,15 +154,19 @@ public final class Stage20ACalibrationReadinessCalculator {
                 RequirementStatus.DEFERRED_STAGE22_CONTENT,
                 "numeric_ftl_heat_law_not_required_to_invent_stage20b_geometry_from_provisional_reference"));
 
-        boolean sensorCoverageIncomplete = sensor.unresolvedGaps().stream()
-                .anyMatch(value -> value.contains("representative_sensor_and_target_class_coverage_incomplete"));
+        long provisionalSensorTargets = sensorTargetCoverage.targets().stream()
+                .filter(value -> value.stage22ReviewRequired())
+                .count();
+        boolean sensorCoverageComplete = sensorTargetCoverage.closesStage20BEntryCoverage();
         requirements.add(result(
                 RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
-                !sensorCoverageIncomplete,
-                sensorCoverageIncomplete
-                        ? "current_sensor_matrix=" + sensor.observerRepresentativeId() + "->"
-                                + sensor.targetRepresentativeId() + ";representative_class_coverage_incomplete"
-                        : "representative_sensor_target_coverage_closed"));
+                sensorCoverageComplete,
+                "profile=" + sensorTargetCoverage.version()
+                        + ";observer=" + sensorTargetCoverage.observerRepresentativeId()
+                        + ";modes=" + sensorTargetCoverage.observerModes().stream()
+                                .map(Enum::name).sorted().collect(Collectors.joining(","))
+                        + ";targets=" + sensorTargetCoverage.targets().size()
+                        + ";provisional_stage22=" + provisionalSensorTargets));
 
         boolean historicalFusedTrackPolicyGap = sensor.unresolvedGaps().stream()
                 .anyMatch(value -> value.contains("final_fused_track_quality_policy_pending_weapon_geometry"));
