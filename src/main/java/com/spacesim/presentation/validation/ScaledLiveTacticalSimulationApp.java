@@ -12,10 +12,12 @@ import com.spacesim.ship.LiveTacticalBattleControlRuntime;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession.SimulationSpeed;
 import com.spacesim.ui.ScaledTacticalDebugSnapshot;
+import com.spacesim.ui.ShipSelectionController;
 import com.spacesim.ui.TacticalPrototypeRenderer;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.TacticalSide;
 import com.spacesim.ui.TacticalScenarioId;
+import com.spacesim.ui.TacticalSelectionOverlayRenderer;
 import com.spacesim.ui.TacticalSidePalette;
 import com.spacesim.ui.WorldMapLayout;
 
@@ -27,7 +29,7 @@ import java.util.Objects;
  *
  * <p>Wall-clock time and input own presentation scheduling only. The viewer never advances partial
  * simulation intervals and never owns movement, AI, sensors, weapons, ammunition, damage, power,
- * heat or body state. Rendering and diagnostics consume immutable read-only projections.</p>
+ * heat or body state. Rendering, selection and diagnostics consume immutable read-only projections.</p>
  */
 public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private static final float VIEW_PADDING_PX = 28f;
@@ -38,6 +40,8 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private final TacticalScenarioId scenarioId;
     private ScaledLiveTacticalSimulationSession session;
     private TacticalPrototypeRenderer tacticalRenderer;
+    private TacticalSelectionOverlayRenderer selectionRenderer;
+    private ShipSelectionController selectionController;
     private OrthographicCamera camera;
     private SpriteBatch batch;
     private BitmapFont font;
@@ -65,6 +69,8 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     public void create() {
         session = new ScaledLiveTacticalSimulationSession(scenarioId);
         tacticalRenderer = new TacticalPrototypeRenderer();
+        selectionRenderer = new TacticalSelectionOverlayRenderer();
+        selectionController = new ShipSelectionController();
         camera = new OrthographicCamera();
         batch = new SpriteBatch();
         font = new BitmapFont();
@@ -81,7 +87,13 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         Gdx.gl.glClearColor(0.006f, 0.010f, 0.020f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         TacticalPrototypeVisualSnapshot snapshot = session.snapshot();
+        selectionController.reconcile(snapshot);
         tacticalRenderer.render(camera.combined, layout, snapshot);
+        selectionRenderer.render(
+                camera.combined,
+                layout,
+                snapshot,
+                selectionController.selectedEntityId().orElse(-1L));
         drawHud(session.debugSnapshot(), snapshot);
     }
 
@@ -107,6 +119,9 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     /** Releases presentation-only resources. */
     @Override
     public void dispose() {
+        if (selectionRenderer != null) {
+            selectionRenderer.dispose();
+        }
         if (tacticalRenderer != null) {
             tacticalRenderer.dispose();
         }
@@ -137,6 +152,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             session.reset();
+            selectionController.clear();
             selectedCombatantIndex = 0;
             accumulatedWallSeconds = 0d;
         }
@@ -160,6 +176,11 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
             selectedCombatantIndex--;
+        }
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            float screenX = Gdx.input.getX();
+            float screenY = Gdx.graphics.getHeight() - 1f - Gdx.input.getY();
+            selectionController.selectAt(screenX, screenY, layout, session.snapshot());
         }
     }
 
@@ -217,6 +238,25 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                 top - 48f);
         font.setColor(HUD_COLOR);
 
+        var selectedShip = selectionController.selectedShip(snapshot);
+        if (selectedShip.isPresent()) {
+            var ship = selectedShip.get();
+            setFontColor(TacticalSidePalette.outline(ship.side()));
+            font.draw(batch,
+                    String.format(Locale.ROOT,
+                            "SELECTED %d [%s] %s | integrity %.3f%s",
+                            ship.entityId(),
+                            ship.side(),
+                            ship.role(),
+                            ship.integrityFraction(),
+                            ship.wreck() ? " | WRECK" : ""),
+                    22f,
+                    top - 72f);
+            font.setColor(HUD_COLOR);
+        } else {
+            font.draw(batch, "SELECTED NONE", 22f, top - 72f);
+        }
+
         if (debugHud && !debug.combatants().isEmpty()) {
             int size = debug.combatants().size();
             int canonicalIndex = Math.floorMod(selectedCombatantIndex, size);
@@ -234,7 +274,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                             actor.movementAxisX(),
                             actor.movementAxisY()),
                     22f,
-                    top - 72f);
+                    top - 96f);
             font.draw(batch,
                     String.format(Locale.ROOT,
                             "AI %s / %s | ammo %d | reaction mass %.1f kg | bus %.3e J",
@@ -244,7 +284,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                             actor.reactionMassKg(),
                             actor.sharedBusEnergyJ()),
                     22f,
-                    top - 96f);
+                    top - 120f);
             String formationText = formation.objectiveKnown()
                     ? String.format(Locale.ROOT,
                             "%s %s/%s slot %d/%d err %.1f m",
@@ -264,10 +304,10 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                             actor.minimumModuleIntegrity(),
                             formationText),
                     22f,
-                    top - 120f);
+                    top - 144f);
         }
         font.draw(batch,
-                "SPACE pause | N/RIGHT single tick | R reset CURRENT scenario | 1/2/4/8 speed | UP/DOWN debug actor | F1 HUD | ESC exit",
+                "LMB select/clear | SPACE pause | N/RIGHT tick | R reset | 1/2/4/8 speed | UP/DOWN debug actor | F1 HUD | ESC exit",
                 22f,
                 18f);
         batch.end();
