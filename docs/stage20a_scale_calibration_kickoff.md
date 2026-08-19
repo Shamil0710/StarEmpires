@@ -230,7 +230,7 @@ The profile retains deterministic provenance and records missing physical closur
 
 Detailed implementation/authority record: `docs/stage20a5_weapon_pd_spatial_calibration.md`.
 
-## 12. Stage 20A.6 — formation / station spatial calibration — IMPLEMENTED
+## 12. Stage 20A.6 — formation / station spatial calibration — ACCEPTED
 
 The sixth implementation slice separates Stage-19 tactical probe geometry from Stage-20 world authority and inventories what station geometry Stage 18 actually owns.
 
