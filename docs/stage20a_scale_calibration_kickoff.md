@@ -155,17 +155,61 @@ The FTL resource also keeps three unresolved gaps explicit:
 - generated edge-transit distribution not yet world-authored;
 - numeric FTL heat coefficient absent from the v1.0 reference despite the architectural requirement that FTL pays heat.
 
-## 10. Immediate next implementation slice
+## 10. Stage 20A.4 — production sensor/signature spatial calibration
 
-Stage 20A.4 should connect already-production-authoritative sensing/signature logic to spatial calibration before inventing any new sensor-range abstraction:
+The fourth implementation slice connects the existing production sensing chain to spatial calibration without introducing a hard `sensorRange`.
 
-1. passive detection geometry against representative physical signatures;
-2. active radar detection/classification/track geometry;
-3. fire-control-quality track geometry and uncertainty/time sensitivity;
-4. damage/EW sensitivity where the production observation runtime already owns the behavior.
+`Stage20SensorCalibrationCalculator` measures the maximum physical separation supporting each existing measurement evidence state by repeatedly invoking the ordinary `ShipSensorRuntime.observe(...)` chain:
 
-After the sensing layer is closed, Stage 20A should continue into weapon time-of-flight/effectiveness, PD/interceptor geometry, formation/station stand-off and jump-arrival geometry.
+```text
+physical fitted sensor
++ physical target signature
++ SI separation
++ damage-aware aperture/noise
++ physical EW interference where present
++ ECCM state where present
+→ production SNR/evidence calculation
+→ DETECTED / CLASSIFIED / TRACKED / FIRE_CONTROL boundary
+```
+
+The first production-authoritative observer/target matrix uses the current `fit.escort_destroyer_schema_v1` because it already exposes fitted passive-thermal and active-radar modes plus a channelized physical signature through the ordinary engineering pipeline.
+
+The profile includes:
+
+- pristine passive-thermal and active-radar envelopes;
+- the same sensor mount re-derived at 50% surviving `utility_sensor` integrity through ordinary `DamageState`;
+- active-radar suppression by the already-authored Stage-17.5I `D_DEFENSIVE_EW` physical jammer;
+- the same jammed geometry with fitted ECCM enabled, retaining its real electrical demand and waste heat;
+- explicit SNR thresholds and bearing/range uncertainty parameters from the fitted sensor definition;
+- deterministic profile ordering and provenance.
+
+The jammer is placed 1,000,000 m cross-range from the observer as an explicit sensitivity probe. That probe is not a future station spacing, sensor range or generated-world constant. The jammer remains `PROVISIONAL_ACCEPTED_COMBAT_TEST`; Stage 20 does not promote Stage-17.5I combat-test content to final Stage-22 faction content.
+
+A single passive bearing legitimately has no direct TRACKED/FIRE_CONTROL range boundary. Stage 20 does not invent exact range to complete a table. Distributed passive triangulation remains an explicit follow-up geometry problem.
+
+The currently consumed `ShipSensorRuntime.TrackQualityPolicy.defaultPolicy()` is recorded as `PROVISIONAL_PRE_STAGE20_DEFAULT` because the production code itself defines it as a pre-Stage20 default. Its position-sigma, age and process-noise values remain visible, but they are not promoted to final calibration constants before weapon geometry justifies the required fire-control precision.
+
+Detailed implementation/authority record: `docs/stage20a4_sensor_spatial_calibration.md`.
+
+Open machine-readable gaps after 20A.4:
+
+- final fused-track quality policy pending weapon geometry;
+- distributed passive triangulation geometry not yet profiled;
+- representative sensor/target-class coverage is still incomplete.
+
+## 11. Immediate next implementation slice
+
+Stage 20A.5 should connect production weapon execution to spatial calibration:
+
+1. kinetic time-of-flight and physical effectiveness bands;
+2. beam geometry/dwell/effectiveness bands;
+3. guided weapon flight and terminal geometry;
+4. PD/interceptor engagement and safe-intercept geometry;
+5. target-motion sensitivity where the production weapon runtime already owns it;
+6. revisit the provisional fused TRACKED/FIRE_CONTROL quality policy using the resulting physical weapon requirements rather than an isolated accuracy constant.
+
+After weapon/PD geometry, Stage 20A should continue into formation spacing, station physical footprint/spacing, jump-arrival stand-off, far-coordinate precision and materialization/LOD bands before Stage 20B star-system physical geometry begins.
 
 Missing representative ship roles continue to remain explicit gaps until production content or accepted reference physics exists. Stage 20A cannot be declared complete while required representative coverage or required calibration domains remain unresolved.
 
-Acceptance continues to require that identical content + profile version produces identical output and that changing physical capability changes derived spatial/travel/FTL bands rather than being hidden by fixed map constants.
+Acceptance continues to require that identical content + profile version produces identical output and that changing physical capability changes derived spatial/travel/FTL/sensor bands rather than being hidden by fixed map constants.
