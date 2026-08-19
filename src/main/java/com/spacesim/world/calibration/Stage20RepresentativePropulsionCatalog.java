@@ -15,8 +15,8 @@ import java.util.Objects;
  * @param schemaVersion data schema version
  * @param version catalog content version
  * @param status authority status shared by the catalog entries
- * @param sourceBaselineId accepted baseline that owns the reference values
- * @param sourceEvidence executable evidence location inside that baseline
+ * @param sourceBaselineId accepted architecture/baseline that bounds the reference values
+ * @param sourceEvidence catalog-level evidence/decision description
  * @param stage22ReviewRequired whether the entries require Stage-22 content review before promotion
  * @param references immutable deterministically ordered reference definitions
  */
@@ -42,8 +42,8 @@ public record Stage20RepresentativePropulsionCatalog(
      * @param schemaVersion data schema version
      * @param version catalog content version
      * @param status authority status shared by the catalog entries
-     * @param sourceBaselineId accepted baseline that owns the reference values
-     * @param sourceEvidence executable evidence location inside that baseline
+     * @param sourceBaselineId accepted architecture/baseline boundary
+     * @param sourceEvidence catalog-level evidence/decision description
      * @param stage22ReviewRequired whether Stage-22 review is required
      * @param references reference definitions
      */
@@ -86,7 +86,8 @@ public record Stage20RepresentativePropulsionCatalog(
      * One accepted physical reference design used only for Stage-20 calibration until promoted.
      *
      * @param id stable calibration reference ID
-     * @param representativeClass stable role/class label inherited from the accepted baseline
+     * @param representativeClass stable role/class label used by Stage-20 calibration
+     * @param sourceEvidenceId exact per-reference numeric/authoring provenance
      * @param designDryMassKg dry design mass
      * @param ammunitionMassKg carried ammunition mass
      * @param missionCargoStoresMassKg carried mission payload, cargo and stores mass
@@ -100,6 +101,7 @@ public record Stage20RepresentativePropulsionCatalog(
     public record ReferenceDefinition(
             String id,
             String representativeClass,
+            String sourceEvidenceId,
             double designDryMassKg,
             double ammunitionMassKg,
             double missionCargoStoresMassKg,
@@ -109,6 +111,12 @@ public record Stage20RepresentativePropulsionCatalog(
             double exhaustVelocityMps,
             double expectedAccelerationMps2,
             double expectedDeltaVMps) {
+        /** Ensures programmatically constructed references cannot lose identity/provenance. */
+        public ReferenceDefinition {
+            requireNonBlank(id, "id");
+            requireNonBlank(representativeClass, "representativeClass");
+            requireNonBlank(sourceEvidenceId, "sourceEvidenceId");
+        }
     }
 
     private static void requireNonBlank(String value, String field) {
