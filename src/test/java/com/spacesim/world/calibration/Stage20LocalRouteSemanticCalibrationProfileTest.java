@@ -152,7 +152,7 @@ class Stage20LocalRouteSemanticCalibrationProfileTest {
                 """;
         assertEquals(4, Stage20LocalRouteSemanticBandCatalogLoader.parse(valid).bands().size());
         assertThrows(IllegalArgumentException.class, () -> Stage20LocalRouteSemanticBandCatalogLoader.parse(
-                valid.replace(",\n                    {\"id\":\"INNER_TO_OUTER_SYSTEM\",\"minDistanceM\":4,\"maxDistanceM\":5,\"sourceEvidenceId\":\"d\"}", "")));
+                valid.replace("\"id\":\"INNER_TO_OUTER_SYSTEM\"", "\"id\":\"STATION_TO_STATION\"")));
         assertThrows(IllegalArgumentException.class, () -> Stage20LocalRouteSemanticBandCatalogLoader.parse(
                 valid.replace("\"minDistanceM\":1,\"maxDistanceM\":2", "\"minDistanceM\":3,\"maxDistanceM\":2")));
     }
