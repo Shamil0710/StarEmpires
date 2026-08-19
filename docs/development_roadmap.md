@@ -508,3 +508,124 @@ Stage 17 COMPLETE
 ```
 
 **Immediate implementation priority is Stage 20.** Stage 19J has closed the interactive scenario/readability/selection/inspection/camera/long-run runtime gate, with final evidence recorded in `docs/stage19j7_long_run_acceptance_record.md`. Stage 20 now consumes the accepted Stage-17.5/18/19 physical capability baseline for calibrated topology, local geometry, resource geography and discovery implementation.
+
+## 14. Near-term Hull / Asset Physical Remediation Queue
+
+**TRACKED — resolve in the nearest Stage-20/21 authoring window; final production promotion remains Stage 22 authority.**
+
+Canonical supporting audit:
+
+- `docs/initial_asset_hull_manifest_v1.md`;
+- `docs/initial_hull_physical_niches_v1.md`.
+
+The hull audit confirmed that the main military ladder is already substantially calculated through doctrine references, Ship Mathematics v0.1/v0.2, the production engineering destroyer and Stage-20 representative calibration. The near-term problem is therefore **not** to recompute every class from scratch, but to close the remaining physical authoring gaps without silently promoting benchmark/provisional values into final content.
+
+### HULL-RM-01 — Patrol Craft concrete physical fit
+
+**Problem:** Patrol Craft currently has doctrine/reference-grid geometry, mass, crew and mobility, but no concrete v0.2/production fitted design.
+
+**Closure requires:**
+
+- one physically closed reference fit using common mass/volume/power/heat/crew contracts;
+- explicit dimensions, operational mass decomposition, reaction mass and propulsion;
+- slot/hardpoint/mission layout compatible with patrol/police/customs role;
+- evidence that low ownership cost, low crew demand and high response mobility arise from the fit rather than a class bonus.
+
+### HULL-RM-02 — General Civilian Freighter geometry / crew / cargo architecture
+
+**Problem:** Stage 20 has a valid provisional propulsion seed for the early civilian freighter, but no authored bounding dimensions, crew model or production cargo architecture.
+
+**Closure requires:**
+
+- bounding geometry and usable cargo-volume architecture;
+- crew/life-support baseline;
+- container/mixed-cargo interfaces;
+- physical fit closing against the existing 28,000 t Stage-20 departure-mass neighborhood or an explicitly re-authored replacement;
+- loaded/empty mobility consequences derived from real mass state.
+
+### HULL-RM-03 — Mining Hull physical integration
+
+**Problem:** Stage 20 closes a 56,000 t mining propulsion reference but dimensions, crew and mining-equipment integration remain unauthored.
+
+**Closure requires:**
+
+- hull geometry and crew baseline;
+- explicit anchoring/extraction/capture/service interfaces;
+- ore/mission-load volume and mass semantics;
+- power/heat/maintenance consequences of the industrial plant;
+- physically closed production/reference fit using the common engineering model.
+
+### HULL-RM-04 — Dedicated Fleet Logistics / Replenishment design
+
+**Problem:** current Stage-20 logistics calibration is represented primarily by the Fleet Tanker. A mixed ammunition/stores/spares replenishment ship is not yet physically closed.
+
+**Closure requires:**
+
+- explicit decision whether Tanker and Fleet Logistics share an auxiliary backbone or require separate HullDefinitions;
+- ammunition, stores, spare-parts and transfer/replenishment handling geometry;
+- protection, crew, endurance and cargo trade-offs;
+- no assumption that changing cargo icon alone creates the required logistics capability.
+
+### HULL-RM-05 — Repair / Salvage / Industrial Support first physical reference
+
+**Problem:** this is the largest current hull-family calculation gap. Doctrine and Stage-18 salvage/repair capabilities exist, but there is no physically closed ship reference.
+
+**Closure requires:**
+
+- first repair/tender or salvage/recovery reference design;
+- workshop/manipulator/recovery/service geometry;
+- spare-parts/cargo capacity;
+- industrial power and thermal budgets;
+- crew/work-rate/maintenance model;
+- derivation through Stage-18 repair/salvage semantics rather than a hidden repair-rate class stat.
+
+### HULL-RM-06 — Carrier size-tier architecture
+
+**Problem:** current strong calculation closes a **Fleet Carrier** around the 560 m / ~508,000 t departure reference. Existing light/drone-carrier concepts cannot inherit this physics automatically.
+
+**Closure requires:**
+
+- explicit Escort/Light/Fleet/Heavy carrier tier decision;
+- decision whether Light Carrier is a separate structural hull, a specialization of another military hull architecture, or a smaller HullDefinition within a broader carrier family;
+- hangar/aviation servicing/launch-recovery volume closure for at least the next required light-carrier tier;
+- no universal `Carrier Hull = Fleet Carrier dimensions` assumption.
+
+### HULL-RM-07 — Small Craft / Drone breadth
+
+**Problem:** the carrier interceptor is physically closed at Craft-scale `C`, but strike, recon/EW, utility/cargo/repair craft and unmanned drones remain incomplete.
+
+**Closure requires:**
+
+- at least one strike-craft and one recon/utility/drone reference;
+- explicit dependence on carrier/base servicing, stores and maintenance;
+- no miniature-FTL-corvette shortcut;
+- carrier air-wing mass/volume/logistics recomputed from actual craft definitions when those replace placeholders.
+
+### HULL-RM-08 — Reference-authority reconciliation before final asset lock
+
+**Problem:** several hulls have multiple valid-but-different authoring layers. The clearest example is Destroyer: the old doctrine/benchmark scale and current `hull.escort_destroyer_v1` production engineering demonstrator do not share identical geometry or mass semantics. Frigate/Battlecruiser endurance and several Stage-20 values also remain provisional.
+
+**Closure requires:**
+
+- preserve distinct semantics such as `bareHullMass`, `designDryMass` and `combatDepartureMass`;
+- production definitions supersede old benchmarks only where fields truly overlap;
+- no averaging of conflicting references to create fake certainty;
+- every provisional value intended for final content must be re-authored, replaced or explicitly promoted during Stage 22;
+- visual production assets must not lock unresolved engineering geometry before that decision.
+
+### Near-term sequencing
+
+```text
+Stage 20 continues using accepted provisional representative calibration
+→ HULL-RM-01 Patrol concrete fit
+→ HULL-RM-02 Early Civilian Freighter geometry/crew/cargo
+→ HULL-RM-03 Mining Hull geometry/crew/integration
+→ HULL-RM-04 Fleet Logistics dedicated fit
+→ HULL-RM-05 Repair/Salvage physical reference
+→ HULL-RM-06 Light Carrier tier decision
+→ HULL-RM-07 Small Craft/Drone breadth
+→ HULL-RM-08 authority reconciliation / final asset lock
+→ Stage 22 production promotion, faction breadth and balance
+```
+
+This queue is intentionally **near-term tracked debt**, not a reason to stop all Stage-20 world-generation work: accepted Stage-20 provisional references remain valid for calibration inside their stated authority. However, asset production and later content authoring may not silently turn unresolved geometry or benchmark values into canonical production hull definitions.
