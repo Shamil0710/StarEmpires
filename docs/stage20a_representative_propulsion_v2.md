@@ -1,6 +1,6 @@
 # Stage 20A Closure — Representative Propulsion v2
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — implementation head passed exact-head Java-17 CI; final status-only merge gate pending  
 **Parent:** Stage 20A representative-ship scale calibration / closure remediation  
 **Date:** 2026-08-19
 
@@ -257,7 +257,7 @@ The reference remains far above the current 100,000,000 kg translated-mass limit
 
 ## 9. FTL consequence
 
-With v2, current ordinary-FTL compatibility should include at least:
+With v2, current ordinary-FTL compatibility includes:
 
 ```text
 TORPEDO_CORVETTE
@@ -280,7 +280,7 @@ This closes the current **civilian ordinary-FTL coverage** gap without pretendin
 
 ## 10. Readiness impact
 
-If implementation and exact-head CI accept this profile, exactly two Stage-20A readiness requirements should change:
+Exactly two Stage-20A readiness requirements change:
 
 ```text
 REPRESENTATIVE_PROPULSION_COVERAGE
@@ -300,7 +300,7 @@ Expected blocking requirement count:
 
 ## 11. Regression requirements
 
-Tests must prove:
+Tests prove:
 
 - all nine required representative roles are present;
 - exactly one escort remains production-authoritative and all other current references remain provisional;
@@ -309,9 +309,14 @@ Tests must prove:
 - early freighter and mining ship remain under the FTL translated-mass ceiling;
 - carrier remains overmass;
 - changing a physical seed changes derived route/FTL outputs rather than being hidden behind fixed world constants;
-- the readiness gate removes exactly the two intended blockers and no others.
+- the readiness gate removes exactly the two intended blockers and no others;
+- Stage-20A.7 jump-arrival evidence automatically expands to the same nine-role representative set rather than retaining a fixed historical cardinality.
 
-## 12. Deferred work
+## 12. Acceptance evidence
+
+Implementation head `257551d76fec5a3fd37924d8542df5f1e540a454` passed complete Java-17 `clean verify`: 1237 tests, 0 failures, 0 errors, with Javadoc, coverage and packaging gates green. Earlier CI failures exposed two historical fixed-cardinality/Javadoc assumptions; both were corrected without changing the accepted physical values or weakening unrelated invariants.
+
+## 13. Deferred work
 
 This slice does not close:
 
