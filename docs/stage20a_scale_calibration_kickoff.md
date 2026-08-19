@@ -197,19 +197,54 @@ Open machine-readable gaps after 20A.4:
 - distributed passive triangulation geometry not yet profiled;
 - representative sensor/target-class coverage is still incomplete.
 
-## 11. Immediate next implementation slice
+## 11. Stage 20A.5 — production weapon / PD spatial calibration — ACCEPTED
 
-Stage 20A.5 should connect production weapon execution to spatial calibration:
+The fifth implementation slice connects production combat execution to spatial calibration without introducing hard Stage-20 weapon ranges or hit-chance constants.
 
-1. kinetic time-of-flight and physical effectiveness bands;
-2. beam geometry/dwell/effectiveness bands;
-3. guided weapon flight and terminal geometry;
-4. PD/interceptor engagement and safe-intercept geometry;
-5. target-motion sensitivity where the production weapon runtime already owns it;
-6. revisit the provisional fused TRACKED/FIRE_CONTROL quality policy using the resulting physical weapon requirements rather than an isolated accuracy constant.
+`Stage20WeaponSpatialCalibrationCalculator` drives the existing production seams directly:
 
-After weapon/PD geometry, Stage 20A should continue into formation spacing, station physical footprint/spacing, jump-arrival stand-off, far-coordinate precision and materialization/LOD bands before Stage 20B star-system physical geometry begins.
+```text
+fitted kinetic round
+→ WeaponFireControl.planKinetic(...)
+→ time of flight + aim uncertainty + maneuver envelope
+
+fitted beam emitter
+→ BeamWeaponRuntime.plan(...)
+→ spot radius + dwell energy + irradiance
+
+authored guided body
+→ GuidanceRuntime.planLeadPursuit(...) / execute(...)
+→ intercept horizon + terminal reserve + physical propellant burn
+
+observed inbound threat
+→ LayeredDefenseScheduler.scheduleObserved(...)
+→ reachable intercept timing + safe-intercept geometry
+```
+
+The profile retains deterministic provenance and records missing physical closure instead of silently filling it with balance constants. In particular:
+
+- beam effectiveness remains continuous and target-dependent because production beam runtime has no artificial hard range wall;
+- safe-intercept distance remains a scheduler input until fragmentation/blast/debris physics derives it;
+- the current range-owning layered-defense path is guided interception rather than an invented independent kinetic-PD range model;
+- final TRACKED/FIRE_CONTROL admissibility remains weapon/target/motion dependent rather than a single global sigma/age constant.
+
+Detailed implementation/authority record: `docs/stage20a5_weapon_pd_spatial_calibration.md`.
+
+## 12. Immediate next implementation slice
+
+Stage 20A.6 should calibrate **formation spacing and station physical footprint/spacing** from existing production/runtime evidence before world geometry is authored.
+
+Required work:
+
+1. identify current Stage-19 formation objectives as authored tactical probe geometry, not canonical world spacing;
+2. derive measurable fleet frontage/slot/recovery envelopes from physical ship count, spacing, acceleration and formation-control behavior where production runtime owns them;
+3. inventory Stage-18 station/facility infrastructure for actual physical dimensions, docking/transfer approach geometry and traffic-clearance inputs;
+4. keep any absent station footprint/docking dimensions machine-visible rather than inventing a final radius from storage capacity or facility count;
+5. define only the minimum accepted physical geometry schema needed by later Stage-20 system placement if current Stage-18 content lacks it, preserving Stage-18 industry authority and Stage-20 placement authority separation;
+6. produce deterministic profile/tests proving that changed physical footprint or formation capability changes spacing evidence rather than being hidden by a fixed map constant.
+
+After formation/station geometry, subsequent Stage-20A slices still own jump-arrival stand-off, far-coordinate numerical precision and materialization/LOD bands before Stage 20B star-system physical geometry begins.
 
 Missing representative ship roles continue to remain explicit gaps until production content or accepted reference physics exists. Stage 20A cannot be declared complete while required representative coverage or required calibration domains remain unresolved.
 
-Acceptance continues to require that identical content + profile version produces identical output and that changing physical capability changes derived spatial/travel/FTL/sensor bands rather than being hidden by fixed map constants.
+Acceptance continues to require that identical content + profile version produces identical output and that changing physical capability changes derived spatial/travel/FTL/sensor/weapon/formation/station bands rather than being hidden by fixed map constants.
