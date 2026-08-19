@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-18 / Stage 19 REOPENED — Stage 19J tactical validation viewer ACTIVE; Stage 20 BLOCKED.**  
+> **Последняя синхронизация: 2026-08-19 / Stage 19 COMPLETE — Stage 19J ACCEPTED; Stage 20 ACTIVE.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -42,8 +42,8 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | 0–6 | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **ACTIVE — Stage 19J HARDENING** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **PLANNED — BLOCKED BY Stage 19J** |
+| **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 20** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
@@ -252,13 +252,14 @@ Stage 18 supplies the physical cost/replenishment basis consumed by Stage 19 war
 
 ## 7. Stage 19 — Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior
 
-**ACTIVE — 19A–19I accepted; Stage 19J tactical validation viewer/runtime hardening is required for exit.**
+**COMPLETE — 19A–19J accepted.**
 
-Canonical acceptance and active-slice artifacts:
+Canonical acceptance artifacts:
 
 - `docs/stage19_scaled_live_tactical_ai_acceptance.md`;
 - `docs/stage19i_exit_evidence_matrix.md`;
-- `docs/stage19j_tactical_validation_viewer.md` — **ACTIVE STAGE-19J CONTRACT**.
+- `docs/stage19j_tactical_validation_viewer.md` — **COMPLETE STAGE-19J CONTRACT**;
+- `docs/stage19j7_long_run_acceptance_record.md` — **FINAL LONG-RUN CLOSEOUT EVIDENCE**.
 
 Stage 19 consumes Stage-17 political state, Stage-17.5 physical ship capability and Stage-18 industrial/logistics network.
 
@@ -316,7 +317,7 @@ Accepted behavior/evidence includes:
 - no immediate fixed-tick A→B→A target/order/formation churn in the scaled soak;
 - deterministic live/headless parity;
 - pause/resume, exact single-step, deterministic reset and X1/X2/X4/X8 fixed-tick batching;
-- read-only debug projection and runnable `--scaled-live-tactical-sim` viewer;
+- read-only debug projection and runnable scaled live viewer;
 - measured body/sensor/AI/ordnance/memory workload.
 
 Final Stage-19I hardening additionally closed:
@@ -325,34 +326,33 @@ Final Stage-19I hardening additionally closed:
 - explicit provisional 2,000 kg material-response envelope for the authored strike missile, with 2,001 kg still rejected rather than extrapolated;
 - deterministic same-tick guided impact ordering audit with a non-vacuous detector and accepted scaled evidence of real ship-impact candidates with zero physically earlier interceptor contacts suppressed by current phase ordering.
 
-### Stage 19J — tactical validation viewer, scenario coverage, readability, and inspection — ACTIVE
+### Stage 19J — tactical validation viewer, scenario coverage, readability, and inspection — COMPLETE
 
-Stage 19J is a mandatory Stage-19 hardening slice, not Stage-23 cosmetic polish. It exists because manual long-running Stage-19I validation exposed runtime states that short acceptance runs did not cover sufficiently, and because the current saturation-only viewer is not adequate for systematic human validation across the accepted scale ladder.
-
-Mandatory 19J scope:
+Stage 19J closed the mandatory final Stage-19 hardening slice rather than deferring combat validation usability to Stage 23. Accepted scope includes:
 
 - one interactive production-runtime viewer path for **1v1 Legacy Duel, 4v4 Balanced, 8v8 Mixed, 8v8 Damaged/Depleted, 16v16 Mixed and 16v16 Saturation**;
 - scenario-aware deterministic reset and a unified launcher/menu/direct scenario argument;
-- distinct schematic visual language for at least **KINETIC, MISSILE, DEFENSIVE/INTERCEPTOR, EW/SENSOR and BALANCED** ships;
-- side-readable rendering: ALPHA uses a cool cyan/blue family, BETA a warm orange/red family, with non-color silhouette cues retained;
-- mouse ship selection, empty-space deselection and obvious selected-ship highlight;
-- read-only inspection panel with an enlarged schematic model preview plus authoritative identity, condition, kinematics, weapons/ammunition, target/track, sensor/control and engineering data where available;
-- clearer HUD with scenario, tick/time, speed, alive counts and selected identity;
-- camera zoom/pan and general outline/ordnance/target readability sufficient for both small and 32-ship battles;
-- long-run soak/regression coverage for normal damage, depletion, stale/lost contacts and destroyed/disabled subsystem states without uncaught exceptions;
+- distinct schematic visual language for **KINETIC, MISSILE, BEAM, DEFENSIVE/EW and BALANCED** ships;
+- side-readable rendering: ALPHA cool cyan/blue, BETA warm orange/red, plus non-color cues;
+- mouse ship selection, empty-space deselection and selected-ship highlight;
+- read-only inspection panel with enlarged schematic model preview plus authoritative identity, condition, kinematics, weapon/ammunition, target/track and engineering data where available;
+- clearer HUD with scenario/tick/speed/zoom/alive/selection information;
+- camera zoom/pan and optional labels sufficient for both small and 32-ship battles;
+- long-run regression/soak coverage crossing normal damage, depletion and stale/lost-contact states without uncaught exceptions;
 - no viewer-owned combat truth, no hidden information shortcut and no simplified per-scale combat engine.
 
-Canonical detailed contract and acceptance criteria: `docs/stage19j_tactical_validation_viewer.md`.
+Final Stage-19J soak evidence includes all six scenarios, with the 16v16 Saturation case completing **600 simulated seconds / 12,000 fixed ticks**, observing real track loss and damage while remaining exception-free. The closeout soak also discovered and fixed a low-energy residual-projectile calibration-boundary defect without weakening the strict no-extrapolation material-response validation API.
 
-**Stage 19 remains ACTIVE until Stage 19J acceptance is recorded and exact-head CI/merge gates pass. Stage 20 implementation is blocked by this exit gate.**
+Canonical detailed contract: `docs/stage19j_tactical_validation_viewer.md`.  
+Canonical long-run closeout: `docs/stage19j7_long_run_acceptance_record.md`.
 
 The Stage-17.5/19 combat content remains provisional. Stage 22 still owns final content re-authoring/balance and may replace the Stage-19 provisional 2 t calibration promotion with final material evidence.
 
 ## 8. Stage 20 — Physical World Generation / Discovery
 
-**PLANNED — BLOCKED BY STAGE 19J EXIT.**
+**ACTIVE — Stage 19J exit gate passed.**
 
-Stage 20 answers **where the already-defined world exists**. It must calibrate generated geometry around the physical/industrial/tactical behavior proven by Stages 17.5–19 once the Stage-19J validation baseline is closed, rather than inventing map distances first and forcing combat/logistics to fit afterward.
+Stage 20 answers **where the already-defined world exists**. It must calibrate generated geometry around the physical/industrial/tactical behavior proven by Stages 17.5–19, rather than inventing map distances first and forcing combat/logistics to fit afterward.
 
 Canonical generation contracts:
 
@@ -499,12 +499,12 @@ No world-wide tactical/render-rate tick.
 Stage 17 COMPLETE
 → Stage 17.5 Combat Depth / Ship Fitting Foundation COMPLETE
 → Stage 18 Resources / Industry / Infrastructure COMPLETE
-→ Stage 19 Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior ACTIVE
-   → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection ACTIVE
-→ Stage 20 Physical World Generation / Discovery BLOCKED until Stage 19J exit
+→ Stage 19 Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior COMPLETE
+   → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
+→ Stage 20 Physical World Generation / Discovery ACTIVE
 → Stage 21 RPG / Living World
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 19J.** Stage 19A–19I remain accepted, but Stage 19 is reopened until the interactive scenario matrix, readable role/side visualization, mouse selection/inspection, camera usability and long-run runtime acceptance defined in `docs/stage19j_tactical_validation_viewer.md` are green. Stage 20 planning/contracts remain valid but implementation is blocked until this exit gate closes.
+**Immediate implementation priority is Stage 20.** Stage 19J has closed the interactive scenario/readability/selection/inspection/camera/long-run runtime gate, with final evidence recorded in `docs/stage19j7_long_run_acceptance_record.md`. Stage 20 now consumes the accepted Stage-17.5/18/19 physical capability baseline for calibrated topology, local geometry, resource geography and discovery implementation.

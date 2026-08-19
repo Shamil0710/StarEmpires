@@ -12,7 +12,14 @@ import java.util.Objects;
 
 /**
  * Stage-17.5F authoritative composition for one kinetic impact:
- * shield interaction → residual physical body → armor response → local compartment/subsystem damage.
+ * shield interaction → residual physical body → bounded armor response → local compartment/subsystem damage.
+ *
+ * <p>The production path delegates material contact to
+ * {@link HeavyImpactResolver#resolveForCombat(ProjectileBody, String, double)}. High-energy response
+ * surfaces are never extrapolated outside their authored calibration envelope: a residual that has
+ * degraded below the minimum calibrated impact velocity terminates at the protection boundary without
+ * invented spall/internal damage, while unsupported projectile mass or above-maximum velocity remains
+ * a hard failure.</p>
  */
 public final class KineticProtectionRuntime {
     private final ShieldFieldRuntime shieldRuntime;
@@ -135,7 +142,7 @@ public final class KineticProtectionRuntime {
         }
 
         ProjectileBody armorEntry = withKineticEnergy(checkedProjectile, residualEnergyJ);
-        ImpactResult impact = impactResolver.resolve(armorEntry, protectionStackId, incidenceAngleRad);
+        ImpactResult impact = impactResolver.resolveForCombat(armorEntry, protectionStackId, incidenceAngleRad);
         DamageEvent damage = impact.internalDamageEnergyJ() > 0d
                 ? damageRuntime.applyImpact(hull, fit, layout, damageState, impact, hitPointM)
                 : null;
