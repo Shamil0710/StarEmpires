@@ -3,11 +3,13 @@ package com.spacesim.presentation.validation;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.math.Vector2;
 import com.spacesim.ship.LiveTacticalBattleControlRuntime;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession;
 import com.spacesim.ui.ScaledLiveTacticalSimulationSession.SimulationSpeed;
@@ -15,6 +17,7 @@ import com.spacesim.ui.ScaledTacticalDebugSnapshot;
 import com.spacesim.ui.ShipInspectionPanelRenderer;
 import com.spacesim.ui.ShipInspectionSnapshot;
 import com.spacesim.ui.ShipSelectionController;
+import com.spacesim.ui.TacticalCameraController;
 import com.spacesim.ui.TacticalPrototypeRenderer;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.TacticalSide;
@@ -32,7 +35,8 @@ import java.util.Optional;
  *
  * <p>Wall-clock time and input own presentation scheduling only. The viewer never advances partial
  * simulation intervals and never owns movement, AI, sensors, weapons, ammunition, damage, power,
- * heat or body state. Rendering, selection, inspection and diagnostics consume read-only projections.</p>
+ * heat or body state. Rendering, camera, selection, inspection and diagnostics consume read-only
+ * projections.</p>
  */
 public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private static final float VIEW_PADDING_PX = 28f;
@@ -46,13 +50,18 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     private TacticalSelectionOverlayRenderer selectionRenderer;
     private ShipInspectionPanelRenderer inspectionRenderer;
     private ShipSelectionController selectionController;
+    private TacticalCameraController cameraController;
     private OrthographicCamera camera;
     private SpriteBatch batch;
     private BitmapFont font;
-    private WorldMapLayout layout;
     private boolean debugHud = true;
+    private boolean showShipLabels;
+    private boolean panning;
+    private float lastPanX;
+    private float lastPanY;
     private int selectedCombatantIndex;
     private double accumulatedWallSeconds;
+    private final Vector2 labelPoint = new Vector2();
 
     /** Creates the historical saturation viewer for backwards-compatible launch paths. */
     public ScaledLiveTacticalSimulationApp() {
@@ -76,11 +85,28 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         selectionRenderer = new TacticalSelectionOverlayRenderer();
         inspectionRenderer = new ShipInspectionPanelRenderer();
         selectionController = new ShipSelectionController();
+        cameraController = new TacticalCameraController(VIEW_PADDING_PX);
         camera = new OrthographicCamera();
         batch = new SpriteBatch();
         font = new BitmapFont();
         font.getData().setScale(1.0f);
         resize(Math.max(1, Gdx.graphics.getWidth()), Math.max(1, Gdx.graphics.getHeight()));
+        Gdx.input.setInputProcessor(new InputAdapter() {
+            @Override
+            public boolean scrolled(float amountX, float amountY) {
+                if (cameraController == null) {
+                    return false;
+                }
+                WorldMapLayout layout = cameraController.layout();
+                float screenX = Gdx.input.getX();
+                float screenY = bottomLeftScreenY();
+                if (!layout.containsMapPoint(screenX, screenY)) {
+                    return false;
+                }
+                cameraController.zoomByScroll(screenX, screenY, amountY);
+                return true;
+            }
+        });
     }
 
     /** Processes viewer controls, whole fixed-tick batches and current read-only presentation. */
@@ -97,10 +123,14 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         Optional<ShipInspectionSnapshot> inspection = selectedEntityId > 0L
                 ? session.inspectionSnapshot(selectedEntityId)
                 : Optional.empty();
+        WorldMapLayout layout = cameraController.layout();
 
         tacticalRenderer.render(camera.combined, layout, snapshot);
         selectionRenderer.render(camera.combined, layout, snapshot, selectedEntityId);
-        drawHud(session.debugSnapshot(), snapshot);
+        if (showShipLabels) {
+            drawShipLabels(snapshot, layout);
+        }
+        drawHud(session.debugSnapshot(), snapshot, layout);
         inspectionRenderer.render(
                 camera.combined,
                 camera.viewportWidth,
@@ -108,30 +138,25 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                 inspection);
     }
 
-    /** Rebuilds presentation-space mapping while reserving a stable right inspection column. */
+    /** Rebuilds the screen rectangle while preserving current tactical camera center and zoom. */
     @Override
     public void resize(int width, int height) {
-        if (camera == null || width <= 0 || height <= 0) {
+        if (camera == null || cameraController == null || width <= 0 || height <= 0) {
             return;
         }
         camera.setToOrtho(false, width, height);
         camera.update();
         float panelWidth = ShipInspectionPanelRenderer.panelWidth(width);
         float mapWidth = Math.max(320f, width - panelWidth);
-        layout = new WorldMapLayout(
-                0f,
-                0f,
-                mapWidth,
-                height,
-                VIEW_PADDING_PX,
-                WorldMapLayout.WORLD_WIDTH * 0.5f,
-                WorldMapLayout.WORLD_HEIGHT * 0.5f,
-                1f);
+        cameraController.resize(mapWidth, height);
     }
 
     /** Releases presentation-only resources. */
     @Override
     public void dispose() {
+        if (Gdx.input != null) {
+            Gdx.input.setInputProcessor(null);
+        }
         if (inspectionRenderer != null) {
             inspectionRenderer.dispose();
         }
@@ -172,6 +197,9 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
             selectedCombatantIndex = 0;
             accumulatedWallSeconds = 0d;
         }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.C)) {
+            cameraController.resetView();
+        }
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) {
             session.setSimulationSpeed(SimulationSpeed.X1);
         }
@@ -187,19 +215,48 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         if (Gdx.input.isKeyJustPressed(Input.Keys.F1)) {
             debugHud = !debugHud;
         }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F2)) {
+            showShipLabels = !showShipLabels;
+        }
         if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
             selectedCombatantIndex++;
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
             selectedCombatantIndex--;
         }
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            float screenX = Gdx.input.getX();
-            float screenY = Gdx.graphics.getHeight() - 1f - Gdx.input.getY();
-            if (layout.containsMapPoint(screenX, screenY)) {
-                selectionController.selectAt(screenX, screenY, layout, session.snapshot());
-            }
+
+        WorldMapLayout layout = cameraController.layout();
+        float screenX = Gdx.input.getX();
+        float screenY = bottomLeftScreenY();
+        handlePan(layout, screenX, screenY);
+
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && layout.containsMapPoint(screenX, screenY)) {
+            selectionController.selectAt(screenX, screenY, layout, session.snapshot());
         }
+    }
+
+    private void handlePan(WorldMapLayout layout, float screenX, float screenY) {
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.MIDDLE) && layout.containsMapPoint(screenX, screenY)) {
+            panning = true;
+            lastPanX = screenX;
+            lastPanY = screenY;
+        }
+        if (!Gdx.input.isButtonPressed(Input.Buttons.MIDDLE)) {
+            panning = false;
+            return;
+        }
+        if (!panning) {
+            return;
+        }
+        float deltaX = screenX - lastPanX;
+        float deltaY = screenY - lastPanY;
+        cameraController.panByScreen(deltaX, deltaY);
+        lastPanX = screenX;
+        lastPanY = screenY;
+    }
+
+    private float bottomLeftScreenY() {
+        return Gdx.graphics.getHeight() - 1f - Gdx.input.getY();
     }
 
     private void advanceFromWallClock(double frameSeconds) {
@@ -216,7 +273,27 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
         }
     }
 
-    private void drawHud(ScaledTacticalDebugSnapshot debug, TacticalPrototypeVisualSnapshot snapshot) {
+    private void drawShipLabels(TacticalPrototypeVisualSnapshot snapshot, WorldMapLayout layout) {
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        for (var ship : snapshot.ships()) {
+            if (!layout.containsVisibleWorldPoint((float) ship.xM(), (float) ship.yM())
+                    || !layout.worldToScreen((float) ship.xM(), (float) ship.yM(), labelPoint)) {
+                continue;
+            }
+            setFontColor(TacticalSidePalette.outline(ship.side()));
+            font.draw(batch,
+                    ship.entityId() + " " + shortRole(ship.role().name()),
+                    labelPoint.x + 9f,
+                    labelPoint.y + 16f);
+        }
+        batch.end();
+    }
+
+    private void drawHud(
+            ScaledTacticalDebugSnapshot debug,
+            TacticalPrototypeVisualSnapshot snapshot,
+            WorldMapLayout layout) {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         font.setColor(HUD_COLOR);
@@ -231,10 +308,11 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                 top);
         font.draw(batch,
                 String.format(Locale.ROOT,
-                        "Tick %d | %s | %s | bodies K/G/I/D %d/%d/%d/%d",
+                        "Tick %d | %s | %s | zoom %.2fx | bodies K/G/I/D %d/%d/%d/%d",
                         debug.tick(),
                         session.paused() ? "PAUSED" : "RUNNING",
                         session.simulationSpeed(),
+                        layout.getZoom(),
                         debug.bodies().kinetic(),
                         debug.bodies().strike(),
                         debug.bodies().interceptor(),
@@ -325,10 +403,18 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
                     top - 144f);
         }
         font.draw(batch,
-                "LMB select/clear | SPACE pause | N/RIGHT tick | R reset | 1/2/4/8 speed | UP/DOWN debug actor | F1 HUD | ESC exit",
+                "Wheel zoom | MMB drag pan | C reset view | F2 labels | LMB select | SPACE pause | R scenario reset | F1 HUD",
                 22f,
                 18f);
         batch.end();
+    }
+
+    private static String shortRole(String role) {
+        return switch (role) {
+            case "DEFENSIVE_EW" -> "EW";
+            case "UNCLASSIFIED" -> "?";
+            default -> role;
+        };
     }
 
     private static long aliveCount(TacticalPrototypeVisualSnapshot snapshot, TacticalSide side) {
