@@ -28,7 +28,6 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(
                 Set.of(
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
-                        RequirementId.FORMATION_SPACING_BAND_CLOSURE,
                         RequirementId.STATION_PHYSICAL_GEOMETRY,
                         RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
                         RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
@@ -39,7 +38,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(9, first.blockingRequirements().size());
+        assertEquals(8, first.blockingRequirements().size());
     }
 
     @Test
@@ -73,6 +72,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.WEAPON_PD_SPATIAL_EVIDENCE,
                 RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
                 RequirementId.FORMATION_SPATIAL_EVIDENCE,
+                RequirementId.FORMATION_SPACING_BAND_CLOSURE,
                 RequirementId.FAR_COORDINATE_PRECISION);
         assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
@@ -115,6 +115,21 @@ class Stage20ACalibrationReadinessProfileTest {
     }
 
     @Test
+    void formationSpacingIsClosedByVersionedStage19AcceptanceBands() {
+        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
+        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult formation = byId.get(RequirementId.FORMATION_SPACING_BAND_CLOSURE);
+
+        assertEquals(RequirementStatus.SATISFIED, formation.status());
+        assertTrue(formation.evidence().contains(Stage20FormationSpacingCalibrationProfile.CURRENT_VERSION));
+        assertTrue(formation.evidence().contains("COMPACT_ACCEPTANCE"));
+        assertTrue(formation.evidence().contains("DISPERSED_ACCEPTANCE"));
+        assertTrue(formation.evidence().contains("source_samples=3"));
+        assertTrue(formation.evidence().contains("stage22_review_required=true"));
+    }
+
+    @Test
     void currentPhysicalAndCalibrationGapsCannotBeHiddenByFallbackConstants() {
         Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
         Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
@@ -141,8 +156,6 @@ class Stage20ACalibrationReadinessProfileTest {
                 .contains(Stage20FireControlPolicyClosureProfile.CURRENT_VERSION));
         assertTrue(byId.get(RequirementId.PD_SAFE_INTERCEPT_GEOMETRY).evidence()
                 .contains("scheduler_probe_input"));
-        assertTrue(byId.get(RequirementId.FORMATION_SPACING_BAND_CLOSURE).evidence()
-                .contains("provisional_stage19_tactical_probes"));
         assertEquals(
                 "placement_ready_stations=0/8",
                 byId.get(RequirementId.STATION_PHYSICAL_GEOMETRY).evidence());
