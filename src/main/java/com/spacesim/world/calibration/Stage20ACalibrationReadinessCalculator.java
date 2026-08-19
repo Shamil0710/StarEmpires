@@ -61,6 +61,8 @@ public final class Stage20ACalibrationReadinessCalculator {
                 Stage20FormationStationSpatialCalibrationCalculator.calibrate();
         Stage20FormationSpacingCalibrationProfile formationSpacing =
                 Stage20FormationSpacingCalibrationProfile.deriveCurrent();
+        Stage20StationDefensiveSensorGeometryProfile stationDefensive =
+                Stage20StationDefensiveSensorGeometryProfile.deriveCurrent();
         Stage20JumpArrivalSpatialCalibrationProfile jumpArrival =
                 Stage20JumpArrivalSpatialCalibrationCalculator.calibrate();
         Stage20FarCoordinatePrecisionCalibrationProfile precision =
@@ -244,10 +246,18 @@ public final class Stage20ACalibrationReadinessCalculator {
                 stationGeometryClosed,
                 "placement_ready_stations=" + readyStations + "/" + stationCount));
 
-        requirements.add(new RequirementResult(
+        boolean stationDefensiveClosed = stationDefensive.closesStage20BEntryCoverage();
+        requirements.add(result(
                 RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
-                RequirementStatus.BLOCKING_STAGE20B_ENTRY,
-                "stage18_station_archetypes_and_stage20a6_geometry_inventory_do_not_author_station_specific_sensor_or_defensive_spatial_capability"));
+                stationDefensiveClosed,
+                "profile=" + stationDefensive.version()
+                        + ";station_rows=" + stationDefensive.stations().size()
+                        + ";tiers=" + stationDefensive.stations().stream()
+                                .map(value -> value.securityTier().name())
+                                .distinct().sorted().collect(Collectors.joining(","))
+                        + ";sensor_reference=" + stationDefensive.sensorReferenceProfileVersion()
+                        + ";weapon_reference=" + stationDefensive.weaponReferenceProfileVersion()
+                        + ";stage22_review_required=" + stationDefensive.stage22ReviewRequired()));
 
         long closedStandOffs = jumpArrival.stationStandOffSamples().stream()
                 .filter(value -> value.authority() != ArrivalSpatialAuthority.UNRESOLVED)
