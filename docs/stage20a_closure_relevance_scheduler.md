@@ -1,6 +1,6 @@
 # Stage 20A Closure — Relevance Scheduler / Wake-Latency Closure
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — exact-head implementation CI green; final merge gate pending  
 **Parent:** Stage 20A Closure / Readiness Remediation  
 **Workstream:** 1.3 — Production relevance scheduler  
 **Date:** 2026-08-19
@@ -211,9 +211,11 @@ numeric_activation_bands_closed           = false
 
 This prevents the remaining physical-band debt from hiding the fact that the runtime/persistence/scheduler lifecycle is now closed.
 
-## 10. Regression invariants
+## 10. Regression acceptance
 
-Tests require:
+Exact-head Java-17 implementation CI completed successfully before this status finalization.
+
+The accepted tests prove:
 
 - an untracked live Stage-20 entity begins conservatively as STRATEGIC;
 - no relevance demotes it to DORMANT and removes only the runtime representation;
@@ -252,6 +254,6 @@ Therefore Workstream 1 should not invent placeholder radii merely to turn the um
 
 ## 13. Immediate next action
 
-After exact-head CI and merge acceptance, continue the dependency-ordered closure plan with **Workstream 2 — representative ship / endurance / civilian FTL coverage**.
+After final exact-head CI and merge acceptance, continue the dependency-ordered closure plan with **Workstream 2 — representative ship / endurance / civilian FTL coverage**.
 
 Before adding any new representative values, audit the accepted Ship Mathematics reference resources for reusable physical evidence. If a required role has no accepted physical basis, keep it explicitly blocked rather than fabricate mass, thrust, delta-v or stores.
