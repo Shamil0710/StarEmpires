@@ -114,6 +114,13 @@ public final class Stage20FormationStationSpatialCalibrationCalculator {
      * <p>The recovery time is the symmetric bang-bang lower bound from the authored break threshold
      * to the slot tolerance, starting and ending at zero lateral speed. It is calibration evidence,
      * not a promise that the live runtime always recovers in exactly this time.</p>
+     *
+     * @param probeId stable Stage-20 formation-probe ID
+     * @param objective authored Stage-19 formation objective
+     * @param shipCount number of ships assigned to the calibrated line
+     * @param accelerationMps2 representative physical acceleration used for recovery evidence
+     * @param source exact formation/propulsion provenance
+     * @return deterministic formation spatial-calibration sample
      */
     public static FormationProbeSample deriveFormationProbe(
             String probeId,
@@ -172,6 +179,9 @@ public final class Stage20FormationStationSpatialCalibrationCalculator {
      * <p>This method is deliberately impossible to call from Stage-18 capacity/throughput alone. The
      * caller must provide actual dimensions and clearances with provenance. The larger of docking and
      * traffic clearance expands the footprint half-diagonal into a conservative operational radius.</p>
+     *
+     * @param input explicit physical station geometry and provenance
+     * @return conservative placement envelope derived only from explicit geometry
      */
     public static StationPlacementEnvelope deriveStationPlacementEnvelope(StationPlacementGeometryInput input) {
         double halfDiagonal = Math.hypot(input.footprintLengthM(), input.footprintWidthM()) / 2d;
