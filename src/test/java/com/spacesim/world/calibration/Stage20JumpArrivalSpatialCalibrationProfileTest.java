@@ -6,7 +6,6 @@ import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfil
 import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfile.StandOffGeometryInput;
 import org.junit.jupiter.api.Test;
 
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -60,21 +59,32 @@ class Stage20JumpArrivalSpatialCalibrationProfileTest {
     }
 
     @Test
-    void allCurrentStationStandOffsRemainExplicitlyUnresolved() {
+    void allEightStationStandOffsAreDerivedFromAcceptedPhysicalAndExclusionReferences() {
         Stage20JumpArrivalSpatialCalibrationProfile profile =
                 Stage20JumpArrivalSpatialCalibrationCalculator.calibrate();
+        Stage20StationPhysicalGeometryProfile physical = Stage20StationPhysicalGeometryProfile.deriveCurrent();
+        Stage20StationDefensiveSensorGeometryProfile defensive =
+                Stage20StationDefensiveSensorGeometryProfile.deriveCurrent();
 
         assertEquals(8, profile.stationStandOffSamples().size());
         assertTrue(profile.stationStandOffSamples().stream()
-                .allMatch(value -> value.authority() == ArrivalSpatialAuthority.UNRESOLVED));
+                .allMatch(value -> value.authority() == ArrivalSpatialAuthority.PROVISIONAL_STAGE20_DESIGN_REFERENCE));
+        assertTrue(profile.stationStandOffSamples().stream().allMatch(value -> value.centerStandOffM().isPresent()));
+        assertTrue(profile.stationStandOffSamples().stream().allMatch(value -> value.unresolvedReasons().isEmpty()));
         assertTrue(profile.stationStandOffSamples().stream()
-                .allMatch(value -> value.centerStandOffM().isEmpty()));
+                .allMatch(value -> value.provenance().contains(Stage20StationPhysicalGeometryProfile.CURRENT_VERSION)));
         assertTrue(profile.stationStandOffSamples().stream()
-                .allMatch(value -> !value.unresolvedReasons().isEmpty()));
+                .allMatch(value -> value.provenance().contains(Stage20StationDefensiveSensorGeometryProfile.CURRENT_VERSION)));
+
+        for (var sample : profile.stationStandOffSamples()) {
+            double operationalRadius = physical.placementEnvelope(sample.stationArchetypeId()).operationalRadiusM();
+            double exclusion = defensive.station(sample.stationArchetypeId()).defensiveExclusionReferenceM();
+            assertEquals(Math.max(operationalRadius, exclusion), sample.centerStandOffM().orElseThrow(), 1e-9d);
+        }
     }
 
     @Test
-    void tacticalRangesRemainProvisionalEvidenceInsteadOfStandOffConstants() {
+    void tacticalProbeRangesRemainSeparateFromDerivedStationStandOffs() {
         Stage20JumpArrivalSpatialCalibrationProfile profile =
                 Stage20JumpArrivalSpatialCalibrationCalculator.calibrate();
 
@@ -85,8 +95,11 @@ class Stage20JumpArrivalSpatialCalibrationProfileTest {
         assertEquals(
                 ArrivalSpatialAuthority.PROVISIONAL_CALIBRATION_PROBE,
                 profile.tacticalResponseEvidence().authority());
+        assertTrue(profile.stationStandOffSamples().stream()
+                .allMatch(value -> !value.provenance().contains("Stage20WeaponSpatialCalibrationProfile")));
         assertFalse(profile.stationStandOffSamples().stream()
-                .anyMatch(value -> value.centerStandOffM().isPresent()));
+                .anyMatch(value -> value.centerStandOffM().orElseThrow()
+                        == profile.tacticalResponseEvidence().maxDirectFireProbeRangeM()));
     }
 
     @Test
