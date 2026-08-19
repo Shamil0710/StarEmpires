@@ -1,6 +1,6 @@
 # Stage 20A.7 — Jump-Arrival Stand-Off Calibration
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED  
 **Parent:** Stage 20A — Representative-Ship Scale Calibration  
 **Date:** 2026-08-19
 
@@ -145,7 +145,9 @@ requiredCenterStandOff = max(
 
 The formula is deliberately input-driven. It cannot obtain station geometry from storage capacity, facility count, sprite size or viewport dimensions, and it does not automatically consume Stage-20A.5 probe maxima as defense constants.
 
-## 8. Sensitivity requirements
+## 8. Acceptance evidence
+
+Exact-head Java-17 CI on implementation head `0083d3b52f1b40cea97095aebbd80c71457aafbb` completed successfully before this status finalization.
 
 Regression evidence proves:
 
@@ -156,6 +158,8 @@ Regression evidence proves:
 - stronger explicitly accepted defense increases required stand-off when it becomes the dominant constraint;
 - all unresolved Stage-18 stations remain unresolved rather than receiving a fallback jump radius;
 - the legacy viewport anchor remains explicitly non-authoritative for Stage-20 world placement.
+
+The final docs-only acceptance head remains subject to the normal exact-head merge gate.
 
 ## 9. Machine-readable implementation
 
@@ -195,6 +199,6 @@ A bad world seed must not later be rescued by moving arrivals with a hidden tele
 
 ## 11. Next slice
 
-After Stage 20A.7 passes the merge gate, the next implementation slice is **Stage 20A.8 — far-coordinate numerical precision calibration**.
+The next implementation slice is **Stage 20A.8 — far-coordinate numerical precision calibration**.
 
 It must prove that physically meaningful distances, velocities and local interactions remain inside a documented numerical-error budget at large local coordinates and that floating-origin/camera-relative presentation can rebase without changing authoritative physical state.
