@@ -26,13 +26,11 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(GateStatus.BLOCKED_FOR_STAGE20B, first.overallStatus());
         assertEquals(RequirementId.values().length, first.requirements().size());
         assertEquals(
-                Set.of(
-                        RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
-                        RequirementId.MATERIALIZATION_LOD_CLOSURE),
+                Set.of(RequirementId.PD_SAFE_INTERCEPT_GEOMETRY),
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(2, first.blockingRequirements().size());
+        assertEquals(1, first.blockingRequirements().size());
     }
 
     @Test
@@ -73,7 +71,8 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
                 RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
                 RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
-                RequirementId.FAR_COORDINATE_PRECISION);
+                RequirementId.FAR_COORDINATE_PRECISION,
+                RequirementId.MATERIALIZATION_LOD_CLOSURE);
         assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
                 RequirementId.FTL_HEAT_COEFFICIENT);
@@ -213,6 +212,27 @@ class Stage20ACalibrationReadinessProfileTest {
     }
 
     @Test
+    void materializationLodIsClosedBySupersedingPhysicalProfileWithoutRewritingHistory() {
+        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
+        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult lod = byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE);
+
+        assertEquals(RequirementStatus.SATISFIED, lod.status());
+        assertTrue(lod.evidence().contains("closure_profile=" + Stage20MaterializationLodClosureProfile.CURRENT_VERSION));
+        assertTrue(lod.evidence().contains("base_profile=" + Stage20MaterializationLodCalibrationProfile.CURRENT_VERSION));
+        assertTrue(lod.evidence().contains("historical_numeric_bands_unresolved=true"));
+        assertTrue(lod.evidence().contains("active_local_activation_m=1.0E9"));
+        assertTrue(lod.evidence().contains("tactical_activation_m="));
+        assertTrue(lod.evidence().contains("wake_latency_s=0.0"));
+        assertTrue(lod.evidence().contains("authoritative_state_retained=true"));
+        assertTrue(lod.evidence().contains("distance_can_suppress_direct_relevance=false"));
+        assertTrue(lod.evidence().contains("render_boundary=false"));
+        assertTrue(lod.evidence().contains("world_boundary=false"));
+        assertTrue(lod.evidence().contains("lossless_materialization_lifecycle_closed=true"));
+    }
+
+    @Test
     void currentPhysicalAndCalibrationGapsCannotBeHiddenByFallbackConstants() {
         Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
         Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
@@ -252,7 +272,9 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(byId.get(RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS).evidence()
                 .contains("maxLinearCorridorLength"));
         assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
-                .contains("numeric_activation_bands_closed=false"));
+                .contains("historical_numeric_bands_unresolved=true"));
+        assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
+                .contains(Stage20MaterializationLodClosureProfile.CURRENT_VERSION));
         assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
                 .contains("lossless_materialization_lifecycle_closed=true"));
     }
