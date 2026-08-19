@@ -15,6 +15,12 @@ import java.util.OptionalDouble;
  * throughput remain industrial authority and are never converted into station dimensions. Missing
  * station footprint/docking geometry is represented explicitly rather than filled with a map-scale
  * constant.</p>
+ *
+ * @param version stable profile version
+ * @param formationSamples deterministic formation calibration samples
+ * @param stationGeometrySamples deterministic station-geometry inventory
+ * @param shipyardBerthSamples production-authoritative shipyard berth evidence
+ * @param unresolvedConstraints machine-visible unresolved physical closure
  */
 public record Stage20FormationStationSpatialCalibrationProfile(
         String version,
@@ -25,7 +31,15 @@ public record Stage20FormationStationSpatialCalibrationProfile(
     /** Current Stage-20A.6 profile version. */
     public static final String CURRENT_VERSION = "stage20a.formation-station-spatial.v1";
 
-    /** Creates a deterministically ordered immutable profile. */
+    /**
+     * Creates a deterministically ordered immutable profile.
+     *
+     * @param version stable profile version
+     * @param formationSamples deterministic formation calibration samples
+     * @param stationGeometrySamples deterministic station-geometry inventory
+     * @param shipyardBerthSamples production-authoritative shipyard berth evidence
+     * @param unresolvedConstraints machine-visible unresolved physical closure
+     */
     public Stage20FormationStationSpatialCalibrationProfile {
         requireText(version, "version");
         formationSamples = sortedCopy(
@@ -84,7 +98,23 @@ public record Stage20FormationStationSpatialCalibrationProfile(
             double accelerationMps2,
             double recoveryDistanceToToleranceM,
             double idealRestToToleranceRecoveryTimeS) {
-        /** Validates one formation calibration sample. */
+        /**
+         * Validates one formation calibration sample.
+         *
+         * @param probeId stable Stage-20 probe ID
+         * @param authority authority of the authored spacing geometry
+         * @param source exact source/provenance description
+         * @param mode Stage-19 authored formation mode
+         * @param shipCount ships assigned to one line
+         * @param spacingM center-to-center authored slot spacing
+         * @param slotToleranceM Stage-19 slot tolerance
+         * @param breakDistanceM Stage-19 observable break distance
+         * @param lineSpanM distance between outermost slot centers
+         * @param outerSlotOffsetM absolute outermost slot-center offset from line center
+         * @param accelerationMps2 physically derived representative acceleration
+         * @param recoveryDistanceToToleranceM distance from break threshold to slot tolerance
+         * @param idealRestToToleranceRecoveryTimeS symmetric full-acceleration lower-bound recovery time
+         */
         public FormationProbeSample {
             requireText(probeId, "probeId");
             Objects.requireNonNull(authority, "authority");
@@ -109,6 +139,15 @@ public record Stage20FormationStationSpatialCalibrationProfile(
      *
      * <p>Empty optionals are intentional unresolved physical closure. Capacity, facility count or
      * transfer throughput must never be used as a fallback dimension.</p>
+     *
+     * @param stationArchetypeId stable Stage-18 station archetype ID
+     * @param authority authority of the spatial values
+     * @param source exact content/runtime provenance
+     * @param footprintLengthM physical station length when authored
+     * @param footprintWidthM physical station width when authored
+     * @param dockingApproachClearanceM required docking-approach clearance when authored
+     * @param trafficClearanceM required traffic clearance when authored
+     * @param unresolvedReasons explicit reasons that placement geometry remains incomplete
      */
     public record StationGeometrySample(
             String stationArchetypeId,
@@ -119,7 +158,18 @@ public record Stage20FormationStationSpatialCalibrationProfile(
             OptionalDouble dockingApproachClearanceM,
             OptionalDouble trafficClearanceM,
             List<String> unresolvedReasons) {
-        /** Validates and freezes one station geometry inventory entry. */
+        /**
+         * Validates and freezes one station geometry inventory entry.
+         *
+         * @param stationArchetypeId stable Stage-18 station archetype ID
+         * @param authority authority of the spatial values
+         * @param source exact content/runtime provenance
+         * @param footprintLengthM physical station length when authored
+         * @param footprintWidthM physical station width when authored
+         * @param dockingApproachClearanceM required docking-approach clearance when authored
+         * @param trafficClearanceM required traffic clearance when authored
+         * @param unresolvedReasons explicit reasons that placement geometry remains incomplete
+         */
         public StationGeometrySample {
             requireText(stationArchetypeId, "stationArchetypeId");
             Objects.requireNonNull(authority, "authority");
@@ -140,7 +190,16 @@ public record Stage20FormationStationSpatialCalibrationProfile(
         }
     }
 
-    /** Existing physical berth envelope; it is not promoted to full station footprint. */
+    /**
+     * Existing physical berth envelope; it is not promoted to full station footprint.
+     *
+     * @param yardId stable Stage-18 shipyard ID
+     * @param authority authority of the berth dimensions
+     * @param source exact content provenance
+     * @param berthLengthM physical berth length
+     * @param berthWidthM physical berth width
+     * @param berthHeightM physical berth height
+     */
     public record ShipyardBerthSample(
             String yardId,
             SpatialAuthority authority,
@@ -148,7 +207,16 @@ public record Stage20FormationStationSpatialCalibrationProfile(
             double berthLengthM,
             double berthWidthM,
             double berthHeightM) {
-        /** Validates one production-authoritative physical berth sample. */
+        /**
+         * Validates one production-authoritative physical berth sample.
+         *
+         * @param yardId stable Stage-18 shipyard ID
+         * @param authority authority of the berth dimensions
+         * @param source exact content provenance
+         * @param berthLengthM physical berth length
+         * @param berthWidthM physical berth width
+         * @param berthHeightM physical berth height
+         */
         public ShipyardBerthSample {
             requireText(yardId, "yardId");
             Objects.requireNonNull(authority, "authority");
@@ -161,6 +229,13 @@ public record Stage20FormationStationSpatialCalibrationProfile(
 
     /**
      * Minimum explicit station geometry input required before Stage-20 placement may derive spacing.
+     *
+     * @param stationArchetypeId stable station archetype ID
+     * @param provenance accepted physical-geometry provenance
+     * @param footprintLengthM explicit physical footprint length
+     * @param footprintWidthM explicit physical footprint width
+     * @param dockingApproachClearanceM explicit docking-approach clearance
+     * @param trafficClearanceM explicit traffic clearance
      */
     public record StationPlacementGeometryInput(
             String stationArchetypeId,
@@ -169,7 +244,16 @@ public record Stage20FormationStationSpatialCalibrationProfile(
             double footprintWidthM,
             double dockingApproachClearanceM,
             double trafficClearanceM) {
-        /** Validates explicit physical placement geometry. */
+        /**
+         * Validates explicit physical placement geometry.
+         *
+         * @param stationArchetypeId stable station archetype ID
+         * @param provenance accepted physical-geometry provenance
+         * @param footprintLengthM explicit physical footprint length
+         * @param footprintWidthM explicit physical footprint width
+         * @param dockingApproachClearanceM explicit docking-approach clearance
+         * @param trafficClearanceM explicit traffic clearance
+         */
         public StationPlacementGeometryInput {
             requireText(stationArchetypeId, "stationArchetypeId");
             requireText(provenance, "provenance");
@@ -182,6 +266,13 @@ public record Stage20FormationStationSpatialCalibrationProfile(
 
     /**
      * Conservative top-down placement envelope derived only from explicit physical geometry.
+     *
+     * @param stationArchetypeId stable station archetype ID
+     * @param provenance accepted physical-geometry provenance
+     * @param footprintHalfDiagonalM half-diagonal of the explicit footprint
+     * @param operationalClearanceM larger of docking and traffic clearance
+     * @param operationalRadiusM conservative footprint-plus-clearance radius
+     * @param sameClassMinimumCenterSeparationM conservative same-class center separation
      */
     public record StationPlacementEnvelope(
             String stationArchetypeId,
@@ -190,7 +281,16 @@ public record Stage20FormationStationSpatialCalibrationProfile(
             double operationalClearanceM,
             double operationalRadiusM,
             double sameClassMinimumCenterSeparationM) {
-        /** Validates one derived placement envelope. */
+        /**
+         * Validates one derived placement envelope.
+         *
+         * @param stationArchetypeId stable station archetype ID
+         * @param provenance accepted physical-geometry provenance
+         * @param footprintHalfDiagonalM half-diagonal of the explicit footprint
+         * @param operationalClearanceM larger of docking and traffic clearance
+         * @param operationalRadiusM conservative footprint-plus-clearance radius
+         * @param sameClassMinimumCenterSeparationM conservative same-class center separation
+         */
         public StationPlacementEnvelope {
             requireText(stationArchetypeId, "stationArchetypeId");
             requireText(provenance, "provenance");
