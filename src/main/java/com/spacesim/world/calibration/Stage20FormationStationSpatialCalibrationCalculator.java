@@ -23,6 +23,7 @@ import java.util.OptionalDouble;
 /** Derives Stage-20A.6 formation and station spatial evidence from existing production authority. */
 public final class Stage20FormationStationSpatialCalibrationCalculator {
     private static final String ESCORT_REPRESENTATIVE_ID = "ESCORT_DESTROYER";
+    private static final double BREAK_BOUNDARY_PROBE_MARGIN_M = 1e-6d;
 
     private Stage20FormationStationSpatialCalibrationCalculator() {
         throw new AssertionError("No instances");
@@ -141,7 +142,7 @@ public final class Stage20FormationStationSpatialCalibrationCalculator {
                 objective,
                 probeSlot,
                 shipCount,
-                desiredY + objective.breakDistanceM() + Math.ulp(objective.breakDistanceM()),
+                desiredY + objective.breakDistanceM() + BREAK_BOUNDARY_PROBE_MARGIN_M,
                 0d,
                 accelerationMps2,
                 true);
