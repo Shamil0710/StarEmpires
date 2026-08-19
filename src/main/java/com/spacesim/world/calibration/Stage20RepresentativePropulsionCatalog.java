@@ -111,7 +111,22 @@ public record Stage20RepresentativePropulsionCatalog(
             double exhaustVelocityMps,
             double expectedAccelerationMps2,
             double expectedDeltaVMps) {
-        /** Ensures programmatically constructed references cannot lose identity/provenance. */
+        /**
+         * Ensures programmatically constructed references cannot lose identity/provenance.
+         *
+         * @param id stable calibration reference ID
+         * @param representativeClass stable role/class label used by Stage-20 calibration
+         * @param sourceEvidenceId exact per-reference numeric/authoring provenance
+         * @param designDryMassKg dry design mass
+         * @param ammunitionMassKg carried ammunition mass
+         * @param missionCargoStoresMassKg carried mission payload, cargo and stores mass
+         * @param reactionMassKg carried propulsion reaction mass
+         * @param departureMassKg composed departure mass
+         * @param thrustN maximum reference thrust
+         * @param exhaustVelocityMps reference effective exhaust velocity
+         * @param expectedAccelerationMps2 accepted derived departure acceleration
+         * @param expectedDeltaVMps accepted derived nominal delta-v
+         */
         public ReferenceDefinition {
             requireNonBlank(id, "id");
             requireNonBlank(representativeClass, "representativeClass");
