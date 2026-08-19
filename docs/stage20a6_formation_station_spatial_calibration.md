@@ -1,6 +1,6 @@
 # Stage 20A.6 — Formation / Station Spatial Calibration
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED  
 **Parent:** Stage 20A — Representative-Ship Scale Calibration  
 **Date:** 2026-08-19
 
@@ -163,9 +163,11 @@ The current profile keeps these gaps machine-visible:
 
 Stage 20B must not begin placing full stations as physically closed objects until station dimensions/clearances are backed by accepted physical content or an explicitly accepted versioned geometry reference.
 
-## 9. Acceptance criteria
+## 9. Acceptance evidence
 
-Stage 20A.6 is accepted when exact-head CI proves simultaneously:
+Exact-head Java-17 `clean verify` on implementation head `bcb36179cd879c4cdf561762d4acdf69b76f2e06` completed successfully before this status finalization.
+
+The accepted evidence proves simultaneously:
 
 - identical accepted content produces identical Stage-20A.6 profile output;
 - compact/dispersed/scaled probes produce their measured distinct spans;
@@ -176,8 +178,10 @@ Stage 20A.6 is accepted when exact-head CI proves simultaneously:
 - explicit footprint/clearance changes alter derived station placement evidence;
 - no storage/facility/throughput value becomes a hidden station-size formula.
 
+The final docs-only acceptance head remains subject to the normal exact-head merge gate before `main` advances.
+
 ## 10. Next slice
 
-After Stage 20A.6 passes the merge gate, the next implementation slice is **Stage 20A.7 — jump-arrival stand-off calibration**.
+The next implementation slice is **Stage 20A.7 — jump-arrival stand-off calibration**.
 
 It should derive arrival/traffic/security stand-off evidence from already accepted FTL edge semantics, ship braking/response capability, sensor/weapon/PD geometry and station/infrastructure geometry closure without introducing a universal jump radius or teleport buffer.
