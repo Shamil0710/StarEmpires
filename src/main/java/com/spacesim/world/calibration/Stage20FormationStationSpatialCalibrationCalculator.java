@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalDouble;
 
-/** Derives Stage-20A.6 formation and station spatial evidence from existing production authority. */
+/** Derives Stage-20A.6 formation and station spatial evidence from explicit physical authority. */
 public final class Stage20FormationStationSpatialCalibrationCalculator {
     private static final String ESCORT_REPRESENTATIVE_ID = "ESCORT_DESTROYER";
     private static final double BREAK_BOUNDARY_PROBE_MARGIN_M = 1e-6d;
@@ -32,10 +32,11 @@ public final class Stage20FormationStationSpatialCalibrationCalculator {
     /**
      * Builds the current deterministic Stage-20A.6 profile.
      *
-     * <p>Formation probes retain Stage-19 authored values with provisional authority. Station
-     * archetypes remain unresolved because Stage-18F does not author footprint/docking dimensions.
-     * Stage-18G shipyard berth dimensions are exposed separately as physical evidence and are never
-     * treated as the whole station footprint.</p>
+     * <p>Formation probes retain Stage-19 authored values with provisional authority. Stage-18F
+     * remains the authority for station archetype identity/economics only; the explicit versioned
+     * Stage-20 station-geometry profile supplies provisional footprints and approach/traffic
+     * clearances. Stage-18G shipyard berth dimensions remain separate physical evidence and are
+     * never treated as the whole station footprint.</p>
      *
      * @return current immutable calibration profile
      */
@@ -66,20 +67,20 @@ public final class Stage20FormationStationSpatialCalibrationCalculator {
                         "docs/stage19i_l_tactical_formation.md;" + accelerationSource));
 
         Stage18StationInfrastructureCatalog stations = Stage18StationInfrastructureCatalogLoader.loadDefault();
+        Stage20StationPhysicalGeometryProfile stationGeometry = Stage20StationPhysicalGeometryProfile.deriveCurrent();
         List<StationGeometrySample> stationSamples = new ArrayList<>();
         for (Stage18StationInfrastructureCatalog.StationArchetypeDefinition station : stations.getArchetypes()) {
+            Stage20StationPhysicalGeometryProfile.StationGeometryDesign design =
+                    stationGeometry.stationDesign(station.id());
             stationSamples.add(new StationGeometrySample(
                     station.id(),
-                    SpatialAuthority.UNRESOLVED,
-                    "Stage18StationInfrastructureCatalog:" + stations.getFingerprint(),
-                    OptionalDouble.empty(),
-                    OptionalDouble.empty(),
-                    OptionalDouble.empty(),
-                    OptionalDouble.empty(),
-                    List.of(
-                            "stage18_station_archetype_has_no_physical_footprint_dimensions",
-                            "stage18_station_archetype_has_no_docking_approach_clearance",
-                            "stage18_station_archetype_has_no_traffic_clearance")));
+                    SpatialAuthority.PROVISIONAL_STAGE20_DESIGN_REFERENCE,
+                    design.provenanceId() + ";Stage18StationInfrastructureCatalog:" + stations.getFingerprint(),
+                    OptionalDouble.of(design.footprintLengthM()),
+                    OptionalDouble.of(design.footprintWidthM()),
+                    OptionalDouble.of(design.dockingApproachClearanceM()),
+                    OptionalDouble.of(design.trafficClearanceM()),
+                    List.of()));
         }
 
         Stage18ShipyardCatalog shipyards = Stage18ShipyardCatalogLoader.loadDefault();
@@ -102,9 +103,7 @@ public final class Stage20FormationStationSpatialCalibrationCalculator {
                 berthSamples,
                 List.of(
                         "stage19_formation_distances_are_acceptance_probes_not_final_world_spacing",
-                        "station_footprint_dimensions_missing_from_stage18_authority",
-                        "station_docking_approach_geometry_missing_from_stage18_authority",
-                        "station_traffic_clearance_missing_from_stage18_authority",
+                        "station_geometry_is_provisional_stage20_design_reference_stage22_review_required",
                         "shipyard_berth_envelope_is_not_station_footprint"));
     }
 

@@ -28,7 +28,6 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(
                 Set.of(
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
-                        RequirementId.STATION_PHYSICAL_GEOMETRY,
                         RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
                         RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
                         RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
@@ -38,7 +37,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(8, first.blockingRequirements().size());
+        assertEquals(7, first.blockingRequirements().size());
     }
 
     @Test
@@ -73,6 +72,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
                 RequirementId.FORMATION_SPATIAL_EVIDENCE,
                 RequirementId.FORMATION_SPACING_BAND_CLOSURE,
+                RequirementId.STATION_PHYSICAL_GEOMETRY,
                 RequirementId.FAR_COORDINATE_PRECISION);
         assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
@@ -157,11 +157,13 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(byId.get(RequirementId.PD_SAFE_INTERCEPT_GEOMETRY).evidence()
                 .contains("scheduler_probe_input"));
         assertEquals(
-                "placement_ready_stations=0/8",
+                "placement_ready_stations=8/8",
                 byId.get(RequirementId.STATION_PHYSICAL_GEOMETRY).evidence());
         assertEquals(
                 "closed_station_stand_offs=0/8",
                 byId.get(RequirementId.STATION_JUMP_ARRIVAL_STANDOFF).evidence());
+        assertTrue(byId.get(RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS).evidence()
+                .contains("station_geometry_is_closed"));
         assertTrue(byId.get(RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS).evidence()
                 .contains("station_to_station"));
         assertTrue(byId.get(RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS).evidence()

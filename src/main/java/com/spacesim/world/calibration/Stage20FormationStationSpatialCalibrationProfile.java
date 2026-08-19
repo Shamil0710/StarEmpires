@@ -12,9 +12,8 @@ import java.util.OptionalDouble;
  * Versioned Stage-20A.6 formation and station spatial-calibration evidence.
  *
  * <p>Stage-19 formation distances remain authored tactical probes. Stage-18 station capacity and
- * throughput remain industrial authority and are never converted into station dimensions. Missing
- * station footprint/docking geometry is represented explicitly rather than filled with a map-scale
- * constant.</p>
+ * throughput remain industrial authority and are never converted into station dimensions. Station
+ * geometry may be supplied only by an explicit physical design authority with preserved provenance.</p>
  *
  * @param version stable profile version
  * @param formationSamples deterministic formation calibration samples
@@ -29,7 +28,7 @@ public record Stage20FormationStationSpatialCalibrationProfile(
         List<ShipyardBerthSample> shipyardBerthSamples,
         List<String> unresolvedConstraints) {
     /** Current Stage-20A.6 profile version. */
-    public static final String CURRENT_VERSION = "stage20a.formation-station-spatial.v1";
+    public static final String CURRENT_VERSION = "stage20a.formation-station-spatial.v2";
 
     /**
      * Creates a deterministically ordered immutable profile.
@@ -61,6 +60,8 @@ public record Stage20FormationStationSpatialCalibrationProfile(
     public enum SpatialAuthority {
         /** Existing production content/runtime owns the physical value. */
         PRODUCTION_AUTHORITATIVE,
+        /** Explicit Stage-20 provisional physical design input pending Stage-22 promotion/review. */
+        PROVISIONAL_STAGE20_DESIGN_REFERENCE,
         /** Existing Stage-19 scenario geometry is retained only as a calibration probe. */
         PROVISIONAL_STAGE19_TACTICAL_PROBE,
         /** Required spatial value is absent from current authoritative content. */
@@ -105,7 +106,7 @@ public record Stage20FormationStationSpatialCalibrationProfile(
          * @param authority authority of the authored spacing geometry
          * @param source exact source/provenance description
          * @param mode Stage-19 authored formation mode
-         * @param shipCount ships assigned to one line
+         * @param shipCount ships assigned to the calibrated line
          * @param spacingM center-to-center authored slot spacing
          * @param slotToleranceM Stage-19 slot tolerance
          * @param breakDistanceM Stage-19 observable break distance
@@ -137,12 +138,12 @@ public record Stage20FormationStationSpatialCalibrationProfile(
     /**
      * Machine-visible station placement geometry inventory.
      *
-     * <p>Empty optionals are intentional unresolved physical closure. Capacity, facility count or
-     * transfer throughput must never be used as a fallback dimension.</p>
+     * <p>Empty optionals represent unresolved physical closure. Capacity, facility count or transfer
+     * throughput must never be used as a fallback dimension.</p>
      *
      * @param stationArchetypeId stable Stage-18 station archetype ID
      * @param authority authority of the spatial values
-     * @param source exact content/runtime provenance
+     * @param source exact content/runtime/design provenance
      * @param footprintLengthM physical station length when authored
      * @param footprintWidthM physical station width when authored
      * @param dockingApproachClearanceM required docking-approach clearance when authored
@@ -163,7 +164,7 @@ public record Stage20FormationStationSpatialCalibrationProfile(
          *
          * @param stationArchetypeId stable Stage-18 station archetype ID
          * @param authority authority of the spatial values
-         * @param source exact content/runtime provenance
+         * @param source exact content/runtime/design provenance
          * @param footprintLengthM physical station length when authored
          * @param footprintWidthM physical station width when authored
          * @param dockingApproachClearanceM required docking-approach clearance when authored
@@ -179,14 +180,23 @@ public record Stage20FormationStationSpatialCalibrationProfile(
             dockingApproachClearanceM = checkedOptional(dockingApproachClearanceM, "dockingApproachClearanceM");
             trafficClearanceM = checkedOptional(trafficClearanceM, "trafficClearanceM");
             unresolvedReasons = sortedStrings(unresolvedReasons, "unresolvedReasons");
+            if (placementValuesComplete(
+                    footprintLengthM,
+                    footprintWidthM,
+                    dockingApproachClearanceM,
+                    trafficClearanceM)
+                    && authority == SpatialAuthority.UNRESOLVED) {
+                throw new IllegalArgumentException("complete station geometry cannot have UNRESOLVED authority");
+            }
         }
 
         /** @return whether this entry contains enough geometry for a conservative placement envelope */
         public boolean placementReady() {
-            return footprintLengthM.isPresent()
-                    && footprintWidthM.isPresent()
-                    && dockingApproachClearanceM.isPresent()
-                    && trafficClearanceM.isPresent();
+            return placementValuesComplete(
+                    footprintLengthM,
+                    footprintWidthM,
+                    dockingApproachClearanceM,
+                    trafficClearanceM);
         }
     }
 
@@ -299,6 +309,17 @@ public record Stage20FormationStationSpatialCalibrationProfile(
             requirePositive(operationalRadiusM, "operationalRadiusM");
             requirePositive(sameClassMinimumCenterSeparationM, "sameClassMinimumCenterSeparationM");
         }
+    }
+
+    private static boolean placementValuesComplete(
+            OptionalDouble footprintLengthM,
+            OptionalDouble footprintWidthM,
+            OptionalDouble dockingApproachClearanceM,
+            OptionalDouble trafficClearanceM) {
+        return footprintLengthM.isPresent()
+                && footprintWidthM.isPresent()
+                && dockingApproachClearanceM.isPresent()
+                && trafficClearanceM.isPresent();
     }
 
     private static OptionalDouble checkedOptional(OptionalDouble value, String field) {

@@ -4,6 +4,7 @@ import com.spacesim.ship.TacticalFormationPlanner;
 import com.spacesim.ship.TacticalFormationPlanner.FormationMode;
 import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.FormationProbeSample;
 import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.ShipyardBerthSample;
+import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.SpatialAuthority;
 import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.StationGeometrySample;
 import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.StationPlacementEnvelope;
 import com.spacesim.world.calibration.Stage20FormationStationSpatialCalibrationProfile.StationPlacementGeometryInput;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20FormationStationSpatialCalibrationProfileTest {
     @Test
-    void currentCalibrationIsDeterministicAndKeepsStationGeometryGapsVisible() {
+    void currentCalibrationIsDeterministicAndConsumesExplicitStage20StationGeometry() {
         Stage20FormationStationSpatialCalibrationProfile first =
                 Stage20FormationStationSpatialCalibrationCalculator.calibrate();
         Stage20FormationStationSpatialCalibrationProfile second =
@@ -30,10 +31,14 @@ class Stage20FormationStationSpatialCalibrationProfileTest {
         assertEquals(8, first.stationGeometrySamples().size());
         assertEquals(1, first.shipyardBerthSamples().size());
         assertFalse(first.unresolvedConstraints().isEmpty());
-        assertTrue(first.stationGeometrySamples().stream().noneMatch(StationGeometrySample::placementReady));
-        assertTrue(first.stationGeometrySamples().stream().allMatch(value -> value.footprintLengthM().isEmpty()));
-        assertTrue(first.stationGeometrySamples().stream().allMatch(value -> value.footprintWidthM().isEmpty()));
-        assertTrue(first.stationGeometrySamples().stream().allMatch(value -> !value.unresolvedReasons().isEmpty()));
+        assertTrue(first.stationGeometrySamples().stream().allMatch(StationGeometrySample::placementReady));
+        assertTrue(first.stationGeometrySamples().stream().allMatch(value ->
+                value.authority() == SpatialAuthority.PROVISIONAL_STAGE20_DESIGN_REFERENCE));
+        assertTrue(first.stationGeometrySamples().stream().allMatch(value -> value.footprintLengthM().isPresent()));
+        assertTrue(first.stationGeometrySamples().stream().allMatch(value -> value.footprintWidthM().isPresent()));
+        assertTrue(first.stationGeometrySamples().stream().allMatch(value -> value.unresolvedReasons().isEmpty()));
+        assertTrue(first.stationGeometrySamples().stream().allMatch(value ->
+                value.source().contains(Stage20StationPhysicalGeometryProfile.SOURCE_DOCUMENT)));
     }
 
     @Test
@@ -84,6 +89,8 @@ class Stage20FormationStationSpatialCalibrationProfileTest {
         assertEquals(70d, berth.berthHeightM());
         assertTrue(profile.unresolvedConstraints().stream()
                 .anyMatch(value -> value.contains("berth_envelope_is_not_station_footprint")));
+        assertTrue(profile.stationGeometrySamples().stream().noneMatch(value ->
+                value.source().contains("Stage18ShipyardCatalog")));
     }
 
     @Test
