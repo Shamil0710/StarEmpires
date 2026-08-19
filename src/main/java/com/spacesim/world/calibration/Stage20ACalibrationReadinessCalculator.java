@@ -69,6 +69,8 @@ public final class Stage20ACalibrationReadinessCalculator {
                 Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent();
         Stage20TopologyQualityCalibrationProfile topologyQuality =
                 Stage20TopologyQualityCalibrationProfile.deriveCurrent();
+        Stage20MajorInfrastructureExtentCalibrationProfile majorInfrastructure =
+                Stage20MajorInfrastructureExtentCalibrationProfile.deriveCurrent();
         Stage20FarCoordinatePrecisionCalibrationProfile precision =
                 Stage20FarCoordinatePrecisionCalibrationCalculator.calibrate();
         Stage20MaterializationLodCalibrationProfile materialization =
@@ -304,12 +306,18 @@ public final class Stage20ACalibrationReadinessCalculator {
                         + "-" + topologyQuality.regionalHopDistanceBand().maxInclusive()
                         + ";stage22_review_required=" + topologyQuality.stage22ReviewRequired()));
 
-        requirements.add(new RequirementResult(
+        boolean majorInfrastructureClosed = majorInfrastructure.closesStage20BEntryCoverage();
+        requirements.add(result(
                 RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
-                RequirementStatus.BLOCKING_STAGE20B_ENTRY,
-                stationGeometryClosed
-                        ? "station_geometry_is_closed_but_no_separate_machine_readable_major_infrastructure_extent_band_profile_exists"
-                        : "major_infrastructure_extent_bands_cannot_close_while_station_footprints_are_unresolved_and_no_extent_band_profile_exists"));
+                majorInfrastructureClosed,
+                "profile=" + majorInfrastructure.version()
+                        + ";bands=" + majorInfrastructure.bands().stream()
+                                .map(value -> value.id().name()).sorted().collect(Collectors.joining(","))
+                        + ";max_extent_m=" + majorInfrastructure.maximumMajorInfrastructureExtentM()
+                        + ";max_station_standoff_m=" + majorInfrastructure.maxClosedStationStandOffM()
+                        + ";inner_outer_min_m=" + majorInfrastructure.innerToOuterSystemMinDistanceM()
+                        + ";hard_boundary=false;clamp_allowed=false"
+                        + ";stage22_review_required=" + majorInfrastructure.stage22ReviewRequired()));
 
         boolean precisionClosed = precision.policy().hierarchicalPhysicalCoordinatesRequired()
                 && !precision.policy().legacyGlobalFloatPhysicalAuthorityAllowed()
