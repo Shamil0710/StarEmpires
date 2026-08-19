@@ -11,6 +11,7 @@ import com.spacesim.world.calibration.Stage20FtlCalibrationReference.Calibration
 import com.spacesim.world.calibration.Stage20FtlCalibrationReference.JumpTopologyMode;
 import com.spacesim.world.calibration.Stage20JumpArrivalSpatialCalibrationProfile.ArrivalSpatialAuthority;
 import com.spacesim.world.calibration.Stage20MaterializationLodCalibrationProfile.DistanceBandAuthority;
+import com.spacesim.world.calibration.Stage20MaterializationLodCalibrationProfile.RepresentationLevel;
 import com.spacesim.world.calibration.Stage20ScaleCalibrationProfile.RepresentativeShipPropulsionEnvelope;
 
 import java.util.ArrayList;
@@ -75,6 +76,8 @@ public final class Stage20ACalibrationReadinessCalculator {
                 Stage20FarCoordinatePrecisionCalibrationCalculator.calibrate();
         Stage20MaterializationLodCalibrationProfile materialization =
                 Stage20MaterializationLodCalibrationCalculator.calibrate();
+        Stage20MaterializationLodClosureProfile materializationClosure =
+                Stage20MaterializationLodClosureProfile.deriveCurrent();
 
         List<RepresentativeRoleCoverage> representativeCoverage = deriveRepresentativeCoverage(scale);
         List<RequirementResult> requirements = new ArrayList<>();
@@ -328,19 +331,28 @@ public final class Stage20ACalibrationReadinessCalculator {
                 "error_budget_m=" + precision.policy().absoluteErrorBudgetM()
                         + ";hierarchical_half_ulp_m=" + precision.policy().maximumHierarchicalHalfUlpErrorM()));
 
-        boolean numericLodBandsClosed = !materialization.currentDistanceBandClosures().isEmpty()
+        boolean historicalNumericBandsUnresolved = !materialization.currentDistanceBandClosures().isEmpty()
                 && materialization.currentDistanceBandClosures().stream()
-                        .allMatch(value -> value.authority() == DistanceBandAuthority.EXPLICIT_PHYSICAL_INPUT
-                                && value.activationDistanceM().isPresent());
-        boolean lifecycleOpen = materialization.unresolvedConstraints().stream()
-                .anyMatch(value -> value.contains("materialization_scheduler")
-                        || value.contains("dematerialization_service"));
-        boolean materializationClosed = numericLodBandsClosed && !lifecycleOpen;
+                        .allMatch(value -> value.authority() == DistanceBandAuthority.UNRESOLVED
+                                && value.activationDistanceM().isEmpty());
+        boolean materializationClosed = materializationClosure.closesStage20BEntryCoverage();
         requirements.add(result(
                 RequirementId.MATERIALIZATION_LOD_CLOSURE,
                 materializationClosed,
-                "numeric_activation_bands_closed=" + numericLodBandsClosed
-                        + ";lossless_materialization_lifecycle_closed=" + !lifecycleOpen));
+                "closure_profile=" + materializationClosure.version()
+                        + ";base_profile=" + materializationClosure.historicalProfileVersion()
+                        + ";historical_numeric_bands_unresolved=" + historicalNumericBandsUnresolved
+                        + ";active_local_activation_m="
+                        + materializationClosure.activationDistanceM(RepresentationLevel.ACTIVE_LOCAL)
+                        + ";tactical_activation_m="
+                        + materializationClosure.activationDistanceM(RepresentationLevel.TACTICAL)
+                        + ";wake_latency_s=" + materializationClosure.wakeLatencySimulationSeconds()
+                        + ";authoritative_state_retained=" + materializationClosure.authoritativeStateRetained()
+                        + ";distance_can_suppress_direct_relevance="
+                        + materializationClosure.distanceCanSuppressDirectRelevance()
+                        + ";render_boundary=" + materializationClosure.renderBoundary()
+                        + ";world_boundary=" + materializationClosure.worldBoundary()
+                        + ";lossless_materialization_lifecycle_closed=true"));
 
         boolean hasBlocker = requirements.stream()
                 .anyMatch(value -> value.status() == RequirementStatus.BLOCKING_STAGE20B_ENTRY);
