@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "version": "stage20a.local-route-semantic-bands.v1",
+  "status": "PROVISIONAL_ACCEPTED_REFERENCE",
+  "stage22ReviewRequired": true,
+  "policyEvidence": "Stage-20 world-generation calibration bands authored against accepted representative propulsion/endurance scale and closed station jump-arrival geometry; distances are operational content-distribution seeds, not walls, hard system radii or screen-space units.",
+  "bands": [
+    {
+      "id": "STATION_TO_STATION",
+      "minDistanceM": 10000000.0,
+      "maxDistanceM": 100000000.0,
+      "sourceEvidenceId": "docs/stage20_physical_world_generation_plan.md:Stage20A/local-logistics-lower-bound|accepted_by=docs/stage20a_local_route_semantic_bands.md"
+    },
+    {
+      "id": "STATION_TO_RESOURCE_FIELD",
+      "minDistanceM": 50000000.0,
+      "maxDistanceM": 500000000.0,
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/STATION_TO_RESOURCE_FIELD"
+    },
+    {
+      "id": "JUMP_ARRIVAL_TO_MAJOR_HUB",
+      "minDistanceM": 100000000.0,
+      "maxDistanceM": 1000000000.0,
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/JUMP_ARRIVAL_TO_MAJOR_HUB"
+    },
+    {
+      "id": "INNER_TO_OUTER_SYSTEM",
+      "minDistanceM": 1000000000.0,
+      "maxDistanceM": 10000000000.0,
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/INNER_TO_OUTER_SYSTEM"
+    }
+  ]
+}
