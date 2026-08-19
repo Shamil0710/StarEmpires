@@ -25,7 +25,8 @@ class Stage20StationDefensiveSensorGeometryProfileTest {
         assertEquals(8, first.stations().size());
         assertTrue(first.closesStage20BEntryCoverage());
         assertTrue(first.stations().stream()
-                .allMatch(Stage20StationDefensiveSensorGeometryProfile.StationDefensiveSensorGeometry::isOperationallyNested));
+                .allMatch(Stage20StationDefensiveSensorGeometryProfile.StationDefensiveSensorGeometry::sensorGeometryNested));
+        assertTrue(first.stations().stream().allMatch(value -> value.defensiveExclusionReferenceM() > 0d));
     }
 
     @Test
@@ -49,7 +50,7 @@ class Stage20StationDefensiveSensorGeometryProfileTest {
     }
 
     @Test
-    void navalOrdnanceDepotUsesTheCapitalReferenceWithoutChangingProductionWeaponRules() {
+    void navalOrdnanceDepotUsesCapitalExclusionReferenceWithoutChangingProductionWeaponRules() {
         Stage20StationDefensiveSensorGeometryProfile profile =
                 Stage20StationDefensiveSensorGeometryProfile.deriveCurrent();
         var naval = profile.station("station.infrastructure.naval_ordnance_depot");
@@ -58,21 +59,23 @@ class Stage20StationDefensiveSensorGeometryProfileTest {
         assertEquals(Stage20SensorTargetClassCoverageProfile.TargetClass.BATTLESHIP, naval.sensorReferenceTarget());
         assertEquals(Stage20WeaponTargetClassCoverageProfile.TargetClass.BATTLESHIP, naval.defenseReferenceTarget());
         assertEquals("weapon.kinetic.xl_capital_v0_3", naval.defenseReferenceWeaponId());
-        assertEquals(2_819_430.91298755d, naval.defensiveResponseEnvelopeM(), 1e-9d);
+        assertEquals(2_819_430.91298755d, naval.defensiveExclusionReferenceM(), 1e-9d);
     }
 
     @Test
-    void ordinaryStationsRemainBelowNavalDefensiveResponseScale() {
+    void defensiveExclusionScaleIsIndependentFromEscortDerivedSensorFloor() {
         Stage20StationDefensiveSensorGeometryProfile profile =
                 Stage20StationDefensiveSensorGeometryProfile.deriveCurrent();
         var mining = profile.station("station.infrastructure.mining_outpost");
         var refinery = profile.station("station.infrastructure.refinery_complex");
         var naval = profile.station("station.infrastructure.naval_ordnance_depot");
 
-        assertTrue(mining.defensiveResponseEnvelopeM() < refinery.defensiveResponseEnvelopeM());
-        assertTrue(refinery.defensiveResponseEnvelopeM() < naval.defensiveResponseEnvelopeM());
-        assertTrue(mining.activeFireControlM() >= mining.defensiveResponseEnvelopeM());
-        assertTrue(refinery.activeFireControlM() >= refinery.defensiveResponseEnvelopeM());
-        assertTrue(naval.activeFireControlM() >= naval.defensiveResponseEnvelopeM());
+        assertTrue(mining.defensiveExclusionReferenceM() < refinery.defensiveExclusionReferenceM());
+        assertTrue(refinery.defensiveExclusionReferenceM() < naval.defensiveExclusionReferenceM());
+        assertTrue(mining.sensorGeometryNested());
+        assertTrue(refinery.sensorGeometryNested());
+        assertTrue(naval.sensorGeometryNested());
+        assertTrue(profile.stations().stream()
+                .anyMatch(value -> value.defensiveExclusionReferenceM() > value.activeFireControlM()));
     }
 }
