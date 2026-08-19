@@ -72,6 +72,7 @@ public final class ScaledLiveTacticalSimulationProjection {
         return new ShipGlyph(
                 combatant.spec().entityId(),
                 tacticalSide(combatant.spec().side()),
+                ShipVisualClassifier.classify(combatant.spec().doctrineId()),
                 combatant.transform().position.x,
                 combatant.transform().position.y,
                 heading,
