@@ -65,6 +65,8 @@ public final class Stage20ACalibrationReadinessCalculator {
                 Stage20StationDefensiveSensorGeometryProfile.deriveCurrent();
         Stage20JumpArrivalSpatialCalibrationProfile jumpArrival =
                 Stage20JumpArrivalSpatialCalibrationCalculator.calibrate();
+        Stage20LocalRouteSemanticCalibrationProfile localRoutes =
+                Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent();
         Stage20FarCoordinatePrecisionCalibrationProfile precision =
                 Stage20FarCoordinatePrecisionCalibrationCalculator.calibrate();
         Stage20MaterializationLodCalibrationProfile materialization =
@@ -270,10 +272,16 @@ public final class Stage20ACalibrationReadinessCalculator {
                 standOffClosed,
                 "closed_station_stand_offs=" + closedStandOffs + "/" + standOffCount));
 
-        requirements.add(new RequirementResult(
+        boolean localRouteClosed = localRoutes.closesStage20BEntryCoverage();
+        requirements.add(result(
                 RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
-                RequirementStatus.BLOCKING_STAGE20B_ENTRY,
-                "raw_route_probe_distances_exist_but_no_machine_readable_station_to_station_station_to_resource_jump_to_hub_or_inner_to_outer_acceptance_bands_exist"));
+                localRouteClosed,
+                "profile=" + localRoutes.version()
+                        + ";bands=" + localRoutes.bands().stream()
+                                .map(value -> value.id().name()).sorted().collect(Collectors.joining(","))
+                        + ";samples=" + localRoutes.samples().size()
+                        + ";max_station_standoff_m=" + localRoutes.maxClosedStationStandOffM()
+                        + ";stage22_review_required=" + localRoutes.stage22ReviewRequired()));
 
         requirements.add(new RequirementResult(
                 RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
