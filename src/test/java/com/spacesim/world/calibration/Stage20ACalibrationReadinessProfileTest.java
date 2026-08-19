@@ -18,25 +18,36 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20ACalibrationReadinessProfileTest {
     @Test
-    void currentGateIsDeterministicAndBlockedByExactlySixStage20BEntryRequirements() {
+    void currentGateIsDeterministicAndAuditsTheCompleteStage20ADod() {
         Stage20ACalibrationReadinessProfile first = Stage20ACalibrationReadinessCalculator.deriveCurrent();
         Stage20ACalibrationReadinessProfile second = Stage20ACalibrationReadinessCalculator.deriveCurrent();
 
         assertEquals(first, second);
         assertEquals(Stage20ACalibrationReadinessProfile.CURRENT_VERSION, first.version());
         assertEquals(GateStatus.BLOCKED_FOR_STAGE20B, first.overallStatus());
+        assertEquals(RequirementId.values().length, first.requirements().size());
         assertEquals(
                 Set.of(
                         RequirementId.REPRESENTATIVE_PROPULSION_COVERAGE,
+                        RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE,
                         RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE,
+                        RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS,
                         RequirementId.SENSOR_TARGET_CLASS_COVERAGE,
+                        RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE,
+                        RequirementId.WEAPON_REPRESENTATIVE_TARGET_COVERAGE,
+                        RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
+                        RequirementId.FORMATION_SPACING_BAND_CLOSURE,
                         RequirementId.STATION_PHYSICAL_GEOMETRY,
+                        RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
                         RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
+                        RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
+                        RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
+                        RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
                         RequirementId.MATERIALIZATION_LOD_CLOSURE),
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(6, first.blockingRequirements().size());
+        assertEquals(16, first.blockingRequirements().size());
     }
 
     @Test
@@ -78,19 +89,33 @@ class Stage20ACalibrationReadinessProfileTest {
     }
 
     @Test
-    void currentCivilianFtlAndStationMaterializationEvidenceCannotBeHiddenByFallbackConstants() {
+    void currentPhysicalAndCalibrationGapsCannotBeHiddenByFallbackConstants() {
         Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
         Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
                 .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
 
         assertTrue(byId.get(RequirementId.CIVILIAN_ORDINARY_FTL_COVERAGE).evidence()
                 .contains("no_current_civilian_logistics_representative"));
+        assertTrue(byId.get(RequirementId.REPRESENTATIVE_ENDURANCE_THRUST_COVERAGE).evidence()
+                .contains("no_machine_readable_stores_endurance"));
+        assertTrue(byId.get(RequirementId.INTERSYSTEM_CADENCE_CALIBRATION_BANDS).evidence()
+                .contains("regional_3_5_hop"));
+        assertTrue(byId.get(RequirementId.FUSED_TRACK_FIRE_CONTROL_POLICY_CLOSURE).evidence()
+                .contains("remains_provisional"));
+        assertTrue(byId.get(RequirementId.PD_SAFE_INTERCEPT_GEOMETRY).evidence()
+                .contains("scheduler_probe_input"));
+        assertTrue(byId.get(RequirementId.FORMATION_SPACING_BAND_CLOSURE).evidence()
+                .contains("provisional_stage19_tactical_probes"));
         assertEquals(
                 "placement_ready_stations=0/8",
                 byId.get(RequirementId.STATION_PHYSICAL_GEOMETRY).evidence());
         assertEquals(
                 "closed_station_stand_offs=0/8",
                 byId.get(RequirementId.STATION_JUMP_ARRIVAL_STANDOFF).evidence());
+        assertTrue(byId.get(RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS).evidence()
+                .contains("station_to_station"));
+        assertTrue(byId.get(RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS).evidence()
+                .contains("maxLinearCorridorLength"));
         assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
                 .contains("numeric_activation_bands_closed=false"));
         assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
