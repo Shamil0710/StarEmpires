@@ -25,9 +25,16 @@ public final class HeavyImpactResolver {
 
     /** Stable terminal material-response outcome. */
     public enum Outcome {
-        /** Projectile energy was consumed by the protection stack. */ STOPPED,
+        /** Projectile energy was consumed by the protection stack inside calibrated response. */ STOPPED,
+        /** Residual fell below the minimum calibrated impact speed and was terminated without extrapolation. */
+        SUB_CALIBRATION_STOPPED,
         /** Authored shallow-angle response deflected a residual physical projectile. */ RICOCHET,
         /** Residual projectile energy passed through the ordered protection stack. */ PERFORATED
+    }
+
+    private enum DomainStatus {
+        INSIDE,
+        BELOW_MINIMUM_VELOCITY
     }
 
     private final ShipEngineeringCatalog engineering;
@@ -45,7 +52,12 @@ public final class HeavyImpactResolver {
     }
 
     /**
-     * Resolves one physical projectile against one ordered protection stack.
+     * Resolves one physical projectile against one ordered protection stack using strict calibration.
+     *
+     * <p>This validation/research entry point fails closed for every calibration-domain exit,
+     * including residual velocity below the authored minimum. Production tactical routing should use
+     * {@link #resolveForCombat(ProjectileBody, String, double)} so a projectile that has already
+     * degraded below the high-energy model can terminate without extrapolating that model.</p>
      *
      * @param projectile authoritative projectile body
      * @param protectionStackId protection stack content ID
@@ -57,6 +69,37 @@ public final class HeavyImpactResolver {
             ProjectileBody projectile,
             String protectionStackId,
             double incidenceAngleRad) {
+        return resolveInternal(projectile, protectionStackId, incidenceAngleRad, false);
+    }
+
+    /**
+     * Resolves one production combat impact without extrapolating the heavy-impact response downward.
+     *
+     * <p>Mass outside the authored domain and velocity above its maximum remain hard failures. When a
+     * projectile/residual remains inside the authored mass range but its current impact speed is below
+     * a layer's minimum calibrated heavy-impact velocity, the combat runtime returns
+     * {@link Outcome#SUB_CALIBRATION_STOPPED}: the remaining body is removed from the combat-effective
+     * projectile pool at the protection boundary, no uncalibrated spall/internal damage is invented,
+     * and the bounded heavy-impact coefficients are not evaluated.</p>
+     *
+     * @param projectile authoritative projectile body
+     * @param protectionStackId protection stack content ID
+     * @param incidenceAngleRad signed angle from the base layer normal; zero is normal impact
+     * @return deterministic bounded combat material response
+     * @throws OutsideCalibrationDomainException for unsupported projectile mass or above-maximum velocity
+     */
+    public ImpactResult resolveForCombat(
+            ProjectileBody projectile,
+            String protectionStackId,
+            double incidenceAngleRad) {
+        return resolveInternal(projectile, protectionStackId, incidenceAngleRad, true);
+    }
+
+    private ImpactResult resolveInternal(
+            ProjectileBody projectile,
+            String protectionStackId,
+            double incidenceAngleRad,
+            boolean terminateBelowMinimumVelocity) {
         ProjectileBody checkedProjectile = Objects.requireNonNull(projectile, "projectile");
         if (protectionStackId == null || protectionStackId.isBlank()) {
             throw new IllegalArgumentException("protectionStackId must be non-blank");
@@ -94,7 +137,26 @@ public final class HeavyImpactResolver {
             }
 
             double residualSpeedMps = speedForEnergy(checkedProjectile.massKg(), residualEnergyJ);
-            requireInside(surface, checkedProjectile.massKg(), residualSpeedMps);
+            DomainStatus domainStatus = requireSupportedDomain(
+                    surface,
+                    checkedProjectile.massKg(),
+                    residualSpeedMps,
+                    terminateBelowMinimumVelocity);
+            if (domainStatus == DomainStatus.BELOW_MINIMUM_VELOCITY) {
+                totalAbsorbedJ += residualEnergyJ;
+                residualEnergyJ = 0d;
+                return new ImpactResult(
+                        protectionStackId,
+                        checkedProjectile.kineticEnergyJ(),
+                        totalAbsorbedJ,
+                        0d,
+                        false,
+                        Outcome.SUB_CALIBRATION_STOPPED,
+                        interactions,
+                        new FragmentCloud(totalSpallMassKg, totalSpallEnergyJ, false),
+                        null,
+                        0d);
+            }
 
             double relativeAngle = incidenceAngleRad - layer.orientationRad();
             double angleFromNormal = Math.acos(Math.abs(Math.cos(relativeAngle)));
@@ -175,16 +237,23 @@ public final class HeavyImpactResolver {
                 internalDamageEnergyJ);
     }
 
-    private static void requireInside(
+    private static DomainStatus requireSupportedDomain(
             HeavyImpactResponseSurfaceDefinition surface,
             double massKg,
-            double velocityMps) {
+            double velocityMps,
+            boolean terminateBelowMinimumVelocity) {
         CalibrationDomainDefinition domain = surface.calibrationDomain();
-        if (velocityMps < domain.minImpactVelocityMps() || velocityMps > domain.maxImpactVelocityMps()
-                || massKg < domain.minProjectileMassKg() || massKg > domain.maxProjectileMassKg()) {
-            throw new OutsideCalibrationDomainException(
-                    surface.id(), velocityMps, massKg, domain);
+        if (massKg < domain.minProjectileMassKg() || massKg > domain.maxProjectileMassKg()
+                || velocityMps > domain.maxImpactVelocityMps()) {
+            throw new OutsideCalibrationDomainException(surface.id(), velocityMps, massKg, domain);
         }
+        if (velocityMps < domain.minImpactVelocityMps()) {
+            if (terminateBelowMinimumVelocity) {
+                return DomainStatus.BELOW_MINIMUM_VELOCITY;
+            }
+            throw new OutsideCalibrationDomainException(surface.id(), velocityMps, massKg, domain);
+        }
+        return DomainStatus.INSIDE;
     }
 
     private static double speedForEnergy(double massKg, double energyJ) {
@@ -262,11 +331,11 @@ public final class HeavyImpactResolver {
      *
      * @param protectionStackId ordered protection stack used for the response
      * @param incomingEnergyJ projectile energy entering material protection
-     * @param absorbedEnergyJ energy absorbed by traversed/impacting layers
+     * @param absorbedEnergyJ energy absorbed by traversed/impacting layers or terminal low-energy stop
      * @param residualProjectileEnergyJ energy retained by residual or ricocheted projectile
      * @param penetrated whether the projectile perforated the stack
-     * @param outcome terminal stop/ricochet/perforation outcome
-     * @param layerInteractions ordered layer response diagnostics
+     * @param outcome terminal stop/sub-calibration stop/ricochet/perforation outcome
+     * @param layerInteractions ordered calibrated layer response diagnostics
      * @param fragments aggregate fragment/spall cloud
      * @param residualProjectile post-protection physical body for ricochet/perforation, or {@code null} when stopped
      * @param internalDamageEnergyJ energy routed into internal compartment damage
@@ -287,11 +356,11 @@ public final class HeavyImpactResolver {
          *
          * @param protectionStackId ordered protection stack used for the response
          * @param incomingEnergyJ projectile energy entering material protection
-         * @param absorbedEnergyJ energy absorbed by traversed/impacting layers
+         * @param absorbedEnergyJ energy absorbed by traversed/impacting layers or terminal low-energy stop
          * @param residualProjectileEnergyJ energy retained by residual or ricocheted projectile
          * @param penetrated whether the projectile perforated the stack
-         * @param outcome terminal stop/ricochet/perforation outcome
-         * @param layerInteractions ordered layer response diagnostics
+         * @param outcome terminal stop/sub-calibration stop/ricochet/perforation outcome
+         * @param layerInteractions ordered calibrated layer response diagnostics
          * @param fragments aggregate fragment/spall cloud
          * @param residualProjectile post-protection physical body for ricochet/perforation, or {@code null} when stopped
          * @param internalDamageEnergyJ energy routed into internal compartment damage
@@ -304,10 +373,11 @@ public final class HeavyImpactResolver {
             Objects.requireNonNull(layerInteractions, "layerInteractions");
             layerInteractions = List.copyOf(layerInteractions);
             Objects.requireNonNull(fragments, "fragments");
-            if (outcome == Outcome.STOPPED && residualProjectile != null) {
+            boolean stopped = outcome == Outcome.STOPPED || outcome == Outcome.SUB_CALIBRATION_STOPPED;
+            if (stopped && residualProjectile != null) {
                 throw new IllegalArgumentException("Stopped impact cannot expose a residual projectile");
             }
-            if (outcome != Outcome.STOPPED && residualProjectile == null) {
+            if (!stopped && residualProjectile == null) {
                 throw new IllegalArgumentException("Ricochet/perforation requires a residual projectile");
             }
         }
