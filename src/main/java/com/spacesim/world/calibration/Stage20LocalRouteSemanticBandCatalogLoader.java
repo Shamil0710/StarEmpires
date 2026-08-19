@@ -27,7 +27,11 @@ public final class Stage20LocalRouteSemanticBandCatalogLoader {
         throw new AssertionError("No instances");
     }
 
-    /** Loads the packaged provisional Stage-20 route-band policy. */
+    /**
+     * Loads the packaged provisional Stage-20 route-band policy.
+     *
+     * @return immutable validated local-route semantic-band catalog
+     */
     public static Stage20LocalRouteSemanticBandCatalog loadDefault() {
         ClassLoader classLoader = Stage20LocalRouteSemanticBandCatalogLoader.class.getClassLoader();
         try (InputStream stream = classLoader.getResourceAsStream(DEFAULT_RESOURCE)) {
@@ -48,7 +52,12 @@ public final class Stage20LocalRouteSemanticBandCatalogLoader {
         }
     }
 
-    /** Parses one standalone local-route band document. */
+    /**
+     * Parses one standalone local-route band document.
+     *
+     * @param json non-empty local-route semantic-band JSON document
+     * @return immutable validated local-route semantic-band catalog
+     */
     public static Stage20LocalRouteSemanticBandCatalog parse(String json) {
         Objects.requireNonNull(json, "json");
         if (json.isBlank()) {
