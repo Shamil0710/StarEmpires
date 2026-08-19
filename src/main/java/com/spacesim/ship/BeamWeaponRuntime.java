@@ -9,16 +9,17 @@ import java.util.Objects;
  * Deterministic Stage-17.5E beam geometry and duty solver.
  *
  * <p>A beam does not materialize a fake projectile body. Range enters continuously through
- * diffraction and pointing jitter; the result exposes spot geometry, energy, irradiance, electrical
- * demand and heat for later material/thermal integration. No authoritative hard range or hit chance
- * exists in this runtime.</p>
+ * diffraction and pointing jitter; track covariance enters continuously through the exposure spot.
+ * The result exposes spot geometry, energy, irradiance, electrical demand and heat for later
+ * material/thermal integration. No authoritative hard range, global fire-control sigma wall or hit
+ * chance exists in this runtime.</p>
  */
 public final class BeamWeaponRuntime {
     /** Stable reason why a requested beam dwell cannot be planned. */
     public enum Failure {
         /** Physical beam solution exists. */ NONE,
         /** Track lacks solved Cartesian range/position. */ TRACK_POSITION_UNKNOWN,
-        /** Track has not reached fire-control quality. */ FIRE_CONTROL_INSUFFICIENT,
+        /** Track has not reached solved TRACKED Cartesian quality. */ FIRE_CONTROL_INSUFFICIENT,
         /** Requested dwell exceeds the emitter's authored continuous-duty limit. */ DWELL_LIMIT_EXCEEDED
     }
 
@@ -94,6 +95,11 @@ public final class BeamWeaponRuntime {
     /**
      * Plans one continuous beam dwell against a current Stage-17.5D track.
      *
+     * <p>Any solved TRACKED/FIRE_CONTROL Cartesian track may form a beam solution. Track quality is
+     * not converted to a second global admission threshold: covariance expands the effective spot
+     * continuously and therefore reduces irradiance continuously. Material response and requested
+     * effect determine whether that solution is useful.</p>
+     *
      * @param weapon physical beam definition
      * @param track target track
      * @param emitterXM emitter x position in meters
@@ -115,7 +121,8 @@ public final class BeamWeaponRuntime {
         if (!checkedTrack.positionKnown()) {
             return rejected(checkedTrack.targetId(), Failure.TRACK_POSITION_UNKNOWN);
         }
-        if (checkedTrack.informationState() != InformationState.FIRE_CONTROL) {
+        InformationState informationState = checkedTrack.informationState();
+        if (informationState != InformationState.TRACKED && informationState != InformationState.FIRE_CONTROL) {
             return rejected(checkedTrack.targetId(), Failure.FIRE_CONTROL_INSUFFICIENT);
         }
         if (dwellSeconds > checkedWeapon.maxContinuousDwellSeconds()) {
