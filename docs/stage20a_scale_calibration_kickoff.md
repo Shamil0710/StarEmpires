@@ -75,8 +75,22 @@ The project has separately recorded `docs/ui_ux_debt_and_polish_contract.md`.
 
 Stage 20 may introduce diagnostic maps, calibration tables and minimal interaction required to validate generated worlds, but production UI/UX redesign is deliberately deferred. The implementation priority is authoritative world generation and measurable quality, not polishing temporary validation screens.
 
-## 7. Immediate next implementation slice
+## 7. Stage 20A.1 — representative local propulsion envelope
 
-The next code PR should introduce the first versioned Stage-20A calibration data model and deterministic calculator/test harness, initially covering the representative profiles that can be derived directly from existing production content.
+The first implementation slice introduces:
 
-Acceptance for that PR should prove that identical content + profile version produces identical calibration output and that changing physical ship capability changes the derived spatial/travel bands rather than being hidden by fixed map constants.
+- `Stage20ScaleCalibrationProfile`, a versioned and deterministically ordered machine-readable calibration profile;
+- `Stage20ScaleCalibrationCalculator`, which consumes `DerivedShipState` rather than duplicating mass, thrust, mass-flow or rocket-equation calculations;
+- the current production escort-destroyer fit with its accepted full reaction-mass load as the first directly authored representative profile;
+- a mass-varying equal-delta-v rest-to-rest calibration manoeuvre exposing reaction-mass fraction, burn cadence, peak speed, acceleration distance, braking distance and characteristic no-coast transfer distance;
+- deterministic and physical-sensitivity tests proving that changed reaction-mass capability changes the resulting spatial envelope.
+
+The characteristic rest-to-rest measurement is a calibration scale, not a maximum reachable distance. Longer transfers may add coast time; later Stage-20A slices will turn propulsion measurements plus authored pacing targets into route-distance bands.
+
+## 8. Immediate next implementation slice
+
+Stage 20A.2 should expand the representative set without pretending provisional calibration hulls are production content. Existing accepted engineering reference ranges may be promoted into explicitly provisional Stage-20 calibration inputs where no authored hull exists yet.
+
+That slice should then derive deterministic local route-time / braking / delta-v bands across the representative set. Sensor/combat reach, FTL cadence and spatial precision/LOD remain subsequent Stage-20A layers.
+
+Acceptance continues to require that identical content + profile version produces identical calibration output and that changing physical ship capability changes the derived spatial/travel bands rather than being hidden by fixed map constants.
