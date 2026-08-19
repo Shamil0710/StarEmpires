@@ -130,7 +130,29 @@ public record Stage20ScaleCalibrationProfile(
             double accelerationDistanceM,
             double brakingDistanceM,
             double characteristicRestToRestDistanceM) {
-        /** Creates one validated immutable representative measurement. */
+        /**
+         * Creates one validated immutable representative measurement.
+         *
+         * @param sourceFitId production engineering fit ID
+         * @param loadCaseId versioned calibration load case
+         * @param wetMassKg departure mass including reaction mass
+         * @param dryMassAfterReactionKg mass after exhausting the represented reaction mass
+         * @param reactionMassKg represented reaction-mass load
+         * @param reactionMassFraction reaction mass divided by wet mass
+         * @param thrustN authoritative available thrust
+         * @param massFlowKgPerS authoritative propulsion mass flow
+         * @param initialAccelerationMps2 authoritative departure acceleration
+         * @param terminalAccelerationMps2 acceleration at the end of the represented reaction-mass burn
+         * @param effectiveExhaustVelocityMps authoritative effective exhaust velocity
+         * @param deltaVMps authoritative idealized available delta-v
+         * @param fullBurnDurationS duration required to consume the represented reaction mass
+         * @param symmetricPeakSpeedMps peak speed of the full-burn equal-delta-v rest-to-rest manoeuvre
+         * @param accelerationBurnDurationS duration of the acceleration leg
+         * @param brakingBurnDurationS duration of the braking leg
+         * @param accelerationDistanceM distance covered by the acceleration leg
+         * @param brakingDistanceM distance covered by the braking leg
+         * @param characteristicRestToRestDistanceM total distance covered by both full-burn legs without coast
+         */
         public RepresentativeShipPropulsionEnvelope {
             requireNonBlank(sourceFitId, "sourceFitId");
             requireNonBlank(loadCaseId, "loadCaseId");
