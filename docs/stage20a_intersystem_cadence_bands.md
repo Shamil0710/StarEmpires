@@ -1,6 +1,6 @@
 # Stage 20A Closure — Inter-system Cadence Bands
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — implementation head passed exact-head Java-17 CI; final status-only merge gate pending  
 **Parent:** Stage 20A FTL / route cadence calibration  
 **Date:** 2026-08-19
 
@@ -123,7 +123,7 @@ These are reference-drive calibration consequences, not promises about final gal
 
 ## Readiness impact
 
-If accepted, exactly one requirement changes:
+Exactly one requirement changes:
 
 ```text
 INTERSYSTEM_CADENCE_CALIBRATION_BANDS
@@ -141,7 +141,7 @@ Expected blocker count:
 
 ## Regression requirements
 
-Tests must prove:
+Tests prove:
 
 - all compatible representatives have deterministic 1/3/5-hop samples;
 - four named bands exist;
@@ -149,5 +149,9 @@ Tests must prove:
 - more massive compatible representatives retain longer spool/cadence where the same reference drive applies;
 - all current overmass representatives remain explicitly excluded;
 - reinforcement includes only the current compatible military response set;
-- changing accepted one-edge spool/transit/cooldown inputs changes multi-hop consequences rather than being masked by fixed route seconds;
+- mass-sensitive one-edge inputs propagate into multi-hop consequences rather than being masked by fixed route seconds;
 - readiness removes exactly one blocker.
+
+## Acceptance evidence
+
+Implementation head `31e3c1eefc0057335ec1e473bb6b09ee2bc0a910` passed the complete Java-17 CI gate, including tests, coverage, Javadoc and packaging. The readiness acceptance test requires exactly eleven remaining Stage-20B blockers while `FTL_EDGE_TRANSIT_DISTRIBUTION` remains later-Stage20-owned.
