@@ -54,7 +54,14 @@ public record Stage20PdSafeInterceptReferenceCatalog(
             double standOffM,
             double shipHitFraction,
             double intersectingEnergyJ) {
-        /** Validates one copied benchmark row. */
+        /**
+         * Validates one copied benchmark row.
+         *
+         * @param lateralSigmaMps lateral fragment/debris dispersion sigma
+         * @param standOffM intercept stand-off from protected target geometry
+         * @param shipHitFraction projected target intersection fraction
+         * @param intersectingEnergyJ projected kinetic energy intersecting the reference target
+         */
         public DebrisRiskSample {
             requirePositiveFinite(lateralSigmaMps, "lateralSigmaMps");
             requirePositiveFinite(standOffM, "standOffM");
@@ -66,7 +73,22 @@ public record Stage20PdSafeInterceptReferenceCatalog(
         }
     }
 
-    /** Creates one immutable deterministic evidence catalog. */
+    /**
+     * Creates one immutable deterministic evidence catalog.
+     *
+     * @param schemaVersion packaged evidence schema version
+     * @param version stable Stage-20 calibration version
+     * @param status calibration authority
+     * @param stage22ReviewRequired whether playable/content review remains required
+     * @param sourceBenchmark exact benchmark path
+     * @param sourceBenchmarkStatus source benchmark authority/status label
+     * @param sourceThreat source benchmark threat ID
+     * @param sourceThreatKineticEnergyJ source intact-threat kinetic energy
+     * @param projectedTarget projected benchmark target ID
+     * @param policyEvidence exact provenance of the provisional risk policy
+     * @param maxProjectedHitFraction maximum accepted projected hit fraction
+     * @param samples immutable benchmark sensitivity rows
+     */
     public Stage20PdSafeInterceptReferenceCatalog {
         if (schemaVersion <= 0) {
             throw new IllegalArgumentException("schemaVersion must be positive");
