@@ -119,7 +119,7 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
                 .contains("numeric_activation_bands_closed=false"));
         assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
-                .contains("lossless_materialization_lifecycle_closed=false"));
+                .contains("lossless_materialization_lifecycle_closed=true"));
     }
 
     private static void assertStatus(
