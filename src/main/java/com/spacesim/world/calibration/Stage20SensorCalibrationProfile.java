@@ -270,7 +270,7 @@ public record Stage20SensorCalibrationProfile(
                 definition.fireControlSnr(),
                 definition.bearingSigmaFloorRad(),
                 definition.rangeSigmaFraction(),
-                definition.eccmProcessingGain(),
+                definition.eccmProcessingGainLinear(),
                 definition.eccmPowerDemandW(),
                 definition.eccmWasteHeatW(),
                 thresholds);
