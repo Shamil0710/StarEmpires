@@ -28,7 +28,6 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(
                 Set.of(
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
-                        RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
                         RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
                         RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
                         RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
@@ -37,7 +36,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(7, first.blockingRequirements().size());
+        assertEquals(6, first.blockingRequirements().size());
     }
 
     @Test
@@ -73,6 +72,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.FORMATION_SPATIAL_EVIDENCE,
                 RequirementId.FORMATION_SPACING_BAND_CLOSURE,
                 RequirementId.STATION_PHYSICAL_GEOMETRY,
+                RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY,
                 RequirementId.FAR_COORDINATE_PRECISION);
         assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
@@ -127,6 +127,22 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(formation.evidence().contains("DISPERSED_ACCEPTANCE"));
         assertTrue(formation.evidence().contains("source_samples=3"));
         assertTrue(formation.evidence().contains("stage22_review_required=true"));
+    }
+
+    @Test
+    void stationDefensiveSensorGeometryIsClosedByAcceptedReferenceTiers() {
+        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
+        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult stationDefense = byId.get(RequirementId.STATION_DEFENSIVE_SENSOR_GEOMETRY);
+
+        assertEquals(RequirementStatus.SATISFIED, stationDefense.status());
+        assertTrue(stationDefense.evidence().contains(Stage20StationDefensiveSensorGeometryProfile.CURRENT_VERSION));
+        assertTrue(stationDefense.evidence().contains("station_rows=8"));
+        assertTrue(stationDefense.evidence().contains("BASIC_SECURITY"));
+        assertTrue(stationDefense.evidence().contains("HARDENED_SECURITY"));
+        assertTrue(stationDefense.evidence().contains("NAVAL_FORTIFIED"));
+        assertTrue(stationDefense.evidence().contains("stage22_review_required=true"));
     }
 
     @Test
