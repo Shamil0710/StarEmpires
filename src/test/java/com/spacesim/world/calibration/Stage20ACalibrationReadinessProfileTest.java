@@ -28,12 +28,11 @@ class Stage20ACalibrationReadinessProfileTest {
         assertEquals(
                 Set.of(
                         RequirementId.PD_SAFE_INTERCEPT_GEOMETRY,
-                        RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
                         RequirementId.MATERIALIZATION_LOD_CLOSURE),
                 first.blockingRequirements().stream()
                         .map(RequirementResult::id)
                         .collect(Collectors.toSet()));
-        assertEquals(3, first.blockingRequirements().size());
+        assertEquals(2, first.blockingRequirements().size());
     }
 
     @Test
@@ -73,6 +72,7 @@ class Stage20ACalibrationReadinessProfileTest {
                 RequirementId.STATION_JUMP_ARRIVAL_STANDOFF,
                 RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS,
                 RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
+                RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
                 RequirementId.FAR_COORDINATE_PRECISION);
         assertStatus(byId, RequirementStatus.DEFERRED_STAGE22_CONTENT,
                 RequirementId.PRODUCTION_FTL_MODULE_PROMOTION,
@@ -195,6 +195,24 @@ class Stage20ACalibrationReadinessProfileTest {
     }
 
     @Test
+    void majorInfrastructureExtentsAreClosedWithoutCreatingSystemBoundaries() {
+        Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
+        Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
+                .collect(Collectors.toMap(RequirementResult::id, Function.identity()));
+        RequirementResult extents = byId.get(RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS);
+
+        assertEquals(RequirementStatus.SATISFIED, extents.status());
+        assertTrue(extents.evidence().contains(Stage20MajorInfrastructureExtentCalibrationProfile.CURRENT_VERSION));
+        assertTrue(extents.evidence().contains("CORE_STATION_CLUSTER"));
+        assertTrue(extents.evidence().contains("INDUSTRIAL_RESOURCE_NETWORK"));
+        assertTrue(extents.evidence().contains("MAJOR_HUB_REACH"));
+        assertTrue(extents.evidence().contains("max_extent_m=1.0E9"));
+        assertTrue(extents.evidence().contains("hard_boundary=false"));
+        assertTrue(extents.evidence().contains("clamp_allowed=false"));
+        assertTrue(extents.evidence().contains("stage22_review_required=true"));
+    }
+
+    @Test
     void currentPhysicalAndCalibrationGapsCannotBeHiddenByFallbackConstants() {
         Stage20ACalibrationReadinessProfile profile = Stage20ACalibrationReadinessCalculator.deriveCurrent();
         Map<RequirementId, RequirementResult> byId = profile.requirements().stream()
@@ -230,7 +248,7 @@ class Stage20ACalibrationReadinessProfileTest {
         assertTrue(byId.get(RequirementId.LOCAL_ROUTE_SEMANTIC_BANDS).evidence()
                 .contains("samples=144"));
         assertTrue(byId.get(RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS).evidence()
-                .contains("station_geometry_is_closed"));
+                .contains("hard_boundary=false"));
         assertTrue(byId.get(RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS).evidence()
                 .contains("maxLinearCorridorLength"));
         assertTrue(byId.get(RequirementId.MATERIALIZATION_LOD_CLOSURE).evidence()
