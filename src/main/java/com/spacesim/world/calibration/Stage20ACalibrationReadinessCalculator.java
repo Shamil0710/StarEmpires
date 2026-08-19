@@ -67,6 +67,8 @@ public final class Stage20ACalibrationReadinessCalculator {
                 Stage20JumpArrivalSpatialCalibrationCalculator.calibrate();
         Stage20LocalRouteSemanticCalibrationProfile localRoutes =
                 Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent();
+        Stage20TopologyQualityCalibrationProfile topologyQuality =
+                Stage20TopologyQualityCalibrationProfile.deriveCurrent();
         Stage20FarCoordinatePrecisionCalibrationProfile precision =
                 Stage20FarCoordinatePrecisionCalibrationCalculator.calibrate();
         Stage20MaterializationLodCalibrationProfile materialization =
@@ -283,10 +285,24 @@ public final class Stage20ACalibrationReadinessCalculator {
                         + ";max_station_standoff_m=" + localRoutes.maxClosedStationStandOffM()
                         + ";stage22_review_required=" + localRoutes.stage22ReviewRequired()));
 
-        requirements.add(new RequirementResult(
+        boolean topologyQualityClosed = topologyQuality.closesStage20BEntryCoverage();
+        requirements.add(result(
                 RequirementId.TOPOLOGY_QUALITY_CALIBRATION_BANDS,
-                RequirementStatus.BLOCKING_STAGE20B_ENTRY,
-                "required_maxLinearCorridorLength_maxDegreeOneFraction_cycle_redundancy_gateway_sector_exit_hub_and_hop_bands_are_not_yet_machine_readable"));
+                topologyQualityClosed,
+                "profile=" + topologyQuality.version()
+                        + ";maxLinearCorridorLength="
+                        + topologyQuality.structuralBudget().maxLinearCorridorLengthEdges()
+                        + ";maxDegreeOneFraction=" + topologyQuality.structuralBudget().maxDegreeOneFraction()
+                        + ";minRegionalCycleCoverage=" + topologyQuality.structuralBudget().minRegionalCycleCoverage()
+                        + ";minCoreRouteRedundancy=" + topologyQuality.structuralBudget().minCoreEdgeDisjointRoutes()
+                        + ";maxSingleGatewayDependency=" + topologyQuality.structuralBudget().maxSingleGatewayDependency()
+                        + ";sectorExitBand=" + topologyQuality.sectorExitBand().minInclusive()
+                        + "-" + topologyQuality.sectorExitBand().maxInclusive()
+                        + ";hubDegreeBand=" + topologyQuality.hubDegreeBand().minInclusive()
+                        + "-" + topologyQuality.hubDegreeBand().maxInclusive()
+                        + ";regionalHopDistanceBand=" + topologyQuality.regionalHopDistanceBand().minInclusive()
+                        + "-" + topologyQuality.regionalHopDistanceBand().maxInclusive()
+                        + ";stage22_review_required=" + topologyQuality.stage22ReviewRequired()));
 
         requirements.add(new RequirementResult(
                 RequirementId.MAJOR_INFRASTRUCTURE_EXTENT_BANDS,
