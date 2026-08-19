@@ -100,6 +100,7 @@ public final class Stage20FarCoordinatePrecisionCalibrationCalculator {
     /**
      * Measures camera-relative pairwise error before and after changing only the presentation origin.
      *
+     * @param probeId stable precision-probe identifier
      * @param source first authoritative physical coordinate
      * @param deltaXM physical X separation to the second coordinate in meters
      * @param deltaYM physical Y separation to the second coordinate in meters
