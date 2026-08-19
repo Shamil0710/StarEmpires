@@ -1,6 +1,6 @@
 # Stage 20A Closure — Persistent Physical Materialization State
 
-**Status:** IMPLEMENTED — acceptance pending exact-head CI / merge gate  
+**Status:** ACCEPTED — exact-head implementation CI green; final merge gate pending  
 **Parent:** Stage 20A Closure / Readiness Remediation  
 **Workstream:** 1.2 — Persistent physical save/load integration  
 **Date:** 2026-08-19
@@ -209,7 +209,9 @@ This slice closes persistent causal continuity, not scheduler relevance policy.
 
 ## 10. Regression acceptance
 
-Tests require:
+Exact-head Java-17 implementation CI completed successfully before this status finalization.
+
+The accepted tests prove:
 
 - a dematerialized entity is still present in the captured full GameState entity set;
 - huge hierarchical position and double velocity survive binary encode/decode exactly;
@@ -223,7 +225,7 @@ Tests require:
 
 ## 11. Immediate next slice
 
-After exact-head CI and merge acceptance, continue Workstream 1 with **1.3 — production relevance scheduler and physically closed activation bands**.
+After final exact-head CI and merge acceptance, continue Workstream 1 with **1.3 — production relevance scheduler and physically closed activation bands**.
 
 The scheduler must decide when to promote/demote representation using authoritative relevance and explicit physical interaction envelopes. Its accepted bounded wake-latency semantics will feed A.9:
 
