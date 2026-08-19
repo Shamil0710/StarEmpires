@@ -11,8 +11,8 @@ import java.util.Objects;
  * Converts authoritative or explicitly provisional ship capability into Stage-20 spatial measurements.
  *
  * <p>Production mass, thrust, mass flow and rocket-equation delta-v remain owned by the Stage-17.5
- * engineering pipeline and arrive through {@link DerivedShipState}. Accepted design-baseline
- * references are handled by a separate entry point and retain provisional provenance in the result.
+ * engineering pipeline and arrive through {@link DerivedShipState}. Explicitly accepted provisional
+ * references are handled by a separate entry point and retain per-reference provenance in the result.
  * The equations owned here describe only the variable-mass calibration manoeuvre.</p>
  */
 public final class Stage20ScaleCalibrationCalculator {
@@ -60,8 +60,8 @@ public final class Stage20ScaleCalibrationCalculator {
      * Derives a calibration envelope from one accepted but explicitly provisional reference design.
      *
      * <p>The loader has already closed the reference's mass, acceleration and delta-v against the
-     * accepted v1.0 baseline. This method consumes those accepted outputs and only derives Stage-20
-     * manoeuvre geometry from them.</p>
+     * shared Stage-20 physical equations. This method consumes those accepted outputs, preserves the
+     * reference's exact provenance and only derives Stage-20 manoeuvre geometry from them.</p>
      *
      * @param catalog owning versioned reference catalog
      * @param reference accepted reference definition contained by {@code catalog}
@@ -83,7 +83,7 @@ public final class Stage20ScaleCalibrationCalculator {
         return derivePhysical(
                 checked.representativeClass(),
                 checkedCatalog.status(),
-                checkedCatalog.sourceBaselineId() + ":" + checked.id(),
+                checked.sourceEvidenceId() + ":" + checked.id(),
                 "load." + checked.id() + ".full_reaction_mass",
                 checked.departureMassKg(),
                 checked.reactionMassKg(),
