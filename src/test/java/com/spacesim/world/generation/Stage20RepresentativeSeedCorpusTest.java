@@ -13,6 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20RepresentativeSeedCorpusTest {
     private static final Path EVIDENCE_DIRECTORY = Path.of("target", "stage20e-evidence");
+    private static final Path MEASURED_BASELINE = Path.of(
+            "docs", "benchmarks", "stage20e-representative-seed-corpus-v1.json");
+    private static final String EVIDENCE_LOG_BEGIN = "STAGE20E_REPRESENTATIVE_CORPUS_EVIDENCE_BEGIN";
+    private static final String EVIDENCE_LOG_END = "STAGE20E_REPRESENTATIVE_CORPUS_EVIDENCE_END";
 
     @Test
     void corpusIsFixedContiguousAndChosenIndependentlyOfResults() {
@@ -23,7 +27,7 @@ class Stage20RepresentativeSeedCorpusTest {
     }
 
     @Test
-    void currentCorpusProducesMachineReadableMeasuredEvidenceWithoutPassQuota() throws IOException {
+    void currentCorpusMatchesTheFrozenMeasuredRejectionBaseline() throws IOException {
         var evidence = Stage20RepresentativeSeedCorpus.evaluateCurrent();
         var report = evidence.batch();
 
@@ -46,15 +50,19 @@ class Stage20RepresentativeSeedCorpusTest {
         assertTrue(evidence.stage22ReviewRequired());
 
         String json = Stage20RepresentativeSeedCorpus.toJson(evidence);
-        assertTrue(json.contains("\"corpusVersion\": \"stage20e.representative-seed-corpus.v1\""));
-        assertTrue(json.contains("\"rootSeed\": 1"));
-        assertTrue(json.contains("\"rootSeed\": 16"));
-        assertTrue(json.contains("\"failureReasonCounts\""));
-        assertTrue(json.contains("\"seedResults\""));
+        String frozenBaseline = Files.readString(MEASURED_BASELINE, StandardCharsets.UTF_8);
+        assertEquals(frozenBaseline, json,
+                "v1 generation changed; preserve the measured baseline and version new evidence explicitly");
 
         Files.createDirectories(EVIDENCE_DIRECTORY);
         Path evidenceFile = EVIDENCE_DIRECTORY.resolve(Stage20RepresentativeSeedCorpus.EVIDENCE_FILE_NAME);
         Files.writeString(evidenceFile, json, StandardCharsets.UTF_8);
         assertEquals(json, Files.readString(evidenceFile, StandardCharsets.UTF_8));
+
+        // Keep the same deterministic evidence observable even when a connector cannot enumerate
+        // main-only workflow artifacts. Markers make exact extraction from repository CI logs safe.
+        System.out.println(EVIDENCE_LOG_BEGIN);
+        System.out.print(json);
+        System.out.println(EVIDENCE_LOG_END);
     }
 }

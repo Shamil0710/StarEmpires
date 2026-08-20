@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "corpusVersion": "stage20e.representative-seed-corpus.v1",
+  "representativeProfileVersion": "stage20e.representative-production-probe-profile.v1",
+  "productionProbeVersion": "stage20e.production-seed-probe.v1",
+  "batchVersion": "stage20e.generated-world-batch-observability.v1",
+  "seedAcceptanceVersion": "stage20e.generated-world-seed-acceptance.v1",
+  "bootstrapRequirementVersion": "stage20e.bootstrap-requirements.v1",
+  "factionStartProfileVersion": "stage20e.faction-start-acceptance.v1",
+  "stage22ReviewRequired": true,
+  "requestedSeeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+  "acceptedSeedCount": 0,
+  "rejectedSeedCount": 16,
+  "unresolvedAuthoritySeedCount": 0,
+  "acceptedFraction": 0.0,
+  "rejectedFraction": 1.0,
+  "unresolvedAuthorityFraction": 0.0,
+  "failureReasonCounts": {
+    "ECONOMIC_THROUGHPUT_REJECTED": 32,
+    "FACTION_START_PLACEMENT_REJECTED": 16
+  },
+  "seedResults": [
+    {
+      "rootSeed": 1,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=26.576425076824755 kg/s, required=50.0 kg/s"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 2,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=14.394907259369607 kg/s, required=25.0 kg/s"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=13.402415445588325 kg/s, required=50.0 kg/s"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 3,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=14.39887474304618 kg/s, required=25.0 kg/s"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=19.243159511315934 kg/s, required=50.0 kg/s"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 4,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 2,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=9.863465240220563 kg/s, required=50.0 kg/s"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 5,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 2,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=6.249651980782594 kg/s, required=50.0 kg/s"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 6,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 2,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 7,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 0,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=5.597562730708871 kg/s, required=25.0 kg/s"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 8,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 2,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 9,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 0,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 10,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=3.1332193699072657 kg/s, required=50.0 kg/s"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 11,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 2,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 12,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 13,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=3.493937102485662 kg/s, required=25.0 kg/s"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 14,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=33.272377066980646 kg/s, required=50.0 kg/s"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 15,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=7.314049011502286 kg/s, required=25.0 kg/s"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "INSUFFICIENT_THROUGHPUT: Best physically deliverable throughput=9.444503855805273 kg/s, required=50.0 kg/s"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    },
+    {
+      "rootSeed": 16,
+      "status": "REJECTED_SEED",
+      "topologyStatus": "ACCEPTED",
+      "topologyRepairPasses": 1,
+      "economicAcceptancePresent": true,
+      "placementStatus": "REJECTED_SEED",
+      "failures": [
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.metallic_ore",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "ECONOMIC_THROUGHPUT_REJECTED",
+          "subject": "StarSystemId[value=1]:commodity.feedstock.water_ice",
+          "detail": "NO_FEASIBLE_ROUTE: Resolved producers exist but no explicit neighbor path satisfies the route-time boundary"
+        },
+        {
+          "reason": "FACTION_START_PLACEMENT_REJECTED",
+          "subject": "faction-start-placement",
+          "detail": "INSUFFICIENT_ACCEPTED_CANDIDATES"
+        }
+      ]
+    }
+  ]
+}
