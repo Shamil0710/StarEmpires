@@ -95,10 +95,12 @@ class Stage20MacroGalaxyGeometryGeneratorTest {
         }
 
         assertTrue(accepted != null, "representative macro generator should yield an accepted topology in bounded corpus");
-        assertTrue(accepted.qualityReport().accepted());
-        assertEquals(Stage20MacroGalaxyGeometryGenerator.COORDINATE_SEMANTICS, acceptedGeometry.coordinateSemantics());
-        accepted.candidateTopology().connections().forEach(edge ->
-                assertTrue(accepted.candidateTopology().neighbors(edge.first()).contains(edge.second())));
+        Stage20JumpTopologyGenerationResult resolved = accepted;
+        MacroGeometryResult resolvedGeometry = acceptedGeometry;
+        assertTrue(resolved.qualityReport().accepted());
+        assertEquals(Stage20MacroGalaxyGeometryGenerator.COORDINATE_SEMANTICS, resolvedGeometry.coordinateSemantics());
+        resolved.candidateTopology().connections().forEach(edge ->
+                assertTrue(resolved.candidateTopology().neighbors(edge.first()).contains(edge.second())));
     }
 
     @Test
