@@ -84,7 +84,13 @@ public record Stage20JumpEdgeState(
             double fittedTransitMultiplier,
             String ftlProfileVersion,
             String semantics) {
-        /** Validates explicit transit parameters. */
+        /**
+         * Validates explicit transit parameters.
+         *
+         * @param fittedTransitMultiplier multiplier applied to live fitted edge-transit time
+         * @param ftlProfileVersion source FTL calibration profile
+         * @param semantics stable textual law identifier
+         */
         public TransitParameters {
             if (!Double.isFinite(fittedTransitMultiplier) || fittedTransitMultiplier <= 0d) {
                 throw new IllegalArgumentException("fittedTransitMultiplier must be positive and finite");
@@ -111,7 +117,16 @@ public record Stage20JumpEdgeState(
             double arrivalVelocityMps,
             String localInfrastructureVersion,
             String jumpArrivalCalibrationVersion) {
-        /** Validates one directional physical endpoint. */
+        /**
+         * Validates one directional physical endpoint.
+         *
+         * @param systemId destination system represented by this endpoint
+         * @param anchorId stable Stage-20C jump-arrival anchor ID
+         * @param position authoritative hierarchical SI position
+         * @param arrivalVelocityMps calibrated post-materialization speed
+         * @param localInfrastructureVersion source Stage-20C layout version
+         * @param jumpArrivalCalibrationVersion source Stage-20A arrival calibration version
+         */
         public ArrivalEndpoint {
             Objects.requireNonNull(systemId, "systemId");
             requireText(anchorId, "anchorId");
@@ -137,7 +152,14 @@ public record Stage20JumpEdgeState(
             List<String> hazardTags,
             List<String> securityTags,
             Optional<String> provenance) {
-        /** Validates one evidence bundle without inventing values for unassessed edges. */
+        /**
+         * Validates one evidence bundle without inventing values for unassessed edges.
+         *
+         * @param observationState whether evidence exists
+         * @param hazardTags deterministic physical hazard tags
+         * @param securityTags deterministic physically observed security tags
+         * @param provenance observation provenance; absent while unassessed
+         */
         public HazardSecurityMetadata {
             Objects.requireNonNull(observationState, "observationState");
             hazardTags = canonicalTags(hazardTags, "hazardTags");
@@ -162,7 +184,21 @@ public record Stage20JumpEdgeState(
         }
     }
 
-    /** Validates one complete edge-metadata state. */
+    /**
+     * Validates one complete edge-metadata state.
+     *
+     * @param version stable metadata schema version
+     * @param edgeId stable ordinary-edge identity derived from canonical endpoint IDs
+     * @param connection existing canonical topology connection
+     * @param operationalAccessState world-global physical edge state
+     * @param discoveryPolicy physical discoverability class, not observer knowledge
+     * @param transitParameters physical transit-law parameters applied to a fitted jump plan
+     * @param firstEndpoint directional arrival geometry for the first endpoint
+     * @param secondEndpoint directional arrival geometry for the second endpoint
+     * @param hazardSecurityMetadata physically observed hazard/security evidence or unassessed state
+     * @param topologyQualityProfileVersion consumed topology-quality calibration version
+     * @param intersystemCadenceProfileVersion consumed cadence calibration version
+     */
     public Stage20JumpEdgeState {
         requireText(version, "version");
         requireText(edgeId, "edgeId");
