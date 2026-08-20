@@ -18,7 +18,6 @@ import java.util.OptionalDouble;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -250,7 +249,7 @@ class Stage20FactionStartDependencyDiagnosticsTest {
                 A,
                 "anchor-a",
                 "host",
-                new LocalPhysicalPosition(0d, 0d),
+                LocalPhysicalPosition.origin(),
                 "occurrence.water",
                 com.spacesim.content.Stage18ExtractionCatalog.ExtractionEnvironment.FREE_BODY,
                 WATER,
