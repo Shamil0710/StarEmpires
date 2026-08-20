@@ -60,7 +60,19 @@ public final class Stage20EconomicThroughputAcceptance {
             double requiredKgPerSecond,
             double headroomKgPerSecond,
             RouteAssessment route) {
-        /** Validates one immutable evidence row. */
+        /**
+         * Validates one immutable evidence row.
+         *
+         * @param startSystemId evaluated start/consumer system
+         * @param commodityId required commodity
+         * @param producerSystemId selected supplier system
+         * @param producerCapacityKgPerSecond non-reserved producer upper bound
+         * @param routeCapacityKgPerSecond physical freight-route throughput
+         * @param deliveredCapacityKgPerSecond minimum of producer and route capacity
+         * @param requiredKgPerSecond injected requirement
+         * @param headroomKgPerSecond delivered minus required
+         * @param route physical selected route assessment
+         */
         public RequirementEvidence {
             Objects.requireNonNull(startSystemId, "startSystemId");
             commodityId = requireText(commodityId, "commodityId");
@@ -89,7 +101,14 @@ public final class Stage20EconomicThroughputAcceptance {
             String commodityId,
             FailureReason reason,
             String detail) {
-        /** Validates one immutable failure row. */
+        /**
+         * Validates one immutable failure row.
+         *
+         * @param startSystemId evaluated start/consumer system
+         * @param commodityId required commodity
+         * @param reason stable rejection reason
+         * @param detail deterministic diagnostic detail
+         */
         public RequirementFailure {
             Objects.requireNonNull(startSystemId, "startSystemId");
             commodityId = requireText(commodityId, "commodityId");
@@ -113,7 +132,15 @@ public final class Stage20EconomicThroughputAcceptance {
             String supplyProfileVersion,
             List<RequirementEvidence> evidence,
             List<RequirementFailure> failures) {
-        /** Validates and freezes one deterministic acceptance report. */
+        /**
+         * Validates and freezes one deterministic acceptance report.
+         *
+         * @param accepted true only when no requirement failed
+         * @param requirementProfileVersion exact requirement profile version
+         * @param supplyProfileVersion exact theoretical supply profile version
+         * @param evidence accepted requirement evidence
+         * @param failures rejection diagnostics
+         */
         public AcceptanceReport {
             requirementProfileVersion = requireText(requirementProfileVersion, "requirementProfileVersion");
             supplyProfileVersion = requireText(supplyProfileVersion, "supplyProfileVersion");
