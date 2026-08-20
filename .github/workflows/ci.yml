@@ -30,7 +30,8 @@ jobs:
 
       # Artifact publication is deliberately restricted to main. Pull requests still execute the
       # exact same mandatory Maven verification gate, but routine branch/PR runs no longer retain a
-      # large shaded JAR, JaCoCo report and Javadocs on every commit.
+      # large shaded JAR, JaCoCo report and Javadocs on every commit. Stage-20 representative seed
+      # evidence is emitted by the test suite and retained only from the authoritative main run.
       - name: Upload desktop application and reports
         if: success() && github.ref == 'refs/heads/main'
         continue-on-error: true
@@ -41,6 +42,7 @@ jobs:
             target/star-empires-*-all.jar
             target/site/jacoco/
             target/site/apidocs/
+            target/stage20e-evidence/
           if-no-files-found: error
           retention-days: 7
 
