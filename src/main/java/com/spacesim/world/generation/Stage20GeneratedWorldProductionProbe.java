@@ -29,6 +29,7 @@ import com.spacesim.world.Stage20FactionStartPlacementGenerator.PlacementResult;
 import com.spacesim.world.Stage20GeneratedWorldSeedAcceptance;
 import com.spacesim.world.Stage20LocalInfrastructureLayout;
 import com.spacesim.world.Stage20LocalInfrastructureLayout.CalibratedConnection;
+import com.spacesim.world.Stage20LocalInfrastructureLayout.PlacementKind;
 import com.spacesim.world.Stage20LocalInfrastructureLayoutGenerator;
 import com.spacesim.world.Stage20LocalInfrastructureLayoutGenerator.PlacementRequest;
 import com.spacesim.world.Stage20PhysicalFreightRouteEvaluator;
@@ -51,7 +52,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -62,21 +62,18 @@ import java.util.TreeMap;
  * Production-style Stage-20B/D/E generated-world probe assembled from the real generation layers.
  *
  * <p>The probe exists to measure one exact root seed without replacing any authoritative subsystem
- * with a convenient fixture world. It creates macro region/system placement, ordinary topology,
- * per-system SI geometry/layouts, generated physical resource hosts, correlated finite resources,
- * extraction logistics/capacity, station process capacity, physical freight throughput, start
- * dependency diagnostics, candidate evaluation, bounded faction placement and finally the existing
- * whole-seed acceptance result.</p>
+ * with a fixture world. It creates macro region/system placement, ordinary topology, per-system SI
+ * geometry/layouts, generated physical resource hosts, correlated finite resources, extraction
+ * logistics/capacity, station process capacity, physical freight throughput, start dependency
+ * diagnostics, candidate evaluation, bounded faction placement and the existing whole-seed result.</p>
  *
  * <p>Numeric economic demand and fitted ship/jump authority are explicit inputs. This class does not
  * invent consumption, prices, stock, ownership, FTL capability or cargo capacity merely to make a
- * seed pass. Delivered monetary cost, buffer stock and resource ownership remain unresolved unless
- * a later authority layer supplies them; the current start profile decides whether that unresolved
- * state is diagnostic or blocking.</p>
+ * seed pass. Delivered monetary cost, buffer stock and resource ownership stay unresolved unless a
+ * later authority supplies them; the start profile decides whether that is diagnostic or blocking.</p>
  *
- * <p>The initial-infrastructure profile is sampled before any resource occurrence is generated.
- * Therefore later resource/start failures cannot ask this layer to add a better station, deposit or
- * topology edge. The profile is an evidence authoring input, not a seed-repair mechanism.</p>
+ * <p>Initial infrastructure is selected before any resource occurrence is generated. Therefore later
+ * resource/start failures cannot ask this layer to add a better station, deposit or topology edge.</p>
  */
 public final class Stage20GeneratedWorldProductionProbe {
     /** Current immutable production-probe implementation version. */
@@ -136,8 +133,8 @@ public final class Stage20GeneratedWorldProductionProbe {
      * Economic/start acceptance authority supplied to the probe rather than guessed by it.
      *
      * <p>Every dependency requirement must match exactly one bootstrap commodity requirement in
-     * commodity identity, sustained kg/s and maximum supplier-route time. The family label is the
-     * only additional diagnostics grouping metadata.</p>
+     * commodity identity, sustained kg/s and maximum supplier-route time. The family label is only
+     * additional diagnostics grouping metadata.</p>
      *
      * @param bootstrapRequirements authoritative essential-throughput requirements
      * @param dependencyRequirements exact diagnostics projection with explicit family labels
@@ -245,7 +242,8 @@ public final class Stage20GeneratedWorldProductionProbe {
             Objects.requireNonNull(acceptance, "acceptance");
             Objects.requireNonNull(transport, "transport");
             if (!topologyQuality.closesStage20BEntryCoverage()) {
-                throw new IllegalArgumentException("production probe requires accepted Stage-20A topology quality authority");
+                throw new IllegalArgumentException(
+                        "production probe requires accepted Stage-20A topology quality authority");
             }
         }
     }
@@ -327,7 +325,8 @@ public final class Stage20GeneratedWorldProductionProbe {
                     && placement.isPresent()
                     && economicAcceptance.isPresent();
             if (topologyAccepted != downstreamComplete) {
-                throw new IllegalArgumentException("downstream probe evidence must exist exactly when topology is accepted");
+                throw new IllegalArgumentException(
+                        "downstream probe evidence must exist exactly when topology is accepted");
             }
         }
     }
@@ -374,7 +373,7 @@ public final class Stage20GeneratedWorldProductionProbe {
                     seedResult);
         }
 
-        GalaxyTopology topology = topologyResult.topology();
+        GalaxyTopology topology = topologyResult.requireAcceptedTopology();
         Catalogs catalogs = loadCatalogs();
         validateInfrastructureProfile(authority.infrastructure(), catalogs.stations());
         List<Stage20LocalInfrastructureLayout> layouts = generateLocalLayouts(
@@ -546,13 +545,13 @@ public final class Stage20GeneratedWorldProductionProbe {
                 throw new IllegalArgumentException("generated hub references unknown station archetype");
             }
             double maximumLocalTravelSeconds = layout.connections().stream()
+                    .filter(value -> !touchesJumpAnchor(layout, value))
                     .map(CalibratedConnection::logisticsConsequences)
                     .mapToDouble(value -> value.civilianRoutineTravelTimeMaxS())
                     .max()
                     .orElse(0d);
             double jumpAccessSeconds = layout.connections().stream()
-                    .filter(value -> layout.placement(value.fromId()).kind()
-                            == Stage20LocalInfrastructureLayout.PlacementKind.JUMP_ARRIVAL_ANCHOR)
+                    .filter(value -> touchesJumpAnchor(layout, value))
                     .map(CalibratedConnection::logisticsConsequences)
                     .mapToDouble(value -> value.civilianRoutineTravelTimeMaxS())
                     .max()
@@ -590,9 +589,9 @@ public final class Stage20GeneratedWorldProductionProbe {
                         outboundLocal = from.maximumLocalTravelSeconds()
                                 + from.jumpAccessSeconds()
                                 + to.jumpAccessSeconds();
-                        returnLocal = to.jumpAccessSeconds()
-                                + from.jumpAccessSeconds()
-                                + from.maximumLocalTravelSeconds();
+                        returnLocal = to.maximumLocalTravelSeconds()
+                                + to.jumpAccessSeconds()
+                                + from.jumpAccessSeconds();
                     }
                     return Optional.of(new EndpointCycleProfile(
                             outboundLocal,
@@ -601,6 +600,13 @@ public final class Stage20GeneratedWorldProductionProbe {
                             to.transferRateKgPerSecond(),
                             from.sourceEvidenceId() + "+" + to.sourceEvidenceId()));
                 });
+    }
+
+    private static boolean touchesJumpAnchor(
+            Stage20LocalInfrastructureLayout layout,
+            CalibratedConnection connection) {
+        return layout.placement(connection.fromId()).kind() == PlacementKind.JUMP_ARRIVAL_ANCHOR
+                || layout.placement(connection.toId()).kind() == PlacementKind.JUMP_ARRIVAL_ANCHOR;
     }
 
     private static void validateInfrastructureProfile(
@@ -626,13 +632,11 @@ public final class Stage20GeneratedWorldProductionProbe {
     }
 
     private static List<StarSystemId> orderedSystems(GalaxyTopology topology) {
-        ArrayList<StarSystemId> systems = new ArrayList<>();
-        topology.sectors().forEach(sector -> sector.systems().forEach(system -> systems.add(system.id())));
-        systems.sort(StarSystemId::compareTo);
+        List<StarSystemId> systems = topology.systems().stream().map(value -> value.id()).sorted().toList();
         if (systems.isEmpty()) {
             throw new IllegalArgumentException("production probe topology has no systems");
         }
-        return List.copyOf(systems);
+        return systems;
     }
 
     private static Catalogs loadCatalogs() {
@@ -649,7 +653,8 @@ public final class Stage20GeneratedWorldProductionProbe {
             BootstrapRequirementProfile bootstrap,
             List<Requirement> dependencyRequirements) {
         if (bootstrap.essentialCommodities().size() != dependencyRequirements.size()) {
-            throw new IllegalArgumentException("dependency requirements must cover every bootstrap essential exactly once");
+            throw new IllegalArgumentException(
+                    "dependency requirements must cover every bootstrap essential exactly once");
         }
         TreeMap<String, Requirement> dependencyByCommodity = new TreeMap<>();
         for (Requirement requirement : dependencyRequirements) {
@@ -660,10 +665,13 @@ public final class Stage20GeneratedWorldProductionProbe {
         for (var commodity : bootstrap.essentialCommodities()) {
             Requirement dependency = dependencyByCommodity.get(commodity.commodityId());
             if (dependency == null) {
-                throw new IllegalArgumentException("missing dependency projection for " + commodity.commodityId());
+                throw new IllegalArgumentException(
+                        "missing dependency projection for " + commodity.commodityId());
             }
-            if (Double.compare(dependency.requiredKgPerSecond(), commodity.minSupplierThroughputKgPerSecond()) != 0
-                    || Double.compare(dependency.maxSupplierRouteTimeS(), commodity.maxSupplierRouteTimeS()) != 0) {
+            if (Double.compare(
+                    dependency.requiredKgPerSecond(), commodity.minSupplierThroughputKgPerSecond()) != 0
+                    || Double.compare(
+                    dependency.maxSupplierRouteTimeS(), commodity.maxSupplierRouteTimeS()) != 0) {
                 throw new IllegalArgumentException(
                         "dependency requirement must preserve bootstrap rate/time for " + commodity.commodityId());
             }
