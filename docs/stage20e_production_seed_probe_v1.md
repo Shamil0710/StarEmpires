@@ -6,11 +6,9 @@
 
 ## Purpose
 
-Stage-20E already had individual implementations for finite resource occurrence, extraction capacity, physical freight throughput, dependency diagnostics, faction-start evaluation/placement, whole-seed acceptance and batch observability.
+Stage-20E already had individual implementations for finite resource occurrence, extraction capacity, physical freight throughput, dependency diagnostics, faction-start evaluation/placement, whole-seed acceptance and batch observability. The remaining evidence gap was that these layers could still be exercised independently with hand-authored fixture worlds.
 
-The remaining evidence gap was that these layers could still be exercised independently with hand-authored fixture worlds.
-
-`Stage20GeneratedWorldProductionProbe` closes that integration gap by evaluating **one exact root seed through the real generated-world chain**:
+`Stage20GeneratedWorldProductionProbe` closes that integration gap by evaluating **one exact root seed through the generated-world chain**:
 
 ```text
 root seed
@@ -19,6 +17,7 @@ root seed
 → accepted ordinary topology or immediate seed rejection
 → Stage20SystemGeometryGenerator per system
 → Stage20LocalInfrastructureLayoutGenerator per system
+→ Stage20JumpEdgeStateMaterializer exact-coverage edge catalog
 → Stage20LocalPhysicalResourceHostGenerator
 → Stage20ResourceOccurrenceGenerator
 → Stage20ExtractionSiteLogisticsResolver
@@ -35,7 +34,7 @@ The probe does not retry another seed internally and does not mutate a rejected 
 
 ## Authority boundary
 
-The probe deliberately does **not** claim authority over several inputs that Stage 20 has not yet canonicalized.
+The probe deliberately does **not** claim authority over inputs that Stage 20 has not yet canonicalized.
 
 ### Explicitly injected rather than guessed
 
@@ -43,15 +42,15 @@ The caller must provide:
 
 - macro generation request;
 - accepted Stage-20A topology-quality profile;
-- an initial local-infrastructure authoring profile;
+- initial local-infrastructure authoring profile;
 - essential bootstrap demand/routing requirements;
 - matching dependency-diagnostics requirements;
 - current/versioned faction-start acceptance policy;
 - stable faction IDs requiring starts;
-- fitted loaded and return `JumpPlan` authority;
+- executable fitted loaded and return `JumpPlan` authority;
 - physical freight payload and allocated freighter count.
 
-The orchestration layer is therefore incapable of silently deciding that a civilization needs an arbitrary number of kilograms per second, that an FTL ship has a convenient range, or that extra freighters appear because a seed would otherwise fail.
+The orchestration layer therefore cannot silently decide that a civilization needs a convenient number of kilograms per second, that a ship has arbitrary FTL capability, or that extra freighters appear because a seed would otherwise fail.
 
 ### Still unresolved in v1
 
@@ -71,7 +70,7 @@ For each accepted generated system, v1 creates:
 
 1. one configured major hub station;
 2. a fixed configured number of Stage-20C `RESOURCE_FIELD_ANCHOR` point anchors;
-3. one Stage-20C jump-arrival point anchor;
+3. one distinct Stage-20C `JUMP_ARRIVAL_ANCHOR` for every incident Stage-20D ordinary edge;
 4. one deterministic industrial station archetype selected from an explicitly supplied Stage-18-compatible set.
 
 The industrial station choice is keyed only by root seed + stable system identity + the predeclared profile. It cannot inspect generated resources, reserve deficits, faction-start evaluation, economic acceptance or later failure state.
@@ -86,11 +85,15 @@ seed is short of X
 
 If the sampled infrastructure does not close the required physical economy, the seed remains rejected evidence.
 
+## Stage-20D edge materialization
+
+A production probe must not stop at abstract graph adjacency. After local layouts are generated, `Stage20JumpEdgeStateMaterializer` consumes them and creates an exact-coverage `Stage20JumpEdgeCatalog`.
+
+The probe deliberately authors one arrival anchor per incident edge so the materializer never falls back to shared or legacy coordinates. The resulting catalog is retained in `ProbeResult` and supplied to both loaded and return `Stage20PhysicalGalacticRoutePlanner` instances. Freight routing therefore respects the same explicit physical edge availability/transit metadata used by Stage-20D execution planning.
+
 ## Resource host integration
 
-The probe consumes `Stage20LocalPhysicalResourceHostGenerator` rather than manually authored `ResourceHostProfile` rows.
-
-That makes the production path:
+The probe consumes `Stage20LocalPhysicalResourceHostGenerator` rather than manually authored `ResourceHostProfile` rows:
 
 ```text
 Stage-20C authoritative SI resource anchor
@@ -104,72 +107,72 @@ No fallback deposit is introduced by the probe.
 
 ## Physical route and throughput authority
 
-The probe uses `Stage20PhysicalGalacticRoutePlanner` and `Stage20PhysicalFreightRouteEvaluator`.
+The probe uses `Stage20PhysicalGalacticRoutePlanner` and `Stage20PhysicalFreightRouteEvaluator` over the exact-coverage jump-edge catalog. Inter-system travel therefore follows actual Stage-20D neighbor edges. There is no Euclidean shortcut and no synthetic per-hop economic penalty.
 
-Inter-system travel therefore follows actual Stage-20D neighbor topology edge-by-edge. There is no Euclidean shortcut and no synthetic per-hop economic penalty.
-
-Local freight-cycle time is derived from the generated Stage-20C calibrated SI layout:
+Local freight-cycle time is derived from generated Stage-20C calibrated SI layout consequences:
 
 - non-jump local access uses generated local infrastructure connections;
-- jump arrival/departure access is carried separately by the generated jump-arrival connection;
+- jump arrival/departure access uses generated jump-arrival connections;
 - loading/unloading rates come from the actual Stage-18 major-hub station archetype;
+- extraction production is separately capped by `Stage20ExtractionSiteLogisticsResolver`, so unresolved source handling never becomes free production;
 - fitted jump spool/transit/cooldown remain supplied physical authority.
 
-The probe currently uses a conservative maximum generated local-access consequence per system for representative freight throughput. This is an acceptance diagnostic, not a runtime cargo reservation system.
+The probe uses a conservative maximum generated local-access consequence per system for representative freight throughput. This is an acceptance diagnostic, not a runtime cargo-reservation model.
+
+## Regression transport authority
+
+The integration test no longer uses arbitrary hand-written FTL timing/mass values. It selects the compatible `EARLY_CIVILIAN_FREIGHTER` row from `Stage20FtlCalibrationProfile.deriveCurrent()` and converts its accepted Stage-20A translated mass, translation energy, spool, edge transit and cooldown into an executable route-planning `JumpPlan`.
+
+Freight payload comes from `Stage20RepresentativePropulsionCatalogLoader.loadDefault()` through `FreightFleetProfile.fromMissionCargoStoresReference(...)`. Its Stage-22 review flag and provenance remain intact. This is still calibration authority rather than final production hull content, but it is materially different from inventing integration-only ship physics.
 
 ## Whole-seed rejection semantics
 
 A topology-rejected seed stops before local/resource/economic materialization and is composed directly into the existing `Stage20GeneratedWorldSeedAcceptance` topology rejection.
 
-A topology-accepted seed continues through all downstream layers, even when those layers prove that the world is economically invalid. No downstream rejection triggers re-generation inside the same root seed.
+A topology-accepted seed continues through all downstream layers, even when those layers prove that the world is economically invalid. No downstream rejection triggers regeneration inside the same root seed.
 
-When bounded faction placement succeeds, quantitative essential-throughput acceptance is evaluated on the selected faction-start systems.
+When bounded faction placement succeeds, quantitative essential-throughput acceptance is evaluated on selected faction-start systems. If placement fails, the probe still produces the mandatory economic report required by the current whole-seed composition API. It evaluates accepted candidate systems when any exist; if none exist, it evaluates one deterministic existing system. That diagnostic cannot rescue the placement failure. A later whole-seed composition revision may remove this fallback once the API can represent placement failure without requiring downstream start-system economics.
 
-If placement itself fails, the probe still produces the mandatory economic acceptance evidence required by the current whole-seed composition API. It evaluates already accepted candidate systems when any exist; if none are accepted, it evaluates one deterministic existing system. That secondary report cannot rescue the placement failure: `Stage20GeneratedWorldSeedAcceptance` still reports the authoritative start-placement rejection.
+## Test demand is not production balance authority
 
-## Test authority is not production balance authority
-
-The integration regression suite supplies explicit numeric demand, route and freight values under IDs such as:
+The integration regression suite still supplies explicit demand and infrastructure values under IDs such as:
 
 - `stage20e.production-probe.integration-demand.v1`;
-- `stage20e.production-probe.integration-freight.v1`;
 - `stage20e.production-probe.integration-infrastructure.v1`.
 
-These values exist only to exercise the real orchestration seam. They are **not** a canonical Stage-20 economic demand baseline and must not be promoted to gameplay balance by copying them into production policy.
+Those values exercise orchestration only. They are **not** a canonical civilization demand baseline and must not be copied into gameplay balance.
 
-The repository still lacks a justified canonical `BootstrapRequirementProfile.current()` equivalent for the initial civilization/start economy. That remains an explicit Stage-20E closeout task.
+The repository still lacks a justified canonical `BootstrapRequirementProfile.current()` equivalent for the initial civilization/start economy. That is the next Stage-20E closeout task.
 
 ## Batch observability
 
-The probe can be passed directly to `Stage20GeneratedWorldBatchAcceptance`:
+The probe can feed `Stage20GeneratedWorldBatchAcceptance` directly:
 
 ```text
 fixed seed corpus
-→ run exactly each requested root seed
+→ run each requested root seed exactly once
 → collect ACCEPTED / REJECTED_SEED / UNRESOLVED_AUTHORITY
 → count normalized failure reasons
 ```
 
-No minimum accepted fraction is introduced by this slice because the accepted roadmap currently provides no evidence-backed numeric target.
-
-The immediate goal is measurement first. A future quantitative batch gate, if justified, must be versioned from observed corpus behavior rather than invented to make CI green.
+No minimum accepted fraction is introduced by this slice because the accepted roadmap provides no evidence-backed numeric target. Measurement comes first; any later quantitative batch gate must be versioned from observed corpus behavior rather than invented to make CI green.
 
 ## Regression coverage
 
-The v1 regression suite proves:
+The v1 suite proves:
 
 1. a bounded corpus contains a topology-accepted representative macro seed;
-2. that seed materializes the real local-layout, host, resource, logistics, supply, candidate, placement, economic and whole-seed layers;
-3. generated resource occurrences resolve back to their generated physical host and exact SI anchor position;
-4. a deliberately undersized topology request rejects before any downstream materialization;
-5. real probe results can feed batch observability without a fabricated pass-rate gate;
-6. dependency diagnostics cannot silently change the bootstrap commodity demand/routing requirement supplied by the acceptance authority.
+2. that seed materializes the real layout, exact edge catalog, host, resource, logistics, supply, candidate, placement, economic and whole-seed layers;
+3. each generated system has exactly one physical jump-arrival anchor per incident ordinary edge;
+4. generated resource occurrences resolve back to their generated physical host and exact SI anchor position;
+5. a deliberately undersized topology request rejects before downstream materialization;
+6. real probe results feed batch observability without a fabricated pass-rate gate;
+7. dependency diagnostics cannot silently change supplied bootstrap demand;
+8. representative transport tests consume accepted Stage-20A FTL/propulsion calibration instead of arbitrary ship physics.
 
 ## Stage-20E remaining work after this slice
 
-This slice is **not** Stage-20E completion.
-
-The next closeout work should use the new probe to establish and measure a fixed representative seed corpus, then resolve the missing upstream authorities rather than hiding them:
+This slice is **not** Stage-20E completion. The next closeout work should use the probe to establish a versioned demand authority and a fixed representative seed corpus, then resolve missing upstream authorities rather than hiding them:
 
 1. author a versioned, provenance-backed civilization/start `BootstrapRequirementProfile` from actual Stage-18 facility/recipe and Stage-20 logistics consequences;
 2. run a fixed deterministic representative corpus through the production probe and preserve machine-readable distributions/failure reasons;
@@ -177,6 +180,7 @@ The next closeout work should use the new probe to establish and measure a fixed
 4. close delivered monetary-cost authority if required for Stage-20E DoD;
 5. close initial buffer/stock authority if required for Stage-20E DoD;
 6. attach initial source/facility ownership authority before ownership concentration becomes a hard gate;
-7. only then declare Stage-20E accepted and move to Stage-20F industrial specialization bootstrap.
+7. close any remaining standalone celestial-body/field-extent authority exposed by the probe as an explicit Stage-20B follow-up;
+8. only then declare Stage-20E accepted and move to Stage-20F industrial specialization bootstrap.
 
-Stage-20F must consume the generated resources, facilities, storage, power/work limits and physical routes established here; it must not replace them with system-type percentage bonuses.
+Stage-20F must consume generated resources, facilities, storage, power/work limits and physical routes established here; it must not replace them with system-type percentage bonuses.
