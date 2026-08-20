@@ -100,9 +100,9 @@ class Stage20GeneratedWorldProductionProbeTest {
     void batchObservabilityCanMeasureRealProbeResultsWithoutInventingAPassFraction() {
         ProbeInputs inputs = representativeInputs();
         long acceptedTopologySeed = firstAcceptedTopologySeed(inputs, 1L, 128L);
-        List<Long> corpus = acceptedTopologySeed == 1L
-                ? List.of(1L, 2L, 3L)
-                : List.of(1L, acceptedTopologySeed, 2L);
+        long secondSeed = acceptedTopologySeed == 1L ? 2L : 1L;
+        long thirdSeed = acceptedTopologySeed == 3L || secondSeed == 3L ? 4L : 3L;
+        List<Long> corpus = List.of(acceptedTopologySeed, secondSeed, thirdSeed);
 
         var report = Stage20GeneratedWorldBatchAcceptance.run(
                 corpus,
@@ -118,7 +118,7 @@ class Stage20GeneratedWorldProductionProbeTest {
                         + report.rejectedFraction()
                         + report.unresolvedAuthorityFraction(),
                 1e-12d);
-        assertTrue(report.requestedSeeds().stream().sorted().toList().equals(report.requestedSeeds()));
+        assertEquals(report.requestedSeeds().stream().sorted().toList(), report.requestedSeeds());
         assertTrue(report.requestedSeeds().contains(acceptedTopologySeed));
     }
 
