@@ -120,7 +120,15 @@ public final class Stage20PhysicalFreightRouteEvaluator
             int activeFreighterCount,
             String sourceEvidenceId,
             boolean stage22ReviewRequired) {
-        /** Validates one explicit immutable freight allocation. */
+        /**
+         * Validates one explicit immutable freight allocation.
+         *
+         * @param version stable profile version
+         * @param payloadMassKgPerFreighter physical delivered payload per loaded trip
+         * @param activeFreighterCount number of identical freighters allocated to this route
+         * @param sourceEvidenceId provenance of the physical payload/fleet assumption
+         * @param stage22ReviewRequired whether provisional calibration input still requires Stage-22 review
+         */
         public FreightFleetProfile {
             version = requireText(version, "version");
             requirePositiveFinite(payloadMassKgPerFreighter, "payloadMassKgPerFreighter");
@@ -189,7 +197,15 @@ public final class Stage20PhysicalFreightRouteEvaluator
             double sourceLoadingRateKgPerSecond,
             double destinationUnloadingRateKgPerSecond,
             String sourceEvidenceId) {
-        /** Validates one immutable physical endpoint profile. */
+        /**
+         * Validates one immutable physical endpoint profile.
+         *
+         * @param outboundLocalAccessSeconds supplier-to-departure plus arrival-to-consumer physical time
+         * @param returnLocalAccessSeconds consumer-to-departure plus arrival-to-supplier physical time
+         * @param sourceLoadingRateKgPerSecond total physical source loading/transfer rate
+         * @param destinationUnloadingRateKgPerSecond total physical destination unloading/transfer rate
+         * @param sourceEvidenceId provenance of the local/handling facts
+         */
         public EndpointCycleProfile {
             requireNonNegativeFinite(outboundLocalAccessSeconds, "outboundLocalAccessSeconds");
             requireNonNegativeFinite(returnLocalAccessSeconds, "returnLocalAccessSeconds");
