@@ -27,6 +27,8 @@ import com.spacesim.world.Stage20FactionStartDependencyDiagnostics.Requirement;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator.PlacementResult;
 import com.spacesim.world.Stage20GeneratedWorldSeedAcceptance;
+import com.spacesim.world.Stage20JumpEdgeCatalog;
+import com.spacesim.world.Stage20JumpEdgeStateMaterializer;
 import com.spacesim.world.Stage20LocalInfrastructureLayout;
 import com.spacesim.world.Stage20LocalInfrastructureLayout.CalibratedConnection;
 import com.spacesim.world.Stage20LocalInfrastructureLayout.PlacementKind;
@@ -59,21 +61,21 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * Production-style Stage-20B/D/E generated-world probe assembled from the real generation layers.
+ * Production-style Stage-20B/D/E generated-world probe assembled from real generation layers.
  *
- * <p>The probe exists to measure one exact root seed without replacing any authoritative subsystem
- * with a fixture world. It creates macro region/system placement, ordinary topology, per-system SI
- * geometry/layouts, generated physical resource hosts, correlated finite resources, extraction
- * logistics/capacity, station process capacity, physical freight throughput, start dependency
- * diagnostics, candidate evaluation, bounded faction placement and the existing whole-seed result.</p>
+ * <p>The probe measures one exact root seed without replacing authoritative subsystems with a
+ * hand-authored world. It creates macro placement, ordinary topology, per-system SI geometry and
+ * layouts, exact-coverage physical jump-edge state, generated resource hosts, finite occurrences,
+ * extraction logistics/capacity, station process capacity, physical freight throughput, start
+ * diagnostics/evaluation/placement and the existing whole-seed acceptance result.</p>
  *
- * <p>Numeric economic demand and fitted ship/jump authority are explicit inputs. This class does not
- * invent consumption, prices, stock, ownership, FTL capability or cargo capacity merely to make a
- * seed pass. Delivered monetary cost, buffer stock and resource ownership stay unresolved unless a
+ * <p>Economic demand and fitted ship/jump authority are explicit inputs. This class does not invent
+ * consumption, prices, stock, ownership, FTL capability or cargo capacity merely to make a seed
+ * pass. Delivered monetary cost, buffer stock and resource ownership remain unresolved unless a
  * later authority supplies them; the start profile decides whether that is diagnostic or blocking.</p>
  *
- * <p>Initial infrastructure is selected before any resource occurrence is generated. Therefore later
- * resource/start failures cannot ask this layer to add a better station, deposit or topology edge.</p>
+ * <p>Initial infrastructure is selected before resource occurrence generation. A downstream failure
+ * therefore cannot request another deposit, station or topology edge as hidden rescue.</p>
  */
 public final class Stage20GeneratedWorldProductionProbe {
     /** Current immutable production-probe implementation version. */
@@ -131,10 +133,6 @@ public final class Stage20GeneratedWorldProductionProbe {
 
     /**
      * Economic/start acceptance authority supplied to the probe rather than guessed by it.
-     *
-     * <p>Every dependency requirement must match exactly one bootstrap commodity requirement in
-     * commodity identity, sustained kg/s and maximum supplier-route time. The family label is only
-     * additional diagnostics grouping metadata.</p>
      *
      * @param bootstrapRequirements authoritative essential-throughput requirements
      * @param dependencyRequirements exact diagnostics projection with explicit family labels
@@ -255,6 +253,7 @@ public final class Stage20GeneratedWorldProductionProbe {
      * @param rootSeed evaluated root seed
      * @param macroGeometry generated macro geometry
      * @param topology generated topology result
+     * @param jumpEdges exact-coverage physical Stage-20D edge state; absent only after topology rejection
      * @param localLayouts generated local SI layouts; absent only after topology rejection
      * @param physicalHosts generated physical resource-host semantics; absent only after topology rejection
      * @param resourceWorld generated finite resource world; absent only after topology rejection
@@ -270,6 +269,7 @@ public final class Stage20GeneratedWorldProductionProbe {
             long rootSeed,
             Stage20MacroGalaxyGeometryGenerator.MacroGeometryResult macroGeometry,
             Stage20JumpTopologyGenerationResult topology,
+            Optional<Stage20JumpEdgeCatalog> jumpEdges,
             Optional<List<Stage20LocalInfrastructureLayout>> localLayouts,
             Optional<Stage20LocalPhysicalResourceHostGenerator.GenerationResult> physicalHosts,
             Optional<Stage20ResourceOccurrenceWorld> resourceWorld,
@@ -286,6 +286,7 @@ public final class Stage20GeneratedWorldProductionProbe {
          * @param rootSeed evaluated seed
          * @param macroGeometry generated macro geometry
          * @param topology generated topology
+         * @param jumpEdges exact-coverage physical edge state
          * @param localLayouts generated local layouts
          * @param physicalHosts generated physical hosts
          * @param resourceWorld generated finite resources
@@ -300,6 +301,7 @@ public final class Stage20GeneratedWorldProductionProbe {
             version = requireText(version, "version");
             Objects.requireNonNull(macroGeometry, "macroGeometry");
             Objects.requireNonNull(topology, "topology");
+            Objects.requireNonNull(jumpEdges, "jumpEdges");
             Objects.requireNonNull(localLayouts, "localLayouts");
             Objects.requireNonNull(physicalHosts, "physicalHosts");
             Objects.requireNonNull(resourceWorld, "resourceWorld");
@@ -316,7 +318,8 @@ public final class Stage20GeneratedWorldProductionProbe {
                 throw new IllegalArgumentException("probe evidence root seeds differ");
             }
             boolean topologyAccepted = topology.status() == Stage20JumpTopologyGenerationResult.Status.ACCEPTED;
-            boolean downstreamComplete = localLayouts.isPresent()
+            boolean downstreamComplete = jumpEdges.isPresent()
+                    && localLayouts.isPresent()
                     && physicalHosts.isPresent()
                     && resourceWorld.isPresent()
                     && logisticsReport.isPresent()
@@ -327,6 +330,10 @@ public final class Stage20GeneratedWorldProductionProbe {
             if (topologyAccepted != downstreamComplete) {
                 throw new IllegalArgumentException(
                         "downstream probe evidence must exist exactly when topology is accepted");
+            }
+            if (jumpEdges.isPresent()
+                    && !jumpEdges.orElseThrow().topology().equals(topology.requireAcceptedTopology())) {
+                throw new IllegalArgumentException("physical jump-edge catalog must cover accepted probe topology");
             }
         }
     }
@@ -370,6 +377,7 @@ public final class Stage20GeneratedWorldProductionProbe {
                     Optional.empty(),
                     Optional.empty(),
                     Optional.empty(),
+                    Optional.empty(),
                     seedResult);
         }
 
@@ -378,6 +386,13 @@ public final class Stage20GeneratedWorldProductionProbe {
         validateInfrastructureProfile(authority.infrastructure(), catalogs.stations());
         List<Stage20LocalInfrastructureLayout> layouts = generateLocalLayouts(
                 rootSeed, topology, authority.infrastructure());
+        TreeMap<StarSystemId, Stage20LocalInfrastructureLayout> layoutsBySystem = new TreeMap<>();
+        for (Stage20LocalInfrastructureLayout layout : layouts) {
+            layoutsBySystem.put(layout.systemId(), layout);
+        }
+        Stage20JumpEdgeCatalog jumpEdges = Stage20JumpEdgeStateMaterializer.materializeCurrent(
+                topology, layoutsBySystem);
+
         Stage20LocalPhysicalResourceHostGenerator.GenerationResult hosts =
                 Stage20LocalPhysicalResourceHostGenerator.generate(
                         rootSeed, topology, layouts, catalogs.extraction());
@@ -407,7 +422,7 @@ public final class Stage20GeneratedWorldProductionProbe {
                 catalogs.manufacturing());
 
         Stage20PhysicalFreightRouteEvaluator routes = physicalRoutes(
-                topology, layouts, catalogs.stations(), authority.transport());
+                topology, jumpEdges, layouts, catalogs.stations(), authority.transport());
         AnalysisProfile analysisProfile = new AnalysisProfile(
                 CURRENT_VERSION + ".supply-analysis",
                 authority.acceptance().bootstrapRequirements().maxIntermediateInputRouteTimeS());
@@ -464,6 +479,7 @@ public final class Stage20GeneratedWorldProductionProbe {
                 rootSeed,
                 macro,
                 topologyResult,
+                Optional.of(jumpEdges),
                 Optional.of(layouts),
                 Optional.of(hosts),
                 Optional.of(resourceWorld),
@@ -508,7 +524,11 @@ public final class Stage20GeneratedWorldProductionProbe {
                 requests.add(PlacementRequest.resourceFieldAnchor(
                         "resource." + systemId.value() + "." + index));
             }
-            requests.add(PlacementRequest.jumpArrivalAnchor("jump-arrival." + systemId.value()));
+            List<StarSystemId> neighbors = topology.neighbors(systemId).stream().sorted().toList();
+            for (StarSystemId neighbor : neighbors) {
+                requests.add(PlacementRequest.jumpArrivalAnchor(
+                        "jump-arrival." + systemId.value() + "." + neighbor.value()));
+            }
             String industrialArchetype = selectedIndustrialArchetype(rootSeed, systemId, profile);
             requests.add(PlacementRequest.independentStation(
                     "industry." + systemId.value(), industrialArchetype));
@@ -534,6 +554,7 @@ public final class Stage20GeneratedWorldProductionProbe {
 
     private static Stage20PhysicalFreightRouteEvaluator physicalRoutes(
             GalaxyTopology topology,
+            Stage20JumpEdgeCatalog jumpEdges,
             List<Stage20LocalInfrastructureLayout> layouts,
             Stage18StationInfrastructureCatalog stations,
             PhysicalTransportAuthority transport) {
@@ -567,9 +588,9 @@ public final class Stage20GeneratedWorldProductionProbe {
         }
 
         Stage20PhysicalGalacticRoutePlanner loaded = new Stage20PhysicalGalacticRoutePlanner(
-                topology, transport.loadedOutboundPlan());
+                topology, transport.loadedOutboundPlan(), jumpEdges);
         Stage20PhysicalGalacticRoutePlanner returned = new Stage20PhysicalGalacticRoutePlanner(
-                topology, transport.returnPlan());
+                topology, transport.returnPlan(), jumpEdges);
         return new Stage20PhysicalFreightRouteEvaluator(
                 loaded,
                 returned,

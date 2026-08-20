@@ -11,6 +11,9 @@ import com.spacesim.world.Stage20GeneratedWorldSeedAcceptance;
 import com.spacesim.world.Stage20LocalInfrastructureLayout.PlacementKind;
 import com.spacesim.world.Stage20PhysicalFreightRouteEvaluator.FreightFleetProfile;
 import com.spacesim.world.calibration.Stage20FactionStartAcceptanceProfile;
+import com.spacesim.world.calibration.Stage20FtlCalibrationProfile;
+import com.spacesim.world.calibration.Stage20FtlCalibrationProfile.JumpEdgeCalibrationSample;
+import com.spacesim.world.calibration.Stage20RepresentativePropulsionCatalogLoader;
 import com.spacesim.world.calibration.Stage20TopologyQualityCalibrationProfile;
 import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.AcceptanceAuthority;
 import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.InitialInfrastructureProfile;
@@ -27,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20GeneratedWorldProductionProbeTest {
+    private static final String FREIGHT_REFERENCE = "EARLY_CIVILIAN_FREIGHTER";
+
     @Test
     void acceptedTopologyMaterializesTheRealDownstreamGenerationChain() {
         ProbeInputs inputs = representativeInputs();
@@ -37,6 +42,7 @@ class Stage20GeneratedWorldProductionProbeTest {
         assertEquals(Stage20GeneratedWorldProductionProbe.CURRENT_VERSION, result.version());
         assertEquals(seed, result.rootSeed());
         assertEquals(Stage20JumpTopologyGenerationResult.Status.ACCEPTED, result.topology().status());
+        assertTrue(result.jumpEdges().isPresent());
         assertTrue(result.localLayouts().isPresent());
         assertTrue(result.physicalHosts().isPresent());
         assertTrue(result.resourceWorld().isPresent());
@@ -46,9 +52,11 @@ class Stage20GeneratedWorldProductionProbeTest {
         assertTrue(result.placement().isPresent());
         assertTrue(result.economicAcceptance().isPresent());
 
-        int systemCount = result.topology().requireAcceptedTopology().systems().size();
+        var topology = result.topology().requireAcceptedTopology();
+        int systemCount = topology.systems().size();
         assertEquals(systemCount, result.localLayouts().orElseThrow().size());
         assertEquals(systemCount, result.candidateEvaluations().orElseThrow().size());
+        assertEquals(topology.connections().size(), result.jumpEdges().orElseThrow().edges().size());
         assertEquals(
                 systemCount * inputs.infrastructure().resourceAnchorCountPerSystem(),
                 result.physicalHosts().orElseThrow().hosts().size());
@@ -59,7 +67,7 @@ class Stage20GeneratedWorldProductionProbeTest {
                 result.seedAcceptance().version());
 
         result.localLayouts().orElseThrow().forEach(layout -> {
-            assertEquals(1L, layout.placements().stream()
+            assertEquals(topology.neighbors(layout.systemId()).size(), layout.placements().stream()
                     .filter(value -> value.kind() == PlacementKind.JUMP_ARRIVAL_ANCHOR)
                     .count());
             assertEquals(inputs.infrastructure().resourceAnchorCountPerSystem(), layout.placements().stream()
@@ -82,6 +90,7 @@ class Stage20GeneratedWorldProductionProbeTest {
         ProbeResult result = Stage20GeneratedWorldProductionProbe.run(9L, inputs);
 
         assertEquals(Stage20JumpTopologyGenerationResult.Status.REJECTED_SEED, result.topology().status());
+        assertTrue(result.jumpEdges().isEmpty());
         assertTrue(result.localLayouts().isEmpty());
         assertTrue(result.physicalHosts().isEmpty());
         assertTrue(result.resourceWorld().isEmpty());
@@ -135,6 +144,19 @@ class Stage20GeneratedWorldProductionProbeTest {
                 List.of("faction.alpha", "faction.beta")));
     }
 
+    @Test
+    void transportFixtureUsesAcceptedStage20ACalibrationInsteadOfArbitraryJumpNumbers() {
+        PhysicalTransportAuthority transport = calibratedTransport();
+        JumpEdgeCalibrationSample reference = calibratedSample(FREIGHT_REFERENCE);
+
+        assertEquals(reference.translatedMassKg(), transport.loadedOutboundPlan().translatedMassKg(), 0d);
+        assertEquals(reference.spoolTimeS().orElseThrow(), transport.loadedOutboundPlan().spoolSeconds(), 0d);
+        assertEquals(reference.referenceEdgeTransitTimeS(), transport.loadedOutboundPlan().edgeTransitSeconds(), 0d);
+        assertEquals(reference.cooldownS(), transport.loadedOutboundPlan().cooldownSeconds(), 0d);
+        assertTrue(transport.fleetProfile().sourceEvidenceId().contains("stage20a"));
+        assertTrue(transport.fleetProfile().stage22ReviewRequired());
+    }
+
     private static ProbeInputs representativeInputs() {
         return inputsWithMacroRequest(Stage20MacroGalaxyGeometryGenerator.GenerationRequest.representative());
     }
@@ -167,15 +189,7 @@ class Stage20GeneratedWorldProductionProbeTest {
                                         1.0e9d)),
                         Stage20FactionStartAcceptanceProfile.current(),
                         List.of("faction.alpha", "faction.beta")),
-                new PhysicalTransportAuthority(
-                        fittedPlan(900d, 3_600d, 1_800d),
-                        fittedPlan(900d, 3_600d, 1_800d),
-                        new FreightFleetProfile(
-                                "stage20e.production-probe.integration-freight.v1",
-                                1_000_000d,
-                                8,
-                                "integration-test explicit freight authority",
-                                true)));
+                calibratedTransport());
     }
 
     private static BootstrapRequirementProfile bootstrapRequirements() {
@@ -188,20 +202,42 @@ class Stage20GeneratedWorldProductionProbeTest {
                         new CommodityRequirement("commodity.feedstock.metallic_ore", 1.0e9d, 1d)));
     }
 
-    private static JumpPlan fittedPlan(double spoolSeconds, double cooldownSeconds, double transitSeconds) {
+    private static PhysicalTransportAuthority calibratedTransport() {
+        JumpPlan plan = calibratedJumpPlan(FREIGHT_REFERENCE);
+        FreightFleetProfile fleet = FreightFleetProfile.fromMissionCargoStoresReference(
+                Stage20RepresentativePropulsionCatalogLoader.loadDefault(),
+                FREIGHT_REFERENCE,
+                8);
+        return new PhysicalTransportAuthority(plan, plan, fleet);
+    }
+
+    private static JumpPlan calibratedJumpPlan(String representativeId) {
+        JumpEdgeCalibrationSample sample = calibratedSample(representativeId);
+        double requiredEnergy = sample.requiredTranslationEnergyJ().orElseThrow();
+        double spoolSeconds = sample.spoolTimeS().orElseThrow();
         return new JumpPlan(
                 true,
                 JumpFailure.NONE,
-                "ftl",
-                10_000d,
-                1_000d,
-                1_000d,
+                "ftl.calibration." + representativeId,
+                sample.translatedMassKg(),
+                requiredEnergy,
+                requiredEnergy,
                 0d,
-                100d,
+                requiredEnergy / spoolSeconds,
                 spoolSeconds,
-                transitSeconds,
-                cooldownSeconds,
-                50d);
+                sample.referenceEdgeTransitTimeS(),
+                sample.cooldownS(),
+                0d);
+    }
+
+    private static JumpEdgeCalibrationSample calibratedSample(String representativeId) {
+        return Stage20FtlCalibrationProfile.deriveCurrent().samples().stream()
+                .filter(value -> value.representativeId().equals(representativeId))
+                .filter(value -> value.requiredTranslationEnergyJ().isPresent())
+                .filter(value -> value.spoolTimeS().isPresent())
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "Missing compatible accepted Stage-20A FTL calibration for " + representativeId));
     }
 
     private static long firstAcceptedTopologySeed(ProbeInputs inputs, long firstSeed, long lastSeed) {
