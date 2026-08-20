@@ -115,7 +115,15 @@ public record Stage20TopologyQualityReport(
             double observed,
             double limit,
             double normalizedSeverity) {
-        /** Validates one immutable violation. */
+        /**
+         * Validates one immutable violation.
+         *
+         * @param type stable machine-readable violation type
+         * @param subject stable human-readable subject, for example a sector/system ID
+         * @param observed observed numeric value
+         * @param limit calibrated bound that was violated
+         * @param normalizedSeverity non-negative dimensionless repair ordering severity
+         */
         public Violation {
             Objects.requireNonNull(type, "type");
             if (subject == null || subject.isBlank()) {
@@ -130,7 +138,36 @@ public record Stage20TopologyQualityReport(
         }
     }
 
-    /** Canonicalizes deterministic collection ordering and validates scalar ranges. */
+    /**
+     * Canonicalizes deterministic collection ordering and validates scalar ranges.
+     *
+     * @param connectedComponents number of connected components in the ordinary jump graph
+     * @param unreachableSystems systems outside the deterministic primary component
+     * @param unreachableSectors sectors with no system in the deterministic primary component
+     * @param degreeHistogram graph degree to system-count histogram
+     * @param degreeOneFraction fraction of systems with exactly one ordinary jump neighbor
+     * @param degreeTwoFraction fraction of systems with exactly two ordinary jump neighbors
+     * @param meanDegree arithmetic mean ordinary jump degree
+     * @param medianDegree median ordinary jump degree
+     * @param hubSystems systems whose degree lies inside the calibrated local-hub band
+     * @param linearCorridorLengths deterministic sorted bridge-only choice-free corridor lengths
+     * @param longestLinearCorridorEdges longest bridge-only choice-free degree-two corridor in edges
+     * @param p90LinearCorridorEdges nearest-rank 90th percentile corridor length
+     * @param cycleParticipationFraction fraction of systems participating in at least one cycle
+     * @param corePairsChecked number of deterministic regional-core pairs checked for redundancy
+     * @param corePairsWithAlternateRoute number of core pairs retaining at least two edge-disjoint routes
+     * @param coreRouteRedundancyCoverage fraction of checked core pairs with an alternate edge-disjoint route
+     * @param articulationSystems articulation systems in deterministic ID order
+     * @param bridgeEdges bridge edges in deterministic edge order
+     * @param sectorExitCounts number of ordinary inter-sector edges incident to each sector
+     * @param sectorInternalCycleCoverage per-sector fraction of systems participating in an internal cycle
+     * @param sectorInternalBridgeCounts per-sector count of bridge edges in the induced internal graph
+     * @param maxSingleGatewayDependency maximum structural dependency proxy caused by removing one gateway system
+     * @param regionalHubHopDistances shortest hop counts between directly adjacent sectors' deterministic hubs
+     * @param medianRegionalHubHopDistance median of {@code regionalHubHopDistances}, absent when not applicable
+     * @param sectorMotifFingerprints deterministic structural fingerprints for diagnostics/presentation
+     * @param violations calibrated quality-gate violations
+     */
     public Stage20TopologyQualityReport {
         if (connectedComponents < 0 || longestLinearCorridorEdges < 0
                 || corePairsChecked < 0 || corePairsWithAlternateRoute < 0
