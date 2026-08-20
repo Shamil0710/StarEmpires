@@ -56,7 +56,12 @@ public record Stage20ResourceOccurrenceWorld(
     public record SystemResourceConditions(
             StarSystemId systemId,
             Map<String, Double> occurrencePotentialByTypeId) {
-        /** Validates and deterministically freezes one condition row. */
+        /**
+         * Validates and deterministically freezes one condition row.
+         *
+         * @param systemId owning system
+         * @param occurrencePotentialByTypeId normalized potential in {@code [0,1]} by Stage-18 occurrence ID
+         */
         public SystemResourceConditions {
             Objects.requireNonNull(systemId, "systemId");
             Objects.requireNonNull(occurrencePotentialByTypeId, "occurrencePotentialByTypeId");
@@ -119,7 +124,23 @@ public record Stage20ResourceOccurrenceWorld(
             double gradeFraction,
             double sourceRecoveryFraction,
             Set<String> requiredCapabilityTags) {
-        /** Validates one immutable finite natural occurrence stream. */
+        /**
+         * Validates one immutable finite natural occurrence stream.
+         *
+         * @param sourceId stable generated source identity
+         * @param systemId owning star system
+         * @param hostAnchorId owning Stage-20C resource-field anchor
+         * @param hostClassId generation-only physical host classifier/provenance
+         * @param position authoritative SI anchor position
+         * @param occurrenceTypeId authoritative Stage-18 occurrence type ID
+         * @param environment Stage-18 extraction environment
+         * @param outputCommodityId Stage-18 extracted feedstock produced by this source stream
+         * @param generationScore final correlated host-presence score in {@code [0,1]}
+         * @param initialAccessibleMassKg finite gross accessible source mass
+         * @param gradeFraction useful target fraction in gross removed source mass
+         * @param sourceRecoveryFraction source-side recoverability fraction
+         * @param requiredCapabilityTags source-specific capabilities beyond method baseline
+         */
         public ResourceOccurrence {
             sourceId = requireText(sourceId, "sourceId");
             Objects.requireNonNull(systemId, "systemId");
@@ -175,7 +196,17 @@ public record Stage20ResourceOccurrenceWorld(
             String locationTag,
             String facilityDefinitionId,
             String extractionMethodId) {
-        /** Validates one immutable explicit extraction installation. */
+        /**
+         * Validates one immutable explicit extraction installation.
+         *
+         * @param siteId stable generated site identity
+         * @param sourceId generated occurrence source served by the installation
+         * @param systemId owning system
+         * @param hostAnchorId owning physical resource-field anchor
+         * @param locationTag Stage-18 facility physical-location tag
+         * @param facilityDefinitionId installed Stage-18 facility definition
+         * @param extractionMethodId Stage-18 extraction method used by the installation
+         */
         public InitialExtractionSite {
             siteId = requireText(siteId, "siteId");
             sourceId = requireText(sourceId, "sourceId");
@@ -187,7 +218,19 @@ public record Stage20ResourceOccurrenceWorld(
         }
     }
 
-    /** Validates, sorts and freezes the complete generated resource world. */
+    /**
+     * Validates, sorts and freezes the complete generated resource world.
+     *
+     * @param version stable Stage-20E world result version
+     * @param rootSeed deterministic root generation seed
+     * @param systemConditions correlated latent physical conditions by system
+     * @param occurrences concrete finite Stage-18 natural source streams
+     * @param initialExtractionSites explicit bootstrap extraction installations
+     * @param ontologyFingerprint exact Stage-18 ontology fingerprint consumed
+     * @param extractionFingerprint exact Stage-18 extraction-catalog fingerprint consumed
+     * @param facilityFingerprint exact Stage-18 facility-catalog fingerprint consumed
+     * @param generationProfileVersion exact Stage-20E calibration profile version consumed
+     */
     public Stage20ResourceOccurrenceWorld {
         version = requireText(version, "version");
         ontologyFingerprint = requireText(ontologyFingerprint, "ontologyFingerprint");
