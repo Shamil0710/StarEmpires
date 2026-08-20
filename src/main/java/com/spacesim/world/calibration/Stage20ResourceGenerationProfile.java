@@ -79,7 +79,18 @@ public final class Stage20ResourceGenerationProfile {
             double maxAccessibleMassKg,
             double minSourceRecoveryFraction,
             double maxSourceRecoveryFraction) {
-        /** Validates one immutable Stage-20E occurrence calibration row. */
+        /**
+         * Validates one immutable Stage-20E occurrence calibration row.
+         *
+         * @param occurrenceTypeId Stage-18 occurrence type ID
+         * @param presenceThreshold minimum correlated host score for a concrete occurrence
+         * @param minGradeFraction minimum generated target grade
+         * @param maxGradeFraction maximum generated target grade
+         * @param minAccessibleMassKg minimum finite accessible gross source mass
+         * @param maxAccessibleMassKg maximum finite accessible gross source mass
+         * @param minSourceRecoveryFraction minimum source-side recoverability
+         * @param maxSourceRecoveryFraction maximum source-side recoverability
+         */
         public OccurrenceBand {
             occurrenceTypeId = requireText(occurrenceTypeId, "occurrenceTypeId");
             requireFractionInclusive(presenceThreshold, "presenceThreshold");
