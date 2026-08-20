@@ -67,7 +67,17 @@ public final class Stage20ResourceOccurrenceGenerator {
             String locationTag,
             Map<String, Double> occurrenceAffinityByTypeId,
             Set<String> sourceRequiredCapabilityTags) {
-        /** Validates and deterministically freezes one host profile. */
+        /**
+         * Validates and deterministically freezes one host profile.
+         *
+         * @param systemId owning system
+         * @param anchorId Stage-20C resource-field anchor ID
+         * @param hostClassId stable generation-only physical host classifier
+         * @param environment authoritative Stage-18 extraction environment
+         * @param locationTag physical Stage-18 facility installation location tag
+         * @param occurrenceAffinityByTypeId non-negative host affinity by Stage-18 occurrence type ID
+         * @param sourceRequiredCapabilityTags source-specific extraction capabilities beyond method baseline
+         */
         public ResourceHostProfile {
             Objects.requireNonNull(systemId, "systemId");
             anchorId = requireText(anchorId, "anchorId");
