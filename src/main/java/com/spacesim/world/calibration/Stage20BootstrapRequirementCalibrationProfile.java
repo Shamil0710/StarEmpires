@@ -109,7 +109,19 @@ public final class Stage20BootstrapRequirementCalibrationProfile {
             double maintenanceLimitedInputKgPerSecond,
             double stationTransferLimitedInputKgPerSecond,
             ProcessLimiter limitingAuthority) {
-        /** Validates immutable process evidence. */
+        /**
+         * Validates immutable process evidence.
+         *
+         * @param recipeId Stage-18 refining recipe
+         * @param facilityDefinitionId unique compatible installed facility
+         * @param grossInputKgPerSecond full-rate gross recipe input
+         * @param usefulOutputKgPerSecond useful process output
+         * @param powerLimitedInputKgPerSecond process-power ceiling
+         * @param engineeringLimitedInputKgPerSecond engineering-work ceiling
+         * @param maintenanceLimitedInputKgPerSecond maintenance-work ceiling
+         * @param stationTransferLimitedInputKgPerSecond station transfer ceiling
+         * @param limitingAuthority physical limiter selected by the minimum rate
+         */
         public ProcessEvidence {
             recipeId = requireText(recipeId, "recipeId");
             facilityDefinitionId = requireText(facilityDefinitionId, "facilityDefinitionId");
@@ -150,7 +162,21 @@ public final class Stage20BootstrapRequirementCalibrationProfile {
             String facilityFingerprint,
             String stationInfrastructureFingerprint,
             boolean stage22ReviewRequired) {
-        /** Validates and freezes a derived profile. */
+        /**
+         * Validates and freezes a derived profile.
+         *
+         * @param version stable Stage-20E calibration version
+         * @param referenceStationArchetypeId explicit reference station policy
+         * @param processPolicy explicit essential process selection
+         * @param processEvidence physical rate calculations
+         * @param bootstrapRequirements economic acceptance input
+         * @param dependencyRequirements matching dependency projection
+         * @param resourceOntologyFingerprint Stage-18A semantic fingerprint
+         * @param refiningFingerprint Stage-18C semantic fingerprint
+         * @param facilityFingerprint Stage-18E semantic fingerprint
+         * @param stationInfrastructureFingerprint Stage-18F semantic fingerprint
+         * @param stage22ReviewRequired later balance-review flag
+         */
         public DerivedProfile {
             version = requireText(version, "version");
             referenceStationArchetypeId = requireText(referenceStationArchetypeId, "referenceStationArchetypeId");
