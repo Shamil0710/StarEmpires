@@ -5,177 +5,206 @@ import com.spacesim.world.Stage20JumpEdgeState.ArrivalEndpoint;
 import com.spacesim.world.Stage20JumpEdgeState.OperationalAccessState;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.TreeMap;
+import java.util.Set;
 
 /**
- * Exact-coverage immutable Stage-20D physical metadata index over one {@link GalaxyTopology}.
+ * Immutable exact-coverage Stage-20D metadata catalog over an existing {@link GalaxyTopology}.
  *
- * <p>The catalog does not replace topology. It augments every existing ordinary
- * {@link JumpConnection} with physical/access/arrival metadata and rejects missing or extra rows so
- * an unknown edge cannot accidentally become an execution shortcut.</p>
+ * <p>The catalog does not replace {@link GalaxyTopology}: every catalog row must correspond to
+ * exactly one existing {@link JumpConnection}, and every topology connection must have exactly one
+ * metadata row. This preserves the already-accepted neighbor graph while making physical edge state
+ * explicit for routing, arrival and later persistence.</p>
  */
 public final class Stage20JumpEdgeCatalog {
-    /** Current exact-coverage catalog version. */
+    /** Current Stage-20D catalog version. */
     public static final String CURRENT_VERSION = "stage20d.jump-edge-catalog.v1";
 
+    private final String version;
     private final GalaxyTopology topology;
+    private final List<Stage20JumpEdgeState> edges;
     private final Map<JumpConnection, Stage20JumpEdgeState> byConnection;
     private final Map<String, Stage20JumpEdgeState> byId;
 
     /**
-     * Creates an exact one-to-one physical metadata catalog for the supplied topology.
+     * Creates and validates one exact-coverage edge catalog.
      *
-     * @param topology immutable ordinary graph authority
-     * @param edgeStates one physical row for every ordinary edge and no extras
+     * @param version stable catalog version
+     * @param topology authoritative existing topology
+     * @param edges one metadata row for every topology connection
      */
-    public Stage20JumpEdgeCatalog(GalaxyTopology topology, List<Stage20JumpEdgeState> edgeStates) {
+    public Stage20JumpEdgeCatalog(
+            String version,
+            GalaxyTopology topology,
+            List<Stage20JumpEdgeState> edges) {
+        if (version == null || version.isBlank()) {
+            throw new IllegalArgumentException("version must not be blank");
+        }
+        this.version = version;
         this.topology = Objects.requireNonNull(topology, "topology");
-        Objects.requireNonNull(edgeStates, "edgeStates");
+        Objects.requireNonNull(edges, "edges");
 
-        TreeMap<JumpConnection, Stage20JumpEdgeState> connections = new TreeMap<>();
-        TreeMap<String, Stage20JumpEdgeState> ids = new TreeMap<>();
-        for (Stage20JumpEdgeState state : edgeStates) {
-            Stage20JumpEdgeState checked = Objects.requireNonNull(state, "edge state");
-            if (!Stage20JumpEdgeState.CURRENT_VERSION.equals(checked.version())) {
-                throw new IllegalArgumentException("Unsupported Stage20 jump-edge state version: " + checked.version());
+        ArrayList<Stage20JumpEdgeState> copy = new ArrayList<>(edges);
+        if (copy.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("edges cannot contain null");
+        }
+        copy.sort(Comparator.comparing(Stage20JumpEdgeState::connection));
+
+        HashMap<JumpConnection, Stage20JumpEdgeState> connectionIndex = new HashMap<>();
+        HashMap<String, Stage20JumpEdgeState> idIndex = new HashMap<>();
+        for (Stage20JumpEdgeState edge : copy) {
+            if (!Stage20JumpEdgeState.CURRENT_VERSION.equals(edge.version())) {
+                throw new IllegalArgumentException("catalog requires current Stage-20D edge metadata version");
             }
-            if (!topology.connections().contains(checked.connection())) {
-                throw new IllegalArgumentException("Jump-edge metadata contains connection outside topology: "
-                        + checked.connection());
+            if (!topology.connections().contains(edge.connection())) {
+                throw new IllegalArgumentException("metadata references non-topology edge: " + edge.connection());
             }
-            if (connections.putIfAbsent(checked.connection(), checked) != null) {
-                throw new IllegalArgumentException("Duplicate physical jump-edge row: " + checked.connection());
+            if (connectionIndex.putIfAbsent(edge.connection(), edge) != null) {
+                throw new IllegalArgumentException("duplicate metadata for topology edge: " + edge.connection());
             }
-            if (ids.putIfAbsent(checked.edgeId(), checked) != null) {
-                throw new IllegalArgumentException("Duplicate stable physical jump-edge id: " + checked.edgeId());
+            if (idIndex.putIfAbsent(edge.edgeId(), edge) != null) {
+                throw new IllegalArgumentException("duplicate stable edge ID: " + edge.edgeId());
             }
         }
-        if (connections.size() != topology.connections().size()) {
-            ArrayList<JumpConnection> missing = new ArrayList<>();
-            for (JumpConnection connection : topology.connections()) {
-                if (!connections.containsKey(connection)) {
-                    missing.add(connection);
-                }
-            }
-            throw new IllegalArgumentException("Stage20 jump-edge metadata must exactly cover topology; missing="
-                    + missing);
+        Set<JumpConnection> missing = new HashSet<>(topology.connections());
+        missing.removeAll(connectionIndex.keySet());
+        if (!missing.isEmpty() || connectionIndex.size() != topology.connections().size()) {
+            throw new IllegalArgumentException("edge metadata must exactly cover topology connections; missing=" + missing);
         }
-        this.byConnection = Collections.unmodifiableMap(new LinkedHashMap<>(connections));
-        this.byId = Collections.unmodifiableMap(new LinkedHashMap<>(ids));
+
+        this.edges = List.copyOf(copy);
+        this.byConnection = Map.copyOf(connectionIndex);
+        this.byId = Map.copyOf(idIndex);
     }
 
-    /** @return immutable topology augmented by this catalog */
+    /**
+     * Returns the stable catalog version.
+     *
+     * @return stable catalog version
+     */
+    public String version() {
+        return version;
+    }
+
+    /**
+     * Returns the authoritative topology covered by this catalog.
+     *
+     * @return authoritative topology covered by this catalog
+     */
     public GalaxyTopology topology() {
         return topology;
     }
 
-    /** @return deterministic immutable edge rows */
-    public List<Stage20JumpEdgeState> edgeStates() {
-        return List.copyOf(byConnection.values());
-    }
-
     /**
-     * Finds physical metadata for an existing connection.
+     * Returns deterministic connection-ordered immutable metadata rows.
      *
-     * @param connection canonical ordinary connection
-     * @return matching physical row when present
+     * @return deterministic connection-ordered immutable metadata rows
      */
-    public Optional<Stage20JumpEdgeState> find(JumpConnection connection) {
-        return Optional.ofNullable(byConnection.get(Objects.requireNonNull(connection, "connection")));
+    public List<Stage20JumpEdgeState> edges() {
+        return edges;
     }
 
     /**
-     * Requires physical metadata for an existing connection.
-     *
-     * @param connection canonical ordinary connection
-     * @return exact physical row
-     */
-    public Stage20JumpEdgeState require(JumpConnection connection) {
-        return find(connection).orElseThrow(() -> new IllegalArgumentException(
-                "No Stage20 physical metadata for topology connection " + connection));
-    }
-
-    /**
-     * Finds one row by stable edge ID.
-     *
-     * @param edgeId stable generated ID
-     * @return matching physical row when present
-     */
-    public Optional<Stage20JumpEdgeState> findById(String edgeId) {
-        if (edgeId == null || edgeId.isBlank()) {
-            throw new IllegalArgumentException("edgeId must not be blank");
-        }
-        return Optional.ofNullable(byId.get(edgeId));
-    }
-
-    /**
-     * Reports whether an ordinary topology edge is currently physically traversable.
+     * Finds metadata by canonical connection.
      *
      * @param connection topology connection
-     * @return true only when physical world state is open
+     * @return matching metadata or empty
+     */
+    public Optional<Stage20JumpEdgeState> find(JumpConnection connection) {
+        return Optional.ofNullable(connection == null ? null : byConnection.get(connection));
+    }
+
+    /**
+     * Requires metadata by canonical connection.
+     *
+     * @param connection topology connection
+     * @return matching metadata
+     */
+    public Stage20JumpEdgeState require(JumpConnection connection) {
+        JumpConnection checked = Objects.requireNonNull(connection, "connection");
+        Stage20JumpEdgeState edge = byConnection.get(checked);
+        if (edge == null) {
+            throw new IllegalArgumentException("unknown topology edge: " + checked);
+        }
+        return edge;
+    }
+
+    /**
+     * Finds metadata by stable edge ID.
+     *
+     * @param edgeId stable edge identity
+     * @return matching metadata or empty
+     */
+    public Optional<Stage20JumpEdgeState> findById(String edgeId) {
+        return Optional.ofNullable(edgeId == null ? null : byId.get(edgeId));
+    }
+
+    /**
+     * Returns whether the edge is currently physically traversable.
+     *
+     * @param connection explicit topology edge
+     * @return true only for an existing physically open edge
      */
     public boolean isPhysicallyTraversable(JumpConnection connection) {
-        return require(connection).operationalAccessState() == OperationalAccessState.OPEN;
+        Stage20JumpEdgeState edge = require(connection);
+        return edge.operationalAccessState() == OperationalAccessState.OPEN;
     }
 
     /**
-     * Computes fitted transit for one physical edge from the authoritative current jump plan.
+     * Applies edge parameters to the live fitted edge-transit capability.
      *
-     * @param connection topology edge
-     * @param fittedPlan current executable fitted FTL planning snapshot
-     * @return edge transit seconds
+     * @param connection explicit topology edge
+     * @param fittedPlan current executable fitted jump plan
+     * @return positive physical transit seconds for this edge
      */
     public double transitSeconds(JumpConnection connection, JumpPlan fittedPlan) {
-        return require(connection).transitParameters().transitSeconds(
-                Objects.requireNonNull(fittedPlan, "fittedPlan"));
+        Stage20JumpEdgeState edge = require(connection);
+        JumpPlan plan = Objects.requireNonNull(fittedPlan, "fittedPlan");
+        if (!plan.allowed() || !Double.isFinite(plan.edgeTransitSeconds()) || plan.edgeTransitSeconds() <= 0d) {
+            throw new IllegalArgumentException("edge transit requires an executable fitted jump plan");
+        }
+        double result = plan.edgeTransitSeconds() * edge.transitParameters().fittedTransitMultiplier();
+        if (!Double.isFinite(result) || result <= 0d) {
+            throw new IllegalStateException("edge transit parameter overflow for " + edge.edgeId());
+        }
+        return result;
     }
 
     /**
-     * Returns the destination-local physical arrival endpoint for traversing one connection.
+     * Returns destination-local physical arrival geometry for one edge.
      *
-     * @param connection topology edge
-     * @param destination direct-neighbor destination
-     * @return generated authoritative destination-local endpoint
+     * @param connection explicit topology edge
+     * @param destination destination endpoint
+     * @return authoritative Stage-20 physical arrival geometry
      */
     public ArrivalEndpoint arrivalIn(JumpConnection connection, StarSystemId destination) {
-        return require(connection).arrivalIn(Objects.requireNonNull(destination, "destination"));
+        return require(connection).arrivalIn(destination);
     }
 
     /**
-     * Produces a new exact-coverage catalog with one physical edge access state changed.
+     * Returns a new catalog with one edge's world-global physical availability updated.
      *
-     * <p>This helper represents world-global physical closure/opening only. Faction law remains a
-     * separate Stage-17 authorization layer.</p>
-     *
-     * @param connection edge to change
-     * @param accessState new physical state
-     * @return immutable updated catalog
+     * @param connection existing topology edge
+     * @param state new physical access state
+     * @return immutable exact-coverage catalog
      */
     public Stage20JumpEdgeCatalog withOperationalAccess(
             JumpConnection connection,
-            OperationalAccessState accessState) {
-        Objects.requireNonNull(connection, "connection");
-        Objects.requireNonNull(accessState, "accessState");
-        ArrayList<Stage20JumpEdgeState> rows = new ArrayList<>(edgeStates());
-        boolean updated = false;
-        for (int index = 0; index < rows.size(); index++) {
-            Stage20JumpEdgeState state = rows.get(index);
-            if (!state.connection().equals(connection)) {
-                continue;
-            }
-            rows.set(index, state.withOperationalAccessState(accessState));
-            updated = true;
-            break;
+            OperationalAccessState state) {
+        JumpConnection checked = Objects.requireNonNull(connection, "connection");
+        require(checked);
+        ArrayList<Stage20JumpEdgeState> updated = new ArrayList<>(edges.size());
+        for (Stage20JumpEdgeState edge : edges) {
+            updated.add(edge.connection().equals(checked)
+                    ? edge.withOperationalAccess(Objects.requireNonNull(state, "state"))
+                    : edge);
         }
-        if (!updated) {
-            throw new IllegalArgumentException("Cannot update non-topology Stage20 edge " + connection);
-        }
-        return new Stage20JumpEdgeCatalog(topology, rows);
+        return new Stage20JumpEdgeCatalog(version, topology, updated);
     }
 }
