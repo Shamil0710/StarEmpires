@@ -26,20 +26,64 @@ import java.util.TreeSet;
 public final class Stage20TheoreticalSupplyThroughputAnalyzer {
     private Stage20TheoreticalSupplyThroughputAnalyzer() { throw new AssertionError("No instances"); }
 
-    /** Calibrated physical time boundary for intermediate production logistics. */
+    /**
+     * Calibrated physical time boundary for intermediate production logistics.
+     *
+     * @param version stable analysis profile version
+     * @param maxIntermediateRouteTimeS maximum accepted physical input-delivery route time
+     */
     public record AnalysisProfile(String version, double maxIntermediateRouteTimeS) {
+        /**
+         * Validates one immutable analysis profile.
+         *
+         * @param version stable analysis profile version
+         * @param maxIntermediateRouteTimeS maximum accepted physical input-delivery route time
+         */
         public AnalysisProfile { version=text(version,"version"); positive(maxIntermediateRouteTimeS,"maxIntermediateRouteTimeS"); }
     }
 
-    /** Commodity capacity at one concrete producer system. */
+    /**
+     * Commodity capacity at one concrete producer system.
+     *
+     * @param commodityId authoritative Stage-18 commodity ID
+     * @param systemId physical producer system
+     */
     public record SupplyKey(String commodityId, StarSystemId systemId) implements Comparable<SupplyKey> {
+        /**
+         * Validates one immutable supply key.
+         *
+         * @param commodityId authoritative Stage-18 commodity ID
+         * @param systemId physical producer system
+         */
         public SupplyKey { commodityId=text(commodityId,"commodityId"); Objects.requireNonNull(systemId,"systemId"); }
+
+        /**
+         * Orders supply identities by commodity and then system.
+         *
+         * @param other other supply key
+         * @return deterministic comparison result
+         */
         @Override public int compareTo(SupplyKey other){ int c=commodityId.compareTo(other.commodityId); return c!=0?c:systemId.compareTo(other.systemId); }
     }
 
-    /** Machine-readable throughput closure. */
+    /**
+     * Machine-readable throughput closure.
+     *
+     * @param profileVersion exact analysis profile version
+     * @param capacityKgPerSecondBySupply resolved non-reserved physical capacity by supply identity
+     * @param unresolvedExtractionSiteIds extraction sites whose export handling remains unresolved
+     * @param processEvidence deterministic process-capacity evidence after physical input constraints
+     */
     public record SupplyThroughputReport(String profileVersion, Map<SupplyKey,Double> capacityKgPerSecondBySupply,
             Set<String> unresolvedExtractionSiteIds, List<ProcessThroughputEvidence> processEvidence) {
+        /**
+         * Validates and freezes one throughput report.
+         *
+         * @param profileVersion exact analysis profile version
+         * @param capacityKgPerSecondBySupply resolved non-reserved physical capacity by supply identity
+         * @param unresolvedExtractionSiteIds extraction sites whose export handling remains unresolved
+         * @param processEvidence deterministic process-capacity evidence after physical input constraints
+         */
         public SupplyThroughputReport {
             profileVersion=text(profileVersion,"profileVersion");
             Objects.requireNonNull(capacityKgPerSecondBySupply,"capacityKgPerSecondBySupply");
@@ -54,12 +98,39 @@ public final class Stage20TheoreticalSupplyThroughputAnalyzer {
             ev.sort(Comparator.comparing(ProcessThroughputEvidence::systemId).thenComparing(ProcessThroughputEvidence::stationPlacementId).thenComparing(ProcessThroughputEvidence::processId));
             processEvidence=List.copyOf(ev);
         }
+
+        /**
+         * Returns resolved capacity for one commodity/system pair.
+         *
+         * @param commodityId authoritative Stage-18 commodity ID
+         * @param systemId physical producer system
+         * @return resolved capacity in kilograms per second, or zero when absent
+         */
         public double capacityKgPerSecond(String commodityId, StarSystemId systemId){ return capacityKgPerSecondBySupply.getOrDefault(new SupplyKey(commodityId,systemId),0d); }
     }
 
-    /** Capacity evidence for one physical process row after input delivery constraints. */
+    /**
+     * Capacity evidence for one physical process row after input delivery constraints.
+     *
+     * @param systemId processing system
+     * @param stationPlacementId physical station placement identity
+     * @param processId authoritative Stage-18 process/recipe identity
+     * @param outputCommodityId produced commodity
+     * @param processAndStationCeilingKgPerSecond pristine process/station export ceiling
+     * @param inputLimitedOutputKgPerSecond output ceiling after physical input-delivery constraints
+     */
     public record ProcessThroughputEvidence(StarSystemId systemId, String stationPlacementId, String processId,
             String outputCommodityId, double processAndStationCeilingKgPerSecond, double inputLimitedOutputKgPerSecond) {
+        /**
+         * Validates one immutable process evidence row.
+         *
+         * @param systemId processing system
+         * @param stationPlacementId physical station placement identity
+         * @param processId authoritative Stage-18 process/recipe identity
+         * @param outputCommodityId produced commodity
+         * @param processAndStationCeilingKgPerSecond pristine process/station export ceiling
+         * @param inputLimitedOutputKgPerSecond output ceiling after physical input-delivery constraints
+         */
         public ProcessThroughputEvidence {
             Objects.requireNonNull(systemId,"systemId"); stationPlacementId=text(stationPlacementId,"stationPlacementId");
             processId=text(processId,"processId"); outputCommodityId=text(outputCommodityId,"outputCommodityId");
@@ -68,7 +139,18 @@ public final class Stage20TheoreticalSupplyThroughputAnalyzer {
         }
     }
 
-    /** Computes resolved feedstock -> material -> component physical throughput closure. */
+    /**
+     * Computes resolved feedstock -> material -> component physical throughput closure.
+     *
+     * @param topology authoritative explicit neighbor topology
+     * @param profile calibrated intermediate-route analysis profile
+     * @param routes physical route evaluator
+     * @param extractionCapacities generated extraction/export upper bounds
+     * @param processCapacities station refining/manufacturing upper bounds
+     * @param refining authoritative Stage-18 refining recipes
+     * @param manufacturing authoritative Stage-18 component manufacturing recipes
+     * @return deterministic non-reserved physical supply-throughput report
+     */
     public static SupplyThroughputReport analyze(GalaxyTopology topology, AnalysisProfile profile, RouteEvaluator routes,
             List<ExtractionCapacity> extractionCapacities, List<StationProcessCapacity> processCapacities,
             Stage18RefiningCatalog refining, Stage18ManufacturingCatalog manufacturing) {
