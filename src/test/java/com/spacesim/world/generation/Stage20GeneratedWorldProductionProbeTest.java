@@ -3,13 +3,12 @@ package com.spacesim.world.generation;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpFailure;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.world.GalaxyId;
-import com.spacesim.world.Stage20EconomicBootstrapValidator.BootstrapRequirementProfile;
-import com.spacesim.world.Stage20EconomicBootstrapValidator.CommodityRequirement;
 import com.spacesim.world.Stage20FactionStartDependencyDiagnostics.Requirement;
 import com.spacesim.world.Stage20GeneratedWorldBatchAcceptance;
 import com.spacesim.world.Stage20GeneratedWorldSeedAcceptance;
 import com.spacesim.world.Stage20LocalInfrastructureLayout.PlacementKind;
 import com.spacesim.world.Stage20PhysicalFreightRouteEvaluator.FreightFleetProfile;
+import com.spacesim.world.calibration.Stage20BootstrapRequirementCalibrationProfile;
 import com.spacesim.world.calibration.Stage20FactionStartAcceptanceProfile;
 import com.spacesim.world.calibration.Stage20FtlCalibrationProfile;
 import com.spacesim.world.calibration.Stage20FtlCalibrationProfile.JumpEdgeCalibrationSample;
@@ -22,6 +21,7 @@ import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.ProbeI
 import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.ProbeResult;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,6 +65,8 @@ class Stage20GeneratedWorldProductionProbeTest {
         assertEquals(
                 Stage20GeneratedWorldSeedAcceptance.CURRENT_VERSION,
                 result.seedAcceptance().version());
+        assertEquals(Stage20BootstrapRequirementCalibrationProfile.CURRENT_VERSION,
+                inputs.acceptance().bootstrapRequirements().version());
 
         result.localLayouts().orElseThrow().forEach(layout -> {
             assertEquals(topology.neighbors(layout.systemId()).size(), layout.placements().stream()
@@ -132,14 +134,19 @@ class Stage20GeneratedWorldProductionProbeTest {
     }
 
     @Test
-    void dependencyProjectionCannotSilentlyChangeBootstrapDemand() {
-        BootstrapRequirementProfile bootstrap = bootstrapRequirements();
+    void dependencyProjectionCannotSilentlyChangeDerivedBootstrapDemand() {
+        var derived = Stage20BootstrapRequirementCalibrationProfile.deriveCurrent();
+        ArrayList<Requirement> altered = new ArrayList<>(derived.dependencyRequirements());
+        Requirement original = altered.get(0);
+        altered.set(0, new Requirement(
+                original.commodityId(),
+                original.familyId(),
+                original.requiredKgPerSecond() * 2d,
+                original.maxSupplierRouteTimeS()));
 
         assertThrows(IllegalArgumentException.class, () -> new AcceptanceAuthority(
-                bootstrap,
-                List.of(
-                        new Requirement("commodity.feedstock.water_ice", "family.water", 2d, 1.0e9d),
-                        new Requirement("commodity.feedstock.metallic_ore", "family.metals", 1d, 1.0e9d)),
+                derived.bootstrapRequirements(),
+                altered,
                 Stage20FactionStartAcceptanceProfile.current(),
                 List.of("faction.alpha", "faction.beta")));
     }
@@ -162,6 +169,7 @@ class Stage20GeneratedWorldProductionProbeTest {
     }
 
     private static ProbeInputs inputsWithMacroRequest(Stage20MacroGalaxyGeometryGenerator.GenerationRequest request) {
+        var derivedDemand = Stage20BootstrapRequirementCalibrationProfile.deriveCurrent();
         return new ProbeInputs(
                 request,
                 Stage20TopologyQualityCalibrationProfile.deriveCurrent(),
@@ -175,31 +183,11 @@ class Stage20GeneratedWorldProductionProbeTest {
                                 "station.infrastructure.refinery_complex"),
                         4),
                 new AcceptanceAuthority(
-                        bootstrapRequirements(),
-                        List.of(
-                                new Requirement(
-                                        "commodity.feedstock.water_ice",
-                                        "family.water",
-                                        1d,
-                                        1.0e9d),
-                                new Requirement(
-                                        "commodity.feedstock.metallic_ore",
-                                        "family.metals",
-                                        1d,
-                                        1.0e9d)),
+                        derivedDemand.bootstrapRequirements(),
+                        derivedDemand.dependencyRequirements(),
                         Stage20FactionStartAcceptanceProfile.current(),
                         List.of("faction.alpha", "faction.beta")),
                 calibratedTransport());
-    }
-
-    private static BootstrapRequirementProfile bootstrapRequirements() {
-        return new BootstrapRequirementProfile(
-                "stage20e.production-probe.integration-demand.v1",
-                1.0e9d,
-                1d,
-                List.of(
-                        new CommodityRequirement("commodity.feedstock.water_ice", 1.0e9d, 1d),
-                        new CommodityRequirement("commodity.feedstock.metallic_ore", 1.0e9d, 1d)));
     }
 
     private static PhysicalTransportAuthority calibratedTransport() {
