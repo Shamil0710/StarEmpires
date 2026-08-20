@@ -70,7 +70,12 @@ public final class Stage20EconomicBootstrapValidator {
      */
     public record RouteAssessment(List<StarSystemId> orderedSystems, double travelTimeS,
             double sustainableCargoThroughputKgPerSecond) {
-        /** Validates one immutable physical route assessment. */
+        /**
+         * Validates one immutable physical route assessment.
+         * @param orderedSystems ordered systems from producer to consumer, including both endpoints
+         * @param travelTimeS physical representative delivery time
+         * @param sustainableCargoThroughputKgPerSecond physically sustainable delivered throughput
+         */
         public RouteAssessment {
             Objects.requireNonNull(orderedSystems, "orderedSystems");
             if (orderedSystems.isEmpty() || orderedSystems.stream().anyMatch(Objects::isNull)) {
@@ -96,7 +101,13 @@ public final class Stage20EconomicBootstrapValidator {
      */
     public record BootstrapRequirementProfile(String version, double maxIntermediateInputRouteTimeS,
             double minIntermediateInputThroughputKgPerSecond, List<CommodityRequirement> essentialCommodities) {
-        /** Validates one immutable requirement profile. */
+        /**
+         * Validates one immutable requirement profile.
+         * @param version stable calibration/profile version
+         * @param maxIntermediateInputRouteTimeS maximum delivery time accepted for recipe inputs
+         * @param minIntermediateInputThroughputKgPerSecond minimum delivered throughput for recipe inputs
+         * @param essentialCommodities required commodity reachability by start system
+         */
         public BootstrapRequirementProfile {
             version = requireText(version, "version");
             requirePositiveFinite(maxIntermediateInputRouteTimeS, "maxIntermediateInputRouteTimeS");
@@ -126,7 +137,12 @@ public final class Stage20EconomicBootstrapValidator {
      */
     public record CommodityRequirement(String commodityId, double maxSupplierRouteTimeS,
             double minSupplierThroughputKgPerSecond) {
-        /** Validates one commodity requirement. */
+        /**
+         * Validates one commodity requirement.
+         * @param commodityId authoritative Stage-18 commodity ID
+         * @param maxSupplierRouteTimeS maximum acceptable physical supplier route time
+         * @param minSupplierThroughputKgPerSecond minimum acceptable delivered throughput
+         */
         public CommodityRequirement {
             commodityId = requireText(commodityId, "commodityId");
             requirePositiveFinite(maxSupplierRouteTimeS, "maxSupplierRouteTimeS");
@@ -145,7 +161,14 @@ public final class Stage20EconomicBootstrapValidator {
     public record BootstrapReport(boolean accepted, String requirementProfileVersion,
             Map<String, Set<StarSystemId>> producerSystemsByCommodity,
             List<RequirementEvidence> requirementEvidence, List<BootstrapFailure> failures) {
-        /** Validates and freezes one deterministic report. */
+        /**
+         * Validates and freezes one deterministic report.
+         * @param accepted true only when every required start/commodity has a physical supply chain
+         * @param requirementProfileVersion exact calibrated requirement profile version
+         * @param producerSystemsByCommodity deterministic production closure by commodity
+         * @param requirementEvidence successful essential-supply evidence
+         * @param failures deterministic rejection diagnostics
+         */
         public BootstrapReport {
             requirementProfileVersion = requireText(requirementProfileVersion, "requirementProfileVersion");
             Objects.requireNonNull(producerSystemsByCommodity, "producerSystemsByCommodity");
@@ -187,7 +210,13 @@ public final class Stage20EconomicBootstrapValidator {
      */
     public record RequirementEvidence(StarSystemId startSystemId, String commodityId,
             StarSystemId producerSystemId, RouteAssessment route) {
-        /** Validates one evidence row. */
+        /**
+         * Validates one evidence row.
+         * @param startSystemId evaluated start/bootstrap system
+         * @param commodityId required commodity
+         * @param producerSystemId selected physical producer
+         * @param route selected explicit physical route
+         */
         public RequirementEvidence {
             Objects.requireNonNull(startSystemId, "startSystemId");
             commodityId = requireText(commodityId, "commodityId");
@@ -205,7 +234,13 @@ public final class Stage20EconomicBootstrapValidator {
      */
     public record BootstrapFailure(StarSystemId startSystemId, String commodityId,
             FailureReason reason, String detail) {
-        /** Validates one failure row. */
+        /**
+         * Validates one failure row.
+         * @param startSystemId evaluated start/bootstrap system
+         * @param commodityId required commodity
+         * @param reason failure class
+         * @param detail human-readable diagnostic without hidden repair action
+         */
         public BootstrapFailure {
             Objects.requireNonNull(startSystemId, "startSystemId");
             commodityId = requireText(commodityId, "commodityId");
