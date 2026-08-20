@@ -120,7 +120,14 @@ public record Stage20PhysicalGalacticRoute(
             double transitSeconds,
             double cooldownBeforeSeconds,
             double arrivalOffsetSeconds) {
-        /** Validates one ordered edge estimate. */
+        /**
+         * Validates one ordered edge estimate.
+         *
+         * @param connection canonical production topology connection
+         * @param transitSeconds edge-transit time used by the fitted planning snapshot/provider
+         * @param cooldownBeforeSeconds cooldown wait before this edge; zero only on the first edge
+         * @param arrivalOffsetSeconds cumulative FTL time at arrival through this edge
+         */
         public EdgeEstimate {
             Objects.requireNonNull(connection, "connection");
             requirePositiveFinite(transitSeconds, "transitSeconds");
