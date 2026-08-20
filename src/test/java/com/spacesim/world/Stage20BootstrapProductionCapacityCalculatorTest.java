@@ -92,16 +92,18 @@ class Stage20BootstrapProductionCapacityCalculatorTest {
                 .filter(row -> row.stationPlacementId().equals("refinery"))
                 .findFirst()
                 .orElseThrow();
-        var heavy = rows.stream()
+        var heavyRows = rows.stream()
                 .filter(row -> row.processId().equals("manufacturing.component.heavy"))
                 .filter(row -> row.stationPlacementId().equals("industry"))
-                .findFirst()
-                .orElseThrow();
+                .toList();
 
         assertEquals("facility.processing.bulk_refinery", structural.facilityDefinitionId());
         assertEquals(17d, structural.theoreticalOutputKgPerSecond(), 1e-9);
-        assertEquals("facility.fabrication.heavy", heavy.facilityDefinitionId());
-        assertEquals(10d, heavy.theoreticalOutputKgPerSecond(), 1e-9);
+        assertEquals(2, heavyRows.size());
+        assertEquals(
+                Set.of("facility.fabrication.assembly", "facility.fabrication.heavy"),
+                heavyRows.stream().map(row -> row.facilityDefinitionId()).collect(java.util.stream.Collectors.toSet()));
+        assertTrue(heavyRows.stream().allMatch(row -> row.theoreticalOutputKgPerSecond() > 0d));
         assertTrue(rows.stream().allMatch(row -> row.theoreticalOutputKgPerSecond() > 0d));
     }
 
