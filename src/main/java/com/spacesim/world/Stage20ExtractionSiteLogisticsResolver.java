@@ -68,7 +68,18 @@ public final class Stage20ExtractionSiteLogisticsResolver {
             Set<String> compatibleArchetypeIds,
             Optional<String> resolvedArchetypeId,
             OptionalDouble resolvedTransferKgPerSecond) {
-        /** Validates and freezes one deterministic logistics binding. */
+        /**
+         * Validates and freezes one deterministic logistics binding.
+         *
+         * @param siteId generated extraction site identity
+         * @param sourceId generated finite source identity
+         * @param systemId owning star system
+         * @param storageClassId Stage-18 storage class that must be exported
+         * @param status resolution status
+         * @param compatibleArchetypeIds all physically compatible existing archetype IDs
+         * @param resolvedArchetypeId unique selected identity only when resolved
+         * @param resolvedTransferKgPerSecond unique physical transfer rate only when resolved
+         */
         public SiteLogisticsBinding {
             siteId = requireText(siteId, "siteId");
             sourceId = requireText(sourceId, "sourceId");
@@ -110,7 +121,11 @@ public final class Stage20ExtractionSiteLogisticsResolver {
      * @param bindings one row for every generated initial extraction site
      */
     public record ResolutionReport(List<SiteLogisticsBinding> bindings) {
-        /** Validates and freezes one report. */
+        /**
+         * Validates and freezes one report.
+         *
+         * @param bindings one row for every generated initial extraction site
+         */
         public ResolutionReport {
             Objects.requireNonNull(bindings, "bindings");
             ArrayList<SiteLogisticsBinding> copy = new ArrayList<>(bindings);
