@@ -122,7 +122,7 @@ class Stage20LocalPhysicalResourceHostGeneratorTest {
 
         assertFalse(resources.occurrences().isEmpty());
         for (var occurrence : resources.occurrences()) {
-            var host = physicalHosts.host(occurrence.systemId(), occurrence.anchorId());
+            var host = physicalHosts.host(occurrence.systemId(), occurrence.hostAnchorId());
             assertEquals(host.position(), occurrence.position());
             assertEquals(host.hostClass().hostClassId(), occurrence.hostClassId());
             assertEquals(host.hostClass().environment(), occurrence.environment());
