@@ -31,6 +31,7 @@ import java.util.Optional;
  * @param topologyQualityProfileVersion consumed topology-quality calibration version
  * @param intersystemCadenceProfileVersion consumed cadence calibration version
  */
+@SuppressWarnings("doclint:missing")
 public record Stage20JumpEdgeState(
         String version,
         String edgeId,

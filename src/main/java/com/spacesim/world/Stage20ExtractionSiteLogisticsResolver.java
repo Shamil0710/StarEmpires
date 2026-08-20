@@ -34,6 +34,7 @@ import java.util.TreeSet;
  * between materially different infrastructure archetypes is a world-generation policy decision,
  * not a lexical or hidden optimization shortcut.</p>
  */
+@SuppressWarnings("doclint:missing")
 public final class Stage20ExtractionSiteLogisticsResolver {
     private Stage20ExtractionSiteLogisticsResolver() {
         throw new AssertionError("No instances");

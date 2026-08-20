@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.OptionalDouble;
 
 /** Physical upper-bound capacity calculations used by Stage-20E bootstrap acceptance. */
+@SuppressWarnings("doclint:missing")
 public final class Stage20BootstrapProductionCapacityCalculator {
     private Stage20BootstrapProductionCapacityCalculator() { throw new AssertionError("No instances"); }
 

@@ -24,6 +24,7 @@ import java.util.TreeSet;
  * both satisfy the injected demand threshold. It still does not model simultaneous multi-commodity
  * fleet allocation; that limitation remains explicit in the source throughput report.</p>
  */
+@SuppressWarnings("doclint:missing")
 public final class Stage20EconomicThroughputAcceptance {
     private Stage20EconomicThroughputAcceptance() {
         throw new AssertionError("No instances");
