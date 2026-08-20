@@ -3,72 +3,57 @@ package com.spacesim.world.generation;
 import com.spacesim.world.GalaxyTopology;
 
 import java.util.Objects;
-import java.util.Optional;
 
 /**
- * Immutable Stage-20D topology generation outcome.
+ * Deterministic Stage-20D topology-generation outcome.
  *
- * @param status accepted topology or bounded deterministic seed rejection
- * @param topology accepted authoritative topology, absent on rejection
- * @param qualityReport final quality diagnostics for the accepted/rejected candidate
- * @param repairPasses number of strictly improving repair edges committed
- * @param rejectionReason stable human-readable reason, empty on acceptance
+ * <p>A rejected candidate remains available for diagnostics but must not be materialized as the
+ * production ordinary galaxy.</p>
+ *
+ * @param seed world/generation seed used by deterministic tie-breaking
+ * @param status accepted or rejected quality-gate result
+ * @param candidateTopology generated candidate graph
+ * @param qualityReport final post-repair diagnostics
+ * @param repairPasses number of committed deterministic repair additions
  */
 public record Stage20JumpTopologyGenerationResult(
+        long seed,
         Status status,
-        Optional<GalaxyTopology> topology,
+        GalaxyTopology candidateTopology,
         Stage20TopologyQualityReport qualityReport,
-        int repairPasses,
-        String rejectionReason) {
-    /** Stable generation outcome. */
+        int repairPasses) {
+
+    /** Final Stage-20D v1 generation status. */
     public enum Status {
-        /** Candidate satisfies the calibrated Stage-20D quality gates. */ ACCEPTED,
-        /** Bounded deterministic repair could not produce an acceptable graph. */ REJECTED_SEED
+        /** Candidate satisfies every ordinary Stage-20D v1 quality budget. */
+        ACCEPTED,
+        /** Bounded deterministic repair could not satisfy the ordinary quality gate. */
+        REJECTED_SEED
     }
 
-    /** Validates acceptance/rejection payload consistency. */
+    /** Validates one immutable generation outcome. */
     public Stage20JumpTopologyGenerationResult {
         Objects.requireNonNull(status, "status");
-        Objects.requireNonNull(topology, "topology");
+        Objects.requireNonNull(candidateTopology, "candidateTopology");
         Objects.requireNonNull(qualityReport, "qualityReport");
         if (repairPasses < 0) {
             throw new IllegalArgumentException("repairPasses must be non-negative");
         }
-        if (rejectionReason == null) {
-            throw new IllegalArgumentException("rejectionReason must not be null");
-        }
-        if (status == Status.ACCEPTED) {
-            if (topology.isEmpty() || !qualityReport.accepted() || !rejectionReason.isBlank()) {
-                throw new IllegalArgumentException("accepted result requires accepted topology/report and no reason");
-            }
-        } else if (topology.isPresent() || qualityReport.accepted() || rejectionReason.isBlank()) {
-            throw new IllegalArgumentException("rejected result requires failing report, reason and no topology");
+        if ((status == Status.ACCEPTED) != qualityReport.accepted()) {
+            throw new IllegalArgumentException("status must match final quality report");
         }
     }
 
-    /** Creates an accepted result. */
-    public static Stage20JumpTopologyGenerationResult accepted(
-            GalaxyTopology topology,
-            Stage20TopologyQualityReport report,
-            int repairPasses) {
-        return new Stage20JumpTopologyGenerationResult(
-                Status.ACCEPTED,
-                Optional.of(Objects.requireNonNull(topology, "topology")),
-                report,
-                repairPasses,
-                "");
-    }
-
-    /** Creates a bounded deterministic seed rejection result. */
-    public static Stage20JumpTopologyGenerationResult rejected(
-            Stage20TopologyQualityReport report,
-            int repairPasses,
-            String reason) {
-        return new Stage20JumpTopologyGenerationResult(
-                Status.REJECTED_SEED,
-                Optional.empty(),
-                report,
-                repairPasses,
-                reason);
+    /**
+     * Returns the candidate only when the ordinary Stage-20D quality gate accepted it.
+     *
+     * @return accepted topology
+     * @throws IllegalStateException when the seed failed the ordinary quality gate
+     */
+    public GalaxyTopology requireAcceptedTopology() {
+        if (status != Status.ACCEPTED) {
+            throw new IllegalStateException("Stage-20D topology seed was rejected: " + seed);
+        }
+        return candidateTopology;
     }
 }
