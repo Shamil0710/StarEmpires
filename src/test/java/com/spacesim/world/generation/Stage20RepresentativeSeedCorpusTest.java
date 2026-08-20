@@ -13,6 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20RepresentativeSeedCorpusTest {
     private static final Path EVIDENCE_DIRECTORY = Path.of("target", "stage20e-evidence");
+    private static final String EVIDENCE_LOG_BEGIN = "STAGE20E_REPRESENTATIVE_CORPUS_EVIDENCE_BEGIN";
+    private static final String EVIDENCE_LOG_END = "STAGE20E_REPRESENTATIVE_CORPUS_EVIDENCE_END";
 
     @Test
     void corpusIsFixedContiguousAndChosenIndependentlyOfResults() {
@@ -56,5 +58,11 @@ class Stage20RepresentativeSeedCorpusTest {
         Path evidenceFile = EVIDENCE_DIRECTORY.resolve(Stage20RepresentativeSeedCorpus.EVIDENCE_FILE_NAME);
         Files.writeString(evidenceFile, json, StandardCharsets.UTF_8);
         assertEquals(json, Files.readString(evidenceFile, StandardCharsets.UTF_8));
+
+        // Keep the same deterministic evidence observable even when a connector cannot enumerate
+        // main-only workflow artifacts. Markers make exact extraction from repository CI logs safe.
+        System.out.println(EVIDENCE_LOG_BEGIN);
+        System.out.print(json);
+        System.out.println(EVIDENCE_LOG_END);
     }
 }
