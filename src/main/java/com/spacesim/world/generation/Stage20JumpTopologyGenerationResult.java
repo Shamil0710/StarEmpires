@@ -31,7 +31,15 @@ public record Stage20JumpTopologyGenerationResult(
         REJECTED_SEED
     }
 
-    /** Validates one immutable generation outcome. */
+    /**
+     * Validates one immutable generation outcome.
+     *
+     * @param seed world/generation seed used by deterministic tie-breaking
+     * @param status accepted or rejected quality-gate result
+     * @param candidateTopology generated candidate graph
+     * @param qualityReport final post-repair diagnostics
+     * @param repairPasses number of committed deterministic repair additions
+     */
     public Stage20JumpTopologyGenerationResult {
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(candidateTopology, "candidateTopology");
