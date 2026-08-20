@@ -27,7 +27,16 @@ public record Stage20NextJumpExecutionPlan(
         JumpConnection connection,
         ArrivalEndpoint arrivalEndpoint,
         Stage20PhysicalGalacticRoute currentRoute) {
-    /** Validates one immediate-hop execution plan. */
+    /**
+     * Validates one immediate-hop execution plan.
+     *
+     * @param routeDestination final requested route destination
+     * @param immediateDestination direct neighboring system for the next authoritative jump
+     * @param edgeId stable Stage-20D edge identity
+     * @param connection exact ordinary topology edge to execute
+     * @param arrivalEndpoint destination-local physical arrival geometry
+     * @param currentRoute freshly replanned physical route from current system to route destination
+     */
     public Stage20NextJumpExecutionPlan {
         Objects.requireNonNull(routeDestination, "routeDestination");
         Objects.requireNonNull(immediateDestination, "immediateDestination");
