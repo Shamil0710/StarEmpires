@@ -43,16 +43,21 @@ import java.util.TreeSet;
  * <p>The search adds only the next prefix freighter on a route and branches only over modifiable arcs
  * crossing the current residual minimum cut. Adding capacity outside that cut cannot increase the
  * current maximum flow, so this preserves completeness while avoiding the much larger Cartesian
- * product of all route allocations. The caller supplies a finite search-node budget. Exhausting that
- * budget is reported as unresolved authority and is never mislabeled as physical infeasibility.</p>
+ * product of all route allocations. Within that complete candidate set, the planner visits the most
+ * constrained demand first. It also prunes a state only when an intentionally optimistic sum of every
+ * remaining route marginal allowed by the per-start fleet bounds still cannot close the current
+ * maximum-flow deficit. That bound ignores producer competition and prefix coupling, so it may
+ * overestimate descendant capacity but cannot reject a physically feasible descendant.</p>
  *
- * <p>The planner does not create ships, stock, resources, topology edges, ownership or money. The
- * per-start freight count is a service-capacity bound supplied by the caller.</p>
+ * <p>The caller supplies a finite search-node budget. Exhausting that budget is reported as unresolved
+ * authority and is never mislabeled as physical infeasibility. The planner does not create ships,
+ * stock, resources, topology edges, ownership or money. The per-start freight count is a
+ * service-capacity bound supplied by the caller.</p>
  */
 @SuppressWarnings("doclint:missing")
 public final class Stage20CoordinatedWholePlacementFreightPlanner {
     /** Stable coordinated-planner version. */
-    public static final String CURRENT_VERSION = "stage20e.coordinated-whole-placement-freight-planner.v1";
+    public static final String CURRENT_VERSION = "stage20e.coordinated-whole-placement-freight-planner.v2";
     private static final double EPSILON = 1.0e-9d;
 
     private Stage20CoordinatedWholePlacementFreightPlanner() {
@@ -919,8 +924,13 @@ public final class Stage20CoordinatedWholePlacementFreightPlanner {
             if (flow.totalFlowKgPerSecond() + EPSILON >= model.totalDemandKgPerSecond()) {
                 return new SearchSolution(routeCounts);
             }
+            if (!canStillReachTotalDemand(flow, routeCounts, shipsByStart)) {
+                failedStates.add(key);
+                return null;
+            }
 
             ArrayList<RouteCurve> candidates = new ArrayList<>();
+            int[] candidateCountsByDemand = new int[model.demands().size()];
             for (RouteCurve curve : model.routes()) {
                 int count = routeCounts[curve.index()];
                 if (count >= curve.points().size() || shipsByStart[curve.startIndex()] >= model.perStartBudget()) {
@@ -930,10 +940,13 @@ public final class Stage20CoordinatedWholePlacementFreightPlanner {
                 int demandNode = flow.demandBase() + curve.demandIndex();
                 if (flow.reachable()[producerNode] && !flow.reachable()[demandNode]) {
                     candidates.add(curve);
+                    candidateCountsByDemand[curve.demandIndex()]++;
                 }
             }
             candidates.sort(Comparator
-                    .comparingDouble((RouteCurve value) -> -value.nextMarginal(routeCounts[value.index()]))
+                    .comparingInt((RouteCurve value) -> candidateCountsByDemand[value.demandIndex()])
+                    .thenComparingDouble(value -> -demandDeficit(flow, value.demandIndex()))
+                    .thenComparingDouble(value -> -value.nextMarginal(routeCounts[value.index()]))
                     .thenComparingInt(RouteCurve::startIndex)
                     .thenComparing(RouteCurve::commodityId)
                     .thenComparing(RouteCurve::supplierSystemId)
@@ -956,6 +969,45 @@ public final class Stage20CoordinatedWholePlacementFreightPlanner {
             }
             failedStates.add(key);
             return null;
+        }
+
+        private double demandDeficit(FlowResult flow, int demandIndex) {
+            Demand demand = model.demands().get(demandIndex);
+            return Math.max(0d,
+                    demand.requirement().minSupplierThroughputKgPerSecond()
+                            - flow.deliveredByDemand()[demandIndex]);
+        }
+
+        private boolean canStillReachTotalDemand(
+                FlowResult flow,
+                int[] routeCounts,
+                int[] shipsByStart) {
+            double optimisticTotal = flow.totalFlowKgPerSecond();
+            for (int startIndex = 0; startIndex < model.assignments().size(); startIndex++) {
+                int remainingShips = model.perStartBudget() - shipsByStart[startIndex];
+                if (remainingShips <= 0) {
+                    continue;
+                }
+                ArrayList<Double> remainingMarginals = new ArrayList<>();
+                for (RouteCurve curve : model.routes()) {
+                    if (curve.startIndex() != startIndex) {
+                        continue;
+                    }
+                    int currentCount = routeCounts[curve.index()];
+                    for (int pointIndex = currentCount; pointIndex < curve.points().size(); pointIndex++) {
+                        remainingMarginals.add(curve.points().get(pointIndex).marginalKgPerSecond());
+                    }
+                }
+                remainingMarginals.sort(Comparator.reverseOrder());
+                int admitted = Math.min(remainingShips, remainingMarginals.size());
+                for (int index = 0; index < admitted; index++) {
+                    optimisticTotal = finiteAdd(optimisticTotal, remainingMarginals.get(index));
+                    if (optimisticTotal + EPSILON >= model.totalDemandKgPerSecond()) {
+                        return true;
+                    }
+                }
+            }
+            return optimisticTotal + EPSILON >= model.totalDemandKgPerSecond();
         }
     }
 
