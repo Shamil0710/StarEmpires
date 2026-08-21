@@ -87,6 +87,12 @@ The v1 acceptance tests require:
 5. an absent selected rich option fails closed;
 6. a non-accepted combiner result cannot become a physical ownership plan.
 
+## Verification evidence
+
+The initial dependency merge-ref Java 17 `clean verify` run `32491405418` completed successfully across tests, coverage, Javadoc and desktop-package verification. The upstream maximum-cap resolver is now merged into `main` as `f7ef11a79cf9599403d1004733b2c3c12159be61`.
+
+This evidence-recording commit intentionally creates a new PR head after retargeting to current `main`; a fresh current-`main` merge-ref CI run is the final acceptance gate.
+
 ## Next causal slice
 
 After this reconstruction seam is accepted, Stage 20E can allocate concrete persistent freight ownership against the returned remote commitments.
