@@ -443,11 +443,14 @@ Current Stage-20F foundation:
   candidates;
 - `docs/stage20f_industrial_input_reservation_plan_v1.md` consumes an explicit physical
   process/output-rate selection and reserves shared `SupplyKey` capacity globally without double-use.
+- `docs/stage20f_industrial_input_freight_ownership_plan_v1.md` assigns every selected process an
+  explicit faction owner, re-evaluates each remote reservation at an exact integer ship count and
+  consumes distinct reserve slots from the existing Stage-20E finite ownership pools.
 
-Candidate and route evidence remain deliberately non-reserved. An accepted input-reservation report
-closes only `RESERVED_INDUSTRIAL_INPUTS`; it cannot promote candidates into operational specialization
-until owned input freight, facility operating state, initial inventory and installed-yard authority are
-explicit.
+Candidate and route evidence remain deliberately non-reserved. Accepted reservation plus freight
+ownership now close `RESERVED_INDUSTRIAL_INPUTS` and `OWNED_INDUSTRIAL_INPUT_FREIGHT`, but cannot
+promote candidates into operational specialization until facility operating state, initial inventory
+and installed-yard authority are explicit.
 
 ## 9. Stage 21 — RPG / Living World
 
