@@ -440,11 +440,14 @@ Current Stage-20F foundation:
   station/facility/storage/extraction/process candidates from one accepted root seed;
 - `docs/stage20f_industrial_input_route_evidence_plan_v1.md` retains the exact input supply keys,
   source capacities, physical routes, route-time admission and route-limited capacity behind those
-  candidates.
+  candidates;
+- `docs/stage20f_industrial_input_reservation_plan_v1.md` consumes an explicit physical
+  process/output-rate selection and reserves shared `SupplyKey` capacity globally without double-use.
 
-Both remain deliberately non-reserved and cannot promote candidates into operational specialization
-until shared-input reservation, owned input freight, facility operating state, initial inventory and
-installed-yard authority are explicit.
+Candidate and route evidence remain deliberately non-reserved. An accepted input-reservation report
+closes only `RESERVED_INDUSTRIAL_INPUTS`; it cannot promote candidates into operational specialization
+until owned input freight, facility operating state, initial inventory and installed-yard authority are
+explicit.
 
 ## 9. Stage 21 — RPG / Living World
 
