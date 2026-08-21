@@ -40,7 +40,16 @@ public final class Stage20RepresentativeGeneratedWorldProbeProfileV3 {
             Stage20CoordinatedFreightAcceptanceProfile coordinatedFreightAcceptance,
             List<String> policyEvidenceIds,
             boolean stage22ReviewRequired) {
-        /** Validates and freezes one v3 profile. */
+        /**
+         * Validates and freezes one v3 profile.
+         *
+         * @param version v3 profile version
+         * @param sourceRepresentativeProfileVersion exact preserved v2 profile version
+         * @param inputs unchanged generated-world production inputs
+         * @param coordinatedFreightAcceptance explicit finite-freight production acceptance policy
+         * @param policyEvidenceIds deterministic provenance statements
+         * @param stage22ReviewRequired inherited provisional review boundary
+         */
         public DerivedProfile {
             version = requireText(version, "version");
             sourceRepresentativeProfileVersion = requireText(
