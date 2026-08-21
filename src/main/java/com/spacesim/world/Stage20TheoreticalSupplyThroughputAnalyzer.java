@@ -95,7 +95,10 @@ public final class Stage20TheoreticalSupplyThroughputAnalyzer {
             unresolvedExtractionSiteIds=Collections.unmodifiableSet(unresolved);
             Objects.requireNonNull(processEvidence,"processEvidence"); ArrayList<ProcessThroughputEvidence> ev=new ArrayList<>(processEvidence);
             if(ev.stream().anyMatch(Objects::isNull)) throw new IllegalArgumentException("null process evidence");
-            ev.sort(Comparator.comparing(ProcessThroughputEvidence::systemId).thenComparing(ProcessThroughputEvidence::stationPlacementId).thenComparing(ProcessThroughputEvidence::processId));
+            ev.sort(Comparator.comparing(ProcessThroughputEvidence::systemId)
+                    .thenComparing(ProcessThroughputEvidence::stationPlacementId)
+                    .thenComparing(ProcessThroughputEvidence::facilityDefinitionId)
+                    .thenComparing(ProcessThroughputEvidence::processId));
             processEvidence=List.copyOf(ev);
         }
 
@@ -114,18 +117,26 @@ public final class Stage20TheoreticalSupplyThroughputAnalyzer {
      *
      * @param systemId processing system
      * @param stationPlacementId physical station placement identity
+     * @param facilityDefinitionId exact installed Stage-18 facility definition providing the process
      * @param processId authoritative Stage-18 process/recipe identity
      * @param outputCommodityId produced commodity
      * @param processAndStationCeilingKgPerSecond pristine process/station export ceiling
      * @param inputLimitedOutputKgPerSecond output ceiling after physical input-delivery constraints
      */
-    public record ProcessThroughputEvidence(StarSystemId systemId, String stationPlacementId, String processId,
-            String outputCommodityId, double processAndStationCeilingKgPerSecond, double inputLimitedOutputKgPerSecond) {
+    public record ProcessThroughputEvidence(
+            StarSystemId systemId,
+            String stationPlacementId,
+            String facilityDefinitionId,
+            String processId,
+            String outputCommodityId,
+            double processAndStationCeilingKgPerSecond,
+            double inputLimitedOutputKgPerSecond) {
         /**
          * Validates one immutable process evidence row.
          *
          * @param systemId processing system
          * @param stationPlacementId physical station placement identity
+         * @param facilityDefinitionId exact installed Stage-18 facility definition
          * @param processId authoritative Stage-18 process/recipe identity
          * @param outputCommodityId produced commodity
          * @param processAndStationCeilingKgPerSecond pristine process/station export ceiling
@@ -133,6 +144,7 @@ public final class Stage20TheoreticalSupplyThroughputAnalyzer {
          */
         public ProcessThroughputEvidence {
             Objects.requireNonNull(systemId,"systemId"); stationPlacementId=text(stationPlacementId,"stationPlacementId");
+            facilityDefinitionId=text(facilityDefinitionId,"facilityDefinitionId");
             processId=text(processId,"processId"); outputCommodityId=text(outputCommodityId,"outputCommodityId");
             positive(processAndStationCeilingKgPerSecond,"process ceiling"); nonNegative(inputLimitedOutputKgPerSecond,"input limited output");
             if(inputLimitedOutputKgPerSecond>processAndStationCeilingKgPerSecond+1e-9) throw new IllegalArgumentException("input output exceeds process ceiling");
@@ -181,7 +193,7 @@ public final class Stage20TheoreticalSupplyThroughputAnalyzer {
         return rows.stream().filter(r->r.processKind()==kind).sorted(PROCESS_ORDER).toList();
     }
     private static void record(List<ProcessThroughputEvidence> evidence, Map<SupplyKey,Double> supply, StationProcessCapacity row, double value){
-        double output=normalize(value); evidence.add(new ProcessThroughputEvidence(row.systemId(),row.stationPlacementId(),row.processId(),row.outputCommodityId(),row.theoreticalExportableOutputKgPerSecond(),output));
+        double output=normalize(value); evidence.add(new ProcessThroughputEvidence(row.systemId(),row.stationPlacementId(),row.facilityDefinitionId(),row.processId(),row.outputCommodityId(),row.theoreticalExportableOutputKgPerSecond(),output));
         if(output>0) add(supply,new SupplyKey(row.outputCommodityId(),row.systemId()),output);
     }
     private static double deliverable(GalaxyTopology topology, RouteEvaluator routes, Map<SupplyKey,Double> supply,

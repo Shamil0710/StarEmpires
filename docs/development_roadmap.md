@@ -434,6 +434,12 @@ Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate
 
 Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
 
+Current Stage-20F foundation: `docs/stage20f_industrial_specialization_candidate_plan_v1.md`.
+It reconstructs exact generated station/facility/storage/extraction/process candidate evidence from
+one accepted root seed, but deliberately does not promote candidates into operational specialization
+until facility operating state, initial inventory, shared-input reservation, owned input freight and
+installed-yard authority are explicit.
+
 ## 9. Stage 21 — RPG / Living World
 
 **PLANNED after Stage 20.**
