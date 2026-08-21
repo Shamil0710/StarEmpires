@@ -82,6 +82,16 @@ public final class Stage20CoordinatedWholePlacementFreightPlanner {
             int allocatedFreighters,
             double deliveredKgPerSecond,
             Optional<RouteAssessment> route) {
+        /**
+         * Validates one supplier-to-demand commitment.
+         *
+         * @param commodityId stable commodity identifier
+         * @param producerSystemId physical producer system
+         * @param local whether producer and consumer are the same system
+         * @param allocatedFreighters explicit remote freighters assigned to this commitment
+         * @param deliveredKgPerSecond actual committed delivered throughput
+         * @param route authoritative remote route, empty only for local service
+         */
         public SupplierCommitment {
             commodityId = requireText(commodityId, "commodityId");
             Objects.requireNonNull(producerSystemId, "producerSystemId");
@@ -106,6 +116,15 @@ public final class Stage20CoordinatedWholePlacementFreightPlanner {
             double deliveredKgPerSecond,
             int remoteFreightersUsed,
             List<SupplierCommitment> commitments) {
+        /**
+         * Validates one accepted commodity-demand plan.
+         *
+         * @param commodityId stable commodity identifier
+         * @param requiredKgPerSecond required bootstrap service throughput
+         * @param deliveredKgPerSecond delivered throughput assigned by the global plan
+         * @param remoteFreightersUsed explicit remote freighters consumed by this demand
+         * @param commitments producer commitments that satisfy the demand
+         */
         public DemandPlan {
             commodityId = requireText(commodityId, "commodityId");
             requirePositiveFinite(requiredKgPerSecond, "requiredKgPerSecond");
@@ -136,6 +155,15 @@ public final class Stage20CoordinatedWholePlacementFreightPlanner {
             int remoteFreighterBudget,
             int remoteFreightersUsed,
             List<DemandPlan> demands) {
+        /**
+         * Validates one placed start's finite-fleet service plan.
+         *
+         * @param stableFactionId canonical faction identifier
+         * @param startSystemId placed start system
+         * @param remoteFreighterBudget finite remote-freighter capacity bound for the start
+         * @param remoteFreightersUsed remote freighters actually used by accepted demands
+         * @param demands accepted essential commodity plans for the start
+         */
         public StartPlan {
             stableFactionId = WorldFactionIdentityState.normalizeStableId(stableFactionId);
             Objects.requireNonNull(startSystemId, "startSystemId");
@@ -161,6 +189,13 @@ public final class Stage20CoordinatedWholePlacementFreightPlanner {
             SupplyKey supplyKey,
             double capacityKgPerSecond,
             double reservedKgPerSecond) {
+        /**
+         * Validates one producer-capacity reservation summary.
+         *
+         * @param supplyKey authoritative commodity/producer key
+         * @param capacityKgPerSecond physical producer capacity
+         * @param reservedKgPerSecond producer throughput reserved by the accepted plan
+         */
         public ProducerUsage {
             Objects.requireNonNull(supplyKey, "supplyKey");
             requirePositiveFinite(capacityKgPerSecond, "capacityKgPerSecond");
@@ -184,6 +219,21 @@ public final class Stage20CoordinatedWholePlacementFreightPlanner {
             int totalRemoteFreightersUsed,
             List<StartPlan> starts,
             List<ProducerUsage> producerUsage) {
+        /**
+         * Validates complete bounded coordinated-planning evidence.
+         *
+         * @param version planner version
+         * @param placementVersion placement authority version
+         * @param supplyProfileVersion physical supply profile version
+         * @param remoteFreighterBudgetPerStart finite fleet bound applied independently to each start
+         * @param searchNodeBudget caller-authorized discrete search-node budget
+         * @param searchNodesVisited discrete allocation states actually inspected
+         * @param status final planning status
+         * @param failureReason explicit failure or unresolved reason when not accepted
+         * @param totalRemoteFreightersUsed sum of remote freighters in accepted start plans
+         * @param starts accepted per-start plans, empty for non-accepted outcomes
+         * @param producerUsage accepted shared producer-capacity usage, empty for non-accepted outcomes
+         */
         public PlanReport {
             version = requireText(version, "version");
             placementVersion = requireText(placementVersion, "placementVersion");
