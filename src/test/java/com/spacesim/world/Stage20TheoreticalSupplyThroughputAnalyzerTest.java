@@ -8,6 +8,7 @@ import com.spacesim.world.Stage20BootstrapProductionCapacityCalculator.ProcessKi
 import com.spacesim.world.Stage20BootstrapProductionCapacityCalculator.StationProcessCapacity;
 import com.spacesim.world.Stage20EconomicBootstrapValidator.RouteAssessment;
 import com.spacesim.world.Stage20TheoreticalSupplyThroughputAnalyzer.AnalysisProfile;
+import com.spacesim.world.Stage20TheoreticalSupplyThroughputAnalyzer.RouteAdmissionStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -41,17 +42,29 @@ class Stage20TheoreticalSupplyThroughputAnalyzerTest {
         var report = Stage20TheoreticalSupplyThroughputAnalyzer.analyze(
                 topology,
                 new AnalysisProfile("test", 100d),
-                (origin, destination) -> Optional.of(new RouteAssessment(List.of(system), 1d, 100d)),
+                (origin, destination) -> Optional.of(new RouteAssessment(List.of(system), 1d, 10d)),
                 List.of(ore),
                 List.of(refinery),
                 Stage18RefiningCatalogLoader.loadDefault(),
                 Stage18ManufacturingCatalogLoader.loadDefault());
 
         assertEquals(20d, report.capacityKgPerSecond("commodity.feedstock.metallic_ore", system), 1e-9);
-        assertEquals(13.6d, report.capacityKgPerSecond("commodity.material.structural_alloy", system), 1e-9);
+        assertEquals(6.8d, report.capacityKgPerSecond("commodity.material.structural_alloy", system), 1e-9);
         assertEquals("facility.processing.bulk_refinery",
                 report.processEvidence().get(0).facilityDefinitionId());
-        assertEquals(13.6d, report.processEvidence().get(0).inputLimitedOutputKgPerSecond(), 1e-9);
+        assertEquals(6.8d, report.processEvidence().get(0).inputLimitedOutputKgPerSecond(), 1e-9);
+
+        var input = report.processEvidence().get(0).inputEvidence().get(0);
+        assertEquals("commodity.feedstock.metallic_ore", input.commodityId());
+        assertEquals(1d / 0.68d, input.inputKgPerOutputKg(), 1e-9);
+        assertEquals(10d, input.admittedInputKgPerSecond(), 1e-9);
+        assertEquals(6.8d, input.inputSupportedOutputKgPerSecond(), 1e-9);
+        assertEquals(1, input.supplyRoutes().size());
+        var route = input.supplyRoutes().get(0);
+        assertEquals(RouteAdmissionStatus.ADMITTED, route.status());
+        assertEquals(20d, route.sourceCapacityKgPerSecond(), 1e-9);
+        assertEquals(10d, route.admittedInputKgPerSecond(), 1e-9);
+        assertEquals(List.of(system), route.route().orElseThrow().orderedSystems());
     }
 
     @Test
@@ -98,6 +111,59 @@ class Stage20TheoreticalSupplyThroughputAnalyzerTest {
                 List.of(refinery),
                 Stage18RefiningCatalogLoader.loadDefault(),
                 Stage18ManufacturingCatalogLoader.loadDefault()));
+    }
+
+    @Test
+    void missingAndOverTimeInputRoutesRemainExplicitNonAdmittedEvidence() {
+        GalaxyTopology topology = topology(2);
+        StarSystemId source = new StarSystemId(1L);
+        StarSystemId processor = new StarSystemId(2L);
+        ExtractionCapacity ore = new ExtractionCapacity(
+                "site.ore", "source.ore", source, "commodity.feedstock.metallic_ore",
+                "facility.extraction.asteroid", "extraction.asteroid_excavation",
+                25d, 20d, 1_000d, ExportHandlingStatus.RESOLVED, OptionalDouble.of(20d));
+        StationProcessCapacity refinery = new StationProcessCapacity(
+                processor,
+                "refinery",
+                "facility.processing.bulk_refinery",
+                ProcessKind.REFINING,
+                "refining.structural_alloy",
+                "commodity.material.structural_alloy",
+                100d,
+                100d,
+                100d);
+
+        var missing = Stage20TheoreticalSupplyThroughputAnalyzer.analyze(
+                topology,
+                new AnalysisProfile("test", 100d),
+                (origin, destination) -> Optional.empty(),
+                List.of(ore),
+                List.of(refinery),
+                Stage18RefiningCatalogLoader.loadDefault(),
+                Stage18ManufacturingCatalogLoader.loadDefault());
+        var missingRoute = missing.processEvidence().get(0)
+                .inputEvidence().get(0).supplyRoutes().get(0);
+        assertEquals(RouteAdmissionStatus.NO_FEASIBLE_ROUTE, missingRoute.status());
+        assertTrue(missingRoute.route().isEmpty());
+        assertEquals(0d, missingRoute.admittedInputKgPerSecond(), 1e-9);
+        assertEquals(0d, missing.processEvidence().get(0).inputLimitedOutputKgPerSecond(), 1e-9);
+
+        var overTime = Stage20TheoreticalSupplyThroughputAnalyzer.analyze(
+                topology,
+                new AnalysisProfile("test", 100d),
+                (origin, destination) -> Optional.of(
+                        new RouteAssessment(List.of(source, processor), 101d, 100d)),
+                List.of(ore),
+                List.of(refinery),
+                Stage18RefiningCatalogLoader.loadDefault(),
+                Stage18ManufacturingCatalogLoader.loadDefault());
+        var overTimeRoute = overTime.processEvidence().get(0)
+                .inputEvidence().get(0).supplyRoutes().get(0);
+        assertEquals(RouteAdmissionStatus.ROUTE_TIME_EXCEEDED, overTimeRoute.status());
+        assertEquals(List.of(source, processor),
+                overTimeRoute.route().orElseThrow().orderedSystems());
+        assertEquals(0d, overTimeRoute.admittedInputKgPerSecond(), 1e-9);
+        assertEquals(0d, overTime.processEvidence().get(0).inputLimitedOutputKgPerSecond(), 1e-9);
     }
 
     private static GalaxyTopology topology(int count) {
