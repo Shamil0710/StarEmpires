@@ -1,15 +1,15 @@
 # Stage 20E — Commodity frontier shared-producer bound v1
 
-> Status: **CANDIDATE SEARCH-PRUNING EVIDENCE / NO PHYSICAL AUTHORITY CHANGE**  
+> Status: **VERIFIED NECESSARY-CONDITION BOUND / NO PHYSICAL AUTHORITY CHANGE**  
 > Version: `stage20e.commodity-frontier-shared-producer-bound.v1`
 
 ## Why this slice exists
 
-The accepted frontier-generator v2 reduced the fixed-corpus result from `0 accepted / 2 infeasible / 13 unresolved` to `12 accepted / 2 infeasible / 1 unresolved` at the unchanged 2,000-node evidence budget per commodity. The sole remaining unresolved case is fixed seed 8, `commodity.feedstock.water_ice`.
+The accepted frontier-generator v2 reduced the fixed-corpus result from `0 accepted / 2 infeasible / 13 unresolved` to `12 accepted / 2 infeasible / 1 unresolved` at the unchanged 2,000-node evidence budget per commodity. The sole remaining unresolved case was fixed seed 8, `commodity.feedstock.water_ice`.
 
-Seed 8 has about `104.9053 kg/s` of authoritative water producer capacity against `100 kg/s` of whole-placement bootstrap demand. The existing route-prefix optimistic bound ranks remaining route marginals by faction start but does not retain shared producer capacity or producer-to-demand reachability in the bound. With such small global headroom, that relaxation can overestimate many cap vectors enough to spend the whole evidence budget before proving them impossible.
+Seed 8 has about `104.9053 kg/s` of authoritative water producer capacity against `100 kg/s` of whole-placement bootstrap demand. The existing route-prefix optimistic bound ranks remaining route marginals by faction start but does not retain shared producer capacity or producer-to-demand reachability in the bound. With such small whole-placement headroom, that relaxation can overestimate impossible cap vectors enough to spend the whole evidence budget before proving them impossible.
 
-This slice measures a stronger, still completeness-safe upper bound before changing the production search.
+This slice introduces a stronger, completeness-safe necessary-condition bound without changing any physical or economic authority.
 
 ## Relaxed network
 
@@ -59,7 +59,7 @@ Shared producer capacity is **not** relaxed: all producer-to-demand arcs still c
 
 If relaxed max flow is below total whole-placement demand, the real problem is also infeasible under that cap vector because the real search has strictly no more routing capacity than the relaxed network.
 
-This result is safe for exact-search pruning.
+This result is safe for exact-search pruning and for a necessary-condition whole-frontier precheck at the maximum physical cap vector.
 
 ### `POSSIBLY_FEASIBLE`
 
@@ -70,22 +70,40 @@ The bound must never be used as:
 - a whole-placement acceptance authority;
 - a producer reservation plan;
 - a fleet materialization plan;
-- a replacement for integer route-prefix search;
+- a replacement for integer route-prefix search when the bound remains possible;
 - a justification to change topology/resources/demand/fleet budgets.
 
-## Candidate evidence gate
+## Exact-head seed-8 evidence
 
-PR #288 initially keeps this bound outside `Stage20CommodityWholePlacementFrontierGenerator` and measures it on fixed seed 8 water across every cap vector from the accepted single-start minimum vector through the unchanged 13-freighter/start maximum.
+PR #288 measured the bound on fixed seed 8 water using the actual production-probe topology, supply report, physical allocated-route evaluator and the unchanged `13`-freighter/start capacity authority.
 
-The measurement records:
+Exact-head Java 17 `clean verify` run `32485913806` completed successfully with `1457` tests, `0` failures, `0` errors, `1` skipped, Javadoc and coverage gates passing.
 
-- actual single-start minimum vector;
-- number of assessed cap vectors;
-- count proved impossible by the shared-producer relaxation;
-- count remaining possibly feasible;
-- exact list of remaining cap vectors.
+Measured evidence:
 
-There is no pass-rate target. If the bound does not materially reduce the seed-8 search region, it should not be integrated merely because it is theoretically stronger.
+```text
+rootSeed=8
+commodity=commodity.feedstock.water_ice
+maximumShipsPerStart=13
+minimumShipsByFaction={faction.alpha=10, faction.beta=6}
+capVectorCount=32
+provedInfeasibleCapVectorCount=32
+possiblyFeasibleCapVectorCount=0
+possiblyFeasibleCapVectors=[]
+```
+
+The assessed grid is exactly:
+
+```text
+alpha = 10..13
+beta  = 6..13
+```
+
+so it includes the maximum physical cap vector `(13,13)`.
+
+Because every remote route in the relaxation may independently consume the full cap of its start, while authoritative producer capacity and producer-to-demand reachability remain enforced, failure even at `(13,13)` is stronger than the real transport problem's necessary condition. Therefore seed 8 water is **physically infeasible under the accepted Stage-20E authorities**, not merely unresolved because of DFS search budget.
+
+This finding does not imply that global water tonnage is insufficient. Aggregate supply exceeds the 100 kg/s two-start requirement. The proven failure comes from the combination of authoritative producer capacity, admitted route reachability/time and finite per-start freight capability.
 
 ## Regression boundary
 
@@ -98,7 +116,7 @@ Synthetic tests require:
 
 ## Explicit non-authorities
 
-This candidate changes none of:
+This bound changes none of:
 
 - fixed seed corpus;
 - Stage-20 topology or geometry;
@@ -112,8 +130,15 @@ This candidate changes none of:
 - production world acceptance;
 - freight ownership/materialization.
 
-## Next causal decision
+## Next causal slice
 
-If exact-head CI confirms that the bound removes a meaningful portion of seed-8 water cap vectors, the next slice should integrate the same proof into the frontier generator before route-prefix DFS and rerun the unchanged 2,000-node fixed corpus.
+Integrate the verified bound into `Stage20CommodityWholePlacementFrontierGenerator` as an early necessary-condition precheck using the **maximum authoritative per-start cap vector**.
 
-Only after every accepted-placement commodity frontier is complete or otherwise decisionally resolved should Stage 20E proceed to bootstrap freight ownership/materialization.
+Required semantics:
+
+1. if the maximum-cap relaxation is `PROVED_INFEASIBLE`, return a `COMPLETE` empty commodity frontier without spending route-prefix DFS nodes;
+2. if it is `POSSIBLY_FEASIBLE`, preserve the existing exact frontier search unchanged;
+3. rerun the same fixed seeds `1..16` at the unchanged 2,000-node per-commodity evidence budget;
+4. do not introduce a pass-rate target and do not change physical/economic authority.
+
+If that integration converts the sole unresolved seed 8 frontier into a complete physical infeasibility proof while preserving all other results, the coordinated frontier-search uncertainty gate is closed sufficiently for Stage 20E to proceed to bootstrap freight ownership/materialization and the remaining economic authorities.
