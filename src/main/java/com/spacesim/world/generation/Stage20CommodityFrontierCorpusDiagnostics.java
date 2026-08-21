@@ -68,7 +68,15 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
             int searchNodesVisited,
             int optionCount,
             List<Map<String, Integer>> nondominatedShipVectors) {
-        /** Validates deterministic bounded commodity evidence. */
+        /**
+         * Validates deterministic bounded commodity evidence.
+         *
+         * @param commodityId authoritative commodity identifier
+         * @param status complete or explicitly unresolved frontier status
+         * @param searchNodesVisited bounded route-prefix states inspected
+         * @param optionCount number of known nondominated frontier options
+         * @param nondominatedShipVectors canonical per-faction ship vectors for known options
+         */
         public CommodityEvidence {
             commodityId = requireText(commodityId, "commodityId");
             Objects.requireNonNull(status, "status");
@@ -103,7 +111,18 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
             Optional<FailureReason> combinerFailureReason,
             Map<String, Integer> combinedRemoteFreightersByFaction,
             List<SelectedOption> selectedOptions) {
-        /** Validates one per-seed measurement without converting unresolved evidence into failure. */
+        /**
+         * Validates one per-seed measurement without converting unresolved evidence into failure.
+         *
+         * @param rootSeed fixed representative root seed
+         * @param placementStatus existing faction-start placement outcome
+         * @param status aggregate frontier/combiner measurement outcome
+         * @param commodities bounded evidence for each essential commodity frontier
+         * @param combinerStatus exact combiner status when placement was accepted
+         * @param combinerFailureReason explicit combiner failure/unresolved reason when present
+         * @param combinedRemoteFreightersByFaction accepted combined fleet usage, otherwise empty
+         * @param selectedOptions accepted exact commodity options, otherwise empty
+         */
         public SeedEvidence {
             if (rootSeed <= 0L) {
                 throw new IllegalArgumentException("rootSeed must be positive");
@@ -192,7 +211,26 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
             int totalFrontierSearchNodesVisited,
             int maxCommodityFrontierSearchNodesVisited,
             List<SeedEvidence> seeds) {
-        /** Validates aggregate status/count consistency. */
+        /**
+         * Validates aggregate status/count consistency.
+         *
+         * @param version diagnostic version
+         * @param candidateProfileVersion representative candidate production-probe profile version
+         * @param bootstrapRequirementVersion bootstrap requirement authority version
+         * @param freightCapacityRequirementVersion derived freight-capacity authority version
+         * @param frontierGeneratorVersion per-commodity frontier generator version
+         * @param combinerVersion exact cross-commodity combiner version
+         * @param perStartFreighterBudget derived finite fleet budget at each placed start
+         * @param frontierSearchNodeBudgetPerCommodity evidence-only search budget per commodity
+         * @param fixedSeedCount number of fixed representative seeds measured
+         * @param acceptedPlacementSeedCount seeds reaching accepted faction-start placement
+         * @param combinerAcceptedSeedCount accepted-placement seeds with a concrete fitting combination
+         * @param combinerInfeasibleSeedCount accepted-placement seeds with complete infeasibility evidence
+         * @param combinerUnresolvedSeedCount accepted-placement seeds retaining incomplete frontier evidence
+         * @param totalFrontierSearchNodesVisited total frontier search nodes across the corpus
+         * @param maxCommodityFrontierSearchNodesVisited maximum nodes consumed by one commodity frontier
+         * @param seeds deterministic per-seed evidence
+         */
         public Report {
             version = requireText(version, "version");
             candidateProfileVersion = requireText(candidateProfileVersion, "candidateProfileVersion");
