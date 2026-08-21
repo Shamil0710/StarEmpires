@@ -57,7 +57,17 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
             ProbeResult generation,
             Optional<Stage20ResolvedFreightAcceptance.AcceptanceReport> coordinatedFreightAcceptance,
             Stage20GeneratedWorldSeedAcceptance.SeedResult seedAcceptance) {
-        /** Validates one immutable resolved production result. */
+        /**
+         * Validates one immutable resolved production result.
+         *
+         * @param version resolved probe version
+         * @param rootSeed exact root seed
+         * @param sourceProbeVersion preserved physical generation probe version
+         * @param representativeProfileVersion v3 representative profile version
+         * @param generation unchanged underlying generated-world evidence
+         * @param coordinatedFreightAcceptance present exactly for accepted faction-start placement
+         * @param seedAcceptance authoritative resolved-freight whole-seed result
+         */
         public ResolvedProbeResult {
             version = requireText(version, "version");
             sourceProbeVersion = requireText(sourceProbeVersion, "sourceProbeVersion");
@@ -155,7 +165,12 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
                 seedAcceptance);
     }
 
-    /** @return resolved production result under the current representative v3 profile */
+    /**
+     * Runs the resolved production path under the current representative v3 profile.
+     *
+     * @param rootSeed exact root seed
+     * @return resolved production result under the current representative v3 profile
+     */
     public static ResolvedProbeResult runCurrent(long rootSeed) {
         return run(rootSeed, Stage20RepresentativeGeneratedWorldProbeProfileV3.deriveCurrent());
     }
