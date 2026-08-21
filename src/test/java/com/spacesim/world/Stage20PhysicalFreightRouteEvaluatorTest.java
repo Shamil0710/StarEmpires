@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20PhysicalFreightRouteEvaluatorTest {
@@ -35,6 +36,36 @@ class Stage20PhysicalFreightRouteEvaluatorTest {
                 route.orderedSystems());
         assertEquals(110d, route.travelTimeS(), 1e-9);
         assertEquals(2_000d / 240d, route.sustainableCargoThroughputKgPerSecond(), 1e-9);
+    }
+
+    @Test
+    void boundedAllocationUsesSameCycleWithoutInventingAdditionalFreighters() {
+        GalaxyTopology topology = chainTopology(true);
+        Stage20PhysicalFreightRouteEvaluator evaluator = new Stage20PhysicalFreightRouteEvaluator(
+                new Stage20PhysicalGalacticRoutePlanner(topology, fittedPlan(10d, 20d, 5d)),
+                new Stage20PhysicalGalacticRoutePlanner(topology, fittedPlan(10d, 20d, 5d)),
+                new FreightFleetProfile("test", 1_000d, 4, "test.fixture", false),
+                (origin, destination) -> Optional.of(new EndpointCycleProfile(
+                        30d, 40d, 100d, 50d, "test.endpoint")));
+
+        var one = evaluator.assessWithAllocatedFreighters(
+                new StarSystemId(1L), new StarSystemId(3L), 1).orElseThrow();
+        var two = evaluator.assessWithAllocatedFreighters(
+                new StarSystemId(1L), new StarSystemId(3L), 2).orElseThrow();
+        var full = evaluator.assess(new StarSystemId(1L), new StarSystemId(3L)).orElseThrow();
+
+        assertEquals(one.travelTimeS(), two.travelTimeS(), 0d);
+        assertEquals(one.travelTimeS(), full.travelTimeS(), 0d);
+        assertEquals(one.sustainableCargoThroughputKgPerSecond() * 2d,
+                two.sustainableCargoThroughputKgPerSecond(), 1e-9);
+        assertEquals(one.sustainableCargoThroughputKgPerSecond() * 4d,
+                full.sustainableCargoThroughputKgPerSecond(), 1e-9);
+        assertThrows(IllegalArgumentException.class,
+                () -> evaluator.assessWithAllocatedFreighters(
+                        new StarSystemId(1L), new StarSystemId(3L), 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> evaluator.assessWithAllocatedFreighters(
+                        new StarSystemId(1L), new StarSystemId(3L), 5));
     }
 
     @Test

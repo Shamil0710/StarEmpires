@@ -46,7 +46,7 @@ public final class Stage20PhysicalFreightRouteEvaluator
     }
 
     /**
-     * Evaluates one repeatable supply route without mutating ship, market or world state.
+     * Evaluates one repeatable supply route using the profile's full route-level freight allocation.
      *
      * @param origin producer system
      * @param destination consumer system
@@ -57,6 +57,30 @@ public final class Stage20PhysicalFreightRouteEvaluator
     public Optional<Stage20EconomicBootstrapValidator.RouteAssessment> assess(
             StarSystemId origin,
             StarSystemId destination) {
+        return assessWithAllocatedFreighters(origin, destination, fleetProfile.activeFreighterCount());
+    }
+
+    /**
+     * Evaluates the same physical route with an explicit bounded subset of the configured freighters.
+     *
+     * <p>This is an allocation diagnostic seam, not a fleet-creation API. The requested count must be
+     * positive and cannot exceed {@link FreightFleetProfile#activeFreighterCount()}. Route geometry,
+     * FTL timing, endpoint access, handling limits and payload remain identical to {@link #assess};
+     * only the number of already-authorized identical freighters assigned to this route changes.</p>
+     *
+     * @param origin producer system
+     * @param destination consumer system
+     * @param allocatedFreighterCount number of configured freighters assigned to this route
+     * @return route assessment under the explicit allocation, or empty when the route is unresolved
+     */
+    public Optional<Stage20EconomicBootstrapValidator.RouteAssessment> assessWithAllocatedFreighters(
+            StarSystemId origin,
+            StarSystemId destination,
+            int allocatedFreighterCount) {
+        if (allocatedFreighterCount <= 0 || allocatedFreighterCount > fleetProfile.activeFreighterCount()) {
+            throw new IllegalArgumentException(
+                    "allocatedFreighterCount must be in 1.." + fleetProfile.activeFreighterCount());
+        }
         StarSystemId checkedOrigin = Objects.requireNonNull(origin, "origin");
         StarSystemId checkedDestination = Objects.requireNonNull(destination, "destination");
         Optional<EndpointCycleProfile> maybeEndpoint = endpointProvider.profile(checkedOrigin, checkedDestination);
@@ -91,8 +115,7 @@ public final class Stage20PhysicalFreightRouteEvaluator
             throw new IllegalStateException("physical freight cycle must have positive duration");
         }
 
-        double fleetCycleThroughput = payloadKg * fleetProfile.activeFreighterCount()
-                / oneFreighterCycleSeconds;
+        double fleetCycleThroughput = payloadKg * allocatedFreighterCount / oneFreighterCycleSeconds;
         double sustainableThroughput = Math.min(
                 fleetCycleThroughput,
                 Math.min(endpoint.sourceLoadingRateKgPerSecond(),
@@ -125,7 +148,7 @@ public final class Stage20PhysicalFreightRouteEvaluator
          *
          * @param version stable profile version
          * @param payloadMassKgPerFreighter physical delivered payload per loaded trip
-         * @param activeFreighterCount number of identical freighters allocated to this route
+         * @param activeFreighterCount number of identical allocated freighters
          * @param sourceEvidenceId provenance of the physical payload/fleet assumption
          * @param stage22ReviewRequired whether provisional calibration input still requires Stage-22 review
          */
