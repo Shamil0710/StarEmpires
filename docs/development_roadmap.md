@@ -434,10 +434,16 @@ Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate
 
 Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
 
-Current Stage-20F foundation: `docs/stage20f_industrial_specialization_candidate_plan_v1.md`.
-It reconstructs exact generated station/facility/storage/extraction/process candidate evidence from
-one accepted root seed, but deliberately does not promote candidates into operational specialization
-until facility operating state, initial inventory, shared-input reservation, owned input freight and
+Current Stage-20F foundation:
+
+- `docs/stage20f_industrial_specialization_candidate_plan_v1.md` reconstructs exact generated
+  station/facility/storage/extraction/process candidates from one accepted root seed;
+- `docs/stage20f_industrial_input_route_evidence_plan_v1.md` retains the exact input supply keys,
+  source capacities, physical routes, route-time admission and route-limited capacity behind those
+  candidates.
+
+Both remain deliberately non-reserved and cannot promote candidates into operational specialization
+until shared-input reservation, owned input freight, facility operating state, initial inventory and
 installed-yard authority are explicit.
 
 ## 9. Stage 21 — RPG / Living World

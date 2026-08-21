@@ -97,8 +97,12 @@ The production integration test uses accepted fixed seed `1` and proves:
 
 ## Next roadmap slice
 
-The next Stage-20F change should introduce an explicit selection/reservation authority over these
-candidates. It must allocate shared industrial inputs and their physical freight without double-use,
+The first follow-up now exposes the exact candidate input supply keys, finite source capacities,
+explicit physical routes, route-time admission states and route-limited capacities in
+`docs/stage20f_industrial_input_route_evidence_plan_v1.md`.
+
+The next Stage-20F change should introduce an explicit selection/reservation authority over that
+evidence. It must allocate shared industrial inputs and their physical freight without double-use,
 then bind explicit facility operating state and initial Stage-18 inventory. Installed-yard placement
 must be a separate explicit authority before any shipbuilding specialization can be accepted.
 
