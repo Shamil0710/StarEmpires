@@ -10,7 +10,6 @@ import com.spacesim.world.Stage20FactionStartPlacementGenerator.PlacementResult;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator.PlacementStatus;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -42,47 +41,134 @@ public final class Stage20BootstrapFreightOwnershipPlan {
     }
 
     /**
-     * One remote physical supplier commitment consuming part of a faction-start freight pool.
+     * Deterministic source identity for one selected remote supplier commitment.
      *
+     * <p>This is planning provenance, not a runtime fleet identifier. Runtime identity remains owned
+     * exclusively by {@link WorldSimulation} and {@link FleetWorldService}.</p>
+     *
+     * @param frontierVersion exact source physical-frontier version
+     * @param optionId exact combiner-selected physical option
+     * @param stableFactionId owning faction/start identity
      * @param commodityId authoritative Stage-18 commodity identifier
      * @param producerSystemId physical producer system
-     * @param consumerStartSystemId faction start consuming the delivered service
+     * @param consumerStartSystemId consuming faction-start system
+     * @param sourceCommitmentOrdinal canonical commitment position inside the selected demand
+     */
+    public record CommitmentKey(
+            String frontierVersion,
+            String optionId,
+            String stableFactionId,
+            String commodityId,
+            StarSystemId producerSystemId,
+            StarSystemId consumerStartSystemId,
+            int sourceCommitmentOrdinal) {
+        /**
+         * Validates one immutable commitment-provenance key.
+         *
+         * @param frontierVersion exact source physical-frontier version
+         * @param optionId exact combiner-selected physical option
+         * @param stableFactionId owning faction/start identity
+         * @param commodityId authoritative Stage-18 commodity identifier
+         * @param producerSystemId physical producer system
+         * @param consumerStartSystemId consuming faction-start system
+         * @param sourceCommitmentOrdinal canonical commitment position inside the selected demand
+         */
+        public CommitmentKey {
+            frontierVersion = requireText(frontierVersion, "frontierVersion");
+            optionId = requireText(optionId, "optionId");
+            stableFactionId = WorldFactionIdentityState.normalizeStableId(stableFactionId);
+            commodityId = requireText(commodityId, "commodityId");
+            Objects.requireNonNull(producerSystemId, "producerSystemId");
+            Objects.requireNonNull(consumerStartSystemId, "consumerStartSystemId");
+            if (producerSystemId.equals(consumerStartSystemId) || sourceCommitmentOrdinal < 0) {
+                throw new IllegalArgumentException("remote commitment key must identify a remote canonical source");
+            }
+        }
+    }
+
+    /**
+     * One deterministic logical freighter inside a committed aggregate allocation.
+     *
+     * @param commitmentKey exact selected physical commitment
+     * @param freighterOrdinal zero-based logical freighter position inside that commitment
+     */
+    public record CommitmentSlot(CommitmentKey commitmentKey, int freighterOrdinal) {
+        /**
+         * Validates one non-runtime commitment slot.
+         *
+         * @param commitmentKey exact selected physical commitment
+         * @param freighterOrdinal zero-based logical freighter position inside that commitment
+         */
+        public CommitmentSlot {
+            Objects.requireNonNull(commitmentKey, "commitmentKey");
+            if (freighterOrdinal < 0) {
+                throw new IllegalArgumentException("freighterOrdinal must be non-negative");
+            }
+        }
+    }
+
+    /**
+     * Deterministic materialization order for one owned freighter, before any FleetId exists.
+     *
+     * @param stableFactionId owning faction
+     * @param ownershipOrdinal zero-based position inside the complete owned faction pool
+     * @param commitment committed source slot, or empty for an uncommitted reserve freighter
+     */
+    public record OwnershipSlot(
+            String stableFactionId,
+            int ownershipOrdinal,
+            Optional<CommitmentSlot> commitment) {
+        /**
+         * Validates one deterministic pre-materialization ownership slot.
+         *
+         * @param stableFactionId owning faction
+         * @param ownershipOrdinal zero-based position inside the complete owned faction pool
+         * @param commitment committed source slot, or empty for an uncommitted reserve freighter
+         */
+        public OwnershipSlot {
+            stableFactionId = WorldFactionIdentityState.normalizeStableId(stableFactionId);
+            if (ownershipOrdinal < 0) {
+                throw new IllegalArgumentException("ownershipOrdinal must be non-negative");
+            }
+            Objects.requireNonNull(commitment, "commitment");
+            if (commitment.isPresent()
+                    && !stableFactionId.equals(commitment.orElseThrow().commitmentKey().stableFactionId())) {
+                throw new IllegalArgumentException("ownership slot faction must match its commitment source");
+            }
+        }
+    }
+
+    /**
+     * One remote physical supplier commitment consuming part of a faction-start freight pool.
+     *
+     * @param commitmentKey deterministic selected-option/source provenance
      * @param allocatedFreighters exact integer freighters committed to this remote service
      * @param deliveredKgPerSecond physical throughput committed by the selected frontier option
      * @param route authoritative explicit-neighbor physical route
      */
     public record RemoteCommitmentAllocation(
-            String commodityId,
-            StarSystemId producerSystemId,
-            StarSystemId consumerStartSystemId,
+            CommitmentKey commitmentKey,
             int allocatedFreighters,
             double deliveredKgPerSecond,
             RouteAssessment route) {
         /**
          * Validates one immutable remote commitment allocation.
          *
-         * @param commodityId authoritative Stage-18 commodity identifier
-         * @param producerSystemId physical producer system
-         * @param consumerStartSystemId faction start consuming the delivered service
+         * @param commitmentKey deterministic selected-option/source provenance
          * @param allocatedFreighters exact positive integer freight allocation
          * @param deliveredKgPerSecond positive committed physical throughput
          * @param route authoritative explicit-neighbor route
          */
         public RemoteCommitmentAllocation {
-            commodityId = requireText(commodityId, "commodityId");
-            Objects.requireNonNull(producerSystemId, "producerSystemId");
-            Objects.requireNonNull(consumerStartSystemId, "consumerStartSystemId");
-            if (producerSystemId.equals(consumerStartSystemId)) {
-                throw new IllegalArgumentException("remote ownership allocation cannot use a local producer");
-            }
+            Objects.requireNonNull(commitmentKey, "commitmentKey");
             if (allocatedFreighters <= 0) {
                 throw new IllegalArgumentException("remote ownership allocation must consume positive freighters");
             }
             requirePositiveFinite(deliveredKgPerSecond, "deliveredKgPerSecond");
             Objects.requireNonNull(route, "route");
-            if (!route.orderedSystems().get(0).equals(producerSystemId)
+            if (!route.orderedSystems().get(0).equals(commitmentKey.producerSystemId())
                     || !route.orderedSystems().get(route.orderedSystems().size() - 1)
-                    .equals(consumerStartSystemId)) {
+                    .equals(commitmentKey.consumerStartSystemId())) {
                 throw new IllegalArgumentException("remote ownership route endpoints must match producer/start");
             }
         }
@@ -134,7 +220,8 @@ public final class Stage20BootstrapFreightOwnershipPlan {
             copy.sort(COMMITMENT_ORDER);
             int allocated = 0;
             for (RemoteCommitmentAllocation commitment : copy) {
-                if (!commitment.consumerStartSystemId().equals(homeStartSystemId)) {
+                if (!commitment.commitmentKey().stableFactionId().equals(stableFactionId)
+                        || !commitment.commitmentKey().consumerStartSystemId().equals(homeStartSystemId)) {
                     throw new IllegalArgumentException("remote commitment consumer must equal owning faction start");
                 }
                 allocated = Math.addExact(allocated, commitment.allocatedFreighters());
@@ -144,33 +231,62 @@ public final class Stage20BootstrapFreightOwnershipPlan {
             }
             remoteCommitments = List.copyOf(copy);
         }
+
+        /**
+         * Expands aggregate commitments and reserve into an exact deterministic pre-FleetId order.
+         *
+         * @return exactly {@link #ownedFreighterCount()} immutable ownership slots
+         */
+        public List<OwnershipSlot> materializationSlots() {
+            ArrayList<OwnershipSlot> result = new ArrayList<>(ownedFreighterCount);
+            int ownershipOrdinal = 0;
+            for (RemoteCommitmentAllocation allocation : remoteCommitments) {
+                for (int freighterOrdinal = 0;
+                        freighterOrdinal < allocation.allocatedFreighters();
+                        freighterOrdinal++) {
+                    result.add(new OwnershipSlot(
+                            stableFactionId,
+                            ownershipOrdinal++,
+                            Optional.of(new CommitmentSlot(
+                                    allocation.commitmentKey(),
+                                    freighterOrdinal))));
+                }
+            }
+            for (int reserveOrdinal = 0; reserveOrdinal < reserveFreighterCount; reserveOrdinal++) {
+                result.add(new OwnershipSlot(stableFactionId, ownershipOrdinal++, Optional.empty()));
+            }
+            return List.copyOf(result);
+        }
     }
 
     /**
      * Complete deterministic freight ownership authority for one accepted generated placement.
      *
      * @param version ownership-plan contract version
-     * @param placementVersion accepted faction-start placement version
-     * @param physicalPlanVersion selected physical freight-plan version
+     * @param rootSeed exact generated-world seed whose placement owns the fleet
+     * @param placementProfileVersion exact faction-start placement profile version
+     * @param physicalPlan exact selected rich physical freight authority
      * @param factions one ownership pool for every placed faction start
      */
     public record OwnershipReport(
             String version,
-            String placementVersion,
-            String physicalPlanVersion,
+            long rootSeed,
+            String placementProfileVersion,
+            PlanReport physicalPlan,
             List<FactionFleetOwnership> factions) {
         /**
          * Validates complete unique faction ownership coverage.
          *
          * @param version ownership-plan contract version
-         * @param placementVersion accepted faction-start placement version
-         * @param physicalPlanVersion selected physical freight-plan version
+         * @param rootSeed exact generated-world seed whose placement owns the fleet
+         * @param placementProfileVersion exact faction-start placement profile version
+         * @param physicalPlan exact selected rich physical freight authority
          * @param factions one ownership pool for every placed faction start
          */
         public OwnershipReport {
             version = requireText(version, "version");
-            placementVersion = requireText(placementVersion, "placementVersion");
-            physicalPlanVersion = requireText(physicalPlanVersion, "physicalPlanVersion");
+            placementProfileVersion = requireText(placementProfileVersion, "placementProfileVersion");
+            Objects.requireNonNull(physicalPlan, "physicalPlan");
             ArrayList<FactionFleetOwnership> copy = new ArrayList<>(
                     Objects.requireNonNull(factions, "factions"));
             if (copy.isEmpty() || copy.stream().anyMatch(Objects::isNull)) {
@@ -183,6 +299,19 @@ public final class Stage20BootstrapFreightOwnershipPlan {
                 if (!ids.add(ownership.stableFactionId()) || !starts.add(ownership.homeStartSystemId())) {
                     throw new IllegalArgumentException("ownership report requires unique factions and start systems");
                 }
+                Integer budget = physicalPlan.remoteFreighterBudgetByFaction()
+                        .get(ownership.stableFactionId());
+                Integer committed = physicalPlan.remoteFreightersByFaction()
+                        .get(ownership.stableFactionId());
+                if (budget == null || committed == null
+                        || ownership.ownedFreighterCount() != budget
+                        || ownership.committedFreighterCount() != committed) {
+                    throw new IllegalArgumentException(
+                            "ownership pools must equal the retained physical plan budget and usage");
+                }
+            }
+            if (!ids.equals(physicalPlan.remoteFreighterBudgetByFaction().keySet())) {
+                throw new IllegalArgumentException("ownership report must cover every physical-plan faction");
             }
             factions = List.copyOf(copy);
         }
@@ -210,28 +339,29 @@ public final class Stage20BootstrapFreightOwnershipPlan {
      * Binds finite per-start freight capacity to accepted factions and selected physical commitments.
      *
      * @param placement accepted deterministic faction-start placement
-     * @param ownedFreighterCapacityByFaction explicit finite ownership capacity per placed start
      * @param physicalPlan accepted/reconstructed physical freight selection
      * @return deterministic ownership plan; no runtime asset is created
      */
     public static OwnershipReport plan(
             PlacementResult placement,
-            Map<String, Integer> ownedFreighterCapacityByFaction,
             PlanReport physicalPlan) {
         PlacementResult checkedPlacement = Objects.requireNonNull(placement, "placement");
         if (checkedPlacement.status() != PlacementStatus.ACCEPTED || checkedPlacement.assignments().isEmpty()) {
             throw new IllegalArgumentException("bootstrap freight ownership requires an accepted non-empty placement");
         }
         PlanReport selected = Objects.requireNonNull(physicalPlan, "physicalPlan");
+        if (!checkedPlacement.version().equals(selected.placementVersion())) {
+            throw new IllegalArgumentException("placement version differs from selected physical authority");
+        }
 
         TreeMap<String, Assignment> assignments = new TreeMap<>();
         for (Assignment assignment : checkedPlacement.assignments()) {
             assignments.put(assignment.stableFactionId(), assignment);
         }
-        TreeMap<String, Integer> capacities = canonicalPositiveCapacityMap(ownedFreighterCapacityByFaction);
+        Map<String, Integer> capacities = selected.remoteFreighterBudgetByFaction();
         if (!capacities.keySet().equals(assignments.keySet())
                 || !selected.remoteFreightersByFaction().keySet().equals(assignments.keySet())) {
-            throw new IllegalArgumentException("placement, ownership capacity and physical plan must cover the same factions");
+            throw new IllegalArgumentException("placement and physical plan must cover the same factions");
         }
 
         TreeMap<String, ArrayList<RemoteCommitmentAllocation>> allocations = new TreeMap<>();
@@ -250,7 +380,9 @@ public final class Stage20BootstrapFreightOwnershipPlan {
                     throw new IllegalArgumentException("selected physical plan budget differs from ownership authority");
                 }
                 for (var demand : start.demands()) {
+                    int sourceCommitmentOrdinal = 0;
                     for (SupplierCommitment commitment : demand.commitments()) {
+                        int currentOrdinal = sourceCommitmentOrdinal++;
                         if (commitment.local()) {
                             if (commitment.allocatedFreighters() != 0
                                     || !commitment.producerSystemId().equals(start.startSystemId())) {
@@ -261,9 +393,14 @@ public final class Stage20BootstrapFreightOwnershipPlan {
                         RouteAssessment route = commitment.route().orElseThrow(
                                 () -> new IllegalArgumentException("remote commitment lost physical route"));
                         allocations.get(start.stableFactionId()).add(new RemoteCommitmentAllocation(
-                                demand.commodityId(),
-                                commitment.producerSystemId(),
-                                start.startSystemId(),
+                                new CommitmentKey(
+                                        commodity.frontierVersion(),
+                                        commodity.optionId(),
+                                        start.stableFactionId(),
+                                        demand.commodityId(),
+                                        commitment.producerSystemId(),
+                                        start.startSystemId(),
+                                        currentOrdinal),
                                 commitment.allocatedFreighters(),
                                 commitment.deliveredKgPerSecond(),
                                 route));
@@ -297,31 +434,20 @@ public final class Stage20BootstrapFreightOwnershipPlan {
 
         return new OwnershipReport(
                 CURRENT_VERSION,
-                checkedPlacement.version(),
-                selected.version(),
+                checkedPlacement.rootSeed(),
+                checkedPlacement.profileVersion(),
+                selected,
                 result);
     }
 
     private static final Comparator<RemoteCommitmentAllocation> COMMITMENT_ORDER =
-            Comparator.comparing(RemoteCommitmentAllocation::commodityId)
-                    .thenComparing(RemoteCommitmentAllocation::producerSystemId)
-                    .thenComparing(RemoteCommitmentAllocation::consumerStartSystemId)
-                    .thenComparing(value -> value.route().orderedSystems().toString());
-
-    private static TreeMap<String, Integer> canonicalPositiveCapacityMap(Map<String, Integer> input) {
-        TreeMap<String, Integer> result = new TreeMap<>();
-        for (Map.Entry<String, Integer> entry : Objects.requireNonNull(input, "ownedFreighterCapacityByFaction").entrySet()) {
-            String faction = WorldFactionIdentityState.normalizeStableId(entry.getKey());
-            Integer count = Objects.requireNonNull(entry.getValue(), "owned freight capacity");
-            if (count <= 0 || result.putIfAbsent(faction, count) != null) {
-                throw new IllegalArgumentException("owned freight capacity must contain unique factions and positive counts");
-            }
-        }
-        if (result.isEmpty()) {
-            throw new IllegalArgumentException("owned freight capacity cannot be empty");
-        }
-        return result;
-    }
+            Comparator.comparing((RemoteCommitmentAllocation value) ->
+                            value.commitmentKey().frontierVersion())
+                    .thenComparing(value -> value.commitmentKey().optionId())
+                    .thenComparing(value -> value.commitmentKey().stableFactionId())
+                    .thenComparing(value -> value.commitmentKey().commodityId())
+                    .thenComparing(value -> value.commitmentKey().producerSystemId())
+                    .thenComparingInt(value -> value.commitmentKey().sourceCommitmentOrdinal());
 
     private static String requireText(String value, String field) {
         if (value == null || value.isBlank()) {

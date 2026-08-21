@@ -19,7 +19,7 @@ stable faction identity
 + uncommitted reserve subset
 ```
 
-The full owned capacity comes from the explicit caller-supplied freight-capacity authority. The selected physical plan may consume only a subset of it.
+The full owned capacity comes directly from the resolved acceptance budget retained by the selected physical plan. Ownership accepts no second caller-supplied capacity map, so the already accepted finite fleet cannot be silently enlarged or reduced. The selected physical plan may consume only a subset of that exact capacity.
 
 ## Ownership semantics
 
@@ -34,16 +34,20 @@ ownedFreighterCount
 
 Every committed ship count is backed by a real remote `SupplierCommitment` retaining:
 
+- source frontier version and selected option ID;
 - Stage-18 commodity ID;
+- stable owning faction/start identity;
 - producer system;
 - consumer faction-start system;
 - explicit physical neighbor route;
 - integer allocated freighters;
 - committed delivered kg/s.
 
+Each aggregate commitment receives a deterministic planning-only `CommitmentKey`. The owned pool can be expanded into an exact ordered list of `OwnershipSlot`s: committed slots carry the source key plus a per-commitment freighter ordinal, while reserve slots carry no commitment. These are not runtime IDs and do not compete with `FleetId` authority.
+
 Local producer service consumes zero remote freight ownership slots.
 
-The ownership capacity must also equal the `remoteFreighterBudget` carried by every selected `StartPlan`. This prevents a later caller from silently changing the finite fleet after physical feasibility was proven.
+The ownership capacity equals both the preserved acceptance budget and the `remoteFreighterBudget` carried by every selected `StartPlan`. The resulting `OwnershipReport` retains the complete immutable physical plan, generated root seed and placement-profile provenance for the later bootstrap bridge.
 
 ## Home system is not spawn position
 
@@ -79,7 +83,8 @@ This slice must not create another persistent freight-ID namespace. It only esta
 Ownership planning rejects when:
 
 - faction-start placement is not accepted;
-- placement, capacity authority and selected physical plan do not cover the same faction set;
+- placement and selected physical plan do not cover the same faction set;
+- placement version differs from the selected physical authority;
 - a selected physical start differs from the accepted placement;
 - selected `StartPlan.remoteFreighterBudget` differs from ownership capacity;
 - aggregate selected ship usage exceeds owned capacity;
@@ -100,6 +105,8 @@ This slice does not:
 - change producer capacity;
 - change topology/resources/demand/payload/cadence;
 - change the accepted finite freight-capacity requirement.
+
+The deterministic `CommitmentKey`, `CommitmentSlot` and `OwnershipSlot` values are immutable bootstrap evidence only. They authorize creation order and source binding; only `WorldSimulation` / `FleetWorldService` may allocate persistent runtime fleet identity.
 
 ## Next causal slice
 

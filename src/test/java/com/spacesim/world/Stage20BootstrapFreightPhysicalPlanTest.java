@@ -13,6 +13,7 @@ import com.spacesim.world.Stage20CoordinatedWholePlacementFreightPlanner.Produce
 import com.spacesim.world.Stage20CoordinatedWholePlacementFreightPlanner.StartPlan;
 import com.spacesim.world.Stage20CoordinatedWholePlacementFreightPlanner.SupplierCommitment;
 import com.spacesim.world.Stage20EconomicBootstrapValidator.RouteAssessment;
+import com.spacesim.world.Stage20ResolvedFreightAcceptance.AcceptanceReport;
 import com.spacesim.world.Stage20TheoreticalSupplyThroughputAnalyzer.SupplyKey;
 import org.junit.jupiter.api.Test;
 
@@ -35,14 +36,16 @@ class Stage20BootstrapFreightPhysicalPlanTest {
     void acceptedCombinerSelectionRestoresRoutesProducerReservationsAndExactShipUsage() {
         FrontierReport water = frontier(WATER, "option.water", WATER_SOURCE, 2, 20d);
         FrontierReport ore = frontier(ORE, "option.ore", ORE_SOURCE, 3, 12d);
-        CombinationReport combination = Stage20CommodityFreightFrontierCombiner.combine(
-                List.of(water.toCombinerFrontier(), ore.toCombinerFrontier()),
-                Map.of(FACTION, 5));
+        AcceptanceReport acceptance = accepted(List.of(water, ore));
 
-        PlanReport plan = Stage20BootstrapFreightPhysicalPlan.reconstruct(
-                List.of(ore, water), combination);
+        PlanReport plan = Stage20BootstrapFreightPhysicalPlan.reconstruct(acceptance);
 
-        assertEquals(Status.ACCEPTED, combination.status());
+        assertEquals(Status.ACCEPTED, acceptance.combination().status());
+        assertEquals(Stage20ResolvedFreightAcceptance.CURRENT_VERSION, plan.acceptanceVersion());
+        assertEquals("placement.v1", plan.placementVersion());
+        assertEquals("supply.v1", plan.supplyProfileVersion());
+        assertEquals(100, plan.searchNodeBudgetPerCommodity());
+        assertEquals(Map.of(FACTION, 5), plan.remoteFreighterBudgetByFaction());
         assertEquals(Map.of(FACTION, 5), plan.remoteFreightersByFaction());
         assertEquals(List.of(ORE, WATER), plan.commodities().stream()
                 .map(SelectedCommodityPlan::commodityId).toList());
@@ -63,12 +66,8 @@ class Stage20BootstrapFreightPhysicalPlanTest {
     void inputFrontierOrderingDoesNotChangeReconstructedPlan() {
         FrontierReport water = frontier(WATER, "option.water", WATER_SOURCE, 2, 20d);
         FrontierReport ore = frontier(ORE, "option.ore", ORE_SOURCE, 3, 12d);
-        CombinationReport combination = Stage20CommodityFreightFrontierCombiner.combine(
-                List.of(water.toCombinerFrontier(), ore.toCombinerFrontier()),
-                Map.of(FACTION, 5));
-
-        PlanReport forward = Stage20BootstrapFreightPhysicalPlan.reconstruct(List.of(water, ore), combination);
-        PlanReport reversed = Stage20BootstrapFreightPhysicalPlan.reconstruct(List.of(ore, water), combination);
+        PlanReport forward = Stage20BootstrapFreightPhysicalPlan.reconstruct(accepted(List.of(water, ore)));
+        PlanReport reversed = Stage20BootstrapFreightPhysicalPlan.reconstruct(accepted(List.of(ore, water)));
 
         assertEquals(forward, reversed);
     }
@@ -87,8 +86,10 @@ class Stage20BootstrapFreightPhysicalPlanTest {
                         new SelectedOption(WATER, water.version(), "option.water", Map.of(FACTION, 1)),
                         new SelectedOption(ORE, ore.version(), "option.ore", Map.of(FACTION, 3))));
 
+        AcceptanceReport acceptance = acceptance(List.of(water, ore), tampered);
+
         assertThrows(IllegalArgumentException.class,
-                () -> Stage20BootstrapFreightPhysicalPlan.reconstruct(List.of(water, ore), tampered));
+                () -> Stage20BootstrapFreightPhysicalPlan.reconstruct(acceptance));
     }
 
     @Test
@@ -96,14 +97,16 @@ class Stage20BootstrapFreightPhysicalPlanTest {
         FrontierReport water = frontier(WATER, "option.water", WATER_SOURCE, 2, 20d);
         CombinationReport infeasible = new CombinationReport(
                 Stage20CommodityFreightFrontierCombiner.CURRENT_VERSION,
-                Map.of(FACTION, 1),
+                Map.of(FACTION, 5),
                 Status.INFEASIBLE,
                 Optional.of(Stage20CommodityFreightFrontierCombiner.FailureReason.SHARED_FLEET_COMBINATION_INFEASIBLE),
                 Map.of(),
                 List.of());
 
+        AcceptanceReport acceptance = acceptance(List.of(water), infeasible);
+
         assertThrows(IllegalArgumentException.class,
-                () -> Stage20BootstrapFreightPhysicalPlan.reconstruct(List.of(water), infeasible));
+                () -> Stage20BootstrapFreightPhysicalPlan.reconstruct(acceptance));
     }
 
     @Test
@@ -121,8 +124,48 @@ class Stage20BootstrapFreightPhysicalPlanTest {
                         "option.absent",
                         Map.of(FACTION, 2))));
 
+        AcceptanceReport acceptance = acceptance(List.of(water), missing);
+
         assertThrows(IllegalArgumentException.class,
-                () -> Stage20BootstrapFreightPhysicalPlan.reconstruct(List.of(water), missing));
+                () -> Stage20BootstrapFreightPhysicalPlan.reconstruct(acceptance));
+    }
+
+    @Test
+    void reconstructedPlanCannotReplaceTheAcceptedFiniteFleetBudget() {
+        FrontierReport water = frontier(WATER, "option.water", WATER_SOURCE, 2, 20d);
+        PlanReport plan = Stage20BootstrapFreightPhysicalPlan.reconstruct(
+                accepted(List.of(water)));
+
+        assertThrows(IllegalArgumentException.class, () -> new PlanReport(
+                plan.version(),
+                plan.acceptanceVersion(),
+                plan.placementVersion(),
+                plan.supplyProfileVersion(),
+                plan.searchNodeBudgetPerCommodity(),
+                Map.of(FACTION, 6),
+                plan.combinerVersion(),
+                plan.remoteFreightersByFaction(),
+                plan.commodities()));
+    }
+
+    private static AcceptanceReport accepted(List<FrontierReport> frontiers) {
+        CombinationReport combination = Stage20CommodityFreightFrontierCombiner.combine(
+                frontiers.stream().map(FrontierReport::toCombinerFrontier).toList(),
+                Map.of(FACTION, 5));
+        return acceptance(frontiers, combination);
+    }
+
+    private static AcceptanceReport acceptance(
+            List<FrontierReport> frontiers,
+            CombinationReport combination) {
+        return new AcceptanceReport(
+                Stage20ResolvedFreightAcceptance.CURRENT_VERSION,
+                "placement.v1",
+                "supply.v1",
+                100,
+                Map.of(FACTION, 5),
+                frontiers,
+                combination);
     }
 
     private static FrontierReport frontier(

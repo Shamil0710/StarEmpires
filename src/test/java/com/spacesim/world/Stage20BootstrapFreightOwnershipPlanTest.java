@@ -2,6 +2,7 @@ package com.spacesim.world;
 
 import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan.FactionFleetOwnership;
 import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan.OwnershipReport;
+import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan.OwnershipSlot;
 import com.spacesim.world.Stage20BootstrapFreightPhysicalPlan.PlanReport;
 import com.spacesim.world.Stage20BootstrapFreightPhysicalPlan.SelectedCommodityPlan;
 import com.spacesim.world.Stage20CoordinatedWholePlacementFreightPlanner.DemandPlan;
@@ -34,19 +35,20 @@ class Stage20BootstrapFreightOwnershipPlanTest {
 
     @Test
     void finiteOwnedPoolSeparatesSelectedCommitmentsFromReserveWithoutAllocatingFleetIds() {
-        PlanReport physical = new PlanReport(
-                Stage20BootstrapFreightPhysicalPlan.CURRENT_VERSION,
-                Stage20CommodityFreightFrontierCombiner.CURRENT_VERSION,
-                Map.of(FACTION, 3),
+        PlanReport physical = physicalPlan(
+                3,
+                5,
                 List.of(
                         remoteCommodity(WATER, WATER_SOURCE, 2, 20d, 5),
                         remoteCommodity(ORE, ORE_SOURCE, 1, 12d, 5)));
 
         OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.plan(
                 placement(START),
-                Map.of(FACTION, 5),
                 physical);
 
+        assertEquals(1L, ownership.rootSeed());
+        assertEquals("profile.v1", ownership.placementProfileVersion());
+        assertEquals(physical, ownership.physicalPlan());
         assertEquals(5, ownership.totalOwnedFreighters());
         assertEquals(3, ownership.totalCommittedFreighters());
         FactionFleetOwnership faction = ownership.factions().get(0);
@@ -56,58 +58,105 @@ class Stage20BootstrapFreightOwnershipPlanTest {
         assertEquals(3, faction.committedFreighterCount());
         assertEquals(2, faction.reserveFreighterCount());
         assertEquals(List.of(ORE, WATER), faction.remoteCommitments().stream()
-                .map(Stage20BootstrapFreightOwnershipPlan.RemoteCommitmentAllocation::commodityId)
+                .map(value -> value.commitmentKey().commodityId())
                 .toList());
         assertTrue(faction.remoteCommitments().stream()
-                .allMatch(value -> value.route().orderedSystems().get(value.route().orderedSystems().size() - 1)
+                .allMatch(value -> value.commitmentKey().consumerStartSystemId()
                         .equals(START)));
+        assertEquals(List.of(0, 1, 2, 3, 4), faction.materializationSlots().stream()
+                .map(OwnershipSlot::ownershipOrdinal)
+                .toList());
+        assertEquals(3L, faction.materializationSlots().stream()
+                .filter(value -> value.commitment().isPresent())
+                .count());
+        assertEquals(2L, faction.materializationSlots().stream()
+                .filter(value -> value.commitment().isEmpty())
+                .count());
+        assertTrue(faction.materializationSlots().stream()
+                .flatMap(value -> value.commitment().stream())
+                .allMatch(value -> value.commitmentKey().frontierVersion().equals("frontier.v1")
+                        && value.commitmentKey().optionId().startsWith("option.")));
     }
 
     @Test
     void localPhysicalServiceConsumesNoRemoteOwnershipSlots() {
-        PlanReport physical = new PlanReport(
-                Stage20BootstrapFreightPhysicalPlan.CURRENT_VERSION,
-                Stage20CommodityFreightFrontierCombiner.CURRENT_VERSION,
-                Map.of(FACTION, 0),
+        PlanReport physical = physicalPlan(
+                0,
+                5,
                 List.of(localCommodity(WATER, 5)));
 
         OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.plan(
                 placement(START),
-                Map.of(FACTION, 5),
                 physical);
 
         FactionFleetOwnership faction = ownership.factions().get(0);
         assertEquals(0, faction.committedFreighterCount());
         assertEquals(5, faction.reserveFreighterCount());
         assertTrue(faction.remoteCommitments().isEmpty());
+        assertTrue(faction.materializationSlots().stream()
+                .allMatch(value -> value.commitment().isEmpty()));
     }
 
     @Test
-    void ownershipCapacityMustEqualThePhysicalFrontierBudget() {
-        PlanReport physical = new PlanReport(
-                Stage20BootstrapFreightPhysicalPlan.CURRENT_VERSION,
-                Stage20CommodityFreightFrontierCombiner.CURRENT_VERSION,
-                Map.of(FACTION, 2),
+    void physicalPlanBudgetIsTheOnlyOwnershipCapacityAuthority() {
+        PlanReport physical = physicalPlan(
+                2,
+                5,
                 List.of(remoteCommodity(WATER, WATER_SOURCE, 2, 20d, 5)));
 
-        assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.plan(
+        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.plan(
                 placement(START),
-                Map.of(FACTION, 6),
-                physical));
+                physical);
+
+        assertEquals(Map.of(FACTION, 5), ownership.physicalPlan().remoteFreighterBudgetByFaction());
+        assertEquals(5, ownership.factions().get(0).ownedFreighterCount());
     }
 
     @Test
     void selectedPhysicalStartMustEqualAcceptedFactionPlacement() {
-        PlanReport physical = new PlanReport(
-                Stage20BootstrapFreightPhysicalPlan.CURRENT_VERSION,
-                Stage20CommodityFreightFrontierCombiner.CURRENT_VERSION,
-                Map.of(FACTION, 2),
+        PlanReport physical = physicalPlan(
+                2,
+                5,
                 List.of(remoteCommodityAtStart(WATER, WATER_SOURCE, OTHER_START, 2, 20d, 5)));
 
         assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.plan(
                 placement(START),
-                Map.of(FACTION, 5),
                 physical));
+    }
+
+    @Test
+    void selectedPhysicalPlanMustRetainTheAcceptedPlacementVersion() {
+        SelectedCommodityPlan water = remoteCommodity(WATER, WATER_SOURCE, 2, 20d, 5);
+        PlanReport mismatched = new PlanReport(
+                Stage20BootstrapFreightPhysicalPlan.CURRENT_VERSION,
+                Stage20ResolvedFreightAcceptance.CURRENT_VERSION,
+                "placement.other",
+                "supply.v1",
+                100,
+                Map.of(FACTION, 5),
+                Stage20CommodityFreightFrontierCombiner.CURRENT_VERSION,
+                Map.of(FACTION, 2),
+                List.of(water));
+
+        assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.plan(
+                placement(START),
+                mismatched));
+    }
+
+    private static PlanReport physicalPlan(
+            int remoteFreightersUsed,
+            int remoteFreighterBudget,
+            List<SelectedCommodityPlan> commodities) {
+        return new PlanReport(
+                Stage20BootstrapFreightPhysicalPlan.CURRENT_VERSION,
+                Stage20ResolvedFreightAcceptance.CURRENT_VERSION,
+                Stage20FactionStartPlacementGenerator.CURRENT_VERSION,
+                "supply.v1",
+                100,
+                Map.of(FACTION, remoteFreighterBudget),
+                Stage20CommodityFreightFrontierCombiner.CURRENT_VERSION,
+                Map.of(FACTION, remoteFreightersUsed),
+                commodities);
     }
 
     private static PlacementResult placement(StarSystemId systemId) {
