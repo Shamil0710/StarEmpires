@@ -21,6 +21,7 @@ import com.spacesim.world.calibration.Stage20BootstrapFreightCapacityRequirement
 import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.PhysicalTransportAuthority;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -29,48 +30,45 @@ import java.util.Optional;
 import java.util.TreeMap;
 
 /**
- * Read-only Stage-20E fixed-corpus measurement of the per-commodity frontier decomposition.
+ * Read-only Stage-20E fixed-corpus measurement of the per-commodity freight-frontier decomposition.
  *
- * <p>The diagnostic replays the unchanged representative v2-candidate production probe and invokes
- * {@link Stage20CommodityWholePlacementFrontierGenerator} independently for every essential bootstrap
- * commodity only after faction-start placement is accepted. The resulting physical frontiers are then
- * joined by {@link Stage20CommodityFreightFrontierCombiner}. The route evaluator, resource supply,
- * bootstrap requirements and derived finite freight fleet are exactly the same authorities used by the
- * existing coordinated-planner diagnostics.</p>
+ * <p>The diagnostic replays the unchanged representative v2-candidate production probe. After a seed
+ * reaches an accepted faction-start placement it generates one physical whole-placement frontier per
+ * essential bootstrap commodity and joins those frontiers with the exact finite-fleet combiner. Route
+ * geometry, Stage-18 supply, bootstrap requirements and the derived per-start freight fleet are the
+ * existing production authorities.</p>
  *
- * <p>{@link #FRONTIER_SEARCH_NODE_BUDGET_PER_COMMODITY} is a bounded CI evidence budget, not a world
- * acceptance threshold. An incomplete frontier remains explicitly unresolved unless already discovered
- * concrete options are sufficient for the exact combiner to accept. This diagnostic does not mutate
- * production acceptance or tune physical world generation.</p>
+ * <p>The search-node budget is evidence-only. An incomplete frontier remains unresolved unless known
+ * concrete options already suffice for an accepted exact combination. This diagnostic changes no
+ * production acceptance or physical generation authority.</p>
  */
 @SuppressWarnings("doclint:missing")
 public final class Stage20CommodityFrontierCorpusDiagnostics {
     /** Stable diagnostic version. */
     public static final String CURRENT_VERSION = "stage20e.commodity-frontier-corpus-diagnostics.v1";
-
-    /** Bounded per-commodity CI evidence budget; not a generation-quality threshold. */
+    /** Bounded per-commodity CI evidence budget; never a world-quality threshold. */
     public static final int FRONTIER_SEARCH_NODE_BUDGET_PER_COMMODITY = 2_000;
 
     private Stage20CommodityFrontierCorpusDiagnostics() {
         throw new AssertionError("No instances");
     }
 
-    /** Mutually exclusive diagnostic outcome for one fixed seed. */
+    /** Mutually exclusive measurement outcome for one fixed seed. */
     public enum SeedStatus {
-        /** Existing v2-candidate placement rejected before freight frontier measurement. */ PLACEMENT_REJECTED,
-        /** Exact combiner found a concrete cross-commodity plan under the shared finite fleets. */ COMBINER_ACCEPTED,
-        /** Complete frontier evidence proved physical/shared-fleet infeasibility. */ COMBINER_INFEASIBLE,
-        /** At least one frontier remains incomplete and no known fitting combination exists. */ COMBINER_UNRESOLVED
+        /** Existing placement rejected before freight measurement. */ PLACEMENT_REJECTED,
+        /** A concrete exact cross-commodity combination fits the finite shared fleets. */ COMBINER_ACCEPTED,
+        /** Complete evidence proves commodity or shared-fleet infeasibility. */ COMBINER_INFEASIBLE,
+        /** No known fitting combination exists while at least one frontier is incomplete. */ COMBINER_UNRESOLVED
     }
 
-    /** One commodity's bounded frontier evidence for one accepted-placement seed. */
+    /** Compact evidence for one commodity frontier on one accepted-placement seed. */
     public record CommodityEvidence(
             String commodityId,
             FrontierStatus status,
             int searchNodesVisited,
             int optionCount,
             List<Map<String, Integer>> nondominatedShipVectors) {
-        /** Validates compact frontier evidence. */
+        /** Validates deterministic bounded commodity evidence. */
         public CommodityEvidence {
             commodityId = requireText(commodityId, "commodityId");
             Objects.requireNonNull(status, "status");
@@ -78,24 +76,24 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
                     || optionCount < 0) {
                 throw new IllegalArgumentException("commodity frontier counts must fit bounded evidence");
             }
-            ArrayList<Map<String, Integer>> vectors = new ArrayList<>(
+            ArrayList<Map<String, Integer>> supplied = new ArrayList<>(
                     Objects.requireNonNull(nondominatedShipVectors, "nondominatedShipVectors"));
-            if (vectors.stream().anyMatch(Objects::isNull) || vectors.size() != optionCount) {
-                throw new IllegalArgumentException("one ship vector is required for every exposed frontier option");
+            if (supplied.stream().anyMatch(Objects::isNull) || supplied.size() != optionCount) {
+                throw new IllegalArgumentException("every frontier option must expose one ship vector");
             }
             ArrayList<Map<String, Integer>> canonical = new ArrayList<>();
-            for (Map<String, Integer> vector : vectors) {
+            for (Map<String, Integer> vector : supplied) {
                 TreeMap<String, Integer> sorted = new TreeMap<>(vector);
                 if (sorted.isEmpty() || sorted.values().stream().anyMatch(value -> value == null || value < 0)) {
-                    throw new IllegalArgumentException("frontier ship vectors must be non-empty and non-negative");
+                    throw new IllegalArgumentException("ship vectors must be non-empty and non-negative");
                 }
-                canonical.add(Map.copyOf(sorted));
+                canonical.add(Collections.unmodifiableMap(sorted));
             }
             nondominatedShipVectors = List.copyOf(canonical);
         }
     }
 
-    /** Per-seed frontier-decomposition evidence. */
+    /** Deterministic frontier/combiner evidence for one fixed root seed. */
     public record SeedEvidence(
             long rootSeed,
             PlacementStatus placementStatus,
@@ -105,13 +103,14 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
             Optional<FailureReason> combinerFailureReason,
             Map<String, Integer> combinedRemoteFreightersByFaction,
             List<SelectedOption> selectedOptions) {
-        /** Validates one deterministic seed measurement. */
+        /** Validates one per-seed measurement without converting unresolved evidence into failure. */
         public SeedEvidence {
             if (rootSeed <= 0L) {
                 throw new IllegalArgumentException("rootSeed must be positive");
             }
             Objects.requireNonNull(placementStatus, "placementStatus");
             Objects.requireNonNull(status, "status");
+
             ArrayList<CommodityEvidence> commodityCopy = new ArrayList<>(
                     Objects.requireNonNull(commodities, "commodities"));
             if (commodityCopy.stream().anyMatch(Objects::isNull)) {
@@ -119,14 +118,17 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
             }
             commodityCopy.sort(Comparator.comparing(CommodityEvidence::commodityId));
             commodities = List.copyOf(commodityCopy);
+
             Objects.requireNonNull(combinerStatus, "combinerStatus");
             Objects.requireNonNull(combinerFailureReason, "combinerFailureReason");
-            TreeMap<String, Integer> combined = new TreeMap<>(
-                    Objects.requireNonNull(combinedRemoteFreightersByFaction, "combinedRemoteFreightersByFaction"));
+            TreeMap<String, Integer> combined = new TreeMap<>(Objects.requireNonNull(
+                    combinedRemoteFreightersByFaction,
+                    "combinedRemoteFreightersByFaction"));
             if (combined.values().stream().anyMatch(value -> value == null || value < 0)) {
                 throw new IllegalArgumentException("combined freight usage must be non-negative");
             }
-            combinedRemoteFreightersByFaction = Map.copyOf(combined);
+            combinedRemoteFreightersByFaction = Collections.unmodifiableMap(combined);
+
             ArrayList<SelectedOption> selectedCopy = new ArrayList<>(
                     Objects.requireNonNull(selectedOptions, "selectedOptions"));
             if (selectedCopy.stream().anyMatch(Objects::isNull)) {
@@ -141,38 +143,38 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
                         || !combinedRemoteFreightersByFaction.isEmpty() || !selectedOptions.isEmpty()) {
                     throw new IllegalArgumentException("placement-rejected seed cannot expose freight evidence");
                 }
-                return;
-            }
-            if (placementStatus != PlacementStatus.ACCEPTED || commodities.isEmpty() || combinerStatus.isEmpty()) {
-                throw new IllegalArgumentException("accepted-placement seed must expose commodity/combiner evidence");
-            }
-            Status measured = combinerStatus.orElseThrow();
-            switch (status) {
-                case COMBINER_ACCEPTED -> {
-                    if (measured != Status.ACCEPTED || combinerFailureReason.isPresent()
-                            || combinedRemoteFreightersByFaction.isEmpty() || selectedOptions.isEmpty()) {
-                        throw new IllegalArgumentException("accepted seed must expose concrete combination evidence");
-                    }
+            } else {
+                if (placementStatus != PlacementStatus.ACCEPTED || commodities.isEmpty() || combinerStatus.isEmpty()) {
+                    throw new IllegalArgumentException("accepted placement must expose commodity and combiner evidence");
                 }
-                case COMBINER_INFEASIBLE -> {
-                    if (measured != Status.INFEASIBLE || combinerFailureReason.isEmpty()
-                            || !combinedRemoteFreightersByFaction.isEmpty() || !selectedOptions.isEmpty()) {
-                        throw new IllegalArgumentException("infeasible seed must expose only complete failure evidence");
+                Status measured = combinerStatus.orElseThrow();
+                switch (status) {
+                    case COMBINER_ACCEPTED -> {
+                        if (measured != Status.ACCEPTED || combinerFailureReason.isPresent()
+                                || combinedRemoteFreightersByFaction.isEmpty() || selectedOptions.isEmpty()) {
+                            throw new IllegalArgumentException("accepted seed requires a concrete selected combination");
+                        }
                     }
-                }
-                case COMBINER_UNRESOLVED -> {
-                    if (measured != Status.UNRESOLVED_FRONTIER
-                            || !combinerFailureReason.equals(Optional.of(FailureReason.FRONTIER_INCOMPLETE))
-                            || !combinedRemoteFreightersByFaction.isEmpty() || !selectedOptions.isEmpty()) {
-                        throw new IllegalArgumentException("unresolved seed must preserve incomplete-frontier semantics");
+                    case COMBINER_INFEASIBLE -> {
+                        if (measured != Status.INFEASIBLE || combinerFailureReason.isEmpty()
+                                || !combinedRemoteFreightersByFaction.isEmpty() || !selectedOptions.isEmpty()) {
+                            throw new IllegalArgumentException("infeasible seed requires complete failure evidence only");
+                        }
                     }
+                    case COMBINER_UNRESOLVED -> {
+                        if (measured != Status.UNRESOLVED_FRONTIER
+                                || !combinerFailureReason.equals(Optional.of(FailureReason.FRONTIER_INCOMPLETE))
+                                || !combinedRemoteFreightersByFaction.isEmpty() || !selectedOptions.isEmpty()) {
+                            throw new IllegalArgumentException("unresolved seed must retain frontier-incomplete semantics");
+                        }
+                    }
+                    case PLACEMENT_REJECTED -> throw new IllegalStateException("handled by outer branch");
                 }
-                case PLACEMENT_REJECTED -> throw new IllegalStateException("handled above");
             }
         }
     }
 
-    /** Aggregate fixed-corpus frontier-decomposition evidence. */
+    /** Aggregate fixed-corpus measurement evidence. */
     public record Report(
             String version,
             String candidateProfileVersion,
@@ -190,13 +192,14 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
             int totalFrontierSearchNodesVisited,
             int maxCommodityFrontierSearchNodesVisited,
             List<SeedEvidence> seeds) {
-        /** Validates aggregate measurement consistency. */
+        /** Validates aggregate status/count consistency. */
         public Report {
             version = requireText(version, "version");
             candidateProfileVersion = requireText(candidateProfileVersion, "candidateProfileVersion");
             bootstrapRequirementVersion = requireText(bootstrapRequirementVersion, "bootstrapRequirementVersion");
             freightCapacityRequirementVersion = requireText(
-                    freightCapacityRequirementVersion, "freightCapacityRequirementVersion");
+                    freightCapacityRequirementVersion,
+                    "freightCapacityRequirementVersion");
             frontierGeneratorVersion = requireText(frontierGeneratorVersion, "frontierGeneratorVersion");
             combinerVersion = requireText(combinerVersion, "combinerVersion");
             if (perStartFreighterBudget <= 0 || frontierSearchNodeBudgetPerCommodity <= 0
@@ -205,33 +208,35 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
                     || combinerUnresolvedSeedCount < 0 || totalFrontierSearchNodesVisited < 0
                     || maxCommodityFrontierSearchNodesVisited < 0
                     || maxCommodityFrontierSearchNodesVisited > frontierSearchNodeBudgetPerCommodity) {
-                throw new IllegalArgumentException("aggregate diagnostic counts/budgets are invalid");
+                throw new IllegalArgumentException("aggregate diagnostic counts or budgets are invalid");
             }
-            ArrayList<SeedEvidence> seedCopy = new ArrayList<>(Objects.requireNonNull(seeds, "seeds"));
-            if (seedCopy.stream().anyMatch(Objects::isNull) || seedCopy.size() != fixedSeedCount) {
+            ArrayList<SeedEvidence> copy = new ArrayList<>(Objects.requireNonNull(seeds, "seeds"));
+            if (copy.stream().anyMatch(Objects::isNull) || copy.size() != fixedSeedCount) {
                 throw new IllegalArgumentException("report must expose exactly one record per fixed seed");
             }
-            seeds = List.copyOf(seedCopy);
-            long rejected = seeds.stream().filter(value -> value.status() == SeedStatus.PLACEMENT_REJECTED).count();
-            if (acceptedPlacementSeedCount + rejected != fixedSeedCount
+            seeds = List.copyOf(copy);
+            long placementRejected = seeds.stream()
+                    .filter(value -> value.status() == SeedStatus.PLACEMENT_REJECTED)
+                    .count();
+            if (acceptedPlacementSeedCount + placementRejected != fixedSeedCount
                     || combinerAcceptedSeedCount + combinerInfeasibleSeedCount + combinerUnresolvedSeedCount
                     != acceptedPlacementSeedCount) {
-                throw new IllegalArgumentException("aggregate seed-status counts must partition the fixed corpus");
+                throw new IllegalArgumentException("aggregate status counts must partition the fixed corpus");
             }
         }
     }
 
     /**
-     * Replays the fixed representative corpus under commodity-frontier decomposition.
+     * Replays the fixed representative corpus using physical commodity frontiers and exact combination.
      *
-     * @return deterministic read-only measurement evidence
+     * @return deterministic measurement; no accepted-seed target is applied
      */
     public static Report evaluateCurrent() {
         var profile = Stage20RepresentativeGeneratedWorldProbeProfileV2.deriveCurrent();
         Stage20BootstrapFreightCapacityRequirementProfile capacity =
                 Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent();
         if (!capacity.bootstrapRequirementVersion().equals(profile.bootstrapRequirementVersion())) {
-            throw new IllegalStateException("freight-capacity authority and v2 candidate use different bootstrap requirements");
+            throw new IllegalStateException("freight-capacity authority and candidate profile disagree on bootstrap requirements");
         }
         PhysicalTransportAuthority transport = profile.inputs().transport();
         if (Math.abs(transport.fleetProfile().payloadMassKgPerFreighter() - capacity.payloadMassKg()) > 1.0e-9d) {
@@ -274,17 +279,16 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
 
             GalaxyTopology topology = probe.topology().requireAcceptedTopology();
             SupplyThroughputReport supply = probe.supplyThroughput().orElseThrow();
-            Stage20PhysicalFreightRouteEvaluator routes =
-                    Stage20WholePlacementCapacityCorpusDiagnostics.physicalRoutes(
-                            topology,
-                            probe.jumpEdges().orElseThrow(),
-                            probe.localLayouts().orElseThrow(),
-                            stations,
-                            transport,
-                            perStartBudget);
-            TreeMap<String, Integer> budgets = budgets(placement, perStartBudget);
+            Stage20PhysicalFreightRouteEvaluator routes = Stage20WholePlacementCapacityCorpusDiagnostics.physicalRoutes(
+                    topology,
+                    probe.jumpEdges().orElseThrow(),
+                    probe.localLayouts().orElseThrow(),
+                    stations,
+                    transport,
+                    perStartBudget);
+            TreeMap<String, Integer> perFactionBudgets = budgets(placement, perStartBudget);
 
-            ArrayList<FrontierReport> frontiers = new ArrayList<>();
+            ArrayList<FrontierReport> frontierReports = new ArrayList<>();
             ArrayList<CommodityEvidence> commodityEvidence = new ArrayList<>();
             for (CommodityRequirement requirement : requirements) {
                 FrontierReport frontier = Stage20CommodityWholePlacementFrontierGenerator.generate(
@@ -292,10 +296,10 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
                         placement,
                         supply,
                         requirement,
-                        budgets,
+                        perFactionBudgets,
                         FRONTIER_SEARCH_NODE_BUDGET_PER_COMMODITY,
                         routes::assessWithAllocatedFreighters);
-                frontiers.add(frontier);
+                frontierReports.add(frontier);
                 totalFrontierNodes = Math.addExact(totalFrontierNodes, frontier.searchNodesVisited());
                 maxCommodityNodes = Math.max(maxCommodityNodes, frontier.searchNodesVisited());
                 commodityEvidence.add(new CommodityEvidence(
@@ -303,14 +307,12 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
                         frontier.status(),
                         frontier.searchNodesVisited(),
                         frontier.options().size(),
-                        frontier.options().stream()
-                                .map(value -> value.remoteFreightersByFaction())
-                                .toList()));
+                        frontier.options().stream().map(value -> value.remoteFreightersByFaction()).toList()));
             }
 
             CombinationReport combination = Stage20CommodityFreightFrontierCombiner.combine(
-                    frontiers.stream().map(FrontierReport::toCombinerFrontier).toList(),
-                    budgets);
+                    frontierReports.stream().map(FrontierReport::toCombinerFrontier).toList(),
+                    perFactionBudgets);
             SeedStatus seedStatus;
             if (combination.status() == Status.ACCEPTED) {
                 acceptedCombinations++;
