@@ -161,7 +161,7 @@ class Stage20FreightPortfolioAllocatorTest {
 
     @Test
     void allocatedRouteCannotHideANonNeighborShortcut() {
-        GalaxyTopology chain = topology(false, true);
+        GalaxyTopology chain = topology(true, false);
         assertThrows(IllegalArgumentException.class, () -> Stage20FreightPortfolioAllocator.allocate(
                 chain,
                 supply(Map.of(new SupplyKey(WATER, SUPPLIER_B), 10d)),
