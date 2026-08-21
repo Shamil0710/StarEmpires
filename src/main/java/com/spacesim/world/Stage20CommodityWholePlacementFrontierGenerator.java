@@ -38,13 +38,17 @@ import java.util.TreeMap;
  * time. This removes cross-commodity fleet coupling from the search. The remaining coupling inside
  * one commodity is authoritative producer capacity shared between all placed faction starts.</p>
  *
- * <p>Frontier completeness is proved by solving every per-start freight-cap vector from zero through
- * the caller-supplied physical fleet budget. Cap vectors are visited by increasing total ships and
- * then lexicographically by canonical faction order. A nondominated feasible usage vector must be
- * rediscovered when its own vector is used as the cap; if a different solution used no more ships at
- * every start, the original vector would be dominated. Therefore complete resolution of all cap
- * vectors proves the returned nondominated frontier complete without enumerating the Cartesian
- * product of water and ore route-prefix decisions together.</p>
+ * <p>Frontier completeness is proved by solving every per-start freight-cap vector from each start's
+ * independently proven single-start minimum through the caller-supplied physical fleet budget. No
+ * whole-placement solution can use fewer ships at a start than that same start requires when it has
+ * all authoritative producer capacity available to itself, so vectors below those minima are
+ * physically impossible and may be skipped without pruning a feasible whole-placement option. Cap
+ * vectors are visited by increasing total ships and then lexicographically by canonical faction
+ * order. A nondominated feasible usage vector must be rediscovered when its own vector is used as the
+ * cap; if a different solution used no more ships at every start, the original vector would be
+ * dominated. Therefore complete resolution of all admissible cap vectors proves the returned
+ * nondominated frontier complete without enumerating the Cartesian product of water and ore
+ * route-prefix decisions together.</p>
  *
  * <p>The caller supplies one shared search-node budget across all cap-vector solves. If that budget is
  * exhausted, already discovered physical options are retained and the frontier is explicitly marked
@@ -54,7 +58,7 @@ import java.util.TreeMap;
 @SuppressWarnings("doclint:missing")
 public final class Stage20CommodityWholePlacementFrontierGenerator {
     /** Stable frontier-generator version. */
-    public static final String CURRENT_VERSION = "stage20e.commodity-whole-placement-frontier-generator.v1";
+    public static final String CURRENT_VERSION = "stage20e.commodity-whole-placement-frontier-generator.v2";
     private static final double EPSILON = 1.0e-9d;
 
     private Stage20CommodityWholePlacementFrontierGenerator() {
@@ -274,7 +278,9 @@ public final class Stage20CommodityWholePlacementFrontierGenerator {
                     List.of());
         }
 
-        for (Assignment assignment : assignments) {
+        int[] minimumShipsByStart = new int[assignments.size()];
+        for (int startIndex = 0; startIndex < assignments.size(); startIndex++) {
+            Assignment assignment = assignments.get(startIndex);
             int budget = budgets.get(assignment.stableFactionId());
             var single = Stage20FreightPortfolioAllocator.allocate(
                     checkedTopology,
@@ -294,6 +300,7 @@ public final class Stage20CommodityWholePlacementFrontierGenerator {
                         FrontierStatus.COMPLETE,
                         List.of());
             }
+            minimumShipsByStart[startIndex] = single.minimumRemoteFreightersRequired();
         }
 
         PlanningModel model = buildModel(
@@ -304,7 +311,9 @@ public final class Stage20CommodityWholePlacementFrontierGenerator {
                 budgets,
                 checkedRoutes);
 
-        List<ShipVector> capVectors = capVectors(model.maxShipsByStart());
+        List<ShipVector> capVectors = capVectors(
+                minimumShipsByStart,
+                model.maxShipsByStart());
         LinkedHashMap<ShipVector, FrontierOption> knownByUsage = new LinkedHashMap<>();
         int totalNodesVisited = 0;
         FrontierStatus finalStatus = FrontierStatus.COMPLETE;
@@ -722,14 +731,31 @@ public final class Stage20CommodityWholePlacementFrontierGenerator {
                 deliveredByDemand);
     }
 
-    private static List<ShipVector> capVectors(int[] maxShipsByStart) {
+    private static List<ShipVector> capVectors(
+            int[] minimumShipsByStart,
+            int[] maximumShipsByStart) {
+        if (minimumShipsByStart.length != maximumShipsByStart.length) {
+            throw new IllegalArgumentException("minimum and maximum ship vectors must have equal length");
+        }
+        for (int index = 0; index < minimumShipsByStart.length; index++) {
+            if (minimumShipsByStart[index] < 0
+                    || minimumShipsByStart[index] > maximumShipsByStart[index]) {
+                throw new IllegalArgumentException("single-start minimum must fit the authoritative fleet maximum");
+            }
+        }
         ArrayList<ShipVector> vectors = new ArrayList<>();
-        buildCapVectors(maxShipsByStart, 0, new int[maxShipsByStart.length], vectors);
+        buildCapVectors(
+                minimumShipsByStart,
+                maximumShipsByStart,
+                0,
+                new int[maximumShipsByStart.length],
+                vectors);
         vectors.sort(SHIP_VECTOR_ORDER);
         return List.copyOf(vectors);
     }
 
     private static void buildCapVectors(
+            int[] minima,
             int[] maxima,
             int index,
             int[] current,
@@ -738,9 +764,9 @@ public final class Stage20CommodityWholePlacementFrontierGenerator {
             target.add(new ShipVector(current));
             return;
         }
-        for (int value = 0; value <= maxima[index]; value++) {
+        for (int value = minima[index]; value <= maxima[index]; value++) {
             current[index] = value;
-            buildCapVectors(maxima, index + 1, current, target);
+            buildCapVectors(minima, maxima, index + 1, current, target);
         }
     }
 
