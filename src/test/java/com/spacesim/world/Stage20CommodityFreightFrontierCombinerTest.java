@@ -91,6 +91,18 @@ class Stage20CommodityFreightFrontierCombinerTest {
     }
 
     @Test
+    void completeCommodityThatCannotFitItsFleetProvesInfeasibleDespiteOtherUnknowns() {
+        CombinationReport report = Stage20CommodityFreightFrontierCombiner.combine(
+                List.of(
+                        complete(WATER, option("water-too-large", WATER, 14, 1)),
+                        unresolved(ORE)),
+                BUDGET_13);
+
+        assertEquals(Status.INFEASIBLE, report.status());
+        assertEquals(Optional.of(FailureReason.SHARED_FLEET_COMBINATION_INFEASIBLE), report.failureReason());
+    }
+
+    @Test
     void dominancePruningKeepsTheLowerShipOptionAndDeterministicEqualVectorTie() {
         CombinationReport report = Stage20CommodityFreightFrontierCombiner.combine(
                 List.of(
