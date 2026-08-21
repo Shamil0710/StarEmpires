@@ -10,6 +10,21 @@ The accepted v1 per-commodity frontier decomposition preserves the correct physi
 
 That bounded-search exhaustion is **not** evidence to change resources, topology, bootstrap demand, route cadence, payload, producer output or the derived 13-freighter-per-start service-capacity requirement.
 
+## Accepted v1 fixed-corpus baseline
+
+The accepted `stage20e.commodity-frontier-corpus-diagnostics.v1` evidence on fixed seeds `1..16`, using 2,000 search nodes per commodity, records:
+
+- fixed seeds: `16`;
+- accepted faction-start placements: `15`;
+- exact combiner accepted: `0`;
+- complete infeasible: `2`;
+- unresolved frontier: `13`;
+- total frontier search nodes visited: `50,952`;
+- maximum one-commodity frontier search nodes visited: `2,000`;
+- fixed seed `8`: unresolved.
+
+This is the comparison baseline for v2. The 2,000-node value is an evidence budget, not a production acceptance threshold or a world-quality target.
+
 ## Safe lower bound
 
 Before whole-placement frontier search, v1 already runs the existing single-start physical freight allocator for every placed start and the commodity. In v2, the accepted single-start result is also used as a lower bound on the cap-vector coordinate for that start.
