@@ -219,10 +219,14 @@ public final class Stage20BootstrapFreightOwnershipPlan {
             }
             copy.sort(COMMITMENT_ORDER);
             int allocated = 0;
+            Set<CommitmentKey> commitmentKeys = new HashSet<>();
             for (RemoteCommitmentAllocation commitment : copy) {
                 if (!commitment.commitmentKey().stableFactionId().equals(stableFactionId)
                         || !commitment.commitmentKey().consumerStartSystemId().equals(homeStartSystemId)) {
                     throw new IllegalArgumentException("remote commitment consumer must equal owning faction start");
+                }
+                if (!commitmentKeys.add(commitment.commitmentKey())) {
+                    throw new IllegalArgumentException("remote commitment keys must be unique inside an owned pool");
                 }
                 allocated = Math.addExact(allocated, commitment.allocatedFreighters());
             }

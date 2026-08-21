@@ -1,8 +1,10 @@
 package com.spacesim.world;
 
+import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan.CommitmentKey;
 import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan.FactionFleetOwnership;
 import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan.OwnershipReport;
 import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan.OwnershipSlot;
+import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan.RemoteCommitmentAllocation;
 import com.spacesim.world.Stage20BootstrapFreightPhysicalPlan.PlanReport;
 import com.spacesim.world.Stage20BootstrapFreightPhysicalPlan.SelectedCommodityPlan;
 import com.spacesim.world.Stage20CoordinatedWholePlacementFreightPlanner.DemandPlan;
@@ -141,6 +143,31 @@ class Stage20BootstrapFreightOwnershipPlanTest {
         assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.plan(
                 placement(START),
                 mismatched));
+    }
+
+    @Test
+    void ownedPoolRejectsDuplicateCommitmentKeysBeforeSlotsCanBecomeAmbiguous() {
+        CommitmentKey key = new CommitmentKey(
+                "frontier.v1",
+                "option.water",
+                FACTION,
+                WATER,
+                WATER_SOURCE,
+                START,
+                0);
+        RemoteCommitmentAllocation allocation = new RemoteCommitmentAllocation(
+                key,
+                1,
+                10d,
+                new RouteAssessment(List.of(WATER_SOURCE, START), 100d, 10d));
+
+        assertThrows(IllegalArgumentException.class, () -> new FactionFleetOwnership(
+                FACTION,
+                START,
+                2,
+                2,
+                0,
+                List.of(allocation, allocation)));
     }
 
     private static PlanReport physicalPlan(

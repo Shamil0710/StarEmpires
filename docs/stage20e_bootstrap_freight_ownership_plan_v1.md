@@ -45,6 +45,8 @@ Every committed ship count is backed by a real remote `SupplierCommitment` retai
 
 Each aggregate commitment receives a deterministic planning-only `CommitmentKey`. The owned pool can be expanded into an exact ordered list of `OwnershipSlot`s: committed slots carry the source key plus a per-commitment freighter ordinal, while reserve slots carry no commitment. These are not runtime IDs and do not compete with `FleetId` authority.
 
+Commitment keys must be unique inside each owned faction pool. Duplicate source keys fail closed before aggregate allocations can expand into ambiguous logical freighter slots.
+
 Local producer service consumes zero remote freight ownership slots.
 
 The ownership capacity equals both the preserved acceptance budget and the `remoteFreighterBudget` carried by every selected `StartPlan`. The resulting `OwnershipReport` retains the complete immutable physical plan, generated root seed and placement-profile provenance for the later bootstrap bridge.
