@@ -49,6 +49,8 @@ class Stage20TheoreticalSupplyThroughputAnalyzerTest {
 
         assertEquals(20d, report.capacityKgPerSecond("commodity.feedstock.metallic_ore", system), 1e-9);
         assertEquals(13.6d, report.capacityKgPerSecond("commodity.material.structural_alloy", system), 1e-9);
+        assertEquals("facility.processing.bulk_refinery",
+                report.processEvidence().get(0).facilityDefinitionId());
         assertEquals(13.6d, report.processEvidence().get(0).inputLimitedOutputKgPerSecond(), 1e-9);
     }
 
