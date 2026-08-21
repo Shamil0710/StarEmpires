@@ -1,6 +1,6 @@
 # Stage 20E — Commodity frontier maximum-cap precheck v1
 
-> Status: **CANDIDATE PRODUCTION INTEGRATION / NO PHYSICAL AUTHORITY CHANGE**  
+> Status: **ACCEPTANCE CANDIDATE / NO PHYSICAL AUTHORITY CHANGE**  
 > Version: `stage20e.commodity-whole-placement-frontier-resolver.v1`
 
 ## Purpose
@@ -62,16 +62,70 @@ The diagnostic deliberately reuses the existing corpus-report data contract so t
 - nondominated ship vectors;
 - exact selected combinations.
 
-There is no pass-rate target. The expected causal change is measured rather than asserted in advance.
+There is no pass-rate target.
+
+### Measured result
+
+Exact merge-ref Java 17 `clean verify` on the dependency-complete candidate passed with `1462` tests, `0` failures, `0` errors and `1` skipped test, plus coverage, Javadoc and desktop-package gates.
+
+At the unchanged `2,000`-node evidence budget per commodity, fixed seeds `1..16` produced:
+
+```text
+fixedSeedCount=16
+acceptedPlacementSeedCount=15
+combinerAcceptedSeedCount=12
+combinerInfeasibleSeedCount=3
+combinerUnresolvedSeedCount=0
+totalFrontierSearchNodesVisited=20595
+maxCommodityFrontierSearchNodesVisited=1040
+```
+
+The accepted generator-v2 baseline was:
+
+```text
+combinerAcceptedSeedCount=12
+combinerInfeasibleSeedCount=2
+combinerUnresolvedSeedCount=1
+totalFrontierSearchNodesVisited=22595
+maxCommodityFrontierSearchNodesVisited=2000
+```
+
+Thus the resolver preserves all `12` previously concrete accepted combinations, converts exactly the sole unresolved case into complete physical infeasibility, reduces bounded DFS work by exactly `2,000` nodes, and leaves no unresolved commodity frontier in the accepted-placement fixed corpus.
+
+### Seed 8 causal closure
+
+The only status change is fixed seed `8`:
+
+```text
+seed=8 placement=ACCEPTED
+status=COMBINER_INFEASIBLE
+combiner=INFEASIBLE
+failure=COMMODITY_INFEASIBLE
+
+commodity.feedstock.metallic_ore:
+  frontier=COMPLETE
+  nodes=819
+  options=1
+  vector={faction.alpha=1, faction.beta=5}
+
+commodity.feedstock.water_ice:
+  frontier=COMPLETE
+  nodes=0
+  options=0
+```
+
+This classification is justified by the already-verified maximum-cap shared-producer proof: seed 8 water remains infeasible even in the relaxed superset at maximum authoritative fleet caps. It is therefore physical infeasibility, not search-budget exhaustion.
 
 ## Acceptance gate
 
-Before this slice can be accepted:
+This slice is accepted only after a fresh pull-request merge-ref Java 17 `clean verify` against the current `main` succeeds after the shared-producer bound itself has been merged.
 
-1. exact-head Java 17 `clean verify` must pass;
-2. fixed seeds `1..16` must be re-measured at the unchanged 2,000-node evidence budget;
-3. any status change must be explained by the maximum-cap proof, not by modified world authority;
-4. no previously accepted concrete combination may disappear;
-5. any remaining unresolved frontier keeps fail-closed semantics.
+The measured causal requirements are already satisfied:
 
-If the sole previous unresolved seed is converted into complete physical infeasibility while the 12 previously accepted combinations remain concrete and unchanged in authority, the Stage-20E coordinated frontier-search uncertainty gate is closed sufficiently to proceed to bootstrap freight ownership/materialization.
+1. fixed seeds `1..16` were re-measured at the unchanged 2,000-node evidence budget;
+2. the sole status change is explained by the maximum-cap proof, not by modified world authority;
+3. all 12 previously accepted concrete combinations remain accepted;
+4. unresolved frontier count is now zero;
+5. no physical authority was changed.
+
+Once the fresh current-`main` merge-ref gate succeeds, the Stage-20E coordinated frontier-search uncertainty gate is closed sufficiently to proceed to bootstrap freight ownership/materialization.
