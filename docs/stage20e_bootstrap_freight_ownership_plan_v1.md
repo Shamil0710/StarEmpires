@@ -1,0 +1,116 @@
+# Stage 20E — Bootstrap freight ownership plan v1
+
+> Status: **CANDIDATE OWNERSHIP AUTHORITY / NO RUNTIME ASSET CREATION**  
+> Version: `stage20e.bootstrap-freight-ownership-plan.v1`
+
+## Purpose
+
+The accepted Stage-20E freight-capacity requirement is explicitly **per ordinary faction start** and is not a hidden galaxy-global transport pool. The selected physical freight plan identifies how many of those freighters are required by concrete remote producer commitments, but it does not yet state who owns the remaining capacity or how much reserve exists.
+
+This slice closes that ownership gap without creating runtime ships.
+
+For every accepted faction-start assignment it binds:
+
+```text
+stable faction identity
++ accepted start system
++ finite owned freight capacity
+→ committed remote freight subset
++ uncommitted reserve subset
+```
+
+The full owned capacity comes from the explicit caller-supplied freight-capacity authority. The selected physical plan may consume only a subset of it.
+
+## Ownership semantics
+
+For one placed faction start:
+
+```text
+ownedFreighterCount
+= committedFreighterCount + reserveFreighterCount
+```
+
+`committedFreighterCount` must equal the aggregate selected physical-plan usage for that faction.
+
+Every committed ship count is backed by a real remote `SupplierCommitment` retaining:
+
+- Stage-18 commodity ID;
+- producer system;
+- consumer faction-start system;
+- explicit physical neighbor route;
+- integer allocated freighters;
+- committed delivered kg/s.
+
+Local producer service consumes zero remote freight ownership slots.
+
+The ownership capacity must also equal the `remoteFreighterBudget` carried by every selected `StartPlan`. This prevents a later caller from silently changing the finite fleet after physical feasibility was proven.
+
+## Home system is not spawn position
+
+`homeStartSystemId` means only:
+
+> this finite freight pool belongs to the faction start selected in this system.
+
+It does **not** mean:
+
+- all ships already physically exist at one coordinate;
+- they are docked at a particular station;
+- they start at the consumer rather than the producer;
+- they contain cargo;
+- a delivery has already occurred.
+
+Physical initial placement remains a later bootstrap-state/materialization authority.
+
+## Why this is separate from FleetId
+
+The existing runtime already owns fleet identity:
+
+```text
+WorldSimulation.createEntity(FLEET)
+→ local persistent EntityId
+→ FleetWorldService.registerLocal
+→ stable FleetId
+```
+
+This slice must not create another persistent freight-ID namespace. It only establishes how many runtime fleet assets a later materializer is authorized to create, who owns the pool and which selected commitments consume its capacity.
+
+## Fail-closed invariants
+
+Ownership planning rejects when:
+
+- faction-start placement is not accepted;
+- placement, capacity authority and selected physical plan do not cover the same faction set;
+- a selected physical start differs from the accepted placement;
+- selected `StartPlan.remoteFreighterBudget` differs from ownership capacity;
+- aggregate selected ship usage exceeds owned capacity;
+- remote commitment counts do not reconstruct aggregate selected usage;
+- a local commitment attempts to consume remote freighters.
+
+## Explicit non-authorities
+
+This slice does not:
+
+- allocate `FleetId` or `EntityId`;
+- create any Ashley entity;
+- choose a physical spawn coordinate;
+- preload cargo or inventory;
+- transfer money;
+- record ledger entries;
+- execute a route/jump;
+- change producer capacity;
+- change topology/resources/demand/payload/cadence;
+- change the accepted finite freight-capacity requirement.
+
+## Next causal slice
+
+After this ownership authority and the selected physical-plan reconstruction are accepted, Stage 20E needs the generated-world bootstrap bridge that turns accepted generation state into authoritative persistent world state.
+
+That bridge must consume rather than duplicate:
+
+- generated topology / local layouts / facilities / resource state;
+- accepted faction-start placement;
+- selected physical freight plan;
+- this ownership plan;
+- existing `WorldFactionIdentityState` and `WorldSimulation` fleet identity machinery.
+
+Only inside that authoritative bootstrap-state path should actual Stage-20-compatible freight entities receive `FleetId`s. The materializer must create the exact owned count, preserve committed-versus-reserve provenance and roll back atomically if partial creation fails. It must not use legacy `item.*` trader archetypes as a substitute for the Stage-20 physical reference freighter unless a separate compatibility authority explicitly proves that equivalence.
