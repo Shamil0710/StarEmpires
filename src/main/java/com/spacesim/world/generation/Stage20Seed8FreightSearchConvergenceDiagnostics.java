@@ -63,7 +63,15 @@ public final class Stage20Seed8FreightSearchConvergenceDiagnostics {
             Optional<FailureReason> failureReason,
             int searchNodesVisited,
             int totalRemoteFreightersUsed) {
-        /** Validates bounded planner evidence for one ladder rung. */
+        /**
+         * Validates bounded planner evidence for one ladder rung.
+         *
+         * @param searchNodeBudget supplied planner node budget
+         * @param status planner status
+         * @param failureReason explicit failure/unresolved reason when present
+         * @param searchNodesVisited discrete states actually inspected
+         * @param totalRemoteFreightersUsed accepted-plan remote freighters, otherwise zero
+         */
         public Attempt {
             if (searchNodeBudget <= 0 || searchNodesVisited < 0 || searchNodesVisited > searchNodeBudget
                     || totalRemoteFreightersUsed < 0) {
@@ -109,7 +117,20 @@ public final class Stage20Seed8FreightSearchConvergenceDiagnostics {
             int baselineCorpusSearchBudget,
             List<Attempt> attempts,
             Optional<Integer> firstResolvedBudget) {
-        /** Validates deterministic targeted convergence evidence. */
+        /**
+         * Validates deterministic targeted convergence evidence.
+         *
+         * @param version diagnostic version
+         * @param rootSeed exact fixed-corpus seed
+         * @param candidateProfileVersion unchanged v2-candidate profile version
+         * @param bootstrapRequirementVersion corrected bootstrap requirement version
+         * @param freightCapacityRequirementVersion derived finite per-start freight authority version
+         * @param plannerVersion coordinated planner version
+         * @param perStartFreighterBudget derived finite service-capacity budget per placed start
+         * @param baselineCorpusSearchBudget existing corpus diagnostic search budget
+         * @param attempts ordered evaluated ladder rungs
+         * @param firstResolvedBudget first budget that returned accepted/proved-infeasible, when any
+         */
         public Report {
             version = requireText(version, "version");
             candidateProfileVersion = requireText(candidateProfileVersion, "candidateProfileVersion");
