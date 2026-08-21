@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-19 / Stage 19 COMPLETE — Stage 19J ACCEPTED; Stage 20 ACTIVE.**  
+> **Последняя синхронизация: 2026-08-21 / Stage 19 COMPLETE — Stage 19J ACCEPTED; Stage 20 ACTIVE; Stage 20.5 sprite baseline scheduled after Stage 20.**  
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -43,7 +43,7 @@
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 20** |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery + minimum playable sprite baseline + NPC/missions/reputation | 20 + 20.5 + 21 | **ACTIVE — Stage 20** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
@@ -434,15 +434,96 @@ Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate
 
 Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
 
-## 9. Stage 21 — RPG / Living World
+## 9. Stage 20.5 — Minimum Playable Sprite Pack
 
-**PLANNED after Stage 20.**
+**PLANNED immediately after Stage 20; required before Stage 21.**
+
+Stage 20.5 replaces the minimum set of schematic/placeholding presentation needed to make the accepted Stage-20 world, ordinary economy and Stage-19 combat loops visually readable as one coherent playable build. It is a **visual integration milestone**, not a new gameplay/content-balance stage and not the final art pass.
+
+Primary objective:
+
+```text
+accepted Stage-20 physical world
++ accepted production hull / station / resource identities
++ existing faction visual code
+→ minimum coherent top-down sprite library
+→ runtime asset binding by authoritative identity / role
+→ visual acceptance in travel, economy and combat scenes
+```
+
+### Minimum asset set
+
+The exact hull IDs are locked only after Stage-20 closeout so provisional test content is not accidentally promoted to canon. The minimum pack must nevertheless cover at least the following playable roles with production-ready sprites:
+
+- **light/player utility hull** — starter/exploration/general-purpose loop;
+- **cargo/transport hull** — physical trade and logistics;
+- **mining/industrial hull** — extraction loop;
+- **light combat/escort hull** — patrol, escort and early combat;
+- **medium combat hull** — fleet combat/readability beyond the starter scale;
+- **one support/specialist hull where required by accepted runtime doctrine** — e.g. carrier/drone/EW/support role selected from the actual accepted content set;
+- **generic station core / trade-dock presentation** sufficient for docking and ordinary market interaction;
+- **industrial/extraction station presentation** sufficient to distinguish resource/industrial infrastructure;
+- **shipyard/major construction presentation** sufficient to distinguish refit/build infrastructure;
+- **resource-body sprite family** sufficient for the Stage-20 extraction/resource loop;
+- **wreck/derelict sprite family** sufficient for discovery/salvage presentation where the accepted Stage-20 runtime exposes such entities.
+
+This is intentionally a **minimum role-complete set**, not one sprite for every hull, faction, module, station subtype or resource definition. Broader faction/content coverage remains Stage 22/23 work.
+
+### Sprite production contract
+
+All Stage-20.5 gameplay sprites must follow the accepted visual pipeline:
+
+- strict **top-down orthographic** projection; no perspective tilt;
+- transparent background and clean alpha;
+- consistent orientation convention and stable pivot/center metadata;
+- physical/readability scale derived from accepted hull/station dimensions rather than arbitrary per-image resizing;
+- silhouette remains readable at normal gameplay camera zoom;
+- no baked starfield, UI, labels, shadows from an external scene, cinematic bloom or decorative background;
+- base hull sprites contain **no baked exhaust, weapon fire, smoke, debris trails or transient combat FX**;
+- engines, emissives, damage states and other transient effects are separate overlays/VFX where runtime state requires them;
+- every gameplay-relevant visible hardpoint/module/launch bay/sensor block that is represented externally must have a stable authored anchor/socket;
+- where a fitted external module is visually represented, its count and placement must correspond to authoritative fitting data rather than decorative random detail;
+- interactive/module-scale elements must remain visually distinguishable enough to support later dedicated sprites, damage states or animation;
+- faction markings/colors may change presentation but cannot hide the physical hull/module identity required for gameplay readability.
+
+### Runtime integration requirements
+
+Stage 20.5 is not complete merely because PNG files exist. The accepted runtime must demonstrate:
+
+- deterministic asset lookup/fallback by stable hull/station/resource identity or explicitly versioned presentation mapping;
+- no sprite filename or visual variant becomes authoritative simulation state;
+- ships retain the same physical collision/sensor/weapon/economy state when presentation assets are swapped;
+- correct sprite orientation, scale, pivot and hardpoint alignment in movement and combat;
+- fitted external modules/visible bays align with their authoritative hardpoints where the selected minimum asset exposes them;
+- separate engine/emissive/damage/VFX layers do not alter gameplay state;
+- the same entity uses the same visual identity through tactical materialization/dematerialization and save/load unless its authoritative hull/faction/presentation state actually changes;
+- minimum sprites are usable in the existing Stage-19 tactical viewer and the Stage-20 generated-world playable path without a parallel rendering-only simulation.
+
+### Stage-20.5 completion gate
+
+Stage 20.5 can be marked COMPLETE only when one representative generated-world session demonstrates, with the minimum pack actually bound in runtime:
+
+- player/utility, cargo, mining and combat ships visually distinguishable at normal play zoom;
+- at least light and medium combat hulls readable in multi-ship Stage-19 combat scenarios;
+- trade/industrial/shipyard infrastructure distinguishable during approach and interaction;
+- resource bodies and any accepted wreck/derelict entities recognizable without relying only on debug labels;
+- visible module/hardpoint placement matches authoritative fitting for every minimum-pack hull that exposes those elements;
+- no base sprite contains baked transient VFX;
+- no missing required asset silently changes simulation behavior;
+- deterministic save/load/materialization retains entity identity and presentation mapping;
+- placeholder geometry remains allowed only for content **outside** the explicitly accepted minimum set.
+
+Stage 20.5 does **not** freeze the final faction fleet catalogue or final balance. Stage 22 may re-author, replace or promote provisional hull/content definitions and expand faction-specific sprite coverage; Stage 23 owns final presentation polish, broader VFX/animation coverage and replacement of remaining placeholders.
+
+## 10. Stage 21 — RPG / Living World
+
+**PLANNED after Stage 20.5.**
 
 NPCs, missions, discovery and reputation consume authoritative physical/economic/political state rather than a disconnected scripted world.
 
 Living-world state must use persistent identity, relevance/cadence/event wakeups and deterministic deadlines; no `all NPCs × full AI × every tick` architecture.
 
-## 10. Stage 22 — Content / Technology / Balance Alpha
+## 11. Stage 22 — Content / Technology / Balance Alpha
 
 **PLANNED after Stage 21.**
 
@@ -465,7 +546,7 @@ No isolated `Mk II = +25% all stats` parallel system.
 
 Detailed plan: `docs/stage22_content_balance_plan.md`.
 
-## 11. Stage 23 — Polish / Release Candidate
+## 12. Stage 23 — Polish / Release Candidate
 
 **PLANNED.**
 
@@ -473,7 +554,7 @@ UX/onboarding/accessibility/performance/content validation/save hardening after 
 
 Stage 23 replaces remaining prototype tactical presentation with production ship/projectile/VFX assets where not already finalized, without creating a new economy/physics model. It closes profiler budgets, migration diagnostics, long-session stability and release hardening.
 
-## 12. Scalability cross-stage contract
+## 13. Scalability cross-stage contract
 
 Canonical scalability document: `docs/simulation_scalability_architecture.md`.
 
@@ -493,7 +574,7 @@ deterministic persistent world
 
 No world-wide tactical/render-rate tick.
 
-## 13. Current immediate sequence
+## 14. Current immediate sequence
 
 ```text
 Stage 17 COMPLETE
@@ -502,9 +583,10 @@ Stage 17 COMPLETE
 → Stage 19 Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
 → Stage 20 Physical World Generation / Discovery ACTIVE
+→ Stage 20.5 Minimum Playable Sprite Pack
 → Stage 21 RPG / Living World
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 20.** Stage 19J has closed the interactive scenario/readability/selection/inspection/camera/long-run runtime gate, with final evidence recorded in `docs/stage19j7_long_run_acceptance_record.md`. Stage 20 now consumes the accepted Stage-17.5/18/19 physical capability baseline for calibrated topology, local geometry, resource geography and discovery implementation.
+**Immediate implementation priority is Stage 20.** Stage 19J has closed the interactive scenario/readability/selection/inspection/camera/long-run runtime gate, with final evidence recorded in `docs/stage19j7_long_run_acceptance_record.md`. Stage 20 now consumes the accepted Stage-17.5/18/19 physical capability baseline for calibrated topology, local geometry, resource geography and discovery implementation. **After Stage 20 closes, Stage 20.5 becomes the mandatory next gate before Stage 21 so that the first living-world work is exercised on a minimum coherent production sprite baseline rather than only schematic placeholders.**
