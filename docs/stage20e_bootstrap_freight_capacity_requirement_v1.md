@@ -35,6 +35,24 @@ The minimum integer freight-service fleet requirement for one ordinary faction s
 
 No extra reserve factor or corpus-derived margin is added in v1.
 
+## Measured current authority
+
+Exact-head CI #4032 evaluated the profile from the current accepted upstream authorities and produced:
+
+- bootstrap requirement authority: `stage20e.bootstrap-requirements.v2`;
+- service cadence authority: `stage20e.bootstrap-service-cadence.v1`;
+- inter-system cadence authority: `stage20a.intersystem-cadence.v1`;
+- representative freight class: `EARLY_CIVILIAN_FREIGHTER`;
+- regional envelope: **5 hops**;
+- total essential bootstrap demand: **75.0 kg/s**;
+- representative payload: **12,000,000 kg**;
+- five-hop FTL ready-again time: **1,475.0 s**;
+- repeatable reference round-trip cycle: **1,987,865.3103799568 s**;
+- one-freighter sustainable service throughput: **6.036626293210149 kg/s**;
+- derived minimum freight-service capacity: **13 freighters per ordinary faction start**.
+
+The value **13** is not selected from the representative seed corpus and is not a pass-rate target. The profile has no dependency on generation/corpus classes; the integer is the direct ceiling of the accepted 75 kg/s service requirement divided by the one-freighter sustainable throughput derived from payload, local handling/access and five-hop ready-again cadence. The previous representative eight-freighter policy is therefore under-sized relative to these currently accepted service assumptions, but this calibration slice does not itself replace or provision that policy.
+
 ## Semantic boundary
 
 This profile is a **capacity requirement**, not a hidden grant. It does not:
