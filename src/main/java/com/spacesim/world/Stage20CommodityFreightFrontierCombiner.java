@@ -1,6 +1,7 @@
 package com.spacesim.world;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -178,16 +179,19 @@ public final class Stage20CommodityFreightFrontierCombiner {
                     "remoteFreighterBudgetByFaction");
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(failureReason, "failureReason");
-            Map<String, Integer> usage = remoteFreightersUsedByFaction.isEmpty()
+            Map<String, Integer> suppliedUsage = Objects.requireNonNull(
+                    remoteFreightersUsedByFaction,
+                    "remoteFreightersUsedByFaction");
+            Map<String, Integer> usage = suppliedUsage.isEmpty()
                     ? Map.of()
-                    : canonicalFreighterMap(remoteFreightersUsedByFaction, false, "remoteFreightersUsedByFaction");
+                    : canonicalFreighterMap(suppliedUsage, false, "remoteFreightersUsedByFaction");
             ArrayList<SelectedOption> selectedCopy = new ArrayList<>(
                     Objects.requireNonNull(selectedOptions, "selectedOptions"));
             if (selectedCopy.stream().anyMatch(Objects::isNull)) {
                 throw new IllegalArgumentException("selected options cannot contain nulls");
             }
             selectedCopy.sort(Comparator.comparing(SelectedOption::commodityId));
-            remoteFreightersUsedByFaction = Map.copyOf(usage);
+            remoteFreightersUsedByFaction = usage;
             selectedOptions = List.copyOf(selectedCopy);
 
             if (status == Status.ACCEPTED) {
@@ -227,6 +231,7 @@ public final class Stage20CommodityFreightFrontierCombiner {
                 true,
                 "remoteFreighterBudgetByFaction");
         ArrayList<String> factions = new ArrayList<>(budgets.keySet());
+        factions.sort(String::compareTo);
 
         TreeMap<String, CommodityFrontier> byCommodity = new TreeMap<>();
         for (CommodityFrontier frontier : Objects.requireNonNull(frontiers, "frontiers")) {
@@ -243,6 +248,13 @@ public final class Stage20CommodityFreightFrontierCombiner {
         for (CommodityFrontier frontier : byCommodity.values()) {
             if (frontier.status() == FrontierStatus.COMPLETE && frontier.options().isEmpty()) {
                 return failedReport(budgets, Status.INFEASIBLE, FailureReason.COMMODITY_INFEASIBLE);
+            }
+            if (frontier.status() == FrontierStatus.COMPLETE
+                    && frontier.options().stream().noneMatch(option -> fitsBudget(option, budgets))) {
+                return failedReport(
+                        budgets,
+                        Status.INFEASIBLE,
+                        FailureReason.SHARED_FLEET_COMBINATION_INFEASIBLE);
             }
         }
 
@@ -287,7 +299,7 @@ public final class Stage20CommodityFreightFrontierCombiner {
         }
 
         Map.Entry<ShipVector, Selection> best = states.entrySet().stream()
-                .min((left, right) -> compareAcceptedState(left, right))
+                .min(Stage20CommodityFreightFrontierCombiner::compareAcceptedState)
                 .orElseThrow();
         TreeMap<String, Integer> used = new TreeMap<>();
         for (int index = 0; index < factions.size(); index++) {
@@ -323,6 +335,17 @@ public final class Stage20CommodityFreightFrontierCombiner {
                 throw new IllegalArgumentException("every commodity option must cover exactly the placed faction starts");
             }
         }
+    }
+
+    private static boolean fitsBudget(
+            CommodityOption option,
+            Map<String, Integer> budgets) {
+        for (Map.Entry<String, Integer> entry : option.remoteFreightersByFaction().entrySet()) {
+            if (entry.getValue() > budgets.get(entry.getKey())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static List<CommodityOption> nondominated(
@@ -453,7 +476,7 @@ public final class Stage20CommodityFreightFrontierCombiner {
         if (canonical.isEmpty()) {
             throw new IllegalArgumentException(fieldName + " must be non-empty");
         }
-        return Map.copyOf(canonical);
+        return Collections.unmodifiableMap(canonical);
     }
 
     private static String requireText(String value, String fieldName) {
