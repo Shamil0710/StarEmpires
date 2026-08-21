@@ -7,22 +7,25 @@ import com.spacesim.world.generation.Stage20JumpTopologyGenerationResult;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Stage-20E whole-seed acceptance composition over already authoritative generation gates.
  *
- * <p>This class does not generate, repair or rebalance a world. It combines the existing Stage-20D
- * topology result, Stage-20E physical economic-throughput acceptance and Stage-20E bounded faction
- * start placement into one machine-readable seed outcome. A topology-rejected seed stops before
- * downstream materialization. A topology-accepted seed must supply both downstream reports; missing
- * reports are an integration error and are never counted as an ordinary rejected seed.</p>
+ * <p>This class does not generate, repair or rebalance a world. The original v1 composition remains
+ * available for the historical single-supplier economic-throughput baseline. The resolved-freight v2
+ * path composes Stage-20D topology, bounded faction-start placement and the coordinated finite-fleet
+ * Stage-20E acceptance without converting bounded-search uncertainty into a rejected world.</p>
  */
 public final class Stage20GeneratedWorldSeedAcceptance {
-    /** Current immutable whole-seed acceptance version. */
+    /** Historical single-supplier whole-seed acceptance version retained for baseline reproducibility. */
     public static final String CURRENT_VERSION = "stage20e.generated-world-seed-acceptance.v1";
+    /** Production candidate using coordinated finite-fleet Stage-20E acceptance. */
+    public static final String RESOLVED_FREIGHT_VERSION = "stage20e.generated-world-seed-acceptance.v2";
 
     private Stage20GeneratedWorldSeedAcceptance() {
         throw new AssertionError("No instances");
@@ -34,7 +37,7 @@ public final class Stage20GeneratedWorldSeedAcceptance {
         ACCEPTED,
         /** At least one authoritative physical/economic/start gate rejected the seed. */
         REJECTED_SEED,
-        /** No authoritative rejection exists, but required start acceptance authority is unresolved. */
+        /** No authoritative rejection exists, but required acceptance authority is unresolved. */
         UNRESOLVED_AUTHORITY
     }
 
@@ -42,8 +45,12 @@ public final class Stage20GeneratedWorldSeedAcceptance {
     public enum FailureReason {
         /** Stage-20D ordinary topology quality could not be repaired inside its bounded policy. */
         TOPOLOGY_QUALITY_REJECTED,
-        /** Selected/ordinary starts fail physical essential delivered-throughput acceptance. */
+        /** Historical selected/ordinary starts fail single-supplier delivered-throughput acceptance. */
         ECONOMIC_THROUGHPUT_REJECTED,
+        /** Complete coordinated finite-fleet evidence proves the placed starts physically infeasible. */
+        COORDINATED_FREIGHT_INFEASIBLE,
+        /** Coordinated freight search remains incomplete and therefore cannot authorize acceptance. */
+        COORDINATED_FREIGHT_AUTHORITY_UNRESOLVED,
         /** Bounded faction-start assignment rejected the generated seed. */
         FACTION_START_PLACEMENT_REJECTED,
         /** Faction-start acceptance is blocked by explicitly missing upstream authority. */
@@ -77,7 +84,8 @@ public final class Stage20GeneratedWorldSeedAcceptance {
          * @return true only for unresolved-authority blockers
          */
         public boolean unresolvedAuthority() {
-            return reason == FailureReason.FACTION_START_AUTHORITY_UNRESOLVED;
+            return reason == FailureReason.FACTION_START_AUTHORITY_UNRESOLVED
+                    || reason == FailureReason.COORDINATED_FREIGHT_AUTHORITY_UNRESOLVED;
         }
     }
 
@@ -89,7 +97,7 @@ public final class Stage20GeneratedWorldSeedAcceptance {
      * @param status final whole-seed status
      * @param topologyStatus exact Stage-20D topology status
      * @param topologyRepairPasses deterministic topology repair additions committed before decision
-     * @param economicAcceptancePresent whether an economic-throughput report was applicable/present
+     * @param economicAcceptancePresent whether the applicable economic/freight report was present
      * @param placementStatus bounded start-placement status when topology passed
      * @param failures deterministic normalized rejection/blocker rows
      */
@@ -103,14 +111,14 @@ public final class Stage20GeneratedWorldSeedAcceptance {
             Optional<PlacementStatus> placementStatus,
             List<Failure> failures) {
         /**
-         * Validates and freezes one composed seed result.
+         * Validates and freezes one composed acceptance result.
          *
          * @param version stable result version
          * @param rootSeed authoritative generation seed
          * @param status final whole-seed status
-         * @param topologyStatus exact topology status
+         * @param topologyStatus exact Stage-20D topology status
          * @param topologyRepairPasses topology repair additions
-         * @param economicAcceptancePresent whether economic acceptance was applicable/present
+         * @param economicAcceptancePresent whether the applicable economic/freight report was present
          * @param placementStatus start-placement status when applicable
          * @param failures normalized rejection/blocker rows
          */
@@ -146,17 +154,15 @@ public final class Stage20GeneratedWorldSeedAcceptance {
     }
 
     /**
-     * Composes one whole-seed decision from existing authoritative generation outputs.
+     * Composes the historical v1 single-supplier whole-seed decision.
      *
-     * <p>When topology is rejected, both downstream reports must be absent because the rejected
-     * candidate must not be materialized as an ordinary production world. When topology is accepted,
-     * both reports are mandatory. This distinction prevents a broken batch harness from lowering the
-     * measured seed acceptance rate.</p>
+     * <p>This path remains unchanged for baseline reproducibility. New Stage-20E production integration
+     * must use {@link #composeResolvedFreight(Stage20JumpTopologyGenerationResult, Optional, Optional)}.</p>
      *
      * @param topology Stage-20D topology generation result
-     * @param economicThroughput physical Stage-20E throughput acceptance when topology passed
+     * @param economicThroughput historical physical throughput acceptance when topology passed
      * @param placement bounded Stage-20E faction-start placement when topology passed
-     * @return deterministic whole-seed result
+     * @return deterministic historical whole-seed result
      */
     public static SeedResult compose(
             Stage20JumpTopologyGenerationResult topology,
@@ -172,28 +178,14 @@ public final class Stage20GeneratedWorldSeedAcceptance {
                 throw new IllegalArgumentException(
                         "topology-rejected seed cannot carry materialized downstream acceptance reports");
             }
-            return new SeedResult(
-                    CURRENT_VERSION,
-                    seed,
-                    Status.REJECTED_SEED,
-                    topologyResult.status(),
-                    topologyResult.repairPasses(),
-                    false,
-                    Optional.empty(),
-                    List.of(new Failure(
-                            FailureReason.TOPOLOGY_QUALITY_REJECTED,
-                            "topology",
-                            "Stage-20D topology quality report retains "
-                                    + topologyResult.qualityReport().violations().size() + " violation(s)")));
+            return topologyRejected(CURRENT_VERSION, topologyResult);
         }
 
         AcceptanceReport economics = economicThroughput.orElseThrow(() -> new IllegalArgumentException(
                 "topology-accepted seed requires physical economic-throughput acceptance"));
         PlacementResult starts = placement.orElseThrow(() -> new IllegalArgumentException(
                 "topology-accepted seed requires bounded faction-start placement"));
-        if (starts.rootSeed() != seed) {
-            throw new IllegalArgumentException("placement root seed differs from topology root seed");
-        }
+        requirePlacementSeed(starts, seed);
 
         ArrayList<Failure> failures = new ArrayList<>();
         if (!economics.accepted()) {
@@ -204,6 +196,130 @@ public final class Stage20GeneratedWorldSeedAcceptance {
                         failure.reason().name() + ": " + failure.detail()));
             }
         }
+        addPlacementFailure(starts, failures);
+
+        return completed(
+                CURRENT_VERSION,
+                topologyResult,
+                starts,
+                true,
+                failures);
+    }
+
+    /**
+     * Composes the Stage-20E v2 whole-seed decision from coordinated finite-fleet freight evidence.
+     *
+     * <p>Topology rejection stops before any downstream result. For an accepted topology, placement
+     * is decided first. A rejected or unresolved placement must not carry a synthetic freight report.
+     * Only an accepted non-empty placement may enter coordinated freight acceptance. Complete freight
+     * infeasibility is an authoritative seed rejection; unresolved frontier search is an authority
+     * blocker and can never be converted into physical infeasibility.</p>
+     *
+     * @param topology Stage-20D topology generation result
+     * @param resolvedFreight coordinated Stage-20E freight evidence only for accepted placement
+     * @param placement bounded Stage-20E faction-start placement when topology passed
+     * @return deterministic v2 whole-seed result
+     */
+    public static SeedResult composeResolvedFreight(
+            Stage20JumpTopologyGenerationResult topology,
+            Optional<Stage20ResolvedFreightAcceptance.AcceptanceReport> resolvedFreight,
+            Optional<PlacementResult> placement) {
+        Stage20JumpTopologyGenerationResult topologyResult = Objects.requireNonNull(topology, "topology");
+        Objects.requireNonNull(resolvedFreight, "resolvedFreight");
+        Objects.requireNonNull(placement, "placement");
+        long seed = topologyResult.seed();
+
+        if (topologyResult.status() == Stage20JumpTopologyGenerationResult.Status.REJECTED_SEED) {
+            if (resolvedFreight.isPresent() || placement.isPresent()) {
+                throw new IllegalArgumentException(
+                        "topology-rejected seed cannot carry placement/freight acceptance reports");
+            }
+            return topologyRejected(RESOLVED_FREIGHT_VERSION, topologyResult);
+        }
+
+        PlacementResult starts = placement.orElseThrow(() -> new IllegalArgumentException(
+                "topology-accepted seed requires bounded faction-start placement"));
+        requirePlacementSeed(starts, seed);
+
+        ArrayList<Failure> failures = new ArrayList<>();
+        if (starts.status() != PlacementStatus.ACCEPTED) {
+            if (resolvedFreight.isPresent()) {
+                throw new IllegalArgumentException(
+                        "non-accepted placement cannot carry coordinated freight acceptance");
+            }
+            addPlacementFailure(starts, failures);
+            return completed(
+                    RESOLVED_FREIGHT_VERSION,
+                    topologyResult,
+                    starts,
+                    false,
+                    failures);
+        }
+        if (starts.assignments().isEmpty()) {
+            throw new IllegalArgumentException("accepted placement must contain at least one faction start");
+        }
+
+        Stage20ResolvedFreightAcceptance.AcceptanceReport freight = resolvedFreight.orElseThrow(
+                () -> new IllegalArgumentException(
+                        "accepted placement requires coordinated finite-fleet acceptance"));
+        if (!freight.placementVersion().equals(starts.version())) {
+            throw new IllegalArgumentException("coordinated freight placement version differs from selected placement");
+        }
+        Set<String> placedFactions = new HashSet<>();
+        starts.assignments().forEach(value -> placedFactions.add(value.stableFactionId()));
+        if (!freight.remoteFreighterBudgetByFaction().keySet().equals(placedFactions)) {
+            throw new IllegalArgumentException("coordinated freight faction set differs from selected placement");
+        }
+
+        if (freight.infeasible()) {
+            failures.add(new Failure(
+                    FailureReason.COORDINATED_FREIGHT_INFEASIBLE,
+                    "coordinated-freight",
+                    freight.combination().failureReason().map(Enum::name)
+                            .orElse("complete coordinated freight infeasibility")));
+        } else if (freight.unresolved()) {
+            failures.add(new Failure(
+                    FailureReason.COORDINATED_FREIGHT_AUTHORITY_UNRESOLVED,
+                    "coordinated-freight",
+                    freight.combination().failureReason().map(Enum::name)
+                            .orElse("coordinated freight frontier remains unresolved")));
+        } else if (!freight.accepted()) {
+            throw new IllegalStateException("unknown coordinated freight acceptance status");
+        }
+
+        return completed(
+                RESOLVED_FREIGHT_VERSION,
+                topologyResult,
+                starts,
+                true,
+                failures);
+    }
+
+    private static SeedResult topologyRejected(
+            String version,
+            Stage20JumpTopologyGenerationResult topologyResult) {
+        return new SeedResult(
+                version,
+                topologyResult.seed(),
+                Status.REJECTED_SEED,
+                topologyResult.status(),
+                topologyResult.repairPasses(),
+                false,
+                Optional.empty(),
+                List.of(new Failure(
+                        FailureReason.TOPOLOGY_QUALITY_REJECTED,
+                        "topology",
+                        "Stage-20D topology quality report retains "
+                                + topologyResult.qualityReport().violations().size() + " violation(s)")));
+    }
+
+    private static void requirePlacementSeed(PlacementResult starts, long seed) {
+        if (starts.rootSeed() != seed) {
+            throw new IllegalArgumentException("placement root seed differs from topology root seed");
+        }
+    }
+
+    private static void addPlacementFailure(PlacementResult starts, List<Failure> failures) {
         if (starts.status() == PlacementStatus.REJECTED_SEED) {
             failures.add(new Failure(
                     FailureReason.FACTION_START_PLACEMENT_REJECTED,
@@ -215,19 +331,26 @@ public final class Stage20GeneratedWorldSeedAcceptance {
                     "faction-start-placement",
                     starts.failureReason().map(Enum::name).orElse("unresolved placement authority")));
         }
+    }
 
+    private static SeedResult completed(
+            String version,
+            Stage20JumpTopologyGenerationResult topologyResult,
+            PlacementResult starts,
+            boolean economicAcceptancePresent,
+            List<Failure> failures) {
         boolean authoritativeRejection = failures.stream().anyMatch(value -> !value.unresolvedAuthority());
         boolean authorityBlocker = failures.stream().anyMatch(Failure::unresolvedAuthority);
         Status status = authoritativeRejection
                 ? Status.REJECTED_SEED
                 : authorityBlocker ? Status.UNRESOLVED_AUTHORITY : Status.ACCEPTED;
         return new SeedResult(
-                CURRENT_VERSION,
-                seed,
+                version,
+                topologyResult.seed(),
                 status,
                 topologyResult.status(),
                 topologyResult.repairPasses(),
-                true,
+                economicAcceptancePresent,
                 Optional.of(starts.status()),
                 failures);
     }
