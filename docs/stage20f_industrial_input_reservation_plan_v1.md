@@ -117,11 +117,11 @@ and the unchanged freight/operating-state/inventory/yard seams.
 
 ## Next roadmap slice
 
-The next Stage-20F authority should consume the accepted **remote** `InputReservation` rows and bind
-their exact kg/s and physical routes to a finite ordinary freight allocation and then to explicit
-bootstrap freight ownership. It must share fleet capacity across all selected industrial inputs and
-must not treat route throughput evidence as a free ship.
+`docs/stage20f_industrial_input_freight_ownership_plan_v1.md` now consumes accepted remote
+reservations, derives exact integer ship demand on their unchanged physical routes, and binds that
+demand to distinct reserve slots in the existing Stage-20E ownership pool under explicit process
+owners.
 
-After freight ownership is explicit, facility operating state and initial Stage-18 inventory remain
-separate bootstrap authorities. Installed yards remain a separate prerequisite before shipbuilding
+The next authority is installed facility operating state. Initial Stage-18 inventory remains a
+separate bootstrap authority, and installed yards remain a separate prerequisite before shipbuilding
 specialization can become operational.
