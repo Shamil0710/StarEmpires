@@ -168,7 +168,7 @@ public final class Stage20ResolvedFreightAcceptance {
             }
         }
 
-        TreeMap<String, Integer> budgets = canonicalPositiveBudgetMap(remoteFreighterBudgetByFaction);
+        Map<String, Integer> budgets = canonicalPositiveBudgetMap(remoteFreighterBudgetByFaction);
         Set<String> placedFactions = checkedPlacement.assignments().stream()
                 .map(Assignment::stableFactionId)
                 .collect(java.util.stream.Collectors.toSet());
