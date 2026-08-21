@@ -8,7 +8,6 @@ import com.spacesim.world.Stage20TheoreticalSupplyThroughputAnalyzer.SupplyKey;
 import com.spacesim.world.Stage20TheoreticalSupplyThroughputAnalyzer.SupplyThroughputReport;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -59,7 +58,20 @@ public final class Stage20RepresentativeSupplyBottleneckDiagnostics {
             int producerSystemCount,
             double totalResolvedSupplyKgPerSecond,
             double maximumProducerSystemSupplyKgPerSecond) {
-        /** Validates one immutable commodity evidence row. */
+        /**
+         * Validates one immutable commodity evidence row.
+         *
+         * @param commodityId authoritative commodity ID
+         * @param requiredKgPerSecond required service throughput
+         * @param occurrenceCount generated occurrences
+         * @param initialSiteCount generated initial extraction sites
+         * @param resolvedSiteCount resolved site bindings
+         * @param noCompatibleArchetypeSiteCount sites without a compatible logistics archetype
+         * @param ambiguousArchetypeSiteCount sites with ambiguous compatible archetypes
+         * @param producerSystemCount resolved producer systems
+         * @param totalResolvedSupplyKgPerSecond global resolved supply
+         * @param maximumProducerSystemSupplyKgPerSecond maximum producer-system contribution
+         */
         public CommodityEvidence {
             commodityId = requireText(commodityId, "commodityId");
             requirePositiveFinite(requiredKgPerSecond, "requiredKgPerSecond");
@@ -111,7 +123,18 @@ public final class Stage20RepresentativeSupplyBottleneckDiagnostics {
             int ambiguousArchetypeSiteCount,
             int unresolvedSupplySiteCount,
             List<CommodityEvidence> commodities) {
-        /** Validates and freezes one seed summary. */
+        /**
+         * Validates and freezes one seed summary.
+         *
+         * @param rootSeed exact measured seed
+         * @param occurrenceCount all generated finite occurrences
+         * @param initialExtractionSiteCount all generated initial extraction sites
+         * @param resolvedLogisticsSiteCount uniquely resolved extraction-site logistics bindings
+         * @param noCompatibleArchetypeSiteCount sites without a compatible logistics archetype
+         * @param ambiguousArchetypeSiteCount sites with ambiguous compatible archetypes
+         * @param unresolvedSupplySiteCount sites omitted from resolved supply
+         * @param commodities deterministic essential-commodity evidence
+         */
         public SeedSummary {
             requireNonNegative(occurrenceCount, "occurrenceCount");
             requireNonNegative(initialExtractionSiteCount, "initialExtractionSiteCount");
@@ -151,7 +174,15 @@ public final class Stage20RepresentativeSupplyBottleneckDiagnostics {
             String representativeProfileVersion,
             String bootstrapRequirementVersion,
             List<SeedSummary> seeds) {
-        /** Validates and freezes one aggregate report. */
+        /**
+         * Validates and freezes one aggregate report.
+         *
+         * @param version exact diagnostics version
+         * @param corpusVersion exact fixed corpus version
+         * @param representativeProfileVersion exact production-probe profile version
+         * @param bootstrapRequirementVersion exact bootstrap requirement authority version
+         * @param seeds deterministic seed summaries
+         */
         public Report {
             version = requireText(version, "version");
             corpusVersion = requireText(corpusVersion, "corpusVersion");
