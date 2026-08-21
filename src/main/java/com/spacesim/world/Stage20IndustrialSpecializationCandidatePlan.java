@@ -76,6 +76,12 @@ public final class Stage20IndustrialSpecializationCandidatePlan {
 
     /** One deterministic non-runtime facility slot inherited from a Stage-18 station archetype. */
     public record FacilitySlot(int facilityOrdinal, FacilityDefinition definition) {
+        /**
+         * Validates one canonical facility-definition slot.
+         *
+         * @param facilityOrdinal zero-based station-local facility order
+         * @param definition exact Stage-18 facility definition
+         */
         public FacilitySlot {
             if (facilityOrdinal < 0) {
                 throw new IllegalArgumentException("facilityOrdinal must be non-negative");
@@ -89,6 +95,13 @@ public final class Stage20IndustrialSpecializationCandidatePlan {
             StationProcessCapacity capacity,
             ProcessThroughputEvidence throughput,
             CandidateStatus status) {
+        /**
+         * Validates an exact facility/process capacity-to-throughput join.
+         *
+         * @param capacity configured pristine station process capacity
+         * @param throughput input-limited physical throughput evidence
+         * @param status status derived from the retained physical upper bound
+         */
         public ProcessCandidate {
             Objects.requireNonNull(capacity, "capacity");
             Objects.requireNonNull(throughput, "throughput");
@@ -129,6 +142,15 @@ public final class Stage20IndustrialSpecializationCandidatePlan {
             StationArchetypeDefinition archetype,
             List<FacilitySlot> facilitySlots,
             List<ProcessCandidate> processes) {
+        /**
+         * Validates exact station-archetype facility and process coverage.
+         *
+         * @param systemId owning generated system
+         * @param placement authoritative physical station placement
+         * @param archetype exact Stage-18 station archetype
+         * @param facilitySlots complete canonical facility-definition slots
+         * @param processes facility-backed process candidates
+         */
         public StationCandidate {
             Objects.requireNonNull(systemId, "systemId");
             Objects.requireNonNull(placement, "placement");
@@ -185,6 +207,13 @@ public final class Stage20IndustrialSpecializationCandidatePlan {
             StarSystemId systemId,
             List<ExtractionCapacity> extractionSites,
             List<StationCandidate> stations) {
+        /**
+         * Validates one generated system's extraction and station evidence.
+         *
+         * @param systemId owning generated system
+         * @param extractionSites finite physical extraction capacities
+         * @param stations physical station candidates
+         */
         public SystemCandidate {
             Objects.requireNonNull(systemId, "systemId");
             ArrayList<ExtractionCapacity> extractionCopy = new ArrayList<>(Objects.requireNonNull(
@@ -225,6 +254,17 @@ public final class Stage20IndustrialSpecializationCandidatePlan {
             String supplyProfileVersion,
             List<SystemCandidate> systems,
             Set<MissingAuthority> missingAuthorities) {
+        /**
+         * Validates complete deterministic candidate evidence and unresolved authority state.
+         *
+         * @param version candidate-plan version
+         * @param rootSeed exact accepted generated root seed
+         * @param resolvedProbeVersion resolved production-probe version
+         * @param generationProbeVersion underlying physical generation-probe version
+         * @param supplyProfileVersion input-limited supply-analysis profile version
+         * @param systems complete generated system candidates
+         * @param missingAuthorities authorities that still block operational specialization
+         */
         public CandidateReport {
             version = requireText(version, "version");
             resolvedProbeVersion = requireText(resolvedProbeVersion, "resolvedProbeVersion");
