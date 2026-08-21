@@ -1,6 +1,6 @@
 # Stage 20E — Resolved whole-seed acceptance v2 seam
 
-> Status: **CANDIDATE PRODUCTION WHOLE-SEED COMPOSITION / NO WORLD REPAIR**  
+> Status: **VERIFIED COMPOSITION SEMANTICS / FINAL CURRENT-MAIN GATE REQUIRED**  
 > Version: `stage20e.generated-world-seed-acceptance.v2`
 
 ## Purpose
@@ -95,12 +95,22 @@ Tests require:
 5. accepted placement cannot silently omit coordinated freight authority;
 6. historical v1 composition remains source-compatible.
 
+## Verification evidence
+
+The dependency merge-ref Java 17 verification run `32497795450` passed all repository gates before `Stage20ResolvedFreightAcceptance` was merged into `main`.
+
+That dependency is now accepted in `main` as merge commit:
+
+`a92489c34426133d870e208e014ef2c1ea6dd0d5`
+
+This PR is retargeted to that current `main`. The evidence-recording commit must now pass a fresh exact merge-ref Java 17 `clean verify` before the composition seam can be accepted.
+
 ## Next causal slice
 
-After this composition seam is accepted, update `Stage20GeneratedWorldProductionProbe` so that the representative production path:
+After this composition seam is accepted, the production path uses the already prepared explicit coordinated-freight policy and resolved v3 wrapper so that the representative production path:
 
 1. performs placement first;
-2. derives the already accepted finite capacity (`13/start`) from its calibration authority;
+2. consumes the physically derived finite capacity (`13/start`);
 3. builds the physical allocated-route evaluator through the accepted factory;
 4. calls `Stage20ResolvedFreightAcceptance` only for accepted placement;
 5. calls `composeResolvedFreight(...)` for the final whole-seed decision;
