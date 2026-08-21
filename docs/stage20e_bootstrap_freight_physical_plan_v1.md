@@ -21,14 +21,17 @@ This slice performs the missing deterministic reverse join.
 
 ## Reconstruction contract
 
-Inputs:
+Input:
 
 ```text
-rich per-commodity FrontierReport set
-+ ACCEPTED CombinationReport
+ACCEPTED Stage20ResolvedFreightAcceptance.AcceptanceReport
+→ rich per-commodity FrontierReport set
++ exact CombinationReport
 ```
 
-For every `SelectedOption` from the combiner, reconstruction requires the exact source frontier version and exact option ID to exist in the supplied rich frontier.
+The resolved acceptance report is the single upstream authority. Its constructor already proves that every rich frontier and the exact combiner share the same placement version, supply-profile version, search budget and finite per-faction freight budget. Reconstruction retains that provenance rather than accepting independently replaceable frontier/combiner inputs.
+
+For every `SelectedOption` from the combiner, reconstruction requires the exact source frontier version and exact option ID to exist in the retained rich frontier.
 
 The selected combiner vector must equal the rich option vector exactly. The result then retains the original:
 
@@ -43,7 +46,7 @@ ProducerUsage
 
 The aggregate ship usage reconstructed from all selected commodity plans must equal the combiner's accepted `remoteFreightersUsedByFaction` exactly.
 
-Any missing option, frontier-version mismatch, vector mismatch, duplicate commodity or non-accepted combiner result fails closed.
+Every selected `StartPlan.remoteFreighterBudget` must equal the preserved accepted `remoteFreighterBudgetByFaction`. Any missing option, frontier-version mismatch, vector mismatch, duplicate commodity, replaced budget or non-accepted combiner result fails closed.
 
 ## Why this precedes FleetId allocation
 
@@ -85,7 +88,9 @@ The v1 acceptance tests require:
 3. input frontier ordering cannot change the result;
 4. a tampered ship-count vector fails closed;
 5. an absent selected rich option fails closed;
-6. a non-accepted combiner result cannot become a physical ownership plan.
+6. a non-accepted combiner result cannot become a physical ownership plan;
+7. the accepted budget/provenance cannot be replaced after reconstruction;
+8. a representative accepted production seed flows through resolved acceptance into the exact rich plan.
 
 ## Verification evidence
 

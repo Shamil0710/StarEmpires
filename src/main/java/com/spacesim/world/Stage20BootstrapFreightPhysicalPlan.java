@@ -7,6 +7,7 @@ import com.spacesim.world.Stage20CommodityWholePlacementFrontierGenerator.Fronti
 import com.spacesim.world.Stage20CommodityWholePlacementFrontierGenerator.FrontierReport;
 import com.spacesim.world.Stage20CoordinatedWholePlacementFreightPlanner.ProducerUsage;
 import com.spacesim.world.Stage20CoordinatedWholePlacementFreightPlanner.StartPlan;
+import com.spacesim.world.Stage20ResolvedFreightAcceptance.AcceptanceReport;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -111,12 +112,22 @@ public final class Stage20BootstrapFreightPhysicalPlan {
      * Complete rich physical plan corresponding to one accepted exact cross-commodity combination.
      *
      * @param version reconstruction contract version
+     * @param acceptanceVersion exact resolved-freight acceptance version
+     * @param placementVersion exact accepted faction-start placement version
+     * @param supplyProfileVersion exact physical supply-profile version
+     * @param searchNodeBudgetPerCommodity bounded search authority applied to every source frontier
+     * @param remoteFreighterBudgetByFaction authoritative finite freight capacity at every start
      * @param combinerVersion exact source combiner version
      * @param remoteFreightersByFaction aggregate selected remote-freighter usage at every start
      * @param commodities selected rich physical option for every required commodity
      */
     public record PlanReport(
             String version,
+            String acceptanceVersion,
+            String placementVersion,
+            String supplyProfileVersion,
+            int searchNodeBudgetPerCommodity,
+            Map<String, Integer> remoteFreighterBudgetByFaction,
             String combinerVersion,
             Map<String, Integer> remoteFreightersByFaction,
             List<SelectedCommodityPlan> commodities) {
@@ -124,15 +135,36 @@ public final class Stage20BootstrapFreightPhysicalPlan {
          * Validates aggregate selected-plan consistency.
          *
          * @param version reconstruction contract version
+         * @param acceptanceVersion exact resolved-freight acceptance version
+         * @param placementVersion exact accepted faction-start placement version
+         * @param supplyProfileVersion exact physical supply-profile version
+         * @param searchNodeBudgetPerCommodity bounded search authority applied to every source frontier
+         * @param remoteFreighterBudgetByFaction authoritative finite freight capacity at every start
          * @param combinerVersion exact source combiner version
          * @param remoteFreightersByFaction aggregate selected remote-freighter usage at every start
          * @param commodities selected rich physical option for every required commodity
          */
         public PlanReport {
             version = requireText(version, "version");
+            acceptanceVersion = requireText(acceptanceVersion, "acceptanceVersion");
+            placementVersion = requireText(placementVersion, "placementVersion");
+            supplyProfileVersion = requireText(supplyProfileVersion, "supplyProfileVersion");
+            if (searchNodeBudgetPerCommodity <= 0) {
+                throw new IllegalArgumentException("searchNodeBudgetPerCommodity must be positive");
+            }
+            remoteFreighterBudgetByFaction = canonicalPositiveFreighterMap(
+                    remoteFreighterBudgetByFaction, "remoteFreighterBudgetByFaction");
             combinerVersion = requireText(combinerVersion, "combinerVersion");
             remoteFreightersByFaction = canonicalFreighterMap(
                     remoteFreightersByFaction, "remoteFreightersByFaction");
+            if (!remoteFreightersByFaction.keySet().equals(remoteFreighterBudgetByFaction.keySet())) {
+                throw new IllegalArgumentException("selected usage and accepted budget must cover the same factions");
+            }
+            for (Map.Entry<String, Integer> entry : remoteFreightersByFaction.entrySet()) {
+                if (entry.getValue() > remoteFreighterBudgetByFaction.get(entry.getKey())) {
+                    throw new IllegalArgumentException("selected usage cannot exceed accepted freight capacity");
+                }
+            }
             ArrayList<SelectedCommodityPlan> copy = new ArrayList<>(
                     Objects.requireNonNull(commodities, "commodities"));
             if (copy.isEmpty() || copy.stream().anyMatch(Objects::isNull)) {
@@ -147,6 +179,13 @@ public final class Stage20BootstrapFreightPhysicalPlan {
                         .equals(remoteFreightersByFaction.keySet())) {
                     throw new IllegalArgumentException("commodity plans must be unique and cover the exact faction set");
                 }
+                for (StartPlan start : commodity.starts()) {
+                    Integer budget = remoteFreighterBudgetByFaction.get(start.stableFactionId());
+                    if (budget == null || start.remoteFreighterBudget() != budget) {
+                        throw new IllegalArgumentException(
+                                "selected physical starts must retain the accepted freight capacity");
+                    }
+                }
                 for (Map.Entry<String, Integer> entry : commodity.remoteFreightersByFaction().entrySet()) {
                     aggregate.put(entry.getKey(), Math.addExact(aggregate.get(entry.getKey()), entry.getValue()));
                 }
@@ -159,23 +198,21 @@ public final class Stage20BootstrapFreightPhysicalPlan {
     }
 
     /**
-     * Reconstructs the exact combiner selection from rich frontier evidence.
+     * Reconstructs the exact combiner selection from one resolved-freight acceptance authority.
      *
-     * @param frontierReports rich per-commodity frontier reports supplied to the exact combiner
-     * @param combination accepted exact cross-commodity combination
+     * @param acceptance resolved freight report retaining the rich frontiers and exact combination
      * @return deterministic rich physical plan containing the selected producer/route commitments
      * @throws IllegalArgumentException when evidence is incomplete, mismatched or not accepted
      */
-    public static PlanReport reconstruct(
-            List<FrontierReport> frontierReports,
-            CombinationReport combination) {
-        CombinationReport selected = Objects.requireNonNull(combination, "combination");
+    public static PlanReport reconstruct(AcceptanceReport acceptance) {
+        AcceptanceReport resolved = Objects.requireNonNull(acceptance, "acceptance");
+        CombinationReport selected = resolved.combination();
         if (selected.status() != Status.ACCEPTED) {
             throw new IllegalArgumentException("physical freight plan requires an accepted exact combination");
         }
 
         TreeMap<String, FrontierReport> frontiers = new TreeMap<>();
-        for (FrontierReport frontier : Objects.requireNonNull(frontierReports, "frontierReports")) {
+        for (FrontierReport frontier : resolved.commodityFrontiers()) {
             FrontierReport value = Objects.requireNonNull(frontier, "frontier");
             if (frontiers.putIfAbsent(value.commodityId(), value) != null) {
                 throw new IllegalArgumentException("rich frontier reports must be unique by commodity");
@@ -211,6 +248,11 @@ public final class Stage20BootstrapFreightPhysicalPlan {
 
         return new PlanReport(
                 CURRENT_VERSION,
+                resolved.version(),
+                resolved.placementVersion(),
+                resolved.supplyProfileVersion(),
+                resolved.searchNodeBudgetPerCommodity(),
+                resolved.remoteFreighterBudgetByFaction(),
                 selected.version(),
                 selected.remoteFreightersUsedByFaction(),
                 restored);
@@ -231,6 +273,16 @@ public final class Stage20BootstrapFreightPhysicalPlan {
             throw new IllegalArgumentException(field + " must be non-empty");
         }
         return Collections.unmodifiableMap(result);
+    }
+
+    private static Map<String, Integer> canonicalPositiveFreighterMap(
+            Map<String, Integer> input,
+            String field) {
+        Map<String, Integer> result = canonicalFreighterMap(input, field);
+        if (result.values().stream().anyMatch(value -> value <= 0)) {
+            throw new IllegalArgumentException(field + " counts must be positive");
+        }
+        return result;
     }
 
     private static TreeMap<String, Integer> zeroUsage(Set<String> factions) {
