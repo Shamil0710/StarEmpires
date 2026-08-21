@@ -295,7 +295,7 @@ public final class Stage20WholePlacementCapacityCorpusDiagnostics {
         return text.toString();
     }
 
-    private static Stage20PhysicalFreightRouteEvaluator physicalRoutes(
+    static Stage20PhysicalFreightRouteEvaluator physicalRoutes(
             GalaxyTopology topology,
             Stage20JumpEdgeCatalog jumpEdges,
             List<Stage20LocalInfrastructureLayout> layouts,
