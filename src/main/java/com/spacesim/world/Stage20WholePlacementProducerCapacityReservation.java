@@ -88,7 +88,16 @@ public final class Stage20WholePlacementProducerCapacityReservation {
             StarSystemId producerSystemId,
             double reservedKgPerSecond,
             boolean local) {
-        /** Validates one immutable producer reservation. */
+        /**
+         * Validates one immutable producer reservation.
+         *
+         * @param stableFactionId canonical placed faction identity
+         * @param consumerSystemId faction start receiving the service
+         * @param commodityId essential commodity
+         * @param producerSystemId physical producer whose capacity is reserved
+         * @param reservedKgPerSecond exact reserved service rate
+         * @param local whether producer and consumer are the same system
+         */
         public Reservation {
             stableFactionId = WorldFactionIdentityState.normalizeStableId(stableFactionId);
             Objects.requireNonNull(consumerSystemId, "consumerSystemId");
@@ -116,7 +125,15 @@ public final class Stage20WholePlacementProducerCapacityReservation {
             double reservedKgPerSecond,
             double producerCapacityKgPerSecond,
             Status status) {
-        /** Validates one immutable commodity evidence row. */
+        /**
+         * Validates one immutable commodity evidence row.
+         *
+         * @param commodityId authoritative commodity ID
+         * @param requiredKgPerSecond summed placed-start requirement
+         * @param reservedKgPerSecond physically reserved service rate
+         * @param producerCapacityKgPerSecond participating authoritative producer capacity
+         * @param status commodity reservation status
+         */
         public CommodityEvidence {
             commodityId = requireText(commodityId, "commodityId");
             requirePositiveFinite(requiredKgPerSecond, "requiredKgPerSecond");
@@ -153,7 +170,18 @@ public final class Stage20WholePlacementProducerCapacityReservation {
             Optional<FailureReason> failureReason,
             List<Reservation> reservations,
             List<CommodityEvidence> commodityEvidence) {
-        /** Validates and freezes one reservation report. */
+        /**
+         * Validates and freezes one reservation report.
+         *
+         * @param version stable reservation-result version
+         * @param placementVersion exact placement version consumed
+         * @param supplyProfileVersion exact supply-throughput profile consumed
+         * @param allocatorVersions allocator result versions consumed
+         * @param status final whole-placement reservation status
+         * @param failureReason absent only when accepted
+         * @param reservations exact non-zero reservations
+         * @param commodityEvidence per-commodity reservation evidence
+         */
         public ReservationReport {
             version = requireText(version, "version");
             placementVersion = requireText(placementVersion, "placementVersion");
