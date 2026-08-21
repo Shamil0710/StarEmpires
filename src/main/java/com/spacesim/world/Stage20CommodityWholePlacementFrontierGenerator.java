@@ -76,7 +76,15 @@ public final class Stage20CommodityWholePlacementFrontierGenerator {
             Map<String, Integer> remoteFreightersByFaction,
             List<StartPlan> starts,
             List<ProducerUsage> producerUsage) {
-        /** Validates and canonicalizes one physical frontier option. */
+        /**
+         * Validates and canonicalizes one physical frontier option.
+         *
+         * @param optionId deterministic option identifier derived from the canonical ship vector
+         * @param commodityId stable commodity identifier
+         * @param remoteFreightersByFaction exact remote freighters used at every placed start
+         * @param starts complete physical service commitments for every placed start
+         * @param producerUsage authoritative shared producer-capacity reservations
+         */
         public FrontierOption {
             optionId = requireText(optionId, "optionId");
             commodityId = requireText(commodityId, "commodityId");
@@ -145,7 +153,19 @@ public final class Stage20CommodityWholePlacementFrontierGenerator {
             FrontierStatus status,
             Map<String, Integer> remoteFreighterBudgetByFaction,
             List<FrontierOption> options) {
-        /** Validates and canonicalizes one bounded frontier report. */
+        /**
+         * Validates and canonicalizes one bounded frontier report.
+         *
+         * @param version frontier-generator version
+         * @param placementVersion accepted faction-placement authority version
+         * @param supplyProfileVersion authoritative supply-profile version
+         * @param commodityId generated commodity identifier
+         * @param searchNodeBudget caller-authorized shared search-node budget
+         * @param searchNodesVisited total discrete route-prefix states inspected across cap vectors
+         * @param status complete or unresolved frontier status
+         * @param remoteFreighterBudgetByFaction authoritative maximum remote freight fleet at each start
+         * @param options known nondominated physically valid options
+         */
         public FrontierReport {
             version = requireText(version, "version");
             placementVersion = requireText(placementVersion, "placementVersion");
