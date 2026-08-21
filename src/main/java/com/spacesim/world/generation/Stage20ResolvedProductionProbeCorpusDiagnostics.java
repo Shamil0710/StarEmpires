@@ -21,7 +21,14 @@ public final class Stage20ResolvedProductionProbeCorpusDiagnostics {
     }
 
     /** One final resolved whole-seed status. */
-    public enum SeedStatus { ACCEPTED, REJECTED, UNRESOLVED }
+    public enum SeedStatus {
+        /** The whole seed passes resolved acceptance. */
+        ACCEPTED,
+        /** The whole seed is deterministically rejected. */
+        REJECTED,
+        /** The whole seed cannot be resolved within the bounded authority. */
+        UNRESOLVED
+    }
 
     /**
      * Evidence for one fixed representative seed.
@@ -40,7 +47,16 @@ public final class Stage20ResolvedProductionProbeCorpusDiagnostics {
             Optional<Stage20CommodityFreightFrontierCombiner.Status> freightStatus,
             List<Stage20GeneratedWorldSeedAcceptance.FailureReason> failureReasons,
             int freightSearchNodesVisited) {
-        /** Validates one immutable seed row. */
+        /**
+         * Validates one immutable seed row.
+         *
+         * @param rootSeed exact root seed
+         * @param status final resolved whole-seed status
+         * @param placementStatus placement status when topology reached downstream generation
+         * @param freightStatus coordinated freight status when placement was accepted
+         * @param failureReasons normalized whole-seed failure/blocker reasons
+         * @param freightSearchNodesVisited bounded coordinated freight search work
+         */
         public SeedEvidence {
             if (rootSeed <= 0L || freightSearchNodesVisited < 0) {
                 throw new IllegalArgumentException("seed/search values must be valid");
@@ -61,7 +77,21 @@ public final class Stage20ResolvedProductionProbeCorpusDiagnostics {
         }
     }
 
-    /** Aggregate fixed-corpus evidence without a pass-rate target. */
+    /**
+     * Aggregate fixed-corpus evidence without a pass-rate target.
+     *
+     * @param version diagnostic schema/version
+     * @param resolvedProbeVersion resolved production probe version
+     * @param representativeProfileVersion representative v3 profile version
+     * @param wholeSeedAcceptanceVersion authoritative whole-seed acceptance version
+     * @param coordinatedFreightProfileVersion coordinated freight policy version
+     * @param fixedSeedCount number of fixed seeds
+     * @param acceptedSeedCount accepted seed count
+     * @param rejectedSeedCount rejected seed count
+     * @param unresolvedSeedCount unresolved seed count
+     * @param totalFreightSearchNodesVisited total bounded freight-search work
+     * @param seeds ordered per-seed evidence rows
+     */
     public record Report(
             String version,
             String resolvedProbeVersion,
@@ -74,7 +104,21 @@ public final class Stage20ResolvedProductionProbeCorpusDiagnostics {
             int unresolvedSeedCount,
             int totalFreightSearchNodesVisited,
             List<SeedEvidence> seeds) {
-        /** Validates aggregate count partitioning. */
+        /**
+         * Validates aggregate count partitioning.
+         *
+         * @param version diagnostic schema/version
+         * @param resolvedProbeVersion resolved production probe version
+         * @param representativeProfileVersion representative v3 profile version
+         * @param wholeSeedAcceptanceVersion authoritative whole-seed acceptance version
+         * @param coordinatedFreightProfileVersion coordinated freight policy version
+         * @param fixedSeedCount number of fixed seeds
+         * @param acceptedSeedCount accepted seed count
+         * @param rejectedSeedCount rejected seed count
+         * @param unresolvedSeedCount unresolved seed count
+         * @param totalFreightSearchNodesVisited total bounded freight-search work
+         * @param seeds ordered per-seed evidence rows
+         */
         public Report {
             version = text(version, "version");
             resolvedProbeVersion = text(resolvedProbeVersion, "resolvedProbeVersion");
@@ -94,7 +138,11 @@ public final class Stage20ResolvedProductionProbeCorpusDiagnostics {
         }
     }
 
-    /** Runs the unchanged fixed root seeds through the resolved v3 production path. */
+    /**
+     * Runs the unchanged fixed root seeds through the resolved v3 production path.
+     *
+     * @return deterministic fixed-corpus report
+     */
     public static Report runFixed() {
         var profile = Stage20RepresentativeGeneratedWorldProbeProfileV3.deriveCurrent();
         ArrayList<SeedEvidence> rows = new ArrayList<>();
@@ -141,7 +189,12 @@ public final class Stage20ResolvedProductionProbeCorpusDiagnostics {
                 rows);
     }
 
-    /** Serializes deterministic compact CI evidence. */
+    /**
+     * Serializes deterministic compact CI evidence.
+     *
+     * @param report report to serialize
+     * @return deterministic line-oriented evidence text
+     */
     public static String toText(Report report) {
         Report value = Objects.requireNonNull(report, "report");
         StringBuilder text = new StringBuilder(4_096);
