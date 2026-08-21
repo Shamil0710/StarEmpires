@@ -101,9 +101,10 @@ The first follow-up now exposes the exact candidate input supply keys, finite so
 explicit physical routes, route-time admission states and route-limited capacities in
 `docs/stage20f_industrial_input_route_evidence_plan_v1.md`.
 
-The next Stage-20F change should introduce an explicit selection/reservation authority over that
-evidence. It must allocate shared industrial inputs and their physical freight without double-use,
-then bind explicit facility operating state and initial Stage-18 inventory. Installed-yard placement
-must be a separate explicit authority before any shipbuilding specialization can be accepted.
+The explicit selection and shared-input reservation boundary is now implemented by
+`docs/stage20f_industrial_input_reservation_plan_v1.md`. The next Stage-20F change must bind its remote
+reservations to finite physical freight allocation and explicit bootstrap ownership without treating
+route evidence as free ships. Facility operating state and initial Stage-18 inventory remain separate
+authorities. Installed-yard placement must also remain explicit before shipbuilding specialization.
 
 Only after those seams close may a generated role label become an operational specialization.

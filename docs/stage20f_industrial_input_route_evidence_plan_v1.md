@@ -84,8 +84,8 @@ endpoints and neighbor-only paths, bounded source capacity and immutable missing
 
 ## Next roadmap slice
 
-The next Stage-20F authority should accept an explicit selected process/output-rate request rather
-than infer one from a station label. It can then reserve shared `SupplyKey` capacity across all
-selected inputs without double-use and bind each remote reservation to an explicit finite freight
-allocation. Facility operating state and initial Stage-18 inventory remain separate later authorities;
+The explicit process/output-rate selection and shared `SupplyKey` reservation boundary is now
+implemented by `docs/stage20f_industrial_input_reservation_plan_v1.md`. The next authority must bind
+each accepted remote input reservation to finite freight allocation and explicit bootstrap ownership.
+Facility operating state and initial Stage-18 inventory remain separate later authorities;
 installed-yard placement remains mandatory before shipbuilding specialization.
