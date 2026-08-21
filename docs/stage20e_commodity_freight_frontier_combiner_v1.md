@@ -82,22 +82,25 @@ This status is valid even if an upstream frontier is incomplete: a concrete feas
 
 The combiner may report infeasibility only from complete evidence:
 
-- a complete commodity frontier is empty; or
+- a complete commodity frontier is empty;
+- a complete commodity frontier has no option that can fit its own per-start fleet budgets, so no other commodity frontier can rescue it; or
 - every commodity frontier is complete and no shared-fleet combination fits.
 
 ### `UNRESOLVED_FRONTIER`
 
-No currently known combination fits and at least one frontier is incomplete.
+No currently known combination fits and at least one frontier is incomplete, except when another complete frontier has already proved impossibility independently of that unknown frontier.
 
-This distinction is mandatory. Search incompleteness must never be converted into seed infeasibility.
+This distinction is mandatory. Search incompleteness must never be converted into seed infeasibility, while a complete independent impossibility must not be weakened to unresolved merely because unrelated evidence is incomplete.
 
 ## Deterministic accepted selection
 
 When several known combinations fit, the combiner chooses deterministically by:
 
 1. minimum total remote freighters across all starts;
-2. lexicographically ordered per-start ship vector;
+2. lexicographically ordered per-start ship vector using canonical stable faction IDs;
 3. stable commodity/option IDs.
+
+Faction IDs are canonicalized and explicitly sorted before vector construction, so input `Map` iteration order cannot change the selected representative plan.
 
 This ordering is only a deterministic representative choice among already feasible options. It is not a monetary-cost authority and does not claim global economic optimality.
 
@@ -110,6 +113,7 @@ The v1 regressions cover:
 - incomplete frontier with no known fitting combination -> `UNRESOLVED_FRONTIER`;
 - incomplete frontier with a concrete fitting option -> `ACCEPTED`;
 - complete empty commodity frontier -> `COMMODITY_INFEASIBLE`;
+- complete commodity frontier that cannot fit its own fleet budget remains proved infeasible despite an unrelated unresolved frontier;
 - dominance and equal-vector deterministic tie handling;
 - input/frontier/map ordering invariance;
 - exact faction-set validation;
