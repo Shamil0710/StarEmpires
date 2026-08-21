@@ -1,6 +1,6 @@
 # Stage 20E — Resolved coordinated freight acceptance v1
 
-> Status: **CANDIDATE PRODUCTION ECONOMIC ACCEPTANCE / NO WORLD REPAIR**  
+> Status: **VERIFIED PRODUCTION ECONOMIC ACCEPTANCE PRIMITIVE / NO WORLD REPAIR**  
 > Version: `stage20e.resolved-freight-acceptance.v1`
 
 ## Why this slice exists
@@ -61,14 +61,35 @@ All are caller inputs. The primitive verifies that finite freight budgets cover 
 
 The evidence-only exact search budget remains `2,000` nodes per commodity. No accepted-seed rate target is applied.
 
-The diagnostic prints:
+Exact Java 17 merge-ref verification run `32492850834` completed successfully with:
 
-- fixed/accepted-placement seed counts;
-- accepted / infeasible / unresolved coordinated freight counts;
-- exact failure reason per seed;
-- bounded search nodes per seed and in aggregate.
+```text
+Tests run: 1469
+Failures: 0
+Errors: 0
+Skipped: 1
+coverage: PASS
+Javadocs: PASS
+package: PASS
+```
 
-The expected purpose of the measurement is causal parity with the already measured frontier-resolver corpus, not a new target. Any difference must be investigated rather than tuned away.
+The production-path fixed corpus measured:
+
+```text
+fixedSeedCount=16
+acceptedPlacementSeedCount=15
+freightAcceptedSeedCount=12
+freightInfeasibleSeedCount=3
+freightUnresolvedSeedCount=0
+totalSearchNodesVisited=20595
+perStartFreighterCapacity=13
+```
+
+The three complete physical infeasibilities are seeds `4`, `6` and `8`, each reported as exact combiner `INFEASIBLE` with `COMMODITY_INFEASIBLE`. Seed `10` never enters freight acceptance because its faction-start placement is rejected. All other accepted placements produce a concrete finite-fleet combination.
+
+This exactly reproduces the already accepted resolver/frontier corpus (`12 accepted / 3 physically infeasible / 0 unresolved`, `20,595` total search nodes). The production primitive therefore preserves the accepted physical feasible set rather than introducing a new acceptance threshold.
+
+The physical route evaluator used by this measurement is created through `stage20e.physical-freight-route-evaluator-factory.v1` at the independently derived `13`-freighter capacity. Payload, FTL plans, local access and transfer rates are unchanged.
 
 ## Explicit non-authorities
 
@@ -86,7 +107,7 @@ This slice does not:
 
 ## Next causal slice
 
-Once fixed-corpus evidence confirms this primitive reproduces the accepted `12 accepted / 3 physically infeasible / 0 unresolved` frontier closure without changing authorities, update the whole-seed acceptance boundary so that:
+The production primitive is now measured and physically equivalent to the accepted frontier closure. The next Stage-20E slice is to update the whole-seed acceptance boundary so that:
 
 ```text
 placement accepted
