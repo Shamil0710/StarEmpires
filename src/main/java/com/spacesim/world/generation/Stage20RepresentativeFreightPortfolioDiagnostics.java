@@ -22,7 +22,6 @@ import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.Physic
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +68,13 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
             StarSystemId supplierSystemId,
             int supplierFreighterOrdinal,
             double marginalDeliveredKgPerSecond) {
+        /**
+         * Validates one marginal route allocation.
+         *
+         * @param supplierSystemId physical supplier system
+         * @param supplierFreighterOrdinal ordinal of the additional freighter allocated to the route
+         * @param marginalDeliveredKgPerSecond incremental delivered capacity contributed by that allocation
+         */
         public MarginalAllocation {
             Objects.requireNonNull(supplierSystemId, "supplierSystemId");
             if (supplierFreighterOrdinal <= 0) {
@@ -94,6 +100,24 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
             double selectedPortfolioCapacityKgPerSecond,
             RequirementStatus status,
             List<MarginalAllocation> selectedMarginals) {
+        /**
+         * Validates one placed-start commodity portfolio row.
+         *
+         * @param rootSeed exact generated root seed
+         * @param startSystemId placed faction-start system
+         * @param commodityId authoritative Stage-18 commodity ID
+         * @param requiredKgPerSecond sustained bootstrap service rate
+         * @param maxSupplierRouteTimeS corrected supplier service-time boundary
+         * @param configuredFreighterCount total representative freighters available to the bounded check
+         * @param admittedSupplierCount suppliers with physical routes inside the time boundary
+         * @param admittedProducerCapacityKgPerSecond summed admitted physical producer capacity
+         * @param bestSingleSupplierDeliveredKgPerSecond best one-route delivered throughput using full configured allocation
+         * @param minimumFreightersRequired minimum bounded allocation found for a sufficient portfolio, or zero on failure
+         * @param selectedSupplierCount number of distinct suppliers in the selected sufficient portfolio
+         * @param selectedPortfolioCapacityKgPerSecond delivered capacity of the selected bounded portfolio
+         * @param status causal single-supplier/portfolio/failure classification
+         * @param selectedMarginals deterministic selected marginal route allocations
+         */
         public RequirementEvidence {
             Objects.requireNonNull(startSystemId, "startSystemId");
             commodityId = requireText(commodityId, "commodityId");
@@ -135,6 +159,17 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
             boolean allRequirementsPortfolioSufficient,
             boolean fitsOneSharedStartFleet,
             List<RequirementEvidence> requirements) {
+        /**
+         * Validates one placed-start aggregate.
+         *
+         * @param rootSeed exact generated root seed
+         * @param startSystemId placed faction-start system
+         * @param configuredFreighterCount configured representative fleet bound
+         * @param minimumFreightersAcrossEssentialCommodities sum of minimum commodity allocations
+         * @param allRequirementsPortfolioSufficient whether every essential commodity has a bounded sufficient portfolio
+         * @param fitsOneSharedStartFleet whether all essential commodities fit inside one configured start-level pool
+         * @param requirements deterministic commodity evidence
+         */
         public StartEvidence {
             Objects.requireNonNull(startSystemId, "startSystemId");
             if (configuredFreighterCount <= 0 || minimumFreightersAcrossEssentialCommodities < 0) {
@@ -161,6 +196,18 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
             boolean everyPlacedStartFitsOwnFleet,
             boolean wholePlacementFitsOneGlobalFleet,
             List<StartEvidence> starts) {
+        /**
+         * Validates one fixed-seed placement aggregate.
+         *
+         * @param rootSeed exact generated root seed
+         * @param placementStatus faction-start placement result
+         * @param assignedStartCount number of assigned starts when placement is accepted
+         * @param configuredFreighterCount configured representative fleet bound
+         * @param minimumFreightersAcrossPlacedStarts sum of measured start-level minima
+         * @param everyPlacedStartFitsOwnFleet whether every placed start fits an independent configured pool
+         * @param wholePlacementFitsOneGlobalFleet whether all placed starts fit one globally shared configured pool
+         * @param starts deterministic placed-start evidence
+         */
         public SeedEvidence {
             Objects.requireNonNull(placementStatus, "placementStatus");
             if (assignedStartCount < 0 || configuredFreighterCount <= 0 || minimumFreightersAcrossPlacedStarts < 0) {
@@ -195,6 +242,19 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
             int wholePlacementSingleGlobalFleetSeedCount,
             Map<String, Integer> requirementStatusCounts,
             List<SeedEvidence> seeds) {
+        /**
+         * Validates one fixed-corpus report.
+         *
+         * @param version diagnostic version
+         * @param candidateProfileVersion representative v2 candidate profile version
+         * @param bootstrapRequirementVersion corrected bootstrap requirement version
+         * @param configuredFreighterCount configured representative fleet bound
+         * @param acceptedPlacementSeedCount fixed seeds with accepted faction-start placement
+         * @param allPlacedStartsOwnFleetSeedCount seeds where every start fits its own configured pool
+         * @param wholePlacementSingleGlobalFleetSeedCount seeds where all starts fit one global configured pool
+         * @param requirementStatusCounts aggregate requirement classifications
+         * @param seeds deterministic per-seed evidence
+         */
         public Report {
             version = requireText(version, "version");
             candidateProfileVersion = requireText(candidateProfileVersion, "candidateProfileVersion");
@@ -211,7 +271,11 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
         }
     }
 
-    /** Replays the fixed corpus through the v2 cadence candidate and measures shared-fleet demand. */
+    /**
+     * Replays the fixed corpus through the v2 cadence candidate and measures shared-fleet demand.
+     *
+     * @return deterministic fixed-corpus freight-portfolio evidence
+     */
     public static Report evaluateCurrent() {
         var profile = Stage20RepresentativeGeneratedWorldProbeProfileV2.deriveCurrent();
         Stage18StationInfrastructureCatalog stations = Stage18StationInfrastructureCatalogLoader.loadDefault();
@@ -316,7 +380,12 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
                 seedEvidence);
     }
 
-    /** Serializes compact deterministic evidence for exact-head CI inspection. */
+    /**
+     * Serializes compact deterministic evidence for exact-head CI inspection.
+     *
+     * @param report measured fixed-corpus portfolio report
+     * @return deterministic text evidence ending with a newline
+     */
     public static String toText(Report report) {
         Report value = Objects.requireNonNull(report, "report");
         StringBuilder text = new StringBuilder(8_192);
