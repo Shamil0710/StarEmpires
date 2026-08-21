@@ -132,6 +132,7 @@ class Stage20BootstrapFreightOwnershipPlanTest {
         PlanReport mismatched = new PlanReport(
                 Stage20BootstrapFreightPhysicalPlan.CURRENT_VERSION,
                 Stage20ResolvedFreightAcceptance.CURRENT_VERSION,
+                1L,
                 "placement.other",
                 "supply.v1",
                 100,
@@ -143,6 +144,25 @@ class Stage20BootstrapFreightOwnershipPlanTest {
         assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.planAccepted(
                 placement(START),
                 mismatched));
+    }
+
+    @Test
+    void selectedPhysicalPlanMustRetainTheAcceptedPlacementRootSeed() {
+        PlanReport physical = physicalPlan(
+                2,
+                5,
+                List.of(remoteCommodity(WATER, WATER_SOURCE, 2, 20d, 5)));
+        PlacementResult otherSeed = new PlacementResult(
+                Stage20FactionStartPlacementGenerator.CURRENT_VERSION,
+                2L,
+                "profile.v1",
+                PlacementStatus.ACCEPTED,
+                List.of(new Assignment(FACTION, START, 0d)),
+                1,
+                Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () ->
+                Stage20BootstrapFreightOwnershipPlan.planAccepted(otherSeed, physical));
     }
 
     @Test
@@ -177,6 +197,7 @@ class Stage20BootstrapFreightOwnershipPlanTest {
         return new PlanReport(
                 Stage20BootstrapFreightPhysicalPlan.CURRENT_VERSION,
                 Stage20ResolvedFreightAcceptance.CURRENT_VERSION,
+                1L,
                 Stage20FactionStartPlacementGenerator.CURRENT_VERSION,
                 "supply.v1",
                 100,

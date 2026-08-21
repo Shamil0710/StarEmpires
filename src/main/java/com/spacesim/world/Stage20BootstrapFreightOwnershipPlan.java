@@ -292,6 +292,9 @@ public final class Stage20BootstrapFreightOwnershipPlan {
             version = requireText(version, "version");
             placementProfileVersion = requireText(placementProfileVersion, "placementProfileVersion");
             Objects.requireNonNull(physicalPlan, "physicalPlan");
+            if (rootSeed != physicalPlan.rootSeed()) {
+                throw new IllegalArgumentException("ownership and physical-plan root seeds must match");
+            }
             ArrayList<FactionFleetOwnership> copy = new ArrayList<>(
                     Objects.requireNonNull(factions, "factions"));
             if (copy.isEmpty() || copy.stream().anyMatch(Objects::isNull)) {
@@ -382,6 +385,9 @@ public final class Stage20BootstrapFreightOwnershipPlan {
             throw new IllegalArgumentException("bootstrap freight ownership requires an accepted non-empty placement");
         }
         PlanReport selected = Objects.requireNonNull(physicalPlan, "physicalPlan");
+        if (checkedPlacement.rootSeed() != selected.rootSeed()) {
+            throw new IllegalArgumentException("placement root seed differs from selected physical authority");
+        }
         if (!checkedPlacement.version().equals(selected.placementVersion())) {
             throw new IllegalArgumentException("placement version differs from selected physical authority");
         }

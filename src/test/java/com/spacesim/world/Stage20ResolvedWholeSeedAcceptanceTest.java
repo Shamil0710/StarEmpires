@@ -46,6 +46,21 @@ class Stage20ResolvedWholeSeedAcceptanceTest {
         assertEquals(Stage20GeneratedWorldSeedAcceptance.Status.ACCEPTED, result.status());
         assertTrue(result.economicAcceptancePresent());
         assertTrue(result.failures().isEmpty());
+
+        var otherSeedFreight = new Stage20ResolvedFreightAcceptance.AcceptanceReport(
+                freight.version(),
+                freight.rootSeed() + 1L,
+                freight.placementVersion(),
+                freight.supplyProfileVersion(),
+                freight.searchNodeBudgetPerCommodity(),
+                freight.remoteFreighterBudgetByFaction(),
+                freight.commodityFrontiers(),
+                freight.combination());
+        assertThrows(IllegalArgumentException.class, () ->
+                Stage20GeneratedWorldSeedAcceptance.composeResolvedFreight(
+                        fixture.probe().topology(),
+                        Optional.of(otherSeedFreight),
+                        Optional.of(fixture.placement())));
     }
 
     @Test
@@ -175,6 +190,7 @@ class Stage20ResolvedWholeSeedAcceptanceTest {
                 List.of(frontier.toCombinerFrontier()), budgets);
         return new Stage20ResolvedFreightAcceptance.AcceptanceReport(
                 Stage20ResolvedFreightAcceptance.CURRENT_VERSION,
+                placement.rootSeed(),
                 placement.version(),
                 SUPPLY_VERSION,
                 SEARCH_BUDGET,
@@ -208,6 +224,7 @@ class Stage20ResolvedWholeSeedAcceptanceTest {
                 List.of());
         return new Stage20ResolvedFreightAcceptance.AcceptanceReport(
                 Stage20ResolvedFreightAcceptance.CURRENT_VERSION,
+                placement.rootSeed(),
                 placement.version(),
                 SUPPLY_VERSION,
                 SEARCH_BUDGET,

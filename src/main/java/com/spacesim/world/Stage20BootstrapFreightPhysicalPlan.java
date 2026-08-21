@@ -113,6 +113,7 @@ public final class Stage20BootstrapFreightPhysicalPlan {
      *
      * @param version reconstruction contract version
      * @param acceptanceVersion exact resolved-freight acceptance version
+     * @param rootSeed exact generated-world seed retained by resolved acceptance
      * @param placementVersion exact accepted faction-start placement version
      * @param supplyProfileVersion exact physical supply-profile version
      * @param searchNodeBudgetPerCommodity bounded search authority applied to every source frontier
@@ -124,6 +125,7 @@ public final class Stage20BootstrapFreightPhysicalPlan {
     public record PlanReport(
             String version,
             String acceptanceVersion,
+            long rootSeed,
             String placementVersion,
             String supplyProfileVersion,
             int searchNodeBudgetPerCommodity,
@@ -136,6 +138,7 @@ public final class Stage20BootstrapFreightPhysicalPlan {
          *
          * @param version reconstruction contract version
          * @param acceptanceVersion exact resolved-freight acceptance version
+         * @param rootSeed exact generated-world seed retained by resolved acceptance
          * @param placementVersion exact accepted faction-start placement version
          * @param supplyProfileVersion exact physical supply-profile version
          * @param searchNodeBudgetPerCommodity bounded search authority applied to every source frontier
@@ -249,6 +252,7 @@ public final class Stage20BootstrapFreightPhysicalPlan {
         return new PlanReport(
                 CURRENT_VERSION,
                 resolved.version(),
+                resolved.rootSeed(),
                 resolved.placementVersion(),
                 resolved.supplyProfileVersion(),
                 resolved.searchNodeBudgetPerCommodity(),

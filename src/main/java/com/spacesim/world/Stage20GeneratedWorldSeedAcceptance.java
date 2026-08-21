@@ -262,6 +262,9 @@ public final class Stage20GeneratedWorldSeedAcceptance {
         Stage20ResolvedFreightAcceptance.AcceptanceReport freight = resolvedFreight.orElseThrow(
                 () -> new IllegalArgumentException(
                         "accepted placement requires coordinated finite-fleet acceptance"));
+        if (freight.rootSeed() != seed) {
+            throw new IllegalArgumentException("coordinated freight root seed differs from generated topology");
+        }
         if (!freight.placementVersion().equals(starts.version())) {
             throw new IllegalArgumentException("coordinated freight placement version differs from selected placement");
         }

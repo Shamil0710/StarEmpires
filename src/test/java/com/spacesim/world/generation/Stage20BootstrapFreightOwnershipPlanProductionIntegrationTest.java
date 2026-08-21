@@ -26,6 +26,7 @@ class Stage20BootstrapFreightOwnershipPlanProductionIntegrationTest {
         assertEquals(Stage20GeneratedWorldSeedAcceptance.Status.ACCEPTED,
                 resolved.seedAcceptance().status());
         assertEquals(1L, ownership.rootSeed());
+        assertEquals(resolved.rootSeed(), ownership.physicalPlan().rootSeed());
         assertEquals(placement.profileVersion(), ownership.placementProfileVersion());
         assertEquals(physical, ownership.physicalPlan());
         assertEquals(ownership, repeated);
