@@ -29,7 +29,7 @@ ACCEPTED Stage20ResolvedFreightAcceptance.AcceptanceReport
 + exact CombinationReport
 ```
 
-The resolved acceptance report is the single upstream authority. Its constructor already proves that every rich frontier and the exact combiner share the same placement version, supply-profile version, search budget and finite per-faction freight budget. Reconstruction retains that provenance rather than accepting independently replaceable frontier/combiner inputs.
+The resolved acceptance report is the single upstream authority. It retains the exact generated-world root seed, and its constructor proves that every rich frontier and the exact combiner share the same placement version, supply-profile version, search budget and finite per-faction freight budget. Reconstruction retains that provenance rather than accepting independently replaceable frontier/combiner inputs.
 
 For every `SelectedOption` from the combiner, reconstruction requires the exact source frontier version and exact option ID to exist in the retained rich frontier.
 

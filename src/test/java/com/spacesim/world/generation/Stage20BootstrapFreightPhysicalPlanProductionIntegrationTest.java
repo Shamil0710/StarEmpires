@@ -23,6 +23,7 @@ class Stage20BootstrapFreightPhysicalPlanProductionIntegrationTest {
         assertEquals(Stage20CommodityFreightFrontierCombiner.Status.ACCEPTED,
                 acceptance.combination().status());
         assertEquals(acceptance.version(), physical.acceptanceVersion());
+        assertEquals(resolved.rootSeed(), physical.rootSeed());
         assertEquals(acceptance.placementVersion(), physical.placementVersion());
         assertEquals(acceptance.supplyProfileVersion(), physical.supplyProfileVersion());
         assertEquals(acceptance.searchNodeBudgetPerCommodity(), physical.searchNodeBudgetPerCommodity());

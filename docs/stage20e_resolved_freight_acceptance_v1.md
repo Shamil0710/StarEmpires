@@ -55,6 +55,8 @@ The primitive does not derive or guess:
 
 All are caller inputs. The primitive verifies that finite freight budgets cover exactly the placed faction set and that each selected start exists in the supplied topology.
 
+The returned report also retains the exact placement `rootSeed`. Downstream resolved-production and ownership constructors reject any attempt to pair the freight evidence with another generated seed.
+
 ## Fixed-corpus production-path measurement
 
 `Stage20ResolvedFreightAcceptanceCorpusDiagnostics` replays the unchanged representative v2-candidate generated world, obtains the independently derived freight-capacity authority, creates a physical evaluator through `Stage20PhysicalFreightRouteEvaluatorFactory`, and calls the production acceptance primitive directly.

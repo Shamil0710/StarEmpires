@@ -44,6 +44,7 @@ public final class Stage20ResolvedFreightAcceptance {
      * Complete coordinated freight acceptance evidence for one accepted faction-start placement.
      *
      * @param version acceptance primitive version
+     * @param rootSeed exact generated-world seed owning the accepted placement
      * @param placementVersion exact accepted placement version
      * @param supplyProfileVersion exact physical supply profile version
      * @param searchNodeBudgetPerCommodity bounded exact-search evidence budget for each commodity
@@ -53,6 +54,7 @@ public final class Stage20ResolvedFreightAcceptance {
      */
     public record AcceptanceReport(
             String version,
+            long rootSeed,
             String placementVersion,
             String supplyProfileVersion,
             int searchNodeBudgetPerCommodity,
@@ -63,6 +65,7 @@ public final class Stage20ResolvedFreightAcceptance {
          * Validates complete frontier/combiner consistency.
          *
          * @param version acceptance primitive version
+         * @param rootSeed exact generated-world seed owning the accepted placement
          * @param placementVersion exact accepted placement version
          * @param supplyProfileVersion exact physical supply profile version
          * @param searchNodeBudgetPerCommodity bounded exact-search evidence budget for each commodity
@@ -205,6 +208,7 @@ public final class Stage20ResolvedFreightAcceptance {
                 budgets);
         return new AcceptanceReport(
                 CURRENT_VERSION,
+                checkedPlacement.rootSeed(),
                 checkedPlacement.version(),
                 checkedSupply.profileVersion(),
                 searchNodeBudgetPerCommodity,

@@ -100,6 +100,11 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
                     throw new IllegalArgumentException(
                             "coordinated freight must exist exactly for accepted placement");
                 }
+                if (coordinatedFreightAcceptance.isPresent()
+                        && coordinatedFreightAcceptance.orElseThrow().rootSeed() != rootSeed) {
+                    throw new IllegalArgumentException(
+                            "coordinated freight and resolved production root seeds differ");
+                }
             }
         }
     }

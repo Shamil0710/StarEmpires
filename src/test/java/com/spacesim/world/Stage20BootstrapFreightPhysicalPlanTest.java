@@ -42,6 +42,7 @@ class Stage20BootstrapFreightPhysicalPlanTest {
 
         assertEquals(Status.ACCEPTED, acceptance.combination().status());
         assertEquals(Stage20ResolvedFreightAcceptance.CURRENT_VERSION, plan.acceptanceVersion());
+        assertEquals(1L, plan.rootSeed());
         assertEquals("placement.v1", plan.placementVersion());
         assertEquals("supply.v1", plan.supplyProfileVersion());
         assertEquals(100, plan.searchNodeBudgetPerCommodity());
@@ -139,6 +140,7 @@ class Stage20BootstrapFreightPhysicalPlanTest {
         assertThrows(IllegalArgumentException.class, () -> new PlanReport(
                 plan.version(),
                 plan.acceptanceVersion(),
+                plan.rootSeed(),
                 plan.placementVersion(),
                 plan.supplyProfileVersion(),
                 plan.searchNodeBudgetPerCommodity(),
@@ -160,6 +162,7 @@ class Stage20BootstrapFreightPhysicalPlanTest {
             CombinationReport combination) {
         return new AcceptanceReport(
                 Stage20ResolvedFreightAcceptance.CURRENT_VERSION,
+                1L,
                 "placement.v1",
                 "supply.v1",
                 100,
