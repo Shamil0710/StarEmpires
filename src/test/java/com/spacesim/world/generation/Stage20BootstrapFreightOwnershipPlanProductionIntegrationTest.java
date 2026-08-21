@@ -20,8 +20,8 @@ class Stage20BootstrapFreightOwnershipPlanProductionIntegrationTest {
         var physical = Stage20BootstrapFreightPhysicalPlan.reconstruct(acceptance);
         var placement = resolved.generation().placement().orElseThrow();
 
-        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.plan(placement, physical);
-        OwnershipReport repeated = Stage20BootstrapFreightOwnershipPlan.plan(placement, physical);
+        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.plan(resolved);
+        OwnershipReport repeated = Stage20BootstrapFreightOwnershipPlan.plan(resolved);
 
         assertEquals(Stage20GeneratedWorldSeedAcceptance.Status.ACCEPTED,
                 resolved.seedAcceptance().status());

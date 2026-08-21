@@ -49,6 +49,8 @@ Commitment keys must be unique inside each owned faction pool. Duplicate source 
 
 Local producer service consumes zero remote freight ownership slots.
 
+The public ownership authority consumes one accepted `ResolvedProbeResult`. It takes placement and freight acceptance from that same root-seed object and reconstructs the selected physical plan internally, so a physical plan cannot be paired with an unrelated seed's placement even when the faction/start mapping happens to match.
+
 The ownership capacity equals both the preserved acceptance budget and the `remoteFreighterBudget` carried by every selected `StartPlan`. The resulting `OwnershipReport` retains the complete immutable physical plan, generated root seed and placement-profile provenance for the later bootstrap bridge.
 
 ## Home system is not spawn position

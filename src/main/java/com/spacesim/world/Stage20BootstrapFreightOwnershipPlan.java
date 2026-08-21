@@ -8,6 +8,7 @@ import com.spacesim.world.Stage20EconomicBootstrapValidator.RouteAssessment;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator.Assignment;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator.PlacementResult;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator.PlacementStatus;
+import com.spacesim.world.generation.Stage20ResolvedGeneratedWorldProductionProbe.ResolvedProbeResult;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -340,13 +341,40 @@ public final class Stage20BootstrapFreightOwnershipPlan {
     }
 
     /**
-     * Binds finite per-start freight capacity to accepted factions and selected physical commitments.
+     * Binds one accepted resolved generated world to exact finite freight ownership.
+     *
+     * <p>The resolved production result is the single public provenance authority: placement and
+     * freight acceptance are taken from the same root-seed evidence object, and the selected rich
+     * physical plan is reconstructed internally. Callers therefore cannot substitute a placement
+     * from another generated seed even when its faction/start mapping happens to compare equal.</p>
+     *
+     * @param resolved accepted resolved generated-world production evidence
+     * @return deterministic ownership plan retaining the exact reconstructed physical plan
+     */
+    public static OwnershipReport plan(ResolvedProbeResult resolved) {
+        ResolvedProbeResult accepted = Objects.requireNonNull(resolved, "resolved");
+        if (accepted.seedAcceptance().status() != Stage20GeneratedWorldSeedAcceptance.Status.ACCEPTED) {
+            throw new IllegalArgumentException("bootstrap freight ownership requires an accepted resolved seed");
+        }
+        PlacementResult placement = accepted.generation().placement().orElseThrow(
+                () -> new IllegalArgumentException("accepted resolved seed lost faction-start placement"));
+        if (placement.rootSeed() != accepted.rootSeed()) {
+            throw new IllegalArgumentException("resolved seed and faction-start placement provenance differ");
+        }
+        PlanReport physicalPlan = Stage20BootstrapFreightPhysicalPlan.reconstruct(
+                accepted.coordinatedFreightAcceptance().orElseThrow(
+                        () -> new IllegalArgumentException("accepted resolved seed lost freight acceptance")));
+        return planAccepted(placement, physicalPlan);
+    }
+
+    /**
+     * Package-private regression seam for fail-closed placement/physical-plan mismatch tests.
      *
      * @param placement accepted deterministic faction-start placement
      * @param physicalPlan accepted/reconstructed physical freight selection
      * @return deterministic ownership plan; no runtime asset is created
      */
-    public static OwnershipReport plan(
+    static OwnershipReport planAccepted(
             PlacementResult placement,
             PlanReport physicalPlan) {
         PlacementResult checkedPlacement = Objects.requireNonNull(placement, "placement");

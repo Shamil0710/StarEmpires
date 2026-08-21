@@ -44,7 +44,7 @@ class Stage20BootstrapFreightOwnershipPlanTest {
                         remoteCommodity(WATER, WATER_SOURCE, 2, 20d, 5),
                         remoteCommodity(ORE, ORE_SOURCE, 1, 12d, 5)));
 
-        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.plan(
+        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.planAccepted(
                 placement(START),
                 physical);
 
@@ -87,7 +87,7 @@ class Stage20BootstrapFreightOwnershipPlanTest {
                 5,
                 List.of(localCommodity(WATER, 5)));
 
-        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.plan(
+        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.planAccepted(
                 placement(START),
                 physical);
 
@@ -106,7 +106,7 @@ class Stage20BootstrapFreightOwnershipPlanTest {
                 5,
                 List.of(remoteCommodity(WATER, WATER_SOURCE, 2, 20d, 5)));
 
-        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.plan(
+        OwnershipReport ownership = Stage20BootstrapFreightOwnershipPlan.planAccepted(
                 placement(START),
                 physical);
 
@@ -121,7 +121,7 @@ class Stage20BootstrapFreightOwnershipPlanTest {
                 5,
                 List.of(remoteCommodityAtStart(WATER, WATER_SOURCE, OTHER_START, 2, 20d, 5)));
 
-        assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.plan(
+        assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.planAccepted(
                 placement(START),
                 physical));
     }
@@ -140,7 +140,7 @@ class Stage20BootstrapFreightOwnershipPlanTest {
                 Map.of(FACTION, 2),
                 List.of(water));
 
-        assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.plan(
+        assertThrows(IllegalArgumentException.class, () -> Stage20BootstrapFreightOwnershipPlan.planAccepted(
                 placement(START),
                 mismatched));
     }
