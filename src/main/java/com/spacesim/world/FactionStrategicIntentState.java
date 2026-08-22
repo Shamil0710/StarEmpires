@@ -10,7 +10,7 @@ import java.util.Objects;
  *
  * @param factionContentId stable owning faction identity
  * @param nextGoalSequence next monotonically increasing persistent goal sequence
- * @param goals active and terminal goal history in canonical goal-ID order
+ * @param goals open and terminal goal history in canonical goal-ID order
  */
 public record FactionStrategicIntentState(
         String factionContentId,
@@ -30,7 +30,7 @@ public record FactionStrategicIntentState(
         }
         sorted.sort(null);
         HashSet<String> goalIds = new HashSet<>();
-        HashSet<String> activeIntentKeys = new HashSet<>();
+        HashSet<String> openIntentKeys = new HashSet<>();
         for (StrategicGoalState goal : sorted) {
             if (!factionContentId.equals(goal.factionContentId())) {
                 throw new IllegalArgumentException("Strategic goal belongs to a different faction: " + goal.goalId());
@@ -38,9 +38,8 @@ public record FactionStrategicIntentState(
             if (!goalIds.add(goal.goalId())) {
                 throw new IllegalArgumentException("Duplicate strategic goal ID: " + goal.goalId());
             }
-            if (goal.lifecycle() == StrategicGoalState.Lifecycle.ACTIVE
-                    && !activeIntentKeys.add(goal.intentKey())) {
-                throw new IllegalArgumentException("Duplicate active strategic intent: " + goal.intentKey());
+            if (goal.isOpen() && !openIntentKeys.add(goal.intentKey())) {
+                throw new IllegalArgumentException("Duplicate open strategic intent: " + goal.intentKey());
             }
         }
         goals = List.copyOf(sorted);
@@ -65,6 +64,15 @@ public record FactionStrategicIntentState(
         return goals.stream()
                 .filter(goal -> goal.lifecycle() == StrategicGoalState.Lifecycle.ACTIVE)
                 .toList();
+    }
+
+    /**
+     * Returns all accepted goals that remain active or stalled.
+     *
+     * @return immutable open goal list
+     */
+    public List<StrategicGoalState> openGoals() {
+        return goals.stream().filter(StrategicGoalState::isOpen).toList();
     }
 
     /**
