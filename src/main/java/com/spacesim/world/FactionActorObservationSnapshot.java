@@ -71,7 +71,14 @@ public record FactionActorObservationSnapshot(
             long observedAtTick,
             long freshUntilTick) implements Comparable<ObservationEvidence> {
 
-        /** Validates explicit provenance without inventing a source-dependent freshness policy. */
+        /**
+         * Validates explicit provenance without inventing a source-dependent freshness policy.
+         *
+         * @param channel allowed observation channel
+         * @param provenanceId stable scan/report/ledger row identity
+         * @param observedAtTick tick when the actor received the fact
+         * @param freshUntilTick inclusive freshness horizon, or {@code -1} for durable evidence
+         */
         public ObservationEvidence {
             Objects.requireNonNull(channel, "Observation channel not set");
             provenanceId = requireText(provenanceId, "Observation provenance ID");
@@ -130,7 +137,15 @@ public record FactionActorObservationSnapshot(
             int severityBasisPoints,
             ObservationEvidence evidence) implements Comparable<ActorObservation> {
 
-        /** Validates one bounded observation and its legal domain/interest pairing. */
+        /**
+         * Validates one bounded observation and its legal domain/interest pairing.
+         *
+         * @param domain observation domain
+         * @param interestKind interest family evidenced by the observation
+         * @param targetId stable route/system/faction/resource/obligation identity
+         * @param severityBasisPoints evidence magnitude in {@code [0,10000]}
+         * @param evidence provenance and freshness
+         */
         public ActorObservation {
             Objects.requireNonNull(domain, "Observation domain not set");
             Objects.requireNonNull(interestKind, "Interest kind not set");
@@ -176,7 +191,16 @@ public record FactionActorObservationSnapshot(
         }
     }
 
-    /** Validates ownership and canonicalizes all four actor-bounded domains. */
+    /**
+     * Validates ownership and canonicalizes all four actor-bounded domains.
+     *
+     * @param factionContentId stable observing faction identity
+     * @param observedAtTick authoritative clock tick represented by the snapshot
+     * @param economic actor-known economic observations
+     * @param territorial actor-known territorial observations
+     * @param security actor-known security observations
+     * @param diplomatic actor-known diplomatic observations
+     */
     public FactionActorObservationSnapshot {
         factionContentId = requireText(factionContentId, "Faction content ID");
         requireNonNegative(observedAtTick, "Snapshot observation tick");
