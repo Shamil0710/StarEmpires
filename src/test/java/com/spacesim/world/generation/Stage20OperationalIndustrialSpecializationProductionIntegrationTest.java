@@ -69,6 +69,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20OperationalIndustrialSpecializationProductionIntegrationTest {
+    static CadenceFixture cadenceFixture() {
+        Fixture fixture = fixture();
+        YardReport yards = Stage20IndustrialShipyardInstallationPlan.plan(
+                fixture.resolved(), fixture.inventory(), yardAuthority(fixture, YardVariant.ACTIVE));
+        return new CadenceFixture(
+                fixture.resolved(),
+                Stage20OperationalIndustrialSpecializationPlan.derive(
+                        fixture.resolved(), yards));
+    }
+
     @Test
     void acceptedGeneratedAndOperationalAuthorityBootstrapsOnlyOwnedAndExplicitKnowledge() {
         Fixture fixture = fixture();
@@ -513,4 +523,9 @@ class Stage20OperationalIndustrialSpecializationProductionIntegrationTest {
             FacilityDefinition heavyDefinition,
             InstalledFacilityState assemblyState,
             YardDefinition yardDefinition) {}
+
+    record CadenceFixture(
+            ResolvedProbeResult resolved,
+            Stage20OperationalIndustrialSpecializationPlan.OperationalSpecializationReport
+                    specialization) {}
 }

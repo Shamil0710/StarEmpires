@@ -851,7 +851,7 @@ radio. Canonical acceptance: `docs/stage20i_communications_intelligence_latency_
 
 ---
 
-# 12. Stage 20J — generated economy cadence calibration
+# 12. Stage 20J — generated economy cadence calibration — COMPLETE
 
 Production/consumption/build/maintenance cadence проверяется против generated logistics и Stage-18 recipes.
 
@@ -876,6 +876,25 @@ shipyard replenishment time
 Не использовать hidden `market restock per minute` как замену перевозкам.
 
 Calibration также должна показать, что regional comparative advantage действительно создаёт measurable trade potential, а не только красивые resource labels.
+
+## Stage-20J acceptance — COMPLETE
+
+The accepted projection consumes the exact resolved generated world plus closed Stage-20F
+operational specialization and retains the physical causal chain:
+
+```text
+finite occurrence reserve × real extraction rate
+→ Stage-18 refining/manufacturing recipe input and output cadence
+→ owned freight payload × allocated ships ÷ fitted ready-again round trip
+→ explicit load/unload overhead and one-way delivery latency
+→ finite station buffer depletion
+→ active-yard Stage-18 hull BOM supply/replenishment ETA
+→ cross-sector surplus-to-deficit delivered trade potential
+```
+
+It creates no market restock, inventory, ship, facility or ownership. The four Stage-20F runtime
+materialization requirements remain exact and open. Canonical acceptance:
+`docs/stage20j_generated_economy_cadence_v1.md`.
 
 ---
 

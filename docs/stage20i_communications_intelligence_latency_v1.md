@@ -1,6 +1,7 @@
 # Stage 20I — communications / intelligence latency v1
 
-Status: **IMPLEMENTED — awaiting exact-head CI/merge**
+Status: **MERGED** — PR #307, exact-head CI run `32545005854` passed; merge
+`b44e33ea5969daf3852aa6f5fd267d5807142d45` preserves the validated head tree exactly.
 
 ## Purpose
 
