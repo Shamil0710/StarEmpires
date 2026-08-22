@@ -15,7 +15,7 @@ import java.util.TreeSet;
 
 /** Deterministic UTF-8 persistence codec for Stage-21B strategic intent state. */
 public final class FactionStrategicIntentStateCodec {
-    private static final String HEADER = "stage21b-strategic-intent-v1";
+    private static final String HEADER = "stage21b-strategic-intent-v2";
 
     private FactionStrategicIntentStateCodec() {
         throw new AssertionError("Utility class");
@@ -39,31 +39,26 @@ public final class FactionStrategicIntentStateCodec {
 
         StringBuilder builder = new StringBuilder(HEADER).append('\n');
         for (FactionStrategicIntentState state : sorted) {
-            builder.append("S\t")
-                    .append(token(state.factionContentId())).append('\t')
+            builder.append("S\t").append(token(state.factionContentId())).append('\t')
                     .append(state.nextGoalSequence()).append('\n');
             for (StrategicGoalState goal : state.goals()) {
-                builder.append("G\t")
-                        .append(token(goal.goalId())).append('\t')
-                        .append(goal.type().wireId()).append('\t')
-                        .append(token(goal.targetId())).append('\t')
+                builder.append("G\t").append(token(goal.goalId())).append('\t')
+                        .append(goal.type().wireId()).append('\t').append(token(goal.targetId())).append('\t')
                         .append(goal.sourceEvidence().kind().name()).append('\t')
                         .append(goal.sourceEvidence().priorityBasisPoints()).append('\t')
-                        .append(goal.urgencyBasisPoints()).append('\t')
-                        .append(goal.feasibilityBasisPoints()).append('\t')
-                        .append(goal.requestedBudgetUnits()).append('\t')
-                        .append(goal.allocatedBudgetUnits()).append('\t')
-                        .append(goal.lifecycle().name()).append('\t')
-                        .append(goal.createdAtTick()).append('\t')
-                        .append(goal.updatedAtTick()).append('\t')
-                        .append(goal.cooldownUntilTick()).append('\t')
-                        .append(goal.cancellationCostUnits()).append('\n');
+                        .append(goal.urgencyBasisPoints()).append('\t').append(goal.feasibilityBasisPoints());
+                appendEnvelope(builder, goal.requestedBudget());
+                appendEnvelope(builder, goal.allocatedBudget());
+                builder.append('\t').append(blockers(goal.blockers())).append('\t').append(goal.lifecycle().name())
+                        .append('\t').append(goal.createdAtTick()).append('\t').append(goal.updatedAtTick())
+                        .append('\t').append(goal.nextReviewTick()).append('\t').append(goal.expiresAtTick())
+                        .append('\t').append(goal.cooldownUntilTick());
+                appendEnvelope(builder, goal.cancellationCost());
+                builder.append('\t').append(goal.outcomeSignal().name()).append('\n');
                 for (ObservationEvidence evidence : goal.sourceEvidence().provenance()) {
-                    builder.append("P\t")
-                            .append(evidence.channel().name()).append('\t')
+                    builder.append("P\t").append(evidence.channel().name()).append('\t')
                             .append(token(evidence.provenanceId())).append('\t')
-                            .append(evidence.observedAtTick()).append('\t')
-                            .append(evidence.freshUntilTick()).append('\n');
+                            .append(evidence.observedAtTick()).append('\t').append(evidence.freshUntilTick()).append('\n');
                 }
                 builder.append("E\n");
             }
@@ -84,7 +79,6 @@ public final class FactionStrategicIntentStateCodec {
         if (lines.length == 0 || !HEADER.equals(lines[0])) {
             throw new IllegalArgumentException("Unsupported strategic intent checkpoint header");
         }
-
         ArrayList<FactionStrategicIntentState> states = new ArrayList<>();
         String factionId = null;
         long nextSequence = 0L;
@@ -108,24 +102,18 @@ public final class FactionStrategicIntentStateCodec {
                     goals = new ArrayList<>();
                 }
                 case "G" -> {
-                    if (parts.length != 15 || factionId == null || goal != null) {
+                    if (parts.length != 28 || factionId == null || goal != null) {
                         throw malformed(index, line);
                     }
                     goal = new GoalFields(
-                            untoken(parts[1]),
-                            StrategicGoalType.fromWireId(parts[2]),
-                            untoken(parts[3]),
-                            parseEnum(InterestKind.class, parts[4], index),
-                            parseInt(parts[5], index),
-                            parseInt(parts[6], index),
-                            parseInt(parts[7], index),
-                            parseLong(parts[8], index),
-                            parseLong(parts[9], index),
-                            parseEnum(Lifecycle.class, parts[10], index),
-                            parseLong(parts[11], index),
-                            parseLong(parts[12], index),
-                            parseLong(parts[13], index),
-                            parseLong(parts[14], index));
+                            untoken(parts[1]), StrategicGoalType.fromWireId(parts[2]), untoken(parts[3]),
+                            parseEnum(InterestKind.class, parts[4], index), parseInt(parts[5], index),
+                            parseInt(parts[6], index), parseInt(parts[7], index),
+                            envelope(parts, 8, index), envelope(parts, 12, index), parseBlockers(parts[16], index),
+                            parseEnum(Lifecycle.class, parts[17], index), parseLong(parts[18], index),
+                            parseLong(parts[19], index), parseLong(parts[20], index), parseLong(parts[21], index),
+                            parseLong(parts[22], index), envelope(parts, 23, index),
+                            parseEnum(StrategicGoalOutcomeSignal.class, parts[27], index));
                     provenance = new ArrayList<>();
                 }
                 case "P" -> {
@@ -133,10 +121,8 @@ public final class FactionStrategicIntentStateCodec {
                         throw malformed(index, line);
                     }
                     provenance.add(new ObservationEvidence(
-                            parseEnum(ObservationChannel.class, parts[1], index),
-                            untoken(parts[2]),
-                            parseLong(parts[3], index),
-                            parseLong(parts[4], index)));
+                            parseEnum(ObservationChannel.class, parts[1], index), untoken(parts[2]),
+                            parseLong(parts[3], index), parseLong(parts[4], index)));
                 }
                 case "E" -> {
                     if (parts.length != 1 || factionId == null || goal == null) {
@@ -145,20 +131,11 @@ public final class FactionStrategicIntentStateCodec {
                     StrategicGoalEvidence evidence = new StrategicGoalEvidence(
                             goal.kind(), goal.targetId(), goal.evidencePriorityBasisPoints(), provenance);
                     goals.add(new StrategicGoalState(
-                            goal.goalId(),
-                            factionId,
-                            goal.type(),
-                            goal.targetId(),
-                            evidence,
-                            goal.urgencyBasisPoints(),
-                            goal.feasibilityBasisPoints(),
-                            goal.requestedBudgetUnits(),
-                            goal.allocatedBudgetUnits(),
-                            goal.lifecycle(),
-                            goal.createdAtTick(),
-                            goal.updatedAtTick(),
-                            goal.cooldownUntilTick(),
-                            goal.cancellationCostUnits()));
+                            goal.goalId(), factionId, goal.type(), goal.targetId(), evidence,
+                            goal.urgencyBasisPoints(), goal.feasibilityBasisPoints(), goal.requestedBudget(),
+                            goal.allocatedBudget(), goal.blockers(), goal.lifecycle(), goal.createdAtTick(),
+                            goal.updatedAtTick(), goal.nextReviewTick(), goal.expiresAtTick(), goal.cooldownUntilTick(),
+                            goal.cancellationCost(), goal.outcomeSignal()));
                     goal = null;
                     provenance = new ArrayList<>();
                 }
@@ -181,6 +158,32 @@ public final class FactionStrategicIntentStateCodec {
             throw new IllegalArgumentException("Duplicate faction state in strategic intent checkpoint");
         }
         return List.copyOf(sorted);
+    }
+
+    private static void appendEnvelope(StringBuilder builder, StrategicPlanningEnvelope envelope) {
+        builder.append('\t').append(envelope.treasuryUnits()).append('\t').append(envelope.logisticsUnits())
+                .append('\t').append(envelope.constructionUnits()).append('\t').append(envelope.readinessUnits());
+    }
+
+    private static StrategicPlanningEnvelope envelope(String[] parts, int offset, int lineIndex) {
+        return new StrategicPlanningEnvelope(
+                parseLong(parts[offset], lineIndex), parseLong(parts[offset + 1], lineIndex),
+                parseLong(parts[offset + 2], lineIndex), parseLong(parts[offset + 3], lineIndex));
+    }
+
+    private static String blockers(List<StrategicGoalBlocker> blockers) {
+        return blockers.isEmpty() ? "-" : blockers.stream().map(Enum::name).reduce((a, b) -> a + "," + b).orElse("-");
+    }
+
+    private static List<StrategicGoalBlocker> parseBlockers(String value, int lineIndex) {
+        if ("-".equals(value)) {
+            return List.of();
+        }
+        try {
+            return List.of(value.split(",")).stream().map(StrategicGoalBlocker::valueOf).sorted().distinct().toList();
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Malformed blocker at strategic intent line " + (lineIndex + 1), exception);
+        }
     }
 
     private static String token(String value) {
@@ -220,24 +223,15 @@ public final class FactionStrategicIntentStateCodec {
     }
 
     private static IllegalArgumentException malformed(int lineIndex, String line) {
-        return new IllegalArgumentException(
-                "Malformed strategic intent checkpoint line " + (lineIndex + 1) + ": " + line);
+        return new IllegalArgumentException("Malformed strategic intent checkpoint line " + (lineIndex + 1) + ": " + line);
     }
 
     private record GoalFields(
-            String goalId,
-            StrategicGoalType type,
-            String targetId,
-            InterestKind kind,
-            int evidencePriorityBasisPoints,
-            int urgencyBasisPoints,
-            int feasibilityBasisPoints,
-            long requestedBudgetUnits,
-            long allocatedBudgetUnits,
-            Lifecycle lifecycle,
-            long createdAtTick,
-            long updatedAtTick,
-            long cooldownUntilTick,
-            long cancellationCostUnits) {
+            String goalId, StrategicGoalType type, String targetId, InterestKind kind,
+            int evidencePriorityBasisPoints, int urgencyBasisPoints, int feasibilityBasisPoints,
+            StrategicPlanningEnvelope requestedBudget, StrategicPlanningEnvelope allocatedBudget,
+            List<StrategicGoalBlocker> blockers, Lifecycle lifecycle, long createdAtTick, long updatedAtTick,
+            long nextReviewTick, long expiresAtTick, long cooldownUntilTick,
+            StrategicPlanningEnvelope cancellationCost, StrategicGoalOutcomeSignal outcomeSignal) {
     }
 }
