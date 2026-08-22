@@ -341,7 +341,7 @@ public final class Stage20PhysicalWorldAcceptanceMatrix {
         public Set<Integer> coveredHardInvariants() {
             TreeSet<Integer> result = new TreeSet<>();
             checks.forEach(value -> result.addAll(value.hardInvariants()));
-            return Set.copyOf(result);
+            return java.util.Collections.unmodifiableSet(result);
         }
     }
 
