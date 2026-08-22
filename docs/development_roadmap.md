@@ -446,11 +446,15 @@ Current Stage-20F foundation:
 - `docs/stage20f_industrial_input_freight_ownership_plan_v1.md` assigns every selected process an
   explicit faction owner, re-evaluates each remote reservation at an exact integer ship count and
   consumes distinct reserve slots from the existing Stage-20E finite ownership pools.
+- `docs/stage20f_industrial_facility_operating_plan_v1.md` binds selected generated facility slots to
+  canonical Stage-18 installed state and shares finite facility/station operating envelopes.
+- `docs/stage20f_industrial_initial_station_inventory_plan_v1.md` restores exact canonical station
+  storage and requires the physical reserved-rate × first-delivery-time input buffer.
 
-Candidate and route evidence remain deliberately non-reserved. Accepted reservation plus freight
-ownership now close `RESERVED_INDUSTRIAL_INPUTS` and `OWNED_INDUSTRIAL_INPUT_FREIGHT`, but cannot
-promote candidates into operational specialization until facility operating state, initial inventory
-and installed-yard authority are explicit.
+Candidate and route evidence remain deliberately non-reserved. The accepted chain now closes
+`RESERVED_INDUSTRIAL_INPUTS`, `OWNED_INDUSTRIAL_INPUT_FREIGHT`,
+`INSTALLED_FACILITY_OPERATING_STATE` and `INITIAL_STATION_INVENTORY` in order. Installed-yard
+authority remains explicit before final operational specialization.
 
 ## 9. Stage 21 — RPG / Living World
 
