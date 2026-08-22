@@ -1383,6 +1383,31 @@ public FactionEconomicDependenceDiagnostics analyzeEconomicDependence(
     }
 
     /**
+     * Requests an ordinary direct jump whose live destination is supplied exclusively by the bound
+     * persisted physical-arrival authority.
+     *
+     * @param fleetId stable fleet identity
+     * @param destinationSystemId directly connected explicit edge destination
+     * @return persistent ordinary jump FSM state
+     */
+    public FleetJumpState requestFleetJump(
+            FleetId fleetId,
+            StarSystemId destinationSystemId) {
+        return requestFleetJump(fleetId, destinationSystemId, 0f, 0f);
+    }
+
+    /**
+     * Binds a persisted Stage-20 physical endpoint authority to the existing ordinary jump FSM.
+     * Binding is one-shot and changes neither topology nor jump engineering constraints.
+     *
+     * @param authority exact physical arrival authority
+     */
+    public void bindFleetArrivalAuthority(FleetArrivalAuthority authority) {
+        fleetJumpService.bindArrivalAuthority(
+                Objects.requireNonNull(authority, "arrivalAuthority"));
+    }
+
+    /**
      * Changes only the detached persistent faction affiliation of an in-transit fleet.
      *
      * <p>The fleet remains detached under the same FleetId, origin/destination and jump FSM state.
