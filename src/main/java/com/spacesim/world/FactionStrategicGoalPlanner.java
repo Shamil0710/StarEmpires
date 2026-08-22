@@ -15,21 +15,21 @@ import java.util.Objects;
 /**
  * Pure Stage-21B strategic-goal arbitration.
  *
- * <p>The planner consumes actor-bounded candidates and an abstract planning envelope. It never
- * changes treasury, production queues, cargo, fleets, treaties, diplomatic relations or territory.
- * Those remain upstream authorities. The output is persistent intent plus a read-only explanation
- * projection for later execution/UI layers.</p>
+ * <p>The planner consumes actor-bounded candidates and normalized read-only capacity projections.
+ * It never changes treasury, production queues, cargo, fleets, treaties, diplomatic relations or
+ * territory. Those remain upstream authorities. The output is persistent intent plus a read-only
+ * explanation projection for execution/UI layers.</p>
  */
 public final class FactionStrategicGoalPlanner {
-    /** Candidate feasibility below this threshold cannot become active. */
+    /** Candidate feasibility below this threshold stalls rather than silently disappearing. */
     public static final int MIN_FEASIBILITY_BASIS_POINTS = 2_500;
-    /** Existing active intent receives this anti-churn priority bonus. */
+    /** Existing accepted intent receives this anti-churn priority bonus. */
     public static final int HYSTERESIS_BONUS_BASIS_POINTS = 750;
     /** Additional anti-churn bonus while the Stage-21A actor commitment horizon is active. */
     public static final int COMMITMENT_BONUS_BASIS_POINTS = 1_250;
-    /** Default target-specific cooldown after cancellation. */
+    /** Default target-specific cooldown after cancellation or terminal failure. */
     public static final long DEFAULT_COOLDOWN_TICKS = 24L;
-    /** Visible cancellation cost, expressed as a fraction of the displaced allocation. */
+    /** Visible cancellation cost as a fraction of the previously allocated planning envelope. */
     public static final int CANCELLATION_COST_BASIS_POINTS = 1_000;
 
     private FactionStrategicGoalPlanner() {
@@ -39,10 +39,14 @@ public final class FactionStrategicGoalPlanner {
     /**
      * Reviews candidate intents and returns the next persistent strategic-goal state.
      *
+     * <p>Allocation is all-or-nothing per goal in every planning dimension. A goal that cannot fit
+     * is persisted as {@link Lifecycle#STALLED} with explicit capacity blockers; it is not silently
+     * dropped. Existing goals preserve their ID when they stall and later recover.</p>
+     *
      * @param actorState Stage-21A lifecycle authority for commitment/hysteresis context
      * @param current current Stage-21B persistent intent state
      * @param candidates actor-bounded candidate goals
-     * @param availableBudgetUnits abstract strategic planning-envelope capacity
+     * @param availableBudget normalized multidimensional strategic capacity projection
      * @param reviewTick authoritative review tick
      * @return deterministic immutable planning result
      */
@@ -50,16 +54,14 @@ public final class FactionStrategicGoalPlanner {
             FactionLivingActorState actorState,
             FactionStrategicIntentState current,
             Collection<StrategicGoalCandidate> candidates,
-            long availableBudgetUnits,
+            StrategicPlanningEnvelope availableBudget,
             long reviewTick) {
         FactionLivingActorState actor = Objects.requireNonNull(actorState, "Living actor state not set");
         FactionStrategicIntentState state = Objects.requireNonNull(current, "Strategic intent state not set");
+        StrategicPlanningEnvelope capacity = Objects.requireNonNull(availableBudget, "Strategic planning budget not set");
         Objects.requireNonNull(candidates, "Strategic goal candidates not set");
         if (!actor.factionContentId().equals(state.factionContentId())) {
             throw new IllegalArgumentException("Living actor and strategic intent faction IDs differ");
-        }
-        if (availableBudgetUnits < 0L) {
-            throw new IllegalArgumentException("Strategic planning budget cannot be negative");
         }
         if (reviewTick < 0L) {
             throw new IllegalArgumentException("Strategic review tick cannot be negative");
@@ -68,125 +70,261 @@ public final class FactionStrategicGoalPlanner {
             throw new IllegalArgumentException("Strategic review cannot precede actor lifecycle review history");
         }
 
-        Map<String, StrategicGoalState> activeByIntent = new HashMap<>();
+        Map<String, StrategicGoalState> openByIntent = new HashMap<>();
         Map<String, Long> cooldownByIntent = new HashMap<>();
         for (StrategicGoalState goal : state.goals()) {
-            if (goal.lifecycle() == Lifecycle.ACTIVE) {
-                activeByIntent.put(goal.intentKey(), goal);
+            if (goal.isOpen()) {
+                openByIntent.put(goal.intentKey(), goal);
             } else if (goal.lifecycle() == Lifecycle.CANCELLED) {
                 cooldownByIntent.merge(goal.intentKey(), goal.cooldownUntilTick(), Math::max);
             }
         }
 
-        ArrayList<ScoredCandidate> scored = new ArrayList<>();
-        HashSet<String> candidateKeys = new HashSet<>();
+        Map<String, StrategicGoalCandidate> candidateByIntent = new HashMap<>();
         for (StrategicGoalCandidate candidate : candidates) {
             StrategicGoalCandidate checked = Objects.requireNonNull(candidate, "Strategic goal candidate not set");
             String key = intentKey(checked.type(), checked.targetId());
-            if (!candidateKeys.add(key)) {
+            if (candidateByIntent.putIfAbsent(key, checked) != null) {
                 throw new IllegalArgumentException("Duplicate strategic goal candidate: " + key);
             }
-            if (checked.feasibilityBasisPoints() < MIN_FEASIBILITY_BASIS_POINTS
-                    || checked.urgencyBasisPoints() == 0
-                    || checked.requestedBudgetUnits() == 0L) {
+        }
+
+        ArrayList<StrategicGoalState> nextGoals = new ArrayList<>();
+        HashSet<String> resolvedOpenKeys = new HashSet<>();
+        StrategicPlanningEnvelope remaining = capacity;
+        StrategicPlanningEnvelope cancellationCost = StrategicPlanningEnvelope.ZERO;
+
+        // Terminal history is immutable. Open goals that are not due retain their commitment first.
+        for (StrategicGoalState goal : state.goals()) {
+            if (!goal.isOpen()) {
+                nextGoals.add(goal);
                 continue;
             }
-            StrategicGoalState existing = activeByIntent.get(key);
+            StrategicGoalCandidate candidate = candidateByIntent.get(goal.intentKey());
+            if (candidate != null && candidate.isExpiredAt(reviewTick)) {
+                nextGoals.add(goal.expire(candidate, reviewTick));
+                resolvedOpenKeys.add(goal.intentKey());
+                continue;
+            }
+            if (candidate != null && candidate.outcomeSignal() == StrategicGoalOutcomeSignal.SUCCEEDED) {
+                nextGoals.add(goal.succeed(candidate, reviewTick));
+                resolvedOpenKeys.add(goal.intentKey());
+                continue;
+            }
+            if (candidate != null && candidate.outcomeSignal() == StrategicGoalOutcomeSignal.FAILED) {
+                StrategicPlanningEnvelope cost = goal.allocatedBudget().fractionCeil(CANCELLATION_COST_BASIS_POINTS);
+                cancellationCost = cancellationCost.plus(cost);
+                nextGoals.add(goal.cancel(
+                        candidate,
+                        reviewTick,
+                        Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
+                        cost,
+                        StrategicGoalOutcomeSignal.FAILED));
+                resolvedOpenKeys.add(goal.intentKey());
+                continue;
+            }
+            if (reviewTick < goal.nextReviewTick()) {
+                StrategicGoalState retained = retainBeforeCadence(goal, candidate, remaining, reviewTick);
+                nextGoals.add(retained);
+                resolvedOpenKeys.add(goal.intentKey());
+                if (retained.lifecycle() == Lifecycle.ACTIVE) {
+                    remaining = remaining.minus(retained.allocatedBudget());
+                }
+            }
+        }
+
+        ArrayList<ScoredCandidate> scored = new ArrayList<>();
+        for (StrategicGoalCandidate candidate : candidateByIntent.values()) {
+            String key = intentKey(candidate.type(), candidate.targetId());
+            if (resolvedOpenKeys.contains(key)) {
+                continue;
+            }
+            StrategicGoalState existing = openByIntent.get(key);
             long cooldownUntil = cooldownByIntent.getOrDefault(key, 0L);
             if (existing == null && cooldownUntil > reviewTick) {
                 continue;
             }
-            int score = checked.effectivePriorityBasisPoints();
+            if (existing == null && (candidate.isExpiredAt(reviewTick)
+                    || candidate.outcomeSignal() != StrategicGoalOutcomeSignal.NONE)) {
+                continue;
+            }
+            int score = candidate.effectivePriorityBasisPoints();
             if (existing != null) {
                 score = cappedAdd(score, HYSTERESIS_BONUS_BASIS_POINTS);
                 if (reviewTick < actor.commitmentUntilTick()) {
                     score = cappedAdd(score, COMMITMENT_BONUS_BASIS_POINTS);
                 }
             }
-            scored.add(new ScoredCandidate(checked, score));
+            scored.add(new ScoredCandidate(candidate, score));
         }
         scored.sort(Comparator
                 .comparingInt(ScoredCandidate::scoreBasisPoints).reversed()
                 .thenComparing(row -> row.candidate().type())
                 .thenComparing(row -> row.candidate().targetId()));
 
-        Map<String, Long> allocationByIntent = new HashMap<>();
-        Map<String, StrategicGoalCandidate> selectedByIntent = new HashMap<>();
-        long remaining = availableBudgetUnits;
-        for (ScoredCandidate row : scored) {
-            if (remaining == 0L) {
-                break;
-            }
-            StrategicGoalCandidate candidate = row.candidate();
-            long allocation = Math.min(candidate.requestedBudgetUnits(), remaining);
-            if (allocation <= 0L) {
-                continue;
-            }
-            String key = intentKey(candidate.type(), candidate.targetId());
-            allocationByIntent.put(key, allocation);
-            selectedByIntent.put(key, candidate);
-            remaining -= allocation;
-        }
-
-        ArrayList<StrategicGoalState> nextGoals = new ArrayList<>();
-        long cancellationCostUnits = 0L;
-        for (StrategicGoalState goal : state.goals()) {
-            if (goal.lifecycle() != Lifecycle.ACTIVE) {
-                nextGoals.add(goal);
-                continue;
-            }
-            StrategicGoalCandidate candidate = selectedByIntent.get(goal.intentKey());
-            if (candidate != null) {
-                nextGoals.add(goal.refresh(candidate, allocationByIntent.get(goal.intentKey()), reviewTick));
-            } else {
-                long cost = fractionCeil(goal.allocatedBudgetUnits(), CANCELLATION_COST_BASIS_POINTS);
-                cancellationCostUnits = Math.addExact(cancellationCostUnits, cost);
-                long cooldownUntil = Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS);
-                nextGoals.add(goal.cancel(reviewTick, cooldownUntil, cost));
-            }
-        }
-
         long nextSequence = state.nextGoalSequence();
         for (ScoredCandidate row : scored) {
             StrategicGoalCandidate candidate = row.candidate();
             String key = intentKey(candidate.type(), candidate.targetId());
-            Long allocation = allocationByIntent.get(key);
-            if (allocation == null || activeByIntent.containsKey(key)) {
+            StrategicGoalState existing = openByIntent.get(key);
+
+            if (candidate.isExpiredAt(reviewTick)) {
+                if (existing != null) {
+                    nextGoals.add(existing.expire(candidate, reviewTick));
+                    resolvedOpenKeys.add(key);
+                }
                 continue;
             }
-            String goalId = state.factionContentId() + ":strategic-goal:" + nextSequence;
-            nextSequence = Math.addExact(nextSequence, 1L);
-            nextGoals.add(new StrategicGoalState(
-                    goalId,
-                    state.factionContentId(),
-                    candidate.type(),
-                    candidate.targetId(),
-                    candidate.sourceEvidence(),
-                    candidate.urgencyBasisPoints(),
-                    candidate.feasibilityBasisPoints(),
-                    candidate.requestedBudgetUnits(),
-                    allocation,
-                    Lifecycle.ACTIVE,
+            if (candidate.outcomeSignal() == StrategicGoalOutcomeSignal.SUCCEEDED) {
+                if (existing != null) {
+                    nextGoals.add(existing.succeed(candidate, reviewTick));
+                    resolvedOpenKeys.add(key);
+                }
+                continue;
+            }
+            if (candidate.outcomeSignal() == StrategicGoalOutcomeSignal.FAILED) {
+                if (existing != null) {
+                    StrategicPlanningEnvelope cost = existing.allocatedBudget()
+                            .fractionCeil(CANCELLATION_COST_BASIS_POINTS);
+                    cancellationCost = cancellationCost.plus(cost);
+                    nextGoals.add(existing.cancel(
+                            candidate,
+                            reviewTick,
+                            Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
+                            cost,
+                            StrategicGoalOutcomeSignal.FAILED));
+                    resolvedOpenKeys.add(key);
+                }
+                continue;
+            }
+
+            List<StrategicGoalBlocker> blockers = blockers(candidate, remaining);
+            Lifecycle lifecycle = blockers.isEmpty() ? Lifecycle.ACTIVE : Lifecycle.STALLED;
+            StrategicPlanningEnvelope allocation = blockers.isEmpty()
+                    ? candidate.requestedBudget()
+                    : StrategicPlanningEnvelope.ZERO;
+            StrategicGoalState next;
+            if (existing != null) {
+                next = blockers.isEmpty()
+                        ? existing.refreshActive(candidate, reviewTick)
+                        : existing.stall(candidate, blockers, reviewTick);
+                resolvedOpenKeys.add(key);
+            } else {
+                String goalId = state.factionContentId() + ":strategic-goal:" + nextSequence;
+                nextSequence = Math.addExact(nextSequence, 1L);
+                next = new StrategicGoalState(
+                        goalId,
+                        state.factionContentId(),
+                        candidate.type(),
+                        candidate.targetId(),
+                        candidate.sourceEvidence(),
+                        candidate.urgencyBasisPoints(),
+                        candidate.feasibilityBasisPoints(),
+                        candidate.requestedBudget(),
+                        allocation,
+                        blockers,
+                        lifecycle,
+                        reviewTick,
+                        reviewTick,
+                        Math.addExact(reviewTick, candidate.reviewCadenceTicks()),
+                        candidate.expiresAtTick(),
+                        0L,
+                        StrategicPlanningEnvelope.ZERO,
+                        StrategicGoalOutcomeSignal.NONE);
+            }
+            nextGoals.add(next);
+            if (next.lifecycle() == Lifecycle.ACTIVE) {
+                remaining = remaining.minus(next.allocatedBudget());
+            }
+        }
+
+        // A due open goal no longer supported by any current actor-bounded candidate is displaced.
+        for (StrategicGoalState goal : state.openGoals()) {
+            if (resolvedOpenKeys.contains(goal.intentKey()) || reviewTick < goal.nextReviewTick()) {
+                continue;
+            }
+            StrategicPlanningEnvelope cost = goal.allocatedBudget().fractionCeil(CANCELLATION_COST_BASIS_POINTS);
+            cancellationCost = cancellationCost.plus(cost);
+            nextGoals.add(goal.cancel(
+                    null,
                     reviewTick,
-                    reviewTick,
-                    0L,
-                    0L));
+                    Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
+                    cost,
+                    StrategicGoalOutcomeSignal.NONE));
         }
 
         FactionStrategicIntentState nextState = new FactionStrategicIntentState(
                 state.factionContentId(),
                 nextSequence,
                 nextGoals);
-        long allocatedBudgetUnits = availableBudgetUnits - remaining;
-        List<GoalProjection> projections = nextState.goals().stream()
-                .map(GoalProjection::from)
-                .toList();
-        return new PlanningResult(
-                nextState,
-                availableBudgetUnits,
-                allocatedBudgetUnits,
-                cancellationCostUnits,
-                projections);
+        StrategicPlanningEnvelope allocated = nextState.activeGoals().stream()
+                .map(StrategicGoalState::allocatedBudget)
+                .reduce(StrategicPlanningEnvelope.ZERO, StrategicPlanningEnvelope::plus);
+        if (!allocated.fitsWithin(capacity)) {
+            throw new IllegalStateException("Strategic planner oversubscribed multidimensional capacity");
+        }
+        List<GoalProjection> projections = nextState.goals().stream().map(GoalProjection::from).toList();
+        return new PlanningResult(nextState, capacity, allocated, cancellationCost, projections);
+    }
+
+    private static StrategicGoalState retainBeforeCadence(
+            StrategicGoalState goal,
+            StrategicGoalCandidate candidate,
+            StrategicPlanningEnvelope remaining,
+            long reviewTick) {
+        if (goal.lifecycle() == Lifecycle.STALLED) {
+            return goal;
+        }
+        if (goal.allocatedBudget().fitsWithin(remaining)) {
+            return goal;
+        }
+        StrategicGoalCandidate basis = candidate != null ? candidate : candidateFromState(goal);
+        return goal.stall(basis, capacityBlockers(goal.allocatedBudget(), remaining), reviewTick);
+    }
+
+    private static StrategicGoalCandidate candidateFromState(StrategicGoalState goal) {
+        long cadence = Math.max(1L, goal.nextReviewTick() - goal.updatedAtTick());
+        return new StrategicGoalCandidate(
+                goal.type(),
+                goal.targetId(),
+                goal.sourceEvidence(),
+                goal.urgencyBasisPoints(),
+                goal.feasibilityBasisPoints(),
+                goal.requestedBudget(),
+                goal.blockers(),
+                goal.expiresAtTick(),
+                cadence,
+                StrategicGoalOutcomeSignal.NONE);
+    }
+
+    private static List<StrategicGoalBlocker> blockers(
+            StrategicGoalCandidate candidate,
+            StrategicPlanningEnvelope remaining) {
+        ArrayList<StrategicGoalBlocker> blockers = new ArrayList<>(candidate.blockers());
+        if (candidate.feasibilityBasisPoints() < MIN_FEASIBILITY_BASIS_POINTS) {
+            blockers.add(StrategicGoalBlocker.FEASIBILITY);
+        }
+        blockers.addAll(capacityBlockers(candidate.requestedBudget(), remaining));
+        return blockers.stream().sorted().distinct().toList();
+    }
+
+    private static List<StrategicGoalBlocker> capacityBlockers(
+            StrategicPlanningEnvelope request,
+            StrategicPlanningEnvelope capacity) {
+        ArrayList<StrategicGoalBlocker> blockers = new ArrayList<>();
+        if (request.treasuryUnits() > capacity.treasuryUnits()) {
+            blockers.add(StrategicGoalBlocker.TREASURY_CAPACITY);
+        }
+        if (request.logisticsUnits() > capacity.logisticsUnits()) {
+            blockers.add(StrategicGoalBlocker.LOGISTICS_CAPACITY);
+        }
+        if (request.constructionUnits() > capacity.constructionUnits()) {
+            blockers.add(StrategicGoalBlocker.CONSTRUCTION_CAPACITY);
+        }
+        if (request.readinessUnits() > capacity.readinessUnits()) {
+            blockers.add(StrategicGoalBlocker.READINESS_CAPACITY);
+        }
+        return List.copyOf(blockers);
     }
 
     private static int cappedAdd(int value, int bonus) {
@@ -195,19 +333,6 @@ public final class FactionStrategicGoalPlanner {
 
     private static String intentKey(StrategicGoalType type, String targetId) {
         return type.wireId() + "\u0000" + targetId;
-    }
-
-    private static long fractionCeil(long value, int basisPoints) {
-        if (value == 0L || basisPoints == 0) {
-            return 0L;
-        }
-        long whole = Math.multiplyExact(value / 10_000L, basisPoints);
-        long remainderProduct = (value % 10_000L) * (long) basisPoints;
-        long remainder = remainderProduct / 10_000L;
-        if (remainderProduct % 10_000L != 0L) {
-            remainder = Math.addExact(remainder, 1L);
-        }
-        return Math.addExact(whole, remainder);
     }
 
     private record ScoredCandidate(StrategicGoalCandidate candidate, int scoreBasisPoints) {
@@ -222,10 +347,14 @@ public final class FactionStrategicGoalPlanner {
      * @param lifecycle persistent lifecycle
      * @param urgencyBasisPoints current urgency
      * @param feasibilityBasisPoints current feasibility
-     * @param requestedBudgetUnits requested planning envelope
-     * @param allocatedBudgetUnits allocated planning envelope
-     * @param cancellationCostUnits visible switching cost when cancelled
+     * @param requestedBudget requested planning envelope
+     * @param allocatedBudget allocated planning envelope
+     * @param blockers current explainable blockers
+     * @param cancellationCost visible switching cost when cancelled
+     * @param nextReviewTick next strategic re-review tick for open goals
+     * @param expiresAtTick expiry horizon, or {@code -1}
      * @param cooldownUntilTick target cooldown horizon
+     * @param outcomeSignal last authoritative terminal outcome signal
      * @param evidenceKind source Stage-21A interest family
      * @param evidencePriorityBasisPoints strongest source evidence magnitude
      * @param provenanceIds delivered report/ledger provenance identities
@@ -237,27 +366,25 @@ public final class FactionStrategicGoalPlanner {
             Lifecycle lifecycle,
             int urgencyBasisPoints,
             int feasibilityBasisPoints,
-            long requestedBudgetUnits,
-            long allocatedBudgetUnits,
-            long cancellationCostUnits,
+            StrategicPlanningEnvelope requestedBudget,
+            StrategicPlanningEnvelope allocatedBudget,
+            List<StrategicGoalBlocker> blockers,
+            StrategicPlanningEnvelope cancellationCost,
+            long nextReviewTick,
+            long expiresAtTick,
             long cooldownUntilTick,
+            StrategicGoalOutcomeSignal outcomeSignal,
             FactionActorObservationSnapshot.InterestKind evidenceKind,
             int evidencePriorityBasisPoints,
             List<String> provenanceIds) {
 
         private static GoalProjection from(StrategicGoalState goal) {
             return new GoalProjection(
-                    goal.goalId(),
-                    goal.type(),
-                    goal.targetId(),
-                    goal.lifecycle(),
-                    goal.urgencyBasisPoints(),
-                    goal.feasibilityBasisPoints(),
-                    goal.requestedBudgetUnits(),
-                    goal.allocatedBudgetUnits(),
-                    goal.cancellationCostUnits(),
-                    goal.cooldownUntilTick(),
-                    goal.sourceEvidence().kind(),
+                    goal.goalId(), goal.type(), goal.targetId(), goal.lifecycle(),
+                    goal.urgencyBasisPoints(), goal.feasibilityBasisPoints(),
+                    goal.requestedBudget(), goal.allocatedBudget(), goal.blockers(),
+                    goal.cancellationCost(), goal.nextReviewTick(), goal.expiresAtTick(),
+                    goal.cooldownUntilTick(), goal.outcomeSignal(), goal.sourceEvidence().kind(),
                     goal.sourceEvidence().priorityBasisPoints(),
                     goal.sourceEvidence().provenance().stream()
                             .map(ObservationEvidence::provenanceId)
@@ -267,13 +394,18 @@ public final class FactionStrategicGoalPlanner {
         /**
          * Returns a compact stable explanation suitable for logs/debug UI.
          *
-         * @return lifecycle/type/evidence/target explanation code
+         * @return lifecycle/type/evidence/target/blocker explanation code
          */
         public String explanationCode() {
+            String blockerCode = blockers.isEmpty()
+                    ? "clear"
+                    : blockers.stream().map(blocker -> blocker.name().toLowerCase()).sorted()
+                            .reduce((left, right) -> left + "," + right).orElse("clear");
             return lifecycle.name().toLowerCase()
                     + ":" + type.wireId()
                     + ":" + evidenceKind.name().toLowerCase()
-                    + ":" + targetId;
+                    + ":" + targetId
+                    + ":" + blockerCode;
         }
     }
 
@@ -281,25 +413,25 @@ public final class FactionStrategicGoalPlanner {
      * Complete pure-planner result.
      *
      * @param state next persistent intent state
-     * @param availableBudgetUnits supplied planning envelope
-     * @param allocatedBudgetUnits envelope allocated to active goals
-     * @param cancellationCostUnits visible switching costs created by this review
+     * @param availableBudget supplied multidimensional planning capacity
+     * @param allocatedBudget capacity allocated to active goals
+     * @param cancellationCost visible switching costs created by this review
      * @param projections read-only explainability rows
      */
     public record PlanningResult(
             FactionStrategicIntentState state,
-            long availableBudgetUnits,
-            long allocatedBudgetUnits,
-            long cancellationCostUnits,
+            StrategicPlanningEnvelope availableBudget,
+            StrategicPlanningEnvelope allocatedBudget,
+            StrategicPlanningEnvelope cancellationCost,
             List<GoalProjection> projections) {
 
         /** Validates immutable planning output accounting. */
         public PlanningResult {
             Objects.requireNonNull(state, "Strategic planning state not set");
-            if (availableBudgetUnits < 0L || allocatedBudgetUnits < 0L || cancellationCostUnits < 0L) {
-                throw new IllegalArgumentException("Strategic planning accounting cannot be negative");
-            }
-            if (allocatedBudgetUnits > availableBudgetUnits) {
+            Objects.requireNonNull(availableBudget, "Strategic planning capacity not set");
+            Objects.requireNonNull(allocatedBudget, "Strategic allocated budget not set");
+            Objects.requireNonNull(cancellationCost, "Strategic cancellation cost not set");
+            if (!allocatedBudget.fitsWithin(availableBudget)) {
                 throw new IllegalArgumentException("Strategic goal allocation exceeds planning envelope");
             }
             projections = List.copyOf(Objects.requireNonNull(projections, "Strategic goal projections not set"));
