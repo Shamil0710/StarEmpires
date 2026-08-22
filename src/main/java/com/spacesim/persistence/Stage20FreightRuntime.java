@@ -78,7 +78,12 @@ public final class Stage20FreightRuntime {
         saved.orders().forEach(value -> orders.put(value.orderId(), value));
     }
 
-    /** Restores an independently validated physical freight sidecar. */
+    /**
+     * Restores an independently validated physical freight sidecar.
+     *
+     * @param state exact persistent freight sidecar
+     * @return mutable ordinary freight runtime
+     */
     public static Stage20FreightRuntime restore(Stage20FreightPersistentState state) {
         return new Stage20FreightRuntime(
                 state,
@@ -88,6 +93,13 @@ public final class Stage20FreightRuntime {
 
     /**
      * Validates all generated authority before restoring the mutable runtime.
+     *
+     * @param campaign exact saved generated campaign
+     * @param specialization exact matching closed Stage-20F authority
+     * @param state exact persistent freight sidecar
+     * @param compatibility explicit hull/fit compatibility authority
+     * @param engineering exact named engineering catalog
+     * @return mutable ordinary freight runtime
      */
     public static Stage20FreightRuntime restore(
             Stage20GeneratedCampaignPersistentState campaign,
@@ -100,7 +112,11 @@ public final class Stage20FreightRuntime {
         return restore(checked);
     }
 
-    /** Captures exact fleet, hold, lot, route and deadline identity without regeneration. */
+    /**
+     * Captures exact fleet, hold, lot, route and deadline identity without regeneration.
+     *
+     * @return complete deterministic Stage-20.5B freight sidecar
+     */
     public Stage20FreightPersistentState capture() {
         ArrayList<FreighterState> fleetRows = new ArrayList<>();
         for (FreighterState state : freighters.values()) {
@@ -120,19 +136,34 @@ public final class Stage20FreightRuntime {
                 List.copyOf(orders.values()));
     }
 
-    /** @return one immutable current fleet state */
+    /**
+     * Finds one immutable current fleet state.
+     *
+     * @param fleetId stable real fleet identity
+     * @return current fleet state or empty when unknown
+     */
     public Optional<FreighterState> findFreighter(FleetId fleetId) {
         FreighterState state = freighters.get(fleetId);
         return state == null ? Optional.empty() : Optional.of(copyFreighter(
                 state, holds.get(state.fleetId()).snapshot()));
     }
 
-    /** @return immutable physical cargo-hold snapshot */
+    /**
+     * Returns one immutable physical cargo-hold snapshot.
+     *
+     * @param fleetId stable real fleet identity
+     * @return exact current Stage-18 hold snapshot
+     */
     public StationStorageSnapshot cargoHoldSnapshot(FleetId fleetId) {
         return requireHold(fleetId).snapshot();
     }
 
-    /** @return immutable current order state */
+    /**
+     * Finds one immutable current order state.
+     *
+     * @param orderId stable transport order identity
+     * @return current order or empty when unknown
+     */
     public Optional<TransportOrderState> findOrder(String orderId) {
         return Optional.ofNullable(orders.get(orderId));
     }
@@ -145,6 +176,15 @@ public final class Stage20FreightRuntime {
     /**
      * Loads physical commodity mass from an ordinary Stage-18 source storage and creates provenance
      * only after the atomic transfer succeeds.
+     *
+     * @param fleetId stable carrying fleet identity
+     * @param source ordinary source storage
+     * @param massKg requested positive physical mass
+     * @param sourceProvenanceId exact accepted source provenance
+     * @param simulationSeconds authoritative loading time
+     * @param handling compatible endpoint handling authority
+     * @param budget finite current transfer budget
+     * @return committed or rejected physical cargo operation
      */
     public CargoOperationResult loadCommodity(
             FleetId fleetId,
@@ -195,7 +235,12 @@ public final class Stage20FreightRuntime {
         return new CargoOperationResult(Status.TRANSFERRED, lotId, massKg);
     }
 
-    /** Starts the persisted loaded producer-to-consumer route. */
+    /**
+     * Starts the persisted loaded producer-to-consumer route.
+     *
+     * @param fleetId stable carrying fleet identity
+     * @param simulationSeconds authoritative dispatch time
+     */
     public void dispatchOutbound(FleetId fleetId, double simulationSeconds) {
         FreighterState fleet = requireFreighter(fleetId);
         TransportOrderState order = requireOrder(fleet);
@@ -220,6 +265,11 @@ public final class Stage20FreightRuntime {
     /**
      * Completes exactly the next persisted outbound neighbor hop using caller-supplied physical
      * arrival kinematics. Stage-20.5D supplies that edge-authoritative state.
+     *
+     * @param fleetId stable carrying fleet identity
+     * @param nextSystemId exact next persisted neighbor
+     * @param arrivalState exact destination-local physical state
+     * @return updated immutable fleet state
      */
     public FreighterState completeNextOutboundHop(
             FleetId fleetId,
@@ -246,7 +296,16 @@ public final class Stage20FreightRuntime {
         return updated;
     }
 
-    /** Unloads physical cargo into the exact ordinary Stage-18 destination storage. */
+    /**
+     * Unloads physical cargo into the exact ordinary Stage-18 destination storage.
+     *
+     * @param fleetId stable carrying fleet identity
+     * @param destination ordinary destination storage
+     * @param massKg requested positive physical mass
+     * @param handling compatible endpoint handling authority
+     * @param budget finite current transfer budget
+     * @return committed or rejected physical cargo operation
+     */
     public CargoOperationResult unloadCommodity(
             FleetId fleetId,
             Stage18StationStorage destination,
@@ -280,7 +339,11 @@ public final class Stage20FreightRuntime {
         return new CargoOperationResult(Status.TRANSFERRED, "", massKg);
     }
 
-    /** Starts the empty consumer-to-producer return route. */
+    /**
+     * Starts the empty consumer-to-producer return route.
+     *
+     * @param fleetId stable returning fleet identity
+     */
     public void dispatchReturn(FleetId fleetId) {
         FreighterState fleet = requireFreighter(fleetId);
         TransportOrderState order = requireOrder(fleet);
@@ -297,7 +360,15 @@ public final class Stage20FreightRuntime {
                 requireHold(fleetId).snapshot()));
     }
 
-    /** Completes exactly the next reverse neighbor hop; origin completion reopens loading. */
+    /**
+     * Completes exactly the next reverse neighbor hop; origin completion reopens loading.
+     *
+     * @param fleetId stable returning fleet identity
+     * @param nextSystemId exact next persisted reverse-route neighbor
+     * @param arrivalState exact destination-local physical state
+     * @param simulationSeconds authoritative arrival time
+     * @return updated immutable fleet state
+     */
     public FreighterState completeNextReturnHop(
             FleetId fleetId,
             StarSystemId nextSystemId,
@@ -330,7 +401,13 @@ public final class Stage20FreightRuntime {
         return updated;
     }
 
-    /** Records every newly crossed physical delivery deadline exactly once. */
+    /**
+     * Records every newly crossed physical delivery deadline exactly once.
+     *
+     * @param fleetId stable active fleet identity
+     * @param simulationSeconds authoritative observation time
+     * @return cumulative missed-delivery count
+     */
     public long observeDeliveryDelay(FleetId fleetId, double simulationSeconds) {
         FreighterState fleet = requireFreighter(fleetId);
         TransportOrderState order = requireOrder(fleet);
@@ -352,6 +429,9 @@ public final class Stage20FreightRuntime {
     /**
      * Permanently destroys one physical freight asset and its aboard mass. No ID, order or reserve
      * slot is created as a replacement.
+     *
+     * @param fleetId stable physical fleet identity
+     * @return exact lost cargo and provenance result
      */
     public DestructionResult destroy(FleetId fleetId) {
         FreighterState fleet = requireFreighter(fleetId);
@@ -384,6 +464,13 @@ public final class Stage20FreightRuntime {
 
     /** Result of one physical cargo operation. */
     public record CargoOperationResult(Status status, String lotId, double transferredMassKg) {
+        /**
+         * Validates one physical cargo-operation result.
+         *
+         * @param status exact Stage-18 transfer status
+         * @param lotId created lot identity or empty when none
+         * @param transferredMassKg physical mass committed by the operation
+         */
         public CargoOperationResult {
             Objects.requireNonNull(status, "status");
             lotId = lotId == null ? "" : lotId;
@@ -411,6 +498,14 @@ public final class Stage20FreightRuntime {
             double lostCargoMassKg,
             List<CargoLotState> lostLots,
             boolean destroyedNow) {
+        /**
+         * Validates one physical freight-destruction result.
+         *
+         * @param fleetId stable destroyed fleet identity
+         * @param lostCargoMassKg physical mass removed with the asset
+         * @param lostLots exact removed provenance lots
+         * @param destroyedNow whether this call performed the destruction
+         */
         public DestructionResult {
             Objects.requireNonNull(fleetId, "fleetId");
             if (!Double.isFinite(lostCargoMassKg) || lostCargoMassKg < 0d) {

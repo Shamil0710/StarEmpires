@@ -95,6 +95,22 @@ public record Stage20FreightPersistentState(
             String activeOrderId,
             int routeIndex,
             StationStorageSnapshot cargoStorage) {
+        /**
+         * Validates one persistent physical freighter row.
+         *
+         * @param fleetId ordinary world-level fleet identity
+         * @param stableFactionId exact owner identity
+         * @param ownershipOrdinal exact accepted owned-pool ordinal
+         * @param hullId explicit compatible physical hull
+         * @param fitId explicit compatible physical fit
+         * @param cargoCapacityKg hull/fit-validated cargo capacity
+         * @param currentSystemId current physical system
+         * @param physicalState exact local physical kinematics
+         * @param phase current route lifecycle phase
+         * @param activeOrderId assigned order or empty for reserve fleet
+         * @param routeIndex current order route index
+         * @param cargoStorage exact Stage-18 cargo-hold snapshot
+         */
         public FreighterState {
             Objects.requireNonNull(fleetId, "fleetId");
             stableFactionId = requireText(stableFactionId, "stableFactionId");
@@ -170,6 +186,18 @@ public record Stage20FreightPersistentState(
             String sourceEndpointId,
             String sourceProvenanceId,
             double loadedAtSimulationSeconds) {
+        /**
+         * Validates one persistent physical cargo lot.
+         *
+         * @param lotId stable campaign-local lot identity
+         * @param fleetId carrying fleet
+         * @param orderId authorizing order
+         * @param commodityId Stage-18 commodity identity
+         * @param massKg current conserved lot mass
+         * @param sourceEndpointId physical loading endpoint
+         * @param sourceProvenanceId accepted upstream provenance
+         * @param loadedAtSimulationSeconds authoritative loading time
+         */
         public CargoLotState {
             lotId = requireText(lotId, "lotId");
             Objects.requireNonNull(fleetId, "fleetId");
@@ -215,6 +243,24 @@ public record Stage20FreightPersistentState(
             double deliveryDeadlineSeconds,
             double deliveredMassKg,
             long delayedDeliveryCount) {
+        /**
+         * Validates one ordinary persistent transport order.
+         *
+         * @param orderId stable order identity
+         * @param fleetId assigned real fleet
+         * @param stableFactionId exact owner
+         * @param assignmentKind accepted planning source
+         * @param commodityId transported Stage-18 commodity
+         * @param sourceEndpointId physical source endpoint
+         * @param destinationEndpointId physical destination endpoint
+         * @param sourceProvenanceId accepted source provenance
+         * @param orderedSystems explicit producer-to-consumer route
+         * @param oneWayDeliverySeconds retained one-way delivery time
+         * @param roundTripCycleSeconds retained ready-again cycle
+         * @param deliveryDeadlineSeconds current delivery deadline
+         * @param deliveredMassKg mass actually delivered
+         * @param delayedDeliveryCount observed missed deadlines
+         */
         public TransportOrderState {
             orderId = requireText(orderId, "orderId");
             Objects.requireNonNull(fleetId, "fleetId");
@@ -248,6 +294,21 @@ public record Stage20FreightPersistentState(
         }
     }
 
+    /**
+     * Validates and canonicalizes one complete freight sidecar.
+     *
+     * @param schemaVersion freight-sidecar schema version
+     * @param rootSeed exact generated campaign seed
+     * @param generatorVersion exact generated-world version
+     * @param worldFingerprint exact generated-world fingerprint
+     * @param materializationVersion Stage-20.5B bridge version
+     * @param compatibilityAuthorityVersion explicit hull/fit authority version
+     * @param nextFleetIdValue next unused persistent FleetId value
+     * @param nextCargoLotOrdinal next unused cargo-lot ordinal
+     * @param freighters complete finite freight fleet
+     * @param cargoLots current physical cargo provenance
+     * @param orders ordinary persistent transport orders
+     */
     public Stage20FreightPersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported Stage-20.5B freight schema: " + schemaVersion);
@@ -343,7 +404,12 @@ public record Stage20FreightPersistentState(
         orders = List.copyOf(orderCopy);
     }
 
-    /** @return stable Stage-18 storage identity for a fleet cargo hold */
+    /**
+     * Derives the stable Stage-18 storage identity for a fleet cargo hold.
+     *
+     * @param fleetId real carrying fleet identity
+     * @return stable Stage-18 cargo-hold storage identity
+     */
     public static String cargoHoldId(FleetId fleetId) {
         return "freight-hold:" + Objects.requireNonNull(fleetId, "fleetId").value();
     }

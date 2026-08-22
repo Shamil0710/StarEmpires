@@ -89,6 +89,19 @@ public final class Stage20FreightRuntimeMaterializer {
             Set<String> supportedStorageClassIds,
             String sourceEvidenceId,
             boolean stage22ReviewRequired) {
+        /**
+         * Validates one explicit provisional freight-content compatibility authority.
+         *
+         * @param version compatibility contract version
+         * @param hullId explicit physical hull identity
+         * @param fitId explicit physical fit identity
+         * @param engineeringCatalogFingerprint exact engineering catalog fingerprint
+         * @param cargoCapacityKg validated physical cargo capacity
+         * @param cargoIntegrationVolumeM3 occupied cargo integration volume
+         * @param supportedStorageClassIds compatible Stage-18 storage classes
+         * @param sourceEvidenceId exact content/provenance evidence
+         * @param stage22ReviewRequired mandatory provisional-content review marker
+         */
         public FreighterCompatibilityAuthority {
             version = requireText(version, "version");
             hullId = requireText(hullId, "hullId");
@@ -256,7 +269,14 @@ public final class Stage20FreightRuntimeMaterializer {
                 orders);
     }
 
-    /** Convenience overload using the explicitly marked provisional current freighter content. */
+    /**
+     * Materializes with the explicitly marked provisional current freighter content.
+     *
+     * @param saved exact saved generated campaign
+     * @param specialization exact matching closed Stage-20F authority
+     * @param firstFleetIdValue first unused world-level FleetId value
+     * @return empty-cargo physical fleet state ready for ordinary loading
+     */
     public static Stage20FreightPersistentState materializeBootstrap(
             Stage20GeneratedCampaignPersistentState saved,
             OperationalSpecializationReport specialization,
@@ -272,6 +292,13 @@ public final class Stage20FreightRuntimeMaterializer {
     /**
      * Validates that a saved freight sidecar is still bound to the exact saved world and fleet pool.
      * This restore seam never regenerates IDs or orders.
+     *
+     * @param saved exact saved generated campaign
+     * @param specialization exact matching closed Stage-20F authority
+     * @param freight persisted Stage-20.5B sidecar
+     * @param compatibility explicit hull/fit compatibility authority
+     * @param engineering exact named engineering catalog
+     * @return the same validated persistent freight sidecar
      */
     public static Stage20FreightPersistentState validateRestore(
             Stage20GeneratedCampaignPersistentState saved,
