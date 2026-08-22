@@ -2,7 +2,7 @@ package com.spacesim.presentation.asset;
 
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.model.ShipType;
-import com.spacesim.ship.Stage175ICombatTestContentPack;
+import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.ui.ShipVisualRole;
 import com.spacesim.world.Stage20SpecialLocationWorld.LocationKind;
 import com.spacesim.world.calibration.Stage20StationPhysicalGeometryProfile;
