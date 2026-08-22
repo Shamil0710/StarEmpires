@@ -670,6 +670,29 @@ World generator не пишет `SYSTEM_TYPE_INDUSTRIAL = +30% production`.
 
 Industrial center может быть intentionally separated от resource source, если actual freight routes, storage, energy/access и facilities делают такую специализацию жизнеспособной.
 
+## Stage-20F acceptance — COMPLETE
+
+Accepted implementation chain:
+
+```text
+exact generated candidates
+→ retained physical input routes
+→ shared SupplyKey reservation
+→ existing Stage-20E reserve freight ownership
+→ canonical facility operating state / shared station services
+→ canonical first-delivery inventory
+→ explicit installed-yard presence or absence
+→ exact owner/station operational specialization
+```
+
+`SHIPBUILDING` exists only for an active `Stage18ShipyardRuntime` projection with exact generated
+support facilities and non-reused resources. Explicit empty-yard authority grants no shipbuilding.
+Canonical acceptance: `docs/stage20f_operational_industrial_specialization_v1.md`.
+
+Runtime handoff remains explicit: reserved `SupplyKey` capacity must be materialized as live source
+producer operation or physical stock, then ordinary cargo lots/orders and persistent owned fleets.
+Theoretical throughput is never interpreted as already-existing cargo.
+
 ---
 
 # 9. Stage 20G — discovery / sensor-consistent visibility

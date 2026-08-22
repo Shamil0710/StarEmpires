@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-19 / Stage 19 COMPLETE — Stage 19J ACCEPTED; Stage 20 ACTIVE.**  
+> **Последняя синхронизация: 2026-08-22 / Stage 20F COMPLETE; Stage 20G NEXT.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -434,7 +434,7 @@ Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate
 
 Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
 
-Current Stage-20F foundation:
+Stage 20F — **COMPLETE / ACCEPTED**:
 
 - `docs/stage20f_industrial_specialization_candidate_plan_v1.md` reconstructs exact generated
   station/facility/storage/extraction/process candidates from one accepted root seed;
@@ -450,11 +450,23 @@ Current Stage-20F foundation:
   canonical Stage-18 installed state and shares finite facility/station operating envelopes.
 - `docs/stage20f_industrial_initial_station_inventory_plan_v1.md` restores exact canonical station
   storage and requires the physical reserved-rate × first-delivery-time input buffer.
+- `docs/stage20f_industrial_shipyard_installation_plan_v1.md` binds explicit Stage-18G yard presence
+  or absence to generated stations, active support facilities and non-reused shared resources.
+- `docs/stage20f_operational_industrial_specialization_v1.md` closes the final exact owner/station
+  capability index and records the accepted Stage-20F completion gate.
 
-Candidate and route evidence remain deliberately non-reserved. The accepted chain now closes
+Candidate and route evidence remain deliberately non-reserved. The accepted chain closes
 `RESERVED_INDUSTRIAL_INPUTS`, `OWNED_INDUSTRIAL_INPUT_FREIGHT`,
-`INSTALLED_FACILITY_OPERATING_STATE` and `INITIAL_STATION_INVENTORY` in order. Installed-yard
-authority remains explicit before final operational specialization.
+`INSTALLED_FACILITY_OPERATING_STATE`, `INITIAL_STATION_INVENTORY` and `INSTALLED_SHIPYARDS` in order.
+Final specialization roles are derived only from accepted recipes and active installed yards. No
+system/station label or percentage bonus grants industrial output.
+
+Stage-20F completion is planning/bootstrap authority, not silent runtime materialization. The final
+report explicitly retains the runtime handoff for source producer/stock materialization, ownership
+ordinal → `FleetId`, physical cargo orders/lots and exact station/facility/storage/yard entities. In
+particular, reserved `SupplyKey` throughput is not cargo already present.
+
+**Next implementation slice: Stage 20G — persistent discovery / sensor-consistent visibility.**
 
 ## 9. Stage 21 — RPG / Living World
 
@@ -523,10 +535,13 @@ Stage 17 COMPLETE
 → Stage 18 Resources / Industry / Infrastructure COMPLETE
 → Stage 19 Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
-→ Stage 20 Physical World Generation / Discovery ACTIVE
+→ Stage 20 Physical World Generation / Discovery ACTIVE — 20F COMPLETE, 20G NEXT
 → Stage 21 RPG / Living World
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 20.** Stage 19J has closed the interactive scenario/readability/selection/inspection/camera/long-run runtime gate, with final evidence recorded in `docs/stage19j7_long_run_acceptance_record.md`. Stage 20 now consumes the accepted Stage-17.5/18/19 physical capability baseline for calibrated topology, local geometry, resource geography and discovery implementation.
+**Immediate implementation priority is Stage 20G.** Stage 20F has closed generated industrial
+specialization through exact facilities, routes, shared reservations, existing freight ownership,
+operating state, canonical inventory and installed yards. Discovery now consumes that accepted
+physical world through persistent knowledge state and Stage-17.5 sensor-consistent visibility.

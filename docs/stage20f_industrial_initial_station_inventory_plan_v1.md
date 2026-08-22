@@ -66,6 +66,7 @@ rejected by the public report boundary.
 
 ## Next roadmap slice
 
-The remaining Stage-20F missing authority is explicit installed shipyards. Yard projection must bind
-real Stage-18G state to generated stations and active Stage-18 support facilities. Only then may final
-operational specialization classify shipbuilding capability; no station or system label may grant it.
+`docs/stage20f_industrial_shipyard_installation_plan_v1.md` now binds explicit Stage-18G yard state to
+generated stations, exact active supports and non-reused station resources. Final role indexing and
+the Stage-20F completion gate are recorded in
+`docs/stage20f_operational_industrial_specialization_v1.md`.
