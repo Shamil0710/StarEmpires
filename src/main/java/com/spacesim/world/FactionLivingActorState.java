@@ -53,7 +53,14 @@ public record FactionLivingActorState(
             long observedAtTick,
             long eligibleAtTick) implements Comparable<EventWakeup> {
 
-        /** Validates and canonicalizes one event wakeup. */
+        /**
+         * Validates and canonicalizes one event wakeup.
+         *
+         * @param reason causal event family
+         * @param sourceId stable report/event identity used for deduplication
+         * @param observedAtTick tick when the actor received the event
+         * @param eligibleAtTick earliest tick at which the event may trigger a review
+         */
         public EventWakeup {
             Objects.requireNonNull(reason, "Wakeup reason not set");
             sourceId = requireText(sourceId, "Wakeup source ID");
@@ -80,7 +87,16 @@ public record FactionLivingActorState(
         }
     }
 
-    /** Validates state and normalizes wakeups into stable deterministic order. */
+    /**
+     * Validates state and normalizes wakeups into stable deterministic order.
+     *
+     * @param factionContentId stable faction content identity
+     * @param nextReviewTick next ordinary strategic review deadline
+     * @param commitmentUntilTick persistent anti-churn commitment horizon
+     * @param lastReviewTick last completed review tick, or {@code -1} before the first review
+     * @param completedReviewCount number of completed reviews
+     * @param pendingWakeups persistent event wakeups not yet consumed by a completed review
+     */
     public FactionLivingActorState {
         factionContentId = requireText(factionContentId, "Faction content ID");
         requireNonNegative(nextReviewTick, "Next review tick");
