@@ -16,6 +16,9 @@ import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
 import com.spacesim.simulation.SimulationSession;
 import com.spacesim.simulation.Stage20MaterializationService;
 import com.spacesim.world.DestructionPolicy;
+import com.spacesim.world.FactionEconomicState;
+import com.spacesim.world.FactionIdentityResolver;
+import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetJumpPhase;
 import com.spacesim.world.FleetLocationKind;
@@ -24,6 +27,7 @@ import com.spacesim.world.Stage20SpecialLocationGenerator;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StarSystemSimulationState;
 import com.spacesim.world.WorldSimulation;
+import com.spacesim.world.WorldFactionIdentityState;
 import com.spacesim.world.WorldState;
 import com.spacesim.world.generation.Stage20OperationalIndustrialSpecializationProductionIntegrationTest
         .CadenceFixture;
@@ -208,8 +212,44 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
                             fixture.resolved().rootSeed() ^ system.id().value(), CONTENT).snapshot()));
         }
         StarSystemId active = topology.systems().get(0).id();
+        ArrayList<FactionEconomicState> economies = new ArrayList<>();
+        ArrayList<FactionStrategicState> strategies = new ArrayList<>();
+        ArrayList<WorldFactionIdentityState> identities = new ArrayList<>();
+        fixture.resolved().generation().placement().orElseThrow().assignments().stream()
+                .map(value -> value.stableFactionId())
+                .distinct()
+                .sorted()
+                .forEach(factionId -> {
+                    FactionIdentityResolver resolver = FactionIdentityResolver.createDefault(
+                            CONTENT, identities);
+                    WorldFactionIdentityState allocated = resolver.allocatePlayerCreated(
+                            factionId, "Generated " + factionId);
+                    identities.add(new WorldFactionIdentityState(
+                            allocated.stableFactionId(),
+                            allocated.runtimeFactionId(),
+                            allocated.displayName(),
+                            WorldFactionIdentityState.Origin.WORLD_BOOTSTRAP));
+                    economies.add(new FactionEconomicState(factionId, 0L, 0L, 0L, 0L, 0L));
+                    strategies.add(new FactionStrategicState(
+                            factionId, 0, List.of(), List.of()));
+                });
+        WorldState bootstrapped = new WorldState(
+                WorldState.CURRENT_VERSION, topology, systems, economies, strategies);
+        WorldState generated = new WorldState(
+                WorldState.CURRENT_VERSION,
+                topology,
+                systems,
+                economies,
+                strategies,
+                bootstrapped.nextConstructionProjectIdValue(),
+                bootstrapped.constructionProjects(),
+                bootstrapped.factionEconomicPressures(),
+                bootstrapped.nextFleetIdValue(),
+                bootstrapped.fleets(),
+                bootstrapped.fleetJumps(),
+                identities);
         return WorldSimulation.restore(
-                new WorldState(WorldState.CURRENT_VERSION, topology, systems),
+                generated,
                 CONTENT,
                 active,
                 10,
