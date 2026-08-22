@@ -81,7 +81,7 @@ public final class ScaledLiveTacticalSimulationApp extends ApplicationAdapter {
     @Override
     public void create() {
         session = new ScaledLiveTacticalSimulationSession(scenarioId);
-        tacticalRenderer = new TacticalPrototypeRenderer();
+        tacticalRenderer = TacticalPrototypeRenderer.withMinimumPlayableSprites();
         selectionRenderer = new TacticalSelectionOverlayRenderer();
         inspectionRenderer = new ShipInspectionPanelRenderer();
         selectionController = new ShipSelectionController();

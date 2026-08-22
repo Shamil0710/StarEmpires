@@ -44,7 +44,7 @@ public final class LiveTacticalSimulationApp extends ApplicationAdapter {
     public void create() {
         resetSession();
         projection = new LiveTacticalSimulationProjection();
-        tacticalRenderer = new TacticalPrototypeRenderer();
+        tacticalRenderer = TacticalPrototypeRenderer.withMinimumPlayableSprites();
         camera = new OrthographicCamera();
         batch = new SpriteBatch();
         font = new BitmapFont();
