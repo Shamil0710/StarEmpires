@@ -1,6 +1,7 @@
 # Star Empires — Stage 20 Physical World Generation / Discovery Plan
 
-> Статус: **PLANNED**  
+> Статус: **COMPLETE — Stage 20A–20L accepted and merged**
+>
 > Основание: accepted `Ship Mathematics v1.0 Design Baseline`, production Stage 17.5 и Stage 18 Resources / Industry / Infrastructure Foundation  
 > Назначение: сделать deterministic seed-driven galaxy generation физически согласованной с кораблями, сенсорами, логистикой, промышленной онтологией, экономикой и временем.
 
@@ -106,7 +107,7 @@ Production implementation обязан иметь documented numerical-precision
 
 ---
 
-# 3. Stage 20A — representative-ship scale calibration
+# 3. Stage 20A — representative-ship scale calibration — COMPLETE
 
 До генерации distribution выбрать stable reference fleet:
 
@@ -222,7 +223,7 @@ materializationDistanceBands
 
 ---
 
-# 4. Stage 20B — star-system physical geometry
+# 4. Stage 20B — star-system physical geometry — COMPLETE
 
 Generator должен создавать system geometry в SI.
 
@@ -297,7 +298,7 @@ Generation должен проверять:
 
 ---
 
-# 5. Stage 20C — local infrastructure spacing calibrated by logistics
+# 5. Stage 20C — local infrastructure spacing calibrated by logistics — COMPLETE
 
 Экономические hubs, factories, mines и shipyards должны размещаться так, чтобы distance имела gameplay consequence.
 
@@ -332,7 +333,7 @@ Default generation не должна случайно ставить major indep
 
 ---
 
-# 6. Stage 20D — inter-system jump topology
+# 6. Stage 20D — inter-system jump topology — COMPLETE
 
 Jump graph генерируется одновременно как strategic topology и physical/temporal logistics layer.
 
@@ -472,7 +473,7 @@ representative generated galaxy
 
 ---
 
-# 7. Stage 20E — Stage-18 resource occurrence generation + economic bootstrap
+# 7. Stage 20E — Stage-18 resource occurrence generation + economic bootstrap — COMPLETE
 
 Stage 20 **не создаёт новую resource taxonomy**.
 
@@ -647,7 +648,7 @@ Generated world не принимается, если типичная seed econ
 
 ---
 
-# 8. Stage 20F — industrial specialization bootstrap
+# 8. Stage 20F — industrial specialization bootstrap — COMPLETE
 
 Stage-18 economic archetypes используются как **constraints**, а не как готовые bonuses.
 
@@ -942,7 +943,7 @@ Canonical acceptance: `docs/stage20k_deterministic_persistence_contract_v1.md`.
 
 ---
 
-# 14. Stage 20L — physical world acceptance matrix
+# 14. Stage 20L — physical world acceptance matrix — COMPLETE
 
 ## Scale tests
 
@@ -1064,9 +1065,28 @@ Repair bounded и versioned. Repair не имеет права создават�
 
 Spatial repair также не имеет права вводить invisible walls, hidden speed multipliers, screen-space ranges или player-only travel shortcuts.
 
+## Stage-20L acceptance — COMPLETE
+
+`Stage20PhysicalWorldAcceptanceMatrix` composes the accepted calibration, generated-world,
+Stage-20F operational ownership, Stage-20J cadence and Stage-20K persistence authority into one
+deterministic report. Its 17 stable rows cover every category above and all 40 hard invariants.
+
+The fixed accepted seed-`1` fixture returns `DETERMINISTIC_REPAIR`: its Stage-20D topology used one
+bounded deterministic edge-addition repair and then passed the complete physical matrix. This is an
+accepted production outcome, not a hidden post-materialization rescue.
+
+Two non-failing boundaries remain explicit:
+
+- `DEFERRED_STAGE22_REVIEW` for provisional production-content promotion;
+- `DEFERRED_RUNTIME_BRIDGE` for exactly the four Stage-20F materialization seams plus
+  `LIVE_ARRIVAL_AUTHORITY_INTEGRATION`.
+
+All physical generated authority, discovery scope and canonical persistence are complete before
+those boundaries. Canonical evidence: `docs/stage20l_physical_world_acceptance_matrix_v1.md`.
+
 ---
 
-# 15. Stage 20 hard invariants
+# 15. Stage 20 hard invariants — COMPLETE
 
 1. every authoritative local distance maps to meters;
 2. star-system local coordinate space has no gameplay wall/edge;
@@ -1111,7 +1131,7 @@ Spatial repair также не имеет права вводить invisible wa
 
 ---
 
-# 16. Stage 20 completion definition
+# 16. Stage 20 completion definition — COMPLETE
 
 Stage 20 COMPLETE означает:
 

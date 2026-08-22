@@ -1,6 +1,8 @@
 # Stage 20K — deterministic seed/persistence contract v1
 
-Status: **IMPLEMENTED — awaiting exact-head CI/merge**
+Status: **MERGED** — PR #309, exact-head CI run `32546544626`, merge
+`db085890deb2c31051da55f73929cb24460bc81f` (merge tree equals validated head
+`017cbb8a18c2f31b91a326f846ea94f62f49cbd7`).
 
 ## Saved authority, not a regeneration recipe
 
@@ -85,4 +87,5 @@ persisted arrival endpoint position/velocity to the real inter-system transition
 - truncated, trailing and fingerprint-tampered envelopes fail closed.
 
 Stage 20L consumes these fingerprints and persisted seams in the final physical-world acceptance
-matrix; it does not close the deferred runtime bridge.
+matrix (`docs/stage20l_physical_world_acceptance_matrix_v1.md`); it does not close the deferred
+runtime bridge.
