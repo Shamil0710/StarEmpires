@@ -126,7 +126,9 @@ public final class GeneratedWorldUiModel {
                                 new InfoLine("Модули", joinIds(station.facilities().stream()
                                         .map(value -> value.definitionId()).toList())),
                                 new InfoLine("Верфи", station.yards().isEmpty() ? "Нет" : joinIds(
-                                        station.yards().stream().map(value -> value.definitionId()).toList())))));
+                                        station.yards().stream()
+                                                .map(value -> value.yardDefinitionId())
+                                                .toList())))));
             }
             result.add(new LocalObjectView(
                     "station:" + endpoint.stationId(),
