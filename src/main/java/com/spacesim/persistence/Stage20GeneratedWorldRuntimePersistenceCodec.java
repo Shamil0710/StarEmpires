@@ -5,6 +5,8 @@ import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.LocalPhysicalPosition;
+import com.spacesim.world.StarSystemSimulationState;
+import com.spacesim.world.WorldState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState.LocalFleetPhysicalState;
 
 import java.io.ByteArrayInputStream;
@@ -16,15 +18,20 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Deterministic bounded codec for one atomic Stage-20.5 generated-world runtime checkpoint. */
 @SuppressWarnings("doclint:missing")
 public final class Stage20GeneratedWorldRuntimePersistenceCodec {
     private static final int MAGIC = 0x53323552; // S25R
-    private static final int FILE_FORMAT_VERSION = 2;
+    private static final int FILE_FORMAT_VERSION = 3;
+    private static final int PHYSICAL_SIDECAR_FILE_FORMAT_VERSION = 2;
     private static final int LEGACY_FILE_FORMAT_VERSION = 1;
     private static final int MAX_LOCAL_FLEETS = 1_000_000;
+    private static final int MAX_ENGINEERING_INSTANCE_STATES = 1_000_000;
     private static final int MAX_BYTES = 512 * 1024 * 1024;
     private static final int MAX_TEXT_BYTES = 1024 * 1024;
     private static final int MAX_PAYLOAD_BYTES = 256 * 1024 * 1024;
@@ -56,6 +63,7 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
                 writePayload(output, world, "world");
                 writePayload(output, freight, "freight");
                 writeLocalFleetPhysicalStates(output, checked.localFleetPhysicalStates());
+                writeEngineeringInstanceStates(output, checked.worldState());
             }
             byte[] result = buffer.toByteArray();
             if (result.length <= 0 || result.length > MAX_BYTES) {
@@ -84,6 +92,7 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
             }
             int fileVersion = input.readInt();
             if (fileVersion != FILE_FORMAT_VERSION
+                    && fileVersion != PHYSICAL_SIDECAR_FILE_FORMAT_VERSION
                     && fileVersion != LEGACY_FILE_FORMAT_VERSION) {
                 throw new IllegalArgumentException(
                         "Unsupported Stage-20.5 runtime file version: " + fileVersion);
@@ -99,12 +108,16 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
             StarSystemId activeSystemId = new StarSystemId(input.readLong());
             Stage20GeneratedCampaignPersistentState campaign =
                     Stage20GeneratedCampaignPersistenceCodec.decode(readPayload(input, "campaign"));
-            var world = WorldStateCodec.decode(readPayload(input, "world"));
+            WorldState world = WorldStateCodec.decode(readPayload(input, "world"));
             Stage20FreightPersistentState freight =
                     Stage20FreightPersistenceCodec.decode(readPayload(input, "freight"));
-            List<LocalFleetPhysicalState> localPhysical = fileVersion >= FILE_FORMAT_VERSION
+            List<LocalFleetPhysicalState> localPhysical =
+                    fileVersion >= PHYSICAL_SIDECAR_FILE_FORMAT_VERSION
                     ? readLocalFleetPhysicalStates(input)
                     : migrateLegacyLocalFleetPhysicalStates(world, freight);
+            if (fileVersion >= FILE_FORMAT_VERSION) {
+                world = readAndApplyEngineeringInstanceStates(input, world);
+            }
             if (input.read() != -1) {
                 throw new IllegalArgumentException(
                         "Trailing bytes after Stage-20.5 runtime checkpoint");
@@ -193,6 +206,162 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
         }
         return List.copyOf(result);
     }
+
+    private static void writeEngineeringInstanceStates(
+            DataOutputStream output,
+            WorldState world) throws IOException {
+        List<EngineeringInstanceRow> rows = world.systems().stream()
+                .sorted(Comparator.comparing(StarSystemSimulationState::systemId))
+                .flatMap(system -> system.simulationState().entities().stream()
+                        .filter(entity -> entity.engineering() != null
+                                && entity.engineering().instanceState() != null)
+                        .sorted(Comparator.comparing(EntityState::id))
+                        .map(entity -> new EngineeringInstanceRow(
+                                system.systemId(),
+                                entity.id(),
+                                entity.engineering().instanceState())))
+                .toList();
+        if (rows.size() > MAX_ENGINEERING_INSTANCE_STATES) {
+            throw new IllegalArgumentException("too many engineering instance states");
+        }
+        output.writeInt(rows.size());
+        for (EngineeringInstanceRow row : rows) {
+            output.writeLong(row.systemId().value());
+            output.writeLong(row.entityId().value());
+            ContentBoundSaveCodec.writeShipInstance(output, row.instanceState());
+        }
+    }
+
+    private static WorldState readAndApplyEngineeringInstanceStates(
+            DataInputStream input,
+            WorldState world) throws IOException {
+        int count = input.readInt();
+        if (count < 0 || count > MAX_ENGINEERING_INSTANCE_STATES) {
+            throw new IllegalArgumentException(
+                    "engineering instance-state count is outside bounds");
+        }
+        Map<StarSystemId, Map<EntityId, EntityState.ShipInstanceState>> rowsBySystem =
+                new HashMap<>();
+        for (int index = 0; index < count; index++) {
+            StarSystemId systemId = new StarSystemId(input.readLong());
+            EntityId entityId = new EntityId(input.readLong());
+            EntityState.ShipInstanceState instance =
+                    ContentBoundSaveCodec.readShipInstance(input);
+            var rows = rowsBySystem.computeIfAbsent(systemId, ignored -> new HashMap<>());
+            if (rows.putIfAbsent(entityId, instance) != null) {
+                throw new IllegalArgumentException(
+                        "duplicate engineering instance state: " + systemId + "/" + entityId);
+            }
+        }
+
+        List<StarSystemSimulationState> systems = new ArrayList<>(world.systems().size());
+        for (StarSystemSimulationState system : world.systems()) {
+            Map<EntityId, EntityState.ShipInstanceState> rows =
+                    rowsBySystem.remove(system.systemId());
+            if (rows == null) {
+                systems.add(system);
+                continue;
+            }
+            GameState state = system.simulationState();
+            List<EntityState> entities = new ArrayList<>(state.entities().size());
+            for (EntityState entity : state.entities()) {
+                EntityState.ShipInstanceState instance = rows.remove(entity.id());
+                if (instance == null) {
+                    entities.add(entity);
+                    continue;
+                }
+                EntityState.EngineeringState engineering = entity.engineering();
+                if (engineering == null) {
+                    throw new IllegalArgumentException(
+                            "engineering instance state has no core engineering entity: "
+                                    + system.systemId() + "/" + entity.id());
+                }
+                EntityState.EngineeringState restoredEngineering =
+                        new EntityState.EngineeringState(
+                                engineering.hullId(),
+                                engineering.installedModules(),
+                                engineering.consumables(),
+                                engineering.sharedBusEnergyJ(),
+                                engineering.shipHeatStoredJ(),
+                                engineering.localHeatJByMount(),
+                                engineering.thrustLimitNByMount(),
+                                engineering.coolantBusCapacityW(),
+                                engineering.ftlCooldownSecondsByMount(),
+                                instance);
+                entities.add(new EntityState(
+                        entity.id(),
+                        entity.identity(),
+                        entity.transform(),
+                        entity.inventory(),
+                        entity.wallet(),
+                        entity.market(),
+                        entity.production(),
+                        entity.priceHistory(),
+                        entity.faction(),
+                        entity.reputation(),
+                        entity.ship(),
+                        entity.tradeAi(),
+                        entity.mining(),
+                        entity.combat(),
+                        entity.asteroid(),
+                        entity.archetype(),
+                        restoredEngineering,
+                        entity.sensorKnowledge()));
+            }
+            if (!rows.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "engineering instance state references absent entities in "
+                                + system.systemId());
+            }
+            systems.add(new StarSystemSimulationState(
+                    system.systemId(),
+                    withEntities(state, entities)));
+        }
+        if (!rowsBySystem.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "engineering instance state references absent star systems");
+        }
+        return withSystems(world, systems);
+    }
+
+    private static GameState withEntities(GameState state, List<EntityState> entities) {
+        return new GameState(
+                state.schemaVersion(),
+                state.rootSeed(),
+                state.clock(),
+                state.nextEntityIdValue(),
+                state.eventRandomState(),
+                state.asteroidRandomState(),
+                state.events(),
+                state.asteroidSpawner(),
+                state.priceRecorder(),
+                state.ledger(),
+                List.copyOf(entities));
+    }
+
+    private static WorldState withSystems(
+            WorldState world,
+            List<StarSystemSimulationState> systems) {
+        return new WorldState(
+                world.schemaVersion(),
+                world.topology(),
+                List.copyOf(systems),
+                world.factions(),
+                world.factionStrategies(),
+                world.nextConstructionProjectIdValue(),
+                world.constructionProjects(),
+                world.factionEconomicPressures(),
+                world.nextFleetIdValue(),
+                world.fleets(),
+                world.fleetJumps(),
+                world.factionIdentities(),
+                world.factionDiplomacyStates());
+    }
+
+    private record EngineeringInstanceRow(
+            StarSystemId systemId,
+            EntityId entityId,
+            EntityState.ShipInstanceState instanceState) { }
 
     private static void writePayload(DataOutputStream output, byte[] payload, String label)
             throws IOException {
