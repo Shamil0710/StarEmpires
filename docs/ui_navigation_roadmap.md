@@ -240,9 +240,9 @@ Extend both maps with discovery and world-content information:
 - NPC/faction-relevant markers where appropriate;
 - performance and decluttering tests under realistic content density.
 
-### Stage 22 — Final UX / Polish
+### Stage 23 — Final UX / Polish
 
-Stage 22 is **not** the first time maps and usable UI appear. It is the final consolidation pass:
+Stage 23 is **not** the first time maps and usable UI appear. It is the final consolidation pass:
 
 - visual consistency across all screens;
 - complete input rebinding and control discoverability;
@@ -276,26 +276,29 @@ Before calling the player-facing UX mature enough for alpha:
 
 ## 8. Design constraint
 
-The project should not wait until Stage 22 to become readable. Camera control, minimap, global navigation and basic information hierarchy are functional usability requirements and will be introduced progressively as soon as the corresponding gameplay systems need them. Stage 22 remains the final polish/hardening phase, not the first UI implementation phase.
+The project should not wait until Stage 23 to become readable. Camera control, minimap, global navigation and basic information hierarchy are functional usability requirements and will be introduced progressively as soon as the corresponding gameplay systems need them. Stage 23 remains the final polish/hardening phase, not the first UI implementation phase.
 
 ## 9. Stage-21 generated-world implementation checkpoint
 
 Implemented in the first production-facing generated-world command interface:
 
 - bounded resolution-aware UI scale and regenerated Latin/Cyrillic TTF fonts;
-- separate current-system, galaxy, faction and logistics tabs;
+- separate current-system, galaxy, faction, military-forces and logistics tabs;
 - mouse selection for every rendered local object, global system, faction row and freight row;
 - scrollable structured inspector projections over existing runtime authority;
 - real Stage-20.5 sprite bindings for supported ships/stations/resources/derelicts;
 - generated-system activation without fleet teleportation;
+- cursor-anchored wheel zoom on system/galaxy maps;
+- middle-button pan on system/galaxy maps;
+- double-click fleet focus from logistics and military-forces lists;
 - atomic runtime save/load without generator replay;
 - a dedicated Windows launcher.
 
 Still open for later Stage-21/23 slices:
 
-- camera pan/zoom within the generated local-system command map;
 - player-order context actions and route building from the new surface;
 - search, filters and high-density list virtualization;
+- return-to-active-object hotkey, camera presets and full input rebinding;
 - full accessibility/rebinding/onboarding validation;
 - mission/NPC/reputation overlays once their authoritative Stage-21 state exists.
 

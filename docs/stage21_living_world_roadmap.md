@@ -358,3 +358,113 @@ run a physical economy
 No single seed is required to exercise every political outcome naturally. Targeted deterministic
 fixtures prove individual branches; the representative corpus proves that the combined system
 supports multiple plausible histories without hidden exceptions.
+
+## 9. Verified implementation status and first code sequence
+
+| Slice | Status | First production seam |
+|---|---|---|
+| 21.0 | **COMPLETE** | generated runtime/UI/fleets/navigation/save/launcher |
+| 21A | **COMPLETE** | persistent actor cadence, bounded observations and interest evidence |
+| 21B | **OPEN — next** | persistent strategic goals, feasibility and commitment |
+| 21C | **OPEN** | proposal/crisis/treaty/war lifecycle |
+| 21D | **OPEN** | physical readiness, command groups and lawful orders |
+| 21E | **OPEN** | operations and exact physical consequences |
+| 21F | **OPEN** | occupation/stabilization/control transitions |
+| 21G | **OPEN** | peace/demobilization/repair/replacement |
+| 21H | **OPEN** | persistent NPCs, missions, reputation and discovery |
+| 21I | **OPEN** | integrated UI/migration/corpus/performance final gate |
+
+Stage 21A has accepted the deliberately narrow foundation: stable faction-bound lifecycle state,
+immutable actor-bounded observations, measurable interests, deterministic traces, ordered wakeups,
+bounded top-K scheduling and exact checkpoint continuation. It deliberately does not create goals,
+relations, assets or wars.
+
+The next 21B implementation must consume the accepted trace rather than recomputing hidden world
+state:
+
+1. introduce stable goal identity and saved lifecycle;
+2. bind every goal to accepted interest evidence and an explicit target;
+3. add economic/force/access feasibility before commitment;
+4. arbitrate real treasury, logistics, construction and fleet budgets;
+5. preserve commitment horizons, hysteresis and cancellation consequences;
+6. expose why a goal exists, what blocks it and when it will be reviewed;
+7. prove save/load and no-churn behavior before 21C diplomacy consumes goals.
+
+## 10. Suggested state ownership
+
+Names below describe responsibilities; exact Java names may change during implementation.
+
+| State/Service | Owns | Must not own |
+|---|---|---|
+| living actor state | cadence, commitment horizon, wakeups, decision trace refs | treasury, fleets, relations |
+| observation snapshot | bounded known facts and evidence timestamps | omniscient live world references |
+| interest/goal state | priority, target, budget intent, success/failure/expiry | direct asset mutation |
+| crisis/war state | participants, issue, demands, deadlines, legal lifecycle | tactical damage or territory flag |
+| command group/order | membership references, intent, route and lifecycle | replacement FleetIds or teleport |
+| operation state | objective, participants, supply/withdrawal and outcome refs | abstract untraceable combat loss |
+| mission state | issuer, target refs, predicates, deadline, escrow and outcome | UI-certified completion |
+| NPC state | identity, affiliation, role, knowledge, location, availability | global truth or free rewards |
+
+Existing treasury, diplomacy, territory, fleet placement, jump FSM, Stage-18 industry and Stage-19
+combat remain their respective authorities.
+
+## 11. Minimum Stage-21 authored content
+
+Stage 21 needs enough authored content to prove mechanics, but not the final Stage-22 breadth.
+
+### Gold-slice actors
+
+- six persistent NPC role archetypes: official, military, trade/logistics, industry/yard,
+  exploration/intelligence and independent/frontier;
+- at least one recurring Imperial contact for each role;
+- deterministic names, affiliation, authority, location, availability and knowledge boundaries;
+- character art may begin with accepted production candidates, but identity/state cannot depend on
+  whether art is loaded.
+
+### First eight mission contracts
+
+1. emergency physical supply delivery;
+2. ordinary market procurement;
+3. convoy escort;
+4. stranded-fleet rescue/refuel;
+5. system/object reconnaissance;
+6. derelict investigation and finite recovery;
+7. interception/defense tied to a real threat;
+8. construction or repair input delivery.
+
+Every contract must prove issuer authority, saved target identity, objective observation, deadline,
+real reward source and deterministic failure/update when the underlying world changes.
+
+### First narrative chain
+
+A compact 3–5-step Imperial chain should combine a real supply dependency, institutional conflict,
+access negotiation and possible escort/crisis outcome. Characters provide interpretation and
+choice; the live world decides whether cargo, route, treaty, fleet and target still exist.
+
+Full faction/NPC/mission/location breadth remains Stage 22 and follows
+`docs/content_production_plan_stage21_23.md`.
+
+## 12. Pull-request decomposition
+
+Each item should remain separately reviewable and leave `main` green:
+
+1. **COMPLETE:** 21A actor state/cadence/persistence;
+2. **COMPLETE:** 21A observation/evidence/interest derivation;
+3. **COMPLETE:** 21A scheduling/diagnostics/generated-runtime composition;
+4. **NEXT:** 21B goal state/feasibility/arbitration;
+5. 21C proposals/treaties and crisis state;
+6. 21C war/peace legal lifecycle;
+7. 21D readiness/command groups;
+8. 21D orders/routing/service validation;
+9. 21E operation lifecycle and contact/materialization seam;
+10. 21E physical consequence return/persistence;
+11. 21F occupation/stabilization/control;
+12. 21G peace/demobilization/replacement;
+13. 21H NPC identity/knowledge/availability;
+14. 21H mission/escrow/objective/reputation;
+15. 21H authored gold-slice content;
+16. 21I command UI/overlays/timeline;
+17. 21I migration/corpus/performance/soak and completion record.
+
+A PR may combine adjacent items only when the resulting authority boundary and acceptance evidence
+remain independently reviewable.

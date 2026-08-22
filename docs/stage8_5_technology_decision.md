@@ -129,7 +129,7 @@ Intended semantics:
 Planned roadmap placement:
 
 - implement and benchmark the first production `BloomMode` pipeline alongside **Stage 13 / V4 Combat VFX**, when combat provides representative emissive/projectile/explosion stress scenes;
-- expose graphics-quality selection, persistence and final performance thresholds in **Stage 22 — UX / performance / release hardening**;
+- expose graphics-quality selection, persistence and final performance thresholds in **Stage 23 — UX / performance / release hardening**;
 - benchmark `OFF`, `LIGHT` and `FULL` separately; `FULL` must never become an implicit requirement for simulation correctness or gameplay readability.
 
 ## Migration alternatives rejected for now
