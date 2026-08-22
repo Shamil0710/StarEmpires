@@ -38,7 +38,7 @@ public final class Stage175ITacticalAcceptanceApp extends ApplicationAdapter {
     @Override
     public void create() {
         playback = Stage175ITacticalAcceptancePlayback.create();
-        tacticalRenderer = new TacticalPrototypeRenderer();
+        tacticalRenderer = TacticalPrototypeRenderer.withMinimumPlayableSprites();
         camera = new OrthographicCamera();
         batch = new SpriteBatch();
         font = new BitmapFont();

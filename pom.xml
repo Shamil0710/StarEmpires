@@ -119,6 +119,7 @@
                         <exclude>com/spacesim/ui/WorldMapRenderer*</exclude>
                         <exclude>com/spacesim/ui/LocalMinimapRenderer*</exclude>
                         <exclude>com/spacesim/ui/TacticalPrototypeRenderer*</exclude>
+                        <exclude>com/spacesim/presentation/asset/Stage20MinimumPlayableTextureRenderer*</exclude>
                     </excludes>
                 </configuration>
                 <executions>

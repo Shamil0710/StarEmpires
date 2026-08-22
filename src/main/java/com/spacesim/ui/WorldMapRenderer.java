@@ -25,13 +25,17 @@ import com.spacesim.constants.Constants;
 import com.spacesim.model.ItemType;
 import com.spacesim.model.ShipType;
 import com.spacesim.persistence.EntityId;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.VisualRole;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
 
 /**
  * Рисует интерактивную карту космических объектов средствами libGDX.
  *
- * <p>Фон, сетка, маршруты и геометрические значки формируются кодом без внешних текстур.
- * Станции показаны кругами с цветом фракции, астероиды — неровными минеральными силуэтами,
- * а пять типов кораблей различаются одновременно силуэтом и контрастным цветом. Навигационные
+ * <p>Фон, сетка и маршруты остаются кодовыми примитивами, а ordinary stations, resource bodies and
+ * ships use the role-complete Stage-20.5 sprite pack. The binding remains presentation-only and
+ * consumes the same live ECS entities as the former schematic markers. Навигационные
  * цели читаются из persistent {@link EntityId} компонентов AI и разрешаются только внутри текущего
  * кадра по актуальному набору сущностей; renderer не хранит persistent runtime-ссылки.</p>
  *
@@ -104,6 +108,7 @@ public final class WorldMapRenderer {
     private final GlyphLayout labelLayout = new GlyphLayout();
     private final ShapeRenderer shapeRenderer;
     private final SpriteBatch spriteBatch;
+    private final Stage20MinimumPlayableTextureRenderer minimumSprites;
     private final Array<Entity> worldEntities = new Array<>(false, 32);
     private final Array<Entity> visibleEntities = new Array<>(false, 16);
     private final Vector2 firstPoint = new Vector2();
@@ -123,6 +128,7 @@ public final class WorldMapRenderer {
         this.font = font;
         this.shapeRenderer = new ShapeRenderer();
         this.spriteBatch = new SpriteBatch();
+        this.minimumSprites = new Stage20MinimumPlayableTextureRenderer();
     }
 
     /**
@@ -151,7 +157,7 @@ public final class WorldMapRenderer {
         beginMapClip(layout);
         try {
             drawGridAndRoutes(layout);
-            drawObjects(layout);
+            drawObjects(projectionMatrix, layout);
             drawSelection(layout, selected);
             drawLabels(projectionMatrix, layout, selected);
         } finally {
@@ -246,9 +252,11 @@ public final class WorldMapRenderer {
         shapeRenderer.end();
     }
 
-    /** Рисует станции, астероиды и направленные маркеры кораблей. */
-    private void drawObjects(WorldMapLayout layout) {
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+    /** Draws live stations, resource bodies and directed ships from the minimum sprite catalogue. */
+    private void drawObjects(Matrix4 projectionMatrix, WorldMapLayout layout) {
+        spriteBatch.setProjectionMatrix(projectionMatrix);
+        spriteBatch.setColor(Color.WHITE);
+        spriteBatch.begin();
         for (Entity entity : visibleEntities) {
             IdentityComponent identity = IDENTITIES.get(entity);
             TransformComponent transform = TRANSFORMS.get(entity);
@@ -257,18 +265,96 @@ public final class WorldMapRenderer {
             }
 
             if (identity.kind == IdentityComponent.Kind.STATION) {
-                shapeRenderer.setColor(stationColor(entity));
-                shapeRenderer.circle(firstPoint.x, firstPoint.y, STATION_RADIUS, 24);
+                drawMinimumSprite(
+                        Stage20MinimumPlayableSpriteCatalog.binding(VisualRole.TRADE_DOCK_STATION),
+                        firstPoint.x,
+                        firstPoint.y,
+                        44f,
+                        0f);
             } else if (identity.kind == IdentityComponent.Kind.ASTEROID) {
-                drawAsteroid(entity, firstPoint.x, firstPoint.y);
+                drawMinimumSprite(
+                        resourceBinding(ASTEROIDS.get(entity)),
+                        firstPoint.x,
+                        firstPoint.y,
+                        ASTEROID_RADIUS * 2f,
+                        0f);
             } else if (identity.kind == IdentityComponent.Kind.FLEET) {
                 ShipComponent ship = SHIPS.get(entity);
-                MarkerStyle style = markerStyle(ship == null ? null : ship.type);
-                shapeRenderer.setColor(style.red(), style.green(), style.blue(), 1f);
-                drawFleetMarker(entity, transform, firstPoint.x, firstPoint.y, style.shape());
+                ResolvedSprite resolved = Stage20MinimumPlayableSpriteCatalog.resolvePlayable(
+                        ship == null ? null : ship.type);
+                drawMinimumSprite(
+                        resolved.binding(),
+                        firstPoint.x,
+                        firstPoint.y,
+                        shipSpriteWidth(resolved.binding().role()),
+                        fleetHeadingDegrees(entity, transform));
             }
         }
-        shapeRenderer.end();
+        spriteBatch.end();
+        spriteBatch.setColor(Color.WHITE);
+    }
+
+    /** Draws one role asset at its authored aspect ratio around its stable pivot. */
+    private void drawMinimumSprite(
+            com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding binding,
+            float centerX,
+            float centerY,
+            float width,
+            float rotationDegrees) {
+        float aspect = (float) (binding.nominalWidthM() / binding.nominalLengthM());
+        float height = Math.max(12f, width * aspect);
+        minimumSprites.draw(spriteBatch, binding, centerX, centerY, width, height, rotationDegrees);
+    }
+
+    /** Selects one deterministic resource atlas quadrant from the ordinary asteroid item identity. */
+    private static com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding
+            resourceBinding(AsteroidComponent asteroid) {
+        int variant = asteroid == null ? 0 : Math.floorMod(asteroid.resourceItem, 4);
+        VisualRole role = switch (variant) {
+            case 0 -> VisualRole.RESOURCE_CARBONACEOUS;
+            case 1 -> VisualRole.RESOURCE_WATER_ICE;
+            case 2 -> VisualRole.RESOURCE_METALLIC;
+            default -> VisualRole.RESOURCE_MINERAL;
+        };
+        return Stage20MinimumPlayableSpriteCatalog.binding(role);
+    }
+
+    /** Returns a readable presentation width; no value is fed back into physical simulation. */
+    private static float shipSpriteWidth(VisualRole role) {
+        return switch (role) {
+            case UTILITY_SHIP -> 30f;
+            case CARGO_TRANSPORT_SHIP -> 40f;
+            case MINING_INDUSTRIAL_SHIP -> 38f;
+            case LIGHT_COMBAT_ESCORT_SHIP -> 36f;
+            case MEDIUM_COMBAT_SHIP -> 46f;
+            default -> 32f;
+        };
+    }
+
+    /** Resolves live target/velocity direction solely for sprite rotation. */
+    private float fleetHeadingDegrees(Entity fleet, TransformComponent transform) {
+        float directionX = 0f;
+        float directionY = 0f;
+        Entity target = navigationTarget(fleet);
+        if (target != null) {
+            TransformComponent targetTransform = TRANSFORMS.get(target);
+            if (hasFinitePosition(targetTransform)) {
+                directionX = targetTransform.position.x - transform.position.x;
+                directionY = targetTransform.position.y - transform.position.y;
+            }
+        }
+        double length = Math.hypot(directionX, directionY);
+        if ((!Double.isFinite(length) || length <= 0.000001d)
+                && transform.velocity != null
+                && Float.isFinite(transform.velocity.x)
+                && Float.isFinite(transform.velocity.y)) {
+            directionX = transform.velocity.x;
+            directionY = transform.velocity.y;
+            length = Math.hypot(directionX, directionY);
+        }
+        return !Double.isFinite(length) || length <= 0.000001d
+                ? 0f
+                : (float) Math.toDegrees(Math.atan2(directionY, directionX));
     }
 
     /** Рисует неровный каменный силуэт и ядро, размер которого отражает остаток ресурса. */
@@ -730,6 +816,7 @@ public final class WorldMapRenderer {
         disposed = true;
         worldEntities.clear();
         visibleEntities.clear();
+        minimumSprites.dispose();
         shapeRenderer.dispose();
         spriteBatch.dispose();
     }

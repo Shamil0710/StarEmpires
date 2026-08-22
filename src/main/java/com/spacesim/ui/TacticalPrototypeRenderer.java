@@ -1,6 +1,7 @@
 package com.spacesim.ui;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector2;
@@ -12,16 +13,21 @@ import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShieldGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShipGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.TacticalSide;
 import com.spacesim.ui.TacticalSidePalette.Rgba;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
+import com.spacesim.world.Stage20SpecialLocationWorld.LocationKind;
 
 import java.util.Objects;
 
 /**
- * Shape-based top-down renderer for the Stage-17.5I/19J Tactical Prototype Visual Set.
+ * Top-down renderer for the Stage-17.5I/19J Tactical Prototype Visual Set.
  *
  * <p>The renderer consumes only an immutable {@link TacticalPrototypeVisualSnapshot}. It has no
  * reference to simulation engines, entities, combat services or persistence and therefore cannot
  * become combat authority. The complete renderer may be replaced by sprites/VFX in Stage 23 without
- * changing any authoritative combat physics.</p>
+ * changing any authoritative combat physics. The compatibility constructor keeps schematic hulls;
+ * {@link #withMinimumPlayableSprites()} replaces only those hull bodies with the Stage-20.5E pack.</p>
  */
 public final class TacticalPrototypeRenderer {
     private static final float MIN_SHIP_LENGTH_PX = 18f;
@@ -52,13 +58,32 @@ public final class TacticalPrototypeRenderer {
     private static final Color DAMAGE_COLOR = new Color(0.96f, 0.28f, 0.20f, 1f);
 
     private final ShapeRenderer shapes;
+    private final SpriteBatch spriteBatch;
+    private final Stage20MinimumPlayableTextureRenderer minimumSprites;
     private final Vector2 a = new Vector2();
     private final Vector2 b = new Vector2();
     private boolean disposed;
 
     /** Creates libGDX shape resources; call only after a graphics context exists. */
     public TacticalPrototypeRenderer() {
+        this(false);
+    }
+
+    private TacticalPrototypeRenderer(boolean useMinimumPlayableSprites) {
         this.shapes = new ShapeRenderer();
+        this.spriteBatch = useMinimumPlayableSprites ? new SpriteBatch() : null;
+        this.minimumSprites = useMinimumPlayableSprites
+                ? new Stage20MinimumPlayableTextureRenderer()
+                : null;
+    }
+
+    /**
+     * Creates the existing tactical renderer with Stage-20.5E production sprite binding enabled.
+     *
+     * @return renderer consuming the same immutable tactical snapshots with sprite ship bodies
+     */
+    public static TacticalPrototypeRenderer withMinimumPlayableSprites() {
+        return new TacticalPrototypeRenderer(true);
     }
 
     /**
@@ -75,10 +100,13 @@ public final class TacticalPrototypeRenderer {
         if (disposed || projectionMatrix == null || layout == null || snapshot == null) {
             return;
         }
+        if (minimumSprites != null) {
+            drawSpriteShips(projectionMatrix, layout, snapshot);
+        }
         shapes.setProjectionMatrix(projectionMatrix);
         drawTrailsAndBeams(layout, snapshot);
         drawShields(layout, snapshot);
-        drawShipsAndBodies(layout, snapshot);
+        drawShipsAndBodies(layout, snapshot, minimumSprites == null);
         drawShipCues(layout, snapshot);
         drawImpactsAndDamage(layout, snapshot);
     }
@@ -86,6 +114,10 @@ public final class TacticalPrototypeRenderer {
     /** Releases renderer-owned libGDX resources. */
     public void dispose() {
         if (!disposed) {
+            if (minimumSprites != null) {
+                minimumSprites.dispose();
+                spriteBatch.dispose();
+            }
             shapes.dispose();
             disposed = true;
         }
@@ -135,13 +167,18 @@ public final class TacticalPrototypeRenderer {
         shapes.end();
     }
 
-    private void drawShipsAndBodies(WorldMapLayout layout, TacticalPrototypeVisualSnapshot snapshot) {
+    private void drawShipsAndBodies(
+            WorldMapLayout layout,
+            TacticalPrototypeVisualSnapshot snapshot,
+            boolean drawSchematicShips) {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        for (ShipGlyph ship : snapshot.ships()) {
-            if (!project(layout, ship.xM(), ship.yM(), a)) {
-                continue;
+        if (drawSchematicShips) {
+            for (ShipGlyph ship : snapshot.ships()) {
+                if (!project(layout, ship.xM(), ship.yM(), a)) {
+                    continue;
+                }
+                drawShip(layout, ship, a.x, a.y);
             }
-            drawShip(layout, ship, a.x, a.y);
         }
         for (BodyGlyph body : snapshot.bodies()) {
             if (!project(layout, body.xM(), body.yM(), a)) {
@@ -150,6 +187,37 @@ public final class TacticalPrototypeRenderer {
             drawBody(layout, body, a.x, a.y);
         }
         shapes.end();
+    }
+
+    private void drawSpriteShips(
+            Matrix4 projectionMatrix,
+            WorldMapLayout layout,
+            TacticalPrototypeVisualSnapshot snapshot) {
+        spriteBatch.setProjectionMatrix(projectionMatrix);
+        spriteBatch.setColor(Color.WHITE);
+        spriteBatch.begin();
+        for (ShipGlyph ship : snapshot.ships()) {
+            if (!project(layout, ship.xM(), ship.yM(), a)) {
+                continue;
+            }
+            ResolvedSprite resolved = ship.wreck()
+                    ? Stage20MinimumPlayableSpriteCatalog.resolveSpecialLocation(LocationKind.DERELICT)
+                    : Stage20MinimumPlayableSpriteCatalog.resolveCombatRole(ship.role());
+            float length = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()))
+                    * roleLengthScale(ship.role());
+            float width = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()))
+                    * roleWidthScale(ship.role());
+            minimumSprites.draw(
+                    spriteBatch,
+                    resolved.binding(),
+                    a.x,
+                    a.y,
+                    length,
+                    width,
+                    (float) Math.toDegrees(ship.headingRad()));
+        }
+        spriteBatch.end();
+        spriteBatch.setColor(Color.WHITE);
     }
 
     private void drawShip(WorldMapLayout layout, ShipGlyph ship, float x, float y) {
