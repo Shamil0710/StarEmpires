@@ -21,7 +21,12 @@ public final class FactionStrategicIntentStateCodec {
         throw new AssertionError("Utility class");
     }
 
-    /** Encodes strategic intent aggregates in stable faction/goal/provenance order. */
+    /**
+     * Encodes strategic intent aggregates in stable faction/goal/provenance order.
+     *
+     * @param states strategic intent states to persist
+     * @return deterministic UTF-8 checkpoint bytes
+     */
     public static byte[] encode(Collection<FactionStrategicIntentState> states) {
         Objects.requireNonNull(states, "Strategic intent states not set");
         TreeSet<FactionStrategicIntentState> sorted = new TreeSet<>();
@@ -67,7 +72,12 @@ public final class FactionStrategicIntentStateCodec {
         return builder.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    /** Decodes a complete Stage-21B strategic intent checkpoint. */
+    /**
+     * Decodes a complete Stage-21B strategic intent checkpoint.
+     *
+     * @param bytes checkpoint bytes produced by {@link #encode(Collection)}
+     * @return immutable strategic intent states in stable faction order
+     */
     public static List<FactionStrategicIntentState> decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "Strategic intent checkpoint bytes not set");
         String[] lines = new String(bytes, StandardCharsets.UTF_8).split("\\n", -1);
