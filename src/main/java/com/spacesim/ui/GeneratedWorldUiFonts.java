@@ -21,7 +21,11 @@ public final class GeneratedWorldUiFonts {
     private final BitmapFont small;
     private boolean disposed;
 
-    /** Generates fonts for one immutable resolution metrics set. */
+    /**
+     * Generates fonts for one immutable resolution metrics set.
+     *
+     * @param metrics resolved font pixel sizes
+     */
     public GeneratedWorldUiFonts(ResponsiveUiMetrics metrics) {
         ResponsiveUiMetrics checked = Objects.requireNonNull(metrics, "metrics");
         FreeTypeFontGenerator regular = new FreeTypeFontGenerator(Gdx.files.internal(REGULAR));

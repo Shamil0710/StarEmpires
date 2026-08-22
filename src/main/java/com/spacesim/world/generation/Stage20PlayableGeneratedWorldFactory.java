@@ -383,7 +383,14 @@ public final class Stage20PlayableGeneratedWorldFactory {
             ContentCatalog content,
             OperationalSpecializationReport specialization,
             LiveRuntime runtime) {
-        /** Validates a complete bootstrap result. */
+        /**
+         * Validates a complete bootstrap result.
+         *
+         * @param rootSeed exact new-world seed
+         * @param content installed content catalogue
+         * @param specialization accepted operational industrial authority
+         * @param runtime live Stage-20.5 generated-world runtime
+         */
         public GeneratedWorld {
             Objects.requireNonNull(content, "content");
             Objects.requireNonNull(specialization, "specialization");

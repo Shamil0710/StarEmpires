@@ -19,7 +19,17 @@ public record GeneratedWorldUiSnapshot(
         List<LocalObjectView> localObjects,
         List<FreightView> freight) {
 
-    /** Validates and freezes one frame of UI projection data. */
+    /**
+     * Validates and freezes one frame of UI projection data.
+     *
+     * @param worldSeed exact generated-world seed
+     * @param worldTick authoritative world tick
+     * @param activeSystemId currently materialized system
+     * @param activeSystemName player-facing active-system label
+     * @param galaxy immutable global-map projection
+     * @param localObjects selectable objects in the active system
+     * @param freight persistent generated freight projections
+     */
     public GeneratedWorldUiSnapshot {
         Objects.requireNonNull(activeSystemId, "activeSystemId");
         activeSystemName = requireText(activeSystemName, "activeSystemName");
@@ -65,7 +75,20 @@ public record GeneratedWorldUiSnapshot(
             String factionName,
             SpriteBinding sprite,
             List<InfoSection> sections) implements Comparable<LocalObjectView> {
-        /** Validates one selectable object projection. */
+        /**
+         * Validates one selectable object projection.
+         *
+         * @param stableId persistent or canonical identity
+         * @param kind presentation object family
+         * @param name player-facing primary label
+         * @param subtitle concise role/state label
+         * @param systemId owning system
+         * @param position authoritative local physical position
+         * @param factionId stable owner/controller ID, or empty when unknown/unowned
+         * @param factionName player-facing owner/controller label
+         * @param sprite optional minimum-pack sprite binding
+         * @param sections structured inspector content
+         */
         public LocalObjectView {
             stableId = requireText(stableId, "stableId");
             Objects.requireNonNull(kind, "kind");
@@ -106,7 +129,28 @@ public record GeneratedWorldUiSnapshot(
             double deliveryDeadlineSeconds,
             long delayedDeliveryCount,
             List<InfoSection> sections) implements Comparable<FreightView> {
-        /** Validates one deterministic logistics projection. */
+        /**
+         * Validates one deterministic logistics projection.
+         *
+         * @param fleetId persistent fleet identity
+         * @param name player-facing fleet label
+         * @param factionId stable owner identity
+         * @param factionName player-facing owner label
+         * @param phase authoritative freight lifecycle phase
+         * @param hullId canonical hull identity
+         * @param fitId canonical fitted-role identity
+         * @param cargoMassKg current conserved cargo mass
+         * @param cargoCapacityKg physical hold capacity
+         * @param commodityId active cargo commodity, or an em dash
+         * @param sourceName source endpoint label
+         * @param destinationName destination endpoint label
+         * @param route ordered neighbor-only route
+         * @param routeIndex current route index
+         * @param deliveredMassKg conserved delivered order mass
+         * @param deliveryDeadlineSeconds physical delivery deadline
+         * @param delayedDeliveryCount recorded delayed deliveries
+         * @param sections structured inspector content
+         */
         public FreightView {
             name = requireText(name, "name");
             factionId = requireText(factionId, "factionId");
@@ -136,7 +180,12 @@ public record GeneratedWorldUiSnapshot(
 
     /** Inspector section containing compact labelled values. */
     public record InfoSection(String title, List<InfoLine> lines) {
-        /** Validates one non-empty inspector section. */
+        /**
+         * Validates one non-empty inspector section.
+         *
+         * @param title section heading
+         * @param lines immutable label/value rows
+         */
         public InfoSection {
             title = requireText(title, "title");
             lines = List.copyOf(Objects.requireNonNull(lines, "lines"));
@@ -145,7 +194,13 @@ public record GeneratedWorldUiSnapshot(
             }
         }
 
-        /** Creates a section from alternating label/value strings. */
+        /**
+         * Creates a section from alternating label/value strings.
+         *
+         * @param title section heading
+         * @param labelValues alternating label/value strings
+         * @return validated immutable inspector section
+         */
         public static InfoSection of(String title, String... labelValues) {
             Objects.requireNonNull(labelValues, "labelValues");
             if (labelValues.length == 0 || (labelValues.length & 1) != 0) {
@@ -161,7 +216,12 @@ public record GeneratedWorldUiSnapshot(
 
     /** One labelled inspector value. */
     public record InfoLine(String label, String value) {
-        /** Validates a complete label/value pair. */
+        /**
+         * Validates a complete label/value pair.
+         *
+         * @param label optional compact value label
+         * @param value player-facing value
+         */
         public InfoLine {
             label = label == null ? "" : label.strip();
             value = value == null || value.isBlank() ? "—" : value.strip();

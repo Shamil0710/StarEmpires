@@ -84,7 +84,12 @@ public final class GeneratedWorldCommandUiRenderer {
 
     /** Stable current selection. */
     public record UiSelection(SelectionKind kind, String stableId) {
-        /** Validates a stable presentation selection. */
+        /**
+         * Validates a stable presentation selection.
+         *
+         * @param kind selected object family
+         * @param stableId persistent presentation identity, or empty for {@link SelectionKind#NONE}
+         */
         public UiSelection {
             Objects.requireNonNull(kind, "kind");
             stableId = stableId == null ? "" : stableId.strip();
@@ -111,7 +116,14 @@ public final class GeneratedWorldCommandUiRenderer {
 
     /** One immutable hit result. */
     public record HitTarget(HitKind kind, String id, Tab tab, Rect bounds) {
-        /** Validates one rendered hit target. */
+        /**
+         * Validates one rendered hit target.
+         *
+         * @param kind hit action family
+         * @param id stable target identity, when applicable
+         * @param tab target tab for a tab action, otherwise {@code null}
+         * @param bounds rendered mouse bounds
+         */
         public HitTarget {
             Objects.requireNonNull(kind, "kind");
             id = id == null ? "" : id.strip();
@@ -127,7 +139,12 @@ public final class GeneratedWorldCommandUiRenderer {
         resize(Math.max(1, Gdx.graphics.getWidth()), Math.max(1, Gdx.graphics.getHeight()));
     }
 
-    /** Rebuilds typography only when the resolved pixel sizes actually change. */
+    /**
+     * Rebuilds typography only when the resolved pixel sizes actually change.
+     *
+     * @param viewportWidth current logical viewport width
+     * @param viewportHeight current logical viewport height
+     */
     public void resize(int viewportWidth, int viewportHeight) {
         if (disposed || viewportWidth <= 0 || viewportHeight <= 0) {
             return;
@@ -187,7 +204,13 @@ public final class GeneratedWorldCommandUiRenderer {
         }
     }
 
-    /** Returns the topmost current hit target at one bottom-left-origin UI coordinate. */
+    /**
+     * Returns the topmost current hit target at one bottom-left-origin UI coordinate.
+     *
+     * @param x horizontal UI coordinate
+     * @param y vertical UI coordinate
+     * @return topmost target, or {@code null} when the point is not interactive
+     */
     public HitTarget hitTest(float x, float y) {
         for (int index = hitTargets.size() - 1; index >= 0; index--) {
             HitTarget target = hitTargets.get(index);
@@ -198,12 +221,20 @@ public final class GeneratedWorldCommandUiRenderer {
         return null;
     }
 
-    /** @return whether a bottom-left-origin point lies over the inspector panel */
+    /**
+     * @param x horizontal UI coordinate
+     * @param y vertical UI coordinate
+     * @return whether a bottom-left-origin point lies over the inspector panel
+     */
     public boolean isInspectorPoint(float x, float y) {
         return inspectorRect.contains(x, y);
     }
 
-    /** @return whether a bottom-left-origin point lies over a scrollable list */
+    /**
+     * @param x horizontal UI coordinate
+     * @param y vertical UI coordinate
+     * @return whether a bottom-left-origin point lies over a scrollable list
+     */
     public boolean isListPoint(float x, float y) {
         return listRect.contains(x, y);
     }
@@ -972,7 +1003,14 @@ public final class GeneratedWorldCommandUiRenderer {
 
     /** Simple immutable UI rectangle in bottom-left-origin logical coordinates. */
     public record Rect(float x, float y, float width, float height) {
-        /** Validates finite non-negative rectangle geometry. */
+        /**
+         * Validates finite non-negative rectangle geometry.
+         *
+         * @param x left edge
+         * @param y bottom edge
+         * @param width non-negative width
+         * @param height non-negative height
+         */
         public Rect {
             if (!Float.isFinite(x) || !Float.isFinite(y)
                     || !Float.isFinite(width) || !Float.isFinite(height)
@@ -991,7 +1029,11 @@ public final class GeneratedWorldCommandUiRenderer {
             return y + height;
         }
 
-        /** @return whether point lies inside inclusive bounds */
+        /**
+         * @param pointX horizontal point coordinate
+         * @param pointY vertical point coordinate
+         * @return whether point lies inside inclusive bounds
+         */
         public boolean contains(float pointX, float pointY) {
             return pointX >= x && pointX <= right() && pointY >= y && pointY <= top();
         }

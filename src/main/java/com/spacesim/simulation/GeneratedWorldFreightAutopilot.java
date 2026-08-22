@@ -136,7 +136,15 @@ public final class GeneratedWorldFreightAutopilot {
             int dispatched,
             int jumpsRequested,
             int extracted) {
-        /** Validates non-negative operation counts. */
+        /**
+         * Validates non-negative operation counts.
+         *
+         * @param loaded cargo-load operations committed
+         * @param unloaded cargo-unload operations committed
+         * @param dispatched outbound/return phases started
+         * @param jumpsRequested ordinary neighbor jumps requested
+         * @param extracted finite extraction/staging operations committed
+         */
         public ActionReport {
             if (loaded < 0 || unloaded < 0 || dispatched < 0
                     || jumpsRequested < 0 || extracted < 0) {

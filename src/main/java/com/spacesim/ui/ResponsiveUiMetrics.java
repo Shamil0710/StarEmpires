@@ -17,7 +17,21 @@ public record ResponsiveUiMetrics(
     private static final float REFERENCE_WIDTH = 1600f;
     private static final float REFERENCE_HEIGHT = 900f;
 
-    /** Validates a complete positive UI metrics set. */
+    /**
+     * Validates a complete positive UI metrics set.
+     *
+     * @param scale bounded logical UI scale
+     * @param titleFontPixels title font pixel size
+     * @param bodyFontPixels body font pixel size
+     * @param smallFontPixels secondary font pixel size
+     * @param outerMargin outer frame margin
+     * @param topBarHeight top navigation height
+     * @param statusBarHeight lower status bar height
+     * @param inspectorWidth inspector panel width
+     * @param listWidth list panel width
+     * @param markerSize map marker size
+     * @param hitRadius minimum map hit radius
+     */
     public ResponsiveUiMetrics {
         if (!Float.isFinite(scale) || scale <= 0f
                 || titleFontPixels <= 0 || bodyFontPixels <= 0 || smallFontPixels <= 0
@@ -61,7 +75,10 @@ public record ResponsiveUiMetrics(
                 Math.max(18f * scale, 24f));
     }
 
-    /** @return true when the viewport needs the compact navigation/header arrangement */
+    /**
+     * @param viewportWidth current logical viewport width
+     * @return true when the viewport needs the compact navigation/header arrangement
+     */
     public boolean compact(int viewportWidth) {
         return viewportWidth < 1180f * scale;
     }
