@@ -26,7 +26,14 @@ public record FactionInterestEvidence(
         List<ActorObservation> supportingObservations)
         implements Comparable<FactionInterestEvidence> {
 
-    /** Validates one immutable evidence aggregate. */
+    /**
+     * Validates one immutable evidence aggregate.
+     *
+     * @param kind measurable interest family
+     * @param targetId stable target identity
+     * @param priorityBasisPoints evidence priority in {@code [0,10000]}
+     * @param supportingObservations canonical supporting observation rows
+     */
     public FactionInterestEvidence {
         Objects.requireNonNull(kind, "Interest kind not set");
         targetId = requireText(targetId, "Interest target ID");
