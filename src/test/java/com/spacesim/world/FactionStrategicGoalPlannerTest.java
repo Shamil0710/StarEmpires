@@ -18,32 +18,40 @@ class FactionStrategicGoalPlannerTest {
     @Test
     void acceptedGoalKeepsPersistentIdAcrossReviewsAndProducesExplainableProjection() {
         FactionLivingActorState actor = FactionLivingActorState.initial("faction.alpha", 0L);
-        FactionStrategicIntentState initial = FactionStrategicIntentState.initial("faction.alpha");
         StrategicGoalCandidate candidate = candidate(
                 StrategicGoalType.STOCKPILE,
                 InterestKind.RESOURCE_DEFICIT,
                 "resource.water",
                 7000,
                 9000,
-                40L,
+                StrategicPlanningEnvelope.balanced(40L),
+                List.of(),
+                -1L,
+                StrategicGoalOutcomeSignal.NONE,
                 "ledger.water");
 
         FactionStrategicGoalPlanner.PlanningResult first = FactionStrategicGoalPlanner.review(
-                actor, initial, List.of(candidate), 40L, 10L);
+                actor,
+                FactionStrategicIntentState.initial("faction.alpha"),
+                List.of(candidate),
+                StrategicPlanningEnvelope.balanced(40L),
+                10L);
         FactionStrategicGoalPlanner.PlanningResult second = FactionStrategicGoalPlanner.review(
-                actor, first.state(), List.of(candidate), 40L, 20L);
+                actor,
+                first.state(),
+                List.of(candidate),
+                StrategicPlanningEnvelope.balanced(40L),
+                20L);
 
         assertEquals(1, first.state().activeGoals().size());
-        assertEquals(
-                first.state().activeGoals().get(0).goalId(),
-                second.state().activeGoals().get(0).goalId());
-        assertEquals(40L, second.allocatedBudgetUnits());
+        assertEquals(first.state().activeGoals().get(0).goalId(), second.state().activeGoals().get(0).goalId());
+        assertEquals(StrategicPlanningEnvelope.balanced(40L), second.allocatedBudget());
         assertEquals("ledger.water", second.projections().get(0).provenanceIds().get(0));
         assertTrue(second.projections().get(0).explanationCode().contains("stockpile"));
     }
 
     @Test
-    void budgetArbitrationAndHysteresisPreferCommittedExistingIntentOverSmallPriorityLead() {
+    void multidimensionalBudgetAndHysteresisPreferCommittedIntentAndExposeCapacityBlocker() {
         FactionLivingActorState actor = FactionLivingActorState.initial("faction.alpha", 0L)
                 .withCommitmentUntilTick(100L);
         StrategicGoalCandidate oldCandidate = candidate(
@@ -52,13 +60,16 @@ class FactionStrategicGoalPlannerTest {
                 "system.home-border",
                 6000,
                 10_000,
-                10L,
+                StrategicPlanningEnvelope.balanced(10L),
+                List.of(),
+                -1L,
+                StrategicGoalOutcomeSignal.NONE,
                 "border.old");
         FactionStrategicGoalPlanner.PlanningResult seeded = FactionStrategicGoalPlanner.review(
                 actor,
                 FactionStrategicIntentState.initial("faction.alpha"),
                 List.of(oldCandidate),
-                10L,
+                StrategicPlanningEnvelope.balanced(10L),
                 10L);
         StrategicGoalCandidate challenger = candidate(
                 StrategicGoalType.EXPLORE,
@@ -66,63 +77,210 @@ class FactionStrategicGoalPlannerTest {
                 "system.frontier",
                 6500,
                 10_000,
-                10L,
+                new StrategicPlanningEnvelope(0L, 0L, 8L, 0L),
+                List.of(),
+                -1L,
+                StrategicGoalOutcomeSignal.NONE,
                 "survey.frontier");
 
         FactionStrategicGoalPlanner.PlanningResult reviewed = FactionStrategicGoalPlanner.review(
                 actor,
                 seeded.state(),
                 List.of(challenger, oldCandidate),
-                10L,
+                StrategicPlanningEnvelope.balanced(10L),
                 20L);
 
         assertEquals(1, reviewed.state().activeGoals().size());
         assertEquals(StrategicGoalType.DEFEND, reviewed.state().activeGoals().get(0).type());
-        assertEquals(10L, reviewed.allocatedBudgetUnits());
+        StrategicGoalState stalled = reviewed.state().goals().stream()
+                .filter(goal -> goal.type() == StrategicGoalType.EXPLORE)
+                .findFirst().orElseThrow();
+        assertEquals(Lifecycle.STALLED, stalled.lifecycle());
+        assertEquals(List.of(StrategicGoalBlocker.CONSTRUCTION_CAPACITY), stalled.blockers());
     }
 
     @Test
-    void infeasibleGoalIsCancelledWithCostAndCooldownBeforeFreshIdentityCanBeCreated() {
+    void feasibilityOrExternalBlockerStallsAndThenRecoversWithSamePersistentGoalId() {
         FactionLivingActorState actor = FactionLivingActorState.initial("faction.alpha", 0L);
-        StrategicGoalCandidate feasible = candidate(
-                StrategicGoalType.SECURE_ROUTE,
-                InterestKind.ROUTE_EXPOSURE,
-                "route.alpha-beta",
-                8000,
-                8000,
-                50L,
-                "route.report");
-        FactionStrategicGoalPlanner.PlanningResult seeded = FactionStrategicGoalPlanner.review(
-                actor,
-                FactionStrategicIntentState.initial("faction.alpha"),
-                List.of(feasible),
-                50L,
-                10L);
-        String originalId = seeded.state().activeGoals().get(0).goalId();
-        StrategicGoalCandidate infeasible = candidate(
+        StrategicGoalCandidate blocked = candidate(
                 StrategicGoalType.SECURE_ROUTE,
                 InterestKind.ROUTE_EXPOSURE,
                 "route.alpha-beta",
                 8000,
                 1000,
-                50L,
+                StrategicPlanningEnvelope.balanced(5L),
+                List.of(StrategicGoalBlocker.INSUFFICIENT_INTELLIGENCE),
+                -1L,
+                StrategicGoalOutcomeSignal.NONE,
+                "route.report");
+        FactionStrategicGoalPlanner.PlanningResult stalled = FactionStrategicGoalPlanner.review(
+                actor,
+                FactionStrategicIntentState.initial("faction.alpha"),
+                List.of(blocked),
+                StrategicPlanningEnvelope.balanced(10L),
+                10L);
+        StrategicGoalState stalledGoal = stalled.state().openGoals().get(0);
+        assertEquals(Lifecycle.STALLED, stalledGoal.lifecycle());
+        assertTrue(stalledGoal.blockers().contains(StrategicGoalBlocker.FEASIBILITY));
+        assertTrue(stalledGoal.blockers().contains(StrategicGoalBlocker.INSUFFICIENT_INTELLIGENCE));
+
+        StrategicGoalCandidate recovered = candidate(
+                StrategicGoalType.SECURE_ROUTE,
+                InterestKind.ROUTE_EXPOSURE,
+                "route.alpha-beta",
+                8000,
+                9000,
+                StrategicPlanningEnvelope.balanced(5L),
+                List.of(),
+                -1L,
+                StrategicGoalOutcomeSignal.NONE,
                 "route.report.new");
+        FactionStrategicGoalPlanner.PlanningResult active = FactionStrategicGoalPlanner.review(
+                actor,
+                stalled.state(),
+                List.of(recovered),
+                StrategicPlanningEnvelope.balanced(10L),
+                20L);
+
+        assertEquals(1, active.state().activeGoals().size());
+        assertEquals(stalledGoal.goalId(), active.state().activeGoals().get(0).goalId());
+    }
+
+    @Test
+    void terminalFailureCreatesCancellationCostCooldownAndFreshIdentityAfterCooldown() {
+        FactionLivingActorState actor = FactionLivingActorState.initial("faction.alpha", 0L);
+        StrategicGoalCandidate feasible = candidate(
+                StrategicGoalType.STOCKPILE,
+                InterestKind.RESOURCE_DEFICIT,
+                "resource.fuel",
+                8000,
+                9000,
+                StrategicPlanningEnvelope.balanced(50L),
+                List.of(),
+                -1L,
+                StrategicGoalOutcomeSignal.NONE,
+                "fuel.report");
+        FactionStrategicGoalPlanner.PlanningResult seeded = FactionStrategicGoalPlanner.review(
+                actor,
+                FactionStrategicIntentState.initial("faction.alpha"),
+                List.of(feasible),
+                StrategicPlanningEnvelope.balanced(50L),
+                10L);
+        String originalId = seeded.state().activeGoals().get(0).goalId();
+        StrategicGoalCandidate failed = candidate(
+                StrategicGoalType.STOCKPILE,
+                InterestKind.RESOURCE_DEFICIT,
+                "resource.fuel",
+                8000,
+                9000,
+                StrategicPlanningEnvelope.balanced(50L),
+                List.of(),
+                -1L,
+                StrategicGoalOutcomeSignal.FAILED,
+                "fuel.execution.failed");
 
         FactionStrategicGoalPlanner.PlanningResult cancelled = FactionStrategicGoalPlanner.review(
-                actor, seeded.state(), List.of(infeasible), 50L, 20L);
+                actor,
+                seeded.state(),
+                List.of(failed),
+                StrategicPlanningEnvelope.balanced(50L),
+                20L);
         StrategicGoalState cancelledGoal = cancelled.state().goals().get(0);
         assertEquals(Lifecycle.CANCELLED, cancelledGoal.lifecycle());
-        assertEquals(5L, cancelledGoal.cancellationCostUnits());
+        assertEquals(StrategicPlanningEnvelope.balanced(5L), cancelledGoal.cancellationCost());
         assertEquals(44L, cancelledGoal.cooldownUntilTick());
 
         FactionStrategicGoalPlanner.PlanningResult blocked = FactionStrategicGoalPlanner.review(
-                actor, cancelled.state(), List.of(feasible), 50L, 30L);
-        assertTrue(blocked.state().activeGoals().isEmpty());
+                actor,
+                cancelled.state(),
+                List.of(feasible),
+                StrategicPlanningEnvelope.balanced(50L),
+                30L);
+        assertTrue(blocked.state().openGoals().isEmpty());
 
         FactionStrategicGoalPlanner.PlanningResult reentered = FactionStrategicGoalPlanner.review(
-                actor, blocked.state(), List.of(feasible), 50L, 44L);
+                actor,
+                blocked.state(),
+                List.of(feasible),
+                StrategicPlanningEnvelope.balanced(50L),
+                44L);
         assertEquals(1, reentered.state().activeGoals().size());
         assertTrue(!originalId.equals(reentered.state().activeGoals().get(0).goalId()));
+    }
+
+    @Test
+    void successAndExpiryAreDistinctTerminalLifecyclesWithoutCancellationPenalty() {
+        FactionLivingActorState actor = FactionLivingActorState.initial("faction.alpha", 0L);
+        StrategicGoalCandidate base = candidate(
+                StrategicGoalType.EXPLORE,
+                InterestKind.TERRITORIAL_OPPORTUNITY,
+                "system.frontier",
+                7000,
+                9000,
+                StrategicPlanningEnvelope.balanced(5L),
+                List.of(),
+                30L,
+                StrategicGoalOutcomeSignal.NONE,
+                "survey.start");
+        FactionStrategicGoalPlanner.PlanningResult seeded = FactionStrategicGoalPlanner.review(
+                actor,
+                FactionStrategicIntentState.initial("faction.alpha"),
+                List.of(base),
+                StrategicPlanningEnvelope.balanced(10L),
+                10L);
+        StrategicGoalCandidate success = candidate(
+                StrategicGoalType.EXPLORE,
+                InterestKind.TERRITORIAL_OPPORTUNITY,
+                "system.frontier",
+                7000,
+                9000,
+                StrategicPlanningEnvelope.balanced(5L),
+                List.of(),
+                30L,
+                StrategicGoalOutcomeSignal.SUCCEEDED,
+                "survey.complete");
+        FactionStrategicGoalPlanner.PlanningResult succeeded = FactionStrategicGoalPlanner.review(
+                actor,
+                seeded.state(),
+                List.of(success),
+                StrategicPlanningEnvelope.balanced(10L),
+                20L);
+        assertEquals(Lifecycle.SUCCEEDED, succeeded.state().goals().get(0).lifecycle());
+        assertTrue(succeeded.cancellationCost().isZero());
+
+        StrategicGoalCandidate expiring = candidate(
+                StrategicGoalType.DEFEND,
+                InterestKind.BORDER_SECURITY,
+                "border.temp",
+                6000,
+                9000,
+                StrategicPlanningEnvelope.balanced(5L),
+                List.of(),
+                15L,
+                StrategicGoalOutcomeSignal.NONE,
+                "border.temp");
+        FactionStrategicGoalPlanner.PlanningResult expiringSeed = FactionStrategicGoalPlanner.review(
+                actor,
+                FactionStrategicIntentState.initial("faction.beta"),
+                List.of(),
+                StrategicPlanningEnvelope.balanced(10L),
+                10L);
+        // Use an actor with matching faction for the second independent scenario.
+        FactionLivingActorState beta = FactionLivingActorState.initial("faction.beta", 0L);
+        expiringSeed = FactionStrategicGoalPlanner.review(
+                beta,
+                FactionStrategicIntentState.initial("faction.beta"),
+                List.of(expiring),
+                StrategicPlanningEnvelope.balanced(10L),
+                10L);
+        FactionStrategicGoalPlanner.PlanningResult expired = FactionStrategicGoalPlanner.review(
+                beta,
+                expiringSeed.state(),
+                List.of(expiring),
+                StrategicPlanningEnvelope.balanced(10L),
+                15L);
+        assertEquals(Lifecycle.EXPIRED, expired.state().goals().get(0).lifecycle());
+        assertTrue(expired.cancellationCost().isZero());
     }
 
     @Test
@@ -165,6 +323,7 @@ class FactionStrategicGoalPlannerTest {
                         StrategicGoalType.DEFEND,
                         StrategicGoalType.OBTAIN_ACCESS).stream().sorted().toList(),
                 candidates.stream().map(StrategicGoalCandidate::type).sorted().toList());
+        assertTrue(candidates.stream().allMatch(candidate -> candidate.reviewCadenceTicks() > 0L));
     }
 
     private static StrategicGoalCandidate candidate(
@@ -173,7 +332,10 @@ class FactionStrategicGoalPlannerTest {
             String target,
             int urgency,
             int feasibility,
-            long budget,
+            StrategicPlanningEnvelope budget,
+            List<StrategicGoalBlocker> blockers,
+            long expiresAtTick,
+            StrategicGoalOutcomeSignal outcome,
             String provenance) {
         return new StrategicGoalCandidate(
                 type,
@@ -182,14 +344,14 @@ class FactionStrategicGoalPlannerTest {
                         kind,
                         target,
                         urgency,
-                        List.of(new ObservationEvidence(
-                                channel(kind),
-                                provenance,
-                                1L,
-                                -1L))),
+                        List.of(new ObservationEvidence(channel(kind), provenance, 1L, -1L))),
                 urgency,
                 feasibility,
-                budget);
+                budget,
+                blockers,
+                expiresAtTick,
+                1L,
+                outcome);
     }
 
     private static ActorObservation observation(
