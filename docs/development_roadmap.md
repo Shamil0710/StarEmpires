@@ -501,8 +501,24 @@ command interface rather than the old schematic test harness:
 
 Canonical UI/launcher contract: `docs/generated_world_command_ui.md`.
 
-This closes the interface/bootstrap entry seam only. NPC, mission, reputation and living-world
-event implementation remain open Stage-21 work.
+This closes the interface/bootstrap entry seam only. The mandatory Stage-21 closure chain is now:
+
+- **21A** — persistent living-actor cadence, actor-bounded observations and interest evidence;
+- **21B** — explainable strategic goals, feasibility, commitment and anti-oscillation;
+- **21C** — diplomacy, treaties, crises, alliances, war declarations and negotiated outcomes;
+- **21D** — physical fleet readiness, command groups, validated orders and neighbor movement;
+- **21E** — raids, escorts, interceptions, blockades, invasions and Stage-19 physical consequences;
+- **21F** — claims, occupation, stabilization, recognition and gradual control transition;
+- **21G** — peace, demobilization, repair, rearmament and economy-funded replacement;
+- **21H** — persistent NPCs, missions, discovery and reputation grounded in living-world state;
+- **21I** — command UI, save migration, representative corpus, performance and long-run final gate.
+
+Canonical detailed plan and exit criteria:
+`docs/stage21_living_world_roadmap.md`.
+
+Stage 21 is not complete when factions merely own systems and patrols. Completion requires the
+causal loop `interests → diplomacy/crisis → physical fleet operation → losses/territory → political
+outcome → recovery`, with deterministic persistence and no hidden grants.
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
