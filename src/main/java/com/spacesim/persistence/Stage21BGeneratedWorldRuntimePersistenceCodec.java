@@ -28,7 +28,12 @@ public final class Stage21BGeneratedWorldRuntimePersistenceCodec {
         throw new AssertionError("No instances");
     }
 
-    /** Encodes Stage 21B without rewriting any embedded Stage-21A/20 persistence schema. */
+    /**
+     * Encodes Stage 21B without rewriting any embedded Stage-21A/20 persistence schema.
+     *
+     * @param state validated Stage-21B checkpoint composition
+     * @return deterministic bounded binary payload
+     */
     public static byte[] encode(Stage21BGeneratedWorldRuntimePersistentState state) {
         Stage21BGeneratedWorldRuntimePersistentState checked = Objects.requireNonNull(state, "state");
         byte[] stage21A = Stage21AGeneratedWorldRuntimePersistenceCodec.encode(checked.stage21ARuntime());
@@ -59,7 +64,12 @@ public final class Stage21BGeneratedWorldRuntimePersistenceCodec {
         }
     }
 
-    /** Decodes and cross-validates one complete Stage-21B generated-world checkpoint. */
+    /**
+     * Decodes and cross-validates one complete Stage-21B generated-world checkpoint.
+     *
+     * @param bytes encoded Stage-21B checkpoint bytes
+     * @return immutable validated Stage-21B checkpoint composition
+     */
     public static Stage21BGeneratedWorldRuntimePersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
         if (bytes.length <= 0 || bytes.length > MAX_BYTES) {
@@ -100,7 +110,13 @@ public final class Stage21BGeneratedWorldRuntimePersistenceCodec {
         }
     }
 
-    /** Atomically writes one Stage-21B checkpoint where the filesystem supports replacement. */
+    /**
+     * Atomically writes one Stage-21B checkpoint where the filesystem supports replacement.
+     *
+     * @param path target checkpoint path
+     * @param state complete validated Stage-21B state
+     * @throws IOException when the file cannot be written or replaced
+     */
     public static void write(Path path, Stage21BGeneratedWorldRuntimePersistentState state) throws IOException {
         Path target = Objects.requireNonNull(path, "path").toAbsolutePath();
         byte[] bytes = encode(state);
@@ -129,7 +145,13 @@ public final class Stage21BGeneratedWorldRuntimePersistenceCodec {
         }
     }
 
-    /** Reads one bounded Stage-21B checkpoint file. */
+    /**
+     * Reads one bounded Stage-21B checkpoint file.
+     *
+     * @param path existing Stage-21B checkpoint path
+     * @return decoded validated Stage-21B state
+     * @throws IOException when the file cannot be read
+     */
     public static Stage21BGeneratedWorldRuntimePersistentState read(Path path) throws IOException {
         Path source = Objects.requireNonNull(path, "path").toAbsolutePath();
         long size = Files.size(source);
