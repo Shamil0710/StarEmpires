@@ -362,7 +362,17 @@ public final class Stage20SourceSupplyMaterializer {
             LocalPhysicalPosition position,
             double generationScore,
             PhysicalSourceState sourceState) {
-        /** Validates one live generated-source binding. */
+        /**
+         * Validates one live generated-source binding.
+         *
+         * @param sourceId stable generated source identity
+         * @param systemId owning system
+         * @param hostAnchorId owning physical resource-field anchor
+         * @param hostClassId generated physical host classifier
+         * @param position authoritative local-system SI position
+         * @param generationScore retained generation evidence in {@code [0,1]}
+         * @param sourceState mutable finite Stage-18 extraction source
+         */
         public MaterializedSource {
             sourceId = requireText(sourceId, "sourceId");
             Objects.requireNonNull(systemId, "systemId");
@@ -399,7 +409,17 @@ public final class Stage20SourceSupplyMaterializer {
             String locationTag,
             String facilityDefinitionId,
             String extractionMethodId) {
-        /** Validates one saved extraction-site binding. */
+        /**
+         * Validates one saved extraction-site binding.
+         *
+         * @param siteId stable generated site identity
+         * @param sourceId generated natural source served by the site
+         * @param systemId owning star system
+         * @param hostAnchorId owning physical resource-field anchor
+         * @param locationTag Stage-18 facility location tag
+         * @param facilityDefinitionId exact installed-facility definition identity
+         * @param extractionMethodId exact Stage-18 extraction method identity
+         */
         public InitialExtractionSite {
             siteId = requireText(siteId, "siteId");
             sourceId = requireText(sourceId, "sourceId");
