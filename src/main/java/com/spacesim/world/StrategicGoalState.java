@@ -98,7 +98,14 @@ public record StrategicGoalState(
         return type.wireId() + "\u0000" + targetId;
     }
 
-    /** Returns a refreshed active state while preserving persistent identity and creation tick. */
+    /**
+     * Returns a refreshed active state while preserving persistent identity and creation tick.
+     *
+     * @param candidate current candidate for the same type/target identity
+     * @param allocation current strategic planning-envelope allocation
+     * @param reviewTick authoritative review tick
+     * @return refreshed immutable active goal state
+     */
     public StrategicGoalState refresh(StrategicGoalCandidate candidate, long allocation, long reviewTick) {
         StrategicGoalCandidate checked = Objects.requireNonNull(candidate, "Strategic goal candidate not set");
         if (type != checked.type() || !targetId.equals(checked.targetId())) {
@@ -121,7 +128,14 @@ public record StrategicGoalState(
                 0L);
     }
 
-    /** Returns a cancelled state with explicit cooldown and switching cost. */
+    /**
+     * Returns a cancelled state with explicit cooldown and switching cost.
+     *
+     * @param reviewTick authoritative cancellation review tick
+     * @param cooldownUntil earliest tick at which this intent may be reconsidered
+     * @param cancellationCost visible strategic switching cost
+     * @return cancelled immutable goal state
+     */
     public StrategicGoalState cancel(long reviewTick, long cooldownUntil, long cancellationCost) {
         return new StrategicGoalState(
                 goalId,
