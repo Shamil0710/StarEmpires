@@ -1,6 +1,6 @@
 # Stage 20G — Persistent Discovery Knowledge v1
 
-**Status:** IMPLEMENTED CANDIDATE — exact-head CI required before merge
+**Status:** IMPLEMENTED — PR #304 exact-head CI run `32541977567` passed
 
 **Authority:** `stage20g.persistent-discovery-knowledge.v1`
 

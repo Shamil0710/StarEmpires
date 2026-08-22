@@ -695,7 +695,7 @@ Theoretical throughput is never interpreted as already-existing cargo.
 
 ---
 
-# 9. Stage 20G — discovery / sensor-consistent visibility
+# 9. Stage 20G — discovery / sensor-consistent visibility — COMPLETE
 
 Persistent discovery должен различать:
 
@@ -750,6 +750,33 @@ host known
 - persistent infrastructure broadcasting.
 
 Все источники должны иметь provenance/freshness там, где информация может устареть.
+
+## Stage-20G acceptance — COMPLETE
+
+Accepted implementation chain:
+
+```text
+world-stable static/resource knowledge with provenance/freshness
+→ deterministic world-bound persistence sidecar
+→ exact generated faction-start hub grants
+→ exact Stage-20F owned operational-station grants
+→ explicit resource survey/map/intelligence grants only
+→ Stage-17.5 TrackState projection for mobile contacts
+→ production sensor + route-calibration geometry acceptance
+```
+
+Representative bright-capital coupling retains a derived `2,890.190 s` physical
+first-detection-to-fire-control interval at the worst accepted military closing speed, versus the
+existing `60 s` tracked-freshness horizon. No map/screen radius participates. Ungranted generated
+resources remain `UNKNOWN`; surveyed resource knowledge stores bounded observer estimates rather
+than physical reserve truth. Canonical acceptance:
+`docs/stage20g_persistent_discovery_knowledge_v1.md` and
+`docs/stage20g_generated_discovery_visibility_v1.md`.
+
+Runtime handoff remains explicit: durable static generated IDs, local Stage-17.5 target IDs and
+future persistent FleetIds must be rebound without merging identity domains. Live survey actions
+must create evidence; they cannot read generated occurrence truth. Purchased/shared intelligence
+transport latency remains Stage 20I work.
 
 ---
 
