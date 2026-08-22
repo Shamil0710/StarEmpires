@@ -3,6 +3,7 @@ package com.spacesim.world;
 import com.spacesim.world.calibration.Stage20RepresentativePropulsionCatalog;
 import com.spacesim.world.calibration.Stage20RepresentativePropulsionCatalog.ReferenceDefinition;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -19,6 +20,7 @@ import java.util.Optional;
  * on each leg so the same representative ship can repeat the route without silently resetting its
  * jump hardware.</p>
  */
+@SuppressWarnings("doclint:missing")
 public final class Stage20PhysicalFreightRouteEvaluator
         implements Stage20EconomicBootstrapValidator.RouteEvaluator {
     private final Stage20PhysicalGalacticRoutePlanner loadedOutboundPlanner;
@@ -77,6 +79,27 @@ public final class Stage20PhysicalFreightRouteEvaluator
             StarSystemId origin,
             StarSystemId destination,
             int allocatedFreighterCount) {
+        return assessCycleWithAllocatedFreighters(origin, destination, allocatedFreighterCount)
+                .map(FreightCycleAssessment::routeAssessment);
+    }
+
+    /**
+     * Evaluates and retains every physical component of one repeatable freight cycle.
+     *
+     * <p>The historical route assessment intentionally exposes only delivery time and sustainable
+     * throughput. Stage 20J additionally needs the load/unload overhead and ready-again round trip,
+     * so this projection retains the exact already-computed components without introducing another
+     * route or cadence model.</p>
+     *
+     * @param origin producer system
+     * @param destination consumer system
+     * @param allocatedFreighterCount number of configured freighters assigned to the route
+     * @return detailed physical cycle, or empty when an endpoint or route is unavailable
+     */
+    public Optional<FreightCycleAssessment> assessCycleWithAllocatedFreighters(
+            StarSystemId origin,
+            StarSystemId destination,
+            int allocatedFreighterCount) {
         if (allocatedFreighterCount <= 0 || allocatedFreighterCount > fleetProfile.activeFreighterCount()) {
             throw new IllegalArgumentException(
                     "allocatedFreighterCount must be in 1.." + fleetProfile.activeFreighterCount());
@@ -122,9 +145,22 @@ public final class Stage20PhysicalFreightRouteEvaluator
                         endpoint.destinationUnloadingRateKgPerSecond()));
         requirePositiveFinite(sustainableThroughput, "sustainableThroughput");
 
-        return Optional.of(new Stage20EconomicBootstrapValidator.RouteAssessment(
+        return Optional.of(new FreightCycleAssessment(
                 forward.orElseThrow().systems(),
+                allocatedFreighterCount,
+                payloadKg,
+                loadSeconds,
+                unloadSeconds,
+                endpoint.outboundLocalAccessSeconds(),
+                forward.orElseThrow().estimatedArrivalSeconds(),
+                forward.orElseThrow().estimatedReadyAgainSeconds(),
+                endpoint.returnLocalAccessSeconds(),
+                reverse.orElseThrow().estimatedReadyAgainSeconds(),
                 deliverySeconds,
+                oneFreighterCycleSeconds,
+                fleetCycleThroughput,
+                Math.min(endpoint.sourceLoadingRateKgPerSecond(),
+                        endpoint.destinationUnloadingRateKgPerSecond()),
                 sustainableThroughput));
     }
 
@@ -238,6 +274,120 @@ public final class Stage20PhysicalFreightRouteEvaluator
         }
     }
 
+    /**
+     * Exact component breakdown of one repeatable physical freight allocation.
+     *
+     * @param orderedSystems loaded outbound route including both endpoints
+     * @param allocatedFreighterCount explicit finite ship count
+     * @param payloadMassKgPerFreighter delivered mass per loaded trip
+     * @param sourceLoadingSeconds source handling time for one payload
+     * @param destinationUnloadingSeconds destination handling time for one payload
+     * @param outboundLocalAccessSeconds combined loaded endpoint access
+     * @param forwardFtlArrivalSeconds loaded FTL arrival time
+     * @param forwardFtlReadyAgainSeconds loaded FTL arrival plus final cooldown
+     * @param returnLocalAccessSeconds combined return endpoint access
+     * @param returnFtlReadyAgainSeconds return FTL arrival plus final cooldown
+     * @param deliverySeconds one-way load/access/arrival/unload delivery time
+     * @param roundTripCycleSeconds ready-again repeatable cycle duration
+     * @param fleetCycleThroughputKgPerSecond payload/count/cycle throughput before handling ceiling
+     * @param endpointHandlingCeilingKgPerSecond shared endpoint handling ceiling
+     * @param sustainableCargoThroughputKgPerSecond final physical sustainable throughput
+     */
+    public record FreightCycleAssessment(
+            List<StarSystemId> orderedSystems,
+            int allocatedFreighterCount,
+            double payloadMassKgPerFreighter,
+            double sourceLoadingSeconds,
+            double destinationUnloadingSeconds,
+            double outboundLocalAccessSeconds,
+            double forwardFtlArrivalSeconds,
+            double forwardFtlReadyAgainSeconds,
+            double returnLocalAccessSeconds,
+            double returnFtlReadyAgainSeconds,
+            double deliverySeconds,
+            double roundTripCycleSeconds,
+            double fleetCycleThroughputKgPerSecond,
+            double endpointHandlingCeilingKgPerSecond,
+            double sustainableCargoThroughputKgPerSecond) {
+        /**
+         * Validates one exact cycle projection.
+         *
+         * @param orderedSystems loaded outbound route including both endpoints
+         * @param allocatedFreighterCount explicit finite ship count
+         * @param payloadMassKgPerFreighter delivered mass per loaded trip
+         * @param sourceLoadingSeconds source handling time for one payload
+         * @param destinationUnloadingSeconds destination handling time for one payload
+         * @param outboundLocalAccessSeconds combined loaded endpoint access
+         * @param forwardFtlArrivalSeconds loaded FTL arrival time
+         * @param forwardFtlReadyAgainSeconds loaded FTL arrival plus final cooldown
+         * @param returnLocalAccessSeconds combined return endpoint access
+         * @param returnFtlReadyAgainSeconds return FTL arrival plus final cooldown
+         * @param deliverySeconds one-way physical delivery time
+         * @param roundTripCycleSeconds ready-again repeatable cycle duration
+         * @param fleetCycleThroughputKgPerSecond payload/count/cycle throughput
+         * @param endpointHandlingCeilingKgPerSecond endpoint handling ceiling
+         * @param sustainableCargoThroughputKgPerSecond final sustainable throughput
+         */
+        public FreightCycleAssessment {
+            orderedSystems = List.copyOf(Objects.requireNonNull(orderedSystems, "orderedSystems"));
+            if (orderedSystems.isEmpty() || orderedSystems.stream().anyMatch(Objects::isNull)) {
+                throw new IllegalArgumentException("freight cycle route cannot be empty");
+            }
+            if (allocatedFreighterCount <= 0) {
+                throw new IllegalArgumentException("allocatedFreighterCount must be positive");
+            }
+            requirePositiveFinite(payloadMassKgPerFreighter, "payloadMassKgPerFreighter");
+            requirePositiveFinite(sourceLoadingSeconds, "sourceLoadingSeconds");
+            requirePositiveFinite(destinationUnloadingSeconds, "destinationUnloadingSeconds");
+            requireNonNegativeFinite(outboundLocalAccessSeconds, "outboundLocalAccessSeconds");
+            requireNonNegativeFinite(forwardFtlArrivalSeconds, "forwardFtlArrivalSeconds");
+            requireNonNegativeFinite(forwardFtlReadyAgainSeconds, "forwardFtlReadyAgainSeconds");
+            requireNonNegativeFinite(returnLocalAccessSeconds, "returnLocalAccessSeconds");
+            requireNonNegativeFinite(returnFtlReadyAgainSeconds, "returnFtlReadyAgainSeconds");
+            requirePositiveFinite(deliverySeconds, "deliverySeconds");
+            requirePositiveFinite(roundTripCycleSeconds, "roundTripCycleSeconds");
+            requirePositiveFinite(fleetCycleThroughputKgPerSecond,
+                    "fleetCycleThroughputKgPerSecond");
+            requirePositiveFinite(endpointHandlingCeilingKgPerSecond,
+                    "endpointHandlingCeilingKgPerSecond");
+            requirePositiveFinite(sustainableCargoThroughputKgPerSecond,
+                    "sustainableCargoThroughputKgPerSecond");
+            double expectedDelivery = finiteSum(
+                    sourceLoadingSeconds,
+                    outboundLocalAccessSeconds,
+                    forwardFtlArrivalSeconds,
+                    destinationUnloadingSeconds);
+            double expectedCycle = finiteSum(
+                    sourceLoadingSeconds,
+                    outboundLocalAccessSeconds,
+                    forwardFtlReadyAgainSeconds,
+                    destinationUnloadingSeconds,
+                    returnLocalAccessSeconds,
+                    returnFtlReadyAgainSeconds);
+            requireClose(expectedDelivery, deliverySeconds, "deliverySeconds");
+            requireClose(expectedCycle, roundTripCycleSeconds, "roundTripCycleSeconds");
+            requireClose(
+                    payloadMassKgPerFreighter * allocatedFreighterCount / roundTripCycleSeconds,
+                    fleetCycleThroughputKgPerSecond,
+                    "fleetCycleThroughputKgPerSecond");
+            requireClose(
+                    Math.min(fleetCycleThroughputKgPerSecond, endpointHandlingCeilingKgPerSecond),
+                    sustainableCargoThroughputKgPerSecond,
+                    "sustainableCargoThroughputKgPerSecond");
+        }
+
+        /** @return historical compact route projection without losing physical semantics */
+        public Stage20EconomicBootstrapValidator.RouteAssessment routeAssessment() {
+            return new Stage20EconomicBootstrapValidator.RouteAssessment(
+                    orderedSystems, deliverySeconds, sustainableCargoThroughputKgPerSecond);
+        }
+
+        /** @return total source plus destination handling time for one payload */
+        public double handlingOverheadSeconds() {
+            return sourceLoadingSeconds + destinationUnloadingSeconds;
+        }
+    }
+
     private static double finiteSum(double... values) {
         double result = 0d;
         for (double value : values) {
@@ -266,6 +416,13 @@ public final class Stage20PhysicalFreightRouteEvaluator
     private static void requireNonNegativeFinite(double value, String field) {
         if (!Double.isFinite(value) || value < 0d) {
             throw new IllegalArgumentException(field + " must be non-negative and finite");
+        }
+    }
+
+    private static void requireClose(double expected, double actual, String field) {
+        double tolerance = 1.0e-9d * Math.max(1d, Math.max(Math.abs(expected), Math.abs(actual)));
+        if (Math.abs(expected - actual) > tolerance) {
+            throw new IllegalArgumentException(field + " differs from physical cycle components");
         }
     }
 }
