@@ -59,6 +59,8 @@ public final class GeneratedFactionMilitaryBootstrap {
     /** Initial physical patrol strength per generated faction. */
     public static final int SHIPS_PER_FACTION = 3;
 
+    // Stage-13 weapon projection only; EngineeringComponent remains physical ship authority.
+    private static final String LEGACY_COMBAT_ARCHETYPE_ID = "ship.guard_frigate";
     private static final ShipEngineeringCatalog ENGINEERING =
             Stage175ICombatTestContentPack.loadDoctrines();
     private static final ShipProtectionCatalog PROTECTION =
@@ -196,7 +198,7 @@ public final class GeneratedFactionMilitaryBootstrap {
         return new Entity()
                 .add(new IdentityComponent(
                         role + " " + shortFactionName(factionDisplayName), IdentityComponent.Kind.FLEET))
-                .add(new ArchetypeComponent(engineering.fit.hullId()))
+                .add(new ArchetypeComponent(LEGACY_COMBAT_ARCHETYPE_ID))
                 .add(transform)
                 .add(new ShipComponent(ShipType.COMBAT_SHIP))
                 .add(new FactionComponent(runtimeFactionId))
