@@ -110,4 +110,21 @@ class FactionLivingActorSchedulerTest {
         assertEquals(25L, batch.selected().get(0).dueTick());
         assertEquals(List.of(WakeupReason.SHORTAGE_REPORTED), batch.selected().get(0).wakeupReasons());
     }
+
+    @Test
+    void olderPeriodicDeadlineKeepsPriorityOverLaterEventWakeup() {
+        FactionLivingActorState state = FactionLivingActorState.initial("faction.alpha", 10L)
+                .withWakeup(new EventWakeup(
+                        WakeupReason.PROJECT_COMPLETED,
+                        "project.completed.1",
+                        20L,
+                        20L));
+
+        FactionLivingActorScheduler.ScheduleBatch batch =
+                FactionLivingActorScheduler.selectDue(List.of(state), 25L, 1);
+
+        assertEquals(1, batch.selected().size());
+        assertEquals(TriggerType.DEADLINE, batch.selected().get(0).triggerType());
+        assertEquals(10L, batch.selected().get(0).dueTick());
+    }
 }
