@@ -8,7 +8,6 @@ import com.spacesim.world.FactionLivingActorState.EventWakeup;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -168,7 +167,12 @@ public final class FactionLivingActorRuntime {
      * @param reviews completed pure actor reviews in scheduler order
      */
     public record RuntimeReviewBatch(ScheduleBatch schedule, List<ReviewResult> reviews) {
-        /** Validates one immutable batch report. */
+        /**
+         * Validates one immutable batch report.
+         *
+         * @param schedule bounded scheduler report
+         * @param reviews completed pure actor reviews in scheduler order
+         */
         public RuntimeReviewBatch {
             Objects.requireNonNull(schedule, "Schedule batch not set");
             reviews = List.copyOf(Objects.requireNonNull(reviews, "Review results not set"));
