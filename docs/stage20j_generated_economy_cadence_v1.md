@@ -1,6 +1,7 @@
 # Stage 20J — generated economy cadence v1
 
-Status: **IMPLEMENTED — awaiting exact-head CI/merge**
+Status: **MERGED** — PR #308, exact-head CI run `32545685272` passed; merge
+`ef56f5d4b8c9f334f42ea0234f24f41b48545b2f` preserves the validated head tree exactly.
 
 ## Authority boundary
 
