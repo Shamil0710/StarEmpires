@@ -129,9 +129,7 @@ public final class FactionStrategicGoalPlanner {
         }
 
         ArrayList<StrategicGoalState> nextGoals = new ArrayList<>();
-        HashSet<String> refreshedGoalIds = new HashSet<>();
         long cancellationCostUnits = 0L;
-
         for (StrategicGoalState goal : state.goals()) {
             if (goal.lifecycle() != Lifecycle.ACTIVE) {
                 nextGoals.add(goal);
@@ -140,7 +138,6 @@ public final class FactionStrategicGoalPlanner {
             StrategicGoalCandidate candidate = selectedByIntent.get(goal.intentKey());
             if (candidate != null) {
                 nextGoals.add(goal.refresh(candidate, allocationByIntent.get(goal.intentKey()), reviewTick));
-                refreshedGoalIds.add(goal.goalId());
             } else {
                 long cost = fractionCeil(goal.allocatedBudgetUnits(), CANCELLATION_COST_BASIS_POINTS);
                 cancellationCostUnits = Math.addExact(cancellationCostUnits, cost);
@@ -267,7 +264,11 @@ public final class FactionStrategicGoalPlanner {
                             .toList());
         }
 
-        /** Returns a compact stable explanation suitable for logs/debug UI. */
+        /**
+         * Returns a compact stable explanation suitable for logs/debug UI.
+         *
+         * @return lifecycle/type/evidence/target explanation code
+         */
         public String explanationCode() {
             return lifecycle.name().toLowerCase()
                     + ":" + type.wireId()
