@@ -8,6 +8,7 @@ import com.spacesim.persistence.Stage20IndustrialEntityMaterializer.Materialized
 import com.spacesim.persistence.Stage20SourceOutpostMaterializer.MaterializedSourceOutpostRegistry;
 import com.spacesim.world.Stage20OperationalIndustrialSpecializationPlan.OperationalSpecializationReport;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -163,9 +164,40 @@ public final class Stage20GeneratedIndustrialRuntimeBridge {
         public Stage20GeneratedCampaignPersistentState captureCampaignState(
                 Stage20GeneratedCampaignPersistentState base) {
             Stage20GeneratedCampaignPersistentState previous = Objects.requireNonNull(base, "base");
-            Stage18IndustrialState withIndustrial = industrial.captureIndustrialState(previous.industrialState());
+            Stage18IndustrialState withIndustrial = captureIndustrialPreservingUnrelated(
+                    previous.industrialState());
             Stage20GeneratedCampaignPersistentState intermediate = replaceIndustry(previous, withIndustrial);
             return Stage20SourceOutpostCampaignPersistence.capture(intermediate, sourceOutposts);
+        }
+
+        private Stage18IndustrialState captureIndustrialPreservingUnrelated(
+                Stage18IndustrialState previous) {
+            Stage18IndustrialState generated = industrial.captureIndustrialState(previous);
+            Set<String> generatedStationIds = industrial.stations().stream()
+                    .map(Stage20IndustrialEntityMaterializer.MaterializedIndustrialStation::stationId)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            ArrayList<StationStorageSnapshot> storage = new ArrayList<>(generated.stationStorages());
+            previous.stationStorages().stream()
+                    .filter(value -> !generatedStationIds.contains(value.stationId()))
+                    .forEach(storage::add);
+            ArrayList<FacilityInstallationSnapshot> facilities = new ArrayList<>(generated.facilities());
+            previous.facilities().stream()
+                    .filter(value -> !generatedStationIds.contains(value.stationId()))
+                    .forEach(facilities::add);
+            ArrayList<YardInstallationSnapshot> yards = new ArrayList<>(generated.yards());
+            previous.yards().stream()
+                    .filter(value -> !generatedStationIds.contains(value.stationId()))
+                    .forEach(yards::add);
+            return new Stage18IndustrialState(
+                    Stage18IndustrialState.CURRENT_VERSION,
+                    generated.contentFingerprint(),
+                    generated.simulationTick(),
+                    generated.sources(),
+                    storage,
+                    facilities,
+                    yards,
+                    generated.constructionOrders(),
+                    generated.processOrders());
         }
     }
 }

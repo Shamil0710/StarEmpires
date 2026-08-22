@@ -1,6 +1,9 @@
 package com.spacesim.world.generation;
 
 import com.spacesim.persistence.Stage18IndustrialState;
+import com.spacesim.persistence.Stage18IndustrialState.FacilityInstallationSnapshot;
+import com.spacesim.economy.Stage18FacilityRuntime.InstalledFacilityState;
+import com.spacesim.economy.Stage18StationStorage.StationStorageSnapshot;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistence;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState;
 import com.spacesim.persistence.Stage20GeneratedIndustrialRuntimeBridge;
@@ -14,6 +17,7 @@ import com.spacesim.world.generation.Stage20OperationalIndustrialSpecializationP
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,7 +37,38 @@ class Stage20GeneratedIndustrialRuntimeBridgeTest {
         assertTrue(runtime.sourceOutposts().extract(
                 sourceOutpost.site().siteId(), requestKg, 60d).committed());
 
-        Stage20GeneratedCampaignPersistentState captured = runtime.captureCampaignState(initial);
+        String unrelatedStationId = "station.stage20_5.unrelated";
+        StationStorageSnapshot unrelatedStorage = new StationStorageSnapshot(
+                unrelatedStationId,
+                Map.of("storage.dry_bulk", 1_000d),
+                Map.of(),
+                Map.of());
+        FacilityInstallationSnapshot unrelatedFacility = new FacilityInstallationSnapshot(
+                unrelatedStationId,
+                new InstalledFacilityState(
+                        unrelatedStationId + ".facility.0",
+                        "facility.processing.bulk_refinery",
+                        1d,
+                        0d,
+                        0d,
+                        0d,
+                        0d,
+                        "location.orbital_station",
+                        false));
+        Stage18IndustrialState withUnrelatedIndustry = new Stage18IndustrialState(
+                Stage18IndustrialState.CURRENT_VERSION,
+                initial.industrialState().contentFingerprint(),
+                initial.industrialState().simulationTick(),
+                initial.industrialState().sources(),
+                List.of(unrelatedStorage),
+                List.of(unrelatedFacility),
+                initial.industrialState().yards(),
+                initial.industrialState().constructionOrders(),
+                initial.industrialState().processOrders());
+        Stage20GeneratedCampaignPersistentState withUnrelated = replaceIndustry(
+                initial, withUnrelatedIndustry);
+
+        Stage20GeneratedCampaignPersistentState captured = runtime.captureCampaignState(withUnrelated);
         var restored = Stage20GeneratedIndustrialRuntimeBridge.restore(captured);
 
         assertEquals(runtime.industrial().stations().stream().map(value -> value.stationId()).toList(),
@@ -45,6 +80,23 @@ class Stage20GeneratedIndustrialRuntimeBridgeTest {
                         .source().sourceState().remainingAccessibleMassKg(), 0d);
         assertEquals(sourceOutpost.storage().snapshot(),
                 restored.sourceOutposts().outpost(sourceOutpost.site().siteId()).storage().snapshot());
+        assertTrue(captured.industrialState().stationStorages().contains(unrelatedStorage));
+        assertTrue(captured.industrialState().facilities().contains(unrelatedFacility));
+        assertEquals(captured.industrialState(),
+                restored.captureCampaignState(captured).industrialState());
+    }
+
+    private static Stage20GeneratedCampaignPersistentState replaceIndustry(
+            Stage20GeneratedCampaignPersistentState base,
+            Stage18IndustrialState industry) {
+        return new Stage20GeneratedCampaignPersistentState(
+                base.schemaVersion(),
+                base.generationIdentity(),
+                base.materializedWorld(),
+                base.materializationState(),
+                industry,
+                base.discoveryState(),
+                base.openRuntimeBoundaries());
     }
 
     private static Stage20GeneratedCampaignPersistentState savedState(CadenceFixture fixture) {
