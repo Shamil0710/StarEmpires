@@ -193,7 +193,20 @@ public record GeneratedWorldUiSnapshot(
             String hullId,
             String fitId,
             List<InfoSection> sections) implements Comparable<MilitaryView> {
-        /** Validates one immutable military presentation projection. */
+        /**
+         * Validates one immutable military presentation projection.
+         *
+         * @param fleetId ordinary persistent fleet identity
+         * @param name display name
+         * @param factionId stable owning-faction identity
+         * @param factionName owning-faction display name
+         * @param status localized current status
+         * @param systemId current or destination system identity
+         * @param inSystem whether the fleet is locally materialized
+         * @param hullId fitted engineering hull identity
+         * @param fitId fitted provisional demonstrator identity
+         * @param sections inspector sections
+         */
         public MilitaryView {
             if (fleetId <= 0L) {
                 throw new IllegalArgumentException("Military FleetId must be positive");

@@ -248,12 +248,24 @@ public final class GeneratedWorldCommandUiRenderer {
         return listRect.contains(x, y);
     }
 
-    /** @return whether a bottom-left-origin point lies over the active map viewport */
+    /**
+     * @param x horizontal UI coordinate
+     * @param y vertical UI coordinate
+     * @return whether a bottom-left-origin point lies over the active map viewport
+     */
     public boolean isMapPoint(float x, float y) {
         return mapRect.contains(x, y);
     }
 
-    /** Applies wheel zoom to the active physical or global map. */
+    /**
+     * Applies wheel zoom to the active physical or global map.
+     *
+     * @param tab active command tab
+     * @param x cursor horizontal UI coordinate
+     * @param y cursor vertical UI coordinate
+     * @param amountY wheel delta
+     * @return whether map zoom consumed the input
+     */
     public boolean zoomMap(Tab tab, float x, float y, float amountY) {
         if (!isMapPoint(x, y) || (tab != Tab.SYSTEM && tab != Tab.GALAXY)) {
             return false;
@@ -264,7 +276,14 @@ public final class GeneratedWorldCommandUiRenderer {
         return amountY != 0f;
     }
 
-    /** Applies middle-button drag to the active physical or global map. */
+    /**
+     * Applies middle-button drag to the active physical or global map.
+     *
+     * @param tab active command tab
+     * @param deltaX horizontal drag delta
+     * @param deltaY vertical drag delta
+     * @return whether map panning consumed the input
+     */
     public boolean panMap(Tab tab, float deltaX, float deltaY) {
         if (tab != Tab.SYSTEM && tab != Tab.GALAXY) {
             return false;
@@ -278,7 +297,13 @@ public final class GeneratedWorldCommandUiRenderer {
         systemMapCamera.reset();
     }
 
-    /** Centers one current-system stable object without mutating its physical coordinates. */
+    /**
+     * Centers one current-system stable object without mutating its physical coordinates.
+     *
+     * @param snapshot current immutable UI projection
+     * @param stableId stable local-object presentation identity
+     * @return whether the requested object was present and focused
+     */
     public boolean focusLocalObject(GeneratedWorldUiSnapshot snapshot, String stableId) {
         Objects.requireNonNull(snapshot, "snapshot");
         String id = Objects.requireNonNull(stableId, "stableId");

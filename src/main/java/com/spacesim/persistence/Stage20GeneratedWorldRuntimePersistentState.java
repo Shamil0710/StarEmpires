@@ -151,7 +151,13 @@ public record Stage20GeneratedWorldRuntimePersistentState(
             FleetId fleetId,
             StarSystemId systemId,
             LocalPhysicalKinematics physicalState) {
-        /** Validates one immutable physical sidecar entry. */
+        /**
+         * Validates one immutable physical sidecar entry.
+         *
+         * @param fleetId ordinary persistent fleet identity
+         * @param systemId containing star system
+         * @param physicalState exact local physical kinematics
+         */
         public LocalFleetPhysicalState {
             Objects.requireNonNull(fleetId, "fleetId");
             Objects.requireNonNull(systemId, "systemId");

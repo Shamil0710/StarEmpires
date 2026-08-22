@@ -237,7 +237,17 @@ public final class GeneratedFactionMilitaryBootstrap {
             DoctrineId provisionalDoctrineId,
             String hullId,
             String fitId) {
-        /** Validates immutable commissioning evidence. */
+        /**
+         * Validates immutable commissioning evidence.
+         *
+         * @param fleetId ordinary persistent fleet identity
+         * @param stableFactionId stable generated-faction identity
+         * @param systemId commissioned system
+         * @param localEntityId system-local entity identity
+         * @param provisionalDoctrineId selected provisional doctrine
+         * @param hullId fitted engineering hull identity
+         * @param fitId fitted provisional demonstrator identity
+         */
         public CommissionedShip {
             Objects.requireNonNull(fleetId, "fleetId");
             stableFactionId = Objects.requireNonNull(stableFactionId, "stableFactionId");
@@ -251,7 +261,12 @@ public final class GeneratedFactionMilitaryBootstrap {
 
     /** Immutable new-campaign commissioning report. */
     public record BootstrapReport(String version, List<CommissionedShip> ships) {
-        /** Validates immutable bootstrap evidence. */
+        /**
+         * Validates immutable bootstrap evidence.
+         *
+         * @param version bootstrap contract version
+         * @param ships commissioned ships ordered by FleetId
+         */
         public BootstrapReport {
             version = Objects.requireNonNull(version, "version");
             ships = List.copyOf(Objects.requireNonNull(ships, "ships"));

@@ -97,12 +97,20 @@ public final class MapCameraState {
         panY = -(pointY - centerY) * zoom;
     }
 
-    /** @return transformed screen X for one fitted base-projection point */
+    /**
+     * @param pointX fitted base-projection X
+     * @param centerX viewport center X
+     * @return transformed screen X for one fitted base-projection point
+     */
     public float transformX(float pointX, float centerX) {
         return centerX + (pointX - centerX) * zoom + panX;
     }
 
-    /** @return transformed screen Y for one fitted base-projection point */
+    /**
+     * @param pointY fitted base-projection Y
+     * @param centerY viewport center Y
+     * @return transformed screen Y for one fitted base-projection point
+     */
     public float transformY(float pointY, float centerY) {
         return centerY + (pointY - centerY) * zoom + panY;
     }
