@@ -43,7 +43,8 @@ public record Stage20DiscoveryKnowledgeState(
         /** Star, planet, moon or another persistent celestial landmark. */ CELESTIAL_BODY,
         /** Station, jump infrastructure or another persistent installed structure. */ INFRASTRUCTURE,
         /** Physical body/field capable of hosting natural resources. */ RESOURCE_HOST,
-        /** One generated finite Stage-18 natural occurrence. */ RESOURCE_OCCURRENCE
+        /** One generated finite Stage-18 natural occurrence. */ RESOURCE_OCCURRENCE,
+        /** One persistent Stage-20H anomaly, derelict or special physical site. */ SPECIAL_LOCATION
     }
 
     /** Physical or institutional provenance for one received discovery fact. */

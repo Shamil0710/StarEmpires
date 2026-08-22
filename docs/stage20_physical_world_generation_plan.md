@@ -780,7 +780,7 @@ transport latency remains Stage 20I work.
 
 ---
 
-# 10. Stage 20H — anomalies, derelicts и special locations
+# 10. Stage 20H — anomalies, derelicts и special locations — COMPLETE
 
 Special content размещается внутри той же geometry.
 
@@ -797,6 +797,26 @@ Generator должен учитывать:
 - discovery rarity.
 
 Derelict/salvage site должен иметь physical remains/resource state, совместимый со Stage-18 salvage/recycling semantics.
+
+## Stage-20H acceptance — COMPLETE
+
+Accepted implementation chain:
+
+```text
+exact accepted resolved generated world
+→ bounded deterministic special-location rarity/coverage
+→ ordinary StarSystemId + LocalPhysicalPosition placement
+→ channelized accepted physical detection signatures
+→ mining-ship physical approach time + real traffic proximity
+→ finite Stage-18 BOM-derived derelict salvage
+→ existing-occurrence-bound resource phenomena
+→ evidence-gated Stage-20G discovery/persistence
+```
+
+No special location creates a disconnected coordinate system, hidden reserve, free faction asset or
+observer omniscience. Derelict material closes against the production escort bare-hull BOM before
+ordinary Stage-18 recovery loss. Resource phenomena reference existing finite occurrence state.
+Canonical acceptance: `docs/stage20h_special_locations_v1.md`.
 
 ---
 
