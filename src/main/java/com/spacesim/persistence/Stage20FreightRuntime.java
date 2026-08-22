@@ -113,6 +113,25 @@ public final class Stage20FreightRuntime {
     }
 
     /**
+     * Restores from the canonical saved authority without rerunning the Stage-20F planner.
+     *
+     * @param campaign exact saved generated campaign
+     * @param state exact persistent freight sidecar
+     * @param compatibility explicit hull/fit compatibility authority
+     * @param engineering exact named engineering catalog
+     * @return mutable ordinary freight runtime
+     */
+    public static Stage20FreightRuntime restore(
+            Stage20GeneratedCampaignPersistentState campaign,
+            Stage20FreightPersistentState state,
+            Stage20FreightRuntimeMaterializer.FreighterCompatibilityAuthority compatibility,
+            com.spacesim.content.ship.ShipEngineeringCatalog engineering) {
+        Stage20FreightPersistentState checked = Stage20FreightRuntimeMaterializer.validateRestore(
+                campaign, state, compatibility, engineering);
+        return restore(checked);
+    }
+
+    /**
      * Captures exact fleet, hold, lot, route and deadline identity without regeneration.
      *
      * @return complete deterministic Stage-20.5B freight sidecar

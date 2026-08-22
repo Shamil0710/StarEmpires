@@ -340,6 +340,85 @@ public final class Stage20FreightRuntimeMaterializer {
         return persisted;
     }
 
+    /**
+     * Validates a saved freight sidecar directly against the persisted Stage-20K authority.
+     *
+     * <p>This load path deliberately does not require rerunning or retaining the Stage-20F planner
+     * object. Exact ownership slots, route endpoints and topology edges are read from the canonical
+     * saved rows; the sidecar fingerprint binds them to the same campaign. The record constructor
+     * independently validates fleet/order/lot/hold conservation.</p>
+     *
+     * @param saved exact saved generated campaign
+     * @param freight persisted Stage-20.5B freight sidecar
+     * @param compatibility explicit hull/fit compatibility authority
+     * @param engineering exact named engineering catalog
+     * @return the same validated persistent freight sidecar
+     */
+    public static Stage20FreightPersistentState validateRestore(
+            Stage20GeneratedCampaignPersistentState saved,
+            Stage20FreightPersistentState freight,
+            FreighterCompatibilityAuthority compatibility,
+            ShipEngineeringCatalog engineering) {
+        Stage20GeneratedCampaignPersistentState state = requireBase(saved);
+        Stage20FreightPersistentState persisted = Objects.requireNonNull(freight, "freight");
+        FreighterCompatibilityAuthority authority = validateCompatibility(compatibility, engineering);
+        if (persisted.rootSeed() != state.generationIdentity().worldSeed()
+                || !persisted.generatorVersion().equals(state.generationIdentity().generatorVersion())
+                || !persisted.worldFingerprint().equals(state.materializedWorld().worldFingerprint())
+                || !persisted.materializationVersion().equals(CURRENT_VERSION)
+                || !persisted.compatibilityAuthorityVersion().equals(authority.version())) {
+            throw new IllegalArgumentException("freight sidecar differs from saved generated authority");
+        }
+
+        Set<OwnerSlotKey> savedSlots = new HashSet<>();
+        for (CanonicalRow row : state.materializedWorld().worldRows()) {
+            if (!OWNERSHIP_SLOT_DOMAIN.equals(row.domain())) {
+                continue;
+            }
+            requireValueCountAtLeast(row, 3);
+            OwnerSlotKey key = new OwnerSlotKey(
+                    requireText(row.values().get(0), "stableFactionId"),
+                    parseNonNegativeInt(row.values().get(1), row, "ownershipOrdinal"));
+            if (!savedSlots.add(key)) {
+                throw new IllegalArgumentException("duplicate saved freight ownership slot");
+            }
+        }
+        Set<OwnerSlotKey> persistedSlots = new HashSet<>();
+        for (FreighterState ship : persisted.freighters()) {
+            persistedSlots.add(new OwnerSlotKey(ship.stableFactionId(), ship.ownershipOrdinal()));
+            if (!ship.hullId().equals(authority.hullId())
+                    || !ship.fitId().equals(authority.fitId())
+                    || Double.compare(ship.cargoCapacityKg(), authority.cargoCapacityKg()) != 0) {
+                throw new IllegalArgumentException("persisted freighter differs from compatibility authority");
+            }
+        }
+        if (savedSlots.isEmpty() || !persistedSlots.equals(savedSlots)) {
+            throw new IllegalArgumentException("persisted freighters differ from saved ownership slots");
+        }
+
+        SavedWorldIndex world = SavedWorldIndex.parse(state);
+        Set<String> industrialEndpoints = state.materializedWorld().worldRows().stream()
+                .filter(row -> row.domain().equals("INDUSTRIAL_SPECIALIZATION"))
+                .peek(row -> requireValueCountAtLeast(row, 3))
+                .map(row -> row.values().get(1))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        for (TransportOrderState order : persisted.orders()) {
+            world.requireNeighborRoute(order.orderedSystems());
+            StarSystemId first = order.orderedSystems().get(0);
+            StarSystemId last = order.orderedSystems().get(order.orderedSystems().size() - 1);
+            if (!order.sourceEndpointId().equals(world.majorHubId(first))) {
+                throw new IllegalArgumentException("saved freight order source is not its canonical major hub");
+            }
+            boolean validDestination = order.assignmentKind() == AssignmentKind.ESSENTIAL_BOOTSTRAP
+                    ? order.destinationEndpointId().equals(world.majorHubId(last))
+                    : industrialEndpoints.contains(order.destinationEndpointId());
+            if (!validDestination) {
+                throw new IllegalArgumentException("saved freight order destination lacks canonical authority");
+            }
+        }
+        return persisted;
+    }
+
     private static Stage20GeneratedCampaignPersistentState requireBase(
             Stage20GeneratedCampaignPersistentState saved) {
         Stage20GeneratedCampaignPersistentState state = Objects.requireNonNull(saved, "saved");
@@ -672,6 +751,18 @@ public final class Stage20FreightRuntimeMaterializer {
             throw new IllegalArgumentException(field + " must be positive in " + row.stableId());
         }
         return parsed;
+    }
+
+    private static int parseNonNegativeInt(String value, CanonicalRow row, String field) {
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed < 0) {
+                throw new NumberFormatException("negative");
+            }
+            return parsed;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(field + " is invalid in " + row.stableId(), exception);
+        }
     }
 
     private static long parseLong(String value, CanonicalRow row, String field) {
