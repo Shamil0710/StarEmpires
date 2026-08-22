@@ -19,7 +19,7 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-08-16 / Stage 17H.**
+**Последняя синхронизация README: 2026-08-22 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 NEXT.**
 
 Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md).
 
@@ -28,12 +28,14 @@
 | **v0.1 Economic Sandbox** | deterministic economic core | **COMPLETE** |
 | **v0.2 Living Galactic Economy** | multi-system factions, logistics, construction, expansion | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining, combat, progression | **COMPLETE** |
-| **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **ACTIVE** |
-| **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | PLANNED |
+| **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **COMPLETE** |
+| **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **ACTIVE — Stage 21** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | PLANNED |
 | **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED |
 
-На текущем roadmap завершены Stages **0–17**, включая финальный **Stage 17H persistence/migration/end-to-end transition gate**. Следующий runtime slice — **Stage 17.5A: production material/hull/module schema**.
+На текущем roadmap завершены Stages **0–20**, включая **Stage 20A–20L physical-world generation**
+и обязательный **Stage 20.5 runtime + visual integration gate**. Следующий runtime slice —
+**Stage 21: RPG / Living World**.
 
 ## Что уже реализовано
 
@@ -267,8 +269,9 @@ Stage 17 COMPLETE
 → Stage 17.5B–I combat/fitting foundation
 → Stage 18 resources/industry/infrastructure
 → Stage 19 warfare
-→ Stage 20 world generation
-→ Stage 21 living world
+→ Stage 20 world generation COMPLETE
+→ Stage 20.5 runtime + visual integration COMPLETE
+→ Stage 21 living world NEXT
 → Stage 22 content/balance
 → Stage 23 RC
 ```

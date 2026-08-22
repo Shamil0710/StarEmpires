@@ -48,6 +48,12 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
         CadenceFixture fixture = fixture();
         LiveRuntime bootstrap = Stage20GeneratedWorldRuntimeBridge.materializeBootstrap(
                 savedState(fixture), fixture.specialization(), world(fixture));
+        long canonicalStationCount = bootstrap.captureState().campaign().materializedWorld()
+                .worldRows().stream()
+                .filter(row -> row.domain().equals("INFRASTRUCTURE_PLACEMENT"))
+                .filter(row -> row.values().size() >= 3 && !row.values().get(2).isBlank())
+                .count();
+        assertEquals(canonicalStationCount, bootstrap.infrastructure().endpoints().size());
         Candidate candidate = candidate(bootstrap);
         FleetId fleetId = candidate.order().fleetId();
         int materializedFleetCount = bootstrap.freight().capture().freighters().size();

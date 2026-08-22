@@ -1,6 +1,6 @@
 # Star Empires — Stage 20.5 Runtime + Visual Integration Plan v1
 
-> Статус: **PROPOSED — post-Stage-20 gate before Stage 21**  
+> Статус: **COMPLETE — accepted post-Stage-20 gate; Stage 21 unblocked**
 > Основание: `docs/stage20_physical_world_generation_plan.md` — **Stage 20A–20L COMPLETE**; `docs/stage20l_physical_world_acceptance_matrix_v1.md` — accepted final Stage-20 composition gate.  
 > Назначение: превратить завершённый Stage-20 generated-world authority в минимально цельный playable runtime с production-bound 2D presentation до начала Stage 21 RPG / Living World.
 
@@ -87,7 +87,7 @@ materialization
 
 ---
 
-## 3. Stage 20.5A — Source supply materialization
+## 3. Stage 20.5A — Source supply materialization — COMPLETE
 
 Закрывает `SOURCE_SUPPLY_MATERIALIZATION`.
 
@@ -114,7 +114,7 @@ accepted source authority
 
 ---
 
-## 4. Stage 20.5B — Freight fleet + cargo materialization
+## 4. Stage 20.5B — Freight fleet + cargo materialization — COMPLETE
 
 Закрывает одновременно:
 
@@ -149,7 +149,7 @@ ownership ordinal
 
 ---
 
-## 5. Stage 20.5C — Industrial entity materialization
+## 5. Stage 20.5C — Industrial entity materialization — COMPLETE
 
 Закрывает `INDUSTRIAL_ENTITY_MATERIALIZATION`.
 
@@ -178,7 +178,7 @@ generated industrial authority
 
 ---
 
-## 6. Stage 20.5D — Live arrival authority integration
+## 6. Stage 20.5D — Live arrival authority integration — COMPLETE
 
 Закрывает `LIVE_ARRIVAL_AUTHORITY_INTEGRATION`.
 
@@ -206,7 +206,7 @@ ordinary edge transition
 
 ---
 
-## 7. Stage 20.5E — Minimum Playable Sprite Pack
+## 7. Stage 20.5E — Minimum Playable Sprite Pack — COMPLETE
 
 Это минимальный production-ready visual pack, достаточный для проверки accepted world/runtime как одной игры. Это не финальный fleet catalogue и не Stage-23 polish.
 
@@ -301,7 +301,7 @@ At normal gameplay zoom:
 
 ## 9. Stage 20.5 completion gate
 
-Stage 20.5 can be marked **COMPLETE** only when:
+Stage 20.5 is **COMPLETE**. The accepted implementation satisfies:
 
 1. all five Stage-20L runtime bridge seams are closed by production code;
 2. one accepted generated world can materialize into ordinary runtime without regeneration or hidden grants;
@@ -333,7 +333,7 @@ Stage 20.5 не закрывает:
 
 ---
 
-## 11. Immediate implementation order
+## 11. Accepted implementation order and evidence
 
 ```text
 20.5A Source supply materialization
@@ -346,3 +346,24 @@ Stage 20.5 не закрывает:
 ```
 
 Если seam dependency требует небольшой перестановки внутри A–D, merge order может меняться, но final gate обязан закрывать все пять Stage-20L boundaries до Stage 21.
+
+The accepted merge order was `20.5C → 20.5B → 20.5D → 20.5E → 20.5A → final acceptance`.
+The order did not alter the locked causal authority: the final composition consumes the already
+accepted Stage-20 generation, ownership, cadence and persistence state.
+
+| Slice | Merge evidence | Primary acceptance evidence |
+| --- | --- | --- |
+| 20.5A | PR #314 | `Stage20SourceSupplyMaterializerTest`, `Stage20SourceOutpostMaterializerTest`, `Stage20SourceOutpostCampaignPersistenceTest` |
+| 20.5B | PR #315 | `Stage20FreightRuntimeMaterializerTest` |
+| 20.5C | PR #313 | `Stage20IndustrialEntityMaterializerTest`, `Stage20GeneratedIndustrialRuntimeBridgeTest` |
+| 20.5D | PR #316 | `Stage20LiveArrivalAuthorityIntegrationTest` |
+| 20.5E | PR #317 | `Stage20MinimumPlayableSpriteCatalogTest` and asset-contract tests |
+| Final composition | PR #318 | `Stage205GeneratedWorldPlayableAcceptanceTest` |
+
+The final acceptance materializes an accepted generated seed into one ordinary runtime, stages
+physically extracted cargo from source outpost to hub, loads a conserved cargo lot, traverses every
+neighbor edge through the production jump FSM, applies exact saved arrival position/velocity,
+round-trips an in-transit checkpoint and delivers into the generated industrial endpoint. A branch
+destroys the same persistent freight fleet and proves cargo loss without replacement or virtual
+delivery. The complete evidence and remaining boundaries are recorded in
+`docs/stage20_5_completion_record.md`.

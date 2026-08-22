@@ -40,6 +40,7 @@ import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.LocalPhysicalPosition;
+import com.spacesim.world.Stage20LocalInfrastructureLayout.PlacementKind;
 import com.spacesim.world.Stage20OperationalIndustrialSpecializationPlan.OperationalSpecializationReport;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldSimulation;
@@ -648,7 +649,12 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 if (!INFRASTRUCTURE_DOMAIN.equals(row.domain())) {
                     continue;
                 }
-                requireValueCount(row, 7);
+                requireValueCount(row, 9);
+                PlacementKind kind = parsePlacementKind(row.values().get(1), row);
+                if (kind != PlacementKind.MAJOR_HUB_STATION
+                        && kind != PlacementKind.INDEPENDENT_STATION) {
+                    continue;
+                }
                 StarSystemId systemId = new StarSystemId(parsePositiveLong(
                         row.values().get(0), row, "systemId"));
                 String stationId = infrastructureId(row.stableId());
@@ -807,6 +813,15 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         if (row.values().size() < count) {
             throw new IllegalArgumentException(
                     "malformed " + row.domain() + " row: " + row.stableId());
+        }
+    }
+
+    private static PlacementKind parsePlacementKind(String value, CanonicalRow row) {
+        try {
+            return PlacementKind.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "infrastructure kind is invalid in " + row.stableId(), exception);
         }
     }
 
