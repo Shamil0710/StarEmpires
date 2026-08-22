@@ -44,7 +44,14 @@ public final class FactionLivingActorScheduler {
             long dueTick,
             List<WakeupReason> wakeupReasons) implements Comparable<ScheduledReview> {
 
-        /** Validates one scheduler authorization. */
+        /**
+         * Validates one scheduler authorization.
+         *
+         * @param factionContentId stable faction identity
+         * @param triggerType winning trigger family
+         * @param dueTick earliest persisted due tick used for ordering
+         * @param wakeupReasons due event reasons in stable enum order
+         */
         public ScheduledReview {
             factionContentId = requireText(factionContentId, "Faction content ID");
             Objects.requireNonNull(triggerType, "Trigger type not set");
@@ -90,7 +97,14 @@ public final class FactionLivingActorScheduler {
             List<ScheduledReview> selected,
             int deferredCount) {
 
-        /** Validates one bounded scheduling report. */
+        /**
+         * Validates one bounded scheduling report.
+         *
+         * @param nowTick scheduler observation tick
+         * @param eligibleCount number of actors due before applying the work budget
+         * @param selected reviews authorized this invocation
+         * @param deferredCount due actors left for a later invocation
+         */
         public ScheduleBatch {
             if (nowTick < 0L) {
                 throw new IllegalArgumentException("Scheduler tick cannot be negative");
