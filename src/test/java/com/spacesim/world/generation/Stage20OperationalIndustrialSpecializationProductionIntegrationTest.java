@@ -8,6 +8,17 @@ import com.spacesim.economy.Stage18ShipyardRuntime.InstalledYardState;
 import com.spacesim.economy.Stage18StationStorage.StationStorageSnapshot;
 import com.spacesim.world.Stage20BootstrapFreightOwnershipPlan;
 import com.spacesim.world.Stage20BootstrapProductionCapacityCalculator.ProcessKind;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceEstimate;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef;
+import com.spacesim.world.Stage20GeneratedDiscoveryBootstrapPlan;
+import com.spacesim.world.Stage20GeneratedDiscoveryBootstrapPlan.BootstrapAuthority;
+import com.spacesim.world.Stage20GeneratedDiscoveryBootstrapPlan.ResourceKnowledgeGrant;
 import com.spacesim.world.Stage20IndustrialFacilityOperatingPlan;
 import com.spacesim.world.Stage20IndustrialFacilityOperatingPlan.FacilitySlotKey;
 import com.spacesim.world.Stage20IndustrialFacilityOperatingPlan.FacilityStateAssignment;
@@ -48,6 +59,8 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,6 +69,91 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20OperationalIndustrialSpecializationProductionIntegrationTest {
+    @Test
+    void acceptedGeneratedAndOperationalAuthorityBootstrapsOnlyOwnedAndExplicitKnowledge() {
+        Fixture fixture = fixture();
+        YardReport yards = Stage20IndustrialShipyardInstallationPlan.plan(
+                fixture.resolved(), fixture.inventory(), yardAuthority(fixture, YardVariant.ACTIVE));
+        var specialization = Stage20OperationalIndustrialSpecializationPlan.derive(
+                fixture.resolved(), yards);
+        var occurrence = fixture.resolved().generation().resourceWorld().orElseThrow()
+                .occurrences().get(0);
+        String ownerId = specialization.specializations().get(0).key().stableFactionId();
+        ResourceKnowledge surveyKnowledge = new ResourceKnowledge(
+                ResourceKnowledgeLevel.SURVEYED_DEPOSIT,
+                Optional.of(occurrence.outputCommodityId()),
+                Optional.of(new ResourceEstimate(0.10d, 0.30d, 1_000d, 2_000d, 0.75d)));
+        ResourceKnowledgeGrant survey = new ResourceKnowledgeGrant(
+                ownerId,
+                occurrence.sourceId(),
+                surveyKnowledge,
+                new DiscoveryEvidence(
+                        DiscoverySource.PHYSICAL_VISIT_OR_SURVEY,
+                        "stage20g.production-fixture.explicit-survey",
+                        80d,
+                        OptionalDouble.empty()));
+
+        var bootstrap = Stage20GeneratedDiscoveryBootstrapPlan.plan(
+                fixture.resolved(),
+                specialization,
+                new BootstrapAuthority(
+                        "stage20g.production-fixture.authority.v1",
+                        fixture.resolved().rootSeed(),
+                        "fixture-world-fingerprint-seed-1",
+                        100d,
+                        3_600d,
+                        List.of(survey)));
+
+        var placement = fixture.resolved().generation().placement().orElseThrow();
+        assertEquals(placement.assignments().size(), bootstrap.ownerKnowledge().size());
+        assertEquals(placement.assignments().size(), bootstrap.startingHubGrantCount());
+        assertEquals(specialization.specializations().size(), bootstrap.operationalStationGrantCount());
+        assertEquals(1, bootstrap.resourceKnowledgeGrantCount());
+        var ownerKnowledge = bootstrap.knowledgeFor(ownerId);
+        var ownerStart = placement.assignments().stream()
+                .filter(value -> value.stableFactionId().equals(ownerId))
+                .findFirst().orElseThrow();
+        var startLayout = fixture.resolved().generation().localLayouts().orElseThrow().stream()
+                .filter(value -> value.systemId().equals(ownerStart.systemId()))
+                .findFirst().orElseThrow();
+        assertEquals(
+                DiscoveryState.KNOWN_STATIC_LOCATION,
+                ownerKnowledge.discoveryState(new StaticObjectRef(
+                        ownerStart.systemId(),
+                        StaticObjectKind.INFRASTRUCTURE,
+                        startLayout.majorHubId())));
+        var operationalStation = specialization.specializations().get(0).key().station();
+        assertEquals(
+                DiscoveryState.KNOWN_STATIC_LOCATION,
+                ownerKnowledge.discoveryState(new StaticObjectRef(
+                        operationalStation.systemId(),
+                        StaticObjectKind.INFRASTRUCTURE,
+                        operationalStation.stationPlacementId())));
+        var resourceRef = new StaticObjectRef(
+                occurrence.systemId(), StaticObjectKind.RESOURCE_OCCURRENCE, occurrence.sourceId());
+        assertEquals(ResourceKnowledgeLevel.SURVEYED_DEPOSIT,
+                ownerKnowledge.knowledge(resourceRef).orElseThrow().resourceKnowledge().level());
+        assertEquals(1_000d, ownerKnowledge.knowledge(resourceRef).orElseThrow()
+                .resourceKnowledge().estimate().orElseThrow().minimumRecoverableMassKg(), 0d);
+
+        var ungranted = fixture.resolved().generation().resourceWorld().orElseThrow().occurrences().stream()
+                .filter(value -> !value.sourceId().equals(occurrence.sourceId()))
+                .findFirst().orElseThrow();
+        assertEquals(
+                DiscoveryState.UNKNOWN,
+                ownerKnowledge.discoveryState(new StaticObjectRef(
+                        ungranted.systemId(),
+                        StaticObjectKind.RESOURCE_OCCURRENCE,
+                        ungranted.sourceId())));
+        assertEquals(bootstrap.ownerKnowledge(), bootstrap.toPersistentState().knowledgeStates());
+        assertTrue(bootstrap.ownerKnowledge().stream()
+                .flatMap(value -> value.entries().stream())
+                .flatMap(value -> value.evidence().stream())
+                .noneMatch(value -> value.source()
+                        == DiscoverySource.PERSISTENT_INFRASTRUCTURE_BROADCAST));
+        assertTrue(specialization.readyForRuntimeBridge());
+    }
+
     @Test
     void realIndustrialStationProjectsActiveYardAndFinalPhysicalRoles() {
         Fixture fixture = fixture();
