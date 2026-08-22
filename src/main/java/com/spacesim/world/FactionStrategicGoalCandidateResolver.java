@@ -10,11 +10,15 @@ import java.util.Objects;
 /**
  * Conservative Stage-21A-to-21B candidate bridge.
  *
- * <p>The resolver uses only the already-ranked actor-bounded evidence in a decision trace. It does
- * not query world truth, doctrine, fleets, treasury or diplomatic authority. Budget units are
- * abstract planning-envelope weights proportional to evidence severity.</p>
+ * <p>The resolver uses only already-ranked actor-bounded evidence in a decision trace. It does not
+ * query world truth, doctrine, fleets, treasury or diplomatic authority. The initial cost profiles
+ * are normalized planning weights; later authority-specific adapters may refine feasibility,
+ * blockers, expiry and outcomes before planner review.</p>
  */
 public final class FactionStrategicGoalCandidateResolver {
+    /** Default cadence for the initial peaceful strategic-goal proof. */
+    public static final long DEFAULT_REVIEW_CADENCE_TICKS = 24L;
+
     private FactionStrategicGoalCandidateResolver() {
         throw new AssertionError("Utility class");
     }
@@ -39,16 +43,30 @@ public final class FactionStrategicGoalCandidateResolver {
                 continue;
             }
             int urgency = evidence.priorityBasisPoints();
-            long budgetUnits = urgency == 0 ? 0L : Math.max(1L, (urgency + 99L) / 100L);
             candidates.add(new StrategicGoalCandidate(
                     type,
                     evidence.targetId(),
                     StrategicGoalEvidence.from(evidence),
                     urgency,
                     10_000,
-                    budgetUnits));
+                    defaultBudget(type, urgency),
+                    List.of(),
+                    -1L,
+                    DEFAULT_REVIEW_CADENCE_TICKS,
+                    StrategicGoalOutcomeSignal.NONE));
         }
         return candidates.stream().sorted().toList();
+    }
+
+    private static StrategicPlanningEnvelope defaultBudget(StrategicGoalType type, int urgencyBasisPoints) {
+        long scale = urgencyBasisPoints == 0 ? 0L : Math.max(1L, (urgencyBasisPoints + 999L) / 1_000L);
+        return switch (type) {
+            case SECURE_ROUTE -> new StrategicPlanningEnvelope(1L * scale, 3L * scale, 0L, 3L * scale);
+            case STOCKPILE -> new StrategicPlanningEnvelope(2L * scale, 3L * scale, 1L * scale, 0L);
+            case EXPLORE -> new StrategicPlanningEnvelope(1L * scale, 1L * scale, 0L, 2L * scale);
+            case DEFEND -> new StrategicPlanningEnvelope(2L * scale, 2L * scale, 1L * scale, 4L * scale);
+            case OBTAIN_ACCESS -> new StrategicPlanningEnvelope(2L * scale, 1L * scale, 0L, 0L);
+        };
     }
 
     private static StrategicGoalType defaultType(InterestKind kind) {
