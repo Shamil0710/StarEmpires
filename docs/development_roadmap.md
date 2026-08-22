@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-22 / Stage 20F COMPLETE; Stage 20G NEXT.**
+> **Последняя синхронизация: 2026-08-22 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 NEXT.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -43,7 +43,7 @@
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 20** |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
@@ -350,7 +350,7 @@ The Stage-17.5/19 combat content remains provisional. Stage 22 still owns final 
 
 ## 8. Stage 20 — Physical World Generation / Discovery
 
-**ACTIVE — Stage 19J exit gate passed.**
+**COMPLETE — Stage 20A–20L accepted; Stage 20.5 runtime/visual integration gate accepted.**
 
 Stage 20 answers **where the already-defined world exists**. It must calibrate generated geometry around the physical/industrial/tactical behavior proven by Stages 17.5–19, rather than inventing map distances first and forcing combat/logistics to fit afterward.
 
@@ -417,7 +417,7 @@ Stage-17.5 ship/sensor/weapon capability
 
 Generator may place resources/facilities but cannot invent hidden emergency resources to rescue a bad seed. Generated `system extent` may describe where meaningful content is concentrated, but it cannot clamp/delete/teleport ships at a map edge. Ordinary inter-system travel remains explicit neighbor-edge transition even when local space is unbounded.
 
-Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate simultaneously:
+Stage-20 completion required representative seed batches to demonstrate simultaneously:
 
 - connected production topology where required, but not predominantly chain-like;
 - meaningful alternate-route coverage in core/developed regions while chokepoints remain bounded strategic features;
@@ -434,43 +434,52 @@ Stage 20 cannot be marked COMPLETE until representative seed batches demonstrate
 
 Detailed plan: `docs/stage20_physical_world_generation_plan.md`.
 
-Stage 20F — **COMPLETE / ACCEPTED**:
+Accepted implementation chain:
 
-- `docs/stage20f_industrial_specialization_candidate_plan_v1.md` reconstructs exact generated
-  station/facility/storage/extraction/process candidates from one accepted root seed;
-- `docs/stage20f_industrial_input_route_evidence_plan_v1.md` retains the exact input supply keys,
-  source capacities, physical routes, route-time admission and route-limited capacity behind those
-  candidates;
-- `docs/stage20f_industrial_input_reservation_plan_v1.md` consumes an explicit physical
-  process/output-rate selection and reserves shared `SupplyKey` capacity globally without double-use.
-- `docs/stage20f_industrial_input_freight_ownership_plan_v1.md` assigns every selected process an
-  explicit faction owner, re-evaluates each remote reservation at an exact integer ship count and
-  consumes distinct reserve slots from the existing Stage-20E finite ownership pools.
-- `docs/stage20f_industrial_facility_operating_plan_v1.md` binds selected generated facility slots to
-  canonical Stage-18 installed state and shares finite facility/station operating envelopes.
-- `docs/stage20f_industrial_initial_station_inventory_plan_v1.md` restores exact canonical station
-  storage and requires the physical reserved-rate × first-delivery-time input buffer.
-- `docs/stage20f_industrial_shipyard_installation_plan_v1.md` binds explicit Stage-18G yard presence
-  or absence to generated stations, active support facilities and non-reused shared resources.
-- `docs/stage20f_operational_industrial_specialization_v1.md` closes the final exact owner/station
-  capability index and records the accepted Stage-20F completion gate.
+- **20A** — capability-derived physical scale and precision calibration;
+- **20B** — unbounded local-system geometry;
+- **20C** — logistics-calibrated local infrastructure layout;
+- **20D** — diverse neighbor topology and persisted physical arrival endpoints;
+- **20E** — finite Stage-18 resource geography, economic bootstrap and faction starts;
+- **20F** — exact industrial specialization, facilities, inventory, yards and freight ownership;
+- **20G** — persistent owner-local, sensor-consistent discovery;
+- **20H** — anomalies, derelicts and special locations;
+- **20I** — communications and intelligence latency seam;
+- **20J** — generated extraction/production/freight/buffer cadence acceptance;
+- **20K** — canonical deterministic generated-campaign persistence;
+- **20L** — final 17-row physical-world acceptance matrix covering hard invariants `1..40`.
 
-Candidate and route evidence remain deliberately non-reserved. The accepted chain closes
-`RESERVED_INDUSTRIAL_INPUTS`, `OWNED_INDUSTRIAL_INPUT_FREIGHT`,
-`INSTALLED_FACILITY_OPERATING_STATE`, `INITIAL_STATION_INVENTORY` and `INSTALLED_SHIPYARDS` in order.
-Final specialization roles are derived only from accepted recipes and active installed yards. No
-system/station label or percentage bonus grants industrial output.
+Canonical implementation and acceptance evidence:
 
-Stage-20F completion is planning/bootstrap authority, not silent runtime materialization. The final
-report explicitly retains the runtime handoff for source producer/stock materialization, ownership
-ordinal → `FleetId`, physical cargo orders/lots and exact station/facility/storage/yard entities. In
-particular, reserved `SupplyKey` throughput is not cargo already present.
+- `docs/stage20_physical_world_generation_plan.md`;
+- `docs/stage20l_physical_world_acceptance_matrix_v1.md`.
 
-**Next implementation slice: Stage 20G — persistent discovery / sensor-consistent visibility.**
+### Stage 20.5 — runtime + visual integration
+
+**COMPLETE — all five Stage-20L downstream seams are production-bound.**
+
+- **20.5A / PR #314** — finite source occurrences materialize as ordinary Stage-18 extraction
+  outposts without turning reserved throughput into stock;
+- **20.5B / PR #315** — ownership ordinals materialize as persistent `FleetId` assets, physical
+  cargo lots and ordinary transport orders;
+- **20.5C / PR #313** — generated stations, facilities, storage and yards materialize through the
+  ordinary industrial runtime;
+- **20.5D / PR #316** — ordinary neighbor jumps consume exact persisted hierarchical arrival
+  position and velocity without changing `FleetId`;
+- **20.5E / PR #317** — the role-complete alpha sprite pack is bound by stable simulation identity,
+  with real alpha and no presentation authority over physical state;
+- **final acceptance / PR #318** — one accepted generated world composes A–E, performs physical
+  extraction, outpost-to-hub staging, cargo loading, edge-by-edge freight delivery, exact arrivals,
+  save/load in transit and loss without free replacement.
+
+Canonical completion evidence:
+
+- `docs/stage20_5_runtime_visual_integration_plan_v1.md`;
+- `docs/stage20_5_completion_record.md`.
 
 ## 9. Stage 21 — RPG / Living World
 
-**PLANNED after Stage 20.**
+**NEXT — Stage 20 and the mandatory Stage-20.5 integration gate are complete.**
 
 NPCs, missions, discovery and reputation consume authoritative physical/economic/political state rather than a disconnected scripted world.
 
@@ -535,13 +544,13 @@ Stage 17 COMPLETE
 → Stage 18 Resources / Industry / Infrastructure COMPLETE
 → Stage 19 Strategic Warfare / Coercive Diplomacy / Advanced Combat Behavior COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
-→ Stage 20 Physical World Generation / Discovery ACTIVE — 20F COMPLETE, 20G NEXT
-→ Stage 21 RPG / Living World
+→ Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
+→ Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
+→ Stage 21 RPG / Living World NEXT
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 20G.** Stage 20F has closed generated industrial
-specialization through exact facilities, routes, shared reservations, existing freight ownership,
-operating state, canonical inventory and installed yards. Discovery now consumes that accepted
-physical world through persistent knowledge state and Stage-17.5 sensor-consistent visibility.
+**Immediate implementation priority is Stage 21.** NPCs, missions, reputation and living-world
+behavior now consume the same accepted generated world, persistent entities, physical logistics,
+exact travel state and minimum coherent presentation established by Stage 20 + Stage 20.5.
