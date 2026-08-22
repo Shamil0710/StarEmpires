@@ -34,7 +34,16 @@ public record Stage20GeneratedWorldRuntimePersistentState(
     /** Current atomic Stage-20.5 generated-runtime checkpoint schema. */
     public static final int CURRENT_VERSION = 1;
 
-    /** Validates all cross-envelope identity and active-route invariants. */
+    /**
+     * Validates all cross-envelope identity and active-route invariants.
+     *
+     * @param schemaVersion checkpoint schema version
+     * @param bridgeVersion exact runtime-composition contract
+     * @param campaign current generated campaign and Stage-18 industrial state
+     * @param worldState ordinary multi-system ECS/fleet/jump state
+     * @param activeSystemId active full-rate local system
+     * @param freight current physical fleet, cargo-lot and transport-order sidecar
+     */
     public Stage20GeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException(

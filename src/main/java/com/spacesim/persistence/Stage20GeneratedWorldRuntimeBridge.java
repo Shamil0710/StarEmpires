@@ -576,7 +576,12 @@ public final class Stage20GeneratedWorldRuntimeBridge {
     public record FreightDestructionResult(
             com.spacesim.world.DestructionResult worldResult,
             Stage20FreightRuntime.DestructionResult freightResult) {
-        /** Validates one identity-preserving destruction pair. */
+        /**
+         * Validates one identity-preserving destruction pair.
+         *
+         * @param worldResult ordinary world destruction result
+         * @param freightResult matching physical-freight destruction result
+         */
         public FreightDestructionResult {
             Objects.requireNonNull(worldResult, "worldResult");
             Objects.requireNonNull(freightResult, "freightResult");
@@ -602,7 +607,17 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             Stage18StationStorage storage,
             HandlingCapability handlingCapability,
             boolean generatedIndustrial) {
-        /** Validates one exact endpoint binding. */
+        /**
+         * Validates one exact endpoint binding.
+         *
+         * @param systemId exact generated system
+         * @param stationId exact generated station identity
+         * @param stationArchetypeId exact Stage-18 station archetype
+         * @param position exact generated local physical position
+         * @param storage ordinary mutable Stage-18 storage
+         * @param handlingCapability ordinary physical handling interface
+         * @param generatedIndustrial whether Stage-20.5C owns this endpoint runtime
+         */
         public RuntimeEndpoint {
             Objects.requireNonNull(systemId, "systemId");
             stationId = requireText(stationId, "stationId");
