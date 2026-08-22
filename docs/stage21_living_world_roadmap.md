@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
-> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. The generated-world command UI,
-> finite faction patrol bootstrap and Windows launcher form the Stage-21 entry foundation.
+> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0 and Stage 21A are complete;
+> Stage 21B is the next delivery slice.
 
 ## 1. Purpose
 
@@ -93,27 +93,37 @@ Delivered entry seam:
 This slice makes the accepted world inspectable. It does not itself grant autonomous strategic
 decision-making.
 
-### 21A — Living actor kernel and interest evidence
+### 21A — Living actor kernel and interest evidence — COMPLETE
 
 Objective: give every autonomous faction a bounded persistent decision lifecycle.
 
-Deliverables:
+Delivered:
 
-- `FactionLivingActorState`-equivalent state bound to existing stable faction identity;
-- persisted next-review deadlines, commitment horizons and event wakeup reasons;
+- `FactionLivingActorState` bound to existing stable faction identity;
+- persisted next-review deadlines, commitment horizons and deduplicated event wakeup reasons;
 - actor-bounded economic, territorial, security and diplomatic observation snapshot;
 - interest evidence for supply dependency, market access, route exposure, resource deficit,
   border security, territorial opportunity and treaty obligation;
 - deterministic priority/conflict resolution without direct stat bonuses;
-- decision trace suitable for tests and UI explanation;
-- relevance scheduler proving bounded work as faction/system counts grow.
+- canonical decision trace suitable for tests and later UI explanation;
+- bounded top-K relevance scheduler with hard review budget;
+- atomic lifecycle runtime that publishes observations only for selected actors;
+- generated-world composition bridge and Stage-21A persistence envelope over the unchanged Stage-20
+  checkpoint authority.
 
-Exit criteria:
+Accepted evidence:
 
-- same seed/checkpoint/events produce byte-identical actor decisions;
-- save/load immediately before a deadline produces one, not zero or two, reviews;
-- hidden information cannot change a decision until observed through an allowed channel;
-- no review directly creates money, cargo, ships, territory or relations.
+- equivalent bounded facts produce byte-identical `DecisionTrace` bytes regardless of input order;
+- save/load immediately before a deadline produces exactly one review;
+- wakeups survive persistence, are consumed once, and forged scheduler authorization fails closed;
+- stale/hidden-like evidence cannot affect a decision until a fresh allowed observation is present;
+- no review layer has direct authority to create money, cargo, ships, territory or relations;
+- a 10,000-due-actor acceptance case retains only the configured top-K review budget;
+- failed observation publication leaves a selected batch atomically unchanged;
+- a real `Stage20PlayableGeneratedWorldFactory` checkpoint round-trips through the Stage-21A
+  composition and remains byte-identical before and after actor-only review state changes.
+
+Implementation and acceptance map: `docs/stage21a_living_actor_kernel.md`.
 
 ### 21B — Strategic intent, goals and commitment
 
