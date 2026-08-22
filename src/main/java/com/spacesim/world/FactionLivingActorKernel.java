@@ -29,7 +29,13 @@ public final class FactionLivingActorKernel {
             DecisionTrace trace,
             ScheduledReview scheduledReview) {
 
-        /** Validates identity alignment across the pure review result. */
+        /**
+         * Validates identity alignment across the pure review result.
+         *
+         * @param updatedState lifecycle state after consuming due wakeups and advancing the deadline
+         * @param trace deterministic interest evidence and explanation trace
+         * @param scheduledReview scheduler authorization that caused the review
+         */
         public ReviewResult {
             Objects.requireNonNull(updatedState, "Updated actor state not set");
             Objects.requireNonNull(trace, "Decision trace not set");
