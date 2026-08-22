@@ -898,7 +898,7 @@ materialization requirements remain exact and open. Canonical acceptance:
 
 ---
 
-# 13. Stage 20K — deterministic seed/persistence contract
+# 13. Stage 20K — deterministic seed/persistence contract — COMPLETE
 
 Generator обязан быть:
 
@@ -926,6 +926,19 @@ Save хранит уже materialized authoritative world; изменение ge
 Resource occurrence IDs/reserves, facilities and discovered knowledge входят в persistence semantics.
 
 Far-local positions/velocities и state, необходимые для причинного продолжения движения, также не могут теряться из-за render/materialization culling.
+
+## Stage-20K acceptance — COMPLETE
+
+The save contract stores stable-ID canonical rows for the already materialized generated world and a
+separate canonical generation-quality report. Each receives a deterministic SHA-256 fingerprint.
+The aggregate embeds the existing typed materialization, Stage-18 industrial and Stage-20G discovery
+sidecars, so current finite reserves, facilities/yard state, durable observer knowledge and exact
+far-local kinematics survive without regeneration.
+
+Resume always preserves the saved world. A changed seed/generator/profile/content identity requires
+an explicit migration or new-world decision and cannot silently rewrite a campaign. The four exact
+Stage-20F materialization seams plus Stage-20D live arrival-authority integration remain explicit.
+Canonical acceptance: `docs/stage20k_deterministic_persistence_contract_v1.md`.
 
 ---
 
