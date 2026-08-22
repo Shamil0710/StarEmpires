@@ -1,6 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.spacesim.content.Stage18ExtractionCatalogLoader;
+import com.spacesim.content.Stage18StationInfrastructureCatalogLoader;
 import com.spacesim.persistence.Stage18IndustrialState;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistence;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState;
@@ -40,6 +41,27 @@ class Stage20SourceOutpostMaterializerTest {
                         && value.stationId().equals(value.storage().stationId())
                         && value.storage().snapshotCommodityMassByIdKg().isEmpty()
                         && value.storage().snapshotProductCountById().isEmpty()));
+
+        var chassis = Stage18StationInfrastructureCatalogLoader.loadDefault()
+                .findArchetype(Stage20SourceOutpostMaterializer.COMPATIBILITY_CHASSIS_ID);
+        var compatibilityOutposts = registry.outposts().stream()
+                .filter(value -> value.stationArchetypeId().startsWith(
+                        Stage20SourceOutpostMaterializer.COMPATIBILITY_AUTHORITY_VERSION))
+                .toList();
+        assertFalse(compatibilityOutposts.isEmpty());
+        assertTrue(compatibilityOutposts.stream().allMatch(value ->
+                (value.site().locationTag().equals("location.surface")
+                        && value.site().facilityDefinitionId().equals("facility.extraction.surface")
+                        || value.site().locationTag().equals("location.deep_subsurface")
+                        && value.site().facilityDefinitionId().equals("facility.extraction.deep"))
+                        && value.storage().snapshot().capacityByStorageClassKg()
+                                .equals(chassis.storageCapacityByClassKg())
+                        && value.stationNode().handlingCapability().supportedStorageClassIds()
+                                .equals(chassis.transferStorageClassIds())
+                        && Double.compare(
+                                value.stationNode().handlingCapability().massRateKgPerSecond(),
+                                chassis.transferMassRateKgPerSecond()) == 0));
+        assertFalse(Stage20SourceOutpostMaterializer.STAGE22_REVIEW_MARKER.isBlank());
     }
 
     @Test

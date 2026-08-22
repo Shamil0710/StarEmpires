@@ -61,6 +61,18 @@ import java.util.TreeSet;
 public final class Stage20SourceOutpostMaterializer {
     /** Stable Stage-20.5A source-outpost materialization contract version. */
     public static final String CURRENT_VERSION = "stage20_5.source-outpost-materialization.v1";
+    /**
+     * Versioned compatibility authority for generated surface/deep sites whose exact extraction
+     * facility is not present in a production Stage-18 station archetype.
+     */
+    public static final String COMPATIBILITY_AUTHORITY_VERSION =
+            "stage20_5.source-outpost-chassis-compatibility.v1";
+    /** Existing physical chassis whose storage/handling envelope is retained by compatibility variants. */
+    public static final String COMPATIBILITY_CHASSIS_ID =
+            "station.infrastructure.mining_outpost";
+    /** Explicit later-content review retained for compatibility-derived source outpost variants. */
+    public static final String STAGE22_REVIEW_MARKER =
+            "stage22.review.source-outpost-surface-deep-archetypes";
     /** Stable suffix separating generated site identity from its runtime outpost station identity. */
     public static final String OUTPOST_SUFFIX = ".runtime-outpost";
 
@@ -110,7 +122,7 @@ public final class Stage20SourceOutpostMaterializer {
                     ontology.findCommodity(source.sourceState().outputCommodityId()),
                     "generated source commodity is absent from installed ontology");
             StationArchetypeDefinition archetype = resolveUniqueArchetype(
-                    site, commodity.storageClassId(), infrastructure);
+                    site, commodity.storageClassId(), infrastructure, facilities);
             String stationId = outpostStationId(site.siteId());
             Stage18StationIndustrialNode node = Stage18StationIndustrialNode.instantiate(
                     stationId, site.locationTag(), archetype, ontology, products);
@@ -201,7 +213,8 @@ public final class Stage20SourceOutpostMaterializer {
     private static StationArchetypeDefinition resolveUniqueArchetype(
             InitialExtractionSite site,
             String storageClassId,
-            Stage18StationInfrastructureCatalog infrastructure) {
+            Stage18StationInfrastructureCatalog infrastructure,
+            Stage18FacilityCatalog facilities) {
         ArrayList<StationArchetypeDefinition> candidates = new ArrayList<>();
         for (StationArchetypeDefinition archetype : infrastructure.getArchetypes()) {
             if (archetype.installedFacilityDefinitionIds().contains(site.facilityDefinitionId())
@@ -212,13 +225,58 @@ public final class Stage20SourceOutpostMaterializer {
             }
         }
         candidates.sort(Comparator.comparing(StationArchetypeDefinition::id));
+        if (candidates.isEmpty()) {
+            StationArchetypeDefinition compatible = compatibilityVariant(
+                    site, storageClassId, infrastructure, facilities);
+            if (compatible != null) {
+                return compatible;
+            }
+        }
         if (candidates.size() != 1) {
             throw new IllegalArgumentException(
                     "source outpost requires exactly one compatible Stage-18 archetype for "
-                            + site.siteId() + ", candidates="
+                            + site.siteId()
+                            + " [facility=" + site.facilityDefinitionId()
+                            + ", location=" + site.locationTag()
+                            + ", storageClass=" + storageClassId + "]"
+                            + ", candidates="
                             + candidates.stream().map(StationArchetypeDefinition::id).toList());
         }
         return candidates.get(0);
+    }
+
+    private static StationArchetypeDefinition compatibilityVariant(
+            InitialExtractionSite site,
+            String storageClassId,
+            Stage18StationInfrastructureCatalog infrastructure,
+            Stage18FacilityCatalog facilities) {
+        String requiredFacility = switch (site.locationTag()) {
+            case "location.surface" -> "facility.extraction.surface";
+            case "location.deep_subsurface" -> "facility.extraction.deep";
+            default -> "";
+        };
+        if (!requiredFacility.equals(site.facilityDefinitionId())) {
+            return null;
+        }
+        FacilityDefinition facility = facilities.findFacility(requiredFacility);
+        StationArchetypeDefinition chassis = infrastructure.findArchetype(COMPATIBILITY_CHASSIS_ID);
+        if (facility == null
+                || chassis == null
+                || !facility.allowedLocationTags().contains(site.locationTag())
+                || !facility.storageClassInterfaces().contains(storageClassId)
+                || !chassis.transferStorageClassIds().contains(storageClassId)
+                || chassis.storageCapacityByClassKg().getOrDefault(storageClassId, 0d) <= 0d) {
+            return null;
+        }
+        return new StationArchetypeDefinition(
+                COMPATIBILITY_AUTHORITY_VERSION + "." + requiredFacility,
+                "Generated extraction outpost compatibility variant",
+                List.of(requiredFacility),
+                chassis.storageCapacityByClassKg(),
+                chassis.transferStorageClassIds(),
+                chassis.transferMassRateKgPerSecond(),
+                chassis.maxTransferUnitMassKg(),
+                Set.of(site.locationTag()));
     }
 
     private static InstalledFacilityReference requireExtractionFacilityReference(
