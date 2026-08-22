@@ -1,0 +1,273 @@
+package com.spacesim;
+
+import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
+import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
+import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
+import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
+import com.spacesim.simulation.GeneratedWorldFreightAutopilot;
+import com.spacesim.ui.GeneratedWorldCommandUiRenderer;
+import com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind;
+import com.spacesim.ui.GeneratedWorldCommandUiRenderer.SelectionKind;
+import com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab;
+import com.spacesim.ui.GeneratedWorldCommandUiRenderer.UiSelection;
+import com.spacesim.ui.GeneratedWorldUiModel;
+import com.spacesim.ui.GeneratedWorldUiSnapshot;
+import com.spacesim.world.StarSystemId;
+import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Locale;
+
+/** Player-facing command interface over the accepted generated Stage-20/20.5 world. */
+public final class GeneratedWorldCommandGame extends ApplicationAdapter {
+    private static final String SAVE_FILE = "saves/generated-world-runtime.s25";
+    private static final float AUTOPILOT_INTERVAL_SECONDS = 0.35f;
+
+    private final long initialSeed;
+
+    private LiveRuntime runtime;
+    private GeneratedWorldUiModel model;
+    private GeneratedWorldFreightAutopilot autopilot;
+    private GeneratedWorldCommandUiRenderer renderer;
+    private GeneratedWorldUiSnapshot snapshot;
+    private Tab tab = Tab.SYSTEM;
+    private UiSelection selection = UiSelection.none();
+    private int detailScrollRows;
+    private int listScrollRows;
+    private float autopilotAccumulator;
+    private boolean paused;
+    private double timeScale = 1d;
+    private String status = "Генерация принятого мира…";
+    private Path savePath;
+
+    /**
+     * Creates an application for a deterministic new-world seed.
+     *
+     * @param initialSeed generated campaign seed
+     */
+    public GeneratedWorldCommandGame(long initialSeed) {
+        this.initialSeed = initialSeed;
+    }
+
+    /** Generates the accepted world, binds the read-only UI and starts ordinary freight circulation. */
+    @Override
+    public void create() {
+        var generated = Stage20PlayableGeneratedWorldFactory.create(initialSeed);
+        runtime = generated.runtime();
+        model = new GeneratedWorldUiModel(generated.rootSeed(), runtime, generated.content());
+        autopilot = new GeneratedWorldFreightAutopilot(runtime);
+        renderer = new GeneratedWorldCommandUiRenderer();
+        savePath = Gdx.files.local(SAVE_FILE).file().toPath();
+        snapshot = model.capture();
+        status = "Мир сгенерирован: " + snapshot.galaxy().systems().size()
+                + " систем, " + snapshot.localObjects().size() + " объектов в активной системе.";
+        setAllClocks(false, 1d);
+        Gdx.input.setInputProcessor(input());
+    }
+
+    private InputAdapter input() {
+        return new InputAdapter() {
+            @Override
+            public boolean keyDown(int keycode) {
+                return switch (keycode) {
+                    case Input.Keys.F1 -> switchTab(Tab.SYSTEM);
+                    case Input.Keys.F2 -> switchTab(Tab.GALAXY);
+                    case Input.Keys.F3 -> switchTab(Tab.FACTIONS);
+                    case Input.Keys.F4 -> switchTab(Tab.LOGISTICS);
+                    case Input.Keys.SPACE -> togglePause();
+                    case Input.Keys.NUM_1 -> setTimeScale(1d);
+                    case Input.Keys.NUM_2 -> setTimeScale(2d);
+                    case Input.Keys.NUM_3 -> setTimeScale(4d);
+                    case Input.Keys.NUM_4 -> setTimeScale(8d);
+                    case Input.Keys.F5 -> save();
+                    case Input.Keys.F9 -> load();
+                    case Input.Keys.ESCAPE -> exit();
+                    default -> false;
+                };
+            }
+
+            @Override
+            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                if (button != Input.Buttons.LEFT || renderer == null) {
+                    return false;
+                }
+                float uiY = Gdx.graphics.getHeight() - screenY;
+                var hit = renderer.hitTest(screenX, uiY);
+                if (hit == null) {
+                    return false;
+                }
+                detailScrollRows = 0;
+                if (hit.kind() == HitKind.TAB) {
+                    return switchTab(hit.tab());
+                }
+                selection = switch (hit.kind()) {
+                    case LOCAL_OBJECT -> new UiSelection(SelectionKind.LOCAL_OBJECT, hit.id());
+                    case SYSTEM -> new UiSelection(SelectionKind.SYSTEM, hit.id());
+                    case FACTION -> new UiSelection(SelectionKind.FACTION, hit.id());
+                    case FREIGHT -> new UiSelection(SelectionKind.FREIGHT, hit.id());
+                    case ACTIVATE_SYSTEM -> selection;
+                    case TAB -> throw new IllegalStateException("Tab hit handled above");
+                };
+                if (hit.kind() == HitKind.ACTIVATE_SYSTEM) {
+                    StarSystemId target = new StarSystemId(Long.parseLong(hit.id()));
+                    runtime.world().activateSystem(target);
+                    tab = Tab.SYSTEM;
+                    selection = UiSelection.none();
+                    status = "Активная область симуляции: система #" + target.value()
+                            + ". Флоты не телепортированы.";
+                    snapshot = model.capture();
+                }
+                return true;
+            }
+
+            @Override
+            public boolean scrolled(float amountX, float amountY) {
+                float x = Gdx.input.getX();
+                float y = Gdx.graphics.getHeight() - Gdx.input.getY();
+                if (renderer == null || !renderer.isInspectorPoint(x, y)) {
+                    if (renderer == null || !renderer.isListPoint(x, y)) {
+                        return false;
+                    }
+                    int listDelta = amountY > 0f ? 1 : amountY < 0f ? -1 : 0;
+                    listScrollRows = Math.max(0, Math.min(10_000, listScrollRows + listDelta));
+                    return listDelta != 0;
+                }
+                int delta = amountY > 0f ? 3 : amountY < 0f ? -3 : 0;
+                detailScrollRows = Math.max(0, Math.min(200, detailScrollRows + delta));
+                return delta != 0;
+            }
+        };
+    }
+
+    private boolean switchTab(Tab target) {
+        tab = target;
+        selection = UiSelection.none();
+        detailScrollRows = 0;
+        listScrollRows = 0;
+        status = "Открыта вкладка «" + target.label().toLowerCase(Locale.ROOT) + "».";
+        return true;
+    }
+
+    private boolean togglePause() {
+        paused = !paused;
+        setAllClocks(paused, timeScale);
+        status = paused ? "Симуляция приостановлена." : "Симуляция продолжена.";
+        return true;
+    }
+
+    private boolean setTimeScale(double scale) {
+        timeScale = scale;
+        setAllClocks(paused, timeScale);
+        status = String.format(Locale.ROOT, "Скорость симуляции ×%.0f.", scale);
+        return true;
+    }
+
+    private void setAllClocks(boolean pause, double scale) {
+        for (var system : runtime.world().getTopology().systems()) {
+            var clock = runtime.world().findSession(system.id()).orElseThrow().getClock();
+            clock.setTimeScale(scale);
+            clock.setPaused(pause);
+        }
+    }
+
+    private boolean save() {
+        try {
+            byte[] bytes = Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState());
+            Files.createDirectories(savePath.getParent());
+            Path temporary = savePath.resolveSibling(savePath.getFileName() + ".tmp");
+            Files.write(temporary, bytes);
+            try {
+                Files.move(temporary, savePath,
+                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+                Files.move(temporary, savePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            status = "Мир сохранён: " + SAVE_FILE + ".";
+        } catch (IOException | RuntimeException exception) {
+            status = "Ошибка сохранения: " + safeMessage(exception);
+        }
+        return true;
+    }
+
+    private boolean load() {
+        try {
+            var checkpoint = Stage20GeneratedWorldRuntimePersistenceCodec.decode(
+                    Files.readAllBytes(savePath));
+            runtime = Stage20GeneratedWorldRuntimeBridge.restore(checkpoint);
+            model = new GeneratedWorldUiModel(
+                    checkpoint.campaign().generationIdentity().worldSeed(),
+                    runtime,
+                    ContentCatalogLoader.loadDefault());
+            autopilot = new GeneratedWorldFreightAutopilot(runtime);
+            paused = runtime.world().findSession(runtime.world().getActiveSystemId())
+                    .orElseThrow().getClock().isPaused();
+            timeScale = runtime.world().findSession(runtime.world().getActiveSystemId())
+                    .orElseThrow().getClock().getTimeScale();
+            selection = UiSelection.none();
+            detailScrollRows = 0;
+            listScrollRows = 0;
+            snapshot = model.capture();
+            status = "Сохранённый generated world загружен без повторной генерации.";
+        } catch (IOException | RuntimeException exception) {
+            status = "Ошибка загрузки: " + safeMessage(exception);
+        }
+        return true;
+    }
+
+    private boolean exit() {
+        Gdx.app.exit();
+        return true;
+    }
+
+    /** Advances the ordinary generated runtime and renders its current read-only projection. */
+    @Override
+    public void render() {
+        float delta = Math.min(0.1f, Math.max(0f, Gdx.graphics.getDeltaTime()));
+        runtime.advanceFrame(delta);
+        if (!paused) {
+            autopilotAccumulator += delta;
+            if (autopilotAccumulator >= AUTOPILOT_INTERVAL_SECONDS) {
+                autopilotAccumulator = 0f;
+                try {
+                    autopilot.advance();
+                } catch (RuntimeException exception) {
+                    status = "Автологистика остановила операцию: " + safeMessage(exception);
+                }
+            }
+        }
+        snapshot = model.capture();
+        renderer.render(snapshot, tab, selection, detailScrollRows, listScrollRows,
+                paused, timeScale, status);
+    }
+
+    /** Keeps the UI in logical screen coordinates and regenerates fonts for the new pixel size. */
+    @Override
+    public void resize(int width, int height) {
+        if (renderer != null) {
+            renderer.resize(width, height);
+        }
+    }
+
+    /** Releases all owned graphics resources. */
+    @Override
+    public void dispose() {
+        if (Gdx.input != null) {
+            Gdx.input.setInputProcessor(null);
+        }
+        if (renderer != null) {
+            renderer.dispose();
+        }
+    }
+
+    private static String safeMessage(Throwable throwable) {
+        String message = throwable.getMessage();
+        return message == null || message.isBlank() ? throwable.getClass().getSimpleName() : message;
+    }
+}

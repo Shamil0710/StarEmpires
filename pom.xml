@@ -28,7 +28,18 @@
         </dependency>
         <dependency>
             <groupId>com.badlogicgames.gdx</groupId>
+            <artifactId>gdx-freetype</artifactId>
+            <version>${gdx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.badlogicgames.gdx</groupId>
             <artifactId>gdx-platform</artifactId>
+            <version>${gdx.version}</version>
+            <classifier>natives-desktop</classifier>
+        </dependency>
+        <dependency>
+            <groupId>com.badlogicgames.gdx</groupId>
+            <artifactId>gdx-freetype-platform</artifactId>
             <version>${gdx.version}</version>
             <classifier>natives-desktop</classifier>
         </dependency>
@@ -113,12 +124,15 @@
                     <excludes>
                         <exclude>com/spacesim/SpaceSimGame*</exclude>
                         <exclude>com/spacesim/PlayableTestGame*</exclude>
+                        <exclude>com/spacesim/GeneratedWorldCommandGame*</exclude>
                         <exclude>com/spacesim/desktop/**</exclude>
                         <exclude>com/spacesim/presentation/validation/Stage175ITacticalAcceptanceApp*</exclude>
                         <exclude>com/spacesim/presentation/validation/LiveTacticalSimulationApp*</exclude>
                         <exclude>com/spacesim/ui/WorldMapRenderer*</exclude>
                         <exclude>com/spacesim/ui/LocalMinimapRenderer*</exclude>
                         <exclude>com/spacesim/ui/TacticalPrototypeRenderer*</exclude>
+                        <exclude>com/spacesim/ui/GeneratedWorldCommandUiRenderer*</exclude>
+                        <exclude>com/spacesim/ui/GeneratedWorldUiFonts*</exclude>
                         <exclude>com/spacesim/presentation/asset/Stage20MinimumPlayableTextureRenderer*</exclude>
                     </excludes>
                 </configuration>

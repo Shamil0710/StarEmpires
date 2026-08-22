@@ -4,6 +4,7 @@ import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.GeneratedWorldCommandGame;
 import com.spacesim.PlayableTestGame;
 import com.spacesim.SpaceSimGame;
 import com.spacesim.presentation.validation.GraphicsValidationApp;
@@ -15,6 +16,7 @@ import com.spacesim.presentation.validation.Stage175ITacticalAcceptanceApp;
 import com.spacesim.ui.TacticalScenarioCatalog;
 import com.spacesim.ui.TacticalScenarioDefinition;
 import com.spacesim.ui.TacticalScenarioId;
+import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 
 /**
  * Desktop entry point for Star Empires on LWJGL3.
@@ -29,6 +31,8 @@ public final class DesktopLauncher {
     private static final String TACTICAL_ACCEPTANCE_ARGUMENT = "--tactical-acceptance";
     private static final String LIVE_TACTICAL_SIM_ARGUMENT = "--live-tactical-sim";
     private static final String SCALED_LIVE_TACTICAL_SIM_ARGUMENT = "--scaled-live-tactical-sim";
+    private static final String GENERATED_WORLD_ARGUMENT = "--generated-world";
+    private static final String WORLD_SEED_ARGUMENT_PREFIX = "--world-seed=";
     private static final String TACTICAL_SIM_ARGUMENT_PREFIX = "--tactical-sim=";
     private static final String SPECTATOR_ARGUMENT = "--spectator";
 
@@ -47,6 +51,7 @@ public final class DesktopLauncher {
         boolean tacticalAcceptance = containsArgument(args, TACTICAL_ACCEPTANCE_ARGUMENT);
         boolean scaledLiveTacticalSimulation = containsArgument(args, SCALED_LIVE_TACTICAL_SIM_ARGUMENT);
         boolean liveTacticalSimulation = containsArgument(args, LIVE_TACTICAL_SIM_ARGUMENT);
+        boolean generatedWorld = containsArgument(args, GENERATED_WORLD_ARGUMENT);
         boolean spectator = containsArgument(args, SPECTATOR_ARGUMENT);
         String tacticalScenarioKey = argumentValue(args, TACTICAL_SIM_ARGUMENT_PREFIX);
         TacticalScenarioDefinition tacticalScenario = tacticalScenarioKey == null
@@ -99,6 +104,18 @@ public final class DesktopLauncher {
             configuration.useVsync(true);
             configuration.setForegroundFPS(60);
             listener = new LiveTacticalSimulationApp();
+        } else if (generatedWorld) {
+            long worldSeed = longArgumentValue(
+                    args,
+                    WORLD_SEED_ARGUMENT_PREFIX,
+                    Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+            configuration.setTitle("Star Empires — Generated World Command Interface");
+            configuration.setWindowedMode(1600, 1000);
+            configuration.setWindowSizeLimits(900, 620, -1, -1);
+            configuration.setResizable(true);
+            configuration.useVsync(true);
+            configuration.setForegroundFPS(60);
+            listener = new GeneratedWorldCommandGame(worldSeed);
         } else if (spectator) {
             enableLargeDemo();
             configuration.setTitle("Star Empires — 100 System Economy Spectator");
@@ -148,5 +165,17 @@ public final class DesktopLauncher {
             }
         }
         return null;
+    }
+
+    private static long longArgumentValue(String[] args, String prefix, long defaultValue) {
+        String value = argumentValue(args, prefix);
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Invalid numeric desktop argument " + prefix + value, exception);
+        }
     }
 }

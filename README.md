@@ -19,7 +19,7 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-08-22 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 NEXT.**
+**Последняя синхронизация README: 2026-08-22 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE.**
 
 Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md).
 
@@ -34,8 +34,9 @@
 | **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED |
 
 На текущем roadmap завершены Stages **0–20**, включая **Stage 20A–20L physical-world generation**
-и обязательный **Stage 20.5 runtime + visual integration gate**. Следующий runtime slice —
-**Stage 21: RPG / Living World**.
+и обязательный **Stage 20.5 runtime + visual integration gate**. Stage 21 начат с production-facing
+generated-world command UI и Windows launcher; NPC/missions/reputation остаются следующими
+living-world slices.
 
 ## Что уже реализовано
 
@@ -178,6 +179,18 @@ Scalability contract: [`docs/simulation_scalability_architecture.md`](docs/simul
 .\run.cmd
 ```
 
+Запуск принятого сгенерированного мира с новым command UI:
+
+```powershell
+.\run-generated-world.bat
+```
+
+Первый аргумент задаёт seed, по умолчанию используется канонический playable seed `1`:
+
+```powershell
+.\run-generated-world.bat 1
+```
+
 Только сборка:
 
 ```powershell
@@ -259,6 +272,7 @@ branch from exact green main
 - [`docs/stage17_5_combat_depth_implementation_plan.md`](docs/stage17_5_combat_depth_implementation_plan.md) — next runtime implementation;
 - [`docs/stage18_resources_industry_infrastructure_plan.md`](docs/stage18_resources_industry_infrastructure_plan.md) — resource/industry ontology;
 - [`docs/stage20_physical_world_generation_plan.md`](docs/stage20_physical_world_generation_plan.md) — world generation;
+- [`docs/generated_world_command_ui.md`](docs/generated_world_command_ui.md) — generated-world UI и Windows launcher;
 - [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — content/balance alpha.
 
 ## Ближайшая последовательность
@@ -271,7 +285,7 @@ Stage 17 COMPLETE
 → Stage 19 warfare
 → Stage 20 world generation COMPLETE
 → Stage 20.5 runtime + visual integration COMPLETE
-→ Stage 21 living world NEXT
+→ Stage 21 living world ACTIVE — generated-world command UI foundation
 → Stage 22 content/balance
 → Stage 23 RC
 ```
