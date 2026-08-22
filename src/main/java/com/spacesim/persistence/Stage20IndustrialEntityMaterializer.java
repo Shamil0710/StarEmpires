@@ -480,7 +480,21 @@ public final class Stage20IndustrialEntityMaterializer {
             String archetypeId,
             LocalPhysicalPosition position) {}
 
-    /** One materialized generated industrial station and its ordinary Stage-18 runtime state. */
+    /**
+     * One materialized generated industrial station and its ordinary Stage-18 runtime state.
+     *
+     * @param systemId exact generated system identity
+     * @param stationId exact generated station placement identity
+     * @param stableFactionId exact generated owner identity
+     * @param stationArchetypeId accepted Stage-18 station archetype identity
+     * @param position exact generated local physical position
+     * @param stationNode ordinary Stage-18 station industrial node
+     * @param storage ordinary Stage-18 station storage
+     * @param facilities persisted installed facility states
+     * @param facilityCapabilities ordinary Stage-18 projected facility capabilities
+     * @param yards persisted installed yard states
+     * @param yardCapabilities ordinary Stage-18 projected yard capabilities
+     */
     public record MaterializedIndustrialStation(
             StarSystemId systemId,
             String stationId,
@@ -493,7 +507,21 @@ public final class Stage20IndustrialEntityMaterializer {
             List<FacilityCapabilitySnapshot> facilityCapabilities,
             List<InstalledYardState> yards,
             List<YardCapabilitySnapshot> yardCapabilities) {
-        /** Validates and freezes one station materialization. */
+        /**
+         * Validates and freezes one station materialization.
+         *
+         * @param systemId exact generated system identity
+         * @param stationId exact generated station placement identity
+         * @param stableFactionId exact generated owner identity
+         * @param stationArchetypeId accepted Stage-18 station archetype identity
+         * @param position exact generated local physical position
+         * @param stationNode ordinary Stage-18 station industrial node
+         * @param storage ordinary Stage-18 station storage
+         * @param facilities persisted installed facility states
+         * @param facilityCapabilities ordinary Stage-18 projected facility capabilities
+         * @param yards persisted installed yard states
+         * @param yardCapabilities ordinary Stage-18 projected yard capabilities
+         */
         public MaterializedIndustrialStation {
             Objects.requireNonNull(systemId, "systemId");
             stationId = requireText(stationId, "stationId");
@@ -514,14 +542,30 @@ public final class Stage20IndustrialEntityMaterializer {
         }
     }
 
-    /** Deterministic generated-world industrial runtime registry. */
+    /**
+     * Deterministic generated-world industrial runtime registry.
+     *
+     * @param version stable Stage-20.5C materialization contract version
+     * @param rootSeed exact generated-world root seed
+     * @param generatorVersion exact generated-world generator version
+     * @param worldFingerprint exact saved materialized-world fingerprint
+     * @param stations deterministic live industrial station registry
+     */
     public record MaterializedIndustrialRegistry(
             String version,
             long rootSeed,
             String generatorVersion,
             String worldFingerprint,
             List<MaterializedIndustrialStation> stations) {
-        /** Validates and freezes one materialized industrial registry. */
+        /**
+         * Validates and freezes one materialized industrial registry.
+         *
+         * @param version stable Stage-20.5C materialization contract version
+         * @param rootSeed exact generated-world root seed
+         * @param generatorVersion exact generated-world generator version
+         * @param worldFingerprint exact saved materialized-world fingerprint
+         * @param stations deterministic live industrial station registry
+         */
         public MaterializedIndustrialRegistry {
             version = requireText(version, "version");
             generatorVersion = requireText(generatorVersion, "generatorVersion");
@@ -567,7 +611,12 @@ public final class Stage20IndustrialEntityMaterializer {
                     previous.processOrders());
         }
 
-        /** Finds one station by exact generated placement ID. */
+        /**
+         * Finds one station by exact generated placement ID.
+         *
+         * @param stationId exact generated station placement ID
+         * @return materialized station carrying that identity
+         */
         public MaterializedIndustrialStation station(String stationId) {
             String id = requireText(stationId, "stationId");
             return stations.stream().filter(value -> value.stationId().equals(id))
