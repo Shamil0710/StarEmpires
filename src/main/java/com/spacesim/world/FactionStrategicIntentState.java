@@ -46,12 +46,21 @@ public record FactionStrategicIntentState(
         goals = List.copyOf(sorted);
     }
 
-    /** Creates an empty persistent intent aggregate. */
+    /**
+     * Creates an empty persistent intent aggregate.
+     *
+     * @param factionContentId stable owning faction identity
+     * @return initial strategic intent state with sequence one and no goals
+     */
     public static FactionStrategicIntentState initial(String factionContentId) {
         return new FactionStrategicIntentState(factionContentId, 1L, List.of());
     }
 
-    /** Returns currently active goals in canonical persistent-ID order. */
+    /**
+     * Returns currently active goals in canonical persistent-ID order.
+     *
+     * @return immutable active goal list
+     */
     public List<StrategicGoalState> activeGoals() {
         return goals.stream()
                 .filter(goal -> goal.lifecycle() == StrategicGoalState.Lifecycle.ACTIVE)
