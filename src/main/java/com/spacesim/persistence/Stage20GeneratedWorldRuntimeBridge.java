@@ -456,12 +456,12 @@ public final class Stage20GeneratedWorldRuntimeBridge {
          * Advances the ordinary world and then commits only completed exact route arrivals.
          *
          * @param realDeltaSeconds non-negative render-frame duration
-         * @return number of active-system fixed ticks executed
+         * @return ordinary world advance report
          */
-        public int advanceFrame(float realDeltaSeconds) {
-            int ticks = world.advanceFrame(realDeltaSeconds);
+        public WorldSimulation.AdvanceReport advanceFrame(float realDeltaSeconds) {
+            WorldSimulation.AdvanceReport report = world.advanceFrame(realDeltaSeconds);
             synchronizeCompletedHops();
-            return ticks;
+            return report;
         }
 
         /**
