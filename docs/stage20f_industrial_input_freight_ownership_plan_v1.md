@@ -110,8 +110,8 @@ current production profile, and proves deterministic binding to existing Stage-2
 
 ## Next roadmap slice
 
-The next Stage-20F authority must bind every selected facility slot to an explicit
-`Stage18FacilityRuntime.InstalledFacilityState` and project its effective capability. Initial
-`Stage18StationStorage` contents remain separate and must fit the generated station's physical
-storage classes and capacities. Installed shipyards remain explicit before shipbuilding
-specialization can become operational.
+`docs/stage20f_industrial_facility_operating_plan_v1.md` now binds selected facility slots to exact
+`Stage18FacilityRuntime.InstalledFacilityState`, shared station services and cargo-transfer limits.
+`docs/stage20f_industrial_initial_station_inventory_plan_v1.md` then validates canonical physical
+storage and the complete first-delivery pipeline buffer. Installed shipyards remain explicit before
+shipbuilding specialization can become operational.
