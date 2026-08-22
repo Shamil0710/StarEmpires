@@ -103,6 +103,32 @@ public final class Stage20MaterializationService {
     }
 
     /**
+     * Releases exact physical authority after the ordinary world fleet service has detached an
+     * entity for inter-system transit.
+     *
+     * <p>The persistent entity continues to exist in the world-owned transit payload, but it no
+     * longer belongs to this local session. The caller must install destination authority under the
+     * freshly allocated destination-local {@link EntityId} when the same FleetId arrives.</p>
+     *
+     * @param id former origin-local persistent entity ID
+     * @return exact released hierarchical/double kinematics
+     */
+    public LocalPhysicalKinematics releasePhysicalStateForWorldTransfer(EntityId id) {
+        EntityId checkedId = Objects.requireNonNull(id, "id");
+        if (registry.contains(checkedId) || dematerializedStates.containsKey(checkedId)) {
+            throw new IllegalStateException(
+                    "World-transfer physical release requires an already detached local entity: "
+                            + checkedId);
+        }
+        LocalPhysicalKinematics released = physicalStates.remove(checkedId);
+        if (released == null) {
+            throw new IllegalStateException(
+                    "World-transfer entity lacks Stage-20 physical authority: " + checkedId);
+        }
+        return released;
+    }
+
+    /**
      * Captures all supported persistent ECS state and removes only the runtime representation.
      *
      * @param id stable persistent entity ID

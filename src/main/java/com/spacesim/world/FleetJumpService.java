@@ -3,6 +3,7 @@ package com.spacesim.world;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
+import com.spacesim.persistence.EntityId;
 import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
@@ -41,6 +42,7 @@ final class FleetJumpService {
     private final JumpTransitTiming timing;
     private final FittedJumpResolver fittedJumpResolver;
     private final Map<FleetId, FleetJumpState> jumpsByFleetId = new HashMap<>();
+    private FleetArrivalAuthority arrivalAuthority;
 
     FleetJumpService(
             GalaxyTopology topology,
@@ -118,14 +120,20 @@ final class FleetJumpService {
         }
         StarSystemId origin = placement.systemId();
         requireDirectConnection(origin, destination);
+        FleetArrivalAuthority.ResolvedArrival exactArrival = arrivalAuthority == null
+                ? null : requireExactArrival(origin, destination);
 
         Optional<FittedJump> fitted = fittedJump(id);
         if (fitted.isPresent() && !fitted.orElseThrow().plan().allowed()) {
             throw fittedJumpUnavailable(id, fitted.orElseThrow().plan());
         }
 
-        float resolvedArrivalX = LocalSystemCoordinates.resolveArrivalX(arrivalX, arrivalY);
-        float resolvedArrivalY = LocalSystemCoordinates.resolveArrivalY(arrivalX, arrivalY);
+        float resolvedArrivalX = exactArrival == null
+                ? LocalSystemCoordinates.resolveArrivalX(arrivalX, arrivalY)
+                : exactArrival.legacyProjectionX();
+        float resolvedArrivalY = exactArrival == null
+                ? LocalSystemCoordinates.resolveArrivalY(arrivalX, arrivalY)
+                : exactArrival.legacyProjectionY();
         long endTick = addTicks(worldTick, timing.approachTicks());
         FleetJumpState state = new FleetJumpState(
                 id,
@@ -156,6 +164,14 @@ final class FleetJumpService {
 
     Optional<FleetJumpState> find(FleetId fleetId) {
         return Optional.ofNullable(fleetId == null ? null : jumpsByFleetId.get(fleetId));
+    }
+
+    void bindArrivalAuthority(FleetArrivalAuthority authority) {
+        FleetArrivalAuthority checked = Objects.requireNonNull(authority, "arrivalAuthority");
+        if (arrivalAuthority != null) {
+            throw new IllegalStateException("Fleet arrival authority is already bound");
+        }
+        arrivalAuthority = checked;
     }
 
     List<FleetJumpState> snapshots() {
@@ -215,6 +231,11 @@ final class FleetJumpService {
                 if (transit.locationKind() != FleetLocationKind.IN_TRANSIT) {
                     throw new IllegalStateException("Fleet detach не создал IN_TRANSIT placement");
                 }
+                if (arrivalAuthority != null) {
+                    EntityId formerLocalEntityId = transit.transitState().entityState().id();
+                    arrivalAuthority.onDeparted(
+                            state.fleetId(), state.originSystemId(), formerLocalEntityId);
+                }
 
                 long transitTicks;
                 if (fitted.isPresent()) {
@@ -237,11 +258,21 @@ final class FleetJumpService {
                                 addTicks(boundary, transitTicks)));
             }
             case IN_TRANSIT -> {
+                FleetArrivalAuthority.ResolvedArrival exactArrival = arrivalAuthority == null
+                        ? null
+                        : requireExactArrival(
+                                state.originSystemId(), state.destinationSystemId());
                 FleetPlacementState arrived = fleetWorldService.completeTransfer(
-                        state.fleetId(), state.arrivalX(), state.arrivalY());
+                        state.fleetId(),
+                        exactArrival == null ? state.arrivalX() : exactArrival.legacyProjectionX(),
+                        exactArrival == null ? state.arrivalY() : exactArrival.legacyProjectionY());
                 if (arrived.locationKind() != FleetLocationKind.IN_SYSTEM
                         || !state.destinationSystemId().equals(arrived.systemId())) {
                     throw new IllegalStateException("Fleet arrival materialized in wrong system");
+                }
+                if (exactArrival != null) {
+                    arrivalAuthority.onArrived(
+                            state.fleetId(), exactArrival, arrived.localEntityId());
                 }
                 yield replace(
                         state,
@@ -288,6 +319,20 @@ final class FleetJumpService {
             throw new IllegalStateException("Jump state changed during deterministic transition: " + previous.fleetId());
         }
         return next;
+    }
+
+    private FleetArrivalAuthority.ResolvedArrival requireExactArrival(
+            StarSystemId origin,
+            StarSystemId destination) {
+        FleetArrivalAuthority.ResolvedArrival result = Objects.requireNonNull(
+                arrivalAuthority.resolve(origin, destination),
+                "FleetArrivalAuthority returned null");
+        if (!result.originSystemId().equals(origin)
+                || !result.destinationSystemId().equals(destination)) {
+            throw new IllegalArgumentException(
+                    "fleet arrival authority resolved a different direct edge");
+        }
+        return result;
     }
 
     private FleetJumpState cancel(FleetJumpState state) {
