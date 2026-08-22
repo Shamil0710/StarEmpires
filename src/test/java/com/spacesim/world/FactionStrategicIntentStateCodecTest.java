@@ -17,45 +17,20 @@ class FactionStrategicIntentStateCodecTest {
     @Test
     void identityEvidenceMultidimensionalBudgetBlockersAndLifecycleSurviveRoundTrip() {
         StrategicGoalState active = goal(
-                "faction.alpha:strategic-goal:1",
-                StrategicGoalType.STOCKPILE,
-                InterestKind.RESOURCE_DEFICIT,
-                "resource.water",
-                Lifecycle.ACTIVE,
-                StrategicPlanningEnvelope.balanced(40L),
-                List.of(),
-                21L,
-                0L,
-                StrategicPlanningEnvelope.ZERO,
-                StrategicGoalOutcomeSignal.NONE);
+                "faction.alpha:strategic-goal:1", StrategicGoalType.STOCKPILE, InterestKind.RESOURCE_DEFICIT,
+                "resource.water", Lifecycle.ACTIVE, StrategicPlanningEnvelope.balanced(40L), List.of(),
+                21L, 0L, StrategicPlanningEnvelope.ZERO, StrategicGoalOutcomeSignal.NONE);
         StrategicGoalState stalled = goal(
-                "faction.alpha:strategic-goal:2",
-                StrategicGoalType.SECURE_ROUTE,
-                InterestKind.ROUTE_EXPOSURE,
-                "route.alpha-beta",
-                Lifecycle.STALLED,
-                StrategicPlanningEnvelope.ZERO,
-                List.of(StrategicGoalBlocker.LOGISTICS_CAPACITY),
-                41L,
-                0L,
-                StrategicPlanningEnvelope.ZERO,
-                StrategicGoalOutcomeSignal.NONE);
+                "faction.alpha:strategic-goal:2", StrategicGoalType.SECURE_ROUTE, InterestKind.ROUTE_EXPOSURE,
+                "route.alpha-beta", Lifecycle.STALLED, StrategicPlanningEnvelope.ZERO,
+                List.of(StrategicGoalBlocker.LOGISTICS_CAPACITY), 41L, 0L,
+                StrategicPlanningEnvelope.ZERO, StrategicGoalOutcomeSignal.NONE);
         StrategicGoalState cancelled = goal(
-                "faction.alpha:strategic-goal:3",
-                StrategicGoalType.OBTAIN_ACCESS,
-                InterestKind.MARKET_ACCESS,
-                "market.beta",
-                Lifecycle.CANCELLED,
-                StrategicPlanningEnvelope.ZERO,
-                List.of(),
-                0L,
-                64L,
-                new StrategicPlanningEnvelope(4L, 2L, 0L, 0L),
-                StrategicGoalOutcomeSignal.FAILED);
+                "faction.alpha:strategic-goal:3", StrategicGoalType.OBTAIN_ACCESS, InterestKind.MARKET_ACCESS,
+                "market.beta", Lifecycle.CANCELLED, StrategicPlanningEnvelope.ZERO, List.of(), 0L, 64L,
+                new StrategicPlanningEnvelope(4L, 2L, 0L, 0L), StrategicGoalOutcomeSignal.FAILED);
         FactionStrategicIntentState state = new FactionStrategicIntentState(
-                "faction.alpha",
-                4L,
-                List.of(cancelled, stalled, active));
+                "faction.alpha", 4L, List.of(cancelled, stalled, active));
 
         byte[] encoded = FactionStrategicIntentStateCodec.encode(List.of(state));
         List<FactionStrategicIntentState> decoded = FactionStrategicIntentStateCodec.decode(encoded);
@@ -70,8 +45,7 @@ class FactionStrategicIntentStateCodecTest {
     @Test
     void codecRejectsDuplicateFactionAggregates() {
         FactionStrategicIntentState state = FactionStrategicIntentState.initial("faction.alpha");
-        assertThrows(
-                IllegalArgumentException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> FactionStrategicIntentStateCodec.encode(List.of(state, state)));
     }
 
@@ -91,29 +65,11 @@ class FactionStrategicIntentStateCodecTest {
                 kind,
                 target,
                 7000,
-                List.of(new ObservationEvidence(
-                        ObservationChannel.ECONOMIC_LEDGER,
-                        "ledger.source",
-                        10L,
-                        -1L)));
+                List.of(new ObservationEvidence(ObservationChannel.ECONOMIC_LEDGER, "ledger.source", 10L, -1L)));
         return new StrategicGoalState(
-                goalId,
-                "faction.alpha",
-                type,
-                target,
-                evidence,
-                7000,
-                8000,
-                new StrategicPlanningEnvelope(50L, 40L, 30L, 20L),
-                allocation,
-                blockers,
-                lifecycle,
-                10L,
-                lifecycle == Lifecycle.ACTIVE ? 20L : 40L,
-                nextReview,
-                -1L,
-                cooldown,
-                cancellationCost,
-                outcome);
+                goalId, "faction.alpha", type, target, evidence, 7000, 8000,
+                StrategicPlanningEnvelope.balanced(50L), allocation, blockers, lifecycle,
+                10L, lifecycle == Lifecycle.ACTIVE ? 20L : 40L, nextReview, -1L, cooldown,
+                cancellationCost, outcome);
     }
 }
