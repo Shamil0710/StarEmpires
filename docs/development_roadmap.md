@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-22 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 NEXT.**
+> **Последняя синхронизация: 2026-08-22 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -479,11 +479,27 @@ Canonical completion evidence:
 
 ## 9. Stage 21 — RPG / Living World
 
-**NEXT — Stage 20 and the mandatory Stage-20.5 integration gate are complete.**
+**ACTIVE — Stage 20 and the mandatory Stage-20.5 integration gate are complete.**
 
 NPCs, missions, discovery and reputation consume authoritative physical/economic/political state rather than a disconnected scripted world.
 
 Living-world state must use persistent identity, relevance/cadence/event wakeups and deterministic deadlines; no `all NPCs × full AI × every tick` architecture.
+
+Stage-21 entry foundation now exposes the accepted generated world through a production-facing
+command interface rather than the old schematic test harness:
+
+- resolution-aware TTF typography and independent UI scale;
+- selectable local objects with read-only physical/economic/fit/route inspection;
+- separate current-system, galaxy, faction and logistics tabs;
+- real Stage-20.5 sprites and exact generated positions downstream of simulation authority;
+- ordinary finite extraction/freight/jump circulation;
+- atomic generated-runtime save/load without regeneration;
+- `run-generated-world.bat` as the Windows playable entry point.
+
+Canonical UI/launcher contract: `docs/generated_world_command_ui.md`.
+
+This closes the interface/bootstrap entry seam only. NPC, mission, reputation and living-world
+event implementation remain open Stage-21 work.
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
@@ -546,11 +562,11 @@ Stage 17 COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
-→ Stage 21 RPG / Living World NEXT
+→ Stage 21 RPG / Living World ACTIVE — generated-world command UI foundation
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 21.** NPCs, missions, reputation and living-world
-behavior now consume the same accepted generated world, persistent entities, physical logistics,
-exact travel state and minimum coherent presentation established by Stage 20 + Stage 20.5.
+**Immediate implementation priority remains Stage 21.** The generated-world command UI and Windows
+launcher now expose the shared runtime; NPCs, missions, reputation and living-world behavior are the
+next slices consuming its persistent entities, physical logistics and exact travel state.

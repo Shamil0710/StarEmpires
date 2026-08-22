@@ -1,0 +1,177 @@
+package com.spacesim.ui;
+
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding;
+import com.spacesim.world.LocalPhysicalPosition;
+import com.spacesim.world.StarSystemId;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Immutable read-only presentation state for the generated-world command interface. */
+@SuppressWarnings("doclint:missing")
+public record GeneratedWorldUiSnapshot(
+        long worldSeed,
+        long worldTick,
+        StarSystemId activeSystemId,
+        String activeSystemName,
+        GalaxyStrategicMapSnapshot galaxy,
+        List<LocalObjectView> localObjects,
+        List<FreightView> freight) {
+
+    /** Validates and freezes one frame of UI projection data. */
+    public GeneratedWorldUiSnapshot {
+        Objects.requireNonNull(activeSystemId, "activeSystemId");
+        activeSystemName = requireText(activeSystemName, "activeSystemName");
+        Objects.requireNonNull(galaxy, "galaxy");
+        localObjects = List.copyOf(Objects.requireNonNull(localObjects, "localObjects"));
+        freight = List.copyOf(Objects.requireNonNull(freight, "freight"));
+    }
+
+    /** Selectable local-system object families. */
+    public enum ObjectKind {
+        /** Ordinary physical freight or ECS ship. */ FLEET,
+        /** Generated major, independent or industrial station. */ STATION,
+        /** Generated extraction outpost bound to a finite source. */ EXTRACTION_OUTPOST,
+        /** Generated finite resource without a commissioned outpost. */ RESOURCE,
+        /** Generated anomaly, derelict or resource phenomenon. */ SPECIAL_LOCATION,
+        /** Generated resource-field navigation anchor. */ RESOURCE_ANCHOR,
+        /** Generated jump-arrival navigation anchor. */ JUMP_ANCHOR,
+        /** Other ordinary local ECS object. */ LOCAL_ENTITY
+    }
+
+    /**
+     * One selectable object rendered on the current-system map.
+     *
+     * @param stableId persistent or canonical identity
+     * @param kind presentation object family
+     * @param name player-facing primary label
+     * @param subtitle concise role/state label
+     * @param systemId owning system
+     * @param position authoritative local physical position
+     * @param factionId stable owner/controller ID, or empty when unknown/unowned
+     * @param factionName player-facing owner/controller label
+     * @param sprite optional minimum-pack sprite binding
+     * @param sections structured inspector content
+     */
+    public record LocalObjectView(
+            String stableId,
+            ObjectKind kind,
+            String name,
+            String subtitle,
+            StarSystemId systemId,
+            LocalPhysicalPosition position,
+            String factionId,
+            String factionName,
+            SpriteBinding sprite,
+            List<InfoSection> sections) implements Comparable<LocalObjectView> {
+        /** Validates one selectable object projection. */
+        public LocalObjectView {
+            stableId = requireText(stableId, "stableId");
+            Objects.requireNonNull(kind, "kind");
+            name = requireText(name, "name");
+            subtitle = requireText(subtitle, "subtitle");
+            Objects.requireNonNull(systemId, "systemId");
+            Objects.requireNonNull(position, "position");
+            factionId = factionId == null ? "" : factionId.strip();
+            factionName = factionName == null || factionName.isBlank() ? "Не определена" : factionName.strip();
+            sections = List.copyOf(Objects.requireNonNull(sections, "sections"));
+        }
+
+        @Override
+        public int compareTo(LocalObjectView other) {
+            LocalObjectView checked = Objects.requireNonNull(other, "other");
+            int kindOrder = Integer.compare(kind.ordinal(), checked.kind.ordinal());
+            return kindOrder != 0 ? kindOrder : stableId.compareTo(checked.stableId);
+        }
+    }
+
+    /** One generated freight/order row for the logistics tab. */
+    public record FreightView(
+            long fleetId,
+            String name,
+            String factionId,
+            String factionName,
+            String phase,
+            String hullId,
+            String fitId,
+            double cargoMassKg,
+            double cargoCapacityKg,
+            String commodityId,
+            String sourceName,
+            String destinationName,
+            List<StarSystemId> route,
+            int routeIndex,
+            double deliveredMassKg,
+            double deliveryDeadlineSeconds,
+            long delayedDeliveryCount,
+            List<InfoSection> sections) implements Comparable<FreightView> {
+        /** Validates one deterministic logistics projection. */
+        public FreightView {
+            name = requireText(name, "name");
+            factionId = requireText(factionId, "factionId");
+            factionName = requireText(factionName, "factionName");
+            phase = requireText(phase, "phase");
+            hullId = requireText(hullId, "hullId");
+            fitId = requireText(fitId, "fitId");
+            commodityId = commodityId == null || commodityId.isBlank() ? "—" : commodityId.strip();
+            sourceName = sourceName == null || sourceName.isBlank() ? "—" : sourceName.strip();
+            destinationName = destinationName == null || destinationName.isBlank() ? "—" : destinationName.strip();
+            route = List.copyOf(Objects.requireNonNull(route, "route"));
+            sections = List.copyOf(Objects.requireNonNull(sections, "sections"));
+            if (fleetId <= 0L || !Double.isFinite(cargoMassKg) || cargoMassKg < 0d
+                    || !Double.isFinite(cargoCapacityKg) || cargoCapacityKg <= 0d
+                    || !Double.isFinite(deliveredMassKg) || deliveredMassKg < 0d
+                    || !Double.isFinite(deliveryDeadlineSeconds) || deliveryDeadlineSeconds < 0d
+                    || delayedDeliveryCount < 0L || routeIndex < 0) {
+                throw new IllegalArgumentException("Invalid freight presentation state");
+            }
+        }
+
+        @Override
+        public int compareTo(FreightView other) {
+            return Long.compare(fleetId, Objects.requireNonNull(other, "other").fleetId);
+        }
+    }
+
+    /** Inspector section containing compact labelled values. */
+    public record InfoSection(String title, List<InfoLine> lines) {
+        /** Validates one non-empty inspector section. */
+        public InfoSection {
+            title = requireText(title, "title");
+            lines = List.copyOf(Objects.requireNonNull(lines, "lines"));
+            if (lines.isEmpty()) {
+                throw new IllegalArgumentException("Inspector section cannot be empty");
+            }
+        }
+
+        /** Creates a section from alternating label/value strings. */
+        public static InfoSection of(String title, String... labelValues) {
+            Objects.requireNonNull(labelValues, "labelValues");
+            if (labelValues.length == 0 || (labelValues.length & 1) != 0) {
+                throw new IllegalArgumentException("InfoSection requires label/value pairs");
+            }
+            ArrayList<InfoLine> lines = new ArrayList<>(labelValues.length / 2);
+            for (int index = 0; index < labelValues.length; index += 2) {
+                lines.add(new InfoLine(labelValues[index], labelValues[index + 1]));
+            }
+            return new InfoSection(title, lines);
+        }
+    }
+
+    /** One labelled inspector value. */
+    public record InfoLine(String label, String value) {
+        /** Validates a complete label/value pair. */
+        public InfoLine {
+            label = label == null ? "" : label.strip();
+            value = value == null || value.isBlank() ? "—" : value.strip();
+        }
+    }
+
+    private static String requireText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " must be non-blank");
+        }
+        return value.strip();
+    }
+}

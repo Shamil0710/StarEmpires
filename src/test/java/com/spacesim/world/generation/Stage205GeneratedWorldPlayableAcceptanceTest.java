@@ -1,41 +1,21 @@
 package com.spacesim.world.generation;
 
-import com.spacesim.content.ContentCatalog;
-import com.spacesim.content.ContentCatalogLoader;
-import com.spacesim.persistence.Stage18IndustrialState;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
-import com.spacesim.persistence.Stage20GeneratedCampaignPersistence;
-import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState;
-import com.spacesim.persistence.Stage20MaterializationPersistence;
-import com.spacesim.persistence.Stage20MaterializationPersistentState;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
-import com.spacesim.simulation.SimulationSession;
-import com.spacesim.simulation.Stage20MaterializationService;
+import com.spacesim.simulation.GeneratedWorldFreightAutopilot;
+import com.spacesim.ui.GeneratedWorldUiModel;
 import com.spacesim.world.DestructionPolicy;
-import com.spacesim.world.FactionEconomicState;
-import com.spacesim.world.FactionIdentityResolver;
-import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetJumpPhase;
 import com.spacesim.world.FleetLocationKind;
-import com.spacesim.world.Stage20DiscoveryKnowledgeState;
-import com.spacesim.world.Stage20SpecialLocationGenerator;
 import com.spacesim.world.StarSystemId;
-import com.spacesim.world.StarSystemSimulationState;
-import com.spacesim.world.WorldSimulation;
-import com.spacesim.world.WorldFactionIdentityState;
-import com.spacesim.world.WorldState;
-import com.spacesim.world.generation.Stage20OperationalIndustrialSpecializationProductionIntegrationTest
-        .CadenceFixture;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,14 +24,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage205GeneratedWorldPlayableAcceptanceTest {
-    private static final ContentCatalog CONTENT = ContentCatalogLoader.loadDefault();
-    private static volatile CadenceFixture sharedFixture;
-
     @Test
     void acceptedWorldRunsConservedFreightThroughOrdinaryJumpAndMidTransitSaveLoad() {
-        CadenceFixture fixture = fixture();
-        LiveRuntime bootstrap = Stage20GeneratedWorldRuntimeBridge.materializeBootstrap(
-                savedState(fixture), fixture.specialization(), world(fixture));
+        LiveRuntime bootstrap = Stage20PlayableGeneratedWorldFactory.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
+        var ui = new GeneratedWorldUiModel(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED,
+                bootstrap,
+                bootstrap.world().findSession(bootstrap.world().getActiveSystemId())
+                        .orElseThrow().getContentCatalog()).capture();
+        assertEquals(bootstrap.world().getTopology().systems().size(), ui.galaxy().systems().size());
+        assertFalse(ui.localObjects().isEmpty());
+        assertTrue(ui.localObjects().stream().allMatch(value -> !value.sections().isEmpty()));
+        assertEquals(bootstrap.freight().capture().freighters().size(), ui.freight().size());
+        assertTrue(ui.freight().stream().allMatch(value -> !value.hullId().isBlank()
+                && !value.fitId().isBlank() && !value.sections().isEmpty()));
+
+        LiveRuntime automatic = Stage20GeneratedWorldRuntimeBridge.restore(bootstrap.captureState());
+        var automaticReport = new GeneratedWorldFreightAutopilot(automatic).advance();
+        assertTrue(automaticReport.changedState());
         long canonicalStationCount = bootstrap.captureState().campaign().materializedWorld()
                 .worldRows().stream()
                 .filter(row -> row.domain().equals("INFRASTRUCTURE_PLACEMENT"))
@@ -200,83 +191,6 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
             runtime.advanceFrame(0.25f);
         }
         throw new AssertionError("ordinary freight jump did not complete");
-    }
-
-    private static WorldSimulation world(CadenceFixture fixture) {
-        var topology = fixture.resolved().generation().topology().requireAcceptedTopology();
-        ArrayList<StarSystemSimulationState> systems = new ArrayList<>();
-        for (var system : topology.systems()) {
-            systems.add(new StarSystemSimulationState(
-                    system.id(),
-                    SimulationSession.createDemo(
-                            fixture.resolved().rootSeed() ^ system.id().value(), CONTENT).snapshot()));
-        }
-        StarSystemId active = topology.systems().get(0).id();
-        ArrayList<FactionEconomicState> economies = new ArrayList<>();
-        ArrayList<FactionStrategicState> strategies = new ArrayList<>();
-        ArrayList<WorldFactionIdentityState> identities = new ArrayList<>();
-        fixture.resolved().generation().placement().orElseThrow().assignments().stream()
-                .map(value -> value.stableFactionId())
-                .distinct()
-                .sorted()
-                .forEach(factionId -> {
-                    FactionIdentityResolver resolver = FactionIdentityResolver.createDefault(
-                            CONTENT, identities);
-                    WorldFactionIdentityState allocated = resolver.allocatePlayerCreated(
-                            factionId, "Generated " + factionId);
-                    identities.add(new WorldFactionIdentityState(
-                            allocated.stableFactionId(),
-                            allocated.runtimeFactionId(),
-                            allocated.displayName(),
-                            WorldFactionIdentityState.Origin.WORLD_BOOTSTRAP));
-                    economies.add(new FactionEconomicState(factionId, 0L, 0L, 0L, 0L, 0L));
-                    strategies.add(new FactionStrategicState(
-                            factionId, 0, List.of(), List.of()));
-                });
-        WorldState bootstrapped = new WorldState(
-                WorldState.CURRENT_VERSION, topology, systems, economies, strategies);
-        WorldState generated = new WorldState(
-                WorldState.CURRENT_VERSION,
-                topology,
-                systems,
-                economies,
-                strategies,
-                bootstrapped.nextConstructionProjectIdValue(),
-                bootstrapped.constructionProjects(),
-                bootstrapped.factionEconomicPressures(),
-                bootstrapped.nextFleetIdValue(),
-                bootstrapped.fleets(),
-                bootstrapped.fleetJumps(),
-                identities);
-        return WorldSimulation.restore(
-                generated,
-                CONTENT,
-                active,
-                10,
-                Math.max(1, systems.size()));
-    }
-
-    private static Stage20GeneratedCampaignPersistentState savedState(CadenceFixture fixture) {
-        SimulationSession session = SimulationSession.createDemo(fixture.resolved().rootSeed());
-        Stage20MaterializationPersistentState physical = Stage20MaterializationPersistence.capture(
-                session, Stage20MaterializationService.forSession(session));
-        return Stage20GeneratedCampaignPersistence.capture(
-                fixture.resolved(),
-                Stage20SpecialLocationGenerator.generateCurrent(fixture.resolved()),
-                fixture.specialization(),
-                physical,
-                Stage18IndustrialState.empty(0L),
-                List.of(new Stage20DiscoveryKnowledgeState(
-                        "faction.stage20_5.final-playable-acceptance",
-                        List.of())));
-    }
-
-    private static synchronized CadenceFixture fixture() {
-        if (sharedFixture == null) {
-            sharedFixture = Stage20OperationalIndustrialSpecializationProductionIntegrationTest
-                    .cadenceFixture();
-        }
-        return sharedFixture;
     }
 
     private record Candidate(
