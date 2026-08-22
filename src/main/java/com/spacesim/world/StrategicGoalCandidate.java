@@ -1,19 +1,26 @@
 package com.spacesim.world;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
  * One read-only Stage-21B strategic option presented to the pure goal planner.
  *
- * <p>Budget units are a planning envelope only. They are not credits and this record has no
- * authority to mutate treasury, production, freight, diplomacy, fleets or territory.</p>
+ * <p>The budget is a normalized planning envelope only. This record has no authority to mutate
+ * treasury, production, freight, diplomacy, fleets or territory. Blockers and outcome signals must
+ * likewise be supplied by actor-visible authority/read-model adapters rather than hidden world
+ * truth.</p>
  *
  * @param type peaceful strategic goal family
  * @param targetId stable goal target identity
  * @param sourceEvidence actor-bounded evidence supporting the candidate
  * @param urgencyBasisPoints urgency in {@code [0,10000]}
  * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
- * @param requestedBudgetUnits non-negative strategic planning-envelope request
+ * @param requestedBudget multidimensional normalized planning request
+ * @param blockers current actor-known non-capacity blockers
+ * @param expiresAtTick terminal expiry tick, or {@code -1} for no automatic expiry
+ * @param reviewCadenceTicks positive interval between strategic re-reviews
+ * @param outcomeSignal read-only terminal outcome reported by an execution authority
  */
 public record StrategicGoalCandidate(
         StrategicGoalType type,
@@ -21,7 +28,11 @@ public record StrategicGoalCandidate(
         StrategicGoalEvidence sourceEvidence,
         int urgencyBasisPoints,
         int feasibilityBasisPoints,
-        long requestedBudgetUnits) implements Comparable<StrategicGoalCandidate> {
+        StrategicPlanningEnvelope requestedBudget,
+        List<StrategicGoalBlocker> blockers,
+        long expiresAtTick,
+        long reviewCadenceTicks,
+        StrategicGoalOutcomeSignal outcomeSignal) implements Comparable<StrategicGoalCandidate> {
 
     /** Validates one candidate without deriving hidden-world information. */
     public StrategicGoalCandidate {
@@ -37,9 +48,19 @@ public record StrategicGoalCandidate(
         }
         requireBasisPoints(urgencyBasisPoints, "Strategic goal urgency");
         requireBasisPoints(feasibilityBasisPoints, "Strategic goal feasibility");
-        if (requestedBudgetUnits < 0L) {
-            throw new IllegalArgumentException("Strategic goal requested budget cannot be negative");
+        Objects.requireNonNull(requestedBudget, "Strategic goal requested budget not set");
+        blockers = Objects.requireNonNull(blockers, "Strategic goal blockers not set").stream()
+                .map(blocker -> Objects.requireNonNull(blocker, "Strategic goal blocker not set"))
+                .sorted()
+                .distinct()
+                .toList();
+        if (expiresAtTick < -1L) {
+            throw new IllegalArgumentException("Strategic goal expiry must be -1 or non-negative");
         }
+        if (reviewCadenceTicks <= 0L) {
+            throw new IllegalArgumentException("Strategic goal review cadence must be positive");
+        }
+        Objects.requireNonNull(outcomeSignal, "Strategic goal outcome signal not set");
     }
 
     /**
@@ -49,6 +70,19 @@ public record StrategicGoalCandidate(
      */
     public int effectivePriorityBasisPoints() {
         return (int) (((long) urgencyBasisPoints * (long) feasibilityBasisPoints) / 10_000L);
+    }
+
+    /**
+     * Reports whether this candidate is expired at the supplied authoritative tick.
+     *
+     * @param tick authoritative review tick
+     * @return true when a finite expiry has been reached
+     */
+    public boolean isExpiredAt(long tick) {
+        if (tick < 0L) {
+            throw new IllegalArgumentException("Strategic review tick cannot be negative");
+        }
+        return expiresAtTick >= 0L && tick >= expiresAtTick;
     }
 
     @Override
