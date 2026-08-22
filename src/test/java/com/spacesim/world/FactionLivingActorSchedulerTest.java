@@ -5,9 +5,11 @@ import com.spacesim.world.FactionLivingActorState.EventWakeup;
 import com.spacesim.world.FactionLivingActorState.WakeupReason;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FactionLivingActorSchedulerTest {
@@ -51,6 +53,42 @@ class FactionLivingActorSchedulerTest {
         assertEquals(
                 List.of("faction.alpha", "faction.bravo"),
                 batch.selected().stream().map(FactionLivingActorScheduler.ScheduledReview::factionContentId).toList());
+    }
+
+    @Test
+    void schedulerKeepsOnlyStableTopKAcrossLargeDuePopulation() {
+        ArrayList<FactionLivingActorState> states = new ArrayList<>();
+        for (int index = 9_999; index >= 0; index--) {
+            states.add(FactionLivingActorState.initial("faction.%05d".formatted(index), 10L));
+        }
+
+        FactionLivingActorScheduler.ScheduleBatch batch =
+                FactionLivingActorScheduler.selectDue(states, 10L, 7);
+
+        assertEquals(10_000, batch.eligibleCount());
+        assertEquals(7, batch.selected().size());
+        assertEquals(9_993, batch.deferredCount());
+        assertEquals(
+                List.of(
+                        "faction.00000",
+                        "faction.00001",
+                        "faction.00002",
+                        "faction.00003",
+                        "faction.00004",
+                        "faction.00005",
+                        "faction.00006"),
+                batch.selected().stream().map(FactionLivingActorScheduler.ScheduledReview::factionContentId).toList());
+    }
+
+    @Test
+    void duplicateFactionLifecycleStateFailsClosedBeforeDoubleScheduling() {
+        List<FactionLivingActorState> states = List.of(
+                FactionLivingActorState.initial("faction.alpha", 10L),
+                FactionLivingActorState.initial("faction.alpha", 20L));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> FactionLivingActorScheduler.selectDue(states, 20L, 2));
     }
 
     @Test
