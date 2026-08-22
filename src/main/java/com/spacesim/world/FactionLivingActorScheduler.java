@@ -182,21 +182,24 @@ public final class FactionLivingActorScheduler {
     }
 
     private static ScheduledReview dueCandidate(FactionLivingActorState state, long nowTick) {
+        boolean deadlineDue = state.nextReviewTick() <= nowTick;
         List<EventWakeup> dueWakeups = state.dueWakeups(nowTick);
         if (!dueWakeups.isEmpty()) {
-            long earliest = dueWakeups.get(0).eligibleAtTick();
-            List<WakeupReason> reasons = dueWakeups.stream()
-                    .map(EventWakeup::reason)
-                    .distinct()
-                    .sorted()
-                    .toList();
-            return new ScheduledReview(
-                    state.factionContentId(),
-                    TriggerType.EVENT_WAKEUP,
-                    earliest,
-                    reasons);
+            long earliestEvent = dueWakeups.get(0).eligibleAtTick();
+            if (!deadlineDue || earliestEvent <= state.nextReviewTick()) {
+                List<WakeupReason> reasons = dueWakeups.stream()
+                        .map(EventWakeup::reason)
+                        .distinct()
+                        .sorted()
+                        .toList();
+                return new ScheduledReview(
+                        state.factionContentId(),
+                        TriggerType.EVENT_WAKEUP,
+                        earliestEvent,
+                        reasons);
+            }
         }
-        if (state.nextReviewTick() <= nowTick) {
+        if (deadlineDue) {
             return new ScheduledReview(
                     state.factionContentId(),
                     TriggerType.DEADLINE,
