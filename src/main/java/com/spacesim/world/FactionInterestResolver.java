@@ -86,7 +86,16 @@ public final class FactionInterestResolver {
             int supportingReportCount,
             boolean primary) {
 
-        /** Validates one explanation row. */
+        /**
+         * Validates one explanation row.
+         *
+         * @param rank one-based deterministic rank
+         * @param kind interest family
+         * @param targetId stable target identity
+         * @param priorityBasisPoints evidence-derived priority
+         * @param supportingReportCount number of retained supporting observations
+         * @param primary whether this row won deterministic conflict ordering
+         */
         public TraceEntry {
             if (rank <= 0) {
                 throw new IllegalArgumentException("Trace rank must be positive");
@@ -118,7 +127,15 @@ public final class FactionInterestResolver {
             Optional<FactionInterestEvidence> primaryInterest,
             List<TraceEntry> traceEntries) {
 
-        /** Validates canonical decision-trace shape. */
+        /**
+         * Validates canonical decision-trace shape.
+         *
+         * @param factionContentId stable actor identity
+         * @param observationTick actor-bounded snapshot tick
+         * @param orderedEvidence deterministic evidence order
+         * @param primaryInterest highest-priority current evidence when present
+         * @param traceEntries compact ranked explanation rows
+         */
         public DecisionTrace {
             factionContentId = requireText(factionContentId, "Faction content ID");
             if (observationTick < 0L) {
