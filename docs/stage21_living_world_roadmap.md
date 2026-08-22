@@ -228,113 +228,133 @@ Deliverables:
 - resistance/contest state without conjuring free hostile fleets;
 - control transfer only after accepted legal/physical thresholds;
 - station/fleet allegiance, market access, tariff and construction consequences through existing law;
-- contested-system behavior when occupation exists without recognized control;
-- rollback/withdrawal behavior when occupation cannot be sustained.
+- liberation, withdrawal and contested-control paths;
+- global-map projection distinguishing claim, occupation, stabilization and recognized control.
 
 Exit criteria:
 
-- no single fleet arrival flips ownership;
-- captured systems continue to contain the same physical assets unless explicitly destroyed/rebuilt;
-- control transition survives save/load at every intermediate phase;
-- economic access and UI ownership labels derive from the same authoritative control state.
+- entering a system cannot immediately recolour it;
+- occupation without supply/security can stall or collapse;
+- save/load preserves exact transition progress and deadlines;
+- control changes update future faction interests, access and economic routes causally.
 
-### 21G — Peace, demobilization, repair, rearmament and replacement
+### 21G — Peace, demobilization, recovery and replacement
 
-Objective: close the causal loop after war instead of ending at a map-color change.
+Objective: close conflict loops without resetting the world.
 
 Deliverables:
 
-- peace terms applied through treaties, claims, access, reparations and recognized control authority;
-- demobilization/return orders for surviving forces;
-- damaged fleets seek ordinary repair and rearm through Stage-18 service capability;
-- replacement demand is generated from real losses and competes for treasury, shipyard and material
-  capacity;
-- no automatic restoration of pre-war fleet strength;
-- post-war shortages, debt and exposed routes feed back into actor observations and goals;
-- cooldowns before renewed escalation unless a new hostile event materially changes the state.
+- ceasefire and peace outcomes tied to war goals, losses, exhaustion, leverage and offers;
+- recognition, access, reparations and territorial terms using existing legal/treasury authority;
+- demobilization and return/redeployment orders for surviving fleets;
+- persistent loss and veteran/damage continuity where supported by ordinary entity state;
+- repair, rearm and refuel through physical facilities and stocks;
+- replacement demand submitted to existing industrial/shipyard planning;
+- no automatic restoration to pre-war fleet composition;
+- post-war cooldown, grievance and treaty memory feeding future interests.
 
 Exit criteria:
 
-- fleet losses remain visible in physical force counts after peace;
-- replacement is impossible without physical/economic capacity;
-- peace can leave a faction weaker, indebted, territorially changed or strategically dependent;
-- the next strategic cycle reacts to those consequences rather than resetting them.
+- peace does not repair ships, refill stores or recreate destroyed fleets;
+- reparations conserve treasury/material transfers;
+- destroyed capability returns only after an ordinary production and commissioning chain;
+- a war changes later diplomatic/economic decisions even after operations end.
 
-### 21H — NPCs, missions, discovery and reputation
+### 21H — NPCs, missions, reputation and discovery grounded in the living world
 
-Objective: expose the living world to the player through persistent people and actionable contracts.
+Objective: make the RPG layer a participant in the autonomous world rather than a disconnected
+quest generator.
 
 Deliverables:
 
-- persistent named NPC identity for faction command, diplomacy, trade, industry, security and local
-  contacts;
-- NPC knowledge bounded by faction/local information and personal role;
-- mission generation from real needs: shortage haul, escort, survey, recovery, repair supply,
-  diplomatic courier, patrol support, bounty/interdiction, evacuation and wartime logistics;
-- accepted missions reserve or reference actual resources/objectives rather than creating duplicates;
-- success/failure derived from authoritative world events and physical delivery/destruction state;
-- persistent reputation/reliability history that influences access and future offers;
-- discovery sharing through Stage-20 knowledge provenance rather than global unlock.
+- persistent NPC identities, roles, affiliations, location, knowledge and availability;
+- actor-bounded NPC knowledge and dialogue facts;
+- reputation changes caused by observed player actions, contracts, betrayals and faction outcomes;
+- mission opportunities derived from real shortages, threats, exploration, diplomacy and operations;
+- contract identity, issuer, objective authority, deadline, reward escrow/cost and failure effects;
+- discovery/intelligence missions that respect Stage-17.5/20 information boundaries;
+- event-driven mission wakeups and bounded relevance instead of polling every possible NPC;
+- mission completion that delegates to ordinary cargo, combat, construction, diplomacy or discovery
+  state and cannot self-certify from UI input.
 
 Exit criteria:
 
-- deleting mission UI cannot change the underlying world need;
-- mission cargo/reward/objective cannot duplicate a resource already owned elsewhere;
-- NPCs do not reveal hidden systems, fleets or threats they have not learned;
-- save/load preserves NPC, mission, deadline, partial progress and reputation identity.
+- a mission cannot promise cargo, money, access or ships the issuer does not lawfully control;
+- destroying or moving the underlying target updates/fails the mission deterministically;
+- NPCs never reveal facts absent from their knowledge state;
+- ignoring a mission does not freeze the world; factions may solve, lose or change the opportunity.
 
-### 21I — Persistence, command UI, observability, corpus and final gate
+### 21I — Command UI, persistence, corpus and long-run final gate
 
-Objective: prove the complete causal living-world loop is playable, inspectable and scalable.
+Objective: make the full living-world chain inspectable, resumable and robust.
 
 Deliverables:
 
-- versioned Stage-21 persistence for actor state, goals, crises, wars, command groups, operations,
-  occupation, NPCs, missions, reputation and all wakeup/deadline watermarks;
-- migration defaults for Stage-20.5 saves with deterministic first-review scheduling;
-- UI surfaces for faction intent, known threats, dependencies, diplomacy, wars, fleet missions,
-  claims/occupation, losses, construction, shortages and mission provenance;
-- explanation trace showing what evidence caused the current strategic decision without exposing
-  hidden information;
-- representative-seed corpus covering peaceful trade, deterrence, alliance, coercion, war,
-  occupation, peace and recovery;
-- save/load branch tests immediately before/after deadlines, negotiations, jumps, battles, occupation
-  thresholds and project completion;
-- performance counters for reviewed actors, deferred actors, wakeup queue, active operations and
-  per-layer milliseconds;
-- long deterministic soak with conservation, identity, orphan-reference and hidden-grant audits.
+- faction UI for interests, relations, treaties, crises, wars, goals and decision evidence;
+- military UI for command group, order, readiness, route, supply, operation and destination;
+- global overlays for access, claims, occupation, control, wars, fronts and known intelligence;
+- timeline/event log with actor-bounded public/private presentation;
+- selectable NPC, mission and discovery inspection;
+- backward migration for supported Stage-20.5/21.0 generated-world saves;
+- deterministic new-world, mid-crisis, mid-transit, mid-operation and post-war save/load tests;
+- representative seed corpus covering peaceful coexistence, alliance, coercion, limited war,
+  territorial transition, recovery and renewed trade;
+- bounded-performance evidence for increasing faction/system/fleet/NPC counts;
+- long-run soak with physical production, losses, diplomacy and territory continuing without
+  resource creation, ID duplication, deadline loss or decision oscillation.
 
-Final exit criteria:
+Exit criteria:
 
-- same seed plus same player commands produce the same persistent living-world outcomes and traces;
-- player and AI actions share validators and physical/economic consequences;
-- no lost ship, cargo, ammunition, propellant, treasury transfer or territory change reappears after
-  save/load;
-- no faction decision consumes hidden knowledge;
-- large-world strategic work remains bounded by relevance/cadence instead of actor-count × fixed-tick;
-- the command UI can explain current wars/goals/operations from authoritative state;
-- Stage 21 ends with no known shortcut for teleportation, free replacement, instant control flip,
-  hidden economy, duplicate mission resource or AI-only privilege;
-- the repository's ordinary Java 17 verification, deterministic long-soak and acceptance corpus pass.
+- every visible strategic value traces to authoritative state;
+- UI actions cannot mutate simulation except through explicit validated commands;
+- corpus tests prove outcome diversity without seed-specific exceptions;
+- final checkpoint restore continues byte/determinism and identity invariants;
+- all Stage-21 hard invariants have non-vacuous acceptance evidence.
 
-## 6. Stage 21 definition of done
+## 6. Mandatory acceptance ladder
 
-Stage 21 is complete only when at least one deterministic generated-world corpus demonstrates the
-full loop:
+1. Pure deterministic tests for interests, goals, deadlines and anti-oscillation.
+2. Actor-knowledge tests proving hidden state cannot leak into decisions.
+3. Diplomacy lifecycle tests from proposal through expiry, breach, crisis, war and peace.
+4. Fleet-order tests for feasibility, routing, service, cancellation and persistence.
+5. Operation tests with real Stage-19 losses and Stage-18 supply consumption.
+6. Territorial tests covering claim, contest, occupation, stabilization and control.
+7. Replacement tests proving shipyard/material/time/treasury conservation.
+8. NPC/mission tests proving real issuer authority, knowledge and world-state completion.
+9. Mid-chain save/load tests at every state-machine boundary.
+10. Representative generated-seed corpus and bounded long-run performance soak.
+
+Acceptance must be non-vacuous: a green test that never creates a crisis, moves a military FleetId,
+consumes supply, records damage, changes a territorial state or resolves a mission is not evidence for
+the corresponding slice.
+
+## 7. Stage-22 boundary
+
+Stage 21 may use the explicit provisional Stage-17.5/19 combat test pack to validate living-world
+causality. Stage 22 owns final hull families, faction engineering doctrine, module/content balance,
+fleet composition and manufacturable content review.
+
+Stage 21 therefore decides **why, when and where** a faction acts and proves that the action is
+physical. Stage 22 finalizes **what production-quality ships and technologies** each faction fields.
+
+## 8. Definition of Stage-21 completion
+
+Stage 21 is complete only when at least one accepted generated campaign can, without scripted
+outcome grants:
 
 ```text
-scarcity/dependency
-→ observed interest
-→ goal
-→ diplomacy/crisis
-→ fleet operation
-→ physical loss or territorial pressure
-→ political outcome
-→ demobilization/replacement
-→ changed economy/knowledge
-→ next strategic review
+run a physical economy
+→ produce divergent faction interests
+→ negotiate, cooperate or enter a causal crisis
+→ commit and physically move ordinary fleets
+→ resolve supply, operation and losses
+→ preserve or change territory through Stage-17 law
+→ negotiate an outcome and recover through Stage-18 industry
+→ generate grounded NPC/mission/reputation consequences
+→ save/load at intermediate boundaries
+→ continue deterministically through a bounded long-run soak
 ```
 
-The loop must survive save/load at intermediate boundaries and remain explainable from actor-bounded
-evidence. Stage 21 is not complete merely because factions own ships, can move them or randomly enter
-wars.
+No single seed is required to exercise every political outcome naturally. Targeted deterministic
+fixtures prove individual branches; the representative corpus proves that the combined system
+supports multiple plausible histories without hidden exceptions.
