@@ -1,6 +1,6 @@
 # Stage 20H — deterministic special locations v1
 
-Status: **IMPLEMENTED — awaiting exact-head CI/merge**
+Status: **IMPLEMENTED AND MERGED** — PR #306, exact-head CI run `32544301469`
 
 ## Purpose
 

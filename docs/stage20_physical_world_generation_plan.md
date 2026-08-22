@@ -820,7 +820,7 @@ Canonical acceptance: `docs/stage20h_special_locations_v1.md`.
 
 ---
 
-# 11. Stage 20I — communications / intelligence latency seam
+# 11. Stage 20I — communications / intelligence latency seam — COMPLETE
 
 Если production design вводит non-instant datalink/communications latency на strategic distances, world generation обязан использовать physical distance.
 
@@ -834,6 +834,20 @@ freshness/age
 ```
 
 Не обязательно вводить realistic light-speed micromanagement на каждом UI action. Но military intel freshness не должна получать отдельные unrelated map units.
+
+## Stage-20I acceptance — COMPLETE
+
+Accepted physical delivery modes:
+
+```text
+same system: LocalPhysicalPosition SI distance / exact vacuum light speed
+different systems: generated hub access + fitted neighbor-edge courier route + destination access
+```
+
+Each receipt retains separate observation, send, transmission, receipt and age values. Finite
+freshness is measured from the original observation, so transport cannot refresh stale intelligence;
+durable survey evidence remains permanent. The current design intentionally has no invented FTL
+radio. Canonical acceptance: `docs/stage20i_communications_intelligence_latency_v1.md`.
 
 ---
 
