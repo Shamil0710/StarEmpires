@@ -15,6 +15,7 @@ import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.FreightView;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.InfoSection;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.LocalObjectView;
+import com.spacesim.ui.GeneratedWorldUiSnapshot.MilitaryView;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.ObjectKind;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.StarSystemId;
@@ -45,6 +46,8 @@ public final class GeneratedWorldCommandUiRenderer {
             new Stage20MinimumPlayableTextureRenderer();
     private final GlyphLayout glyph = new GlyphLayout();
     private final ArrayList<HitTarget> hitTargets = new ArrayList<>();
+    private final MapCameraState systemMapCamera = new MapCameraState();
+    private final MapCameraState galaxyMapCamera = new MapCameraState();
 
     private GeneratedWorldUiFonts fonts;
     private ResponsiveUiMetrics metrics;
@@ -52,6 +55,7 @@ public final class GeneratedWorldCommandUiRenderer {
     private int height;
     private Rect inspectorRect = Rect.empty();
     private Rect listRect = Rect.empty();
+    private Rect mapRect = Rect.empty();
     private boolean disposed;
 
     /** Top-level production UI surfaces. */
@@ -59,6 +63,7 @@ public final class GeneratedWorldCommandUiRenderer {
         /** Current physical star system. */ SYSTEM("СИСТЕМА"),
         /** Generated galaxy topology. */ GALAXY("ГАЛАКТИКА"),
         /** Persistent faction economy and control. */ FACTIONS("ФРАКЦИИ"),
+        /** Persistent ordinary combat fleets. */ MILITARY("ВОЕННЫЕ СИЛЫ"),
         /** Physical freight fleets and orders. */ LOGISTICS("ЛОГИСТИКА");
 
         private final String label;
@@ -79,7 +84,8 @@ public final class GeneratedWorldCommandUiRenderer {
         /** One local object. */ LOCAL_OBJECT,
         /** One global system. */ SYSTEM,
         /** One faction. */ FACTION,
-        /** One physical freighter. */ FREIGHT
+        /** One physical freighter. */ FREIGHT,
+        /** One ordinary military fleet. */ MILITARY
     }
 
     /** Stable current selection. */
@@ -111,6 +117,7 @@ public final class GeneratedWorldCommandUiRenderer {
         /** Select one global system. */ SYSTEM,
         /** Select one faction. */ FACTION,
         /** Select one freighter/order. */ FREIGHT,
+        /** Select one ordinary military fleet. */ MILITARY,
         /** Make the selected global system the active inspected system. */ ACTIVATE_SYSTEM
     }
 
@@ -194,12 +201,14 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         hitTargets.clear();
         listRect = Rect.empty();
+        mapRect = Rect.empty();
         beginFrame();
         drawFrameChrome(snapshot, tab, paused, timeScale, status);
         switch (tab) {
             case SYSTEM -> drawSystem(snapshot, selection, detailScrollRows);
             case GALAXY -> drawGalaxy(snapshot, selection, detailScrollRows);
             case FACTIONS -> drawFactions(snapshot, selection, detailScrollRows, listScrollRows);
+            case MILITARY -> drawMilitary(snapshot, selection, detailScrollRows, listScrollRows);
             case LOGISTICS -> drawLogistics(snapshot, selection, detailScrollRows, listScrollRows);
         }
     }
@@ -237,6 +246,77 @@ public final class GeneratedWorldCommandUiRenderer {
      */
     public boolean isListPoint(float x, float y) {
         return listRect.contains(x, y);
+    }
+
+    /**
+     * @param x horizontal UI coordinate
+     * @param y vertical UI coordinate
+     * @return whether a bottom-left-origin point lies over the active map viewport
+     */
+    public boolean isMapPoint(float x, float y) {
+        return mapRect.contains(x, y);
+    }
+
+    /**
+     * Applies wheel zoom to the active physical or global map.
+     *
+     * @param tab active command tab
+     * @param x cursor horizontal UI coordinate
+     * @param y cursor vertical UI coordinate
+     * @param amountY wheel delta
+     * @return whether map zoom consumed the input
+     */
+    public boolean zoomMap(Tab tab, float x, float y, float amountY) {
+        if (!isMapPoint(x, y) || (tab != Tab.SYSTEM && tab != Tab.GALAXY)) {
+            return false;
+        }
+        MapCameraState state = tab == Tab.SYSTEM ? systemMapCamera : galaxyMapCamera;
+        state.zoomAt(amountY, x, y, mapRect.x() + mapRect.width() * 0.5f,
+                mapRect.y() + mapRect.height() * 0.5f);
+        return amountY != 0f;
+    }
+
+    /**
+     * Applies middle-button drag to the active physical or global map.
+     *
+     * @param tab active command tab
+     * @param deltaX horizontal drag delta
+     * @param deltaY vertical drag delta
+     * @return whether map panning consumed the input
+     */
+    public boolean panMap(Tab tab, float deltaX, float deltaY) {
+        if (tab != Tab.SYSTEM && tab != Tab.GALAXY) {
+            return false;
+        }
+        (tab == Tab.SYSTEM ? systemMapCamera : galaxyMapCamera).pan(deltaX, deltaY);
+        return deltaX != 0f || deltaY != 0f;
+    }
+
+    /** Resets the fitted current-system overview before changing inspected systems. */
+    public void resetSystemMapCamera() {
+        systemMapCamera.reset();
+    }
+
+    /**
+     * Centers one current-system stable object without mutating its physical coordinates.
+     *
+     * @param snapshot current immutable UI projection
+     * @param stableId stable local-object presentation identity
+     * @return whether the requested object was present and focused
+     */
+    public boolean focusLocalObject(GeneratedWorldUiSnapshot snapshot, String stableId) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        String id = Objects.requireNonNull(stableId, "stableId");
+        Layout layout = splitMapAndInspector();
+        Rect content = inset(layout.map(), 28f * metrics.scale());
+        Point point = projectLocal(snapshot.localObjects(), content).get(id);
+        if (point == null) {
+            return false;
+        }
+        systemMapCamera.focus(point.x(), point.y(),
+                layout.map().x() + layout.map().width() * 0.5f,
+                layout.map().y() + layout.map().height() * 0.5f);
+        return true;
     }
 
     private void beginFrame() {
@@ -309,7 +389,7 @@ public final class GeneratedWorldCommandUiRenderer {
         fonts.small().setColor(ImperialUiPalette.IVORY);
         fonts.small().draw(batch,
                 status == null || status.isBlank()
-                        ? "F1–F4 вкладки  •  ЛКМ выбрать  •  колесо прокрутить  •  SPACE пауза  •  F5/F9 сохранить/загрузить"
+                        ? "F1–F5 вкладки  •  колесо зум  •  СКМ панорама  •  двойной клик к кораблю  •  F8/F9 save/load"
                         : status,
                 metrics.outerMargin(), statusHeight * 0.68f,
                 width - metrics.outerMargin() * 2f, Align.left, false);
@@ -322,16 +402,20 @@ public final class GeneratedWorldCommandUiRenderer {
             int detailScrollRows) {
         Layout layout = splitMapAndInspector();
         inspectorRect = layout.inspector();
+        mapRect = layout.map();
         panel(layout.map(), ImperialUiPalette.MAP_SURFACE, ImperialUiPalette.GUNMETAL);
         panel(layout.inspector(), ImperialUiPalette.PANEL_SURFACE, ImperialUiPalette.GUNMETAL);
         drawGrid(layout.map());
 
-        Map<String, Point> points = projectLocal(snapshot.localObjects(), inset(layout.map(), 28f * metrics.scale()));
+        Map<String, Point> points = applyCamera(
+                projectLocal(snapshot.localObjects(), inset(layout.map(), 28f * metrics.scale())),
+                layout.map(),
+                systemMapCamera);
         ArrayList<LocalObjectView> spriteObjects = new ArrayList<>();
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (LocalObjectView object : snapshot.localObjects()) {
             Point point = points.get(object.stableId());
-            if (point == null) {
+            if (point == null || !layout.map().contains(point.x(), point.y())) {
                 continue;
             }
             boolean selected = selection.kind() == SelectionKind.LOCAL_OBJECT
@@ -392,11 +476,13 @@ public final class GeneratedWorldCommandUiRenderer {
             int detailScrollRows) {
         Layout layout = splitMapAndInspector();
         inspectorRect = layout.inspector();
+        mapRect = layout.map();
         panel(layout.map(), ImperialUiPalette.MAP_SURFACE, ImperialUiPalette.GUNMETAL);
         panel(layout.inspector(), ImperialUiPalette.PANEL_SURFACE, ImperialUiPalette.GUNMETAL);
         drawGrid(layout.map());
         Rect mapContent = inset(layout.map(), 42f * metrics.scale());
-        Map<StarSystemId, Point> points = projectSystems(snapshot.galaxy(), mapContent);
+        Map<StarSystemId, Point> points = applyCamera(
+                projectSystems(snapshot.galaxy(), mapContent), layout.map(), galaxyMapCamera);
 
         shapes.begin(ShapeRenderer.ShapeType.Line);
         for (GalaxyStrategicMapSnapshot.EdgeView edge : snapshot.galaxy().edges()) {
@@ -412,6 +498,9 @@ public final class GeneratedWorldCommandUiRenderer {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.galaxy().systems()) {
             Point point = points.get(system.id());
+            if (point == null || !layout.map().contains(point.x(), point.y())) {
+                continue;
+            }
             boolean selected = selection.kind() == SelectionKind.SYSTEM
                     && selection.stableId().equals(Long.toString(system.id().value()));
             shapes.setColor(selected ? ImperialUiPalette.BRASS
@@ -437,6 +526,9 @@ public final class GeneratedWorldCommandUiRenderer {
                 layout.map().x() + 18f * metrics.scale(), layout.map().top() - 46f * metrics.scale());
         for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.galaxy().systems()) {
             Point point = points.get(system.id());
+            if (point == null || !layout.map().contains(point.x(), point.y())) {
+                continue;
+            }
             boolean important = system.active() || selection.stableId().equals(Long.toString(system.id().value()))
                     || snapshot.galaxy().systems().size() <= 30;
             if (important) {
@@ -537,13 +629,16 @@ public final class GeneratedWorldCommandUiRenderer {
         } else {
             long fleets = snapshot.freight().stream()
                     .filter(value -> value.factionId().equals(selected.factionId())).count();
+            long military = snapshot.military().stream()
+                    .filter(value -> value.factionId().equals(selected.factionId())).count();
             List<InfoSection> sections = List.of(
                     InfoSection.of(
                             "Идентификация",
                             "Название", selected.displayName(),
                             "Faction ID", selected.factionId(),
                             "Контролируемые системы", Integer.toString(selected.controlledSystems()),
-                            "Физические транспорты", Long.toString(fleets)),
+                            "Физические транспорты", Long.toString(fleets),
+                            "Военные корабли", Long.toString(military)),
                     InfoSection.of(
                             "Экономика",
                             "Казна", String.format(Locale.ROOT, "%,.2f cr",
@@ -623,6 +718,68 @@ public final class GeneratedWorldCommandUiRenderer {
                     "Выберите физический транспорт, чтобы увидеть владельца, корпус, фит, груз и полный маршрут.");
         } else {
             drawInspector(layout.inspector(), selected.name(), selected.phase(),
+                    selected.factionName(), selected.sections(), detailScrollRows);
+        }
+    }
+
+    private void drawMilitary(
+            GeneratedWorldUiSnapshot snapshot,
+            UiSelection selection,
+            int detailScrollRows,
+            int listScrollRows) {
+        Layout layout = splitListAndInspector();
+        inspectorRect = layout.inspector();
+        listRect = layout.map();
+        panel(layout.map(), ImperialUiPalette.MAP_SURFACE, ImperialUiPalette.GUNMETAL);
+        panel(layout.inspector(), ImperialUiPalette.PANEL_SURFACE, ImperialUiPalette.GUNMETAL);
+        long transit = snapshot.military().stream().filter(value -> !value.inSystem()).count();
+        long factions = snapshot.military().stream().map(MilitaryView::factionId).distinct().count();
+        drawListHeader(layout.map(), "ВОЕННЫЕ СИЛЫ",
+                snapshot.military().size() + " кораблей  •  " + factions
+                        + " фракций  •  " + transit + " в переходе");
+        float y = layout.map().top() - 76f * metrics.scale();
+        float rowHeight = 88f * metrics.scale();
+        int startIndex = Math.min(listScrollRows, snapshot.military().size());
+        for (int index = startIndex; index < snapshot.military().size(); index++) {
+            MilitaryView fleet = snapshot.military().get(index);
+            if (y - rowHeight < layout.map().y() + 12f * metrics.scale()) {
+                break;
+            }
+            Rect row = new Rect(
+                    layout.map().x() + 12f * metrics.scale(), y - rowHeight,
+                    layout.map().width() - 24f * metrics.scale(), rowHeight - 6f * metrics.scale());
+            boolean selected = selection.kind() == SelectionKind.MILITARY
+                    && selection.stableId().equals(Long.toString(fleet.fleetId()));
+            listRow(row, selected, factionColor(fleet.factionId()));
+            batch.begin();
+            fonts.body().setColor(ImperialUiPalette.IVORY);
+            fonts.body().draw(batch, fleet.name(), row.x() + 14f * metrics.scale(),
+                    row.top() - 12f * metrics.scale());
+            fonts.small().setColor(fleet.inSystem()
+                    ? ImperialUiPalette.CYAN : ImperialUiPalette.AMBER);
+            fonts.small().draw(batch, fleet.status(), row.x() + 14f * metrics.scale(),
+                    row.top() - 38f * metrics.scale(), row.width() - 28f * metrics.scale(),
+                    Align.left, false);
+            fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
+            fonts.small().draw(batch,
+                    fleet.factionName() + "  •  " + displayContentId(fleet.hullId()),
+                    row.x() + 14f * metrics.scale(), row.y() + 14f * metrics.scale(),
+                    row.width() - 28f * metrics.scale(), Align.left, false);
+            batch.end();
+            hitTargets.add(new HitTarget(
+                    HitKind.MILITARY, Long.toString(fleet.fleetId()), null, row));
+            y -= rowHeight;
+        }
+        drawListScrollHint(layout.map(), startIndex, snapshot.military().size());
+        MilitaryView selected = snapshot.military().stream()
+                .filter(value -> selection.kind() == SelectionKind.MILITARY
+                        && selection.stableId().equals(Long.toString(value.fleetId())))
+                .findFirst().orElse(null);
+        if (selected == null) {
+            drawEmptyInspector(layout.inspector(), "КОРАБЛЬ НЕ ВЫБРАН",
+                    "Выберите военный корабль. Двойной клик откроет его систему и центрирует камеру.");
+        } else {
+            drawInspector(layout.inspector(), selected.name(), selected.status(),
                     selected.factionName(), selected.sections(), detailScrollRows);
         }
     }
@@ -951,6 +1108,22 @@ public final class GeneratedWorldCommandUiRenderer {
         return result;
     }
 
+    private static <K> Map<K, Point> applyCamera(
+            Map<K, Point> base,
+            Rect viewport,
+            MapCameraState camera) {
+        float centerX = viewport.x() + viewport.width() * 0.5f;
+        float centerY = viewport.y() + viewport.height() * 0.5f;
+        Map<K, Point> result = new HashMap<>();
+        for (Map.Entry<K, Point> entry : base.entrySet()) {
+            Point point = entry.getValue();
+            result.put(entry.getKey(), new Point(
+                    camera.transformX(point.x(), centerX),
+                    camera.transformY(point.y(), centerY)));
+        }
+        return result;
+    }
+
     private float markerSize(ObjectKind kind) {
         return switch (kind) {
             case STATION -> metrics.markerSize() * 1.35f;
@@ -985,6 +1158,12 @@ public final class GeneratedWorldCommandUiRenderer {
 
     private static String format(double value) {
         return String.format(Locale.ROOT, "%,.2f", value);
+    }
+
+    private static String displayContentId(String value) {
+        int separator = value.lastIndexOf('.');
+        String tail = separator >= 0 ? value.substring(separator + 1) : value;
+        return tail.replace('_', ' ').replace('-', ' ');
     }
 
     /** Releases all owned OpenGL/font resources exactly once. */

@@ -28,6 +28,7 @@ import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
 import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState.CanonicalRow;
 import com.spacesim.persistence.Stage20GeneratedIndustrialRuntimeBridge.MaterializedGeneratedIndustrialRuntime;
+import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState.LocalFleetPhysicalState;
 import com.spacesim.persistence.Stage20IndustrialEntityMaterializer.MaterializedIndustrialStation;
 import com.spacesim.persistence.Stage20SourceOutpostMaterializer.MaterializedExtractionOutpost;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
@@ -129,6 +130,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         validateOrderEndpoints(saved.freight(), infrastructure);
         Stage20LiveArrivalAuthorityIntegration arrival =
                 Stage20LiveArrivalAuthorityIntegration.restoreAndBind(saved.campaign(), world);
+        registerRestoredLocalFleetPhysicalStates(
+                world, saved.localFleetPhysicalStates(), arrival);
         validateAndRegisterRestoredFreight(world, saved.freight(), arrival);
         return new LiveRuntime(saved.campaign(), world, industry, infrastructure, freight, arrival);
     }
@@ -232,8 +235,28 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 throw new IllegalArgumentException(
                         "restored ordinary freight entity differs from persisted hull/owner identity");
             }
-            arrival.materialization(placement.systemId())
-                    .registerPhysicalState(placement.localEntityId(), fleet.physicalState());
+            LocalPhysicalKinematics restored = arrival.materialization(placement.systemId())
+                    .physicalState(placement.localEntityId()).orElseThrow();
+            if (!restored.equals(fleet.physicalState())) {
+                throw new IllegalArgumentException(
+                        "restored ordinary freight physical state differs from freight sidecar");
+            }
+        }
+    }
+
+    private static void registerRestoredLocalFleetPhysicalStates(
+            WorldSimulation world,
+            List<LocalFleetPhysicalState> states,
+            Stage20LiveArrivalAuthorityIntegration arrival) {
+        for (LocalFleetPhysicalState state : states) {
+            FleetPlacementState placement = world.findFleet(state.fleetId()).orElseThrow();
+            if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                    || !placement.systemId().equals(state.systemId())) {
+                throw new IllegalArgumentException(
+                        "restored fleet physical sidecar differs from ordinary placement");
+            }
+            arrival.materialization(state.systemId()).registerPhysicalState(
+                    placement.localEntityId(), state.physicalState());
         }
     }
 
@@ -525,7 +548,26 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     campaign,
                     world.snapshot(),
                     world.getActiveSystemId(),
-                    freightState);
+                    freightState,
+                    captureLocalFleetPhysicalStates());
+        }
+
+        private List<LocalFleetPhysicalState> captureLocalFleetPhysicalStates() {
+            ArrayList<LocalFleetPhysicalState> result = new ArrayList<>();
+            for (FleetPlacementState placement : world.getFleetPlacements()) {
+                if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+                    continue;
+                }
+                LocalPhysicalKinematics physical = arrival.materialization(placement.systemId())
+                        .physicalState(placement.localEntityId()).orElseThrow(
+                                () -> new IllegalStateException(
+                                        "ordinary local fleet lacks exact Stage-20 physical state: "
+                                                + placement.id()));
+                result.add(new LocalFleetPhysicalState(
+                        placement.id(), placement.systemId(), physical));
+            }
+            result.sort(java.util.Comparator.comparing(LocalFleetPhysicalState::fleetId));
+            return List.copyOf(result);
         }
 
         private void synchronizeCompletedHops() {

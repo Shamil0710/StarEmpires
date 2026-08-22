@@ -5,6 +5,8 @@ import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState;
+import com.spacesim.components.CombatComponent;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
 import com.spacesim.simulation.GeneratedWorldFreightAutopilot;
 import com.spacesim.ui.GeneratedWorldUiModel;
@@ -22,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class Stage205GeneratedWorldPlayableAcceptanceTest {
     @Test
@@ -39,6 +42,22 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
         assertEquals(bootstrap.freight().capture().freighters().size(), ui.freight().size());
         assertTrue(ui.freight().stream().allMatch(value -> !value.hullId().isBlank()
                 && !value.fitId().isBlank() && !value.sections().isEmpty()));
+        long generatedFactionCount = bootstrap.world().getWorldFactionIdentities().size();
+        assertEquals(
+                generatedFactionCount * GeneratedFactionMilitaryBootstrap.SHIPS_PER_FACTION,
+                ui.military().size());
+        assertTrue(ui.military().stream().allMatch(value -> !value.hullId().isBlank()
+                && !value.fitId().isBlank() && !value.sections().isEmpty()));
+        assertEquals(bootstrap.world().getFleetPlacements().stream()
+                        .filter(value -> value.locationKind() == FleetLocationKind.IN_SYSTEM).count(),
+                bootstrap.captureState().localFleetPhysicalStates().size());
+
+        FleetId militaryFleetId = new FleetId(ui.military().get(0).fleetId());
+        var militaryPlacement = bootstrap.world().findFleet(militaryFleetId).orElseThrow();
+        var militaryEntity = bootstrap.world().findSession(militaryPlacement.systemId()).orElseThrow()
+                .getEntityRegistry().require(militaryPlacement.localEntityId());
+        assertNotNull(militaryEntity.getComponent(CombatComponent.class));
+        assertNotNull(militaryEntity.getComponent(EngineeringComponent.class));
 
         LiveRuntime automatic = Stage20GeneratedWorldRuntimeBridge.restore(bootstrap.captureState());
         var automaticReport = new GeneratedWorldFreightAutopilot(automatic).advance();
@@ -98,6 +117,21 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
                 destroyedBranch.captureState();
         assertTrue(destroyedCheckpoint.worldState().fleets().stream()
                 .noneMatch(value -> value.id().equals(fleetId)));
+
+        LiveRuntime destroyedMilitaryBranch = Stage20GeneratedWorldRuntimeBridge.restore(
+                Stage20GeneratedWorldRuntimePersistenceCodec.decode(sourceBytes));
+        var destroyedMilitaryPlacement = destroyedMilitaryBranch.world()
+                .findFleet(militaryFleetId).orElseThrow();
+        assertEquals(destroyedMilitaryPlacement.localEntityId(),
+                destroyedMilitaryBranch.world().destroyEntity(
+                destroyedMilitaryPlacement.systemId(),
+                destroyedMilitaryPlacement.localEntityId(),
+                DestructionPolicy.destroyAll()).destroyedEntityId());
+        destroyedMilitaryBranch.arrival().materialization(destroyedMilitaryPlacement.systemId())
+                .releasePhysicalStateForWorldTransfer(destroyedMilitaryPlacement.localEntityId());
+        LiveRuntime restoredWithoutMilitary = Stage20GeneratedWorldRuntimeBridge.restore(
+                destroyedMilitaryBranch.captureState());
+        assertTrue(restoredWithoutMilitary.world().findFleet(militaryFleetId).isEmpty());
 
         LiveRuntime delivery = Stage20GeneratedWorldRuntimeBridge.restore(
                 Stage20GeneratedWorldRuntimePersistenceCodec.decode(sourceBytes));

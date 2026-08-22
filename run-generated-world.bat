@@ -49,12 +49,15 @@ echo [2/2] Starting accepted generated world with seed %WORLD_SEED%...
 echo First launch generates the accepted Stage-20 world and can take some time.
 echo.
 echo Controls:
-echo   F1 / F2 / F3 / F4   System / Galaxy / Factions / Logistics
-echo   Left mouse button   Select an object, system, faction or freighter
-echo   Mouse wheel         Scroll the information inspector
+echo   F1 / F2 / F3 / F4 / F5   System / Galaxy / Factions / Military / Logistics
+echo   Left mouse button         Select an object, system, faction or fleet
+echo   Double left click         Focus a logistics or military ship
+echo   Mouse wheel over map      Zoom at cursor
+echo   Hold middle mouse button  Pan the system or galaxy camera
+echo   Mouse wheel over panels   Scroll lists and the information inspector
 echo   SPACE               Pause / resume simulation
 echo   1 / 2 / 3 / 4       Time scale 1x / 2x / 4x / 8x
-echo   F5 / F9             Save / load generated runtime
+echo   F8 / F9                   Save / load generated runtime
 echo   ESC                 Exit
 echo.
 "%JAVA_EXE%" -jar "%APP_JAR%" --generated-world --world-seed=%WORLD_SEED%

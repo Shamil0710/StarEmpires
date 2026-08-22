@@ -247,7 +247,7 @@ public final class ContentBoundSaveCodec {
                 state.priceRecorder(), state.ledger(), List.copyOf(entities));
     }
 
-    private static void writeShipInstance(DataOutputStream output, EntityState.ShipInstanceState state) throws IOException {
+    static void writeShipInstance(DataOutputStream output, EntityState.ShipInstanceState state) throws IOException {
         writeMountRows(output, state.compartmentIntegrityById(), "compartment integrity");
         writeMountRows(output, state.moduleIntegrityByMount(), "module integrity");
         List<EntityState.ShieldRuntimeState> shields = requireList(state.shieldsByMount(), "shields");
@@ -271,7 +271,7 @@ public final class ContentBoundSaveCodec {
         writeMountRows(output, state.weaponCooldownByMount(), "weapon cooldowns");
     }
 
-    private static EntityState.ShipInstanceState readShipInstance(DataInputStream input) throws IOException {
+    static EntityState.ShipInstanceState readShipInstance(DataInputStream input) throws IOException {
         List<EntityState.MountDoubleState> compartments = readMountRows(input, "compartment integrity");
         List<EntityState.MountDoubleState> modules = readMountRows(input, "module integrity");
         int shieldCount = readCount(input, MAX_EXTENSION_ROWS, "shields");
