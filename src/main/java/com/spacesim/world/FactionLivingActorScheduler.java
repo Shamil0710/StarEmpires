@@ -3,18 +3,21 @@ package com.spacesim.world;
 import com.spacesim.world.FactionLivingActorState.EventWakeup;
 import com.spacesim.world.FactionLivingActorState.WakeupReason;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Set;
 
 /**
  * Bounded deterministic Stage-21A scheduler for autonomous faction reviews.
  *
- * <p>The scheduler may inspect lifecycle metadata for all supplied actors, but it authorizes at
- * most {@code maxReviews} expensive actor reviews in one invocation. Ordering depends only on
- * persisted deadlines/wakeups and stable faction identity.</p>
+ * <p>The scheduler performs one lightweight lifecycle scan over the supplied actors, but retains
+ * only the best {@code maxReviews} due candidates. Expensive review work, candidate memory and
+ * candidate ordering therefore remain bounded by the explicit review budget as faction counts grow.
+ * Ordering depends only on persisted deadlines/wakeups and stable faction identity.</p>
  */
 public final class FactionLivingActorScheduler {
     private FactionLivingActorScheduler() {
@@ -99,11 +102,18 @@ public final class FactionLivingActorScheduler {
             if (eligibleCount != selected.size() + deferredCount) {
                 throw new IllegalArgumentException("Eligible count must equal selected plus deferred reviews");
             }
+            if (!selected.equals(selected.stream().sorted().toList())) {
+                throw new IllegalArgumentException("Selected reviews must use canonical scheduler order");
+            }
         }
     }
 
     /**
      * Selects a deterministic bounded batch of due actor reviews.
+     *
+     * <p>Selection uses a reverse-order top-K heap. The method scans lifecycle metadata once,
+     * retains at most {@code maxReviews} candidates and finally sorts only those retained rows.
+     * Duplicate stable faction identities fail closed rather than authorizing two reviews.</p>
      *
      * @param states persistent actor lifecycle states
      * @param nowTick authoritative review clock tick
@@ -122,25 +132,64 @@ public final class FactionLivingActorScheduler {
             throw new IllegalArgumentException("Review work budget must be positive");
         }
 
-        List<ScheduledReview> eligible = new ArrayList<>();
+        PriorityQueue<ScheduledReview> selectedHeap = new PriorityQueue<>(
+                maxReviews,
+                Comparator.reverseOrder());
+        Set<String> observedFactionIds = new HashSet<>();
+        int eligibleCount = 0;
         for (FactionLivingActorState state : states) {
             FactionLivingActorState checked = Objects.requireNonNull(state, "Living actor state not set");
-            List<EventWakeup> dueWakeups = checked.dueWakeups(nowTick);
-            if (!dueWakeups.isEmpty()) {
-                long earliest = dueWakeups.get(0).eligibleAtTick();
-                List<WakeupReason> reasons = dueWakeups.stream().map(EventWakeup::reason).distinct().sorted().toList();
-                eligible.add(new ScheduledReview(
-                        checked.factionContentId(), TriggerType.EVENT_WAKEUP, earliest, reasons));
-            } else if (checked.nextReviewTick() <= nowTick) {
-                eligible.add(new ScheduledReview(
-                        checked.factionContentId(), TriggerType.DEADLINE, checked.nextReviewTick(), List.of()));
+            if (!observedFactionIds.add(checked.factionContentId())) {
+                throw new IllegalArgumentException(
+                        "Duplicate living actor state: " + checked.factionContentId());
+            }
+            ScheduledReview candidate = dueCandidate(checked, nowTick);
+            if (candidate == null) {
+                continue;
+            }
+            eligibleCount = Math.addExact(eligibleCount, 1);
+            if (selectedHeap.size() < maxReviews) {
+                selectedHeap.add(candidate);
+                continue;
+            }
+            ScheduledReview worstSelected = selectedHeap.peek();
+            if (worstSelected != null && candidate.compareTo(worstSelected) < 0) {
+                selectedHeap.remove();
+                selectedHeap.add(candidate);
             }
         }
 
-        eligible.sort(Comparator.naturalOrder());
-        int selectedCount = Math.min(maxReviews, eligible.size());
-        List<ScheduledReview> selected = List.copyOf(eligible.subList(0, selectedCount));
-        return new ScheduleBatch(nowTick, eligible.size(), selected, eligible.size() - selectedCount);
+        List<ScheduledReview> selected = selectedHeap.stream().sorted().toList();
+        return new ScheduleBatch(
+                nowTick,
+                eligibleCount,
+                selected,
+                eligibleCount - selected.size());
+    }
+
+    private static ScheduledReview dueCandidate(FactionLivingActorState state, long nowTick) {
+        List<EventWakeup> dueWakeups = state.dueWakeups(nowTick);
+        if (!dueWakeups.isEmpty()) {
+            long earliest = dueWakeups.get(0).eligibleAtTick();
+            List<WakeupReason> reasons = dueWakeups.stream()
+                    .map(EventWakeup::reason)
+                    .distinct()
+                    .sorted()
+                    .toList();
+            return new ScheduledReview(
+                    state.factionContentId(),
+                    TriggerType.EVENT_WAKEUP,
+                    earliest,
+                    reasons);
+        }
+        if (state.nextReviewTick() <= nowTick) {
+            return new ScheduledReview(
+                    state.factionContentId(),
+                    TriggerType.DEADLINE,
+                    state.nextReviewTick(),
+                    List.of());
+        }
+        return null;
     }
 
     private static String requireText(String value, String label) {
