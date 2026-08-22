@@ -501,9 +501,11 @@ command interface rather than the old schematic test harness:
 
 Canonical UI/launcher contract: `docs/generated_world_command_ui.md`.
 
-This closes the interface/bootstrap entry seam only. The mandatory Stage-21 closure chain is now:
+Stage 21A additionally closes the persistent living-actor/observation/interest foundation. The
+mandatory Stage-21 closure chain is now:
 
-- **21A** — persistent living-actor cadence, actor-bounded observations and interest evidence;
+- **21A — COMPLETE** — persistent living-actor cadence, actor-bounded observations, interest
+  evidence, bounded scheduling and exact generated-runtime checkpoint continuation;
 - **21B** — explainable strategic goals, feasibility, commitment and anti-oscillation;
 - **21C** — diplomacy, treaties, crises, alliances, war declarations and negotiated outcomes;
 - **21D** — physical fleet readiness, command groups, validated orders and neighbor movement;
@@ -543,6 +545,10 @@ No isolated `Mk II = +25% all stats` parallel system.
 
 Detailed plan: `docs/stage22_content_balance_plan.md`.
 
+Cross-media production plan for faction packages, ships, stations, NPCs, missions, locations,
+characters, UI art, VFX, audio, localization, manifests, alpha floors and cut rules:
+`docs/content_production_plan_stage21_23.md`.
+
 ## 11. Stage 23 — Polish / Release Candidate
 
 **PLANNED.**
@@ -550,6 +556,25 @@ Detailed plan: `docs/stage22_content_balance_plan.md`.
 UX/onboarding/accessibility/performance/content validation/save hardening after fundamental simulation/content architecture is stable.
 
 Stage 23 replaces remaining prototype tactical presentation with production ship/projectile/VFX assets where not already finalized, without creating a new economy/physics model. It closes profiler budgets, migration diagnostics, long-session stability and release hardening.
+
+Mandatory closure chain:
+
+- **23A** — scope lock, issue taxonomy, versioning and release governance;
+- **23B** — production information architecture, navigation, search, inspectors and validated actions;
+- **23C** — resolution/aspect matrix, accessibility, input rebinding and RU/EN localization;
+- **23D** — onboarding/tutorial over ordinary authoritative state;
+- **23E** — final art, VFX, animation and audio replacement;
+- **23F** — profiler-driven performance, memory and long-session hardening;
+- **23G** — atomic saves, migration, recovery and diagnostics;
+- **23H** — distributable Windows package and clean-machine launcher without Maven/JDK;
+- **23I** — campaign journeys, playtest and regression closure;
+- **23J** — exact-package Release Candidate acceptance gate.
+
+Canonical detailed plan: `docs/stage23_release_candidate_roadmap.md`.
+
+Stage 23 is not complete when the source tree merely builds. The exact distributable package must
+launch on a clean supported machine, remain readable across the accepted display envelope, preserve
+supported campaigns and pass deterministic, performance, migration and long-session evidence.
 
 ## 12. Scalability cross-stage contract
 
@@ -581,11 +606,15 @@ Stage 17 COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
-→ Stage 21 RPG / Living World ACTIVE — generated-world command UI foundation
+→ Stage 21 RPG / Living World ACTIVE — 21.0 + 21A COMPLETE; 21B next
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority remains Stage 21.** The generated-world command UI and Windows
-launcher now expose the shared runtime; NPCs, missions, reputation and living-world behavior are the
-next slices consuming its persistent entities, physical logistics and exact travel state.
+**Immediate implementation priority is Stage 21B.** Stage 21A now supplies bounded observations,
+interest evidence, deterministic traces and persistent actor cadence; the next slice converts those
+accepted facts into durable, feasible, explainable strategic goals without creating assets or
+recomputing hidden world state.
+
+Verified all-remaining-stage execution order, status audit, cross-stage acceptance matrix and risk
+register: `docs/remaining_stages_execution_plan.md`.

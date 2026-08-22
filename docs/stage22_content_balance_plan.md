@@ -733,3 +733,130 @@ technology/content choice
 ```
 
 Если technology или module минует эту цепочку и просто добавляет abstract bonus, он нарушает accepted design baseline.
+
+---
+
+# 27. Stage-22 production sequence
+
+Буквенные work packages 22A–22T задают полный scope, но не означают, что двадцать независимых
+каталогов следует писать параллельно. Канонический порядок поставки:
+
+## 22.0 — content inventory and governance gate
+
+- machine-readable inventory всех существующих content IDs и обратных ссылок;
+- решение `PROMOTE / REAUTHOR / REPLACE / RETIRE` для каждого Stage-17.5/19 provisional ID;
+- review пяти major и трёх minor/transnational faction identities;
+- schemas/manifests для art, NPC, mission, localization, VFX/audio bindings;
+- automated validation и semantic fingerprint policy;
+- утверждённые alpha floors и cut priority.
+
+Без 22.0 запрещено массово генерировать ассеты или переименовывать content IDs.
+
+## 22.1 — Imperial gold slice
+
+Закрывает одну faction package end-to-end:
+
+- 22A–K engineering/industry definitions, необходимые её reference roster;
+- минимум шесть военных и три civilian/support base hulls;
+- три signature station variants;
+- doctrine fits, reference fleet, market/progression access и replacement chain;
+- шесть recurring NPCs, десять mission templates и две короткие faction chains;
+- production sprites/characters/icons/VFX/audio subset;
+- peaceful, crisis, battle, loss, recovery и save/load acceptance.
+
+Визуальная основа — принятый код «Империи»: тяжёлая ремонтопригодная осевая инженерия,
+центральная цитадель, сдержанная иерархия, graphite/ivory/burgundy/brass и отсутствие fantasy decor.
+
+## 22.2 — contrast faction
+
+Вторая faction выбирается за максимальный mechanical/political/visual contrast. Pairwise acceptance
+обязана доказать:
+
+- различимый силуэт без цвета и герба;
+- другую viable engineering/fleet solution в одной физике;
+- иные интересы/переговоры без scripted personality бонусов;
+- реальную торговую зависимость, конфликт и counterplay;
+- отсутствие одного доминирующего fit между обеими сторонами.
+
+## 22.3 — full major-faction breadth
+
+- ещё три major packages, по одной за review iteration;
+- cross-faction module/industry availability;
+- roster/fleet/station/character/mission coverage;
+- pairwise и representative-corpus validation после каждой package;
+- общий civilian licensed/shared content там, где это объяснимо производителем и рынком.
+
+## 22.4 — minor organizations and civilian ecosystem
+
+- политическая роль `neutral`, `trade_league`, `miners`;
+- contracts, market access, extraction, arbitration, convoy и independent-settlement content;
+- peaceful/economic careers с плотностью контента, сопоставимой с military path;
+- special locations, regional manufacturers and service-history variants.
+
+## 22.5 — combined alpha balance
+
+- 22L–R fleet/combat/logistics/economy/faction matrices;
+- 22S progression/market access;
+- 22T benchmark/fingerprint governance;
+- NPC/mission/location distribution and repetition audit;
+- финальное решение по каждому provisional ID;
+- explicit finite list оставшихся prototype visuals для Stage 23.
+
+# 28. Content breadth authority
+
+Подробный сквозной production plan для factions, ships, stations, characters, missions, locations,
+UI art, VFX, audio, localization, manifests, quotas и cut rules:
+
+`docs/content_production_plan_stage21_23.md`.
+
+Он дополняет, но не заменяет engineering authority этого документа. При конфликте:
+
+- physical/economic параметр и manufacturability определяются Stage-17.5/18/22 contracts;
+- faction/asset/narrative production workflow определяется content production plan;
+- world behavior, knowledge и mission completion определяются Stage 21;
+- release packaging/accessibility/recovery определяются Stage 23.
+
+# 29. Stage-22 PR/workstream decomposition
+
+Recommended reviewable sequence:
+
+1. inventory/provisional disposition schema;
+2. content/asset/localization manifest validation;
+3. faction roster and Imperial systemic doctrine;
+4. 22A material/component production catalog;
+5. 22B–D power/propulsion/thermal gold-slice families;
+6. 22E–G sensor/EW/weapon/protection gold-slice families;
+7. 22H Imperial hulls/fits and physical anchors;
+8. 22J–K yard/facility/cost/replacement chain;
+9. Imperial visuals/characters/missions/runtime binding;
+10. Imperial reference fleet/campaign acceptance;
+11. contrast faction systemic package;
+12. contrast hull/station/content package and pairwise acceptance;
+13. remaining major factions one package at a time;
+14. minor organizations/common civilian ecosystem;
+15. special locations/events/full mission breadth;
+16. 22L–M fleet/saturation matrices;
+17. 22N–O world logistics/macro soak;
+18. 22P–S anti-dominance/faction/progression closure;
+19. 22T fingerprint/performance baselines;
+20. Stage-22 alpha completion record and Stage-23 handoff manifest.
+
+# 30. Quantified alpha acceptance floor
+
+Stage 22 не закрывается одним большим каталогом. Минимальный product-level floor:
+
+- five reviewed sovereign major-faction packages;
+- three reviewed minor/transnational organization packages;
+- six signature military and three faction civilian/support base hulls per major faction;
+- at least eight neutral/licensed civilian hulls across ordinary markets;
+- ten functional station exterior roles and three signature variants per major faction;
+- thirty-nine recurring named NPCs across major/minor actors;
+- forty-eight mechanically distinct mission templates;
+- twenty special-location archetypes;
+- RU source copy and complete EN localization path;
+- production-valid art/metadata for every alpha-facing definition;
+- no unresolved provisional content decision;
+- combined combat, economy, logistics, progression, save and long-run acceptance.
+
+Количество является floor покрытия, а не KPI наполнения. Дубликат существующего role, filler text
+или paint-only variant не засчитывается как новая механическая единица.

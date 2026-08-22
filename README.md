@@ -35,8 +35,8 @@
 
 На текущем roadmap завершены Stages **0–20**, включая **Stage 20A–20L physical-world generation**
 и обязательный **Stage 20.5 runtime + visual integration gate**. Stage 21 начат с production-facing
-generated-world command UI и Windows launcher; NPC/missions/reputation остаются следующими
-living-world slices.
+generated-world command UI, Windows launcher и принятым Stage-21A living-actor kernel;
+Stage 21B strategic goals является следующим slice.
 
 ## Что уже реализовано
 
@@ -274,25 +274,28 @@ branch from exact green main
 - [`docs/stage17g_faction_management_completion_record.md`](docs/stage17g_faction_management_completion_record.md) — Stage 17G;
 - [`docs/stage17h_persistence_transition_completion_record.md`](docs/stage17h_persistence_transition_completion_record.md) — Stage 17H final gate;
 - [`docs/ship_mathematics_v1_0_design_baseline.md`](docs/ship_mathematics_v1_0_design_baseline.md) — accepted Ship Mathematics v1.0;
-- [`docs/stage17_5_combat_depth_implementation_plan.md`](docs/stage17_5_combat_depth_implementation_plan.md) — next runtime implementation;
+- [`docs/stage17_5_combat_depth_implementation_plan.md`](docs/stage17_5_combat_depth_implementation_plan.md) — completed combat-depth contract;
 - [`docs/stage18_resources_industry_infrastructure_plan.md`](docs/stage18_resources_industry_infrastructure_plan.md) — resource/industry ontology;
 - [`docs/stage20_physical_world_generation_plan.md`](docs/stage20_physical_world_generation_plan.md) — world generation;
 - [`docs/generated_world_command_ui.md`](docs/generated_world_command_ui.md) — generated-world UI и Windows launcher;
-- [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — content/balance alpha.
+- [`docs/remaining_stages_execution_plan.md`](docs/remaining_stages_execution_plan.md) — verified Stage 21–23 execution order;
+- [`docs/stage21_living_world_roadmap.md`](docs/stage21_living_world_roadmap.md) — living factions/NPC/missions;
+- [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — content/technology/balance alpha;
+- [`docs/content_production_plan_stage21_23.md`](docs/content_production_plan_stage21_23.md) — faction/ship/character/mission/media production;
+- [`docs/stage23_release_candidate_roadmap.md`](docs/stage23_release_candidate_roadmap.md) — polish, packaging and RC gate.
 
 ## Ближайшая последовательность
 
 ```text
 Stage 17 COMPLETE
-→ Stage 17.5A material/hull/module schema
-→ Stage 17.5B–I combat/fitting foundation
-→ Stage 18 resources/industry/infrastructure
-→ Stage 19 warfare
+→ Stage 17.5 combat/fitting foundation COMPLETE
+→ Stage 18 resources/industry/infrastructure COMPLETE
+→ Stage 19 warfare COMPLETE
 → Stage 20 world generation COMPLETE
 → Stage 20.5 runtime + visual integration COMPLETE
-→ Stage 21 living world ACTIVE — generated-world command UI foundation
-→ Stage 22 content/balance
-→ Stage 23 RC
+→ Stage 21 living world ACTIVE — 21.0 + 21A complete; 21B–21I open
+→ Stage 22 content/technology/balance alpha PLANNED
+→ Stage 23 polish/release candidate PLANNED
 ```
 
 ## Лицензия
