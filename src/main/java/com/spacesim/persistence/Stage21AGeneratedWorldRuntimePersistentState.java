@@ -21,7 +21,6 @@ import java.util.Set;
  * @param stage20Runtime exact underlying generated-world runtime checkpoint
  * @param livingActors autonomous faction lifecycle rows in canonical stable-ID order
  */
-@SuppressWarnings("doclint:missing")
 public record Stage21AGeneratedWorldRuntimePersistentState(
         int schemaVersion,
         String runtimeVersion,
@@ -32,7 +31,14 @@ public record Stage21AGeneratedWorldRuntimePersistentState(
     /** Stable Stage-21A runtime composition contract. */
     public static final String CURRENT_RUNTIME_VERSION = "stage21a.generated-world-living-actors.v1";
 
-    /** Validates cross-layer faction identities and canonicalizes lifecycle rows. */
+    /**
+     * Validates cross-layer faction identities and canonicalizes lifecycle rows.
+     *
+     * @param schemaVersion Stage-21A composition schema
+     * @param runtimeVersion exact Stage-21A runtime composition contract
+     * @param stage20Runtime exact underlying generated-world runtime checkpoint
+     * @param livingActors autonomous faction lifecycle rows in canonical stable-ID order
+     */
     public Stage21AGeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException(
