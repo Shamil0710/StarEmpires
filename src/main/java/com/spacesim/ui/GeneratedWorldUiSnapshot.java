@@ -17,7 +17,8 @@ public record GeneratedWorldUiSnapshot(
         String activeSystemName,
         GalaxyStrategicMapSnapshot galaxy,
         List<LocalObjectView> localObjects,
-        List<FreightView> freight) {
+        List<FreightView> freight,
+        List<MilitaryView> military) {
 
     /**
      * Validates and freezes one frame of UI projection data.
@@ -29,6 +30,7 @@ public record GeneratedWorldUiSnapshot(
      * @param galaxy immutable global-map projection
      * @param localObjects selectable objects in the active system
      * @param freight persistent generated freight projections
+     * @param military persistent ordinary military fleet projections
      */
     public GeneratedWorldUiSnapshot {
         Objects.requireNonNull(activeSystemId, "activeSystemId");
@@ -36,6 +38,7 @@ public record GeneratedWorldUiSnapshot(
         Objects.requireNonNull(galaxy, "galaxy");
         localObjects = List.copyOf(Objects.requireNonNull(localObjects, "localObjects"));
         freight = List.copyOf(Objects.requireNonNull(freight, "freight"));
+        military = List.copyOf(Objects.requireNonNull(military, "military"));
     }
 
     /** Selectable local-system object families. */
@@ -174,6 +177,39 @@ public record GeneratedWorldUiSnapshot(
 
         @Override
         public int compareTo(FreightView other) {
+            return Long.compare(fleetId, Objects.requireNonNull(other, "other").fleetId);
+        }
+    }
+
+    /** One ordinary persistent military fleet row for the military-forces tab. */
+    public record MilitaryView(
+            long fleetId,
+            String name,
+            String factionId,
+            String factionName,
+            String status,
+            StarSystemId systemId,
+            boolean inSystem,
+            String hullId,
+            String fitId,
+            List<InfoSection> sections) implements Comparable<MilitaryView> {
+        /** Validates one immutable military presentation projection. */
+        public MilitaryView {
+            if (fleetId <= 0L) {
+                throw new IllegalArgumentException("Military FleetId must be positive");
+            }
+            name = requireText(name, "name");
+            factionId = requireText(factionId, "factionId");
+            factionName = requireText(factionName, "factionName");
+            status = requireText(status, "status");
+            Objects.requireNonNull(systemId, "systemId");
+            hullId = requireText(hullId, "hullId");
+            fitId = requireText(fitId, "fitId");
+            sections = List.copyOf(Objects.requireNonNull(sections, "sections"));
+        }
+
+        @Override
+        public int compareTo(MilitaryView other) {
             return Long.compare(fleetId, Objects.requireNonNull(other, "other").fleetId);
         }
     }

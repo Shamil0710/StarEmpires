@@ -100,6 +100,9 @@ public final class Stage20PlayableGeneratedWorldFactory {
         WorldSimulation world = ordinaryWorld(fixture.resolved());
         LiveRuntime runtime = Stage20GeneratedWorldRuntimeBridge.materializeBootstrap(
                 campaign, fixture.specialization(), world);
+        GeneratedFactionMilitaryBootstrap.materialize(
+                runtime,
+                fixture.resolved().generation().placement().orElseThrow().assignments());
         return new GeneratedWorld(rootSeed, CONTENT, fixture.specialization(), runtime);
     }
 
@@ -256,17 +259,16 @@ public final class Stage20PlayableGeneratedWorldFactory {
         for (var system : topology.systems()) {
             systems.add(new StarSystemSimulationState(
                     system.id(),
-                    SimulationSession.createDemo(resolved.rootSeed() ^ system.id().value(), CONTENT).snapshot()));
+                    SimulationSession.createEmpty(resolved.rootSeed() ^ system.id().value(), CONTENT).snapshot()));
         }
         StarSystemId active = topology.systems().get(0).id();
         ArrayList<FactionEconomicState> economies = new ArrayList<>();
         ArrayList<FactionStrategicState> strategies = new ArrayList<>();
         ArrayList<WorldFactionIdentityState> identities = new ArrayList<>();
         resolved.generation().placement().orElseThrow().assignments().stream()
-                .map(value -> value.stableFactionId())
-                .distinct()
-                .sorted()
-                .forEach(factionId -> {
+                .sorted(Comparator.comparing(value -> value.stableFactionId()))
+                .forEach(assignment -> {
+                    String factionId = assignment.stableFactionId();
                     FactionIdentityResolver resolver = FactionIdentityResolver.createDefault(CONTENT, identities);
                     WorldFactionIdentityState allocated = resolver.allocatePlayerCreated(
                             factionId, generatedFactionName(factionId));
@@ -276,7 +278,8 @@ public final class Stage20PlayableGeneratedWorldFactory {
                             allocated.displayName(),
                             WorldFactionIdentityState.Origin.WORLD_BOOTSTRAP));
                     economies.add(new FactionEconomicState(factionId, 0L, 0L, 0L, 0L, 0L));
-                    strategies.add(new FactionStrategicState(factionId, 0, List.of(), List.of()));
+                    strategies.add(new FactionStrategicState(
+                            factionId, 0, List.of(), List.of(assignment.systemId())));
                 });
         WorldState bootstrap = new WorldState(
                 WorldState.CURRENT_VERSION, topology, systems, economies, strategies);

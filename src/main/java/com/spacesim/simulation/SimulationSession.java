@@ -116,6 +116,28 @@ public final class SimulationSession {
      * @throws NullPointerException если каталог не задан
      */
     public static SimulationSession createDemo(long rootSeed, ContentCatalog contentCatalog) {
+        return create(rootSeed, contentCatalog, true);
+    }
+
+    /**
+     * Creates an empty authoritative local-system session for a generated-world materializer.
+     *
+     * <p>The simulation systems, deterministic streams and persistence services are identical to a
+     * demo session, but no legacy demo stations or ships are granted. Generated-world bootstraps
+     * must populate this session only through their accepted physical materializers.</p>
+     *
+     * @param rootSeed root seed for deterministic simulation streams
+     * @param contentCatalog versioned catalog owned by the session
+     * @return fully assembled session with no initial entities
+     */
+    public static SimulationSession createEmpty(long rootSeed, ContentCatalog contentCatalog) {
+        return create(rootSeed, contentCatalog, false);
+    }
+
+    private static SimulationSession create(
+            long rootSeed,
+            ContentCatalog contentCatalog,
+            boolean populateDemoWorld) {
         ContentCatalog content = Objects.requireNonNull(contentCatalog, "ContentCatalog не задан");
         SimulationRandom random = new SimulationRandom(rootSeed);
         StatefulRandom eventRandom = random.createStream("economy-events");
@@ -130,8 +152,10 @@ public final class SimulationSession {
                 AsteroidSpawnConfig.demoWorld(), asteroidRandom, ledger, ids);
         PriceRecorderSystem recorder = new PriceRecorderSystem();
         addSystems(engine, events, ledger, registry, spawner, recorder, content);
-        for (Entity entity : DemoWorldFactory.createEntities(ids, content)) {
-            engine.addEntity(entity);
+        if (populateDemoWorld) {
+            for (Entity entity : DemoWorldFactory.createEntities(ids, content)) {
+                engine.addEntity(entity);
+            }
         }
         return new SimulationSession(
                 rootSeed,

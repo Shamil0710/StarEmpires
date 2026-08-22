@@ -46,6 +46,15 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private double timeScale = 1d;
     private String status = "Генерация принятого мира…";
     private Path savePath;
+    private boolean middleDragging;
+    private int dragPointer = -1;
+    private float previousDragX;
+    private float previousDragY;
+    private HitKind previousClickKind;
+    private String previousClickId = "";
+    private long previousClickNanos;
+
+    private static final long DOUBLE_CLICK_NANOS = 450_000_000L;
 
     /**
      * Creates an application for a deterministic new-world seed.
@@ -80,13 +89,14 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     case Input.Keys.F1 -> switchTab(Tab.SYSTEM);
                     case Input.Keys.F2 -> switchTab(Tab.GALAXY);
                     case Input.Keys.F3 -> switchTab(Tab.FACTIONS);
-                    case Input.Keys.F4 -> switchTab(Tab.LOGISTICS);
+                    case Input.Keys.F4 -> switchTab(Tab.MILITARY);
+                    case Input.Keys.F5 -> switchTab(Tab.LOGISTICS);
                     case Input.Keys.SPACE -> togglePause();
                     case Input.Keys.NUM_1 -> setTimeScale(1d);
                     case Input.Keys.NUM_2 -> setTimeScale(2d);
                     case Input.Keys.NUM_3 -> setTimeScale(4d);
                     case Input.Keys.NUM_4 -> setTimeScale(8d);
-                    case Input.Keys.F5 -> save();
+                    case Input.Keys.F8 -> save();
                     case Input.Keys.F9 -> load();
                     case Input.Keys.ESCAPE -> exit();
                     default -> false;
@@ -95,10 +105,20 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
             @Override
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-                if (button != Input.Buttons.LEFT || renderer == null) {
+                if (renderer == null) {
                     return false;
                 }
                 float uiY = Gdx.graphics.getHeight() - screenY;
+                if (button == Input.Buttons.MIDDLE && renderer.isMapPoint(screenX, uiY)) {
+                    middleDragging = true;
+                    dragPointer = pointer;
+                    previousDragX = screenX;
+                    previousDragY = uiY;
+                    return true;
+                }
+                if (button != Input.Buttons.LEFT) {
+                    return false;
+                }
                 var hit = renderer.hitTest(screenX, uiY);
                 if (hit == null) {
                     return false;
@@ -112,25 +132,57 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     case SYSTEM -> new UiSelection(SelectionKind.SYSTEM, hit.id());
                     case FACTION -> new UiSelection(SelectionKind.FACTION, hit.id());
                     case FREIGHT -> new UiSelection(SelectionKind.FREIGHT, hit.id());
+                    case MILITARY -> new UiSelection(SelectionKind.MILITARY, hit.id());
                     case ACTIVATE_SYSTEM -> selection;
                     case TAB -> throw new IllegalStateException("Tab hit handled above");
                 };
                 if (hit.kind() == HitKind.ACTIVATE_SYSTEM) {
                     StarSystemId target = new StarSystemId(Long.parseLong(hit.id()));
                     runtime.world().activateSystem(target);
+                    renderer.resetSystemMapCamera();
                     tab = Tab.SYSTEM;
                     selection = UiSelection.none();
                     status = "Активная область симуляции: система #" + target.value()
                             + ". Флоты не телепортированы.";
                     snapshot = model.capture();
                 }
+                if ((hit.kind() == HitKind.FREIGHT || hit.kind() == HitKind.MILITARY)
+                        && isDoubleClick(hit)) {
+                    return focusFleet(Long.parseLong(hit.id()));
+                }
                 return true;
+            }
+
+            @Override
+            public boolean touchDragged(int screenX, int screenY, int pointer) {
+                if (!middleDragging || pointer != dragPointer || renderer == null) {
+                    return false;
+                }
+                float uiY = Gdx.graphics.getHeight() - screenY;
+                float deltaX = screenX - previousDragX;
+                float deltaY = uiY - previousDragY;
+                previousDragX = screenX;
+                previousDragY = uiY;
+                return renderer.panMap(tab, deltaX, deltaY);
+            }
+
+            @Override
+            public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+                if (button == Input.Buttons.MIDDLE && middleDragging && pointer == dragPointer) {
+                    middleDragging = false;
+                    dragPointer = -1;
+                    return true;
+                }
+                return false;
             }
 
             @Override
             public boolean scrolled(float amountX, float amountY) {
                 float x = Gdx.input.getX();
                 float y = Gdx.graphics.getHeight() - Gdx.input.getY();
+                if (renderer != null && renderer.zoomMap(tab, x, y, amountY)) {
+                    return true;
+                }
                 if (renderer == null || !renderer.isInspectorPoint(x, y)) {
                     if (renderer == null || !renderer.isListPoint(x, y)) {
                         return false;
@@ -144,6 +196,47 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 return delta != 0;
             }
         };
+    }
+
+    private boolean isDoubleClick(GeneratedWorldCommandUiRenderer.HitTarget hit) {
+        long now = System.nanoTime();
+        boolean result = hit.kind() == previousClickKind
+                && hit.id().equals(previousClickId)
+                && now - previousClickNanos <= DOUBLE_CLICK_NANOS;
+        previousClickKind = hit.kind();
+        previousClickId = hit.id();
+        previousClickNanos = now;
+        return result;
+    }
+
+    private boolean focusFleet(long fleetIdValue) {
+        var placement = runtime.world().findFleet(new com.spacesim.world.FleetId(fleetIdValue))
+                .orElse(null);
+        if (placement == null) {
+            status = "Корабль #" + fleetIdValue + " уже не существует.";
+            return true;
+        }
+        if (placement.locationKind() == com.spacesim.world.FleetLocationKind.IN_TRANSIT) {
+            status = "Корабль #" + fleetIdValue
+                    + " находится в межсистемном перелёте; локальной точки для камеры нет.";
+            return true;
+        }
+        boolean changedSystem = !runtime.world().getActiveSystemId().equals(placement.systemId());
+        runtime.world().activateSystem(placement.systemId());
+        if (changedSystem) {
+            renderer.resetSystemMapCamera();
+        }
+        tab = Tab.SYSTEM;
+        selection = new UiSelection(SelectionKind.LOCAL_OBJECT, "fleet:" + fleetIdValue);
+        detailScrollRows = 0;
+        listScrollRows = 0;
+        snapshot = model.capture();
+        if (renderer.focusLocalObject(snapshot, selection.stableId())) {
+            status = "Камера переведена к кораблю #" + fleetIdValue + ".";
+        } else {
+            status = "Корабль #" + fleetIdValue + " не имеет локальной визуализации.";
+        }
+        return true;
     }
 
     private boolean switchTab(Tab target) {
@@ -213,6 +306,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             selection = UiSelection.none();
             detailScrollRows = 0;
             listScrollRows = 0;
+            renderer.resetSystemMapCamera();
             snapshot = model.capture();
             status = "Сохранённый generated world загружен без повторной генерации.";
         } catch (IOException | RuntimeException exception) {

@@ -2,12 +2,17 @@ package com.spacesim.ui;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.FactionComponent;
+import com.spacesim.components.CombatComponent;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
+import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.economy.Stage18StationStorage;
 import com.spacesim.persistence.EntityId;
+import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
 import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState;
@@ -25,8 +30,10 @@ import com.spacesim.ui.GeneratedWorldUiSnapshot.FreightView;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.InfoLine;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.InfoSection;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.LocalObjectView;
+import com.spacesim.ui.GeneratedWorldUiSnapshot.MilitaryView;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.ObjectKind;
 import com.spacesim.world.FleetLocationKind;
+import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.Stage20LocalInfrastructureLayout.PlacementKind;
@@ -34,6 +41,10 @@ import com.spacesim.world.Stage20SpecialLocationWorld.LocationKind;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldFactionIdentityState;
 import com.spacesim.world.calibration.Stage20StationPhysicalGeometryProfile;
+import com.spacesim.ship.DerivedShipCalculator;
+import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
+import com.spacesim.ship.Stage175IFleetDoctrineCatalog;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -51,6 +62,10 @@ import java.util.TreeMap;
 public final class GeneratedWorldUiModel {
     private static final String INFRASTRUCTURE_DOMAIN = "INFRASTRUCTURE_PLACEMENT";
     private static final String SPECIAL_DOMAIN = "SPECIAL_LOCATION";
+    private static final ShipEngineeringCatalog MILITARY_ENGINEERING =
+            Stage175ICombatTestContentPack.loadDoctrines();
+    private static final DerivedShipCalculator MILITARY_CALCULATOR =
+            new DerivedShipCalculator(MILITARY_ENGINEERING);
 
     private final long worldSeed;
     private final LiveRuntime runtime;
@@ -80,7 +95,8 @@ public final class GeneratedWorldUiModel {
         GalaxyStrategicMapSnapshot galaxy = GalaxyStrategicMapModel.capture(
                 runtime.world(), content, active, null);
         List<FreightView> freight = freightViews(galaxy);
-        List<LocalObjectView> local = localObjects(active, galaxy, freight);
+        List<MilitaryView> military = militaryViews(galaxy);
+        List<LocalObjectView> local = localObjects(active, galaxy, freight, military);
         return new GeneratedWorldUiSnapshot(
                 worldSeed,
                 runtime.world().getAuthoritativeWorldTick(),
@@ -88,13 +104,15 @@ public final class GeneratedWorldUiModel {
                 activeName,
                 galaxy,
                 local,
-                freight);
+                freight,
+                military);
     }
 
     private List<LocalObjectView> localObjects(
             StarSystemId active,
             GalaxyStrategicMapSnapshot galaxy,
-            List<FreightView> freightViews) {
+            List<FreightView> freightViews,
+            List<MilitaryView> militaryViews) {
         ArrayList<LocalObjectView> result = new ArrayList<>();
         Map<String, MaterializedIndustrialStation> industrial = new HashMap<>();
         runtime.industry().industrial().stations().forEach(value -> industrial.put(value.stationId(), value));
@@ -210,9 +228,38 @@ public final class GeneratedWorldUiModel {
 
         addCanonicalStaticObjects(result, active);
         addFreightObjects(result, active, freightByFleet);
+        addMilitaryObjects(result, active, militaryViews);
         addOrdinaryEntities(result, active);
         result.sort(Comparator.naturalOrder());
         return List.copyOf(result);
+    }
+
+    private void addMilitaryObjects(
+            List<LocalObjectView> result,
+            StarSystemId active,
+            List<MilitaryView> militaryViews) {
+        for (MilitaryView military : militaryViews) {
+            if (!military.inSystem() || !military.systemId().equals(active)) {
+                continue;
+            }
+            FleetPlacementState placement = runtime.world()
+                    .findFleet(new FleetId(military.fleetId())).orElseThrow();
+            LocalPhysicalPosition position = runtime.arrival().materialization(active)
+                    .physicalState(placement.localEntityId()).orElseThrow().position();
+            SpriteBinding sprite = Stage20MinimumPlayableSpriteCatalog.resolveShip(
+                    military.hullId(), ShipRole.MEDIUM_COMBAT, MILITARY_ENGINEERING).binding();
+            result.add(new LocalObjectView(
+                    "fleet:" + military.fleetId(),
+                    ObjectKind.FLEET,
+                    military.name(),
+                    military.status(),
+                    active,
+                    position,
+                    military.factionId(),
+                    military.factionName(),
+                    sprite,
+                    military.sections()));
+        }
     }
 
     private void addFreightObjects(
@@ -449,6 +496,115 @@ public final class GeneratedWorldUiModel {
         }
         result.sort(Comparator.naturalOrder());
         return List.copyOf(result);
+    }
+
+    private List<MilitaryView> militaryViews(GalaxyStrategicMapSnapshot galaxy) {
+        Set<FleetId> freightIds = runtime.freight().capture().freighters().stream()
+                .map(FreighterState::fleetId)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        ArrayList<MilitaryView> result = new ArrayList<>();
+        for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
+            if (freightIds.contains(placement.id())) {
+                continue;
+            }
+            Entity entity = placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                    ? runtime.world().findSession(placement.systemId()).orElseThrow()
+                            .getEntityRegistry().require(placement.localEntityId())
+                    : EntityStateMapper.restore(placement.transitState().entityState());
+            ShipComponent ship = entity.getComponent(ShipComponent.class);
+            CombatComponent combat = entity.getComponent(CombatComponent.class);
+            EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
+            FactionComponent faction = entity.getComponent(FactionComponent.class);
+            IdentityComponent identity = entity.getComponent(IdentityComponent.class);
+            if (ship == null || ship.type == null || !ship.type.isCombat()
+                    || combat == null || engineering == null
+                    || faction == null || identity == null) {
+                continue;
+            }
+            String ownerId = runtime.world().findFactionStableId(faction.factionId).orElseThrow();
+            String ownerName = factionName(ownerId);
+            StarSystemId displayedSystem = placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                    ? placement.systemId() : placement.transitState().destinationSystemId();
+            String status = placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                    ? "Патруль системы " + systemName(displayedSystem, galaxy)
+                    : "Перелёт " + systemName(placement.transitState().originSystemId(), galaxy)
+                            + " → " + systemName(placement.transitState().destinationSystemId(), galaxy);
+            DerivedShipState derived = MILITARY_CALCULATOR.derive(
+                    MILITARY_ENGINEERING.findHull(engineering.fit.hullId()),
+                    engineering.fit,
+                    engineering.runtimeState.consumables(),
+                    engineering.instanceState.damage().moduleDamage());
+            String fitId = provisionalFitId(engineering.fit);
+            double structuralIntegrity = engineering.instanceState.damage()
+                    .compartmentIntegrityById().values().stream()
+                    .mapToDouble(Double::doubleValue).average().orElse(1d);
+            double shieldReserve = engineering.instanceState.shieldStatesByMount().values().stream()
+                    .mapToDouble(value -> value.reserveJ()).sum();
+            String modules = engineering.fit.installedModules().stream()
+                    .map(value -> displayId(value.mountId()) + ": " + displayId(value.moduleId()))
+                    .collect(java.util.stream.Collectors.joining("; "));
+            ArrayList<InfoSection> sections = new ArrayList<>();
+            sections.add(InfoSection.of(
+                    "Идентификация",
+                    "Название", identity.name,
+                    "FleetId", Long.toString(placement.id().value()),
+                    "Фракция", ownerName,
+                    "Faction ID", ownerId,
+                    "Состояние", status));
+            sections.add(InfoSection.of(
+                    "Корпус и фит",
+                    "Корпус", engineering.fit.hullId(),
+                    "Фит", fitId,
+                    "Модули", modules,
+                    "Масса", mass(derived.totalMassKg()),
+                    "Экипаж", derived.crewRequired() + " / " + derived.crewSupported()));
+            sections.add(InfoSection.of(
+                    "Боевая готовность",
+                    "Структура", percent(structuralIntegrity),
+                    "Щитовой резерв", format(shieldReserve) + " Дж",
+                    "Боеприпасы", derived.ammunitionCount() + " ед. / " + mass(derived.ammunitionMassKg()),
+                    "Реактивная масса", mass(derived.reactionMassKg()),
+                    "Ускорение", format(derived.accelerationMps2()) + " м/с²",
+                    "Delta-v", format(derived.deltaVMps()) + " м/с"));
+            sections.add(InfoSection.of(
+                    "Назначение",
+                    "Текущий приказ", placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                            ? "Охрана стартовой системы" : "Межсистемный переход",
+                    "Куда направляется", placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                            ? "Локальный патруль" : systemName(
+                                    placement.transitState().destinationSystemId(), galaxy),
+                    "Контент", "Временный Stage 17.5/19; замена доктрин в Stage 22"));
+            result.add(new MilitaryView(
+                    placement.id().value(),
+                    identity.name,
+                    ownerId,
+                    ownerName,
+                    status,
+                    displayedSystem,
+                    placement.locationKind() == FleetLocationKind.IN_SYSTEM,
+                    engineering.fit.hullId(),
+                    fitId,
+                    sections));
+        }
+        result.sort(Comparator.naturalOrder());
+        return List.copyOf(result);
+    }
+
+    private static String provisionalFitId(InstalledFit fit) {
+        return Stage175IFleetDoctrineCatalog.all().stream()
+                .filter(value -> InstalledFit.fromDemonstrator(
+                        MILITARY_ENGINEERING.findDemonstratorFit(value.fitId())).equals(fit))
+                .map(Stage175IFleetDoctrineCatalog.Doctrine::fitId)
+                .findFirst().orElse("fit.provisional.unknown");
+    }
+
+    private static String systemName(
+            StarSystemId systemId,
+            GalaxyStrategicMapSnapshot galaxy) {
+        return galaxy.systems().stream()
+                .filter(value -> value.id().equals(systemId))
+                .map(GalaxyStrategicMapSnapshot.SystemView::name)
+                .findFirst().orElse("#" + systemId.value());
     }
 
     private String controller(StarSystemId systemId, GalaxyStrategicMapSnapshot galaxy) {

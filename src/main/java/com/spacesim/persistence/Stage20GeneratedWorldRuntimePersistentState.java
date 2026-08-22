@@ -5,10 +5,14 @@ import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetJumpState;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
+import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldState;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -22,6 +26,7 @@ import java.util.Objects;
  * @param worldState ordinary multi-system ECS/fleet/jump state
  * @param activeSystemId active full-rate local system
  * @param freight current physical fleet, cargo-lot and transport-order sidecar
+ * @param localFleetPhysicalStates exact Stage-20 kinematics for every in-system ordinary fleet
  */
 @SuppressWarnings("doclint:missing")
 public record Stage20GeneratedWorldRuntimePersistentState(
@@ -30,9 +35,10 @@ public record Stage20GeneratedWorldRuntimePersistentState(
         Stage20GeneratedCampaignPersistentState campaign,
         WorldState worldState,
         StarSystemId activeSystemId,
-        Stage20FreightPersistentState freight) {
+        Stage20FreightPersistentState freight,
+        List<LocalFleetPhysicalState> localFleetPhysicalStates) {
     /** Current atomic Stage-20.5 generated-runtime checkpoint schema. */
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     /**
      * Validates all cross-envelope identity and active-route invariants.
@@ -43,6 +49,7 @@ public record Stage20GeneratedWorldRuntimePersistentState(
      * @param worldState ordinary multi-system ECS/fleet/jump state
      * @param activeSystemId active full-rate local system
      * @param freight current physical fleet, cargo-lot and transport-order sidecar
+     * @param localFleetPhysicalStates exact Stage-20 kinematics for every in-system ordinary fleet
      */
     public Stage20GeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
@@ -57,6 +64,10 @@ public record Stage20GeneratedWorldRuntimePersistentState(
         Objects.requireNonNull(worldState, "worldState");
         Objects.requireNonNull(activeSystemId, "activeSystemId");
         Objects.requireNonNull(freight, "freight");
+        ArrayList<LocalFleetPhysicalState> physical = new ArrayList<>(
+                Objects.requireNonNull(localFleetPhysicalStates, "localFleetPhysicalStates"));
+        physical.sort(Comparator.comparing(LocalFleetPhysicalState::fleetId));
+        localFleetPhysicalStates = List.copyOf(physical);
         if (worldState.topology().findSystem(activeSystemId).isEmpty()) {
             throw new IllegalArgumentException("active system is absent from checkpoint topology");
         }
@@ -72,6 +83,28 @@ public record Stage20GeneratedWorldRuntimePersistentState(
         Map<FleetId, FleetPlacementState> placements = new HashMap<>();
         for (FleetPlacementState placement : worldState.fleets()) {
             placements.put(placement.id(), placement);
+        }
+        Map<FleetId, LocalFleetPhysicalState> physicalByFleet = new HashMap<>();
+        for (LocalFleetPhysicalState state : localFleetPhysicalStates) {
+            if (physicalByFleet.putIfAbsent(state.fleetId(), state) != null) {
+                throw new IllegalArgumentException(
+                        "duplicate local fleet physical state: " + state.fleetId());
+            }
+            FleetPlacementState placement = placements.get(state.fleetId());
+            if (placement == null
+                    || placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                    || !placement.systemId().equals(state.systemId())) {
+                throw new IllegalArgumentException(
+                        "fleet physical state lacks matching local world placement: " + state.fleetId());
+            }
+        }
+        for (FleetPlacementState placement : worldState.fleets()) {
+            boolean hasPhysical = physicalByFleet.containsKey(placement.id());
+            if ((placement.locationKind() == FleetLocationKind.IN_SYSTEM) != hasPhysical) {
+                throw new IllegalArgumentException(
+                        "local/transit fleet physical-state coverage differs from world placement: "
+                                + placement.id());
+            }
         }
         Map<FleetId, FleetJumpState> jumps = new HashMap<>();
         for (FleetJumpState jump : worldState.fleetJumps()) {
@@ -110,6 +143,19 @@ public record Stage20GeneratedWorldRuntimePersistentState(
                 throw new IllegalArgumentException(
                         "transit freight placement lacks its ordinary jump FSM state");
             }
+        }
+    }
+
+    /** Exact persisted physical state owned by one ordinary in-system fleet placement. */
+    public record LocalFleetPhysicalState(
+            FleetId fleetId,
+            StarSystemId systemId,
+            LocalPhysicalKinematics physicalState) {
+        /** Validates one immutable physical sidecar entry. */
+        public LocalFleetPhysicalState {
+            Objects.requireNonNull(fleetId, "fleetId");
+            Objects.requireNonNull(systemId, "systemId");
+            Objects.requireNonNull(physicalState, "physicalState");
         }
     }
 }

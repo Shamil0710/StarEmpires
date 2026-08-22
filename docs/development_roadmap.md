@@ -490,7 +490,10 @@ command interface rather than the old schematic test harness:
 
 - resolution-aware TTF typography and independent UI scale;
 - selectable local objects with read-only physical/economic/fit/route inspection;
-- separate current-system, galaxy, faction and logistics tabs;
+- separate current-system, galaxy, faction, military-forces and logistics tabs;
+- finite generated-faction patrols as ordinary persistent `FleetId` combat entities, with no free
+  replacement and an explicit provisional-content boundary before Stage 22;
+- cursor-anchored wheel zoom, middle-button map panning and double-click fleet camera focus;
 - real Stage-20.5 sprites and exact generated positions downstream of simulation authority;
 - ordinary finite extraction/freight/jump circulation;
 - atomic generated-runtime save/load without regeneration;
