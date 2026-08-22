@@ -15,31 +15,47 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class FactionStrategicIntentStateCodecTest {
 
     @Test
-    void goalIdentityEvidenceBudgetLifecycleAndCooldownSurviveRoundTrip() {
+    void identityEvidenceMultidimensionalBudgetBlockersAndLifecycleSurviveRoundTrip() {
         StrategicGoalState active = goal(
                 "faction.alpha:strategic-goal:1",
-                "faction.alpha",
                 StrategicGoalType.STOCKPILE,
                 InterestKind.RESOURCE_DEFICIT,
                 "resource.water",
                 Lifecycle.ACTIVE,
-                40L,
+                StrategicPlanningEnvelope.balanced(40L),
+                List.of(),
+                21L,
                 0L,
-                0L);
-        StrategicGoalState cancelled = goal(
+                StrategicPlanningEnvelope.ZERO,
+                StrategicGoalOutcomeSignal.NONE);
+        StrategicGoalState stalled = goal(
                 "faction.alpha:strategic-goal:2",
-                "faction.alpha",
                 StrategicGoalType.SECURE_ROUTE,
                 InterestKind.ROUTE_EXPOSURE,
                 "route.alpha-beta",
-                Lifecycle.CANCELLED,
+                Lifecycle.STALLED,
+                StrategicPlanningEnvelope.ZERO,
+                List.of(StrategicGoalBlocker.LOGISTICS_CAPACITY),
+                41L,
                 0L,
-                60L,
-                4L);
+                StrategicPlanningEnvelope.ZERO,
+                StrategicGoalOutcomeSignal.NONE);
+        StrategicGoalState cancelled = goal(
+                "faction.alpha:strategic-goal:3",
+                StrategicGoalType.OBTAIN_ACCESS,
+                InterestKind.MARKET_ACCESS,
+                "market.beta",
+                Lifecycle.CANCELLED,
+                StrategicPlanningEnvelope.ZERO,
+                List.of(),
+                0L,
+                64L,
+                new StrategicPlanningEnvelope(4L, 2L, 0L, 0L),
+                StrategicGoalOutcomeSignal.FAILED);
         FactionStrategicIntentState state = new FactionStrategicIntentState(
                 "faction.alpha",
-                3L,
-                List.of(cancelled, active));
+                4L,
+                List.of(cancelled, stalled, active));
 
         byte[] encoded = FactionStrategicIntentStateCodec.encode(List.of(state));
         List<FactionStrategicIntentState> decoded = FactionStrategicIntentStateCodec.decode(encoded);
@@ -48,6 +64,7 @@ class FactionStrategicIntentStateCodecTest {
         assertArrayEquals(encoded, FactionStrategicIntentStateCodec.encode(decoded));
         assertEquals("faction.alpha:strategic-goal:1", decoded.get(0).goals().get(0).goalId());
         assertEquals("ledger.source", decoded.get(0).goals().get(0).sourceEvidence().provenance().get(0).provenanceId());
+        assertEquals(List.of(StrategicGoalBlocker.LOGISTICS_CAPACITY), decoded.get(0).goals().get(1).blockers());
     }
 
     @Test
@@ -60,14 +77,16 @@ class FactionStrategicIntentStateCodecTest {
 
     private static StrategicGoalState goal(
             String goalId,
-            String factionId,
             StrategicGoalType type,
             InterestKind kind,
             String target,
             Lifecycle lifecycle,
-            long allocation,
+            StrategicPlanningEnvelope allocation,
+            List<StrategicGoalBlocker> blockers,
+            long nextReview,
             long cooldown,
-            long cancellationCost) {
+            StrategicPlanningEnvelope cancellationCost,
+            StrategicGoalOutcomeSignal outcome) {
         StrategicGoalEvidence evidence = new StrategicGoalEvidence(
                 kind,
                 target,
@@ -79,18 +98,22 @@ class FactionStrategicIntentStateCodecTest {
                         -1L)));
         return new StrategicGoalState(
                 goalId,
-                factionId,
+                "faction.alpha",
                 type,
                 target,
                 evidence,
                 7000,
                 8000,
-                50L,
+                new StrategicPlanningEnvelope(50L, 40L, 30L, 20L),
                 allocation,
+                blockers,
                 lifecycle,
                 10L,
                 lifecycle == Lifecycle.ACTIVE ? 20L : 40L,
+                nextReview,
+                -1L,
                 cooldown,
-                cancellationCost);
+                cancellationCost,
+                outcome);
     }
 }
