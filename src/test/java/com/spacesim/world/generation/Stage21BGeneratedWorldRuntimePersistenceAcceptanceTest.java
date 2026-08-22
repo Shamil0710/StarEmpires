@@ -11,7 +11,9 @@ import com.spacesim.world.FactionStrategicGoalPlanner;
 import com.spacesim.world.FactionStrategicIntentState;
 import com.spacesim.world.StrategicGoalCandidate;
 import com.spacesim.world.StrategicGoalEvidence;
+import com.spacesim.world.StrategicGoalOutcomeSignal;
 import com.spacesim.world.StrategicGoalType;
+import com.spacesim.world.StrategicPlanningEnvelope;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -47,12 +49,16 @@ class Stage21BGeneratedWorldRuntimePersistenceAcceptanceTest {
                                 -1L))),
                 8000,
                 9000,
-                50L);
+                new StrategicPlanningEnvelope(20L, 30L, 10L, 0L),
+                List.of(),
+                -1L,
+                24L,
+                StrategicGoalOutcomeSignal.NONE);
         var planned = FactionStrategicGoalPlanner.review(
                 stage21aState.livingActors().get(0),
                 FactionStrategicIntentState.initial(factionId),
                 List.of(candidate),
-                100L,
+                StrategicPlanningEnvelope.balanced(100L),
                 nowTick);
 
         Stage21BGeneratedWorldRuntimePersistentState stage21b =
@@ -72,6 +78,9 @@ class Stage21BGeneratedWorldRuntimePersistenceAcceptanceTest {
         assertEquals(
                 planned.state().activeGoals().get(0).goalId(),
                 decoded.strategicIntents().get(0).activeGoals().get(0).goalId());
+        assertEquals(
+                new StrategicPlanningEnvelope(20L, 30L, 10L, 0L),
+                decoded.strategicIntents().get(0).activeGoals().get(0).allocatedBudget());
         assertEquals(
                 "ledger.propellant.shortage",
                 decoded.strategicIntents().get(0).activeGoals().get(0)
