@@ -1,6 +1,6 @@
 # Stage 21C — Diplomacy, crisis, alliance and war lifecycle
 
-**Status:** **COMPLETE** for the Stage-21C implementation and acceptance contract. Repository merge remains subject to the exact-head CI/review gate; Stage 21D is OPEN/NEXT and is intentionally not implemented here.
+**Status:** **COMPLETE and merged in `main` via PR #324**. README closeout status was synchronized via PR #325. Stage 21D is OPEN/NEXT and is intentionally not implemented here.
 
 ## Scope
 
