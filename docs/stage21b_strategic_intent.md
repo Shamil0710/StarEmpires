@@ -1,6 +1,6 @@
 # Stage 21B — Strategic intent, goals and commitment
 
-**Status:** implemented in `stage21b-persistent-strategic-goals`; merge remains gated by repository CI and final acceptance review.
+**Status:** **COMPLETE** and merged in `main` via PR #323. Stage 21C consumes this accepted persistent-intent contract without rewriting its authority.
 
 ## Scope
 
