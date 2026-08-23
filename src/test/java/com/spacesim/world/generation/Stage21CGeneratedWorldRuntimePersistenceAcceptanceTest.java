@@ -1,6 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.spacesim.persistence.Stage19ConflictState;
+import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
 import com.spacesim.persistence.Stage21AGeneratedWorldRuntimeBridge;
 import com.spacesim.persistence.Stage21BGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage21BGeneratedWorldRuntimePersistentState;
@@ -185,7 +186,7 @@ class Stage21CGeneratedWorldRuntimePersistenceAcceptanceTest {
     }
 
     private static Stage21BGeneratedWorldRuntimePersistentState stage21b(
-            Stage20GeneratedWorldRuntimeBridge stage20,
+            LiveRuntime stage20,
             String first,
             String second) {
         var stage21a = Stage21AGeneratedWorldRuntimeBridge.materializeBootstrap(
