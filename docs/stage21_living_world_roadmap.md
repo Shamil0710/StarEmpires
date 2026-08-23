@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
-> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0 and Stage 21A are complete;
-> Stage 21B is the next delivery slice.
+> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A and Stage 21B are complete;
+> Stage 21C is the next delivery slice.
 
 ## 1. Purpose
 
@@ -125,11 +125,11 @@ Accepted evidence:
 
 Implementation and acceptance map: `docs/stage21a_living_actor_kernel.md`.
 
-### 21B — Strategic intent, goals and commitment
+### 21B — Strategic intent, goals and commitment — COMPLETE
 
 Objective: convert measured interests into durable, explainable goals.
 
-Deliverables:
+Delivered:
 
 - goal families for secure-route, obtain-access, stockpile, defend, escort, explore, claim,
   deter, coerce, raid, blockade, invade and recover;
@@ -140,12 +140,27 @@ Deliverables:
 - hysteresis, minimum commitment duration and material-change wakeups;
 - cancellation consequences rather than free instantaneous retasking.
 
+Accepted evidence:
+
+- all 13 goal families have stable persistence identities and doctrine-gated candidate generation;
+- candidate ranking uses persisted urgency, strategic value, feasibility and doctrine preference;
+- infeasible or over-budget goals remain explainable through typed blockers and `STALLED` state;
+- accepted goals preserve identity across unchanged reviews and stall/recovery transitions;
+- cancellation has visible cost, target cooldown and fresh identity on later re-entry;
+- Stage-21A completed-review watermarks provide one-shot material-change re-evaluation before ordinary goal cadence;
+- `commitmentUntilTick` protects accepted goals from nonterminal evidence-loss churn while terminal outcomes still win;
+- success/failure conditions and cost ceilings remain declarative and survive save/load;
+- Stage-21B v5 persistence wraps the accepted Stage-21A checkpoint without rewriting its authority;
+- future/corrupt actor-review watermarks fail closed during composition validation.
+
 Exit criteria:
 
 - goals are reconstructible from saved evidence and never inferred from a UI label;
 - impossible goals are rejected or deferred with a reason;
 - repeated unchanged reviews do not churn goal or target identity;
 - different physical dependencies can produce different goals for otherwise similar factions.
+
+Implementation and acceptance map: `docs/stage21b_strategic_intent.md`.
 
 ### 21C — Diplomacy, crisis, alliance and war lifecycle
 
@@ -365,8 +380,8 @@ supports multiple plausible histories without hidden exceptions.
 |---|---|---|
 | 21.0 | **COMPLETE** | generated runtime/UI/fleets/navigation/save/launcher |
 | 21A | **COMPLETE** | persistent actor cadence, bounded observations and interest evidence |
-| 21B | **OPEN — next** | persistent strategic goals, feasibility and commitment |
-| 21C | **OPEN** | proposal/crisis/treaty/war lifecycle |
+| 21B | **COMPLETE** | persistent strategic goals, feasibility, commitment and explainability |
+| 21C | **OPEN — next** | proposal/crisis/treaty/war lifecycle |
 | 21D | **OPEN** | physical readiness, command groups and lawful orders |
 | 21E | **OPEN** | operations and exact physical consequences |
 | 21F | **OPEN** | occupation/stabilization/control transitions |
@@ -374,21 +389,26 @@ supports multiple plausible histories without hidden exceptions.
 | 21H | **OPEN** | persistent NPCs, missions, reputation and discovery |
 | 21I | **OPEN** | integrated UI/migration/corpus/performance final gate |
 
-Stage 21A has accepted the deliberately narrow foundation: stable faction-bound lifecycle state,
+Stage 21A accepted the deliberately narrow actor foundation: stable faction-bound lifecycle state,
 immutable actor-bounded observations, measurable interests, deterministic traces, ordered wakeups,
-bounded top-K scheduling and exact checkpoint continuation. It deliberately does not create goals,
-relations, assets or wars.
+bounded top-K scheduling and exact checkpoint continuation.
 
-The next 21B implementation must consume the accepted trace rather than recomputing hidden world
-state:
+Stage 21B now accepts the next causal layer: stable evidence-bound strategic goals, explicit scoring
+inputs and cost ceilings, multidimensional feasibility/budget arbitration, persistent lifecycle and
+cancellation consequences, minimum commitment, one-shot material-change re-evaluation, read-only
+explainability and exact v5 checkpoint continuation. It deliberately does not create diplomatic legal
+state, fleet orders, physical operations or territory changes.
 
-1. introduce stable goal identity and saved lifecycle;
-2. bind every goal to accepted interest evidence and an explicit target;
-3. add economic/force/access feasibility before commitment;
-4. arbitrate real treasury, logistics, construction and fleet budgets;
-5. preserve commitment horizons, hysteresis and cancellation consequences;
-6. expose why a goal exists, what blocks it and when it will be reviewed;
-7. prove save/load and no-churn behavior before 21C diplomacy consumes goals.
+The next 21C implementation must consume accepted persistent goals rather than recomputing hidden
+world state or applying relation rolls directly:
+
+1. introduce persistent proposal and crisis identity;
+2. derive offers/demands from accepted goals and actor-bounded diplomatic evidence;
+3. delegate treaty/access/treasury effects to existing Stage-17 authorities;
+4. persist deadlines, concessions, refusals and escalation evidence;
+5. add explicit causal war identity only after a valid crisis/decision or observed hostile action;
+6. preserve war/peace hysteresis and re-escalation cooldowns;
+7. prove save/load and peaceful/coercive outcome diversity before 21D consumes political state.
 
 ## 10. Suggested state ownership
 
@@ -451,8 +471,8 @@ Each item should remain separately reviewable and leave `main` green:
 1. **COMPLETE:** 21A actor state/cadence/persistence;
 2. **COMPLETE:** 21A observation/evidence/interest derivation;
 3. **COMPLETE:** 21A scheduling/diagnostics/generated-runtime composition;
-4. **NEXT:** 21B goal state/feasibility/arbitration;
-5. 21C proposals/treaties and crisis state;
+4. **COMPLETE:** 21B goal state/feasibility/arbitration;
+5. **NEXT:** 21C proposals/treaties and crisis state;
 6. 21C war/peace legal lifecycle;
 7. 21D readiness/command groups;
 8. 21D orders/routing/service validation;
