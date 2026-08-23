@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class Stage21BGeneratedWorldRuntimePersistenceAcceptanceTest {
 
@@ -85,5 +86,19 @@ class Stage21BGeneratedWorldRuntimePersistenceAcceptanceTest {
                 "ledger.propellant.shortage",
                 decoded.strategicIntents().get(0).activeGoals().get(0)
                         .sourceEvidence().provenance().get(0).provenanceId());
+
+        long impossibleReviewCount = stage21aState.livingActors().get(0).completedReviewCount() + 1L;
+        FactionStrategicIntentState futureIntent = new FactionStrategicIntentState(
+                factionId,
+                planned.state().nextGoalSequence(),
+                impossibleReviewCount,
+                planned.state().goals());
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new Stage21BGeneratedWorldRuntimePersistentState(
+                        Stage21BGeneratedWorldRuntimePersistentState.CURRENT_VERSION,
+                        Stage21BGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION,
+                        stage21aState,
+                        List.of(futureIntent)));
     }
 }
