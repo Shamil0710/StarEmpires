@@ -94,7 +94,6 @@ public final class FactionStrategicGoalPlanner {
         StrategicPlanningEnvelope remaining = capacity;
         StrategicPlanningEnvelope cancellationCost = StrategicPlanningEnvelope.ZERO;
 
-        // Terminal history is immutable. Open goals that are not due retain their commitment first.
         for (StrategicGoalState goal : state.goals()) {
             if (!goal.isOpen()) {
                 nextGoals.add(goal);
@@ -114,12 +113,8 @@ public final class FactionStrategicGoalPlanner {
             if (candidate != null && candidate.outcomeSignal() == StrategicGoalOutcomeSignal.FAILED) {
                 StrategicPlanningEnvelope cost = goal.allocatedBudget().fractionCeil(CANCELLATION_COST_BASIS_POINTS);
                 cancellationCost = cancellationCost.plus(cost);
-                nextGoals.add(goal.cancel(
-                        candidate,
-                        reviewTick,
-                        Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
-                        cost,
-                        StrategicGoalOutcomeSignal.FAILED));
+                nextGoals.add(goal.cancel(candidate, reviewTick, Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
+                        cost, StrategicGoalOutcomeSignal.FAILED));
                 resolvedOpenKeys.add(goal.intentKey());
                 continue;
             }
@@ -187,11 +182,8 @@ public final class FactionStrategicGoalPlanner {
                     StrategicPlanningEnvelope cost = existing.allocatedBudget()
                             .fractionCeil(CANCELLATION_COST_BASIS_POINTS);
                     cancellationCost = cancellationCost.plus(cost);
-                    nextGoals.add(existing.cancel(
-                            candidate,
-                            reviewTick,
-                            Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
-                            cost,
+                    nextGoals.add(existing.cancel(candidate, reviewTick,
+                            Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS), cost,
                             StrategicGoalOutcomeSignal.FAILED));
                     resolvedOpenKeys.add(key);
                 }
@@ -219,7 +211,9 @@ public final class FactionStrategicGoalPlanner {
                         candidate.targetId(),
                         candidate.sourceEvidence(),
                         candidate.urgencyBasisPoints(),
+                        candidate.strategicValueBasisPoints(),
                         candidate.feasibilityBasisPoints(),
+                        candidate.doctrinePreferenceBasisPoints(),
                         candidate.requestedBudget(),
                         allocation,
                         blockers,
@@ -238,25 +232,18 @@ public final class FactionStrategicGoalPlanner {
             }
         }
 
-        // A due open goal no longer supported by any current actor-bounded candidate is displaced.
         for (StrategicGoalState goal : state.openGoals()) {
             if (resolvedOpenKeys.contains(goal.intentKey()) || reviewTick < goal.nextReviewTick()) {
                 continue;
             }
             StrategicPlanningEnvelope cost = goal.allocatedBudget().fractionCeil(CANCELLATION_COST_BASIS_POINTS);
             cancellationCost = cancellationCost.plus(cost);
-            nextGoals.add(goal.cancel(
-                    null,
-                    reviewTick,
-                    Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
-                    cost,
-                    StrategicGoalOutcomeSignal.NONE));
+            nextGoals.add(goal.cancel(null, reviewTick, Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
+                    cost, StrategicGoalOutcomeSignal.NONE));
         }
 
         FactionStrategicIntentState nextState = new FactionStrategicIntentState(
-                state.factionContentId(),
-                nextSequence,
-                nextGoals);
+                state.factionContentId(), nextSequence, nextGoals);
         StrategicPlanningEnvelope allocated = nextState.activeGoals().stream()
                 .map(StrategicGoalState::allocatedBudget)
                 .reduce(StrategicPlanningEnvelope.ZERO, StrategicPlanningEnvelope::plus);
@@ -285,16 +272,10 @@ public final class FactionStrategicGoalPlanner {
     private static StrategicGoalCandidate candidateFromState(StrategicGoalState goal) {
         long cadence = Math.max(1L, goal.nextReviewTick() - goal.updatedAtTick());
         return new StrategicGoalCandidate(
-                goal.type(),
-                goal.targetId(),
-                goal.sourceEvidence(),
-                goal.urgencyBasisPoints(),
-                goal.feasibilityBasisPoints(),
-                goal.requestedBudget(),
-                goal.blockers(),
-                goal.expiresAtTick(),
-                cadence,
-                StrategicGoalOutcomeSignal.NONE);
+                goal.type(), goal.targetId(), goal.sourceEvidence(), goal.urgencyBasisPoints(),
+                goal.strategicValueBasisPoints(), goal.feasibilityBasisPoints(),
+                goal.doctrinePreferenceBasisPoints(), goal.requestedBudget(), goal.blockers(),
+                goal.expiresAtTick(), cadence, StrategicGoalOutcomeSignal.NONE);
     }
 
     private static List<StrategicGoalBlocker> blockers(
@@ -342,11 +323,14 @@ public final class FactionStrategicGoalPlanner {
      * Read-only explainability projection for UI/debug/replay inspection.
      *
      * @param goalId persistent goal identity
-     * @param type peaceful goal family
+     * @param type strategic goal family
      * @param targetId stable target identity
      * @param lifecycle persistent lifecycle
      * @param urgencyBasisPoints current urgency
+     * @param strategicValueBasisPoints current strategic value
      * @param feasibilityBasisPoints current feasibility
+     * @param doctrinePreferenceBasisPoints current caller-owned doctrine preference
+     * @param scoreBasisPoints roadmap score before hysteresis
      * @param requestedBudget requested planning envelope
      * @param allocatedBudget allocated planning envelope
      * @param blockers current explainable blockers
@@ -365,7 +349,10 @@ public final class FactionStrategicGoalPlanner {
             String targetId,
             Lifecycle lifecycle,
             int urgencyBasisPoints,
+            int strategicValueBasisPoints,
             int feasibilityBasisPoints,
+            int doctrinePreferenceBasisPoints,
+            int scoreBasisPoints,
             StrategicPlanningEnvelope requestedBudget,
             StrategicPlanningEnvelope allocatedBudget,
             List<StrategicGoalBlocker> blockers,
@@ -381,14 +368,19 @@ public final class FactionStrategicGoalPlanner {
         private static GoalProjection from(StrategicGoalState goal) {
             return new GoalProjection(
                     goal.goalId(), goal.type(), goal.targetId(), goal.lifecycle(),
-                    goal.urgencyBasisPoints(), goal.feasibilityBasisPoints(),
-                    goal.requestedBudget(), goal.allocatedBudget(), goal.blockers(),
-                    goal.cancellationCost(), goal.nextReviewTick(), goal.expiresAtTick(),
-                    goal.cooldownUntilTick(), goal.outcomeSignal(), goal.sourceEvidence().kind(),
-                    goal.sourceEvidence().priorityBasisPoints(),
-                    goal.sourceEvidence().provenance().stream()
-                            .map(ObservationEvidence::provenanceId)
-                            .toList());
+                    goal.urgencyBasisPoints(), goal.strategicValueBasisPoints(), goal.feasibilityBasisPoints(),
+                    goal.doctrinePreferenceBasisPoints(), score(goal), goal.requestedBudget(),
+                    goal.allocatedBudget(), goal.blockers(), goal.cancellationCost(), goal.nextReviewTick(),
+                    goal.expiresAtTick(), goal.cooldownUntilTick(), goal.outcomeSignal(),
+                    goal.sourceEvidence().kind(), goal.sourceEvidence().priorityBasisPoints(),
+                    goal.sourceEvidence().provenance().stream().map(ObservationEvidence::provenanceId).toList());
+        }
+
+        private static int score(StrategicGoalState goal) {
+            long product = (long) goal.urgencyBasisPoints() * goal.strategicValueBasisPoints();
+            product = product * goal.feasibilityBasisPoints();
+            product = product * goal.doctrinePreferenceBasisPoints();
+            return (int) (product / 1_000_000_000_000L);
         }
 
         /**
