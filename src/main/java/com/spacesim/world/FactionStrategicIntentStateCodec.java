@@ -15,7 +15,7 @@ import java.util.TreeSet;
 
 /** Deterministic UTF-8 persistence codec for Stage-21B strategic intent state. */
 public final class FactionStrategicIntentStateCodec {
-    private static final String HEADER = "stage21b-strategic-intent-v4";
+    private static final String HEADER = "stage21b-strategic-intent-v5";
 
     private FactionStrategicIntentStateCodec() {
         throw new AssertionError("Utility class");
@@ -40,7 +40,8 @@ public final class FactionStrategicIntentStateCodec {
         StringBuilder builder = new StringBuilder(HEADER).append('\n');
         for (FactionStrategicIntentState state : sorted) {
             builder.append("S\t").append(token(state.factionContentId())).append('\t')
-                    .append(state.nextGoalSequence()).append('\n');
+                    .append(state.nextGoalSequence()).append('\t')
+                    .append(state.lastActorReviewCount()).append('\n');
             for (StrategicGoalState goal : state.goals()) {
                 builder.append("G\t").append(token(goal.goalId())).append('\t')
                         .append(goal.type().wireId()).append('\t').append(token(goal.targetId())).append('\t')
@@ -88,6 +89,7 @@ public final class FactionStrategicIntentStateCodec {
         ArrayList<FactionStrategicIntentState> states = new ArrayList<>();
         String factionId = null;
         long nextSequence = 0L;
+        long lastActorReviewCount = 0L;
         ArrayList<StrategicGoalState> goals = new ArrayList<>();
         GoalFields goal = null;
         ArrayList<ObservationEvidence> provenance = new ArrayList<>();
@@ -98,9 +100,10 @@ public final class FactionStrategicIntentStateCodec {
             String[] parts = line.split("\\t", -1);
             switch (parts[0]) {
                 case "S" -> {
-                    if (parts.length != 3 || factionId != null || goal != null) throw malformed(index, line);
+                    if (parts.length != 4 || factionId != null || goal != null) throw malformed(index, line);
                     factionId = untoken(parts[1]);
                     nextSequence = parseLong(parts[2], index);
+                    lastActorReviewCount = parseLong(parts[3], index);
                     goals = new ArrayList<>();
                 }
                 case "G" -> {
@@ -141,8 +144,10 @@ public final class FactionStrategicIntentStateCodec {
                 }
                 case "Z" -> {
                     if (parts.length != 1 || factionId == null || goal != null) throw malformed(index, line);
-                    states.add(new FactionStrategicIntentState(factionId, nextSequence, goals));
+                    states.add(new FactionStrategicIntentState(
+                            factionId, nextSequence, lastActorReviewCount, goals));
                     factionId = null;
+                    lastActorReviewCount = 0L;
                     goals = new ArrayList<>();
                 }
                 default -> throw malformed(index, line);
