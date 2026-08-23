@@ -103,6 +103,7 @@ class DiplomaticLifecycleServiceIntegrationTest {
                 List.of(),
                 deadline));
         proposal = service.materializeTreatyOffer(proposal.proposalId());
+        String proposalId = proposal.proposalId();
         String treatyId = proposal.linkedTreatyId();
 
         advancePast(world, deadline);
@@ -111,7 +112,7 @@ class DiplomaticLifecycleServiceIntegrationTest {
         assertEquals(
                 ProposalStatus.EXPIRED,
                 service.snapshot().proposals().stream()
-                        .filter(saved -> saved.proposalId().equals(proposal.proposalId()))
+                        .filter(saved -> saved.proposalId().equals(proposalId))
                         .findFirst()
                         .orElseThrow()
                         .status());
