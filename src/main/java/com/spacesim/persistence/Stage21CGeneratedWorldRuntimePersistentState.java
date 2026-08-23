@@ -8,6 +8,7 @@ import com.spacesim.world.DiplomaticLifecycleState.Proposal;
 import com.spacesim.world.DiplomaticLifecycleState.RelationMemory;
 import com.spacesim.world.DiplomaticLifecycleState.War;
 import com.spacesim.world.DiplomaticLifecycleState.WarStartKind;
+import com.spacesim.world.WorldState;
 
 import java.util.HashMap;
 import java.util.Map;
