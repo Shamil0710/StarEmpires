@@ -124,17 +124,18 @@ class DiplomaticLifecycleServiceIntegrationTest {
                 List.of(),
                 100L));
         var crisis = service.openCrisis(ultimatum.proposalId(), "decision.open-crisis", 100L);
+        String crisisId = crisis.crisisId();
         List<WarGoal> goals = goals();
 
-        assertThrows(IllegalStateException.class, () -> service.declareWarFromCrisis(crisis.crisisId(), goals));
-        crisis = service.escalateCrisis(crisis.crisisId(), "decision.pressure", 100L);
+        assertThrows(IllegalStateException.class, () -> service.declareWarFromCrisis(crisisId, goals));
+        crisis = service.escalateCrisis(crisisId, "decision.pressure", 100L);
         assertEquals(CrisisEscalation.PRESSURE, crisis.escalation());
-        crisis = service.escalateCrisis(crisis.crisisId(), "decision.ultimatum", 100L);
+        crisis = service.escalateCrisis(crisisId, "decision.ultimatum", 100L);
         assertEquals(CrisisEscalation.ULTIMATUM, crisis.escalation());
-        crisis = service.escalateCrisis(crisis.crisisId(), "decision.war-authorized", 100L);
+        crisis = service.escalateCrisis(crisisId, "decision.war-authorized", 100L);
         assertEquals(CrisisEscalation.WAR_AUTHORIZED, crisis.escalation());
 
-        var war = service.declareWarFromCrisis(crisis.crisisId(), goals);
+        var war = service.declareWarFromCrisis(crisisId, goals);
         assertEquals(WarStatus.ACTIVE, war.status());
         assertEquals(2, war.stage19ConflictIds().size());
         for (String conflictId : war.stage19ConflictIds()) {
