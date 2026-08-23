@@ -15,7 +15,7 @@ import java.util.TreeSet;
 
 /** Deterministic UTF-8 persistence codec for Stage-21B strategic intent state. */
 public final class FactionStrategicIntentStateCodec {
-    private static final String HEADER = "stage21b-strategic-intent-v3";
+    private static final String HEADER = "stage21b-strategic-intent-v4";
 
     private FactionStrategicIntentStateCodec() {
         throw new AssertionError("Utility class");
@@ -51,6 +51,9 @@ public final class FactionStrategicIntentStateCodec {
                         .append(goal.feasibilityBasisPoints()).append('\t')
                         .append(goal.doctrinePreferenceBasisPoints());
                 appendEnvelope(builder, goal.requestedBudget());
+                appendEnvelope(builder, goal.costCeiling());
+                builder.append('\t').append(conditions(goal.successConditions()))
+                        .append('\t').append(conditions(goal.failureConditions()));
                 appendEnvelope(builder, goal.allocatedBudget());
                 builder.append('\t').append(blockers(goal.blockers())).append('\t').append(goal.lifecycle().name())
                         .append('\t').append(goal.createdAtTick()).append('\t').append(goal.updatedAtTick())
@@ -91,62 +94,53 @@ public final class FactionStrategicIntentStateCodec {
 
         for (int index = 1; index < lines.length; index++) {
             String line = lines[index];
-            if (line.isEmpty()) {
-                continue;
-            }
+            if (line.isEmpty()) continue;
             String[] parts = line.split("\\t", -1);
             switch (parts[0]) {
                 case "S" -> {
-                    if (parts.length != 3 || factionId != null || goal != null) {
-                        throw malformed(index, line);
-                    }
+                    if (parts.length != 3 || factionId != null || goal != null) throw malformed(index, line);
                     factionId = untoken(parts[1]);
                     nextSequence = parseLong(parts[2], index);
                     goals = new ArrayList<>();
                 }
                 case "G" -> {
-                    if (parts.length != 30 || factionId == null || goal != null) {
-                        throw malformed(index, line);
-                    }
+                    if (parts.length != 36 || factionId == null || goal != null) throw malformed(index, line);
                     goal = new GoalFields(
                             untoken(parts[1]), StrategicGoalType.fromWireId(parts[2]), untoken(parts[3]),
                             parseEnum(InterestKind.class, parts[4], index), parseInt(parts[5], index),
                             parseInt(parts[6], index), parseInt(parts[7], index), parseInt(parts[8], index),
                             parseInt(parts[9], index), envelope(parts, 10, index), envelope(parts, 14, index),
-                            parseBlockers(parts[18], index), parseEnum(Lifecycle.class, parts[19], index),
-                            parseLong(parts[20], index), parseLong(parts[21], index), parseLong(parts[22], index),
-                            parseLong(parts[23], index), parseLong(parts[24], index), envelope(parts, 25, index),
-                            parseEnum(StrategicGoalOutcomeSignal.class, parts[29], index));
+                            parseConditions(parts[18], index), parseConditions(parts[19], index),
+                            envelope(parts, 20, index), parseBlockers(parts[24], index),
+                            parseEnum(Lifecycle.class, parts[25], index), parseLong(parts[26], index),
+                            parseLong(parts[27], index), parseLong(parts[28], index), parseLong(parts[29], index),
+                            parseLong(parts[30], index), envelope(parts, 31, index),
+                            parseEnum(StrategicGoalOutcomeSignal.class, parts[35], index));
                     provenance = new ArrayList<>();
                 }
                 case "P" -> {
-                    if (parts.length != 5 || factionId == null || goal == null) {
-                        throw malformed(index, line);
-                    }
+                    if (parts.length != 5 || factionId == null || goal == null) throw malformed(index, line);
                     provenance.add(new ObservationEvidence(
                             parseEnum(ObservationChannel.class, parts[1], index), untoken(parts[2]),
                             parseLong(parts[3], index), parseLong(parts[4], index)));
                 }
                 case "E" -> {
-                    if (parts.length != 1 || factionId == null || goal == null) {
-                        throw malformed(index, line);
-                    }
+                    if (parts.length != 1 || factionId == null || goal == null) throw malformed(index, line);
                     StrategicGoalEvidence evidence = new StrategicGoalEvidence(
                             goal.kind(), goal.targetId(), goal.evidencePriorityBasisPoints(), provenance);
                     goals.add(new StrategicGoalState(
                             goal.goalId(), factionId, goal.type(), goal.targetId(), evidence,
                             goal.urgencyBasisPoints(), goal.strategicValueBasisPoints(),
                             goal.feasibilityBasisPoints(), goal.doctrinePreferenceBasisPoints(),
-                            goal.requestedBudget(), goal.allocatedBudget(), goal.blockers(), goal.lifecycle(),
+                            goal.requestedBudget(), goal.costCeiling(), goal.successConditions(),
+                            goal.failureConditions(), goal.allocatedBudget(), goal.blockers(), goal.lifecycle(),
                             goal.createdAtTick(), goal.updatedAtTick(), goal.nextReviewTick(), goal.expiresAtTick(),
                             goal.cooldownUntilTick(), goal.cancellationCost(), goal.outcomeSignal()));
                     goal = null;
                     provenance = new ArrayList<>();
                 }
                 case "Z" -> {
-                    if (parts.length != 1 || factionId == null || goal != null) {
-                        throw malformed(index, line);
-                    }
+                    if (parts.length != 1 || factionId == null || goal != null) throw malformed(index, line);
                     states.add(new FactionStrategicIntentState(factionId, nextSequence, goals));
                     factionId = null;
                     goals = new ArrayList<>();
@@ -170,9 +164,28 @@ public final class FactionStrategicIntentStateCodec {
     }
 
     private static StrategicPlanningEnvelope envelope(String[] parts, int offset, int lineIndex) {
-        return new StrategicPlanningEnvelope(
-                parseLong(parts[offset], lineIndex), parseLong(parts[offset + 1], lineIndex),
+        return new StrategicPlanningEnvelope(parseLong(parts[offset], lineIndex), parseLong(parts[offset + 1], lineIndex),
                 parseLong(parts[offset + 2], lineIndex), parseLong(parts[offset + 3], lineIndex));
+    }
+
+    private static String conditions(List<StrategicGoalCondition> conditions) {
+        return conditions.stream().map(condition -> token(condition.code()) + ":" + token(condition.targetId()))
+                .reduce((left, right) -> left + "," + right).orElseThrow();
+    }
+
+    private static List<StrategicGoalCondition> parseConditions(String value, int lineIndex) {
+        try {
+            return java.util.Arrays.stream(value.split(","))
+                    .map(item -> item.split(":", -1))
+                    .map(parts -> {
+                        if (parts.length != 2) throw new IllegalArgumentException("Malformed condition");
+                        return new StrategicGoalCondition(untoken(parts[0]), untoken(parts[1]));
+                    })
+                    .sorted().distinct().toList();
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "Malformed strategic condition at strategic intent line " + (lineIndex + 1), exception);
+        }
     }
 
     private static String blockers(List<StrategicGoalBlocker> blockers) {
@@ -180,11 +193,10 @@ public final class FactionStrategicIntentStateCodec {
     }
 
     private static List<StrategicGoalBlocker> parseBlockers(String value, int lineIndex) {
-        if ("-".equals(value)) {
-            return List.of();
-        }
+        if ("-".equals(value)) return List.of();
         try {
-            return List.of(value.split(",")).stream().map(StrategicGoalBlocker::valueOf).sorted().distinct().toList();
+            return java.util.Arrays.stream(value.split(","))
+                    .map(StrategicGoalBlocker::valueOf).sorted().distinct().toList();
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("Malformed blocker at strategic intent line " + (lineIndex + 1), exception);
         }
@@ -203,25 +215,22 @@ public final class FactionStrategicIntentStateCodec {
     }
 
     private static long parseLong(String value, int lineIndex) {
-        try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException exception) {
+        try { return Long.parseLong(value); }
+        catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Malformed number at strategic intent line " + (lineIndex + 1), exception);
         }
     }
 
     private static int parseInt(String value, int lineIndex) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException exception) {
+        try { return Integer.parseInt(value); }
+        catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Malformed number at strategic intent line " + (lineIndex + 1), exception);
         }
     }
 
     private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, int lineIndex) {
-        try {
-            return Enum.valueOf(type, value);
-        } catch (IllegalArgumentException exception) {
+        try { return Enum.valueOf(type, value); }
+        catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("Malformed enum at strategic intent line " + (lineIndex + 1), exception);
         }
     }
@@ -231,25 +240,14 @@ public final class FactionStrategicIntentStateCodec {
     }
 
     private record GoalFields(
-            String goalId,
-            StrategicGoalType type,
-            String targetId,
-            InterestKind kind,
-            int evidencePriorityBasisPoints,
-            int urgencyBasisPoints,
-            int strategicValueBasisPoints,
-            int feasibilityBasisPoints,
-            int doctrinePreferenceBasisPoints,
-            StrategicPlanningEnvelope requestedBudget,
-            StrategicPlanningEnvelope allocatedBudget,
-            List<StrategicGoalBlocker> blockers,
-            Lifecycle lifecycle,
-            long createdAtTick,
-            long updatedAtTick,
-            long nextReviewTick,
-            long expiresAtTick,
-            long cooldownUntilTick,
-            StrategicPlanningEnvelope cancellationCost,
+            String goalId, StrategicGoalType type, String targetId, InterestKind kind,
+            int evidencePriorityBasisPoints, int urgencyBasisPoints, int strategicValueBasisPoints,
+            int feasibilityBasisPoints, int doctrinePreferenceBasisPoints,
+            StrategicPlanningEnvelope requestedBudget, StrategicPlanningEnvelope costCeiling,
+            List<StrategicGoalCondition> successConditions, List<StrategicGoalCondition> failureConditions,
+            StrategicPlanningEnvelope allocatedBudget, List<StrategicGoalBlocker> blockers,
+            Lifecycle lifecycle, long createdAtTick, long updatedAtTick, long nextReviewTick,
+            long expiresAtTick, long cooldownUntilTick, StrategicPlanningEnvelope cancellationCost,
             StrategicGoalOutcomeSignal outcomeSignal) {
     }
 }
