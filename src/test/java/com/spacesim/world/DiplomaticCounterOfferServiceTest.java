@@ -33,11 +33,13 @@ class DiplomaticCounterOfferServiceTest {
                 List.of(),
                 100L));
         original = service.materializeTreatyOffer(original.proposalId());
+        String originalProposalId = original.proposalId();
+        String originalIssueId = original.issueId();
         String originalTreatyId = original.linkedTreatyId();
 
         var counter = DiplomaticCounterOfferService.counter(
                 service,
-                original.proposalId(),
+                originalProposalId,
                 ProposalKind.TRADE,
                 List.of(),
                 List.of(),
@@ -45,12 +47,12 @@ class DiplomaticCounterOfferServiceTest {
 
         assertEquals(MINERS, counter.proposerFactionId());
         assertEquals(TRADE_LEAGUE, counter.recipientFactionId());
-        assertEquals(original.issueId(), counter.issueId());
-        assertEquals(original.proposalId(), DiplomaticCounterOfferService.causalProposalId(counter).orElseThrow());
+        assertEquals(originalIssueId, counter.issueId());
+        assertEquals(originalProposalId, DiplomaticCounterOfferService.causalProposalId(counter).orElseThrow());
         assertEquals(
                 ProposalStatus.REJECTED,
                 service.snapshot().proposals().stream()
-                        .filter(proposal -> proposal.proposalId().equals(original.proposalId()))
+                        .filter(proposal -> proposal.proposalId().equals(originalProposalId))
                         .findFirst()
                         .orElseThrow()
                         .status());
