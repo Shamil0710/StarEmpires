@@ -21,10 +21,27 @@ import java.util.Objects;
 public final class FleetReadinessEvaluator {
     private final ShipEngineeringCatalog catalog;
 
+    /**
+     * Creates a readiness evaluator backed by the existing ship-engineering catalog.
+     *
+     * @param catalog authoritative hull/module/interface definitions used to interpret fitted state
+     */
     public FleetReadinessEvaluator(ShipEngineeringCatalog catalog) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
     }
 
+    /**
+     * Derives bounded readiness dimensions from an authoritative fitted fleet entity and explicit
+     * operational observations.
+     *
+     * <p>The evaluator is read-only. Hull/module fit, damage, ammunition, reaction mass, sensors and
+     * maintenance remain owned by their existing engineering/persistence layers. Crew and supply access
+     * use the explicit availability seam and fail closed when absent.</p>
+     *
+     * @param entity exact authoritative persistent fleet entity payload
+     * @param availability observed crew and service-access prerequisites, or {@code null} to fail closed
+     * @return immutable readiness projection; unknown engineering/catalog state returns unavailable readiness
+     */
     public FleetReadinessState evaluate(EntityState entity, FleetOperationalAvailability availability) {
         Objects.requireNonNull(entity, "entity");
         FleetOperationalAvailability observed = availability == null
