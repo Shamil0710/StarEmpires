@@ -7,13 +7,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/**
- * Persistent Stage-21D command state.
- *
- * <p>Command groups reference ordinary {@link FleetId}s; they never replace fleet identity or
- * placement. Active-order uniqueness is validated here so one physical force cannot be assigned
- * twice through a different caller.</p>
- */
+/** Persistent Stage-21D command state referencing ordinary FleetIds only. */
 public record FleetCommandState(
         long nextCommandGroupId,
         long nextOrderId,
@@ -29,9 +23,7 @@ public record FleetCommandState(
         Set<Long> groupIds = new HashSet<>();
         Set<FleetId> assignedMembers = new HashSet<>();
         for (CommandGroupState group : groups) {
-            if (!groupIds.add(group.id())) {
-                throw new IllegalArgumentException("duplicate command group id: " + group.id());
-            }
+            if (!groupIds.add(group.id())) throw new IllegalArgumentException("duplicate command group id: " + group.id());
             for (FleetId fleetId : group.memberFleetIds()) {
                 if (!assignedMembers.add(fleetId)) {
                     throw new IllegalArgumentException("FleetId assigned to multiple command groups: " + fleetId);
@@ -41,9 +33,7 @@ public record FleetCommandState(
         Set<Long> orderIds = new HashSet<>();
         Set<Long> activeGroupIds = new HashSet<>();
         for (FleetOrderState order : orders) {
-            if (!orderIds.add(order.id())) {
-                throw new IllegalArgumentException("duplicate fleet order id: " + order.id());
-            }
+            if (!orderIds.add(order.id())) throw new IllegalArgumentException("duplicate fleet order id: " + order.id());
             if (!groupIds.contains(order.commandGroupId())) {
                 throw new IllegalArgumentException("order references unknown command group: " + order.commandGroupId());
             }
@@ -53,9 +43,7 @@ public record FleetCommandState(
         }
     }
 
-    public static FleetCommandState empty() {
-        return new FleetCommandState(1L, 1L, List.of(), List.of());
-    }
+    public static FleetCommandState empty() { return new FleetCommandState(1L, 1L, List.of(), List.of()); }
 
     public CommandGroupState requireGroup(long groupId) {
         return groups.stream().filter(group -> group.id() == groupId).findFirst()
@@ -90,16 +78,10 @@ public record FleetCommandState(
         ArrayList<FleetOrderState> next = new ArrayList<>(orders.size());
         boolean replaced = false;
         for (FleetOrderState order : orders) {
-            if (order.id() == replacement.id()) {
-                next.add(replacement);
-                replaced = true;
-            } else {
-                next.add(order);
-            }
+            if (order.id() == replacement.id()) { next.add(replacement); replaced = true; }
+            else next.add(order);
         }
-        if (!replaced) {
-            throw new IllegalArgumentException("unknown fleet order: " + replacement.id());
-        }
+        if (!replaced) throw new IllegalArgumentException("unknown fleet order: " + replacement.id());
         return new FleetCommandState(nextCommandGroupId, nextOrderId, groups, next);
     }
 
@@ -117,6 +99,7 @@ public record FleetCommandState(
         return List.copyOf(copy);
     }
 
+    /** maxStrategicRiskBps is a persistent doctrine ceiling, not a combat-stat replacement. */
     public record CommandGroupState(
             long id,
             int factionId,
@@ -124,12 +107,17 @@ public record FleetCommandState(
             List<FleetId> memberFleetIds,
             StarSystemId homeSystemId,
             boolean reserve,
-            boolean homeDefense) {
+            boolean homeDefense,
+            int maxStrategicRiskBps) {
         public CommandGroupState {
             if (id <= 0L) throw new IllegalArgumentException("command group id must be positive");
             name = normalized(name, "command group name");
+            if (name.length() > 1024) throw new IllegalArgumentException("command group name is too long");
             Objects.requireNonNull(memberFleetIds, "memberFleetIds");
             Objects.requireNonNull(homeSystemId, "homeSystemId");
+            if (maxStrategicRiskBps < 0 || maxStrategicRiskBps > FleetReadinessState.FULL) {
+                throw new IllegalArgumentException("maxStrategicRiskBps must be in 0..10000");
+            }
             ArrayList<FleetId> members = new ArrayList<>(memberFleetIds);
             members.sort(Comparator.naturalOrder());
             if (members.isEmpty()) throw new IllegalArgumentException("command group cannot be empty");
@@ -163,12 +151,8 @@ public record FleetCommandState(
             if (!route.get(route.size() - 1).equals(targetSystemId)) {
                 throw new IllegalArgumentException("order route must end at target system");
             }
-            if (routeCursor < 0 || routeCursor >= route.size()) {
-                throw new IllegalArgumentException("routeCursor outside route");
-            }
-            if (submittedTick < 0L || stagingDeadlineTick < submittedTick) {
-                throw new IllegalArgumentException("invalid order timing");
-            }
+            if (routeCursor < 0 || routeCursor >= route.size()) throw new IllegalArgumentException("routeCursor outside route");
+            if (submittedTick < 0L || stagingDeadlineTick < submittedTick) throw new IllegalArgumentException("invalid order timing");
         }
 
         public FleetOrderState withStatus(OrderStatus nextStatus) {
@@ -186,15 +170,8 @@ public record FleetCommandState(
     public enum OrderType {
         PATROL, GUARD, ESCORT, STAGE, REINFORCE, INTERCEPT, SHADOW, RAID, BLOCKADE, INVADE,
         WITHDRAW, REFUEL, REARM, REPAIR, RETURN;
-
-        public boolean serviceOrder() {
-            return this == REFUEL || this == REARM || this == REPAIR;
-        }
-
-        public boolean offensiveOrder() {
-            return this == RAID || this == BLOCKADE || this == INVADE;
-        }
-
+        public boolean serviceOrder() { return this == REFUEL || this == REARM || this == REPAIR; }
+        public boolean offensiveOrder() { return this == RAID || this == BLOCKADE || this == INVADE; }
         public boolean combatOrder() {
             return this == GUARD || this == ESCORT || this == REINFORCE || this == INTERCEPT
                     || this == SHADOW || offensiveOrder();
@@ -205,9 +182,7 @@ public record FleetCommandState(
 
     public enum OrderStatus {
         STAGING, ACTIVE, SERVICE_PENDING, COMPLETE, CANCELLED, FAILED;
-        public boolean active() {
-            return this == STAGING || this == ACTIVE || this == SERVICE_PENDING;
-        }
+        public boolean active() { return this == STAGING || this == ACTIVE || this == SERVICE_PENDING; }
     }
 
     private static String normalized(String value, String label) {
