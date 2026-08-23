@@ -2,6 +2,8 @@ package com.spacesim.world;
 
 /** Explainable reasons a Stage-21B strategic goal cannot currently progress. */
 public enum StrategicGoalBlocker {
+    /** Requested normalized planning cost exceeds the accepted goal cost ceiling. */
+    COST_CEILING,
     /** Available treasury planning capacity is insufficient. */
     TREASURY_CAPACITY,
     /** Available logistics planning capacity is insufficient. */
