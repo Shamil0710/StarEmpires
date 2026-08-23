@@ -12,9 +12,10 @@ import java.util.Objects;
 /**
  * Converts validated Stage-21D orders into existing world operations.
  *
- * <p>Movement is applied only through {@link WorldSimulation#requestFleetJump(FleetId,
- * StarSystemId)}. Refuel/rearm/repair are returned as explicit service requests for the existing
- * Stage-18 authority; this class never changes engineering consumables, damage or economy.</p>
+ * <p>Movement is applied only through the existing {@link WorldSimulation#requestFleetJump(
+ * FleetId, StarSystemId, float, float)} boundary. Refuel/rearm/repair are returned as explicit
+ * service requests for the existing Stage-18 authority; this class never changes engineering
+ * consumables, damage or economy.</p>
  */
 public final class FleetOrderExecutionService {
     private final GalaxyTopology topology;
@@ -78,7 +79,7 @@ public final class FleetOrderExecutionService {
         }
         for (Operation operation : operations) {
             MovementOperation movement = (MovementOperation) operation;
-            world.requestFleetJump(movement.fleetId(), movement.destinationSystemId());
+            world.requestFleetJump(movement.fleetId(), movement.destinationSystemId(), 0f, 0f);
         }
         FleetOrderState order = commandState.requireOrder(orderId);
         return commandState.replaceOrder(order.withStatus(OrderStatus.ACTIVE));
