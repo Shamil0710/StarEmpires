@@ -11,11 +11,13 @@ import java.util.Objects;
  *
  * @param goalId persistent goal identity
  * @param factionContentId owning faction content identity
- * @param type peaceful goal family
+ * @param type strategic goal family
  * @param targetId stable target identity
  * @param sourceEvidence persisted actor-bounded source evidence
  * @param urgencyBasisPoints urgency in {@code [0,10000]}
+ * @param strategicValueBasisPoints strategic value in {@code [0,10000]}
  * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+ * @param doctrinePreferenceBasisPoints caller-owned doctrine preference in {@code [0,10000]}
  * @param requestedBudget requested multidimensional planning envelope
  * @param allocatedBudget currently allocated multidimensional planning envelope
  * @param blockers current explainable blockers
@@ -35,7 +37,9 @@ public record StrategicGoalState(
         String targetId,
         StrategicGoalEvidence sourceEvidence,
         int urgencyBasisPoints,
+        int strategicValueBasisPoints,
         int feasibilityBasisPoints,
+        int doctrinePreferenceBasisPoints,
         StrategicPlanningEnvelope requestedBudget,
         StrategicPlanningEnvelope allocatedBudget,
         List<StrategicGoalBlocker> blockers,
@@ -62,11 +66,13 @@ public record StrategicGoalState(
      *
      * @param goalId persistent goal identity
      * @param factionContentId owning faction content identity
-     * @param type peaceful goal family
+     * @param type strategic goal family
      * @param targetId stable target identity
      * @param sourceEvidence persisted actor-bounded source evidence
      * @param urgencyBasisPoints urgency in {@code [0,10000]}
+     * @param strategicValueBasisPoints strategic value in {@code [0,10000]}
      * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+     * @param doctrinePreferenceBasisPoints caller-owned doctrine preference in {@code [0,10000]}
      * @param requestedBudget requested multidimensional planning envelope
      * @param allocatedBudget currently allocated multidimensional planning envelope
      * @param blockers current explainable blockers
@@ -102,7 +108,9 @@ public record StrategicGoalState(
             throw new IllegalArgumentException("Strategic goal type is incompatible with persisted evidence");
         }
         requireBasisPoints(urgencyBasisPoints, "Strategic goal urgency");
+        requireBasisPoints(strategicValueBasisPoints, "Strategic goal value");
         requireBasisPoints(feasibilityBasisPoints, "Strategic goal feasibility");
+        requireBasisPoints(doctrinePreferenceBasisPoints, "Strategic doctrine preference");
         if (!allocatedBudget.fitsWithin(requestedBudget)) {
             throw new IllegalArgumentException("Strategic goal allocation cannot exceed request");
         }
@@ -164,6 +172,53 @@ public record StrategicGoalState(
     }
 
     /**
+     * Compatibility constructor using neutral strategic value and doctrine preference.
+     *
+     * @param goalId persistent goal identity
+     * @param factionContentId owning faction content identity
+     * @param type strategic goal family
+     * @param targetId stable target identity
+     * @param sourceEvidence persisted actor-bounded source evidence
+     * @param urgencyBasisPoints urgency in {@code [0,10000]}
+     * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+     * @param requestedBudget requested multidimensional planning envelope
+     * @param allocatedBudget currently allocated multidimensional planning envelope
+     * @param blockers current explainable blockers
+     * @param lifecycle current goal lifecycle
+     * @param createdAtTick creation tick
+     * @param updatedAtTick last review/update tick
+     * @param nextReviewTick next scheduled strategic review for open goals, otherwise zero
+     * @param expiresAtTick terminal expiry tick, or {@code -1}
+     * @param cooldownUntilTick earliest reconsideration tick, or zero
+     * @param cancellationCost visible switching cost
+     * @param outcomeSignal last authoritative terminal outcome signal
+     */
+    public StrategicGoalState(
+            String goalId,
+            String factionContentId,
+            StrategicGoalType type,
+            String targetId,
+            StrategicGoalEvidence sourceEvidence,
+            int urgencyBasisPoints,
+            int feasibilityBasisPoints,
+            StrategicPlanningEnvelope requestedBudget,
+            StrategicPlanningEnvelope allocatedBudget,
+            List<StrategicGoalBlocker> blockers,
+            Lifecycle lifecycle,
+            long createdAtTick,
+            long updatedAtTick,
+            long nextReviewTick,
+            long expiresAtTick,
+            long cooldownUntilTick,
+            StrategicPlanningEnvelope cancellationCost,
+            StrategicGoalOutcomeSignal outcomeSignal) {
+        this(goalId, factionContentId, type, targetId, sourceEvidence, urgencyBasisPoints, 10_000,
+                feasibilityBasisPoints, 10_000, requestedBudget, allocatedBudget, blockers, lifecycle,
+                createdAtTick, updatedAtTick, nextReviewTick, expiresAtTick, cooldownUntilTick,
+                cancellationCost, outcomeSignal);
+    }
+
+    /**
      * Stable identity of a target-specific strategic intent, independent of the persistent goal ID.
      *
      * @return canonical goal type/target key
@@ -190,15 +245,8 @@ public record StrategicGoalState(
      */
     public StrategicGoalState refreshActive(StrategicGoalCandidate candidate, long reviewTick) {
         StrategicGoalCandidate checked = requireSameIntent(candidate);
-        return fromCandidate(
-                checked,
-                checked.requestedBudget(),
-                List.of(),
-                Lifecycle.ACTIVE,
-                reviewTick,
-                Math.addExact(reviewTick, checked.reviewCadenceTicks()),
-                0L,
-                StrategicPlanningEnvelope.ZERO,
+        return fromCandidate(checked, checked.requestedBudget(), List.of(), Lifecycle.ACTIVE, reviewTick,
+                Math.addExact(reviewTick, checked.reviewCadenceTicks()), 0L, StrategicPlanningEnvelope.ZERO,
                 StrategicGoalOutcomeSignal.NONE);
     }
 
@@ -215,15 +263,8 @@ public record StrategicGoalState(
             List<StrategicGoalBlocker> currentBlockers,
             long reviewTick) {
         StrategicGoalCandidate checked = requireSameIntent(candidate);
-        return fromCandidate(
-                checked,
-                StrategicPlanningEnvelope.ZERO,
-                currentBlockers,
-                Lifecycle.STALLED,
-                reviewTick,
-                Math.addExact(reviewTick, checked.reviewCadenceTicks()),
-                0L,
-                StrategicPlanningEnvelope.ZERO,
+        return fromCandidate(checked, StrategicPlanningEnvelope.ZERO, currentBlockers, Lifecycle.STALLED, reviewTick,
+                Math.addExact(reviewTick, checked.reviewCadenceTicks()), 0L, StrategicPlanningEnvelope.ZERO,
                 StrategicGoalOutcomeSignal.NONE);
     }
 
@@ -236,16 +277,8 @@ public record StrategicGoalState(
      */
     public StrategicGoalState succeed(StrategicGoalCandidate candidate, long reviewTick) {
         StrategicGoalCandidate checked = requireSameIntent(candidate);
-        return fromCandidate(
-                checked,
-                StrategicPlanningEnvelope.ZERO,
-                List.of(),
-                Lifecycle.SUCCEEDED,
-                reviewTick,
-                0L,
-                0L,
-                StrategicPlanningEnvelope.ZERO,
-                StrategicGoalOutcomeSignal.SUCCEEDED);
+        return fromCandidate(checked, StrategicPlanningEnvelope.ZERO, List.of(), Lifecycle.SUCCEEDED, reviewTick,
+                0L, 0L, StrategicPlanningEnvelope.ZERO, StrategicGoalOutcomeSignal.SUCCEEDED);
     }
 
     /**
@@ -270,22 +303,14 @@ public record StrategicGoalState(
         if (candidate == null) {
             return new StrategicGoalState(
                     goalId, factionContentId, type, targetId, sourceEvidence,
-                    urgencyBasisPoints, feasibilityBasisPoints, requestedBudget,
-                    StrategicPlanningEnvelope.ZERO, List.of(), Lifecycle.CANCELLED,
-                    createdAtTick, reviewTick, 0L, expiresAtTick, cooldownUntil,
-                    Objects.requireNonNull(cost, "Strategic cancellation cost not set"), outcome);
+                    urgencyBasisPoints, strategicValueBasisPoints, feasibilityBasisPoints,
+                    doctrinePreferenceBasisPoints, requestedBudget, StrategicPlanningEnvelope.ZERO,
+                    List.of(), Lifecycle.CANCELLED, createdAtTick, reviewTick, 0L, expiresAtTick,
+                    cooldownUntil, Objects.requireNonNull(cost, "Strategic cancellation cost not set"), outcome);
         }
         StrategicGoalCandidate checked = requireSameIntent(candidate);
-        return fromCandidate(
-                checked,
-                StrategicPlanningEnvelope.ZERO,
-                List.of(),
-                Lifecycle.CANCELLED,
-                reviewTick,
-                0L,
-                cooldownUntil,
-                Objects.requireNonNull(cost, "Strategic cancellation cost not set"),
-                outcome);
+        return fromCandidate(checked, StrategicPlanningEnvelope.ZERO, List.of(), Lifecycle.CANCELLED, reviewTick,
+                0L, cooldownUntil, Objects.requireNonNull(cost, "Strategic cancellation cost not set"), outcome);
     }
 
     /**
@@ -297,16 +322,8 @@ public record StrategicGoalState(
      */
     public StrategicGoalState expire(StrategicGoalCandidate candidate, long reviewTick) {
         StrategicGoalCandidate checked = requireSameIntent(candidate);
-        return fromCandidate(
-                checked,
-                StrategicPlanningEnvelope.ZERO,
-                List.of(),
-                Lifecycle.EXPIRED,
-                reviewTick,
-                0L,
-                0L,
-                StrategicPlanningEnvelope.ZERO,
-                StrategicGoalOutcomeSignal.NONE);
+        return fromCandidate(checked, StrategicPlanningEnvelope.ZERO, List.of(), Lifecycle.EXPIRED, reviewTick,
+                0L, 0L, StrategicPlanningEnvelope.ZERO, StrategicGoalOutcomeSignal.NONE);
     }
 
     @Override
@@ -334,24 +351,11 @@ public record StrategicGoalState(
             StrategicPlanningEnvelope cost,
             StrategicGoalOutcomeSignal outcome) {
         return new StrategicGoalState(
-                goalId,
-                factionContentId,
-                type,
-                targetId,
-                candidate.sourceEvidence(),
-                candidate.urgencyBasisPoints(),
-                candidate.feasibilityBasisPoints(),
-                candidate.requestedBudget(),
-                allocation,
-                currentBlockers,
-                nextLifecycle,
-                createdAtTick,
-                reviewTick,
-                nextReview,
-                candidate.expiresAtTick(),
-                cooldownUntil,
-                cost,
-                outcome);
+                goalId, factionContentId, type, targetId, candidate.sourceEvidence(),
+                candidate.urgencyBasisPoints(), candidate.strategicValueBasisPoints(),
+                candidate.feasibilityBasisPoints(), candidate.doctrinePreferenceBasisPoints(),
+                candidate.requestedBudget(), allocation, currentBlockers, nextLifecycle, createdAtTick,
+                reviewTick, nextReview, candidate.expiresAtTick(), cooldownUntil, cost, outcome);
     }
 
     private static void requireBasisPoints(int value, String label) {
