@@ -6,8 +6,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -63,12 +65,22 @@ public record Stage21BGeneratedWorldRuntimePersistentState(
                         "Duplicate Stage-21B strategic intent state: " + intent.factionContentId());
             }
         }
-        Set<String> actorIds = stage21ARuntime.livingActors().stream()
-                .map(actor -> actor.factionContentId())
-                .collect(Collectors.toUnmodifiableSet());
+        Map<String, Long> actorReviewCounts = stage21ARuntime.livingActors().stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        actor -> actor.factionContentId(),
+                        actor -> actor.completedReviewCount()));
+        Set<String> actorIds = actorReviewCounts.keySet();
         if (!actorIds.equals(intentIds)) {
             throw new IllegalArgumentException(
                     "Stage-21B strategic intent identities must match Stage-21A living actors exactly");
+        }
+        for (FactionStrategicIntentState intent : intents) {
+            long actorReviewCount = actorReviewCounts.get(intent.factionContentId());
+            if (intent.lastActorReviewCount() > actorReviewCount) {
+                throw new IllegalArgumentException(
+                        "Stage-21B intent consumed a future Stage-21A actor review: "
+                                + intent.factionContentId());
+            }
         }
         strategicIntents = List.copyOf(intents);
     }
