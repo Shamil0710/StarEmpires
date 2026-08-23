@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class FactionStrategicIntentStateCodecTest {
 
     @Test
-    void identityEvidenceMultidimensionalBudgetBlockersAndLifecycleSurviveRoundTrip() {
+    void identityEvidenceScoringBudgetBlockersAndLifecycleSurviveRoundTrip() {
         StrategicGoalState active = goal(
                 "faction.alpha:strategic-goal:1", StrategicGoalType.STOCKPILE, InterestKind.RESOURCE_DEFICIT,
                 "resource.water", Lifecycle.ACTIVE, StrategicPlanningEnvelope.balanced(40L), List.of(),
@@ -39,6 +39,8 @@ class FactionStrategicIntentStateCodecTest {
         assertArrayEquals(encoded, FactionStrategicIntentStateCodec.encode(decoded));
         assertEquals("faction.alpha:strategic-goal:1", decoded.get(0).goals().get(0).goalId());
         assertEquals("ledger.source", decoded.get(0).goals().get(0).sourceEvidence().provenance().get(0).provenanceId());
+        assertEquals(6_500, decoded.get(0).goals().get(0).strategicValueBasisPoints());
+        assertEquals(7_500, decoded.get(0).goals().get(0).doctrinePreferenceBasisPoints());
         assertEquals(List.of(StrategicGoalBlocker.LOGISTICS_CAPACITY), decoded.get(0).goals().get(1).blockers());
     }
 
@@ -67,7 +69,7 @@ class FactionStrategicIntentStateCodecTest {
                 7000,
                 List.of(new ObservationEvidence(ObservationChannel.ECONOMIC_LEDGER, "ledger.source", 10L, -1L)));
         return new StrategicGoalState(
-                goalId, "faction.alpha", type, target, evidence, 7000, 8000,
+                goalId, "faction.alpha", type, target, evidence, 7000, 6500, 8000, 7500,
                 StrategicPlanningEnvelope.balanced(50L), allocation, blockers, lifecycle,
                 10L, lifecycle == Lifecycle.ACTIVE ? 20L : 40L, nextReview, -1L, cooldown,
                 cancellationCost, outcome);
