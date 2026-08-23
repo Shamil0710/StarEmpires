@@ -1,20 +1,21 @@
 # Star Empires — execution plan for all unfinished stages
 
-> Audit date: **2026-08-22**.
-> Repository baseline: `main` after generated faction fleets, command UI, camera navigation,
-> persistent generated saves and accepted Stage 21A living-actor kernel.
+> Audit date: **2026-08-23**.
+> Repository baseline: `main` after Stage 21C diplomacy/crisis/alliance/legal-war acceptance,
+> merged closeout documentation and synchronized generated-world command status.
 
 ## 1. Verified status
 
 | Stage | Actual status | What is complete | What remains |
 |---|---|---|---|
-| 21 — Living World | **ACTIVE** | 21.0 generated runtime/UI and 21A actor lifecycle, bounded observations, interests, scheduling and persistence | 21B–21I: goals through diplomacy, war, territory, recovery, NPC/missions/reputation and final soak |
+| 21 — Living World | **ACTIVE** | 21.0 generated runtime/UI; 21A actor lifecycle/observations; 21B persistent strategic intent/goals; 21C diplomacy, crisis, obligations and causal legal-war lifecycle | 21D–21I: fleet readiness/orders, physical operations, territory, recovery, NPC/missions/reputation and final soak |
 | 22 — Content / Technology / Balance Alpha | **PLANNED** | foundational schemas/physics/industry and provisional test packs exist | production catalog, faction packages, content breadth, progression, balance, art/audio/narrative breadth and long-run alpha gate |
 | 23 — Polish / Release Candidate | **PLANNED** | first responsive command UI and developer Windows launcher exist | final UX/accessibility/onboarding, production assets, performance, save recovery, package and RC validation |
 
-Stage 21A is implemented and accepted. There is no evidence that 21B or a later Stage-21 slice is
-implemented. Existing Stage-17/19 strategy and reputation primitives remain upstream authority,
-not a completed autonomous diplomacy, living-world or mission system.
+Stage 21A, Stage 21B and Stage 21C are implemented and accepted. Stage 21C is merged in `main` via
+PR #324, with README closeout synchronized via PR #325. **Stage 21D is the first remaining Stage-21
+implementation slice.** Existing Stage-17/19 authorities remain upstream law/warfare boundaries and
+must be consumed rather than replaced by later living-world work.
 
 ## 2. Product outcome
 
@@ -39,9 +40,9 @@ The safest implementation order is not “all AI, then all UI, then all content�
 with an inspectable vertical result.
 
 1. **21A — COMPLETE:** actor observation, evidence, scheduling and decision traces.
-2. **21B — NEXT:** durable goals, feasibility, commitment and arbitration.
-3. **21C:** diplomacy/crisis/war lifecycle using Stage-17/19 authority.
-4. **21D:** readiness, command groups, lawful orders and neighbor-only movement.
+2. **21B — COMPLETE:** durable goals, feasibility, commitment and arbitration.
+3. **21C — COMPLETE:** diplomacy, bounded counter-offers, crises, obligations, causal war and peace hysteresis using Stage-17/19 authority.
+4. **21D — NEXT:** readiness, command groups, lawful orders and neighbor-only movement.
 5. **21E–21G:** operations, losses, occupation/control, peace and economy-funded recovery.
 6. **21H:** NPC/mission/reputation layer grounded in the now-moving world.
 7. **21I:** integrated UI, migration, corpus, performance and long-run closure.
@@ -71,39 +72,52 @@ The merged 21A slice provides:
 - generated-runtime composition and exact persistence continuation;
 - tests for ordering, hidden/stale evidence, deadline continuity and bounded 10,000-actor work.
 
-This foundation owns no treasury, fleets, relations, territory or war mutation. Stage 21B is the
-first remaining implementation target.
+This foundation owns no treasury, fleets, relations, territory or war mutation. Stage 21B and Stage
+21C are now accepted consumers of this boundary; **Stage 21D is the first remaining implementation
+target**.
 
-### 4.2 21B vertical proof
+### 4.2 Accepted strategic-intent proof — 21B COMPLETE
 
-- persistent goal ID, target, evidence, urgency, budget and lifecycle;
-- secure-route, stockpile, explore, defend and obtain-access as the initial non-war set;
-- add deter/coerce/raid/invade only after feasibility and commitment work;
-- budget arbitration across treasury, production and finite fleets;
-- hysteresis, cooldown and cancellation costs;
-- UI shows “why this goal exists”, “what blocks it” and “when it will be reviewed”.
+Accepted implementation map: `docs/stage21b_strategic_intent.md`.
 
-### 4.3 21C political proof
+The merged 21B slice proves:
 
-Minimum vertical scenario:
+- persistent goal ID, target, evidence, urgency, budget, success/failure predicates and lifecycle;
+- the full roadmap goal family from secure-route/obtain-access through deter/coerce/raid/blockade/invade/recover;
+- doctrine-gated deterministic candidate generation without doctrine becoming a free stat buff;
+- multidimensional feasibility and budget arbitration across treasury, logistics, construction and fleet readiness;
+- hysteresis, commitment horizon, cooldown and cancellation consequences;
+- one-shot material-change re-evaluation from accepted Stage-21A review watermarks;
+- exact persistence continuation without creating assets or hidden world knowledge.
+
+### 4.3 Accepted political proof — 21C COMPLETE
+
+Accepted implementation map: `docs/stage21c_diplomacy_crisis_lifecycle.md`.
+
+Accepted vertical scenario:
 
 ```text
-observed dependency on a foreign gateway
-→ access proposal
+accepted Stage-21B strategic goal / actor-bounded dependency evidence
+→ access/trade/security proposal
 → bounded counter-offer
 → acceptance or persisted crisis
-→ deadline/breach/escalation
+→ pressure / ultimatum / explicit WAR_AUTHORIZED decision
 → lawful war state or negotiated resolution
+→ ceasefire / peace hysteresis
 ```
 
-Required negative proofs:
+Accepted negative proofs:
 
-- hidden resource cannot affect offer;
-- relation score alone cannot declare war;
-- a treaty cannot transfer unowned treasury/territory;
-- save/load at proposal, counter-offer, ultimatum and ceasefire preserves one transition.
+- hidden resource cannot affect an autonomous offer through the pure Stage-21B→21C planning seam;
+- relation score or random tie-break alone cannot declare war;
+- a treaty/proposal cannot promise unowned spendable treasury or construction authority;
+- accepted treaty effects delegate to ordinary Stage-17 access/tariff/territory law;
+- war identity delegates actor-perspective conflicts to Stage 19 rather than creating a parallel combat authority;
+- save/load at proposal, counter-offer, ultimatum and ceasefire preserves exactly one continuation transition;
+- future actor evidence and invalid cross-layer treaty/conflict references fail closed;
+- production-materializable generated worlds exercise trade, deterrence, negotiated resolution and causal war while the frozen Stage-20 seed corpus remains tie-break-only evidence.
 
-### 4.4 21D–21E military proof
+### 4.4 21D NEXT / 21E military proof
 
 Build from real `FleetId` entities:
 
@@ -287,8 +301,9 @@ workload benchmarks established in 21A and extended at every later actor layer.
 ### Scripted war replacing causality
 
 Risk: random relation rolls or narrative triggers recolour the map.
-Mitigation: persisted interest evidence, crisis/war identity, physical operations, territorial
-thresholds and no outcome without ordinary authority transition.
+Mitigation: accepted Stage-21B intent evidence plus Stage-21C persisted proposal/crisis/war identity,
+physical Stage-19 conflict linkage, later physical operations, territorial thresholds and no outcome
+without ordinary authority transition.
 
 ### Content breadth before stable schemas
 
