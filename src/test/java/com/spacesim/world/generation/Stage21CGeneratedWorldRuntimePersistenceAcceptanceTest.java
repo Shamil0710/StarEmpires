@@ -185,6 +185,43 @@ class Stage21CGeneratedWorldRuntimePersistenceAcceptanceTest {
                 Stage19ConflictState.empty(now)));
     }
 
+    @Test
+    void compositionRejectsFutureActorMemoryEvidence() {
+        var stage20 = Stage20PlayableGeneratedWorldFactory.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
+        var initial = stage20.captureState();
+        String first = initial.worldState().factions().get(0).factionContentId();
+        String second = initial.worldState().factions().get(1).factionContentId();
+        long now = stage20.world().getAuthoritativeWorldTick();
+        Stage21BGeneratedWorldRuntimePersistentState stage21b = stage21b(stage20, first, second);
+        DiplomaticLifecycleState futureEvidence = new DiplomaticLifecycleState(
+                DiplomaticLifecycleState.CURRENT_VERSION,
+                now,
+                1L,
+                1L,
+                1L,
+                List.of(new DiplomaticLifecycleState.RelationMemory(
+                        first,
+                        second,
+                        List.of(new DiplomaticLifecycleState.RelationEvent(
+                                "memory.future",
+                                DiplomaticLifecycleState.RelationFactor.THREAT,
+                                -20,
+                                now + 1L,
+                                "future.security-report")))),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
+
+        assertThrows(IllegalArgumentException.class, () -> new Stage21CGeneratedWorldRuntimePersistentState(
+                Stage21CGeneratedWorldRuntimePersistentState.CURRENT_VERSION,
+                Stage21CGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION,
+                stage21b,
+                futureEvidence,
+                Stage19ConflictState.empty(now)));
+    }
+
     private static Stage21BGeneratedWorldRuntimePersistentState stage21b(
             LiveRuntime stage20,
             String first,
