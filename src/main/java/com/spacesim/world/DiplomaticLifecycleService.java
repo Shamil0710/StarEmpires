@@ -198,7 +198,10 @@ public final class DiplomaticLifecycleService {
      * Materializes the treaty-bearing portion of an open proposal through the Stage-17 command boundary.
      *
      * <p>Proposal families without a Stage-17 treaty representation remain pure Stage-21C legal offers.
-     * Recognition, construction concessions, embargoes and war status have their own existing commands.</p>
+     * Recognition, construction concessions, embargoes and war status have their own existing commands.
+     * Stage-21C response deadlines are intentionally separate from the accepted treaty's lifetime;
+     * treaty-bearing offers therefore use the Stage-17 indefinite lifetime unless a future owning
+     * treaty-duration contract explicitly supplies another value.</p>
      *
      * @param proposalId persistent proposal identity
      * @return updated proposal, possibly linked to a Stage-17 treaty
@@ -218,7 +221,7 @@ public final class DiplomaticLifecycleService {
                         current.proposerFactionId(),
                         current.recipientFactionId(),
                         clauses,
-                        current.deadlineTick()));
+                        -1L));
         long now = world.getAuthoritativeWorldTick();
         Proposal updated = copyProposal(
                 current,
@@ -295,7 +298,10 @@ public final class DiplomaticLifecycleService {
     }
 
     /**
-     * Expires every open proposal whose deadline has elapsed.
+     * Expires every open proposal whose response deadline has elapsed.
+     *
+     * <p>Any linked Stage-17 treaty proposal is explicitly rejected at the same boundary so an
+     * indefinite accepted-treaty lifetime cannot leave a stale independently open treaty offer.</p>
      *
      * @return number of proposals transitioned to EXPIRED
      */
@@ -305,6 +311,11 @@ public final class DiplomaticLifecycleService {
         for (int index = 0; index < proposals.size(); index++) {
             Proposal current = proposals.get(index);
             if (current.status() == ProposalStatus.OPEN && current.deadlineTick() <= now) {
+                if (!current.linkedTreatyId().isEmpty()) {
+                    world.applyDiplomaticTreatyCommand(
+                            new DiplomaticTreatyCommand.Reject(
+                                    current.recipientFactionId(), current.linkedTreatyId()));
+                }
                 proposals.set(index, copyProposal(
                         current, ProposalStatus.EXPIRED, now, current.linkedCrisisId(), current.linkedTreatyId()));
                 changed++;
