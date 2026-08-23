@@ -57,7 +57,28 @@ public record StrategicGoalState(
         /** The accepted goal reached its explicit expiry horizon. */ EXPIRED
     }
 
-    /** Validates one immutable persistent goal state. */
+    /**
+     * Validates one immutable persistent goal state.
+     *
+     * @param goalId persistent goal identity
+     * @param factionContentId owning faction content identity
+     * @param type peaceful goal family
+     * @param targetId stable target identity
+     * @param sourceEvidence persisted actor-bounded source evidence
+     * @param urgencyBasisPoints urgency in {@code [0,10000]}
+     * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+     * @param requestedBudget requested multidimensional planning envelope
+     * @param allocatedBudget currently allocated multidimensional planning envelope
+     * @param blockers current explainable blockers
+     * @param lifecycle current goal lifecycle
+     * @param createdAtTick creation tick
+     * @param updatedAtTick last review/update tick
+     * @param nextReviewTick next scheduled strategic review for open goals, otherwise zero
+     * @param expiresAtTick terminal expiry tick, or {@code -1} for no automatic expiry
+     * @param cooldownUntilTick earliest tick a cancelled target may be reconsidered, or zero
+     * @param cancellationCost visible switching cost in normalized planning-envelope units
+     * @param outcomeSignal last authoritative terminal outcome signal
+     */
     public StrategicGoalState {
         goalId = requireText(goalId, "Strategic goal ID");
         factionContentId = requireText(factionContentId, "Strategic goal faction ID");
