@@ -34,7 +34,9 @@ public final class FactionStrategicGoalPlanner {
      *
      * <p>A newly completed Stage-21A actor review is a persisted early-review trigger. It may wake
      * goals before their ordinary cadence exactly once because the consumed actor review count is
-     * written into the returned strategic-intent state.</p>
+     * written into the returned strategic-intent state. The Stage-21A commitment horizon is also
+     * honored as a minimum anti-churn interval: loss of nonterminal supporting evidence cannot by
+     * itself cancel an already accepted goal before that horizon.</p>
      *
      * @param actorState Stage-21A lifecycle context
      * @param current current Stage-21B persistent intent state
@@ -116,6 +118,15 @@ public final class FactionStrategicGoalPlanner {
                 nextGoals.add(goal.cancel(candidate, reviewTick, Math.addExact(reviewTick, DEFAULT_COOLDOWN_TICKS),
                         cost, StrategicGoalOutcomeSignal.FAILED));
                 resolvedOpenKeys.add(goal.intentKey());
+                continue;
+            }
+            if (candidate == null && reviewTick < actor.commitmentUntilTick()) {
+                StrategicGoalState retained = retainBeforeCadence(goal, null, remaining, reviewTick);
+                nextGoals.add(retained);
+                resolvedOpenKeys.add(goal.intentKey());
+                if (retained.lifecycle() == Lifecycle.ACTIVE) {
+                    remaining = remaining.minus(retained.allocatedBudget());
+                }
                 continue;
             }
             if (!actorReviewAdvanced && reviewTick < goal.nextReviewTick()) {
