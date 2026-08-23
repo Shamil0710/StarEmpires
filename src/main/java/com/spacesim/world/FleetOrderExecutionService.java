@@ -20,10 +20,26 @@ import java.util.Objects;
 public final class FleetOrderExecutionService {
     private final GalaxyTopology topology;
 
+    /**
+     * Creates an execution adapter bound to the existing physical galaxy topology.
+     *
+     * @param topology authoritative neighbor topology used to validate persisted route hops
+     */
     public FleetOrderExecutionService(GalaxyTopology topology) {
         this.topology = Objects.requireNonNull(topology, "topology");
     }
 
+    /**
+     * Projects the next ordinary operations required by an active strategic order.
+     *
+     * <p>Movement operations are neighbor-only. Service operations are requests only and must be
+     * fulfilled by the pre-existing Stage-18 service authority.</p>
+     *
+     * @param commandState persistent Stage-21D command state
+     * @param forces current read-only reconstruction of ordinary fleets
+     * @param orderId strategic order identifier to inspect
+     * @return immutable next-operation list, empty when no Stage-21D dispatch is currently required
+     */
     public List<Operation> planNextOperations(
             FleetCommandState commandState,
             FleetForceRegistry forces,
@@ -60,7 +76,16 @@ public final class FleetOrderExecutionService {
         return List.of();
     }
 
-    /** Applies only movement operations through the existing jump FSM. */
+    /**
+     * Applies only movement operations through the existing jump finite-state machine.
+     *
+     * @param world authoritative world simulation that owns physical fleet jumps
+     * @param commandState persistent strategic command state
+     * @param forces current reconstruction of ordinary fleet placement and readiness
+     * @param orderId active strategic order to dispatch
+     * @return updated command state with the order marked active after successful jump requests
+     * @throws IllegalStateException when a service operation is routed here or a member already has an active jump
+     */
     public FleetCommandState dispatchMovementHop(
             WorldSimulation world,
             FleetCommandState commandState,
@@ -88,6 +113,11 @@ public final class FleetOrderExecutionService {
     /**
      * Advances the persistent route cursor only after every member has physically arrived. It never
      * manufactures arrival state and therefore cannot duplicate or teleport a fleet.
+     *
+     * @param commandState persistent strategic command state
+     * @param forces current reconstruction of ordinary fleet placement after world simulation progress
+     * @param orderId strategic order whose next physical arrival is being reconciled
+     * @return unchanged state until all members arrive, otherwise state advanced by one route node
      */
     public FleetCommandState reconcilePhysicalArrival(
             FleetCommandState commandState,
@@ -113,12 +143,27 @@ public final class FleetOrderExecutionService {
         return commandState.replaceOrder(advanced);
     }
 
+    /** Marker for ordinary operations projected from a validated strategic order. */
     public sealed interface Operation permits MovementOperation, ServiceOperation { }
 
+    /**
+     * One neighbor-only physical fleet movement request.
+     *
+     * @param fleetId stable ordinary fleet identity
+     * @param originSystemId route node from which the fleet must depart
+     * @param destinationSystemId adjacent route node requested through the existing jump authority
+     */
     public record MovementOperation(
             FleetId fleetId,
             StarSystemId originSystemId,
             StarSystemId destinationSystemId) implements Operation {
+        /**
+         * Validates one physical movement request.
+         *
+         * @param fleetId stable ordinary fleet identity
+         * @param originSystemId non-null origin system
+         * @param destinationSystemId non-null distinct destination system
+         */
         public MovementOperation {
             Objects.requireNonNull(fleetId, "fleetId");
             Objects.requireNonNull(originSystemId, "originSystemId");
@@ -129,11 +174,24 @@ public final class FleetOrderExecutionService {
         }
     }
 
-    /** A request only; Stage-21D deliberately has no API that can grant the service for free. */
+    /**
+     * A service request only; Stage-21D deliberately has no API that can grant the service for free.
+     *
+     * @param fleetId stable ordinary fleet identity requiring service
+     * @param systemId system where existing service authority must satisfy the request
+     * @param serviceType refuel, rearm or repair request type
+     */
     public record ServiceOperation(
             FleetId fleetId,
             StarSystemId systemId,
             OrderType serviceType) implements Operation {
+        /**
+         * Validates a request delegated to the existing Stage-18 service authority.
+         *
+         * @param fleetId stable ordinary fleet identity requiring service
+         * @param systemId service location
+         * @param serviceType refuel, rearm or repair order type
+         */
         public ServiceOperation {
             Objects.requireNonNull(fleetId, "fleetId");
             Objects.requireNonNull(systemId, "systemId");
