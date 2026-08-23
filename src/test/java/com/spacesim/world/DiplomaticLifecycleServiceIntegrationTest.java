@@ -6,6 +6,9 @@ import com.spacesim.warfare.Stage19ConflictRuntime;
 import com.spacesim.world.DiplomaticLifecycleState.CrisisEscalation;
 import com.spacesim.world.DiplomaticLifecycleState.ObligationOutcome;
 import com.spacesim.world.DiplomaticLifecycleState.ProposalKind;
+import com.spacesim.world.DiplomaticLifecycleState.ProposalStatus;
+import com.spacesim.world.DiplomaticLifecycleState.RelationEvent;
+import com.spacesim.world.DiplomaticLifecycleState.RelationFactor;
 import com.spacesim.world.DiplomaticLifecycleState.Term;
 import com.spacesim.world.DiplomaticLifecycleState.TermKind;
 import com.spacesim.world.DiplomaticLifecycleState.WarGoal;
@@ -57,6 +60,116 @@ class DiplomaticLifecycleServiceIntegrationTest {
         assertEquals(CustomsTariffResolver.Reason.TREATY_EXEMPTION, tariff.reason());
         assertEquals(0, tariff.basisPoints());
         assertEquals(linked.linkedTreatyId(), tariff.instrumentId());
+    }
+
+    @Test
+    void proposalResponseDeadlineDoesNotBecomeAcceptedTreatyExpiry() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_305L);
+        DiplomaticLifecycleService service = service(world);
+        long deadline = world.getAuthoritativeWorldTick() + 2L;
+        var proposal = service.propose(new DiplomaticLifecycleService.ProposalRequest(
+                "goal.trade.duration-seam",
+                TRADE_LEAGUE,
+                MINERS,
+                ProposalKind.TRADE,
+                "route.duration-seam",
+                List.of(),
+                List.of(),
+                deadline));
+        proposal = service.materializeTreatyOffer(proposal.proposalId());
+        String treatyId = proposal.linkedTreatyId();
+        assertEquals(-1L, world.findDiplomaticTreaty(treatyId).orElseThrow().expiresTick());
+        service.accept(proposal.proposalId());
+
+        advancePast(world, deadline);
+
+        DiplomaticTreatyState treaty = world.findDiplomaticTreaty(treatyId).orElseThrow();
+        assertEquals(DiplomaticTreatyState.Status.ACTIVE, treaty.status());
+        assertTrue(treaty.activeAt(world.getAuthoritativeWorldTick()));
+    }
+
+    @Test
+    void expiredStage21CProposalClosesLinkedStage17TreatyOffer() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_306L);
+        DiplomaticLifecycleService service = service(world);
+        long deadline = world.getAuthoritativeWorldTick() + 2L;
+        var proposal = service.propose(new DiplomaticLifecycleService.ProposalRequest(
+                "goal.trade.expiry-seam",
+                TRADE_LEAGUE,
+                MINERS,
+                ProposalKind.TRADE,
+                "route.expiry-seam",
+                List.of(),
+                List.of(),
+                deadline));
+        proposal = service.materializeTreatyOffer(proposal.proposalId());
+        String treatyId = proposal.linkedTreatyId();
+
+        advancePast(world, deadline);
+
+        assertEquals(1, service.expireDueProposals());
+        assertEquals(
+                ProposalStatus.EXPIRED,
+                service.snapshot().proposals().stream()
+                        .filter(saved -> saved.proposalId().equals(proposal.proposalId()))
+                        .findFirst()
+                        .orElseThrow()
+                        .status());
+        assertEquals(
+                DiplomaticTreatyState.Status.REJECTED,
+                world.findDiplomaticTreaty(treatyId).orElseThrow().status());
+    }
+
+    @Test
+    void everyRequiredProposalFamilyHasPersistentIdentity() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_307L);
+        DiplomaticLifecycleService service = service(world);
+        long deadline = world.getAuthoritativeWorldTick() + 100L;
+
+        for (ProposalKind kind : ProposalKind.values()) {
+            var proposal = service.propose(new DiplomaticLifecycleService.ProposalRequest(
+                    "goal.family." + kind.name().toLowerCase(),
+                    TRADE_LEAGUE,
+                    MINERS,
+                    kind,
+                    "issue.family." + kind.name().toLowerCase(),
+                    List.of(),
+                    List.of(),
+                    deadline));
+            assertFalse(proposal.proposalId().isBlank());
+            assertEquals(kind, proposal.kind());
+        }
+
+        assertEquals(ProposalKind.values().length, service.snapshot().proposals().size());
+        for (ProposalKind kind : ProposalKind.values()) {
+            assertTrue(service.snapshot().proposals().stream().anyMatch(proposal -> proposal.kind() == kind));
+        }
+    }
+
+    @Test
+    void allRequiredRelationFactorsContributeOnlyThroughRememberedActorEvidence() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_308L);
+        DiplomaticLifecycleService service = service(world);
+        long now = world.getAuthoritativeWorldTick();
+
+        for (RelationFactor factor : RelationFactor.values()) {
+            service.remember(
+                    TRADE_LEAGUE,
+                    MINERS,
+                    new RelationEvent(
+                            "memory.factor." + factor.name().toLowerCase(),
+                            factor,
+                            5,
+                            now,
+                            "subject." + factor.name().toLowerCase()));
+        }
+
+        assertEquals(RelationFactor.values().length * 5, service.derivedRelation(TRADE_LEAGUE, MINERS));
+        assertEquals(RelationFactor.values().length, service.snapshot().relationMemories().get(0).events().size());
+        assertThrows(IllegalArgumentException.class, () -> service.remember(
+                TRADE_LEAGUE,
+                MINERS,
+                new RelationEvent("memory.future", RelationFactor.THREAT, -5, now + 1L, "future.hidden")));
     }
 
     @Test
@@ -175,6 +288,37 @@ class DiplomaticLifecycleServiceIntegrationTest {
     }
 
     @Test
+    void guaranteeMayBeHonoredWithoutMutatingTreatyAuthorityAndBuildsPositiveMemory() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_309L);
+        DiplomaticLifecycleService service = service(world);
+        var proposal = service.propose(new DiplomaticLifecycleService.ProposalRequest(
+                "goal.defensive-cooperation-honored",
+                TRADE_LEAGUE,
+                MINERS,
+                ProposalKind.DEFENSIVE_COOPERATION,
+                "security.corona",
+                List.of(),
+                List.of(),
+                100L));
+        var linked = service.materializeTreatyOffer(proposal.proposalId());
+        service.accept(linked.proposalId());
+
+        var decision = service.evaluateObligation(
+                linked.linkedTreatyId(),
+                TRADE_LEAGUE,
+                MINERS,
+                "observed.attack.miners.honored",
+                true);
+
+        assertEquals(ObligationOutcome.HONORED, decision.outcome());
+        assertTrue(decision.reputationImpact() > 0);
+        assertEquals(
+                DiplomaticTreatyState.Status.ACTIVE,
+                world.findDiplomaticTreaty(linked.linkedTreatyId()).orElseThrow().status());
+        assertTrue(service.derivedRelation(MINERS, TRADE_LEAGUE) > 0);
+    }
+
+    @Test
     void guaranteeMayBeRefusedButRefusalBreachesExistingTreatyAndCreatesReputationalMemory() {
         WorldSimulation world = DemoGalaxyFactory.create(21_303L);
         DiplomaticLifecycleService service = service(world);
@@ -210,6 +354,13 @@ class DiplomaticLifecycleServiceIntegrationTest {
                 Stage19ConflictState.empty(world.getAuthoritativeWorldTick()));
         return new DiplomaticLifecycleService(
                 world, warfare, DiplomaticLifecycleState.empty(world.getAuthoritativeWorldTick()));
+    }
+
+    private static void advancePast(WorldSimulation world, long tick) {
+        for (int attempt = 0; attempt < 100 && world.getAuthoritativeWorldTick() <= tick; attempt++) {
+            world.advanceFrame(1.0f);
+        }
+        assertTrue(world.getAuthoritativeWorldTick() > tick);
     }
 
     private static List<WarGoal> goals() {
