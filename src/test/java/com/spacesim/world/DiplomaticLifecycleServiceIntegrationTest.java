@@ -10,6 +10,7 @@ import com.spacesim.world.DiplomaticLifecycleState.Term;
 import com.spacesim.world.DiplomaticLifecycleState.TermKind;
 import com.spacesim.world.DiplomaticLifecycleState.WarGoal;
 import com.spacesim.world.DiplomaticLifecycleState.WarGoalKind;
+import com.spacesim.world.DiplomaticLifecycleState.WarStartKind;
 import com.spacesim.world.DiplomaticLifecycleState.WarStatus;
 import org.junit.jupiter.api.Test;
 
@@ -150,6 +151,27 @@ class DiplomaticLifecycleServiceIntegrationTest {
                 "attack.after-peace",
                 world.getAuthoritativeWorldTick(),
                 goals));
+    }
+
+    @Test
+    void observedHostileAttackCanCreateLegalWarWithoutFabricatingACrisis() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_304L);
+        Stage19ConflictRuntime warfare = new Stage19ConflictRuntime(
+                Stage19ConflictState.empty(world.getAuthoritativeWorldTick()));
+        DiplomaticLifecycleService service = new DiplomaticLifecycleService(
+                world, warfare, DiplomaticLifecycleState.empty(world.getAuthoritativeWorldTick()));
+
+        var war = service.declareWarFromObservedAttack(
+                TRADE_LEAGUE,
+                MINERS,
+                "observed.attack.corona",
+                world.getAuthoritativeWorldTick(),
+                goals());
+
+        assertEquals(WarStartKind.OBSERVED_HOSTILE_ATTACK, war.startEvidence().kind());
+        assertTrue(war.startEvidence().crisisId().isEmpty());
+        assertEquals(2, war.stage19ConflictIds().size());
+        assertTrue(service.snapshot().crises().isEmpty());
     }
 
     @Test
