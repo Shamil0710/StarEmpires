@@ -5,6 +5,7 @@ import com.spacesim.world.FactionActorObservationSnapshot.ObservationChannel;
 import com.spacesim.world.FactionActorObservationSnapshot.ObservationEvidence;
 import com.spacesim.world.FactionLivingActorState.EventWakeup;
 import com.spacesim.world.FactionLivingActorState.WakeupReason;
+import com.spacesim.world.StrategicGoalState.Lifecycle;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -70,6 +71,48 @@ class Stage21BMaterialChangeReviewTest {
         assertEquals(1L, repeated.state().lastActorReviewCount());
         assertEquals(FactionStrategicGoalPlanner.PlanningTrigger.CADENCE_OR_EXPLICIT,
                 repeated.planningTrigger());
+    }
+
+    @Test
+    void minimumCommitmentDefersNonterminalDisplacementAfterMaterialReview() {
+        FactionLivingActorState committedActor = FactionLivingActorState.initial("faction.alpha", 100L)
+                .withCommitmentUntilTick(100L);
+        StrategicGoalCandidate candidate = defendCandidate(7_000, "intel:border:seed", 100L);
+        var seeded = FactionStrategicGoalPlanner.review(
+                committedActor,
+                FactionStrategicIntentState.initial("faction.alpha"),
+                List.of(candidate),
+                StrategicPlanningEnvelope.balanced(20L),
+                10L);
+        String goalId = seeded.state().activeGoals().get(0).goalId();
+
+        FactionLivingActorState changedActor = committedActor
+                .withWakeup(new EventWakeup(
+                        WakeupReason.MATERIAL_OBSERVATION_CHANGED,
+                        "material-change:border:lost-evidence",
+                        20L,
+                        20L))
+                .afterReview(20L, 100L);
+        var protectedReview = FactionStrategicGoalPlanner.review(
+                changedActor,
+                seeded.state(),
+                List.of(),
+                StrategicPlanningEnvelope.balanced(20L),
+                20L);
+
+        assertEquals(goalId, protectedReview.state().openGoals().get(0).goalId());
+        assertEquals(Lifecycle.ACTIVE, protectedReview.state().openGoals().get(0).lifecycle());
+        assertEquals(1L, protectedReview.state().lastActorReviewCount());
+
+        var afterCommitment = FactionStrategicGoalPlanner.review(
+                changedActor,
+                protectedReview.state(),
+                List.of(),
+                StrategicPlanningEnvelope.balanced(20L),
+                110L);
+
+        assertTrue(afterCommitment.state().openGoals().isEmpty());
+        assertEquals(Lifecycle.CANCELLED, afterCommitment.state().goals().get(0).lifecycle());
     }
 
     @Test
