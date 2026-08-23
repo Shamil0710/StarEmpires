@@ -6,10 +6,9 @@ import java.util.Objects;
 /**
  * One read-only Stage-21B strategic option presented to the pure goal planner.
  *
- * <p>The budget is a normalized planning envelope only. This record has no authority to mutate
- * treasury, production, freight, diplomacy, fleets or territory. Blockers and outcome signals must
- * likewise be supplied by actor-visible authority/read-model adapters rather than hidden world
- * truth.</p>
+ * <p>Planning envelopes are normalized intent metadata only. This record has no authority to mutate
+ * treasury, production, freight, diplomacy, fleets or territory. Conditions are declarative and
+ * must be evaluated by external domain authorities that report an outcome signal.</p>
  *
  * @param type strategic goal family
  * @param targetId stable goal target identity
@@ -19,6 +18,9 @@ import java.util.Objects;
  * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
  * @param doctrinePreferenceBasisPoints caller-owned doctrine preference in {@code [0,10000]}
  * @param requestedBudget multidimensional normalized planning request
+ * @param costCeiling maximum accepted normalized planning cost
+ * @param successConditions declarative external-authority success conditions
+ * @param failureConditions declarative external-authority failure conditions
  * @param blockers current actor-known non-capacity blockers
  * @param expiresAtTick terminal expiry tick, or {@code -1} for no automatic expiry
  * @param reviewCadenceTicks positive interval between strategic re-reviews
@@ -33,6 +35,9 @@ public record StrategicGoalCandidate(
         int feasibilityBasisPoints,
         int doctrinePreferenceBasisPoints,
         StrategicPlanningEnvelope requestedBudget,
+        StrategicPlanningEnvelope costCeiling,
+        List<StrategicGoalCondition> successConditions,
+        List<StrategicGoalCondition> failureConditions,
         List<StrategicGoalBlocker> blockers,
         long expiresAtTick,
         long reviewCadenceTicks,
@@ -49,6 +54,9 @@ public record StrategicGoalCandidate(
      * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
      * @param doctrinePreferenceBasisPoints caller-owned doctrine preference in {@code [0,10000]}
      * @param requestedBudget multidimensional normalized planning request
+     * @param costCeiling maximum accepted normalized planning cost
+     * @param successConditions declarative external-authority success conditions
+     * @param failureConditions declarative external-authority failure conditions
      * @param blockers current actor-known non-capacity blockers
      * @param expiresAtTick terminal expiry tick, or {@code -1} for no automatic expiry
      * @param reviewCadenceTicks positive interval between strategic re-reviews
@@ -70,6 +78,9 @@ public record StrategicGoalCandidate(
         requireBasisPoints(feasibilityBasisPoints, "Strategic goal feasibility");
         requireBasisPoints(doctrinePreferenceBasisPoints, "Strategic doctrine preference");
         Objects.requireNonNull(requestedBudget, "Strategic goal requested budget not set");
+        Objects.requireNonNull(costCeiling, "Strategic goal cost ceiling not set");
+        successConditions = normalizeConditions(successConditions, "Strategic goal success conditions");
+        failureConditions = normalizeConditions(failureConditions, "Strategic goal failure conditions");
         blockers = Objects.requireNonNull(blockers, "Strategic goal blockers not set").stream()
                 .map(blocker -> Objects.requireNonNull(blocker, "Strategic goal blocker not set"))
                 .sorted()
@@ -82,6 +93,41 @@ public record StrategicGoalCandidate(
             throw new IllegalArgumentException("Strategic goal review cadence must be positive");
         }
         Objects.requireNonNull(outcomeSignal, "Strategic goal outcome signal not set");
+    }
+
+    /**
+     * Compatibility constructor with explicit scoring and default declarative goal contract.
+     *
+     * @param type strategic goal family
+     * @param targetId stable goal target identity
+     * @param sourceEvidence actor-bounded evidence supporting the candidate
+     * @param urgencyBasisPoints urgency in {@code [0,10000]}
+     * @param strategicValueBasisPoints strategic value in {@code [0,10000]}
+     * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+     * @param doctrinePreferenceBasisPoints doctrine preference in {@code [0,10000]}
+     * @param requestedBudget multidimensional normalized planning request
+     * @param blockers current actor-known non-capacity blockers
+     * @param expiresAtTick terminal expiry tick, or {@code -1}
+     * @param reviewCadenceTicks positive interval between reviews
+     * @param outcomeSignal read-only terminal outcome signal
+     */
+    public StrategicGoalCandidate(
+            StrategicGoalType type,
+            String targetId,
+            StrategicGoalEvidence sourceEvidence,
+            int urgencyBasisPoints,
+            int strategicValueBasisPoints,
+            int feasibilityBasisPoints,
+            int doctrinePreferenceBasisPoints,
+            StrategicPlanningEnvelope requestedBudget,
+            List<StrategicGoalBlocker> blockers,
+            long expiresAtTick,
+            long reviewCadenceTicks,
+            StrategicGoalOutcomeSignal outcomeSignal) {
+        this(type, targetId, sourceEvidence, urgencyBasisPoints, strategicValueBasisPoints,
+                feasibilityBasisPoints, doctrinePreferenceBasisPoints, requestedBudget, requestedBudget,
+                defaultSuccess(type, targetId), defaultFailure(targetId), blockers, expiresAtTick,
+                reviewCadenceTicks, outcomeSignal);
     }
 
     /**
@@ -147,6 +193,28 @@ public record StrategicGoalCandidate(
         }
         int typeOrder = type.compareTo(other.type);
         return typeOrder != 0 ? typeOrder : targetId.compareTo(other.targetId);
+    }
+
+    private static List<StrategicGoalCondition> normalizeConditions(
+            List<StrategicGoalCondition> conditions,
+            String label) {
+        List<StrategicGoalCondition> normalized = Objects.requireNonNull(conditions, label + " not set").stream()
+                .map(condition -> Objects.requireNonNull(condition, label + " contains null"))
+                .sorted()
+                .distinct()
+                .toList();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(label + " cannot be empty");
+        }
+        return normalized;
+    }
+
+    private static List<StrategicGoalCondition> defaultSuccess(StrategicGoalType type, String targetId) {
+        return List.of(new StrategicGoalCondition(type.wireId() + "-satisfied", targetId));
+    }
+
+    private static List<StrategicGoalCondition> defaultFailure(String targetId) {
+        return List.of(new StrategicGoalCondition("objective-unreachable", targetId));
     }
 
     private static void requireBasisPoints(int value, String label) {
