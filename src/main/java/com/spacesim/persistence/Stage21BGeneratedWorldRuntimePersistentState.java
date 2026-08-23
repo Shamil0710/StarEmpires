@@ -32,7 +32,14 @@ public record Stage21BGeneratedWorldRuntimePersistentState(
     /** Stable Stage-21B runtime composition contract. */
     public static final String CURRENT_RUNTIME_VERSION = "stage21b.generated-world-strategic-intent.v2";
 
-    /** Validates one-to-one living-actor/intent ownership and canonicalizes intent rows. */
+    /**
+     * Validates one-to-one living-actor/intent ownership and canonicalizes intent rows.
+     *
+     * @param schemaVersion Stage-21B composition schema
+     * @param runtimeVersion exact Stage-21B runtime composition contract
+     * @param stage21ARuntime exact underlying Stage-21A generated-world checkpoint
+     * @param strategicIntents persistent strategic intent rows in canonical faction-ID order
+     */
     public Stage21BGeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException(
