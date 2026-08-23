@@ -73,6 +73,8 @@ There is intentionally no Stage-21D method that adds reaction mass, ammunition o
 
 `FleetOrderExecutionService.dispatchMovementHop` calls only `WorldSimulation.requestFleetJump`. It does not detach/materialize entities directly and does not mutate `FleetJumpState` itself.
 
+Dispatch is recoverable rather than pretending that several independent physical jump requests form a new strategic transaction. A member already executing the exact persisted hop, or already physically present at the next route node, receives no duplicate request; a lagging member may still receive its ordinary jump later. An active jump toward any different edge fails closed. This preserves already accepted physical movement without inventing rollback authority in Stage 21D.
+
 Persistent order progress advances only after `FleetForceRegistry` reconstructs every group member physically in the expected next system. A strategic order therefore cannot teleport a fleet, self-certify arrival or duplicate a completed arrival.
 
 ## Readiness and feasibility
@@ -135,7 +137,7 @@ Only one active order may occupy a command group's active-order slot. This rejec
 
 `Stage21DGeneratedWorldRuntimePersistentState` schema `7` / runtime contract `stage21d.generated-world-force-command.v7` embeds the complete accepted Stage-21C runtime unchanged and adds only `FleetCommandState`.
 
-Composition validates every member `FleetId`, home system and order-route system against the embedded physical world. Unknown cross-layer references fail closed.
+Composition validates every member `FleetId`, physical faction ownership, home system and every neighbor edge in an order route against the embedded physical world. Unknown or mismatched cross-layer references fail closed.
 
 The Stage-20.5 checkpoint remains the authority for exact local/transit fleet state. A mid-transit generated fleet therefore retains the existing ordinary `FleetJumpState`, detached entity payload and exact arrival sidecar while Stage 21D independently preserves command metadata around it.
 
@@ -156,9 +158,10 @@ The Stage-20.5 checkpoint remains the authority for exact local/transit fleet st
 | Double active-order assignment is rejected | `FleetOrderSubmissionServiceTest.secondActiveOrderForTheSameCommandGroupIsRejected` |
 | Route selection is deterministic and neighbor-only | `FleetStrategicRoutePlannerTest` |
 | Strategic movement creates only ordinary jump-FSM work | `FleetOrderExecutionServiceIntegrationTest.strategicMovementDispatchesTheExistingJumpFsmAndReconcilesOnlyAfterPhysicalArrival` |
-| Duplicate dispatch/arrival and teleport are rejected | `FleetOrderExecutionServiceIntegrationTest` |
+| Same-hop retry is idempotent and partially progressed groups remain recoverable | `FleetOrderExecutionServiceIntegrationTest.strategicMovementDispatchesTheExistingJumpFsmAndReconcilesOnlyAfterPhysicalArrival`, `partiallyProgressedGroupPlansOnlyLaggingMemberAndCompletesAfterBothArrive` |
+| Duplicate arrival and teleport are rejected | `FleetOrderExecutionServiceIntegrationTest` |
 | Repair/rearm/refuel remain service requests rather than free mutation | `FleetOrderExecutionServiceIntegrationTest.serviceOrdersAreRequestsOnlyAndCannotGrantFreeRepairOrRearm` |
-| Complete Stage-21D wrapper rejects unknown fleet/system references and future versions | `Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest` |
+| Complete Stage-21D wrapper rejects unknown fleet/owner/system/route references and future versions | `Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest` |
 | Real generated fleet survives mid-transit Stage21D save/load and completes through ordinary arrival authority | `Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest.midTransitGeneratedFleetAndActiveCommandRoundTripThenCompleteThroughOrdinaryArrivalAuthority` |
 | Existing exact transit payload authority preserves stable FleetId/cargo/local payload | `WorldSimulationJumpAcceptanceTest.jumpSurvivesMidTransitSaveLoadAndLargeRenderFrame` |
 | Fitted jump engineering cannot fall back to free legacy movement | `FleetJumpEngineeringIntegrationTest.fittedPhysicalRejectionCannotFallBackToLegacyJump` |
@@ -169,7 +172,7 @@ The Stage-20.5 checkpoint remains the authority for exact local/transit fleet st
 - **Strategic order causes only ordinary movement/service operations:** movement delegates to `WorldSimulation.requestFleetJump`; service types return Stage-18 requests only.
 - **In-transit fleets retain identity, fit, damage, cargo and arrival authority across save/load:** Stage 21D embeds unchanged Stage-20/21C authority; generated mid-transit acceptance restores the same `FleetId`, jump state, entity payload and exact arrival authority before ordinary arrival.
 - **Fleet lacking fuel/ammunition/access cannot silently execute:** shared submission validation fails closed before an order is accepted.
-- **Double assignment, teleport, duplicate arrival and free repair/rearm are rejected:** command-state uniqueness, one-active-order rule, neighbor routing, active-jump rejection, physical-arrival reconciliation and service-request-only execution enforce these boundaries.
+- **Double assignment, teleport, duplicate arrival and free repair/rearm are rejected:** command-state uniqueness, one-active-order rule, neighbor routing, exact-hop idempotency, recoverable staggered dispatch, physical-arrival reconciliation and service-request-only execution enforce these boundaries.
 
 ## Later-stage boundary
 
