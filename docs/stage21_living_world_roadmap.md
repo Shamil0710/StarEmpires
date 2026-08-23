@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
-> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A, Stage 21B and
-> Stage 21C are complete; **Stage 21D is OPEN/NEXT** and is not implemented yet.
+> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A, Stage 21B,
+> Stage 21C and **Stage 21D are complete; Stage 21E is OPEN/NEXT**.
 
 ## 1. Purpose
 
@@ -203,11 +203,11 @@ Exit criteria — accepted:
 
 Implementation and acceptance map: `docs/stage21c_diplomacy_crisis_lifecycle.md`.
 
-### 21D — Fleet readiness, command groups and strategic movement — OPEN/NEXT
+### 21D — Fleet readiness, command groups and strategic movement — COMPLETE
 
 Objective: turn owned physical ships into finite forces that can receive lawful strategic orders.
 
-Deliverables:
+Delivered:
 
 - read-only force registry reconstructed from ordinary `FleetId` placements and fitted entities;
 - readiness from damage, ammunition, propellant, crew, sensors, maintenance and supply access;
@@ -217,16 +217,21 @@ Deliverables:
 - neighbor-only route planning using known topology and legal access;
 - mobilization/staging deadlines based on physical location and handling/service capability;
 - risk, reserve and home-defense constraints;
-- player and AI submission through the same validated fleet-order boundary.
+- player and AI submission through the same validated fleet-order boundary;
+- recoverable exact-hop dispatch: members already on the persisted edge or physically at the next
+  node do not receive duplicate jumps, while lagging members may continue through ordinary jump authority;
+- generated-world Stage-21D persistence wrapping Stage-21C without replacing Stage-20 transit state.
 
-Exit criteria:
+Exit criteria — accepted:
 
 - a strategic order causes only ordinary movement/service operations;
 - in-transit fleets retain exact identity, fit, damage, cargo and arrival authority across save/load;
 - a fleet lacking fuel/ammunition/access cannot silently execute an infeasible order;
 - double assignment, teleport, duplicate arrival and free repair/rearm are rejected.
 
-### 21E — Strategic operations and physical warfare consequences
+Implementation and acceptance map: `docs/stage21d_fleet_readiness_command_movement.md`.
+
+### 21E — Strategic operations and physical warfare consequences — OPEN/NEXT
 
 Objective: execute coercion and warfare through Stage-19/ordinary-world state.
 
@@ -399,8 +404,8 @@ supports multiple plausible histories without hidden exceptions.
 | 21A | **COMPLETE** | persistent actor cadence, bounded observations and interest evidence |
 | 21B | **COMPLETE** | persistent strategic goals, feasibility, commitment and explainability |
 | 21C | **COMPLETE** | proposal/counter-offer/crisis/treaty/war legal lifecycle |
-| 21D | **OPEN — next** | physical readiness, command groups and lawful orders |
-| 21E | **OPEN** | operations and exact physical consequences |
+| 21D | **COMPLETE** | physical readiness, command groups, lawful orders and neighbor-only movement |
+| 21E | **OPEN — next** | operations and exact physical consequences |
 | 21F | **OPEN** | occupation/stabilization/control transitions |
 | 21G | **OPEN** | peace/demobilization/repair/replacement |
 | 21H | **OPEN** | persistent NPCs, missions, reputation and discovery |
@@ -416,22 +421,27 @@ minimum commitment, one-shot material-change re-evaluation, read-only explainabi
 checkpoint continuation. It deliberately does not create diplomatic legal state, fleet orders,
 physical operations or territory changes.
 
-Stage 21C now accepts the political/legal layer: accepted Stage-21B goals and actor-known diplomatic
+Stage 21C accepts the political/legal layer: accepted Stage-21B goals and actor-known diplomatic
 memory become bounded proposals/counter-offers, crises, guarantees and causal legal wars. Executable
 treaty/access/tariff/territory effects stay in Stage 17; actor-perspective conflict records stay in
 Stage 19; Stage-21C persistence composes those authorities and proves exact mid-lifecycle
 continuation. Random/tie-break input cannot create war.
 
-The next 21D implementation must consume real `FleetId` entities and Stage-21C political state rather
-than inventing strategic force points or teleporting fleets:
+Stage 21D accepts the finite force-command layer over real ordinary fleet state:
 
-1. reconstruct a read-only force registry from ordinary placements/fitted ships;
-2. derive readiness from real damage, stores, propellant, crew, maintenance and access;
-3. persist command-group identity without replacing member FleetIds;
-4. validate all strategic orders through shared player/AI boundaries;
-5. route only through known neighbor topology and legal access;
-6. prove staging/service infeasibility, duplicate-assignment rejection and exact save/load;
-7. stop before Stage 21E physical operation resolution until 21D exit criteria are accepted.
+1. `FleetForceRegistry` reconstructs read-only force state from existing placements and fitted payloads;
+2. readiness derives from damage, ammunition, propellant, crew, sensors, maintenance and supply access;
+3. persistent command groups retain member `FleetId` identities rather than replacing them;
+4. all fifteen strategic order families share the same PLAYER/AI validation boundary;
+5. routing is deterministic, neighbor-only and constrained by existing legal access;
+6. reserve, home-defense, risk, service and duplicate-assignment constraints fail closed;
+7. movement delegates only to the existing jump FSM, including idempotent same-hop retry and recoverable staggered group progress;
+8. Stage-21D persistence composes Stage-21C while the Stage-20.5 checkpoint remains exact local/transit authority.
+
+Stage 21E is now the first remaining implementation slice. It must consume the accepted Stage-21D
+finite force identities, readiness and lawful routes, acquire actor-bounded contact, create persistent
+operation identity and materialize/return physical warfare consequences through Stage 19. It must not
+replace Stage-21D orders with abstract combat points or remote percentage debuffs.
 
 ## 10. Suggested state ownership
 
@@ -497,9 +507,9 @@ Each item should remain separately reviewable and leave `main` green:
 4. **COMPLETE:** 21B goal state/feasibility/arbitration;
 5. **COMPLETE:** 21C proposals/treaties/counter-offers and crisis state;
 6. **COMPLETE:** 21C war/peace legal lifecycle and persistence acceptance;
-7. **NEXT:** 21D readiness/command groups;
-8. 21D orders/routing/service validation;
-9. 21E operation lifecycle and contact/materialization seam;
+7. **COMPLETE:** 21D readiness/command groups;
+8. **COMPLETE:** 21D orders/routing/service validation/persistence;
+9. **NEXT:** 21E operation lifecycle and contact/materialization seam;
 10. 21E physical consequence return/persistence;
 11. 21F occupation/stabilization/control;
 12. 21G peace/demobilization/replacement;
