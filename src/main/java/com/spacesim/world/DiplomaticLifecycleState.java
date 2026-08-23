@@ -40,7 +40,20 @@ public record DiplomaticLifecycleState(
     /** Current Stage-21C lifecycle schema. */
     public static final int CURRENT_VERSION = 1;
 
-    /** Validates and canonicalizes the complete diplomatic lifecycle aggregate. */
+    /**
+     * Validates and canonicalizes the complete diplomatic lifecycle aggregate.
+     *
+     * @param schemaVersion Stage-21C lifecycle schema
+     * @param simulationTick latest authoritative tick represented by this sidecar
+     * @param nextProposalSequence next monotonically increasing proposal sequence
+     * @param nextCrisisSequence next monotonically increasing crisis sequence
+     * @param nextWarSequence next monotonically increasing legal-war sequence
+     * @param relationMemories actor-bounded directed relationship memories
+     * @param proposals persistent negotiation proposals
+     * @param crises persistent diplomatic crises
+     * @param wars persistent legal war/ceasefire/peace identities
+     * @param obligationDecisions persistent treaty-obligation decisions
+     */
     public DiplomaticLifecycleState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported Stage-21C diplomacy schema: " + schemaVersion);
@@ -194,7 +207,15 @@ public record DiplomaticLifecycleState(
             int impact,
             long observedTick,
             String subjectId) implements Comparable<RelationEvent> {
-        /** Validates one remembered diplomatic event. */
+        /**
+         * Validates one remembered diplomatic event.
+         *
+         * @param eventId stable evidence identity
+         * @param factor source family
+         * @param impact signed relation contribution in [-100,100]
+         * @param observedTick tick when the actor learned the event
+         * @param subjectId stable actor-known subject/provenance identity
+         */
         public RelationEvent {
             eventId = requireText(eventId, "Relation event ID");
             Objects.requireNonNull(factor, "Relation factor not set");
@@ -221,7 +242,13 @@ public record DiplomaticLifecycleState(
             String ownerFactionId,
             String targetFactionId,
             List<RelationEvent> events) implements Comparable<RelationMemory> {
-        /** Validates directed actor-bounded memory. */
+        /**
+         * Validates directed actor-bounded memory.
+         *
+         * @param ownerFactionId actor whose memory this is
+         * @param targetFactionId remembered counterparty
+         * @param events canonical remembered evidence
+         */
         public RelationMemory {
             ownerFactionId = requireText(ownerFactionId, "Relation-memory owner");
             targetFactionId = requireText(targetFactionId, "Relation-memory target");
@@ -256,7 +283,13 @@ public record DiplomaticLifecycleState(
      * @param amountMilliCredits real treasury amount for TREASURY_PAYMENT, otherwise zero
      */
     public record Term(TermKind kind, String subjectId, long amountMilliCredits) implements Comparable<Term> {
-        /** Validates one immutable negotiation term. */
+        /**
+         * Validates one immutable negotiation term.
+         *
+         * @param kind semantic term family
+         * @param subjectId stable target identity; use a StarSystem numeric value for system-scoped terms
+         * @param amountMilliCredits real treasury amount for TREASURY_PAYMENT, otherwise zero
+         */
         public Term {
             Objects.requireNonNull(kind, "Negotiation term kind not set");
             subjectId = requireText(subjectId, "Negotiation term subject");
@@ -311,7 +344,24 @@ public record DiplomaticLifecycleState(
             ProposalStatus status,
             String linkedCrisisId,
             String linkedTreatyId) implements Comparable<Proposal> {
-        /** Validates one persistent proposal. */
+        /**
+         * Validates one persistent proposal.
+         *
+         * @param proposalId stable proposal identity
+         * @param sourceGoalId Stage-21B goal identity that caused it, or a stable external command identity
+         * @param proposerFactionId proposing faction
+         * @param recipientFactionId receiving faction
+         * @param kind proposal family
+         * @param issueId stable issue/subject identity
+         * @param demands terms requested from the recipient
+         * @param concessions terms offered by the proposer
+         * @param createdTick creation tick
+         * @param deadlineTick final response tick
+         * @param updatedTick latest lifecycle update tick
+         * @param status current proposal status
+         * @param linkedCrisisId causal crisis identity or empty
+         * @param linkedTreatyId Stage-17 treaty identity or empty
+         */
         public Proposal {
             proposalId = requireText(proposalId, "Proposal ID");
             sourceGoalId = requireText(sourceGoalId, "Proposal source goal ID");
@@ -332,7 +382,12 @@ public record DiplomaticLifecycleState(
             linkedTreatyId = optionalText(linkedTreatyId);
         }
 
-        /** @return true while the proposal may still receive a response at {@code worldTick} */
+        /**
+         * Checks whether the proposal may still receive a response.
+         *
+         * @param worldTick authoritative world tick to evaluate
+         * @return true while the proposal may still receive a response at {@code worldTick}
+         */
         public boolean openAt(long worldTick) {
             return status == ProposalStatus.OPEN && worldTick >= createdTick && worldTick < deadlineTick;
         }
@@ -372,7 +427,22 @@ public record DiplomaticLifecycleState(
             String decisionEvidenceId,
             long createdTick,
             long updatedTick) implements Comparable<Crisis> {
-        /** Validates one persistent crisis. */
+        /**
+         * Validates one persistent crisis.
+         *
+         * @param crisisId stable crisis identity
+         * @param initiatorFactionId initiating faction
+         * @param targetFactionId target faction
+         * @param issueId stable crisis issue
+         * @param demands current demands
+         * @param concessions current offered concessions
+         * @param deadlineTick current escalation/response deadline
+         * @param escalation current escalation state
+         * @param causalProposalId proposal that opened the crisis, or stable external cause identity
+         * @param decisionEvidenceId evidence/decision supporting the latest escalation
+         * @param createdTick creation tick
+         * @param updatedTick latest update tick
+         */
         public Crisis {
             crisisId = requireText(crisisId, "Crisis ID");
             initiatorFactionId = requireText(initiatorFactionId, "Crisis initiator");
@@ -391,7 +461,12 @@ public record DiplomaticLifecycleState(
             }
         }
 
-        /** @return whether the supplied faction is one of the two crisis participants */
+        /**
+         * Checks whether a faction participates in the crisis.
+         *
+         * @param factionId faction identity to test
+         * @return whether the supplied faction is one of the two crisis participants
+         */
         public boolean includes(String factionId) {
             return initiatorFactionId.equals(factionId) || targetFactionId.equals(factionId);
         }
@@ -417,7 +492,15 @@ public record DiplomaticLifecycleState(
             WarGoalKind kind,
             String subjectId,
             boolean mandatory) implements Comparable<WarGoal> {
-        /** Validates one legal war objective. */
+        /**
+         * Validates one legal war objective.
+         *
+         * @param goalId stable objective identity
+         * @param claimantFactionId faction seeking the objective
+         * @param kind political goal family
+         * @param subjectId real political subject identity
+         * @param mandatory whether a settlement must satisfy the objective for that claimant
+         */
         public WarGoal {
             goalId = requireText(goalId, "War goal ID");
             claimantFactionId = requireText(claimantFactionId, "War goal claimant");
@@ -444,7 +527,14 @@ public record DiplomaticLifecycleState(
             String evidenceId,
             long observedTick,
             String crisisId) {
-        /** Validates causal war evidence. */
+        /**
+         * Validates causal war evidence.
+         *
+         * @param kind causal category
+         * @param evidenceId stable evidence/decision identity
+         * @param observedTick tick at which the evidence existed for the declaring actor
+         * @param crisisId causal crisis ID for CRISIS_DECISION, otherwise empty
+         */
         public WarStartEvidence {
             Objects.requireNonNull(kind, "War start kind not set");
             evidenceId = requireText(evidenceId, "War start evidence ID");
@@ -486,7 +576,20 @@ public record DiplomaticLifecycleState(
             long startedTick,
             long statusChangedTick,
             long reEscalationCooldownUntilTick) implements Comparable<War> {
-        /** Validates one legal war lifecycle state. */
+        /**
+         * Validates one legal war lifecycle state.
+         *
+         * @param warId stable war identity
+         * @param factionA first participant in canonical lexical order
+         * @param factionB second participant in canonical lexical order
+         * @param goals explicit political objectives
+         * @param startEvidence persisted legal cause
+         * @param stage19ConflictIds exact Stage-19 actor-perspective conflict identities
+         * @param status legal lifecycle status
+         * @param startedTick war creation tick
+         * @param statusChangedTick latest ceasefire/peace transition tick
+         * @param reEscalationCooldownUntilTick earliest legal re-escalation tick after ceasefire/peace
+         */
         public War {
             warId = requireText(warId, "War ID");
             factionA = requireText(factionA, "War faction A");
@@ -528,12 +631,23 @@ public record DiplomaticLifecycleState(
             }
         }
 
-        /** @return whether the supplied faction is a participant */
+        /**
+         * Checks whether a faction participates in the war.
+         *
+         * @param factionId faction identity to test
+         * @return whether the supplied faction is a participant
+         */
         public boolean includes(String factionId) {
             return factionA.equals(factionId) || factionB.equals(factionId);
         }
 
-        /** @return whether this war is between exactly the supplied pair */
+        /**
+         * Checks whether this war contains exactly a supplied participant pair.
+         *
+         * @param first first faction identity
+         * @param second second faction identity
+         * @return whether this war is between exactly the supplied pair
+         */
         public boolean matchesPair(String first, String second) {
             return includes(first) && includes(second) && !Objects.equals(first, second);
         }
@@ -565,7 +679,18 @@ public record DiplomaticLifecycleState(
             ObligationOutcome outcome,
             int reputationImpact,
             long decisionTick) implements Comparable<ObligationDecision> {
-        /** Validates one persisted obligation decision. */
+        /**
+         * Validates one persisted obligation decision.
+         *
+         * @param decisionId stable decision identity
+         * @param treatyId Stage-17 treaty identity
+         * @param obligatedFactionId faction expected to act
+         * @param beneficiaryFactionId protected/beneficiary faction
+         * @param threatEvidenceId actor-known evidence that triggered the obligation
+         * @param outcome chosen honor/refusal outcome
+         * @param reputationImpact signed remembered reputation contribution
+         * @param decisionTick authoritative decision tick
+         */
         public ObligationDecision {
             decisionId = requireText(decisionId, "Obligation decision ID");
             treatyId = requireText(treatyId, "Obligation treaty ID");
