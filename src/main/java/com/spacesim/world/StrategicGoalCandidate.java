@@ -34,7 +34,20 @@ public record StrategicGoalCandidate(
         long reviewCadenceTicks,
         StrategicGoalOutcomeSignal outcomeSignal) implements Comparable<StrategicGoalCandidate> {
 
-    /** Validates one candidate without deriving hidden-world information. */
+    /**
+     * Validates one candidate without deriving hidden-world information.
+     *
+     * @param type peaceful strategic goal family
+     * @param targetId stable goal target identity
+     * @param sourceEvidence actor-bounded evidence supporting the candidate
+     * @param urgencyBasisPoints urgency in {@code [0,10000]}
+     * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+     * @param requestedBudget multidimensional normalized planning request
+     * @param blockers current actor-known non-capacity blockers
+     * @param expiresAtTick terminal expiry tick, or {@code -1} for no automatic expiry
+     * @param reviewCadenceTicks positive interval between strategic re-reviews
+     * @param outcomeSignal read-only terminal outcome reported by an execution authority
+     */
     public StrategicGoalCandidate {
         Objects.requireNonNull(type, "Strategic goal type not set");
         targetId = requireText(targetId, "Strategic goal target ID");
