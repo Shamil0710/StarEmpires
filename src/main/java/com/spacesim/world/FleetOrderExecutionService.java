@@ -32,8 +32,13 @@ public final class FleetOrderExecutionService {
     /**
      * Projects the next ordinary operations required by an active strategic order.
      *
-     * <p>Movement operations are neighbor-only. Service operations are requests only and must be
-     * fulfilled by the pre-existing Stage-18 service authority.</p>
+     * <p>Movement operations are neighbor-only. Members already physically executing the exact
+     * persisted hop, or already present at its destination, produce no duplicate operation. This
+     * keeps a multi-fleet command recoverable when the ordinary jump authority accepts some members
+     * before another member becomes temporarily infeasible.</p>
+     *
+     * <p>Service operations are requests only and must be fulfilled by the pre-existing Stage-18
+     * service authority.</p>
      *
      * @param commandState persistent Stage-21D command state
      * @param forces current read-only reconstruction of ordinary fleets
@@ -61,10 +66,20 @@ public final class FleetOrderExecutionService {
             for (FleetId fleetId : group.memberFleetIds()) {
                 FleetForceRegistry.Entry force = forces.find(fleetId)
                         .orElseThrow(() -> new IllegalStateException("missing FleetId: " + fleetId));
-                if (force.locationKind() != FleetLocationKind.IN_SYSTEM || !current.equals(force.systemId())) {
-                    throw new IllegalStateException("fleet is not staged at persisted route cursor: " + fleetId);
+                if (force.locationKind() == FleetLocationKind.IN_SYSTEM && current.equals(force.systemId())) {
+                    operations.add(new MovementOperation(fleetId, current, next));
+                    continue;
                 }
-                operations.add(new MovementOperation(fleetId, current, next));
+                if (force.locationKind() == FleetLocationKind.IN_SYSTEM && next.equals(force.systemId())) {
+                    continue;
+                }
+                if (force.locationKind() == FleetLocationKind.IN_TRANSIT
+                        && current.equals(force.transitOriginSystemId())
+                        && next.equals(force.transitDestinationSystemId())) {
+                    continue;
+                }
+                throw new IllegalStateException(
+                        "fleet is outside persisted route hop " + current + " -> " + next + ": " + fleetId);
             }
             return List.copyOf(operations);
         }
@@ -79,12 +94,17 @@ public final class FleetOrderExecutionService {
     /**
      * Applies only movement operations through the existing jump finite-state machine.
      *
+     * <p>An already-active jump is accepted only when it is the same persisted route hop; in that
+     * case no duplicate request is created. A different active jump fails closed. This makes retry
+     * after a partially accepted multi-fleet dispatch deterministic without rolling back physical
+     * movement that the authoritative jump system has already accepted.</p>
+     *
      * @param world authoritative world simulation that owns physical fleet jumps
      * @param commandState persistent strategic command state
      * @param forces current reconstruction of ordinary fleet placement and readiness
      * @param orderId active strategic order to dispatch
      * @return updated command state with the order marked active after successful jump requests
-     * @throws IllegalStateException when a service operation is routed here or a member already has an active jump
+     * @throws IllegalStateException when a service operation is routed here or an active jump targets another hop
      */
     public FleetCommandState dispatchMovementHop(
             WorldSimulation world,
@@ -94,16 +114,24 @@ public final class FleetOrderExecutionService {
         Objects.requireNonNull(world, "world");
         List<Operation> operations = planNextOperations(commandState, forces, orderId);
         if (operations.isEmpty()) return commandState;
+        ArrayList<MovementOperation> pending = new ArrayList<>();
         for (Operation operation : operations) {
             if (!(operation instanceof MovementOperation movement)) {
                 throw new IllegalStateException("service operation must be executed by Stage-18 service authority");
             }
-            if (world.findFleetJump(movement.fleetId()).isPresent()) {
-                throw new IllegalStateException("fleet already has an active jump: " + movement.fleetId());
+            var activeJump = world.findFleetJump(movement.fleetId());
+            if (activeJump.isEmpty()) {
+                pending.add(movement);
+                continue;
+            }
+            FleetJumpState jump = activeJump.orElseThrow();
+            if (!movement.originSystemId().equals(jump.originSystemId())
+                    || !movement.destinationSystemId().equals(jump.destinationSystemId())) {
+                throw new IllegalStateException(
+                        "fleet already has a different active jump: " + movement.fleetId());
             }
         }
-        for (Operation operation : operations) {
-            MovementOperation movement = (MovementOperation) operation;
+        for (MovementOperation movement : pending) {
             world.requestFleetJump(movement.fleetId(), movement.destinationSystemId(), 0f, 0f);
         }
         FleetOrderState order = commandState.requireOrder(orderId);
