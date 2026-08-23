@@ -25,6 +25,16 @@ public final class Stage21DGeneratedWorldRuntimePersistenceCodec {
 
     private Stage21DGeneratedWorldRuntimePersistenceCodec() { throw new AssertionError("No instances"); }
 
+    /**
+     * Encodes one atomic Stage-21D generated-world checkpoint.
+     *
+     * <p>The Stage-21C runtime is embedded through its existing codec unchanged, while the Stage-21D
+     * command payload is encoded separately through {@link FleetCommandStateCodec}.</p>
+     *
+     * @param state validated Stage-21D persistent runtime wrapper
+     * @return deterministic bounded checkpoint bytes
+     * @throws IllegalArgumentException when an embedded or aggregate payload exceeds configured bounds
+     */
     public static byte[] encode(Stage21DGeneratedWorldRuntimePersistentState state) {
         Stage21DGeneratedWorldRuntimePersistentState checked = Objects.requireNonNull(state, "state");
         byte[] stage21C = Stage21CGeneratedWorldRuntimePersistenceCodec.encode(checked.stage21CRuntime());
@@ -51,6 +61,13 @@ public final class Stage21DGeneratedWorldRuntimePersistenceCodec {
         }
     }
 
+    /**
+     * Decodes and validates an atomic Stage-21D generated-world checkpoint.
+     *
+     * @param bytes encoded checkpoint bytes
+     * @return validated Stage-21D persistent runtime wrapper
+     * @throws IllegalArgumentException when magic, version, bounds, embedded state or trailing bytes are invalid
+     */
     public static Stage21DGeneratedWorldRuntimePersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
         if (bytes.length <= 0 || bytes.length > MAX_BYTES) {
@@ -80,6 +97,13 @@ public final class Stage21DGeneratedWorldRuntimePersistenceCodec {
         }
     }
 
+    /**
+     * Atomically writes a Stage-21D checkpoint when the filesystem supports atomic replacement.
+     *
+     * @param path destination checkpoint path
+     * @param state validated Stage-21D persistent runtime wrapper
+     * @throws IOException when temporary-file creation, writing or replacement fails
+     */
     public static void write(Path path, Stage21DGeneratedWorldRuntimePersistentState state) throws IOException {
         Path target = Objects.requireNonNull(path, "path").toAbsolutePath();
         byte[] bytes = encode(state);
@@ -100,6 +124,14 @@ public final class Stage21DGeneratedWorldRuntimePersistenceCodec {
         }
     }
 
+    /**
+     * Reads and validates a bounded Stage-21D checkpoint file.
+     *
+     * @param path source checkpoint path
+     * @return decoded validated Stage-21D persistent runtime wrapper
+     * @throws IOException when the file cannot be inspected or read
+     * @throws IllegalArgumentException when the file or decoded payload is outside accepted bounds
+     */
     public static Stage21DGeneratedWorldRuntimePersistentState read(Path path) throws IOException {
         Path source = Objects.requireNonNull(path, "path").toAbsolutePath();
         long size = Files.size(source);
