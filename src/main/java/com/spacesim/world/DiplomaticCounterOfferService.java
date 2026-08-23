@@ -12,10 +12,11 @@ import java.util.Optional;
 /**
  * Stage-21C bounded counter-offer transition composed entirely from the diplomatic lifecycle API.
  *
- * <p>A counter-offer explicitly rejects the currently open proposal, which also closes any linked
- * Stage-17 treaty offer through {@link DiplomaticLifecycleService#reject(String)}, then creates one
- * reversed open proposal. Counter lineage is persisted in the existing source identity as
- * {@code counter-proposal:<proposalId>} so no parallel negotiation authority is introduced.</p>
+ * <p>A counter-offer first validates and creates one reversed bounded proposal, then explicitly
+ * rejects the previously open proposal, which also closes any linked Stage-17 treaty offer through
+ * {@link DiplomaticLifecycleService#reject(String)}. Counter lineage is persisted in the existing
+ * source identity as {@code counter-proposal:<proposalId>} so no parallel negotiation authority is
+ * introduced.</p>
  */
 public final class DiplomaticCounterOfferService {
     private static final String COUNTER_PREFIX = "counter-proposal:";
@@ -26,6 +27,9 @@ public final class DiplomaticCounterOfferService {
 
     /**
      * Replaces one open proposal with a bounded reversed counter-offer.
+     *
+     * <p>Counter validation happens before the original proposal is rejected, so an infeasible
+     * treasury/territorial concession cannot destroy the still-valid original offer.</p>
      *
      * @param lifecycle authoritative Stage-21C lifecycle service
      * @param proposalId exact currently open proposal identity
@@ -49,8 +53,7 @@ public final class DiplomaticCounterOfferService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown proposal: " + id));
 
-        service.reject(id);
-        return service.propose(new ProposalRequest(
+        Proposal counter = service.propose(new ProposalRequest(
                 COUNTER_PREFIX + current.proposalId(),
                 current.recipientFactionId(),
                 current.proposerFactionId(),
@@ -59,6 +62,8 @@ public final class DiplomaticCounterOfferService {
                 List.copyOf(Objects.requireNonNull(demands, "Counter demands not set")),
                 List.copyOf(Objects.requireNonNull(concessions, "Counter concessions not set")),
                 deadlineTick));
+        service.reject(id);
+        return counter;
     }
 
     /**
