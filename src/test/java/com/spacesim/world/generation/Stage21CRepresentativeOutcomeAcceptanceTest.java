@@ -1,6 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.spacesim.persistence.Stage19ConflictState;
+import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
 import com.spacesim.warfare.Stage19ConflictRuntime;
 import com.spacesim.world.DiplomaticLifecycleService;
 import com.spacesim.world.DiplomaticLifecycleService.DiplomaticSituation;
@@ -20,6 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class Stage21CRepresentativeOutcomeAcceptanceTest {
+    private static final List<Long> PRODUCTION_WORLD_SEEDS = List.of(
+            Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED,
+            Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED + 1L);
+
     private enum RepresentativeHistory {
         TRADE(StrategicOutcome.TRADE),
         DETERRENCE(StrategicOutcome.DETERRENCE),
@@ -34,34 +39,39 @@ class Stage21CRepresentativeOutcomeAcceptanceTest {
     }
 
     @Test
-    void fixedGeneratedSeedCorpusExercisesDifferentPersistedPoliticalHistories() {
+    void fixedProductionWorldCorpusExercisesDifferentPersistedPoliticalHistories() {
         EnumSet<StrategicOutcome> outcomes = EnumSet.noneOf(StrategicOutcome.class);
-        List<Long> seeds = Stage20RepresentativeSeedCorpus.seeds();
-        RepresentativeHistory[] histories = RepresentativeHistory.values();
+        assertEquals(2, PRODUCTION_WORLD_SEEDS.stream().distinct().count());
 
-        for (int index = 0; index < seeds.size(); index++) {
-            long seed = seeds.get(index);
-            RepresentativeHistory history = histories[index % histories.length];
+        for (long seed : PRODUCTION_WORLD_SEEDS) {
             var generated = Stage20PlayableGeneratedWorldFactory.create(seed).runtime();
-            var saved = generated.captureState();
-            String first = saved.worldState().factions().get(0).factionContentId();
-            String second = saved.worldState().factions().get(1).factionContentId();
-            long now = generated.world().getAuthoritativeWorldTick();
-            DiplomaticLifecycleService lifecycle = new DiplomaticLifecycleService(
-                    generated.world(),
-                    new Stage19ConflictRuntime(Stage19ConflictState.empty(now)),
-                    DiplomaticLifecycleState.empty(now));
+            var baseCheckpoint = generated.captureState();
 
-            DiplomaticSituation situation = materializeHistory(
-                    lifecycle,
-                    first,
-                    second,
-                    history,
-                    now + 120L);
-            StrategicOutcome outcome = DiplomaticLifecycleService.selectOutcome(situation, seed);
+            for (RepresentativeHistory history : RepresentativeHistory.values()) {
+                var runtime = Stage20GeneratedWorldRuntimeBridge.restore(baseCheckpoint);
+                var saved = runtime.captureState();
+                String first = saved.worldState().factions().get(0).factionContentId();
+                String second = saved.worldState().factions().get(1).factionContentId();
+                long now = runtime.world().getAuthoritativeWorldTick();
+                DiplomaticLifecycleService lifecycle = new DiplomaticLifecycleService(
+                        runtime.world(),
+                        new Stage19ConflictRuntime(Stage19ConflictState.empty(now)),
+                        DiplomaticLifecycleState.empty(now));
 
-            assertEquals(history.expectedOutcome, outcome, "unexpected political outcome for generated seed " + seed);
-            outcomes.add(outcome);
+                DiplomaticSituation situation = materializeHistory(
+                        lifecycle,
+                        first,
+                        second,
+                        history,
+                        now + 120L);
+                StrategicOutcome outcome = DiplomaticLifecycleService.selectOutcome(situation, seed);
+
+                assertEquals(
+                        history.expectedOutcome,
+                        outcome,
+                        "unexpected political outcome for generated seed " + seed + " / " + history);
+                outcomes.add(outcome);
+            }
         }
 
         assertEquals(EnumSet.allOf(StrategicOutcome.class), outcomes);
