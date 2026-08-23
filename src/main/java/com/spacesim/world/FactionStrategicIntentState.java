@@ -10,11 +10,13 @@ import java.util.Objects;
  *
  * @param factionContentId stable owning faction identity
  * @param nextGoalSequence next monotonically increasing persistent goal sequence
+ * @param lastActorReviewCount latest Stage-21A completed-review count already consumed by goal planning
  * @param goals open and terminal goal history in canonical goal-ID order
  */
 public record FactionStrategicIntentState(
         String factionContentId,
         long nextGoalSequence,
+        long lastActorReviewCount,
         List<StrategicGoalState> goals) implements Comparable<FactionStrategicIntentState> {
 
     /**
@@ -22,12 +24,16 @@ public record FactionStrategicIntentState(
      *
      * @param factionContentId stable owning faction identity
      * @param nextGoalSequence next monotonically increasing persistent goal sequence
+     * @param lastActorReviewCount latest Stage-21A completed-review count already consumed by goal planning
      * @param goals open and terminal goal history in canonical goal-ID order
      */
     public FactionStrategicIntentState {
         factionContentId = requireText(factionContentId, "Strategic intent faction ID");
         if (nextGoalSequence <= 0L) {
             throw new IllegalArgumentException("Next strategic goal sequence must be positive");
+        }
+        if (lastActorReviewCount < 0L) {
+            throw new IllegalArgumentException("Last consumed actor review count cannot be negative");
         }
         ArrayList<StrategicGoalState> sorted = new ArrayList<>(
                 Objects.requireNonNull(goals, "Strategic goals not set"));
@@ -52,13 +58,27 @@ public record FactionStrategicIntentState(
     }
 
     /**
+     * Compatibility constructor for callers that do not yet carry Stage-21A review bookkeeping.
+     *
+     * @param factionContentId stable owning faction identity
+     * @param nextGoalSequence next monotonically increasing persistent goal sequence
+     * @param goals open and terminal goal history in canonical goal-ID order
+     */
+    public FactionStrategicIntentState(
+            String factionContentId,
+            long nextGoalSequence,
+            List<StrategicGoalState> goals) {
+        this(factionContentId, nextGoalSequence, 0L, goals);
+    }
+
+    /**
      * Creates an empty persistent intent aggregate.
      *
      * @param factionContentId stable owning faction identity
      * @return initial strategic intent state with sequence one and no goals
      */
     public static FactionStrategicIntentState initial(String factionContentId) {
-        return new FactionStrategicIntentState(factionContentId, 1L, List.of());
+        return new FactionStrategicIntentState(factionContentId, 1L, 0L, List.of());
     }
 
     /**
