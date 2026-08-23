@@ -1,7 +1,7 @@
 package com.spacesim.world.generation;
 
+import com.spacesim.persistence.EntityState;
 import com.spacesim.persistence.EntityStateMapper;
-import com.spacesim.persistence.FleetTransferStateMapper;
 import com.spacesim.persistence.Stage19ConflictState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
 import com.spacesim.persistence.Stage21AGeneratedWorldRuntimeBridge;
@@ -32,6 +32,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,6 +53,7 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
                 })
                 .findFirst().orElseThrow();
         FleetPlacementState local = stage20.world().findFleet(fleetId).orElseThrow();
+        var formerLocalEntityId = local.localEntityId();
         StarSystemId origin = local.systemId();
         StarSystemId destination = stage20.world().getTopology().neighbors(origin).get(0);
 
@@ -120,6 +122,8 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
         assertEquals(fleetId, arrived.id());
         assertEquals(FleetLocationKind.IN_SYSTEM, arrived.locationKind());
         assertEquals(destination, arrived.systemId());
+        assertNotEquals(formerLocalEntityId, arrived.localEntityId(),
+                "cross-system materialization must allocate a fresh system-local entity identity");
         assertEquals(1L, restored.world().getFleetPlacements().stream()
                 .filter(value -> value.id().equals(fleetId)).count());
         assertTrue(restored.arrival().materialization(destination)
@@ -127,10 +131,7 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
                 "restored Stage-20 arrival authority must own exact destination kinematics");
         var arrivedEntity = restored.world().findSession(destination).orElseThrow()
                 .getEntityRegistry().require(arrived.localEntityId());
-        assertEquals(
-                FleetTransferStateMapper.sanitize(exactTransitPayload),
-                FleetTransferStateMapper.sanitize(EntityStateMapper.capture(arrivedEntity)),
-                "fit, damage, cargo and every supported physical payload field must survive the ordinary transit handoff");
+        assertTransferPayloadPreserved(exactTransitPayload, EntityStateMapper.capture(arrivedEntity));
     }
 
     @Test
@@ -247,6 +248,25 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
         var entity = session.getEntityRegistry().require(placement.localEntityId());
         var captured = EntityStateMapper.capture(entity);
         return captured.faction() == null ? -1 : captured.faction().factionId();
+    }
+
+    private static void assertTransferPayloadPreserved(EntityState expected, EntityState actual) {
+        assertEquals(expected.identity(), actual.identity(), "fleet identity payload must survive transit");
+        assertEquals(expected.inventory(), actual.inventory(), "cargo inventory must survive transit");
+        assertEquals(expected.wallet(), actual.wallet(), "wallet payload must survive transit");
+        assertEquals(expected.market(), actual.market(), "market payload must survive transit");
+        assertEquals(expected.production(), actual.production(), "production payload must survive transit");
+        assertEquals(expected.priceHistory(), actual.priceHistory(), "price history must survive transit");
+        assertEquals(expected.faction(), actual.faction(), "faction affiliation must survive transit");
+        assertEquals(expected.reputation(), actual.reputation(), "reputation payload must survive transit");
+        assertEquals(expected.ship(), actual.ship(), "ship classification must survive transit");
+        assertEquals(expected.tradeAi(), actual.tradeAi(), "trade AI payload must survive transit");
+        assertEquals(expected.mining(), actual.mining(), "mining payload must survive transit");
+        assertEquals(expected.combat(), actual.combat(), "combat payload must survive transit");
+        assertEquals(expected.asteroid(), actual.asteroid(), "asteroid payload must survive transit");
+        assertEquals(expected.archetype(), actual.archetype(), "fitted hull/archetype must survive transit");
+        assertEquals(expected.engineering(), actual.engineering(), "engineering fit and damage must survive transit");
+        assertEquals(expected.sensorKnowledge(), actual.sensorKnowledge(), "sensor knowledge must survive transit");
     }
 
     private static void advanceUntilPhase(
