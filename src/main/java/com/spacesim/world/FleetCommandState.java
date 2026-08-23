@@ -41,24 +41,34 @@ public record FleetCommandState(
         orders = canonicalOrders(orders);
         Set<Long> groupIds = new HashSet<>();
         Set<FleetId> assignedMembers = new HashSet<>();
+        long maxGroupId = 0L;
         for (CommandGroupState group : groups) {
             if (!groupIds.add(group.id())) throw new IllegalArgumentException("duplicate command group id: " + group.id());
+            maxGroupId = Math.max(maxGroupId, group.id());
             for (FleetId fleetId : group.memberFleetIds()) {
                 if (!assignedMembers.add(fleetId)) {
                     throw new IllegalArgumentException("FleetId assigned to multiple command groups: " + fleetId);
                 }
             }
         }
+        if (nextCommandGroupId <= maxGroupId) {
+            throw new IllegalArgumentException("nextCommandGroupId must be above every persisted command-group id");
+        }
         Set<Long> orderIds = new HashSet<>();
         Set<Long> activeGroupIds = new HashSet<>();
+        long maxOrderId = 0L;
         for (FleetOrderState order : orders) {
             if (!orderIds.add(order.id())) throw new IllegalArgumentException("duplicate fleet order id: " + order.id());
+            maxOrderId = Math.max(maxOrderId, order.id());
             if (!groupIds.contains(order.commandGroupId())) {
                 throw new IllegalArgumentException("order references unknown command group: " + order.commandGroupId());
             }
             if (order.status().active() && !activeGroupIds.add(order.commandGroupId())) {
                 throw new IllegalArgumentException("command group has multiple active orders: " + order.commandGroupId());
             }
+        }
+        if (nextOrderId <= maxOrderId) {
+            throw new IllegalArgumentException("nextOrderId must be above every persisted fleet-order id");
         }
     }
 
@@ -113,7 +123,7 @@ public record FleetCommandState(
         Objects.requireNonNull(group, "group");
         ArrayList<CommandGroupState> next = new ArrayList<>(groups);
         next.add(group);
-        return new FleetCommandState(Math.max(nextCommandGroupId, group.id() + 1L), nextOrderId, next, orders);
+        return new FleetCommandState(Math.max(nextCommandGroupId, Math.addExact(group.id(), 1L)), nextOrderId, next, orders);
     }
 
     /**
@@ -126,7 +136,7 @@ public record FleetCommandState(
         Objects.requireNonNull(order, "order");
         ArrayList<FleetOrderState> next = new ArrayList<>(orders);
         next.add(order);
-        return new FleetCommandState(nextCommandGroupId, Math.max(nextOrderId, order.id() + 1L), groups, next);
+        return new FleetCommandState(nextCommandGroupId, Math.max(nextOrderId, Math.addExact(order.id(), 1L)), groups, next);
     }
 
     /**
@@ -169,7 +179,7 @@ public record FleetCommandState(
      * combat-power score and does not replace Stage-19 physical warfare authority.</p>
      *
      * @param id positive command-group identifier
-     * @param factionId owning faction identifier
+     * @param factionId owning faction runtime identifier
      * @param name normalized display name
      * @param memberFleetIds non-empty unique ordinary fleet identities
      * @param homeSystemId doctrine-defined home system used by reserve/home-defense constraints
@@ -190,7 +200,7 @@ public record FleetCommandState(
          * Validates and canonicalizes a strategic command group.
          *
          * @param id positive command-group identifier
-         * @param factionId owning faction identifier
+         * @param factionId non-negative owning faction runtime identifier
          * @param name normalized display name
          * @param memberFleetIds non-empty unique ordinary fleet identities
          * @param homeSystemId doctrine-defined home system
@@ -200,6 +210,7 @@ public record FleetCommandState(
          */
         public CommandGroupState {
             if (id <= 0L) throw new IllegalArgumentException("command group id must be positive");
+            if (factionId < 0) throw new IllegalArgumentException("command group factionId must be non-negative");
             name = normalized(name, "command group name");
             if (name.length() > 1024) throw new IllegalArgumentException("command group name is too long");
             Objects.requireNonNull(memberFleetIds, "memberFleetIds");
