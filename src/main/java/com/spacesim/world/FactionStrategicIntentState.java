@@ -17,7 +17,13 @@ public record FactionStrategicIntentState(
         long nextGoalSequence,
         List<StrategicGoalState> goals) implements Comparable<FactionStrategicIntentState> {
 
-    /** Validates ownership, persistent IDs and canonicalizes goal order. */
+    /**
+     * Validates ownership, persistent IDs and canonicalizes goal order.
+     *
+     * @param factionContentId stable owning faction identity
+     * @param nextGoalSequence next monotonically increasing persistent goal sequence
+     * @param goals open and terminal goal history in canonical goal-ID order
+     */
     public FactionStrategicIntentState {
         factionContentId = requireText(factionContentId, "Strategic intent faction ID");
         if (nextGoalSequence <= 0L) {
