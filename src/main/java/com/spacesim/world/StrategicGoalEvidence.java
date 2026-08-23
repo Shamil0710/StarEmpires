@@ -24,7 +24,14 @@ public record StrategicGoalEvidence(
         int priorityBasisPoints,
         List<ObservationEvidence> provenance) {
 
-    /** Validates and canonicalizes one persistent evidence snapshot. */
+    /**
+     * Validates and canonicalizes one persistent evidence snapshot.
+     *
+     * @param kind Stage-21A interest family that justified the goal
+     * @param targetId stable route/system/faction/resource/obligation identity
+     * @param priorityBasisPoints strongest observed evidence magnitude in {@code [0,10000]}
+     * @param provenance canonical delivered evidence rows
+     */
     public StrategicGoalEvidence {
         Objects.requireNonNull(kind, "Strategic goal evidence kind not set");
         targetId = requireText(targetId, "Strategic goal evidence target ID");
