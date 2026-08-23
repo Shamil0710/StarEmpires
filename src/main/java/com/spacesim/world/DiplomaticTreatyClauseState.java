@@ -74,4 +74,3 @@ public record DiplomaticTreatyClauseState(
         return value.systemId == null ? 1 : systemId.compareTo(value.systemId);
     }
 }
-
