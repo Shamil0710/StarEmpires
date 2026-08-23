@@ -80,6 +80,12 @@ public record Stage21CGeneratedWorldRuntimePersistentState(
         for (RelationMemory memory : diplomacyLifecycle.relationMemories()) {
             requireKnown(knownFactions, memory.ownerFactionId(), "relation-memory owner");
             requireKnown(knownFactions, memory.targetFactionId(), "relation-memory target");
+            for (var event : memory.events()) {
+                if (event.observedTick() > diplomacyLifecycle.simulationTick()) {
+                    throw new IllegalArgumentException(
+                            "Stage-21C relation memory is newer than its checkpoint: " + event.eventId());
+                }
+            }
         }
         Map<String, Proposal> proposalsById = new HashMap<>();
         for (Proposal proposal : diplomacyLifecycle.proposals()) {
@@ -116,6 +122,10 @@ public record Stage21CGeneratedWorldRuntimePersistentState(
         for (ObligationDecision decision : diplomacyLifecycle.obligationDecisions()) {
             requireKnown(knownFactions, decision.obligatedFactionId(), "obligated faction");
             requireKnown(knownFactions, decision.beneficiaryFactionId(), "obligation beneficiary");
+            if (decision.decisionTick() > diplomacyLifecycle.simulationTick()) {
+                throw new IllegalArgumentException(
+                        "Stage-21C obligation decision is newer than its checkpoint: " + decision.decisionId());
+            }
             if (!treatiesById.containsKey(decision.treatyId())) {
                 throw new IllegalArgumentException(
                         "Stage-21C obligation references missing Stage-17 treaty: " + decision.treatyId());
