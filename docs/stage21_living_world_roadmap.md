@@ -184,16 +184,20 @@ Delivered:
 - fail-closed validation for unknown cross-layer identities, missing treaty/conflict links and future
   actor evidence;
 - mid-lifecycle continuation after save/load at proposal, counter-offer, ultimatum and ceasefire;
-- fixed generated-world root-seed corpus exercising trade, deterrence, negotiated resolution and
-  causal war without allowing the seed/tie-break input to create war.
+- production-materializable generated-world roots `DEFAULT_WORLD_SEED` and `DEFAULT_WORLD_SEED + 1`,
+  each replaying predeclared trade, deterrence, negotiated-resolution and causal-war histories;
+- frozen Stage-20 representative seeds `1..16` retained only for the bounded tie-break proof, where
+  seed input is verified incapable of creating war.
 
 Exit criteria — accepted:
 
 - war cannot begin without a persisted causal crisis/decision or an explicit actor-observed hostile attack;
 - random input may resolve bounded peaceful tie-breaking but cannot be the reason for war;
 - treaties and wars round-trip through persistence and accepted treaty clauses affect ordinary access/tariff law;
-- fixed generated-world seeds `1..16`, paired with predeclared persisted political-history fixtures,
-  exercise trade, deterrence, negotiated resolution and war rather than one universal outcome;
+- both production-materializable generated-world roots replay all four predeclared persisted political
+  histories and produce trade, deterrence, negotiated resolution and causal war as expected;
+- the frozen Stage-20 representative seeds `1..16` remain a separate tie-break-only proof and are not
+  reclassified as production-materializable worlds;
 - Stage-21B goal consumption is pure/actor-bounded and physical warfare execution remains owned by
   Stage 19 and later Stage-21 military slices.
 
