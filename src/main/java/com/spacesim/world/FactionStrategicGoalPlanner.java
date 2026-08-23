@@ -425,7 +425,15 @@ public final class FactionStrategicGoalPlanner {
             StrategicPlanningEnvelope cancellationCost,
             List<GoalProjection> projections) {
 
-        /** Validates immutable planning output accounting. */
+        /**
+         * Validates immutable planning output accounting.
+         *
+         * @param state next persistent intent state
+         * @param availableBudget supplied multidimensional planning capacity
+         * @param allocatedBudget capacity allocated to active goals
+         * @param cancellationCost visible switching costs created by this review
+         * @param projections read-only explainability rows
+         */
         public PlanningResult {
             Objects.requireNonNull(state, "Strategic planning state not set");
             Objects.requireNonNull(availableBudget, "Strategic planning capacity not set");
