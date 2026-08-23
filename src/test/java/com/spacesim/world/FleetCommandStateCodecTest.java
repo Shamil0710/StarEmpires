@@ -60,6 +60,20 @@ class FleetCommandStateCodecTest {
     }
 
     @Test
+    void staleAllocatorWatermarksAndUnaffiliatedGroupsFailClosed() {
+        CommandGroupState group = group(2L, 101L, "Group", ALPHA);
+        FleetOrderState order = order(4L, group.id(), OrderType.PATROL, ALPHA, BETA);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new FleetCommandState(2L, 5L, List.of(group), List.of(order)));
+        assertThrows(IllegalArgumentException.class,
+                () -> new FleetCommandState(3L, 4L, List.of(group), List.of(order)));
+        assertThrows(IllegalArgumentException.class,
+                () -> new CommandGroupState(1L, -1, "Unaffiliated", List.of(new FleetId(99L)), ALPHA,
+                        false, false, FleetReadinessState.FULL));
+    }
+
+    @Test
     void corruptFutureTrailingAndTruncatedPayloadsFailClosed() {
         byte[] encoded = FleetCommandStateCodec.encode(sampleState());
 
