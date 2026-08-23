@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
-> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A and Stage 21B are complete;
-> Stage 21C is the next delivery slice.
+> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A, Stage 21B and
+> Stage 21C are complete; **Stage 21D is OPEN/NEXT** and is not implemented yet.
 
 ## 1. Purpose
 
@@ -162,31 +162,44 @@ Exit criteria:
 
 Implementation and acceptance map: `docs/stage21b_strategic_intent.md`.
 
-### 21C — Diplomacy, crisis, alliance and war lifecycle
+### 21C — Diplomacy, crisis, alliance and war lifecycle — COMPLETE
 
 Objective: let factions negotiate or escalate through the existing political authority.
 
-Deliverables:
+Delivered:
 
-- relation changes derived from remembered actions, treaty performance, territorial conflict,
+- directed relation memory derived from remembered actions, treaty performance, territorial conflict,
   trade dependence, threat and diplomatic commitments;
-- proposals for access, trade, recognition, construction rights, non-aggression, defensive
+- proposal identities for access, trade, recognition, construction rights, non-aggression, defensive
   cooperation, alliance, embargo, ultimatum, ceasefire and peace;
+- bounded counter-offers with explicit causal lineage and feasibility validation before replacement;
 - persistent crisis state with participants, issue, demands, concessions, deadlines and escalation;
-- explicit war identity, participants, legal state, war goals and start evidence;
-- alliance/treaty obligation evaluation with an allowed refusal and reputational consequence;
-- bounded negotiation offers using real treasury, access and territorial concessions;
-- war/peace anti-oscillation and minimum re-escalation cooldowns.
+- explicit legal war identity, participants, war goals, start evidence and Stage-19 conflict links;
+- alliance/treaty obligation evaluation with allowed refusal and real treaty/reputation consequence;
+- bounded negotiation offers checked against real spendable treasury and territorial authority;
+- accepted trade delegated to Stage-17 treaty/access/tariff law;
+- response deadlines separated from accepted treaty lifetime, with stale offers closed on expiry;
+- war/peace anti-oscillation and minimum re-escalation cooldowns;
+- complete Stage-21C generated-world checkpoint composition over unchanged Stage-21B + Stage-19 state;
+- fail-closed validation for unknown cross-layer identities, missing treaty/conflict links and future
+  actor evidence;
+- mid-lifecycle continuation after save/load at proposal, counter-offer, ultimatum and ceasefire;
+- fixed generated-world root-seed corpus exercising trade, deterrence, negotiated resolution and
+  causal war without allowing the seed/tie-break input to create war.
 
-Exit criteria:
+Exit criteria — accepted:
 
-- war cannot begin without a persisted causal crisis/decision or an observed hostile attack;
-- random input may resolve bounded tie-breaking but cannot be the reason for war;
-- treaties and wars round-trip through persistence and affect ordinary access/tariff law;
-- representative seeds exhibit trade, deterrence, negotiated resolution and war rather than one
-  universal outcome.
+- war cannot begin without a persisted causal crisis/decision or an explicit actor-observed hostile attack;
+- random input may resolve bounded peaceful tie-breaking but cannot be the reason for war;
+- treaties and wars round-trip through persistence and accepted treaty clauses affect ordinary access/tariff law;
+- fixed generated-world seeds `1..16`, paired with predeclared persisted political-history fixtures,
+  exercise trade, deterrence, negotiated resolution and war rather than one universal outcome;
+- Stage-21B goal consumption is pure/actor-bounded and physical warfare execution remains owned by
+  Stage 19 and later Stage-21 military slices.
 
-### 21D — Fleet readiness, command groups and strategic movement
+Implementation and acceptance map: `docs/stage21c_diplomacy_crisis_lifecycle.md`.
+
+### 21D — Fleet readiness, command groups and strategic movement — OPEN/NEXT
 
 Objective: turn owned physical ships into finite forces that can receive lawful strategic orders.
 
@@ -381,8 +394,8 @@ supports multiple plausible histories without hidden exceptions.
 | 21.0 | **COMPLETE** | generated runtime/UI/fleets/navigation/save/launcher |
 | 21A | **COMPLETE** | persistent actor cadence, bounded observations and interest evidence |
 | 21B | **COMPLETE** | persistent strategic goals, feasibility, commitment and explainability |
-| 21C | **OPEN — next** | proposal/crisis/treaty/war lifecycle |
-| 21D | **OPEN** | physical readiness, command groups and lawful orders |
+| 21C | **COMPLETE** | proposal/counter-offer/crisis/treaty/war legal lifecycle |
+| 21D | **OPEN — next** | physical readiness, command groups and lawful orders |
 | 21E | **OPEN** | operations and exact physical consequences |
 | 21F | **OPEN** | occupation/stabilization/control transitions |
 | 21G | **OPEN** | peace/demobilization/repair/replacement |
@@ -393,22 +406,28 @@ Stage 21A accepted the deliberately narrow actor foundation: stable faction-boun
 immutable actor-bounded observations, measurable interests, deterministic traces, ordered wakeups,
 bounded top-K scheduling and exact checkpoint continuation.
 
-Stage 21B now accepts the next causal layer: stable evidence-bound strategic goals, explicit scoring
-inputs and cost ceilings, multidimensional feasibility/budget arbitration, persistent lifecycle and
-cancellation consequences, minimum commitment, one-shot material-change re-evaluation, read-only
-explainability and exact v5 checkpoint continuation. It deliberately does not create diplomatic legal
-state, fleet orders, physical operations or territory changes.
+Stage 21B accepts stable evidence-bound strategic goals, explicit scoring inputs and cost ceilings,
+multidimensional feasibility/budget arbitration, persistent lifecycle and cancellation consequences,
+minimum commitment, one-shot material-change re-evaluation, read-only explainability and exact v5
+checkpoint continuation. It deliberately does not create diplomatic legal state, fleet orders,
+physical operations or territory changes.
 
-The next 21C implementation must consume accepted persistent goals rather than recomputing hidden
-world state or applying relation rolls directly:
+Stage 21C now accepts the political/legal layer: accepted Stage-21B goals and actor-known diplomatic
+memory become bounded proposals/counter-offers, crises, guarantees and causal legal wars. Executable
+treaty/access/tariff/territory effects stay in Stage 17; actor-perspective conflict records stay in
+Stage 19; Stage-21C persistence composes those authorities and proves exact mid-lifecycle
+continuation. Random/tie-break input cannot create war.
 
-1. introduce persistent proposal and crisis identity;
-2. derive offers/demands from accepted goals and actor-bounded diplomatic evidence;
-3. delegate treaty/access/treasury effects to existing Stage-17 authorities;
-4. persist deadlines, concessions, refusals and escalation evidence;
-5. add explicit causal war identity only after a valid crisis/decision or observed hostile action;
-6. preserve war/peace hysteresis and re-escalation cooldowns;
-7. prove save/load and peaceful/coercive outcome diversity before 21D consumes political state.
+The next 21D implementation must consume real `FleetId` entities and Stage-21C political state rather
+than inventing strategic force points or teleporting fleets:
+
+1. reconstruct a read-only force registry from ordinary placements/fitted ships;
+2. derive readiness from real damage, stores, propellant, crew, maintenance and access;
+3. persist command-group identity without replacing member FleetIds;
+4. validate all strategic orders through shared player/AI boundaries;
+5. route only through known neighbor topology and legal access;
+6. prove staging/service infeasibility, duplicate-assignment rejection and exact save/load;
+7. stop before Stage 21E physical operation resolution until 21D exit criteria are accepted.
 
 ## 10. Suggested state ownership
 
@@ -472,9 +491,9 @@ Each item should remain separately reviewable and leave `main` green:
 2. **COMPLETE:** 21A observation/evidence/interest derivation;
 3. **COMPLETE:** 21A scheduling/diagnostics/generated-runtime composition;
 4. **COMPLETE:** 21B goal state/feasibility/arbitration;
-5. **NEXT:** 21C proposals/treaties and crisis state;
-6. 21C war/peace legal lifecycle;
-7. 21D readiness/command groups;
+5. **COMPLETE:** 21C proposals/treaties/counter-offers and crisis state;
+6. **COMPLETE:** 21C war/peace legal lifecycle and persistence acceptance;
+7. **NEXT:** 21D readiness/command groups;
 8. 21D orders/routing/service validation;
 9. 21E operation lifecycle and contact/materialization seam;
 10. 21E physical consequence return/persistence;
