@@ -23,7 +23,14 @@ public record StrategicPlanningEnvelope(
     /** Zero capacity/request. */
     public static final StrategicPlanningEnvelope ZERO = new StrategicPlanningEnvelope(0L, 0L, 0L, 0L);
 
-    /** Validates non-negative planning dimensions. */
+    /**
+     * Validates non-negative planning dimensions.
+     *
+     * @param treasuryUnits normalized treasury capacity
+     * @param logisticsUnits normalized logistics capacity
+     * @param constructionUnits normalized construction capacity
+     * @param readinessUnits normalized fleet/readiness capacity
+     */
     public StrategicPlanningEnvelope {
         requireNonNegative(treasuryUnits, "Treasury planning units");
         requireNonNegative(logisticsUnits, "Logistics planning units");
