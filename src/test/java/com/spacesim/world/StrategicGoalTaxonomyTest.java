@@ -54,7 +54,7 @@ class StrategicGoalTaxonomyTest {
                 "border:alpha",
                 8_000,
                 List.of(new ObservationEvidence(
-                        ObservationChannel.SECURITY,
+                        ObservationChannel.LOCAL_SENSOR_REPORT,
                         "report:alpha",
                         10L,
                         20L)));
