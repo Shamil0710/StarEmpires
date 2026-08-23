@@ -1,6 +1,6 @@
 # Stage 21C — Diplomacy, crisis, alliance and war lifecycle
 
-**Status:** implemented in `stage21c-diplomacy-crisis-lifecycle`; merge remains gated by repository CI and final acceptance review.
+**Status:** **COMPLETE** for the Stage-21C implementation and acceptance contract. Repository merge remains subject to the exact-head CI/review gate; Stage 21D is OPEN/NEXT and is intentionally not implemented here.
 
 ## Scope
 
@@ -33,7 +33,7 @@ Only an `ACTIVE` persisted goal may issue an autonomous diplomatic request. Non-
 - threat;
 - diplomatic commitments.
 
-Future-dated evidence is rejected. Derived relation is a clamped projection over persisted actor-known events, not a hidden global relation roll.
+Future-dated evidence is rejected at mutation time and again by the complete generated-checkpoint composition. Derived relation is a clamped projection over persisted actor-known events, not a hidden global relation roll.
 
 ## Proposal and counter-offer contract
 
@@ -109,6 +109,8 @@ Admissible start evidence is only:
 1. a persisted crisis already in `WAR_AUTHORIZED`, with matching participants and decision evidence; or
 2. an explicitly actor-observed hostile attack with a valid observation tick.
 
+The direct hostile-attack path accepts explicit actor-observed evidence identity and observation tick from the caller rather than inventing a second Stage-21A intelligence schema. Stage 21A remains the owner of bounded observation/report channels.
+
 War cannot predate its evidence. An existing active war blocks duplicate declaration. Ceasefire and peace impose a minimum re-escalation cooldown of `600` ticks, and peace is terminal for that legal war identity.
 
 ## Alliance and treaty obligations
@@ -123,6 +125,8 @@ No free fleet, combat participation or hidden enforcement is created by the obli
 
 Random/deterministic tie-break input is consulted only when two peaceful alternatives have exactly equal scores. It can choose between trade and deterrence, but cannot produce `WAR`. War requires the explicit crisis/hostile-attack predicates above.
 
+The fixed Stage-20 representative root seeds `1..16` are now exercised through actual generated-world runtimes. Each seed is paired with a predeclared persisted political-history fixture (trade, deterrence, negotiated resolution or causal war); the root seed is used only as the bounded tie-break input and is never itself the war cause. This keeps the diversity proof non-vacuous without introducing seed-specific production exceptions.
+
 ## Persistence
 
 `DiplomaticLifecycleStateCodec` deterministically persists relation memory, proposals, crises, wars, goals and obligation decisions. It rejects corrupt magic, truncation, trailing bytes, unsupported stale/future file versions and unsupported future lifecycle schemas.
@@ -132,6 +136,7 @@ Random/deterministic tie-break input is consulted only when two peaceful alterna
 Restore validation fails closed when cross-layer references are invalid, including:
 
 - unknown faction identities;
+- future-dated actor relation evidence or obligation decisions relative to the checkpoint tick;
 - proposal links to missing Stage-17 treaties;
 - inconsistent proposal/crisis linkage;
 - obligation decisions referencing missing treaties;
@@ -156,8 +161,9 @@ Mid-lifecycle acceptance restores and continues exactly one transition from prop
 | War needs persisted crisis decision before declaration | `warRequiresPersistedCauseCreatesStage19ConflictsAndCannotOscillateAfterPeace` |
 | Observed hostile attack is an explicit alternate cause without fabricated crisis | `observedHostileAttackCanCreateLegalWarWithoutFabricatingACrisis` |
 | Random input cannot select war | `Stage21CRepresentativeOutcomeAcceptanceTest` plus planner tests |
-| Representative outcomes include trade, deterrence, negotiated resolution and war | `Stage21CRepresentativeOutcomeAcceptanceTest` |
+| Fixed generated-world corpus covers trade, deterrence, negotiated resolution and causal war | `Stage21CRepresentativeOutcomeAcceptanceTest.fixedGeneratedSeedCorpusExercisesDifferentPersistedPoliticalHistories` |
 | Deterministic codec round-trip and corrupt/stale/future rejection | `DiplomaticLifecycleStateCodecTest` |
+| Complete generated checkpoint rejects future actor evidence | `Stage21CGeneratedWorldRuntimePersistenceAcceptanceTest.compositionRejectsFutureActorMemoryEvidence` |
 | Generated-world Stage-17/21C/19 composition round-trips | `Stage21CGeneratedWorldRuntimePersistenceAcceptanceTest` |
 | Proposal/counter-offer/ultimatum/ceasefire continue after restore | `Stage21CDiplomaticMidLifecyclePersistenceAcceptanceTest` |
 
@@ -166,7 +172,7 @@ Mid-lifecycle acceptance restores and continues exactly one transition from prop
 - War cannot begin without a persisted causal crisis/decision or observed hostile attack: enforced in service and persistence cross-validation.
 - Random input is bounded to peaceful tie-breaking and cannot be the reason for war.
 - Treaties and wars round-trip while accepted treaty clauses affect ordinary access/tariff law.
-- Representative deterministic fixtures exhibit trade, deterrence, negotiated resolution and war rather than one universal result.
+- The fixed generated-world corpus exercises trade, deterrence, negotiated resolution and causal war rather than one universal result, while explicit persisted political history—not seed randomness—remains the causal input.
 
 ## Later-stage boundary
 
