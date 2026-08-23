@@ -18,16 +18,18 @@ class FleetCommandGroupServiceTest {
     void formationAllocatesOnlyCommandIdentityAndRetainsOrdinaryFleetIds() {
         FleetId firstFleet = new FleetId(101L);
         FleetId secondFleet = new FleetId(102L);
+        FleetId thirdFleet = new FleetId(103L);
         FleetForceRegistry forces = new FleetForceRegistry(List.of(
                 entry(firstFleet, FACTION),
-                entry(secondFleet, FACTION)));
+                entry(secondFleet, FACTION),
+                entry(thirdFleet, FACTION)));
         FleetCommandGroupService service = new FleetCommandGroupService(topology());
 
         var first = service.form(
                 FleetCommandState.empty(), forces, FACTION, "First", List.of(secondFleet, firstFleet),
                 ALPHA, false, true, 4_000);
         var second = service.form(
-                first.state(), forces, FACTION, "Second", List.of(),
+                first.state(), forces, FACTION, "Second", List.of(thirdFleet),
                 BETA, false, false, 5_000);
 
         assertEquals(1L, first.group().id());
@@ -36,7 +38,9 @@ class FleetCommandGroupServiceTest {
         assertEquals(FACTION, first.group().factionId());
         assertEquals(firstFleet, forces.find(firstFleet).orElseThrow().fleetId());
         assertEquals(secondFleet, forces.find(secondFleet).orElseThrow().fleetId());
+        assertEquals(thirdFleet, forces.find(thirdFleet).orElseThrow().fleetId());
         assertEquals(2L, second.group().id());
+        assertEquals(List.of(thirdFleet), second.group().memberFleetIds());
         assertEquals(3L, second.state().nextCommandGroupId());
     }
 
