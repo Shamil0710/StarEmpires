@@ -11,11 +11,13 @@ import java.util.Objects;
  * likewise be supplied by actor-visible authority/read-model adapters rather than hidden world
  * truth.</p>
  *
- * @param type peaceful strategic goal family
+ * @param type strategic goal family
  * @param targetId stable goal target identity
  * @param sourceEvidence actor-bounded evidence supporting the candidate
  * @param urgencyBasisPoints urgency in {@code [0,10000]}
+ * @param strategicValueBasisPoints strategic value in {@code [0,10000]}
  * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+ * @param doctrinePreferenceBasisPoints caller-owned doctrine preference in {@code [0,10000]}
  * @param requestedBudget multidimensional normalized planning request
  * @param blockers current actor-known non-capacity blockers
  * @param expiresAtTick terminal expiry tick, or {@code -1} for no automatic expiry
@@ -27,7 +29,9 @@ public record StrategicGoalCandidate(
         String targetId,
         StrategicGoalEvidence sourceEvidence,
         int urgencyBasisPoints,
+        int strategicValueBasisPoints,
         int feasibilityBasisPoints,
+        int doctrinePreferenceBasisPoints,
         StrategicPlanningEnvelope requestedBudget,
         List<StrategicGoalBlocker> blockers,
         long expiresAtTick,
@@ -37,11 +41,13 @@ public record StrategicGoalCandidate(
     /**
      * Validates one candidate without deriving hidden-world information.
      *
-     * @param type peaceful strategic goal family
+     * @param type strategic goal family
      * @param targetId stable goal target identity
      * @param sourceEvidence actor-bounded evidence supporting the candidate
      * @param urgencyBasisPoints urgency in {@code [0,10000]}
+     * @param strategicValueBasisPoints strategic value in {@code [0,10000]}
      * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+     * @param doctrinePreferenceBasisPoints caller-owned doctrine preference in {@code [0,10000]}
      * @param requestedBudget multidimensional normalized planning request
      * @param blockers current actor-known non-capacity blockers
      * @param expiresAtTick terminal expiry tick, or {@code -1} for no automatic expiry
@@ -60,7 +66,9 @@ public record StrategicGoalCandidate(
                     "Strategic goal type " + type + " is not supported by evidence " + sourceEvidence.kind());
         }
         requireBasisPoints(urgencyBasisPoints, "Strategic goal urgency");
+        requireBasisPoints(strategicValueBasisPoints, "Strategic goal value");
         requireBasisPoints(feasibilityBasisPoints, "Strategic goal feasibility");
+        requireBasisPoints(doctrinePreferenceBasisPoints, "Strategic doctrine preference");
         Objects.requireNonNull(requestedBudget, "Strategic goal requested budget not set");
         blockers = Objects.requireNonNull(blockers, "Strategic goal blockers not set").stream()
                 .map(blocker -> Objects.requireNonNull(blocker, "Strategic goal blocker not set"))
@@ -77,12 +85,44 @@ public record StrategicGoalCandidate(
     }
 
     /**
-     * Deterministic priority metric before hysteresis.
+     * Backward-compatible constructor for callers that have not supplied value/doctrine weights.
      *
-     * @return urgency multiplied by feasibility, normalized back to basis points
+     * @param type strategic goal family
+     * @param targetId stable goal target identity
+     * @param sourceEvidence actor-bounded evidence supporting the candidate
+     * @param urgencyBasisPoints urgency in {@code [0,10000]}
+     * @param feasibilityBasisPoints feasibility in {@code [0,10000]}
+     * @param requestedBudget multidimensional normalized planning request
+     * @param blockers current actor-known non-capacity blockers
+     * @param expiresAtTick terminal expiry tick, or {@code -1}
+     * @param reviewCadenceTicks positive interval between reviews
+     * @param outcomeSignal read-only terminal outcome signal
+     */
+    public StrategicGoalCandidate(
+            StrategicGoalType type,
+            String targetId,
+            StrategicGoalEvidence sourceEvidence,
+            int urgencyBasisPoints,
+            int feasibilityBasisPoints,
+            StrategicPlanningEnvelope requestedBudget,
+            List<StrategicGoalBlocker> blockers,
+            long expiresAtTick,
+            long reviewCadenceTicks,
+            StrategicGoalOutcomeSignal outcomeSignal) {
+        this(type, targetId, sourceEvidence, urgencyBasisPoints, 10_000, feasibilityBasisPoints, 10_000,
+                requestedBudget, blockers, expiresAtTick, reviewCadenceTicks, outcomeSignal);
+    }
+
+    /**
+     * Deterministic roadmap score before hysteresis.
+     *
+     * @return urgency × strategic value × feasibility × doctrine preference, normalized to basis points
      */
     public int effectivePriorityBasisPoints() {
-        return (int) (((long) urgencyBasisPoints * (long) feasibilityBasisPoints) / 10_000L);
+        long product = (long) urgencyBasisPoints * strategicValueBasisPoints;
+        product = product * feasibilityBasisPoints;
+        product = product * doctrinePreferenceBasisPoints;
+        return (int) (product / 1_000_000_000_000L);
     }
 
     /**
