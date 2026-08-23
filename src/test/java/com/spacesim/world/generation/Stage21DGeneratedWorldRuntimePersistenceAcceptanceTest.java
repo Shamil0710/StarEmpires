@@ -47,6 +47,7 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
                 .filter(id -> {
                     FleetPlacementState placement = stage20.world().findFleet(id).orElseThrow();
                     return placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                            && authoritativeFactionId(stage20, placement) >= 0
                             && !stage20.world().getTopology().neighbors(placement.systemId()).isEmpty();
                 })
                 .findFirst().orElseThrow();
@@ -60,9 +61,10 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
         assertEquals(FleetLocationKind.IN_TRANSIT, inTransit.locationKind());
         assertNotNull(inTransit.transitState());
         var exactTransitPayload = inTransit.transitState().entityState();
+        assertNotNull(exactTransitPayload.faction(), "generated freight used by Stage 21D must retain physical affiliation");
 
         Stage21CGeneratedWorldRuntimePersistentState stage21c = stage21c(stage20);
-        int factionId = exactTransitPayload.faction() == null ? -1 : exactTransitPayload.faction().factionId();
+        int factionId = exactTransitPayload.faction().factionId();
         CommandGroupState group = new CommandGroupState(
                 1L,
                 factionId,
@@ -132,36 +134,61 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
     }
 
     @Test
-    void compositionRejectsUnknownFleetAndUnknownRouteSystem() {
+    void compositionRejectsUnknownFleetOwnerMismatchUnknownSystemAndNonNeighborRoute() {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime stage20 = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
         Stage21CGeneratedWorldRuntimePersistentState stage21c = stage21c(stage20);
         FleetPlacementState local = stage20.world().getFleetPlacements().stream()
                 .filter(value -> value.locationKind() == FleetLocationKind.IN_SYSTEM)
+                .filter(value -> authoritativeFactionId(stage20, value) >= 0)
                 .findFirst().orElseThrow();
         StarSystemId home = local.systemId();
+        int factionId = authoritativeFactionId(stage20, local);
 
         FleetCommandState unknownFleet = new FleetCommandState(
                 2L,
                 1L,
                 List.of(new CommandGroupState(
-                        1L, 1, "Unknown Fleet", List.of(new FleetId(Long.MAX_VALUE)), home,
+                        1L, factionId, "Unknown Fleet", List.of(new FleetId(Long.MAX_VALUE)), home,
                         false, false, FleetReadinessState.FULL)),
                 List.of());
         assertThrows(IllegalArgumentException.class,
                 () -> Stage21DGeneratedWorldRuntimePersistentState.compose(stage21c, unknownFleet));
 
+        FleetCommandState wrongOwner = new FleetCommandState(
+                2L,
+                1L,
+                List.of(new CommandGroupState(
+                        1L, factionId + 1, "Wrong Owner", List.of(local.id()), home,
+                        false, false, FleetReadinessState.FULL)),
+                List.of());
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage21DGeneratedWorldRuntimePersistentState.compose(stage21c, wrongOwner));
+
         StarSystemId unknownSystem = new StarSystemId(Long.MAX_VALUE);
         CommandGroupState validGroup = new CommandGroupState(
-                1L, 1, "Known Fleet", List.of(local.id()), home,
+                1L, factionId, "Known Fleet", List.of(local.id()), home,
                 false, false, FleetReadinessState.FULL);
-        FleetOrderState invalidOrder = new FleetOrderState(
+        FleetOrderState unknownSystemOrder = new FleetOrderState(
                 1L, validGroup.id(), OrderType.PATROL, OrderSource.PLAYER,
                 unknownSystem, List.of(home, unknownSystem), 0, 0L, 1L, OrderStatus.STAGING);
         FleetCommandState unknownRoute = new FleetCommandState(
-                2L, 2L, List.of(validGroup), List.of(invalidOrder));
+                2L, 2L, List.of(validGroup), List.of(unknownSystemOrder));
         assertThrows(IllegalArgumentException.class,
                 () -> Stage21DGeneratedWorldRuntimePersistentState.compose(stage21c, unknownRoute));
+
+        StarSystemId nonNeighbor = stage20.world().getTopology().systems().stream()
+                .map(system -> system.id())
+                .filter(systemId -> !systemId.equals(home))
+                .filter(systemId -> !stage20.world().getTopology().neighbors(home).contains(systemId))
+                .findFirst().orElseThrow();
+        FleetOrderState nonNeighborOrder = new FleetOrderState(
+                1L, validGroup.id(), OrderType.STAGE, OrderSource.AI,
+                nonNeighbor, List.of(home, nonNeighbor), 0, 0L, 1L, OrderStatus.STAGING);
+        FleetCommandState nonNeighborRoute = new FleetCommandState(
+                2L, 2L, List.of(validGroup), List.of(nonNeighborOrder));
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage21DGeneratedWorldRuntimePersistentState.compose(stage21c, nonNeighborRoute));
     }
 
     @Test
@@ -206,6 +233,20 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
                 stage21b,
                 DiplomaticLifecycleState.empty(now),
                 Stage19ConflictState.empty(now));
+    }
+
+    private static int authoritativeFactionId(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
+            FleetPlacementState placement) {
+        if (placement.locationKind() == FleetLocationKind.IN_TRANSIT) {
+            return placement.transitState() == null || placement.transitState().entityState().faction() == null
+                    ? -1
+                    : placement.transitState().entityState().faction().factionId();
+        }
+        var session = runtime.world().findSession(placement.systemId()).orElseThrow();
+        var entity = session.getEntityRegistry().require(placement.localEntityId());
+        var captured = EntityStateMapper.capture(entity);
+        return captured.faction() == null ? -1 : captured.faction().factionId();
     }
 
     private static void advanceUntilPhase(
