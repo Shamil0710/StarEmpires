@@ -15,7 +15,7 @@ import java.util.TreeSet;
 
 /** Deterministic UTF-8 persistence codec for Stage-21B strategic intent state. */
 public final class FactionStrategicIntentStateCodec {
-    private static final String HEADER = "stage21b-strategic-intent-v2";
+    private static final String HEADER = "stage21b-strategic-intent-v3";
 
     private FactionStrategicIntentStateCodec() {
         throw new AssertionError("Utility class");
@@ -46,7 +46,10 @@ public final class FactionStrategicIntentStateCodec {
                         .append(goal.type().wireId()).append('\t').append(token(goal.targetId())).append('\t')
                         .append(goal.sourceEvidence().kind().name()).append('\t')
                         .append(goal.sourceEvidence().priorityBasisPoints()).append('\t')
-                        .append(goal.urgencyBasisPoints()).append('\t').append(goal.feasibilityBasisPoints());
+                        .append(goal.urgencyBasisPoints()).append('\t')
+                        .append(goal.strategicValueBasisPoints()).append('\t')
+                        .append(goal.feasibilityBasisPoints()).append('\t')
+                        .append(goal.doctrinePreferenceBasisPoints());
                 appendEnvelope(builder, goal.requestedBudget());
                 appendEnvelope(builder, goal.allocatedBudget());
                 builder.append('\t').append(blockers(goal.blockers())).append('\t').append(goal.lifecycle().name())
@@ -102,18 +105,18 @@ public final class FactionStrategicIntentStateCodec {
                     goals = new ArrayList<>();
                 }
                 case "G" -> {
-                    if (parts.length != 28 || factionId == null || goal != null) {
+                    if (parts.length != 30 || factionId == null || goal != null) {
                         throw malformed(index, line);
                     }
                     goal = new GoalFields(
                             untoken(parts[1]), StrategicGoalType.fromWireId(parts[2]), untoken(parts[3]),
                             parseEnum(InterestKind.class, parts[4], index), parseInt(parts[5], index),
-                            parseInt(parts[6], index), parseInt(parts[7], index),
-                            envelope(parts, 8, index), envelope(parts, 12, index), parseBlockers(parts[16], index),
-                            parseEnum(Lifecycle.class, parts[17], index), parseLong(parts[18], index),
-                            parseLong(parts[19], index), parseLong(parts[20], index), parseLong(parts[21], index),
-                            parseLong(parts[22], index), envelope(parts, 23, index),
-                            parseEnum(StrategicGoalOutcomeSignal.class, parts[27], index));
+                            parseInt(parts[6], index), parseInt(parts[7], index), parseInt(parts[8], index),
+                            parseInt(parts[9], index), envelope(parts, 10, index), envelope(parts, 14, index),
+                            parseBlockers(parts[18], index), parseEnum(Lifecycle.class, parts[19], index),
+                            parseLong(parts[20], index), parseLong(parts[21], index), parseLong(parts[22], index),
+                            parseLong(parts[23], index), parseLong(parts[24], index), envelope(parts, 25, index),
+                            parseEnum(StrategicGoalOutcomeSignal.class, parts[29], index));
                     provenance = new ArrayList<>();
                 }
                 case "P" -> {
@@ -132,10 +135,11 @@ public final class FactionStrategicIntentStateCodec {
                             goal.kind(), goal.targetId(), goal.evidencePriorityBasisPoints(), provenance);
                     goals.add(new StrategicGoalState(
                             goal.goalId(), factionId, goal.type(), goal.targetId(), evidence,
-                            goal.urgencyBasisPoints(), goal.feasibilityBasisPoints(), goal.requestedBudget(),
-                            goal.allocatedBudget(), goal.blockers(), goal.lifecycle(), goal.createdAtTick(),
-                            goal.updatedAtTick(), goal.nextReviewTick(), goal.expiresAtTick(), goal.cooldownUntilTick(),
-                            goal.cancellationCost(), goal.outcomeSignal()));
+                            goal.urgencyBasisPoints(), goal.strategicValueBasisPoints(),
+                            goal.feasibilityBasisPoints(), goal.doctrinePreferenceBasisPoints(),
+                            goal.requestedBudget(), goal.allocatedBudget(), goal.blockers(), goal.lifecycle(),
+                            goal.createdAtTick(), goal.updatedAtTick(), goal.nextReviewTick(), goal.expiresAtTick(),
+                            goal.cooldownUntilTick(), goal.cancellationCost(), goal.outcomeSignal()));
                     goal = null;
                     provenance = new ArrayList<>();
                 }
@@ -227,11 +231,25 @@ public final class FactionStrategicIntentStateCodec {
     }
 
     private record GoalFields(
-            String goalId, StrategicGoalType type, String targetId, InterestKind kind,
-            int evidencePriorityBasisPoints, int urgencyBasisPoints, int feasibilityBasisPoints,
-            StrategicPlanningEnvelope requestedBudget, StrategicPlanningEnvelope allocatedBudget,
-            List<StrategicGoalBlocker> blockers, Lifecycle lifecycle, long createdAtTick, long updatedAtTick,
-            long nextReviewTick, long expiresAtTick, long cooldownUntilTick,
-            StrategicPlanningEnvelope cancellationCost, StrategicGoalOutcomeSignal outcomeSignal) {
+            String goalId,
+            StrategicGoalType type,
+            String targetId,
+            InterestKind kind,
+            int evidencePriorityBasisPoints,
+            int urgencyBasisPoints,
+            int strategicValueBasisPoints,
+            int feasibilityBasisPoints,
+            int doctrinePreferenceBasisPoints,
+            StrategicPlanningEnvelope requestedBudget,
+            StrategicPlanningEnvelope allocatedBudget,
+            List<StrategicGoalBlocker> blockers,
+            Lifecycle lifecycle,
+            long createdAtTick,
+            long updatedAtTick,
+            long nextReviewTick,
+            long expiresAtTick,
+            long cooldownUntilTick,
+            StrategicPlanningEnvelope cancellationCost,
+            StrategicGoalOutcomeSignal outcomeSignal) {
     }
 }
