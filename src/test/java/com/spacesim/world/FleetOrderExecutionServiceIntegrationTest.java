@@ -42,9 +42,13 @@ class FleetOrderExecutionServiceIntegrationTest {
         assertEquals(FleetLocationKind.IN_SYSTEM, world.findFleet(source.id()).orElseThrow().locationKind(),
                 "requesting a strategic hop must not teleport the fleet");
 
-        assertThrows(IllegalStateException.class,
-                () -> service.dispatchMovementHop(world, dispatched, forces(source, ALPHA), sourceOrderId()),
-                "a second dispatch while the ordinary jump is active must be rejected");
+        FleetJumpState firstRequest = world.findFleetJump(source.id()).orElseThrow();
+        FleetCommandState retried = service.dispatchMovementHop(
+                world, dispatched, forces(source, ALPHA), sourceOrderId());
+        assertEquals(dispatched, retried,
+                "retrying the same accepted strategic hop must be idempotent");
+        assertEquals(firstRequest, world.findFleetJump(source.id()).orElseThrow(),
+                "retrying must not duplicate or restart the ordinary jump FSM");
 
         world.advanceFrame(6.0f);
         assertTrue(world.findFleetJump(source.id()).isEmpty());
@@ -63,6 +67,42 @@ class FleetOrderExecutionServiceIntegrationTest {
         assertEquals(1L, world.getFleetPlacements().stream()
                 .filter(placement -> placement.id().equals(source.id()))
                 .count(), "arrival reconciliation must never duplicate an ordinary fleet");
+    }
+
+    @Test
+    void partiallyProgressedGroupPlansOnlyLaggingMemberAndCompletesAfterBothArrive() {
+        FleetId moving = new FleetId(101L);
+        FleetId lagging = new FleetId(102L);
+        FleetOrderExecutionService service = new FleetOrderExecutionService(initialWorld().topology());
+        CommandGroupState group = new CommandGroupState(
+                1L, 1, "Two Fleet Group", List.of(moving, lagging), ALPHA,
+                false, false, FleetReadinessState.FULL);
+        FleetOrderState order = new FleetOrderState(
+                1L, group.id(), OrderType.STAGE, OrderSource.AI, BETA,
+                List.of(ALPHA, BETA), 0, 10L, 20L, OrderStatus.STAGING);
+        FleetCommandState state = new FleetCommandState(2L, 2L, List.of(group), List.of(order));
+        FleetForceRegistry partial = new FleetForceRegistry(List.of(
+                forceEntry(moving, FleetLocationKind.IN_TRANSIT, null, ALPHA, BETA),
+                forceEntry(lagging, FleetLocationKind.IN_SYSTEM, ALPHA, null, null)));
+
+        List<FleetOrderExecutionService.Operation> operations =
+                service.planNextOperations(state, partial, order.id());
+
+        assertEquals(1, operations.size(),
+                "member already executing the exact persisted hop must not receive a duplicate operation");
+        FleetOrderExecutionService.MovementOperation movement = assertInstanceOf(
+                FleetOrderExecutionService.MovementOperation.class, operations.get(0));
+        assertEquals(lagging, movement.fleetId());
+        assertEquals(ALPHA, movement.originSystemId());
+        assertEquals(BETA, movement.destinationSystemId());
+
+        FleetForceRegistry arrived = new FleetForceRegistry(List.of(
+                forceEntry(moving, FleetLocationKind.IN_SYSTEM, BETA, null, null),
+                forceEntry(lagging, FleetLocationKind.IN_SYSTEM, BETA, null, null)));
+        FleetCommandState reconciled = service.reconcilePhysicalArrival(
+                state.replaceOrder(order.withStatus(OrderStatus.ACTIVE)), arrived, order.id());
+        assertEquals(1, reconciled.requireOrder(order.id()).routeCursor());
+        assertEquals(OrderStatus.COMPLETE, reconciled.requireOrder(order.id()).status());
     }
 
     @Test
@@ -118,16 +158,30 @@ class FleetOrderExecutionServiceIntegrationTest {
     }
 
     private static FleetForceRegistry forces(FleetPlacementState placement, StarSystemId systemId) {
-        return new FleetForceRegistry(List.of(new FleetForceRegistry.Entry(
+        return new FleetForceRegistry(List.of(forceEntry(
                 placement.id(),
-                1,
                 placement.locationKind(),
                 systemId,
                 placement.transitState() == null ? null : placement.transitState().originSystemId(),
-                placement.transitState() == null ? null : placement.transitState().destinationSystemId(),
-                new EntityState(new EntityId(placement.id().value()), null, null, null, null, null, null, null,
+                placement.transitState() == null ? null : placement.transitState().destinationSystemId())));
+    }
+
+    private static FleetForceRegistry.Entry forceEntry(
+            FleetId fleetId,
+            FleetLocationKind locationKind,
+            StarSystemId systemId,
+            StarSystemId transitOrigin,
+            StarSystemId transitDestination) {
+        return new FleetForceRegistry.Entry(
+                fleetId,
+                1,
+                locationKind,
+                systemId,
+                transitOrigin,
+                transitDestination,
+                new EntityState(new EntityId(fleetId.value()), null, null, null, null, null, null, null,
                         null, null, null, null, null, null, null, null, null, null),
-                new FleetReadinessState(10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000))));
+                new FleetReadinessState(10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000));
     }
 
     private static FleetPlacementState fleetIn(WorldSimulation world, StarSystemId systemId) {
