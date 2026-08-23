@@ -23,10 +23,14 @@ public record DiplomaticTreatyClauseState(
         CONSTRUCTION_RIGHT,
         /** Strategic transit permission; route integration is added by its owning stage. */
         TRANSIT_RIGHT,
-        /** Exemption from a future transaction/customs tariff. */
+        /** Exemption from the ordinary transaction/customs tariff. */
         CUSTOMS_TARIFF_EXEMPTION,
-        /** Security guarantee consumed by Stage 18 conflict logic. */
-        GUARANTEE
+        /** Bilateral promise not to initiate hostile coercion while the treaty is active. */
+        NON_AGGRESSION,
+        /** Security guarantee consumed by conflict-obligation logic. */
+        GUARANTEE,
+        /** Stronger mutual political/security commitment distinct from a limited guarantee. */
+        ALLIANCE
     }
 
     /** Direction relative to the treaty directory owner. */
