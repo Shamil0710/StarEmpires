@@ -32,6 +32,10 @@ public final class FactionStrategicGoalPlanner {
     /**
      * Reviews candidate intents without mutating any neighboring simulation authority.
      *
+     * <p>A newly completed Stage-21A actor review is a persisted early-review trigger. It may wake
+     * goals before their ordinary cadence exactly once because the consumed actor review count is
+     * written into the returned strategic-intent state.</p>
+     *
      * @param actorState Stage-21A lifecycle context
      * @param current current Stage-21B persistent intent state
      * @param candidates actor-bounded candidate goals
@@ -58,6 +62,13 @@ public final class FactionStrategicGoalPlanner {
         if (actor.lastReviewTick() >= 0L && reviewTick < actor.lastReviewTick()) {
             throw new IllegalArgumentException("Strategic review cannot precede actor lifecycle review history");
         }
+        if (actor.completedReviewCount() < state.lastActorReviewCount()) {
+            throw new IllegalArgumentException("Strategic intent cannot have consumed a future actor review");
+        }
+        boolean actorReviewAdvanced = actor.completedReviewCount() > state.lastActorReviewCount();
+        PlanningTrigger planningTrigger = actorReviewAdvanced
+                ? PlanningTrigger.ACTOR_REVIEW_ADVANCED
+                : PlanningTrigger.CADENCE_OR_EXPLICIT;
 
         Map<String, StrategicGoalState> openByIntent = new HashMap<>();
         Map<String, Long> cooldownByIntent = new HashMap<>();
@@ -107,7 +118,7 @@ public final class FactionStrategicGoalPlanner {
                 resolvedOpenKeys.add(goal.intentKey());
                 continue;
             }
-            if (reviewTick < goal.nextReviewTick()) {
+            if (!actorReviewAdvanced && reviewTick < goal.nextReviewTick()) {
                 StrategicGoalState retained = retainBeforeCadence(goal, candidate, remaining, reviewTick);
                 nextGoals.add(retained);
                 resolvedOpenKeys.add(goal.intentKey());
@@ -208,7 +219,8 @@ public final class FactionStrategicGoalPlanner {
         }
 
         for (StrategicGoalState goal : state.openGoals()) {
-            if (resolvedOpenKeys.contains(goal.intentKey()) || reviewTick < goal.nextReviewTick()) {
+            if (resolvedOpenKeys.contains(goal.intentKey())
+                    || (!actorReviewAdvanced && reviewTick < goal.nextReviewTick())) {
                 continue;
             }
             StrategicPlanningEnvelope cost = goal.allocatedBudget().fractionCeil(CANCELLATION_COST_BASIS_POINTS);
@@ -218,7 +230,7 @@ public final class FactionStrategicGoalPlanner {
         }
 
         FactionStrategicIntentState nextState = new FactionStrategicIntentState(
-                state.factionContentId(), nextSequence, nextGoals);
+                state.factionContentId(), nextSequence, actor.completedReviewCount(), nextGoals);
         StrategicPlanningEnvelope allocated = nextState.activeGoals().stream()
                 .map(StrategicGoalState::allocatedBudget)
                 .reduce(StrategicPlanningEnvelope.ZERO, StrategicPlanningEnvelope::plus);
@@ -226,7 +238,9 @@ public final class FactionStrategicGoalPlanner {
             throw new IllegalStateException("Strategic planner oversubscribed multidimensional capacity");
         }
         List<GoalProjection> projections = nextState.goals().stream().map(GoalProjection::from).toList();
-        return new PlanningResult(nextState, capacity, allocated, cancellationCost, projections);
+        return new PlanningResult(
+                nextState, capacity, allocated, cancellationCost,
+                planningTrigger, actor.completedReviewCount(), projections);
     }
 
     private static StrategicGoalState retainBeforeCadence(
@@ -284,6 +298,29 @@ public final class FactionStrategicGoalPlanner {
     }
 
     private record ScoredCandidate(StrategicGoalCandidate candidate, int scoreBasisPoints) {
+    }
+
+    /** Cause recorded for the current strategic planning pass. */
+    public enum PlanningTrigger {
+        /** Ordinary cadence or an explicit caller-requested review with no new actor review. */
+        CADENCE_OR_EXPLICIT("cadence-or-explicit"),
+        /** Stage 21A completed a new actor review since the previous strategic planning pass. */
+        ACTOR_REVIEW_ADVANCED("actor-review-advanced");
+
+        private final String wireId;
+
+        PlanningTrigger(String wireId) {
+            this.wireId = wireId;
+        }
+
+        /**
+         * Stable explanation identity.
+         *
+         * @return lowercase hyphenated trigger identity
+         */
+        public String wireId() {
+            return wireId;
+        }
     }
 
     /**
@@ -360,6 +397,8 @@ public final class FactionStrategicGoalPlanner {
      * @param availableBudget supplied multidimensional planning capacity
      * @param allocatedBudget capacity allocated to active goals
      * @param cancellationCost visible switching costs created by this review
+     * @param planningTrigger cause of this strategic planning pass
+     * @param actorReviewCount Stage-21A completed-review count consumed by this pass
      * @param projections read-only explainability rows
      */
     public record PlanningResult(
@@ -367,6 +406,8 @@ public final class FactionStrategicGoalPlanner {
             StrategicPlanningEnvelope availableBudget,
             StrategicPlanningEnvelope allocatedBudget,
             StrategicPlanningEnvelope cancellationCost,
+            PlanningTrigger planningTrigger,
+            long actorReviewCount,
             List<GoalProjection> projections) {
         /**
          * Validates immutable planning output accounting.
@@ -375,6 +416,8 @@ public final class FactionStrategicGoalPlanner {
          * @param availableBudget supplied multidimensional planning capacity
          * @param allocatedBudget capacity allocated to active goals
          * @param cancellationCost visible switching costs created by this review
+         * @param planningTrigger cause of this strategic planning pass
+         * @param actorReviewCount Stage-21A completed-review count consumed by this pass
          * @param projections read-only explainability rows
          */
         public PlanningResult {
@@ -382,10 +425,26 @@ public final class FactionStrategicGoalPlanner {
             Objects.requireNonNull(availableBudget, "Strategic planning capacity not set");
             Objects.requireNonNull(allocatedBudget, "Strategic allocated budget not set");
             Objects.requireNonNull(cancellationCost, "Strategic cancellation cost not set");
+            Objects.requireNonNull(planningTrigger, "Strategic planning trigger not set");
+            if (actorReviewCount < 0L) {
+                throw new IllegalArgumentException("Actor review count cannot be negative");
+            }
+            if (state.lastActorReviewCount() != actorReviewCount) {
+                throw new IllegalArgumentException("Planning result actor-review bookkeeping mismatch");
+            }
             if (!allocatedBudget.fitsWithin(availableBudget)) {
                 throw new IllegalArgumentException("Strategic goal allocation exceeds planning envelope");
             }
             projections = List.copyOf(Objects.requireNonNull(projections, "Strategic goal projections not set"));
+        }
+
+        /**
+         * Returns a compact explanation of why this planning pass ran now.
+         *
+         * @return stable trigger identity plus consumed Stage-21A review count
+         */
+        public String whyNowCode() {
+            return planningTrigger.wireId() + ":actor-review:" + actorReviewCount;
         }
     }
 }
