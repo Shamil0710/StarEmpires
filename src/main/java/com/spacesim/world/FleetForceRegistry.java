@@ -13,15 +13,17 @@ import java.util.Optional;
 /**
  * Read-only Stage-21D view of ordinary persistent fleets.
  *
- * <p>No placement is owned here. Every entry is reconstructed from {@link WorldState#fleets()} and
- * the exact fitted entity stored either in a local {@link GameState} or the existing transit
- * payload. Consequently the stable FleetId remains the sole fleet identity.</p>
+ * <p>No placement is owned here. Every production entry is reconstructed from
+ * {@link WorldState#fleets()} and the exact fitted entity stored either in a local
+ * {@link GameState} or the existing transit payload. Consequently the stable FleetId remains the
+ * sole fleet identity.</p>
  */
 public final class FleetForceRegistry {
     private final List<Entry> entries;
     private final Map<FleetId, Entry> byId;
 
-    private FleetForceRegistry(List<Entry> entries) {
+    /** Package-local for acceptance fixtures; production callers use {@link #reconstruct}. */
+    FleetForceRegistry(List<Entry> entries) {
         this.entries = List.copyOf(entries);
         Map<FleetId, Entry> index = new HashMap<>();
         for (Entry entry : this.entries) {
@@ -74,9 +76,7 @@ public final class FleetForceRegistry {
         return new FleetForceRegistry(result);
     }
 
-    public List<Entry> entries() {
-        return entries;
-    }
+    public List<Entry> entries() { return entries; }
 
     public Optional<Entry> find(FleetId fleetId) {
         return Optional.ofNullable(fleetId == null ? null : byId.get(fleetId));
@@ -90,9 +90,7 @@ public final class FleetForceRegistry {
         Map<StarSystemId, Map<com.spacesim.persistence.EntityId, EntityState>> result = new HashMap<>();
         for (StarSystemSimulationState system : world.systems()) {
             Map<com.spacesim.persistence.EntityId, EntityState> entities = new HashMap<>();
-            for (EntityState entity : system.simulationState().entities()) {
-                entities.put(entity.id(), entity);
-            }
+            for (EntityState entity : system.simulationState().entities()) entities.put(entity.id(), entity);
             result.put(system.systemId(), entities);
         }
         return result;
