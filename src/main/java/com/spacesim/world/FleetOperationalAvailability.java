@@ -12,6 +12,12 @@ package com.spacesim.world;
  * @param supplyAccessBps observed physical supply/service access, 0..10000
  */
 public record FleetOperationalAvailability(int availableCrew, int supplyAccessBps) {
+    /**
+     * Validates the bounded external readiness observations.
+     *
+     * @param availableCrew currently available trained crew members; never negative
+     * @param supplyAccessBps observed physical supply/service access in basis points, 0..10000
+     */
     public FleetOperationalAvailability {
         if (availableCrew < 0) {
             throw new IllegalArgumentException("availableCrew must be non-negative");
@@ -21,7 +27,11 @@ public record FleetOperationalAvailability(int availableCrew, int supplyAccessBp
         }
     }
 
-    /** Missing observation deliberately means unavailable, never implicit full readiness. */
+    /**
+     * Creates the fail-closed value used when no operational availability observation exists.
+     *
+     * @return zero crew and zero supply-access observation
+     */
     public static FleetOperationalAvailability unavailable() {
         return new FleetOperationalAvailability(0, 0);
     }
