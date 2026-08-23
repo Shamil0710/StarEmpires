@@ -632,7 +632,16 @@ public final class DiplomaticLifecycleService {
             int commitmentBasisPoints,
             CrisisEscalation crisisEscalation,
             boolean credibleSettlementOffer) {
-        /** Validates bounded actor-visible diplomatic inputs. */
+        /**
+         * Validates bounded actor-visible diplomatic inputs.
+         *
+         * @param relation remembered assessment in [-100,100]
+         * @param tradeDependenceBasisPoints observed trade dependence in [0,10000]
+         * @param threatBasisPoints observed threat in [0,10000]
+         * @param commitmentBasisPoints observed alliance/commitment strength in [0,10000]
+         * @param crisisEscalation current persisted crisis posture
+         * @param credibleSettlementOffer whether an actual bounded offer is visible
+         */
         public DiplomaticSituation {
             if (relation < -100 || relation > 100) {
                 throw new IllegalArgumentException("Diplomatic relation must be in [-100,100]");
@@ -665,7 +674,18 @@ public final class DiplomaticLifecycleService {
             List<Term> demands,
             List<Term> concessions,
             long deadlineTick) {
-        /** Validates immutable proposal request syntax before authority checks. */
+        /**
+         * Validates immutable proposal request syntax before authority checks.
+         *
+         * @param sourceGoalId persistent Stage-21B goal or stable player-command identity
+         * @param proposerFactionId proposer
+         * @param recipientFactionId recipient
+         * @param kind proposal family
+         * @param issueId stable issue/target identity
+         * @param demands terms requested from recipient
+         * @param concessions terms offered by proposer
+         * @param deadlineTick future response deadline
+         */
         public ProposalRequest {
             sourceGoalId = requireText(sourceGoalId, "Proposal source goal ID");
             proposerFactionId = requireText(proposerFactionId, "Proposal proposer");
