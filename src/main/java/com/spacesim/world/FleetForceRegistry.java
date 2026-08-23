@@ -34,6 +34,16 @@ public final class FleetForceRegistry {
         this.byId = Map.copyOf(index);
     }
 
+    /**
+     * Reconstructs the strategic read model from authoritative persistent fleet placements and payloads.
+     *
+     * @param world persistent world containing ordinary fleet placements and local/transit entity state
+     * @param evaluator readiness evaluator derived from existing engineering and consumable authority
+     * @param availabilityByFleet external bounded availability observations keyed by stable fleet identity;
+     *                            missing entries fail closed to unavailable
+     * @return immutable deterministic force registry sorted by {@link FleetId}
+     * @throws IllegalStateException when a fleet placement cannot be resolved to its authoritative entity payload
+     */
     public static FleetForceRegistry reconstruct(
             WorldState world,
             FleetReadinessEvaluator evaluator,
@@ -76,12 +86,29 @@ public final class FleetForceRegistry {
         return new FleetForceRegistry(result);
     }
 
+    /**
+     * Returns all reconstructed fleets in canonical identity order.
+     *
+     * @return immutable force entries
+     */
     public List<Entry> entries() { return entries; }
 
+    /**
+     * Looks up a reconstructed fleet by stable ordinary fleet identity.
+     *
+     * @param fleetId fleet identity, or {@code null}
+     * @return matching entry when present
+     */
     public Optional<Entry> find(FleetId fleetId) {
         return Optional.ofNullable(fleetId == null ? null : byId.get(fleetId));
     }
 
+    /**
+     * Projects all reconstructed fleets currently affiliated with the supplied faction.
+     *
+     * @param factionId faction identifier
+     * @return immutable list preserving canonical registry order
+     */
     public List<Entry> ownedBy(int factionId) {
         return entries.stream().filter(entry -> entry.factionId() == factionId).toList();
     }
@@ -96,7 +123,18 @@ public final class FleetForceRegistry {
         return result;
     }
 
-    /** One reconstructed force entry; entityState is the exact existing physical payload. */
+    /**
+     * One reconstructed strategic force entry whose {@code entityState} is the exact existing physical payload.
+     *
+     * @param fleetId stable ordinary fleet identity
+     * @param factionId currently affiliated faction identifier, or {@code -1} when unaffiliated
+     * @param locationKind existing local/transit placement kind
+     * @param systemId current local system identifier when applicable
+     * @param transitOriginSystemId transit origin when the fleet is in transit
+     * @param transitDestinationSystemId transit destination when the fleet is in transit
+     * @param entityState exact persistent physical entity payload
+     * @param readiness Stage-21D readiness projection derived from the physical payload and availability seam
+     */
     public record Entry(
             FleetId fleetId,
             int factionId,
@@ -106,6 +144,18 @@ public final class FleetForceRegistry {
             StarSystemId transitDestinationSystemId,
             EntityState entityState,
             FleetReadinessState readiness) {
+        /**
+         * Validates required reconstructed entry fields.
+         *
+         * @param fleetId stable ordinary fleet identity
+         * @param factionId current faction affiliation
+         * @param locationKind existing fleet placement kind
+         * @param systemId current local system when applicable
+         * @param transitOriginSystemId transit origin when applicable
+         * @param transitDestinationSystemId transit destination when applicable
+         * @param entityState exact persistent physical fleet payload
+         * @param readiness readiness projection for this payload
+         */
         public Entry {
             Objects.requireNonNull(fleetId, "fleetId");
             Objects.requireNonNull(locationKind, "locationKind");
