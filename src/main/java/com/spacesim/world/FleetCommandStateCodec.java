@@ -27,6 +27,13 @@ public final class FleetCommandStateCodec {
 
     private FleetCommandStateCodec() { throw new AssertionError("No instances"); }
 
+    /**
+     * Encodes command state into the deterministic bounded Stage-21D binary format.
+     *
+     * @param state validated persistent command state
+     * @return encoded command-state payload
+     * @throws IllegalArgumentException when collection or payload bounds are exceeded
+     */
     public static byte[] encode(FleetCommandState state) {
         FleetCommandState checked = Objects.requireNonNull(state, "state");
         try {
@@ -66,6 +73,16 @@ public final class FleetCommandStateCodec {
         }
     }
 
+    /**
+     * Decodes and validates a deterministic Stage-21D command-state payload.
+     *
+     * <p>Unknown versions, corrupt counts, truncated payloads, invalid enum values and trailing bytes
+     * are rejected rather than migrated implicitly.</p>
+     *
+     * @param bytes encoded command-state payload
+     * @return validated persistent command state
+     * @throws IllegalArgumentException when the payload is corrupt, unsupported or outside bounds
+     */
     public static FleetCommandState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
         if (bytes.length <= 0 || bytes.length > MAX_BYTES) throw new IllegalArgumentException("Stage-21D command payload size outside bounds");
