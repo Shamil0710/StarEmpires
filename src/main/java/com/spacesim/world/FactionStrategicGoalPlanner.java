@@ -12,14 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Pure Stage-21B strategic-goal arbitration.
- *
- * <p>The planner consumes actor-bounded candidates and normalized read-only capacity projections.
- * It never changes treasury, production queues, cargo, fleets, treaties, diplomatic relations or
- * territory. Those remain upstream authorities. The output is persistent intent plus a read-only
- * explanation projection for execution/UI layers.</p>
- */
+/** Pure Stage-21B strategic-goal arbitration over actor-bounded read-only inputs. */
 public final class FactionStrategicGoalPlanner {
     /** Candidate feasibility below this threshold stalls rather than silently disappearing. */
     public static final int MIN_FEASIBILITY_BASIS_POINTS = 2_500;
@@ -37,13 +30,9 @@ public final class FactionStrategicGoalPlanner {
     }
 
     /**
-     * Reviews candidate intents and returns the next persistent strategic-goal state.
+     * Reviews candidate intents without mutating any neighboring simulation authority.
      *
-     * <p>Allocation is all-or-nothing per goal in every planning dimension. A goal that cannot fit
-     * is persisted as {@link Lifecycle#STALLED} with explicit capacity blockers; it is not silently
-     * dropped. Existing goals preserve their ID when they stall and later recover.</p>
-     *
-     * @param actorState Stage-21A lifecycle authority for commitment/hysteresis context
+     * @param actorState Stage-21A lifecycle context
      * @param current current Stage-21B persistent intent state
      * @param candidates actor-bounded candidate goals
      * @param availableBudget normalized multidimensional strategic capacity projection
@@ -162,7 +151,6 @@ public final class FactionStrategicGoalPlanner {
             StrategicGoalCandidate candidate = row.candidate();
             String key = intentKey(candidate.type(), candidate.targetId());
             StrategicGoalState existing = openByIntent.get(key);
-
             if (candidate.isExpiredAt(reviewTick)) {
                 if (existing != null) {
                     nextGoals.add(existing.expire(candidate, reviewTick));
@@ -190,41 +178,28 @@ public final class FactionStrategicGoalPlanner {
                 continue;
             }
 
-            List<StrategicGoalBlocker> blockers = blockers(candidate, remaining);
-            Lifecycle lifecycle = blockers.isEmpty() ? Lifecycle.ACTIVE : Lifecycle.STALLED;
-            StrategicPlanningEnvelope allocation = blockers.isEmpty()
-                    ? candidate.requestedBudget()
-                    : StrategicPlanningEnvelope.ZERO;
+            List<StrategicGoalBlocker> currentBlockers = blockers(candidate, remaining);
+            Lifecycle lifecycle = currentBlockers.isEmpty() ? Lifecycle.ACTIVE : Lifecycle.STALLED;
+            StrategicPlanningEnvelope allocation = currentBlockers.isEmpty()
+                    ? candidate.requestedBudget() : StrategicPlanningEnvelope.ZERO;
             StrategicGoalState next;
             if (existing != null) {
-                next = blockers.isEmpty()
+                next = currentBlockers.isEmpty()
                         ? existing.refreshActive(candidate, reviewTick)
-                        : existing.stall(candidate, blockers, reviewTick);
+                        : existing.stall(candidate, currentBlockers, reviewTick);
                 resolvedOpenKeys.add(key);
             } else {
                 String goalId = state.factionContentId() + ":strategic-goal:" + nextSequence;
                 nextSequence = Math.addExact(nextSequence, 1L);
                 next = new StrategicGoalState(
-                        goalId,
-                        state.factionContentId(),
-                        candidate.type(),
-                        candidate.targetId(),
-                        candidate.sourceEvidence(),
-                        candidate.urgencyBasisPoints(),
-                        candidate.strategicValueBasisPoints(),
-                        candidate.feasibilityBasisPoints(),
-                        candidate.doctrinePreferenceBasisPoints(),
-                        candidate.requestedBudget(),
-                        allocation,
-                        blockers,
-                        lifecycle,
-                        reviewTick,
-                        reviewTick,
-                        Math.addExact(reviewTick, candidate.reviewCadenceTicks()),
-                        candidate.expiresAtTick(),
-                        0L,
-                        StrategicPlanningEnvelope.ZERO,
-                        StrategicGoalOutcomeSignal.NONE);
+                        goalId, state.factionContentId(), candidate.type(), candidate.targetId(),
+                        candidate.sourceEvidence(), candidate.urgencyBasisPoints(),
+                        candidate.strategicValueBasisPoints(), candidate.feasibilityBasisPoints(),
+                        candidate.doctrinePreferenceBasisPoints(), candidate.requestedBudget(),
+                        candidate.costCeiling(), candidate.successConditions(), candidate.failureConditions(),
+                        allocation, currentBlockers, lifecycle, reviewTick, reviewTick,
+                        Math.addExact(reviewTick, candidate.reviewCadenceTicks()), candidate.expiresAtTick(),
+                        0L, StrategicPlanningEnvelope.ZERO, StrategicGoalOutcomeSignal.NONE);
             }
             nextGoals.add(next);
             if (next.lifecycle() == Lifecycle.ACTIVE) {
@@ -255,10 +230,8 @@ public final class FactionStrategicGoalPlanner {
     }
 
     private static StrategicGoalState retainBeforeCadence(
-            StrategicGoalState goal,
-            StrategicGoalCandidate candidate,
-            StrategicPlanningEnvelope remaining,
-            long reviewTick) {
+            StrategicGoalState goal, StrategicGoalCandidate candidate,
+            StrategicPlanningEnvelope remaining, long reviewTick) {
         if (goal.lifecycle() == Lifecycle.STALLED) {
             return goal;
         }
@@ -274,14 +247,17 @@ public final class FactionStrategicGoalPlanner {
         return new StrategicGoalCandidate(
                 goal.type(), goal.targetId(), goal.sourceEvidence(), goal.urgencyBasisPoints(),
                 goal.strategicValueBasisPoints(), goal.feasibilityBasisPoints(),
-                goal.doctrinePreferenceBasisPoints(), goal.requestedBudget(), goal.blockers(),
-                goal.expiresAtTick(), cadence, StrategicGoalOutcomeSignal.NONE);
+                goal.doctrinePreferenceBasisPoints(), goal.requestedBudget(), goal.costCeiling(),
+                goal.successConditions(), goal.failureConditions(), goal.blockers(), goal.expiresAtTick(),
+                cadence, StrategicGoalOutcomeSignal.NONE);
     }
 
     private static List<StrategicGoalBlocker> blockers(
-            StrategicGoalCandidate candidate,
-            StrategicPlanningEnvelope remaining) {
+            StrategicGoalCandidate candidate, StrategicPlanningEnvelope remaining) {
         ArrayList<StrategicGoalBlocker> blockers = new ArrayList<>(candidate.blockers());
+        if (!candidate.requestedBudget().fitsWithin(candidate.costCeiling())) {
+            blockers.add(StrategicGoalBlocker.COST_CEILING);
+        }
         if (candidate.feasibilityBasisPoints() < MIN_FEASIBILITY_BASIS_POINTS) {
             blockers.add(StrategicGoalBlocker.FEASIBILITY);
         }
@@ -290,21 +266,12 @@ public final class FactionStrategicGoalPlanner {
     }
 
     private static List<StrategicGoalBlocker> capacityBlockers(
-            StrategicPlanningEnvelope request,
-            StrategicPlanningEnvelope capacity) {
+            StrategicPlanningEnvelope request, StrategicPlanningEnvelope capacity) {
         ArrayList<StrategicGoalBlocker> blockers = new ArrayList<>();
-        if (request.treasuryUnits() > capacity.treasuryUnits()) {
-            blockers.add(StrategicGoalBlocker.TREASURY_CAPACITY);
-        }
-        if (request.logisticsUnits() > capacity.logisticsUnits()) {
-            blockers.add(StrategicGoalBlocker.LOGISTICS_CAPACITY);
-        }
-        if (request.constructionUnits() > capacity.constructionUnits()) {
-            blockers.add(StrategicGoalBlocker.CONSTRUCTION_CAPACITY);
-        }
-        if (request.readinessUnits() > capacity.readinessUnits()) {
-            blockers.add(StrategicGoalBlocker.READINESS_CAPACITY);
-        }
+        if (request.treasuryUnits() > capacity.treasuryUnits()) blockers.add(StrategicGoalBlocker.TREASURY_CAPACITY);
+        if (request.logisticsUnits() > capacity.logisticsUnits()) blockers.add(StrategicGoalBlocker.LOGISTICS_CAPACITY);
+        if (request.constructionUnits() > capacity.constructionUnits()) blockers.add(StrategicGoalBlocker.CONSTRUCTION_CAPACITY);
+        if (request.readinessUnits() > capacity.readinessUnits()) blockers.add(StrategicGoalBlocker.READINESS_CAPACITY);
         return List.copyOf(blockers);
     }
 
@@ -329,9 +296,12 @@ public final class FactionStrategicGoalPlanner {
      * @param urgencyBasisPoints current urgency
      * @param strategicValueBasisPoints current strategic value
      * @param feasibilityBasisPoints current feasibility
-     * @param doctrinePreferenceBasisPoints current caller-owned doctrine preference
+     * @param doctrinePreferenceBasisPoints current doctrine preference
      * @param scoreBasisPoints roadmap score before hysteresis
      * @param requestedBudget requested planning envelope
+     * @param costCeiling accepted planning cost ceiling
+     * @param successConditions declarative success conditions
+     * @param failureConditions declarative failure conditions
      * @param allocatedBudget allocated planning envelope
      * @param blockers current explainable blockers
      * @param cancellationCost visible switching cost when cancelled
@@ -344,35 +314,25 @@ public final class FactionStrategicGoalPlanner {
      * @param provenanceIds delivered report/ledger provenance identities
      */
     public record GoalProjection(
-            String goalId,
-            StrategicGoalType type,
-            String targetId,
-            Lifecycle lifecycle,
-            int urgencyBasisPoints,
-            int strategicValueBasisPoints,
-            int feasibilityBasisPoints,
-            int doctrinePreferenceBasisPoints,
-            int scoreBasisPoints,
-            StrategicPlanningEnvelope requestedBudget,
-            StrategicPlanningEnvelope allocatedBudget,
-            List<StrategicGoalBlocker> blockers,
-            StrategicPlanningEnvelope cancellationCost,
-            long nextReviewTick,
-            long expiresAtTick,
-            long cooldownUntilTick,
-            StrategicGoalOutcomeSignal outcomeSignal,
+            String goalId, StrategicGoalType type, String targetId, Lifecycle lifecycle,
+            int urgencyBasisPoints, int strategicValueBasisPoints, int feasibilityBasisPoints,
+            int doctrinePreferenceBasisPoints, int scoreBasisPoints,
+            StrategicPlanningEnvelope requestedBudget, StrategicPlanningEnvelope costCeiling,
+            List<StrategicGoalCondition> successConditions, List<StrategicGoalCondition> failureConditions,
+            StrategicPlanningEnvelope allocatedBudget, List<StrategicGoalBlocker> blockers,
+            StrategicPlanningEnvelope cancellationCost, long nextReviewTick, long expiresAtTick,
+            long cooldownUntilTick, StrategicGoalOutcomeSignal outcomeSignal,
             FactionActorObservationSnapshot.InterestKind evidenceKind,
-            int evidencePriorityBasisPoints,
-            List<String> provenanceIds) {
+            int evidencePriorityBasisPoints, List<String> provenanceIds) {
 
         private static GoalProjection from(StrategicGoalState goal) {
             return new GoalProjection(
-                    goal.goalId(), goal.type(), goal.targetId(), goal.lifecycle(),
-                    goal.urgencyBasisPoints(), goal.strategicValueBasisPoints(), goal.feasibilityBasisPoints(),
-                    goal.doctrinePreferenceBasisPoints(), score(goal), goal.requestedBudget(),
-                    goal.allocatedBudget(), goal.blockers(), goal.cancellationCost(), goal.nextReviewTick(),
-                    goal.expiresAtTick(), goal.cooldownUntilTick(), goal.outcomeSignal(),
-                    goal.sourceEvidence().kind(), goal.sourceEvidence().priorityBasisPoints(),
+                    goal.goalId(), goal.type(), goal.targetId(), goal.lifecycle(), goal.urgencyBasisPoints(),
+                    goal.strategicValueBasisPoints(), goal.feasibilityBasisPoints(),
+                    goal.doctrinePreferenceBasisPoints(), score(goal), goal.requestedBudget(), goal.costCeiling(),
+                    goal.successConditions(), goal.failureConditions(), goal.allocatedBudget(), goal.blockers(),
+                    goal.cancellationCost(), goal.nextReviewTick(), goal.expiresAtTick(), goal.cooldownUntilTick(),
+                    goal.outcomeSignal(), goal.sourceEvidence().kind(), goal.sourceEvidence().priorityBasisPoints(),
                     goal.sourceEvidence().provenance().stream().map(ObservationEvidence::provenanceId).toList());
         }
 
@@ -383,21 +343,13 @@ public final class FactionStrategicGoalPlanner {
             return (int) (product / 1_000_000_000_000L);
         }
 
-        /**
-         * Returns a compact stable explanation suitable for logs/debug UI.
-         *
-         * @return lifecycle/type/evidence/target/blocker explanation code
-         */
+        /** @return lifecycle/type/evidence/target/blocker explanation code */
         public String explanationCode() {
-            String blockerCode = blockers.isEmpty()
-                    ? "clear"
+            String blockerCode = blockers.isEmpty() ? "clear"
                     : blockers.stream().map(blocker -> blocker.name().toLowerCase()).sorted()
                             .reduce((left, right) -> left + "," + right).orElse("clear");
-            return lifecycle.name().toLowerCase()
-                    + ":" + type.wireId()
-                    + ":" + evidenceKind.name().toLowerCase()
-                    + ":" + targetId
-                    + ":" + blockerCode;
+            return lifecycle.name().toLowerCase() + ":" + type.wireId() + ":"
+                    + evidenceKind.name().toLowerCase() + ":" + targetId + ":" + blockerCode;
         }
     }
 
@@ -416,7 +368,6 @@ public final class FactionStrategicGoalPlanner {
             StrategicPlanningEnvelope allocatedBudget,
             StrategicPlanningEnvelope cancellationCost,
             List<GoalProjection> projections) {
-
         /**
          * Validates immutable planning output accounting.
          *
