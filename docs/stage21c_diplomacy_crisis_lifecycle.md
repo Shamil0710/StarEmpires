@@ -125,7 +125,7 @@ No free fleet, combat participation or hidden enforcement is created by the obli
 
 Random/deterministic tie-break input is consulted only when two peaceful alternatives have exactly equal scores. It can choose between trade and deterrence, but cannot produce `WAR`. War requires the explicit crisis/hostile-attack predicates above.
 
-The fixed Stage-20 representative root seeds `1..16` are now exercised through actual generated-world runtimes. Each seed is paired with a predeclared persisted political-history fixture (trade, deterrence, negotiated resolution or causal war); the root seed is used only as the bounded tie-break input and is never itself the war cause. This keeps the diversity proof non-vacuous without introducing seed-specific production exceptions.
+The representative generated-world proof uses a fixed production-materializable Stage-20 seed pair: `DEFAULT_WORLD_SEED` and `DEFAULT_WORLD_SEED + 1` (currently roots `1` and `2`). Each generated checkpoint is crossed with four predeclared persisted political histories: trade, deterrence, negotiated resolution and causal war. The world seed is used only as the bounded tie-break input and is never itself the war cause. The older frozen Stage-20E `1..16` rejection corpus is intentionally left unchanged and is used only by the separate tie-break safety proof, where no world materialization occurs.
 
 ## Persistence
 
@@ -161,7 +161,7 @@ Mid-lifecycle acceptance restores and continues exactly one transition from prop
 | War needs persisted crisis decision before declaration | `warRequiresPersistedCauseCreatesStage19ConflictsAndCannotOscillateAfterPeace` |
 | Observed hostile attack is an explicit alternate cause without fabricated crisis | `observedHostileAttackCanCreateLegalWarWithoutFabricatingACrisis` |
 | Random input cannot select war | `Stage21CRepresentativeOutcomeAcceptanceTest` plus planner tests |
-| Fixed generated-world corpus covers trade, deterrence, negotiated resolution and causal war | `Stage21CRepresentativeOutcomeAcceptanceTest.fixedGeneratedSeedCorpusExercisesDifferentPersistedPoliticalHistories` |
+| Fixed production-generated corpus covers trade, deterrence, negotiated resolution and causal war | `Stage21CRepresentativeOutcomeAcceptanceTest.fixedProductionWorldCorpusExercisesDifferentPersistedPoliticalHistories` |
 | Deterministic codec round-trip and corrupt/stale/future rejection | `DiplomaticLifecycleStateCodecTest` |
 | Complete generated checkpoint rejects future actor evidence | `Stage21CGeneratedWorldRuntimePersistenceAcceptanceTest.compositionRejectsFutureActorMemoryEvidence` |
 | Generated-world Stage-17/21C/19 composition round-trips | `Stage21CGeneratedWorldRuntimePersistenceAcceptanceTest` |
@@ -172,7 +172,7 @@ Mid-lifecycle acceptance restores and continues exactly one transition from prop
 - War cannot begin without a persisted causal crisis/decision or observed hostile attack: enforced in service and persistence cross-validation.
 - Random input is bounded to peaceful tie-breaking and cannot be the reason for war.
 - Treaties and wars round-trip while accepted treaty clauses affect ordinary access/tariff law.
-- The fixed generated-world corpus exercises trade, deterrence, negotiated resolution and causal war rather than one universal result, while explicit persisted political history—not seed randomness—remains the causal input.
+- The fixed production-materializable generated-world pair, crossed with four persisted political histories, exercises trade, deterrence, negotiated resolution and causal war rather than one universal result, while explicit persisted political history—not seed randomness—remains the causal input.
 
 ## Later-stage boundary
 
