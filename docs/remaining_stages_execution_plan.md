@@ -1,21 +1,23 @@
 # Star Empires — execution plan for all unfinished stages
 
-> Audit date: **2026-08-23**.
-> Repository baseline: `main` after Stage 21C diplomacy/crisis/alliance/legal-war acceptance,
-> merged closeout documentation and synchronized generated-world command status.
+> Audit date: **2026-08-24**.
+> Repository baseline: `main` after accepted Stage 21D fleet-readiness/command/order/strategic-movement
+> implementation merge, with Stage 21E now the first remaining living-world slice.
 
 ## 1. Verified status
 
 | Stage | Actual status | What is complete | What remains |
 |---|---|---|---|
-| 21 — Living World | **ACTIVE** | 21.0 generated runtime/UI; 21A actor lifecycle/observations; 21B persistent strategic intent/goals; 21C diplomacy, crisis, obligations and causal legal-war lifecycle | 21D–21I: fleet readiness/orders, physical operations, territory, recovery, NPC/missions/reputation and final soak |
+| 21 — Living World | **ACTIVE** | 21.0 generated runtime/UI; 21A actor lifecycle/observations; 21B persistent strategic intent/goals; 21C diplomacy/crisis/obligations/causal legal war; 21D finite readiness/command groups/lawful orders/neighbor movement | 21E–21I: physical operations, territory, recovery, NPC/missions/reputation and final soak |
 | 22 — Content / Technology / Balance Alpha | **PLANNED** | foundational schemas/physics/industry and provisional test packs exist | production catalog, faction packages, content breadth, progression, balance, art/audio/narrative breadth and long-run alpha gate |
 | 23 — Polish / Release Candidate | **PLANNED** | first responsive command UI and developer Windows launcher exist | final UX/accessibility/onboarding, production assets, performance, save recovery, package and RC validation |
 
-Stage 21A, Stage 21B and Stage 21C are implemented and accepted. Stage 21C is merged in `main` via
-PR #324, with README closeout synchronized via PR #325. **Stage 21D is the first remaining Stage-21
-implementation slice.** Existing Stage-17/19 authorities remain upstream law/warfare boundaries and
-must be consumed rather than replaced by later living-world work.
+Stage 21A, Stage 21B, Stage 21C and **Stage 21D are implemented and accepted**. Stage 21D was
+merged in `main` via PR #327 from exact green head `52671c0070184323cca1e0ca56695f3c5b03aa97`;
+the resulting implementation merge commit is `517f32f1d0bd9260fcb090af20888cd5ad8e0e3d`.
+**Stage 21E is the first remaining Stage-21 implementation slice.** Existing Stage-17/18/19
+authorities remain upstream legal/service/warfare boundaries and must be consumed rather than
+replaced by later living-world work.
 
 ## 2. Product outcome
 
@@ -42,15 +44,16 @@ with an inspectable vertical result.
 1. **21A — COMPLETE:** actor observation, evidence, scheduling and decision traces.
 2. **21B — COMPLETE:** durable goals, feasibility, commitment and arbitration.
 3. **21C — COMPLETE:** diplomacy, bounded counter-offers, crises, obligations, causal war and peace hysteresis using Stage-17/19 authority.
-4. **21D — NEXT:** readiness, command groups, lawful orders and neighbor-only movement.
-5. **21E–21G:** operations, losses, occupation/control, peace and economy-funded recovery.
-6. **21H:** NPC/mission/reputation layer grounded in the now-moving world.
-7. **21I:** integrated UI, migration, corpus, performance and long-run closure.
-8. **22.0 + Imperial gold slice:** freeze content governance and prove one faction package.
-9. **Stage-22 catalog breadth:** technology, hulls, stations, four contrast factions and minor actors.
-10. **Stage-22 balance/freeze:** progression, world distribution, fleet/logistics/economy soaks.
-11. **23A–23E:** scope lock, production UX, accessibility, onboarding and final media.
-12. **23F–23J:** performance, saves, packaging, QA and exact RC gate.
+4. **21D — COMPLETE:** readiness, command groups, lawful orders, persistence and neighbor-only movement.
+5. **21E — NEXT:** persistent strategic operations, actor-bounded contact and exact Stage-19 physical consequences.
+6. **21F–21G:** occupation/control, peace and economy-funded recovery.
+7. **21H:** NPC/mission/reputation layer grounded in the now-moving world.
+8. **21I:** integrated UI, migration, corpus, performance and long-run closure.
+9. **22.0 + Imperial gold slice:** freeze content governance and prove one faction package.
+10. **Stage-22 catalog breadth:** technology, hulls, stations, four contrast factions and minor actors.
+11. **Stage-22 balance/freeze:** progression, world distribution, fleet/logistics/economy soaks.
+12. **23A–23E:** scope lock, production UX, accessibility, onboarding and final media.
+13. **23F–23J:** performance, saves, packaging, QA and exact RC gate.
 
 Stage-22 concept and writing work may begin in parallel with Stage 21, but it cannot define hidden
 mechanics or mass-balance against temporary interfaces. Stage 23 polish may prototype early, but
@@ -72,9 +75,9 @@ The merged 21A slice provides:
 - generated-runtime composition and exact persistence continuation;
 - tests for ordering, hidden/stale evidence, deadline continuity and bounded 10,000-actor work.
 
-This foundation owns no treasury, fleets, relations, territory or war mutation. Stage 21B and Stage
-21C are now accepted consumers of this boundary; **Stage 21D is the first remaining implementation
-target**.
+This foundation owns no treasury, fleets, relations, territory or war mutation. Stage 21B, Stage 21C
+and Stage 21D are now accepted consumers of this boundary; **Stage 21E is the first remaining
+implementation target**.
 
 ### 4.2 Accepted strategic-intent proof — 21B COMPLETE
 
@@ -117,16 +120,28 @@ Accepted negative proofs:
 - future actor evidence and invalid cross-layer treaty/conflict references fail closed;
 - production-materializable generated worlds exercise trade, deterrence, negotiated resolution and causal war while the frozen Stage-20 seed corpus remains tie-break-only evidence.
 
-### 4.4 21D NEXT / 21E military proof
+### 4.4 Accepted 21D force-command proof / 21E NEXT military proof
 
-Build from real `FleetId` entities:
+Accepted Stage-21D implementation map: `docs/stage21d_fleet_readiness_command_movement.md`.
+
+Stage 21D now proves from real `FleetId` entities:
 
 - readiness projection from fit, damage, ammunition, propellant, maintenance, crew and access;
 - persistent command-group wrapper without replacing member identities;
-- order validation and reserved commitment;
-- route and staging through known neighbor topology;
-- contact acquisition and Stage-19 materialization only when forces physically meet;
+- all fifteen order families through one PLAYER/AI validation boundary;
+- reserved/home-defense/risk/service feasibility constraints;
+- deterministic route and staging through known neighbor topology and legal access;
+- movement only through the ordinary jump FSM, including exact-hop idempotency and recoverable lagging-member dispatch;
+- command persistence layered over unchanged Stage-20/21C exact fleet/transit authority;
+- no strategic combat-power shortcut or Stage-21D free repair/rearm/refuel authority.
+
+Stage 21E must now add, without replacing those boundaries:
+
+- persistent operation identity and participant/objective/ROE/supply/withdrawal state;
+- actor-bounded contact acquisition before interception or battle materialization;
+- Stage-19 tactical materialization only when forces physically meet;
 - exact return of damage, stores, survivors and destroyed identities;
+- blockade/interdiction effects through actual traffic/handling/route state;
 - no strategic combat-power shortcut as sole resolution authority.
 
 Initial operation ladder:

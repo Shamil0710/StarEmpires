@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-23 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21C COMPLETE; 21D NEXT.**
+> **Последняя синхронизация: 2026-08-24 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21D COMPLETE; 21E NEXT.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -43,7 +43,7 @@
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21 / 21D NEXT** |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21 / 21E NEXT** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
@@ -479,7 +479,7 @@ Canonical completion evidence:
 
 ## 9. Stage 21 — RPG / Living World
 
-**ACTIVE — Stage 20/20.5 and Stage 21.0–21C are complete; Stage 21D is OPEN/NEXT.**
+**ACTIVE — Stage 20/20.5 and Stage 21.0–21D are complete; Stage 21E is OPEN/NEXT.**
 
 NPCs, missions, discovery and reputation consume authoritative physical/economic/political state rather than a disconnected scripted world.
 
@@ -508,8 +508,9 @@ The mandatory Stage-21 closure chain is now:
 - **21B — COMPLETE** — explainable strategic goals, feasibility, commitment and anti-oscillation;
 - **21C — COMPLETE** — diplomacy, counter-offers, treaties, crises, alliances, causal war declarations,
   ceasefire/peace hysteresis and compositional persistence;
-- **21D — NEXT** — physical fleet readiness, command groups, validated orders and neighbor movement;
-- **21E** — raids, escorts, interceptions, blockades, invasions and Stage-19 physical consequences;
+- **21D — COMPLETE** — finite physical readiness, persistent command groups, shared PLAYER/AI order validation,
+  legal neighbor routing, recoverable ordinary jump dispatch and compositional persistence;
+- **21E — NEXT** — raids, escorts, interceptions, blockades, invasions and Stage-19 physical consequences;
 - **21F** — claims, occupation, stabilization, recognition and gradual control transition;
 - **21G** — peace, demobilization, repair, rearmament and economy-funded replacement;
 - **21H** — persistent NPCs, missions, discovery and reputation grounded in living-world state;
@@ -520,6 +521,9 @@ Canonical detailed plan and exit criteria:
 
 Accepted Stage-21C implementation/acceptance map:
 `docs/stage21c_diplomacy_crisis_lifecycle.md`.
+
+Accepted Stage-21D implementation/acceptance map:
+`docs/stage21d_fleet_readiness_command_movement.md`.
 
 Stage 21 is not complete when factions merely own systems and patrols. Completion requires the
 causal loop `interests → diplomacy/crisis → physical fleet operation → losses/territory → political
@@ -609,16 +613,16 @@ Stage 17 COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
-→ Stage 21 RPG / Living World ACTIVE — 21.0 + 21A + 21B + 21C COMPLETE; 21D NEXT
+→ Stage 21 RPG / Living World ACTIVE — 21.0 + 21A + 21B + 21C + 21D COMPLETE; 21E NEXT
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 21D.** Stage 21C now supplies persistent proposals,
-crises, obligations and causal legal wars over the accepted Stage-17/19 authorities. The next slice
-must turn real existing `FleetId` assets into finite readiness/command-group/order state using
-ordinary neighbor movement, access and service constraints. Stage 21D is identified as NEXT here but
-is intentionally not started by the Stage-21C closeout.
+**Immediate implementation priority is Stage 21E.** Stage 21D now supplies finite readiness,
+command-group identity, shared validated orders and lawful neighbor-only movement over real existing
+`FleetId` assets while preserving Stage-17 access, Stage-18 service and ordinary jump authority.
+Stage 21E must add persistent operation/contact/materialization/consequence flow through Stage 19;
+it is identified as NEXT here but is intentionally not started by the Stage-21D closeout.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
 file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.

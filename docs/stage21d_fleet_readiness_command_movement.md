@@ -1,6 +1,6 @@
 # Stage 21D — Fleet readiness, command groups and strategic movement
 
-**Status:** implementation and acceptance work is present on PR #327; exact-head CI/review/merge gate is still required before Stage 21D may be marked COMPLETE. Stage 21E is intentionally out of scope.
+**Status: COMPLETE.** Implementation merged via PR #327 from exact green head `52671c0070184323cca1e0ca56695f3c5b03aa97`; required CI run #4757 (`32665321371`) and Java 17 verification job `97257705063` completed successfully. Merge commit on `main`: `517f32f1d0bd9260fcb090af20888cd5ad8e0e3d`. **Stage 21E is OPEN/NEXT and intentionally not implemented here.**
 
 ## Scope
 
@@ -173,6 +173,16 @@ The Stage-20.5 checkpoint remains the authority for exact local/transit fleet st
 - **In-transit fleets retain identity, fit, damage, cargo and arrival authority across save/load:** Stage 21D embeds unchanged Stage-20/21C authority; generated mid-transit acceptance restores the same `FleetId`, jump state, entity payload and exact arrival authority before ordinary arrival.
 - **Fleet lacking fuel/ammunition/access cannot silently execute:** shared submission validation fails closed before an order is accepted.
 - **Double assignment, teleport, duplicate arrival and free repair/rearm are rejected:** command-state uniqueness, one-active-order rule, neighbor routing, exact-hop idempotency, recoverable staggered dispatch, physical-arrival reconciliation and service-request-only execution enforce these boundaries.
+
+## Closeout evidence
+
+- implementation PR: `#327`;
+- exact green implementation head: `52671c0070184323cca1e0ca56695f3c5b03aa97`;
+- required CI: run `32665321371` / run #4757 — **SUCCESS**;
+- Java 17 verification job `97257705063` — **SUCCESS**;
+- merged implementation commit on `main`: `517f32f1d0bd9260fcb090af20888cd5ad8e0e3d`;
+- review submissions, review threads and PR comments were empty at the merge gate;
+- Stage 21E remains the next slice and has not been started by this closeout.
 
 ## Later-stage boundary
 
