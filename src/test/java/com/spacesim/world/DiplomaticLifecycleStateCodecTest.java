@@ -43,17 +43,31 @@ class DiplomaticLifecycleStateCodecTest {
     }
 
     @Test
-    void corruptTruncatedTrailingAndFuturePayloadsFailClosed() {
+    void corruptTruncatedTrailingStaleAndFuturePayloadsFailClosed() {
         byte[] encoded = DiplomaticLifecycleStateCodec.encode(representativeState());
 
         byte[] corruptMagic = encoded.clone();
         corruptMagic[0] ^= 0x01;
         assertThrows(IllegalArgumentException.class, () -> DiplomaticLifecycleStateCodec.decode(corruptMagic));
+
         assertThrows(
                 IllegalArgumentException.class,
                 () -> DiplomaticLifecycleStateCodec.decode(Arrays.copyOf(encoded, encoded.length - 1)));
+
         byte[] trailing = Arrays.copyOf(encoded, encoded.length + 1);
         assertThrows(IllegalArgumentException.class, () -> DiplomaticLifecycleStateCodec.decode(trailing));
+
+        byte[] staleFileVersion = encoded.clone();
+        staleFileVersion[7] = 0;
+        assertThrows(IllegalArgumentException.class, () -> DiplomaticLifecycleStateCodec.decode(staleFileVersion));
+
+        byte[] futureFileVersion = encoded.clone();
+        futureFileVersion[7] = 2;
+        assertThrows(IllegalArgumentException.class, () -> DiplomaticLifecycleStateCodec.decode(futureFileVersion));
+
+        byte[] futureSchemaVersion = encoded.clone();
+        futureSchemaVersion[11] = 2;
+        assertThrows(IllegalArgumentException.class, () -> DiplomaticLifecycleStateCodec.decode(futureSchemaVersion));
     }
 
     @Test
