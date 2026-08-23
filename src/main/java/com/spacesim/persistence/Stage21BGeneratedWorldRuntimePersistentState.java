@@ -28,9 +28,9 @@ public record Stage21BGeneratedWorldRuntimePersistentState(
         Stage21AGeneratedWorldRuntimePersistentState stage21ARuntime,
         List<FactionStrategicIntentState> strategicIntents) {
     /** Current Stage-21B checkpoint composition schema. */
-    public static final int CURRENT_VERSION = 3;
+    public static final int CURRENT_VERSION = 4;
     /** Stable Stage-21B runtime composition contract. */
-    public static final String CURRENT_RUNTIME_VERSION = "stage21b.generated-world-strategic-intent.v3";
+    public static final String CURRENT_RUNTIME_VERSION = "stage21b.generated-world-strategic-intent.v4";
 
     /**
      * Validates one-to-one living-actor/intent ownership and canonicalizes intent rows.
