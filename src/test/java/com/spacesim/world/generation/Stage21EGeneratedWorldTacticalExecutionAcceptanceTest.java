@@ -261,7 +261,27 @@ class Stage21EGeneratedWorldTacticalExecutionAcceptanceTest {
             assertTrue(runtime.world().findFleetJump(fleetId).isEmpty(),
                     "ordinary target movement must finish every topology hop");
             assertEquals(route.get(index), runtime.world().findFleet(fleetId).orElseThrow().systemId());
+            if (index + 1 < route.size()) {
+                awaitFittedCooldown(runtime, fleetId);
+            }
         }
+    }
+
+    private static void awaitFittedCooldown(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
+            FleetId fleetId) {
+        for (int attempt = 0; attempt < 400; attempt++) {
+            FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
+            Entity entity = runtime.world().findSession(placement.systemId()).orElseThrow()
+                    .getEntityRegistry().require(placement.localEntityId());
+            EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
+            if (engineering == null || engineering.runtimeState.ftlCooldownSecondsByMount().values().stream()
+                    .noneMatch(value -> value > 0d)) {
+                return;
+            }
+            runtime.advanceFrame(0.25f);
+        }
+        throw new AssertionError("ordinary fitted FTL cooldown did not clear through simulation time");
     }
 
     private static List<StarSystemId> route(
