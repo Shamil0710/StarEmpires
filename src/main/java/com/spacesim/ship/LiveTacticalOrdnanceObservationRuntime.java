@@ -2,7 +2,6 @@ package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
-import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.ship.ElectronicWarfareState.NoiseJammer;
@@ -111,7 +110,7 @@ public final class LiveTacticalOrdnanceObservationRuntime {
         if (decoyRuntime != null && decoyRuntime.ordnanceRuntime() != ordnanceRuntime) {
             throw new IllegalArgumentException("decoyRuntime must wrap the same ordnanceRuntime instance");
         }
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        engineeringCatalog = battleState().engineeringCatalog();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         sensorAdapter = new ShipSensorEngineeringAdapter();
