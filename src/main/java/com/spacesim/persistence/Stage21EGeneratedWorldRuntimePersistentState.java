@@ -101,6 +101,10 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
             requireSystem(systems, operation.withdrawalPolicy().fallbackSystemId(), "fallback", operation.id());
             for (FleetId fleetId : operation.participantFleetIds()) {
                 Integer owner = currentFleetOwners.get(fleetId);
+                if (operation.status().active() && owner == null) {
+                    throw new IllegalArgumentException(
+                            "active Stage-21E participant is absent from ordinary world: " + fleetId);
+                }
                 if (owner != null && owner != operation.factionId()) {
                     throw new IllegalArgumentException(
                             "Stage-21E participant current owner differs from operation: " + fleetId);
