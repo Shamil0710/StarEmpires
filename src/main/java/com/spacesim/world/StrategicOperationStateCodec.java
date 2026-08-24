@@ -17,7 +17,6 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 
 /** Deterministic bounded binary codec for persistent Stage-21E operation metadata. */
@@ -31,7 +30,12 @@ public final class StrategicOperationStateCodec {
 
     private StrategicOperationStateCodec() { throw new AssertionError("No instances"); }
 
-    /** Encodes canonical operation state deterministically. */
+    /**
+     * Encodes canonical operation state deterministically.
+     *
+     * @param state validated persistent Stage-21E operation state
+     * @return deterministic bounded operation payload bytes
+     */
     public static byte[] encode(StrategicOperationState state) {
         StrategicOperationState checked = Objects.requireNonNull(state, "state");
         if (checked.operations().size() > MAX_OPERATIONS) throw new IllegalArgumentException("too many operations");
@@ -52,7 +56,12 @@ public final class StrategicOperationStateCodec {
         }
     }
 
-    /** Decodes canonical operation state and fails closed on corrupt/future/trailing data. */
+    /**
+     * Decodes canonical operation state and fails closed on corrupt, future or trailing data.
+     *
+     * @param bytes encoded Stage-21E operation payload
+     * @return decoded and validated persistent operation state
+     */
     public static StrategicOperationState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
         if (bytes.length <= 0 || bytes.length > MAX_BYTES) throw new IllegalArgumentException("operation payload outside bounds");
