@@ -55,7 +55,7 @@ public final class LiveTacticalBattleOrdnanceRuntime {
      */
     public LiveTacticalBattleOrdnanceRuntime(LiveTacticalBattleWeaponRuntime weaponRuntime) {
         this.weaponRuntime = Objects.requireNonNull(weaponRuntime, "weaponRuntime");
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        engineeringCatalog = battleState().engineeringCatalog();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
         calculator = new DerivedShipCalculator(engineeringCatalog);
