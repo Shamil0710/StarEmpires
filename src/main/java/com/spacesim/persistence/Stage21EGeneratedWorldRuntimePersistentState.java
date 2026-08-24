@@ -115,6 +115,11 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
             }
             if (operation.encounter() != null) {
                 requireSystem(systems, operation.encounter().systemId(), "encounter", operation.id());
+                if (operation.encounter().active()) {
+                    throw new IllegalArgumentException(
+                            "Stage-21E checkpoint cannot retain an active transient tactical encounter: "
+                                    + operation.id());
+                }
             }
         }
     }
