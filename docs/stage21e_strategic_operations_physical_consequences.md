@@ -24,6 +24,7 @@ It does **not** store combat strength, synthetic losses, production debuffs, dup
 
 Stage 21E composes these existing owners rather than replacing them:
 
+- **Stage 17 faction identity directory** — `FactionIdentityResolver` binds dense ECS faction slots to stable faction content identities. Contact acquisition uses this existing authority to prove that an actor-bounded observation belongs to the operation owner before any report evidence is inspected.
 - **Stage 21A actor observations** — `FactionActorObservationSnapshot` supplies provenance and freshness for target acquisition. The operation service has no hidden-world lookup path for discovering targets.
 - **Stage 21D fleet/command state** — `FleetCommandState`, `FleetForceRegistry`, `FleetReadinessState`, `FleetOrderSubmissionService` and ordinary movement remain the fleet identity, readiness, command and travel authorities.
 - **Stage 19 physical warfare** — `PhysicalWarfareOperation` and `PhysicalWarfareOperationService` decide whether blockade/interdiction has a real combat-capable physical anchor.
@@ -54,7 +55,7 @@ Important invariants:
 
 ## 4. Contact acquisition and information latency
 
-`StrategicOperationService.acquireContact(...)` accepts only a current `SECURITY` observation whose target identity is the exact ordinary `FleetId` string.
+`StrategicOperationService.acquireContact(...)` accepts only a current `SECURITY` observation whose target identity is the exact ordinary `FleetId` string. Before examining the report, the service resolves the operation's dense faction slot through the existing Stage-17 `FactionIdentityResolver` and requires the snapshot's stable `factionContentId` to match. A current report owned by another faction therefore cannot leak contact knowledge into the operation.
 
 Allowed evidence channels are limited to actor-bounded sensor/intelligence/owned-asset/discovery reports. Freshness is evaluated at the decision tick and the exact provenance is persisted in `ContactState`.
 
@@ -164,7 +165,11 @@ Current schema/runtime identity:
 
 Decode fails closed on invalid magic, future file/schema versions, corrupt bounds, incompatible active group/order/system references and trailing bytes.
 
-Historical participant identities and terminal group/order references may remain in operation metadata after a real physical loss. Existing surviving fleet owners are still cross-checked against the operation faction. This allows a post-battle checkpoint to remember which ordinary identity was lost without resurrecting it or weakening the Stage-21D live-command validation contract.
+Every active operation participant must still exist in ordinary physical fleet authority at the full checkpoint boundary and must retain the operation's owner. Missing `FleetId` references are permitted only in terminal historical operation metadata after a real physical loss. Existing surviving fleet owners are still cross-checked against the operation faction.
+
+The full Stage-21E checkpoint also rejects an encounter reference that is still active. Tactical execution is deliberately synchronous: an `ENGAGED` in-memory transition may exist only while the Stage-19 authority owns that exact exchange, and physical consequences plus a resolved encounter reference must be committed before checkpoint composition. This prevents a save from preserving metadata for a tactical runtime that no longer exists after load.
+
+Together these rules allow a post-battle checkpoint to remember which ordinary identity was lost without resurrecting it, weakening Stage-21D live-command validation, or creating a phantom mid-battle continuation path.
 
 ## 11. Acceptance evidence
 
@@ -172,16 +177,19 @@ Automated coverage includes:
 
 - deterministic operation-state roundtrip including retained contact and tactical encounter metadata;
 - corrupt magic, future payload version and trailing bytes fail closed;
-- current actor-bounded security evidence can create a contact;
+- current actor-bounded security evidence can create a contact only when its stable faction identity matches the operation owner resolved by Stage 17;
+- current evidence belonging to another faction is rejected before contact creation;
 - stale evidence cannot reveal/materialize a target;
 - only the six Stage-21E roadmap operation families are admitted from Stage-21D orders;
-- exact generated-world Stage-19 execution moves hostile fleets through ordinary topology hops, commits real damage/stores/losses to ordinary fleet authority, creates no replacement fleets and yields byte-identical repeated outcomes;
+- exact generated-world Stage-19 execution moves hostile fleets through ordinary topology hops, commits real damage/stores and at least one real ordinary `FleetId` loss, creates no replacement fleets and yields byte-identical repeated outcomes;
 - Stage-19 exact import accepts the original doctrine fit and its one registered strategic variant while rejecting arbitrary same-hull mutation;
 - the Stage-17.5I/19 doctrine loader remains unchanged by Stage-21 content composition, while every registered strategic fit replaces exactly one datalink mount with one physical FTL module;
 - strategic FTL planning/commit is covered for translated mass, energy, local heat and cooldown, and destroyed FTL hardware fails the damage-aware production resolver;
 - a generated military fleet completes an ordinary topology-neighbor jump through the existing world jump FSM, retains the same `FleetId` and fit, and retains physical energy/heat/cooldown evidence of FTL use;
 - post-battle command cleanup removes destroyed `FleetId` references from live Stage-21D command state while terminal operation history remains valid;
+- an active operation with a missing ordinary participant fails full-checkpoint validation while terminal history may retain the lost identity;
 - full post-battle Stage-21E checkpoint roundtrip embeds the exact already-committed ordinary physical world and contains no hidden active tactical runtime;
+- a full checkpoint explicitly rejects an active transient tactical encounter reference;
 - a physically anchored hostile blockade prevents the actual Stage-20 source-loading mutation and leaves freight state unchanged;
 - a physically anchored hostile interception prevents the actual Stage-20 next-hop request before the ordinary jump FSM starts;
 - friendly operation presence does not deny its own ordinary freight handling;
