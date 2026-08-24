@@ -22,7 +22,12 @@ import java.util.Set;
  */
 public record StrategicOperationState(long nextOperationId, List<OperationState> operations) {
 
-    /** Validates allocator identity and canonicalizes operation order. */
+    /**
+     * Validates allocator identity and canonicalizes operation order.
+     *
+     * @param nextOperationId next positive operation identity watermark
+     * @param operations persistent operations to validate and canonicalize
+     */
     public StrategicOperationState {
         if (nextOperationId <= 0L) {
             throw new IllegalArgumentException("nextOperationId must be positive");
@@ -56,7 +61,12 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
         return new StrategicOperationState(1L, List.of());
     }
 
-    /** Resolves one operation or fails closed. */
+    /**
+     * Resolves one operation or fails closed.
+     *
+     * @param operationId positive persistent operation identity
+     * @return matching persistent operation
+     */
     public OperationState requireOperation(long operationId) {
         return operations.stream()
                 .filter(operation -> operation.id() == operationId)
@@ -64,14 +74,24 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
                 .orElseThrow(() -> new IllegalArgumentException("unknown strategic operation: " + operationId));
     }
 
-    /** Finds the single active operation for one command group. */
+    /**
+     * Finds the single active operation for one command group.
+     *
+     * @param commandGroupId Stage-21D command group identity
+     * @return active operation when present
+     */
     public Optional<OperationState> activeForCommandGroup(long commandGroupId) {
         return operations.stream()
                 .filter(operation -> operation.commandGroupId() == commandGroupId && operation.status().active())
                 .findFirst();
     }
 
-    /** Adds one newly allocated operation. */
+    /**
+     * Adds one newly allocated operation.
+     *
+     * @param operation operation whose identity equals the allocator watermark
+     * @return immutable state containing the new operation
+     */
     public StrategicOperationState add(OperationState operation) {
         OperationState checked = Objects.requireNonNull(operation, "operation");
         if (checked.id() != nextOperationId) {
@@ -82,7 +102,12 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
         return new StrategicOperationState(Math.addExact(nextOperationId, 1L), next);
     }
 
-    /** Replaces an existing operation without changing its identity. */
+    /**
+     * Replaces an existing operation without changing its identity.
+     *
+     * @param replacement replacement lifecycle state for an existing operation
+     * @return immutable state containing the replacement
+     */
     public StrategicOperationState replace(OperationState replacement) {
         OperationState checked = Objects.requireNonNull(replacement, "replacement");
         ArrayList<OperationState> next = new ArrayList<>(operations.size());
@@ -145,7 +170,13 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
             int minimumMissionReadinessBps,
             int minimumSupplyAccessBps,
             long maximumUnsupportedTicks) {
-        /** Validates bounded decision thresholds. */
+        /**
+         * Validates bounded decision thresholds.
+         *
+         * @param minimumMissionReadinessBps minimum derived mission readiness in basis points
+         * @param minimumSupplyAccessBps minimum observed supply access in basis points
+         * @param maximumUnsupportedTicks maximum continuous unsupported duration
+         */
         public SupplyPolicy {
             requireBps(minimumMissionReadinessBps, "minimumMissionReadinessBps");
             requireBps(minimumSupplyAccessBps, "minimumSupplyAccessBps");
@@ -168,7 +199,14 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
             int withdrawBelowReadinessBps,
             boolean withdrawWhenOutOfAmmunition,
             boolean withdrawWhenOutOfPropellant) {
-        /** Validates one physical withdrawal decision policy. */
+        /**
+         * Validates one physical withdrawal decision policy.
+         *
+         * @param fallbackSystemId lawful physical fallback destination
+         * @param withdrawBelowReadinessBps readiness threshold that triggers withdrawal
+         * @param withdrawWhenOutOfAmmunition whether zero ammunition forces withdrawal
+         * @param withdrawWhenOutOfPropellant whether zero propellant makes the operation fail closed
+         */
         public WithdrawalPolicy {
             Objects.requireNonNull(fallbackSystemId, "fallbackSystemId");
             requireBps(withdrawBelowReadinessBps, "withdrawBelowReadinessBps");
@@ -192,7 +230,16 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
             String provenanceId,
             long observedAtTick,
             long freshUntilTick) {
-        /** Validates contact identity/provenance without consulting hidden world truth. */
+        /**
+         * Validates contact identity and provenance without consulting hidden world truth.
+         *
+         * @param targetFleetId ordinary physical fleet identity reported to the actor
+         * @param observedSystemId actor-known system in which the target was observed
+         * @param channel allowed actor-bounded observation channel
+         * @param provenanceId stable source report identity
+         * @param observedAtTick tick at which the actor received the report
+         * @param freshUntilTick inclusive freshness horizon, or -1 for durable evidence
+         */
         public ContactState {
             Objects.requireNonNull(targetFleetId, "targetFleetId");
             Objects.requireNonNull(observedSystemId, "observedSystemId");
@@ -212,7 +259,12 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
             }
         }
 
-        /** @return true when this report is available/current at the supplied tick */
+        /**
+         * Tests whether the retained actor-known report is current at a tick.
+         *
+         * @param tick authoritative non-negative review tick
+         * @return true when the report exists by that tick and has not exceeded its freshness horizon
+         */
         public boolean currentAt(long tick) {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");
@@ -236,7 +288,15 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
             StarSystemId systemId,
             long materializedAtTick,
             long resolvedAtTick) {
-        /** Validates a tactical reference while leaving battle contents in Stage 19. */
+        /**
+         * Validates a tactical reference while leaving battle contents in Stage 19.
+         *
+         * @param encounterId deterministic positive encounter identity
+         * @param targetFleetId opposing ordinary FleetId
+         * @param systemId exact physical encounter system
+         * @param materializedAtTick non-negative tactical materialization tick
+         * @param resolvedAtTick resolution tick, or -1 while active
+         */
         public TacticalEncounterState {
             if (encounterId <= 0L) {
                 throw new IllegalArgumentException("encounterId must be positive");
@@ -299,7 +359,28 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
             ContactState contact,
             TacticalEncounterState encounter) {
 
-        /** Validates and canonicalizes one operation. */
+        /**
+         * Validates and canonicalizes one operation.
+         *
+         * @param id stable positive operation identity
+         * @param type physical operation family
+         * @param commandGroupId Stage-21D command group identity
+         * @param sourceOrderId accepted Stage-21D source order identity
+         * @param factionId owning faction runtime identifier
+         * @param participantFleetIds non-empty ordinary participating FleetIds
+         * @param stagingSystemId physical staging system at admission
+         * @param objectiveSystemId physical objective system
+         * @param objectiveId stable concrete objective identity
+         * @param rulesOfEngagement explicit engagement policy
+         * @param supplyPolicy explicit physical readiness/supply policy
+         * @param withdrawalPolicy explicit physical fallback/withdrawal policy
+         * @param status current operation lifecycle state
+         * @param createdAtTick non-negative creation tick
+         * @param lastTransitionTick latest lifecycle transition tick
+         * @param unsupportedSinceTick first unsupported tick, or -1
+         * @param contact retained actor-bounded target contact, or null
+         * @param encounter Stage-19 tactical encounter reference, or null
+         */
         public OperationState {
             if (id <= 0L || commandGroupId <= 0L || sourceOrderId <= 0L) {
                 throw new IllegalArgumentException("operation/group/order identities must be positive");
@@ -345,7 +426,16 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
             }
         }
 
-        /** Returns an immutable lifecycle replacement. */
+        /**
+         * Returns an immutable lifecycle replacement.
+         *
+         * @param nextStatus next operation lifecycle state
+         * @param tick non-decreasing lifecycle transition tick
+         * @param nextUnsupportedSinceTick next unsupported-supply watermark, or -1
+         * @param nextContact retained actor-bounded contact, or null
+         * @param nextEncounter retained Stage-19 tactical reference, or null
+         * @return immutable operation retaining identity and physical participants
+         */
         public OperationState withLifecycle(
                 OperationStatus nextStatus,
                 long tick,
