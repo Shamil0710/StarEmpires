@@ -17,6 +17,7 @@ import com.spacesim.world.FleetCommandState.FleetOrderState;
 import com.spacesim.world.FleetCommandState.OrderSource;
 import com.spacesim.world.FleetCommandState.OrderStatus;
 import com.spacesim.world.FleetCommandState.OrderType;
+import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.FleetReadinessState;
@@ -77,6 +78,39 @@ class Stage21EGeneratedWorldRuntimePersistenceAcceptanceTest {
     }
 
     @Test
+    void activeOperationCannotPersistMissingParticipantButTerminalHistoryMayRetainIt() {
+        Stage20GeneratedWorldRuntimeBridge.LiveRuntime stage20 = Stage20PlayableGeneratedWorldFactory.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
+        FleetPlacementState local = stage20.world().getFleetPlacements().stream()
+                .filter(value -> value.locationKind() == FleetLocationKind.IN_SYSTEM)
+                .filter(value -> authoritativeFactionId(stage20, value) >= 0)
+                .findFirst().orElseThrow();
+        int factionId = authoritativeFactionId(stage20, local);
+        long now = stage20.world().getAuthoritativeWorldTick();
+        FleetId missing = new FleetId(Long.MAX_VALUE);
+
+        CommandGroupState group = new CommandGroupState(
+                1L, factionId, "Persistence Guard", List.of(local.id()), local.systemId(),
+                false, false, FleetReadinessState.FULL);
+        FleetOrderState order = new FleetOrderState(
+                1L, group.id(), OrderType.BLOCKADE, OrderSource.AI, local.systemId(),
+                List.of(local.systemId()), 0, now, now + 100L, OrderStatus.ACTIVE);
+        Stage21DGeneratedWorldRuntimePersistentState stage21d = Stage21DGeneratedWorldRuntimePersistentState.compose(
+                stage21c(stage20), new FleetCommandState(2L, 2L, List.of(group), List.of(order)));
+
+        OperationState active = operation(
+                group, order, factionId, List.of(local.id(), missing), local, now, OperationStatus.ACTIVE);
+        assertThrows(IllegalArgumentException.class, () -> Stage21EGeneratedWorldRuntimePersistentState.compose(
+                stage21d, new StrategicOperationState(2L, List.of(active))));
+
+        OperationState terminal = operation(
+                group, order, factionId, List.of(local.id(), missing), local, now, OperationStatus.FAILED);
+        Stage21EGeneratedWorldRuntimePersistentState historical = Stage21EGeneratedWorldRuntimePersistentState.compose(
+                stage21d, new StrategicOperationState(2L, List.of(terminal)));
+        assertEquals(List.of(local.id(), missing), historical.operationState().requireOperation(1L).participantFleetIds());
+    }
+
+    @Test
     void futureFileAndSchemaVersionsFailClosed() {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime stage20 = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
@@ -95,6 +129,23 @@ class Stage21EGeneratedWorldRuntimePersistenceAcceptanceTest {
         ByteBuffer.wrap(futureSchema).putInt(8, Stage21EGeneratedWorldRuntimePersistentState.CURRENT_VERSION + 1);
         assertThrows(IllegalArgumentException.class,
                 () -> Stage21EGeneratedWorldRuntimePersistenceCodec.decode(futureSchema));
+    }
+
+    private static OperationState operation(
+            CommandGroupState group,
+            FleetOrderState order,
+            int factionId,
+            List<FleetId> participants,
+            FleetPlacementState local,
+            long now,
+            OperationStatus status) {
+        return new OperationState(
+                1L, OperationType.BLOCKADE, group.id(), order.id(), factionId, participants,
+                local.systemId(), local.systemId(), "system:" + local.systemId().value(),
+                RulesOfEngagement.DECLARED_HOSTILES,
+                new SupplyPolicy(3_000, 1_000, 200L),
+                new WithdrawalPolicy(local.systemId(), 2_000, true, true),
+                status, now, now, -1L, null, null);
     }
 
     private static Stage21CGeneratedWorldRuntimePersistentState stage21c(
