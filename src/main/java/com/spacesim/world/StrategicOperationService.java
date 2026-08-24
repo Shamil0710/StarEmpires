@@ -25,7 +25,19 @@ import java.util.Objects;
  * to an already accepted Stage-21D order and exact ordinary {@link FleetForceRegistry} entries.</p>
  */
 public final class StrategicOperationService {
-    /** Starts a Stage-21E operation from an already accepted active Stage-21D order. */
+    /**
+     * Starts a Stage-21E operation from an already accepted active Stage-21D order.
+     *
+     * @param state current persistent operation state
+     * @param commandState accepted Stage-21D command and order state
+     * @param forces current ordinary physical force reconstruction
+     * @param commandGroupId command group whose active order is admitted
+     * @param currentTick authoritative non-negative world tick
+     * @param rulesOfEngagement explicit engagement policy
+     * @param supplyPolicy explicit physical readiness and supply policy
+     * @param withdrawalPolicy explicit ordinary-route withdrawal policy
+     * @return immutable operation state containing the newly admitted operation
+     */
     public StrategicOperationState beginFromActiveOrder(
             StrategicOperationState state,
             FleetCommandState commandState,
@@ -77,7 +89,15 @@ public final class StrategicOperationService {
                 withdrawalPolicy, initialStatus, currentTick, currentTick, -1L, null, null));
     }
 
-    /** Advances staging only after all participants physically reach the objective system. */
+    /**
+     * Advances staging only after all participants physically reach the objective system.
+     *
+     * @param state current persistent operation state
+     * @param operationId operation to review
+     * @param forces current ordinary physical force reconstruction
+     * @param currentTick authoritative non-negative world tick
+     * @return unchanged state until all participants arrive, otherwise ACTIVE replacement state
+     */
     public StrategicOperationState activateWhenPhysicallyArrived(
             StrategicOperationState state, long operationId, FleetForceRegistry forces, long currentTick) {
         Objects.requireNonNull(state, "state");
@@ -94,7 +114,17 @@ public final class StrategicOperationService {
                 OperationStatus.ACTIVE, currentTick, operation.unsupportedSinceTick(), null, null));
     }
 
-    /** Acquires a target exclusively from an actor-bounded current security observation. */
+    /**
+     * Acquires a target exclusively from an actor-bounded current security observation.
+     *
+     * @param state current persistent operation state
+     * @param operationId active operation identity
+     * @param observations actor-bounded observations already available to the owning faction
+     * @param targetFleetId ordinary target FleetId reported by the actor's information layer
+     * @param observedSystemId system reported by the actor-known observation adapter
+     * @param currentTick authoritative non-negative decision tick
+     * @return state retaining the exact current contact evidence
+     */
     public StrategicOperationState acquireContact(
             StrategicOperationState state,
             long operationId,
@@ -126,7 +156,15 @@ public final class StrategicOperationService {
                 contact, operation.encounter()));
     }
 
-    /** Records that the separate Stage-19 authority accepted exact-local tactical materialization. */
+    /**
+     * Records that the separate Stage-19 authority accepted exact-local tactical materialization.
+     *
+     * @param state current persistent operation state
+     * @param operationId operation owning the encounter
+     * @param encounter validated Stage-19 tactical encounter reference
+     * @param currentTick authoritative non-negative world tick
+     * @return state with the operation moved to ENGAGED
+     */
     public StrategicOperationState markEngaged(
             StrategicOperationState state, long operationId, TacticalEncounterState encounter, long currentTick) {
         Objects.requireNonNull(state, "state");
@@ -144,7 +182,15 @@ public final class StrategicOperationService {
                 operation.contact(), encounter));
     }
 
-    /** Re-evaluates physical readiness/supply without modifying those physical facts. */
+    /**
+     * Re-evaluates physical readiness and supply without modifying those physical facts.
+     *
+     * @param state current persistent operation state
+     * @param operationId operation to review
+     * @param forces current ordinary physical force reconstruction
+     * @param currentTick authoritative non-negative world tick
+     * @return updated state and physical continuation/withdrawal decision
+     */
     public SupplyReview reviewSupplyAndReadiness(
             StrategicOperationState state, long operationId, FleetForceRegistry forces, long currentTick) {
         Objects.requireNonNull(state, "state");
@@ -200,7 +246,12 @@ public final class StrategicOperationService {
         return new SupplyReview(state.replace(refreshed), SupplyDecision.CONTINUE);
     }
 
-    /** Maps only the six Stage-21E operation-bearing Stage-21D order families. */
+    /**
+     * Maps only the six Stage-21E operation-bearing Stage-21D order families.
+     *
+     * @param type accepted Stage-21D strategic order family
+     * @return corresponding Stage-21E physical operation family
+     */
     public static OperationType operationType(OrderType type) {
         return switch (Objects.requireNonNull(type, "type")) {
             case ESCORT -> OperationType.ESCORT;
@@ -222,9 +273,19 @@ public final class StrategicOperationService {
         /** Withdrawal policy requires propellant but none remains. */ FAIL_CANNOT_WITHDRAW
     }
 
-    /** @param state updated operation registry @param decision required continuation action */
+    /**
+     * Result of one physical readiness/supply review.
+     *
+     * @param state updated operation registry
+     * @param decision required continuation action
+     */
     public record SupplyReview(StrategicOperationState state, SupplyDecision decision) {
-        /** Validates a review result. */
+        /**
+         * Validates a review result.
+         *
+         * @param state updated operation registry
+         * @param decision required continuation action
+         */
         public SupplyReview {
             Objects.requireNonNull(state, "state");
             Objects.requireNonNull(decision, "decision");
