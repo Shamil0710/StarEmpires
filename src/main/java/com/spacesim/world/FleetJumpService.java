@@ -2,7 +2,6 @@ package com.spacesim.world;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.EngineeringComponent;
-import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
@@ -55,7 +54,7 @@ final class FleetJumpService {
                 sessionsById,
                 fleetWorldService,
                 timing,
-                new ShipEngineeringRuntime(ShipEngineeringCatalogLoader.loadDefault()),
+                new ProductionFittedJumpResolver(),
                 initialStates);
     }
 
@@ -303,7 +302,7 @@ final class FleetJumpService {
         if (component == null) {
             return Optional.empty();
         }
-        if (component.fit == null || component.runtimeState == null) {
+        if (component.fit == null || component.runtimeState == null || component.instanceState == null) {
             throw new IllegalStateException("Fleet EngineeringComponent is incomplete: " + fleetId);
         }
         JumpPlan plan = Objects.requireNonNull(
@@ -391,7 +390,13 @@ final class FleetJumpService {
         return new FittedJumpResolver() {
             @Override
             public JumpPlan plan(EngineeringComponent component) {
-                return runtime.planJump(component.fit, component.runtimeState);
+                if (component.instanceState == null) {
+                    throw new IllegalStateException("Fleet EngineeringComponent is missing instance state");
+                }
+                return runtime.planJump(
+                        component.fit,
+                        component.runtimeState,
+                        component.instanceState.damage().moduleDamage());
             }
 
             @Override
