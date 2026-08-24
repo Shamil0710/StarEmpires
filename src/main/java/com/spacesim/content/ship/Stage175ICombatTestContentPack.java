@@ -23,10 +23,10 @@ import java.util.Map;
  * <p>Both representative hull vocabulary and doctrine fits deliberately use
  * {@link ShipEngineeringCatalogLoader} rather than a parallel test schema. Stage 19 promotes only
  * the provisional doctrine heavy-impact mass domain needed to contain the already-authored 2,000 kg
- * strike round; Stage 21 additionally registers explicit strategic-mobility variants of the same
- * physical A-E fits. The original Stage-19 fit definitions remain unchanged and continue to be the
- * exact acceptance baseline. Stage 22 may replace or explicitly promote the wider provisional
- * definitions.</p>
+ * strike round. The Stage-17.5I/19 doctrine loader remains stable so older manufacturing and tactical
+ * authorities do not silently absorb later-stage content. Stage 21 composes its explicit strategic
+ * mobility variants through {@link #loadStage21StrategicDoctrines()} instead. Stage 22 may replace or
+ * explicitly promote the wider provisional definitions.</p>
  */
 public final class Stage175ICombatTestContentPack {
     /** Classpath resource for the Stage 17.5I representative hull engineering pack. */
@@ -58,18 +58,33 @@ public final class Stage175ICombatTestContentPack {
     }
 
     /**
-     * Loads the five-doctrine combat pack, applies the explicit Stage-19 strike-mass promotion and
-     * registers explicit Stage-21 strategic-mobility variants.
+     * Loads the five-doctrine Stage-17.5I/19 combat pack and applies only the explicit Stage-19
+     * strike-mass promotion.
      *
-     * <p>The original five demonstrator fits are retained byte-for-semantic-field unchanged. Each
-     * Stage-21 variant differs only by replacing the provisional datalink utility mount with one
-     * ordinary physical FTL module. This is an explicit fitted tradeoff: the variants do not gain a
-     * hidden movement statistic, free slot, duplicate energy store or doctrine/class bonus.</p>
+     * <p>This method intentionally does not register Stage-21 strategic mobility. Stage-18
+     * manufacturing and authored Stage-19 acceptance depend on this older content boundary remaining
+     * stable.</p>
      *
-     * @return immutable validated doctrine engineering catalog containing base and strategic variants
+     * @return immutable validated Stage-17.5I/19 doctrine engineering catalog
      */
     public static ShipEngineeringCatalog loadDoctrines() {
-        return addStage21StrategicMobility(promoteStage19StrikeMass(loadResource(DOCTRINE_RESOURCE)));
+        return promoteStage19StrikeMass(loadResource(DOCTRINE_RESOURCE));
+    }
+
+    /**
+     * Composes the explicit Stage-21 strategic-mobility variants over the stable Stage-17.5I/19
+     * doctrine catalog.
+     *
+     * <p>The original five demonstrator fits are retained semantic-field unchanged. Each Stage-21
+     * variant differs only by replacing the provisional datalink utility mount with one ordinary
+     * physical FTL module. This is an explicit fitted tradeoff: the variants do not gain a hidden
+     * movement statistic, free slot, duplicate energy store or doctrine/class bonus.</p>
+     *
+     * @return immutable validated doctrine catalog containing the five original fits and five exact
+     *         Stage-21 strategic variants
+     */
+    public static ShipEngineeringCatalog loadStage21StrategicDoctrines() {
+        return addStage21StrategicMobility(loadDoctrines());
     }
 
     /**
