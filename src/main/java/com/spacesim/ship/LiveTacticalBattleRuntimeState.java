@@ -49,18 +49,22 @@ public final class LiveTacticalBattleRuntimeState {
      * @param scenario authored exact-local battle roster
      */
     public LiveTacticalBattleRuntimeState(LiveTacticalBattleScenario scenario) {
-        this(Objects.requireNonNull(scenario, "scenario"), Map.of());
+        this(
+                Objects.requireNonNull(scenario, "scenario"),
+                Map.of(),
+                Stage175ICombatTestContentPack.loadDoctrines());
     }
 
     private LiveTacticalBattleRuntimeState(
             LiveTacticalBattleScenario scenario,
-            Map<Long, ImportedCombatantState> importedByEntityId) {
+            Map<Long, ImportedCombatantState> importedByEntityId,
+            ShipEngineeringCatalog engineeringCatalog) {
         this.scenario = Objects.requireNonNull(scenario, "scenario");
         Objects.requireNonNull(importedByEntityId, "importedByEntityId");
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        this.engineeringCatalog = Objects.requireNonNull(engineeringCatalog, "engineeringCatalog");
         protectionCatalog = Stage175ICombatTestProtectionPack.load();
-        engineeringRuntime = new ShipEngineeringRuntime(engineeringCatalog);
-        calculator = new DerivedShipCalculator(engineeringCatalog);
+        engineeringRuntime = new ShipEngineeringRuntime(this.engineeringCatalog);
+        calculator = new DerivedShipCalculator(this.engineeringCatalog);
         shieldAdapter = new ShipShieldEngineeringAdapter();
         shieldRuntime = new ShieldFieldRuntime();
 
@@ -80,10 +84,11 @@ public final class LiveTacticalBattleRuntimeState {
     /**
      * Creates a detached Stage-19 tactical roster from exact current physical engineering snapshots.
      *
-     * <p>Each imported fit must exactly equal one currently supported provisional Stage-17.5/19
-     * demonstrator fit. The matching doctrine supplies metadata/content identity only; imported
-     * damage, shields, cooldowns, ammunition, propellant, energy, heat and maintenance are preserved
-     * unchanged. Unsupported fits fail closed rather than being substituted.</p>
+     * <p>Each imported fit must exactly equal either one currently supported provisional Stage-17.5/19
+     * demonstrator fit or its single registered Stage-21 strategic-mobility variant. The matching
+     * doctrine supplies metadata/content identity only; imported damage, shields, cooldowns,
+     * ammunition, propellant, energy, heat and maintenance are preserved unchanged. Arbitrary
+     * same-hull or modified fits fail closed rather than being substituted.</p>
      *
      * @param combatants exact physical combatants with stable tactical identities and kinematics
      * @return independent Stage-19 battle state containing detached exact physical snapshots
@@ -93,7 +98,8 @@ public final class LiveTacticalBattleRuntimeState {
         if (combatants.size() < 2) {
             throw new IllegalArgumentException("exact tactical import requires at least two combatants");
         }
-        ShipEngineeringCatalog catalog = Stage175ICombatTestContentPack.loadDoctrines();
+        ShipEngineeringCatalog catalog =
+                Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
         TreeMap<Long, ImportedCombatantState> byId = new TreeMap<>();
         ArrayList<CombatantSpec> specs = new ArrayList<>(combatants.size());
         boolean alpha = false;
@@ -112,7 +118,8 @@ public final class LiveTacticalBattleRuntimeState {
         if (!alpha || !beta) {
             throw new IllegalArgumentException("exact tactical import requires combatants on both sides");
         }
-        return new LiveTacticalBattleRuntimeState(new LiveTacticalBattleScenario(specs), byId);
+        return new LiveTacticalBattleRuntimeState(
+                new LiveTacticalBattleScenario(specs), byId, catalog);
     }
 
     /** @return immutable authored scenario/identity roster driving this battle */
@@ -199,9 +206,7 @@ public final class LiveTacticalBattleRuntimeState {
     private CombatantRuntime materializeImported(CombatantSpec spec, ImportedCombatantState imported) {
         Doctrine doctrine = Stage175IFleetDoctrineCatalog.get(spec.doctrineId());
         EngineeringComponent source = imported.engineering();
-        InstalledFit expected = InstalledFit.fromDemonstrator(
-                engineeringCatalog.findDemonstratorFit(doctrine.fitId()));
-        if (!expected.equals(source.fit)) {
+        if (!matchesDoctrineFit(engineeringCatalog, doctrine, source.fit)) {
             throw new IllegalArgumentException("imported fit differs from resolved Stage-19 content identity");
         }
         HullDefinition hull = engineeringCatalog.findHull(source.fit.hullId());
@@ -232,11 +237,25 @@ public final class LiveTacticalBattleRuntimeState {
     private static Doctrine requireDoctrineForFit(ShipEngineeringCatalog catalog, InstalledFit fit) {
         InstalledFit checked = Objects.requireNonNull(fit, "fit");
         return Stage175IFleetDoctrineCatalog.all().stream()
-                .filter(doctrine -> InstalledFit.fromDemonstrator(
-                        catalog.findDemonstratorFit(doctrine.fitId())).equals(checked))
+                .filter(doctrine -> matchesDoctrineFit(catalog, doctrine, checked))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Stage-19 exact import does not support fitted state: " + checked.hullId()));
+    }
+
+    private static boolean matchesDoctrineFit(
+            ShipEngineeringCatalog catalog,
+            Doctrine doctrine,
+            InstalledFit fit) {
+        InstalledFit base = InstalledFit.fromDemonstrator(
+                catalog.findDemonstratorFit(doctrine.fitId()));
+        if (base.equals(fit)) {
+            return true;
+        }
+        String strategicId = Stage175ICombatTestContentPack.stage21StrategicFitId(doctrine.fitId());
+        ShipEngineeringCatalog.DemonstratorFitDefinition strategic =
+                catalog.findDemonstratorFit(strategicId);
+        return strategic != null && InstalledFit.fromDemonstrator(strategic).equals(fit);
     }
 
     /**
