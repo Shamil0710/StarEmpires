@@ -43,6 +43,11 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
     /**
      * Validates operation references against the embedded ordinary world and command state.
      *
+     * <p>Active operations must retain a current compatible Stage-21D command group and source order.
+     * Terminal operations may retain historical group/order identities after physical annihilation has
+     * removed those command objects; when either historical object still exists it remains cross-checked.
+     * This preserves loss evidence without weakening any active command invariant.</p>
+     *
      * @param schemaVersion exact supported Stage-21E schema version
      * @param runtimeVersion exact supported Stage-21E runtime contract identifier
      * @param stage21DRuntime complete embedded Stage-21D runtime checkpoint
@@ -71,13 +76,25 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
 
         for (OperationState operation : operationState.operations()) {
             CommandGroupState group = groups.get(operation.commandGroupId());
-            if (group == null) throw new IllegalArgumentException("Stage-21E operation references unknown command group: " + operation.id());
             FleetOrderState order = orders.get(operation.sourceOrderId());
-            if (order == null || order.commandGroupId() != operation.commandGroupId()) {
-                throw new IllegalArgumentException("Stage-21E operation references incompatible source order: " + operation.id());
+            if (operation.status().active()) {
+                if (group == null) {
+                    throw new IllegalArgumentException(
+                            "active Stage-21E operation references unknown command group: " + operation.id());
+                }
+                if (order == null || order.commandGroupId() != operation.commandGroupId()) {
+                    throw new IllegalArgumentException(
+                            "active Stage-21E operation references incompatible source order: " + operation.id());
+                }
+            } else {
+                if (order != null && order.commandGroupId() != operation.commandGroupId()) {
+                    throw new IllegalArgumentException(
+                            "terminal Stage-21E operation references incompatible surviving source order: " + operation.id());
+                }
             }
-            if (group.factionId() != operation.factionId()) {
-                throw new IllegalArgumentException("Stage-21E operation faction differs from command group: " + operation.id());
+            if (group != null && group.factionId() != operation.factionId()) {
+                throw new IllegalArgumentException(
+                        "Stage-21E operation faction differs from command group: " + operation.id());
             }
             requireSystem(systems, operation.stagingSystemId(), "staging", operation.id());
             requireSystem(systems, operation.objectiveSystemId(), "objective", operation.id());
@@ -85,7 +102,8 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
             for (FleetId fleetId : operation.participantFleetIds()) {
                 Integer owner = currentFleetOwners.get(fleetId);
                 if (owner != null && owner != operation.factionId()) {
-                    throw new IllegalArgumentException("Stage-21E participant current owner differs from operation: " + fleetId);
+                    throw new IllegalArgumentException(
+                            "Stage-21E participant current owner differs from operation: " + fleetId);
                 }
             }
             if (operation.contact() != null) {
@@ -113,7 +131,8 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
 
     private static void requireSystem(Set<StarSystemId> systems, StarSystemId systemId, String label, long operationId) {
         if (!systems.contains(systemId)) {
-            throw new IllegalArgumentException("Stage-21E " + label + " system is unknown for operation " + operationId);
+            throw new IllegalArgumentException(
+                    "Stage-21E " + label + " system is unknown for operation " + operationId);
         }
     }
 
