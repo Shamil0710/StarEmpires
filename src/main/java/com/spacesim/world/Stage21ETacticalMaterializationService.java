@@ -109,7 +109,14 @@ public final class Stage21ETacticalMaterializationService {
             CombatSide side,
             int factionId,
             EntityState entityState) {
-        /** Validates an exact physical handoff row. */
+        /**
+         * Validates an exact physical handoff row.
+         *
+         * @param fleetId stable ordinary fleet identity
+         * @param side tactical handoff side identity only
+         * @param factionId current physical faction affiliation
+         * @param entityState exact current persistent entity payload including engineering state
+         */
         public PhysicalCombatant {
             Objects.requireNonNull(fleetId, "fleetId");
             Objects.requireNonNull(side, "side");
@@ -136,7 +143,14 @@ public final class Stage21ETacticalMaterializationService {
             StarSystemId systemId,
             long materializedAtTick,
             List<PhysicalCombatant> combatants) {
-        /** Validates canonical exact-local request shape. */
+        /**
+         * Validates canonical exact-local request shape.
+         *
+         * @param operationId positive owning Stage-21E operation identity
+         * @param systemId physical system containing every combatant
+         * @param materializedAtTick exact non-negative handoff tick
+         * @param combatants exact physical payloads in canonical FleetId order
+         */
         public TacticalMaterializationRequest {
             if (operationId <= 0L || materializedAtTick < 0L) {
                 throw new IllegalArgumentException("invalid operation/tick identity");
