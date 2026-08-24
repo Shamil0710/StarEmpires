@@ -2,6 +2,7 @@ package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedEngagementRole;
@@ -89,7 +90,7 @@ public final class LiveTacticalBattleDefenseRuntime {
             throw new IllegalArgumentException("decoyRuntime must wrap the same ordnanceRuntime instance");
         }
         observationRuntime = new LiveTacticalOrdnanceObservationRuntime(ordnanceRuntime, decoyRuntime);
-        engineeringCatalog = battleState().engineeringCatalog();
+        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
         calculator = new DerivedShipCalculator(engineeringCatalog);
@@ -658,11 +659,27 @@ public final class LiveTacticalBattleDefenseRuntime {
         }
     }
 
+    /**
+     * Per-defender physical interceptor stores/launch/interception projection.
+     *
+     * @param entityId stable defender combatant identity
+     * @param interceptorLaunches physical interceptor launch count
+     * @param successfulInterceptions swept physical interceptor/threat collision count
+     * @param remainingInterceptorRounds current itemized INTERCEPTOR rounds on fitted mounts
+     */
     public record DefenderFingerprint(
             long entityId,
             long interceptorLaunches,
             long successfulInterceptions,
             long remainingInterceptorRounds) {
+        /**
+         * Validates one defender projection.
+         *
+         * @param entityId stable defender combatant identity
+         * @param interceptorLaunches physical interceptor launch count
+         * @param successfulInterceptions swept physical interceptor/threat collision count
+         * @param remainingInterceptorRounds current itemized interceptor rounds
+         */
         public DefenderFingerprint {
             if (entityId <= 0L || interceptorLaunches < 0L
                     || successfulInterceptions < 0L || remainingInterceptorRounds < 0L) {
@@ -671,6 +688,20 @@ public final class LiveTacticalBattleDefenseRuntime {
         }
     }
 
+    /**
+     * Equality-friendly projection of one active physical interceptor.
+     *
+     * @param bodyId stable interceptor-body identity
+     * @param defenderEntityId launching defender identity
+     * @param mountId physical fitted launcher mount
+     * @param targetThreatId observed guided threat hypothesis identity
+     * @param xM current x position
+     * @param yM current y position
+     * @param velocityXMps current x velocity
+     * @param velocityYMps current y velocity
+     * @param remainingPropellantKg current physical interceptor propellant
+     * @param remainingPoweredBurnSeconds current authored powered-burn lifetime
+     */
     public record InterceptorFingerprint(
             long bodyId,
             long defenderEntityId,
@@ -682,6 +713,20 @@ public final class LiveTacticalBattleDefenseRuntime {
             double velocityYMps,
             double remainingPropellantKg,
             double remainingPoweredBurnSeconds) {
+        /**
+         * Validates one interceptor projection.
+         *
+         * @param bodyId stable interceptor-body identity
+         * @param defenderEntityId launching defender identity
+         * @param mountId physical fitted launcher mount
+         * @param targetThreatId observed guided threat hypothesis identity
+         * @param xM current x position
+         * @param yM current y position
+         * @param velocityXMps current x velocity
+         * @param velocityYMps current y velocity
+         * @param remainingPropellantKg current physical interceptor propellant
+         * @param remainingPoweredBurnSeconds current powered-burn lifetime
+         */
         public InterceptorFingerprint {
             if (bodyId <= 0L || defenderEntityId <= 0L || targetThreatId <= 0L) {
                 throw new IllegalArgumentException("interceptor identities must be positive");
@@ -698,11 +743,27 @@ public final class LiveTacticalBattleDefenseRuntime {
         }
     }
 
+    /**
+     * Whole-battle layered-defense deterministic fingerprint.
+     *
+     * @param tick authoritative shared battle tick
+     * @param ordnanceFingerprint wrapped ship/weapon/guided physical state
+     * @param defenders stable per-defender launch/store/interception projections
+     * @param activeInterceptors current physical interceptor bodies
+     */
     public record BattleDefenseFingerprint(
             long tick,
             LiveTacticalBattleOrdnanceRuntime.BattleOrdnanceFingerprint ordnanceFingerprint,
             List<DefenderFingerprint> defenders,
             List<InterceptorFingerprint> activeInterceptors) {
+        /**
+         * Validates and freezes one defense fingerprint.
+         *
+         * @param tick authoritative shared battle tick
+         * @param ordnanceFingerprint wrapped physical ordnance fingerprint
+         * @param defenders stable defender projections
+         * @param activeInterceptors current interceptor projections
+         */
         public BattleDefenseFingerprint {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");

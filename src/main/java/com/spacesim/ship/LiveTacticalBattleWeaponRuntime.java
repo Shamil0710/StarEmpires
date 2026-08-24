@@ -4,6 +4,7 @@ import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.Vector3d;
 import com.spacesim.content.ship.ShipProtectionCatalog;
+import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.ship.Stage175ICombatTestProtectionPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
@@ -58,7 +59,7 @@ public final class LiveTacticalBattleWeaponRuntime {
      */
     public LiveTacticalBattleWeaponRuntime(LiveTacticalBattleControlRuntime controlRuntime) {
         this.controlRuntime = Objects.requireNonNull(controlRuntime, "controlRuntime");
-        engineeringCatalog = battleState().engineeringCatalog();
+        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         protectionCatalog = Stage175ICombatTestProtectionPack.load();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
@@ -148,6 +149,20 @@ public final class LiveTacticalBattleWeaponRuntime {
         return impactsByTargetEntityId.values().stream().mapToLong(Long::longValue).sum();
     }
 
+    /**
+     * Routes one already-detected external physical-body impact through the exact production
+     * shield/material/local-damage path owned by this runtime.
+     *
+     * <p>This package seam performs no hit test and grants no damage. The caller supplies the physical
+     * body at its swept intersection and the target position at that same instant. The impact is
+     * counted exactly once here, alongside native kinetic impacts.</p>
+     *
+     * @param targetEntityId physically intersected combatant
+     * @param impactBody physical body at the intersection point
+     * @param targetXM target x position at the intersection instant
+     * @param targetYM target y position at the intersection instant
+     * @return ordinary production protection result
+     */
     KineticProtectionRuntime.Result resolveExternalPhysicalImpact(
             long targetEntityId,
             ProjectileBody impactBody,
@@ -161,10 +176,20 @@ public final class LiveTacticalBattleWeaponRuntime {
         return result;
     }
 
+    /**
+     * Transfers an external surviving physical residual into the single production projectile pool.
+     *
+     * @param body surviving physical projectile/debris body
+     */
     void acceptExternalProjectile(ProjectileBody body) {
         projectiles.add(Objects.requireNonNull(body, "body"));
     }
 
+    /**
+     * Returns an equality-friendly deterministic weapon/body/protection projection.
+     *
+     * @return whole-battle weapon fingerprint
+     */
     public BattleWeaponFingerprint fingerprint() {
         List<SourceWeaponFingerprint> sources = battleState().combatants().stream()
                 .map(combatant -> new SourceWeaponFingerprint(
@@ -614,11 +639,27 @@ public final class LiveTacticalBattleWeaponRuntime {
         }
     }
 
+    /**
+     * Per-source finite-ammunition and launcher-continuity projection.
+     *
+     * @param entityId stable combatant identity
+     * @param shotsFired physically materialized kinetic shot count
+     * @param ammunitionRounds current itemized physical ammunition rounds
+     * @param cooldownSecondsByMount physical launcher cycle state
+     */
     public record SourceWeaponFingerprint(
             long entityId,
             long shotsFired,
             long ammunitionRounds,
             Map<String, Double> cooldownSecondsByMount) {
+        /**
+         * Validates and freezes one source weapon projection.
+         *
+         * @param entityId stable combatant identity
+         * @param shotsFired physically materialized kinetic shot count
+         * @param ammunitionRounds current itemized physical ammunition rounds
+         * @param cooldownSecondsByMount physical launcher cycle state
+         */
         public SourceWeaponFingerprint {
             if (entityId <= 0L || shotsFired < 0L || ammunitionRounds < 0L) {
                 throw new IllegalArgumentException("weapon fingerprint counters/identity must be valid");
@@ -628,11 +669,27 @@ public final class LiveTacticalBattleWeaponRuntime {
         }
     }
 
+    /**
+     * Per-target physical protection projection.
+     *
+     * @param entityId stable target combatant identity
+     * @param impactsResolved physical body interactions resolved on this target
+     * @param meanCompartmentIntegrity current mean production compartment integrity
+     * @param totalShieldReserveJ current summed persistent fitted shield reserve
+     */
     public record TargetProtectionFingerprint(
             long entityId,
             long impactsResolved,
             double meanCompartmentIntegrity,
             double totalShieldReserveJ) {
+        /**
+         * Validates one target protection projection.
+         *
+         * @param entityId stable target combatant identity
+         * @param impactsResolved physical body interactions resolved on this target
+         * @param meanCompartmentIntegrity current mean production compartment integrity
+         * @param totalShieldReserveJ current summed persistent fitted shield reserve
+         */
         public TargetProtectionFingerprint {
             if (entityId <= 0L || impactsResolved < 0L
                     || !Double.isFinite(meanCompartmentIntegrity)
@@ -643,12 +700,30 @@ public final class LiveTacticalBattleWeaponRuntime {
         }
     }
 
+    /**
+     * Whole-battle deterministic physical weapon/body/protection fingerprint.
+     *
+     * @param tick authoritative shared tick
+     * @param controlFingerprint production control/flight fingerprint
+     * @param sources canonical stable-entity weapon projections
+     * @param targets canonical stable-entity protection projections
+     * @param projectiles current independent physical projectile bodies
+     */
     public record BattleWeaponFingerprint(
             long tick,
             LiveTacticalBattleControlRuntime.BattleControlFingerprint controlFingerprint,
             List<SourceWeaponFingerprint> sources,
             List<TargetProtectionFingerprint> targets,
             List<ProjectileBody> projectiles) {
+        /**
+         * Validates and freezes the whole-battle weapon projection.
+         *
+         * @param tick authoritative shared tick
+         * @param controlFingerprint production control/flight fingerprint
+         * @param sources canonical stable-entity weapon projections
+         * @param targets canonical stable-entity protection projections
+         * @param projectiles current independent physical projectile bodies
+         */
         public BattleWeaponFingerprint {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");

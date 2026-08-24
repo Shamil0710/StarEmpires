@@ -2,6 +2,7 @@ package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponLauncherCatalog;
@@ -54,7 +55,7 @@ public final class LiveTacticalBattleOrdnanceRuntime {
      */
     public LiveTacticalBattleOrdnanceRuntime(LiveTacticalBattleWeaponRuntime weaponRuntime) {
         this.weaponRuntime = Objects.requireNonNull(weaponRuntime, "weaponRuntime");
-        engineeringCatalog = battleState().engineeringCatalog();
+        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
         calculator = new DerivedShipCalculator(engineeringCatalog);
@@ -530,10 +531,24 @@ public final class LiveTacticalBattleOrdnanceRuntime {
         }
     }
 
+    /**
+     * Per-source finite guided ammunition projection.
+     *
+     * @param entityId stable launching combatant identity
+     * @param guidedLaunches physically materialized guided launches
+     * @param guidedAmmunitionRounds current itemized guided-feed rounds
+     */
     public record SourceGuidedFingerprint(
             long entityId,
             long guidedLaunches,
             long guidedAmmunitionRounds) {
+        /**
+         * Validates one per-source guided projection.
+         *
+         * @param entityId stable launching combatant identity
+         * @param guidedLaunches physically materialized guided launches
+         * @param guidedAmmunitionRounds current itemized guided-feed rounds
+         */
         public SourceGuidedFingerprint {
             if (entityId <= 0L || guidedLaunches < 0L || guidedAmmunitionRounds < 0L) {
                 throw new IllegalArgumentException("invalid guided source fingerprint");
@@ -541,7 +556,19 @@ public final class LiveTacticalBattleOrdnanceRuntime {
         }
     }
 
+    /**
+     * Per-target guided physical-impact projection.
+     *
+     * @param entityId stable target identity
+     * @param guidedImpactsResolved guided-body intersections resolved on the target
+     */
     public record TargetGuidedFingerprint(long entityId, long guidedImpactsResolved) {
+        /**
+         * Validates one guided target projection.
+         *
+         * @param entityId stable target identity
+         * @param guidedImpactsResolved non-negative guided impact count
+         */
         public TargetGuidedFingerprint {
             if (entityId <= 0L || guidedImpactsResolved < 0L) {
                 throw new IllegalArgumentException("invalid guided target fingerprint");
@@ -549,6 +576,23 @@ public final class LiveTacticalBattleOrdnanceRuntime {
         }
     }
 
+    /**
+     * Equality-friendly projection of one active guided physical body.
+     *
+     * @param bodyId stable guided body identity
+     * @param sourceEntityId launching combatant identity
+     * @param targetId current target hypothesis identity
+     * @param launchMountId physical launcher mount owning its support channel
+     * @param spawnTick deterministic physical launch tick
+     * @param xM current x position
+     * @param yM current y position
+     * @param velocityXMps current x velocity
+     * @param velocityYMps current y velocity
+     * @param remainingPropellantKg current physical propellant mass
+     * @param remainingPoweredBurnSeconds current physical powered-burn lifetime
+     * @param seekerAvailable current seeker availability
+     * @param guidanceAvailable current guidance availability
+     */
     public record GuidedBodyFingerprint(
             long bodyId,
             long sourceEntityId,
@@ -563,6 +607,23 @@ public final class LiveTacticalBattleOrdnanceRuntime {
             double remainingPoweredBurnSeconds,
             boolean seekerAvailable,
             boolean guidanceAvailable) {
+        /**
+         * Validates one guided body projection.
+         *
+         * @param bodyId stable guided body identity
+         * @param sourceEntityId launching combatant identity
+         * @param targetId current target hypothesis identity
+         * @param launchMountId physical launcher mount owning its support channel
+         * @param spawnTick deterministic physical launch tick
+         * @param xM current x position
+         * @param yM current y position
+         * @param velocityXMps current x velocity
+         * @param velocityYMps current y velocity
+         * @param remainingPropellantKg current physical propellant mass
+         * @param remainingPoweredBurnSeconds current physical powered-burn lifetime
+         * @param seekerAvailable current seeker availability
+         * @param guidanceAvailable current guidance availability
+         */
         public GuidedBodyFingerprint {
             if (bodyId <= 0L || sourceEntityId <= 0L || targetId <= 0L || spawnTick < 0L) {
                 throw new IllegalArgumentException("guided body identities/tick must be valid");
@@ -579,12 +640,30 @@ public final class LiveTacticalBattleOrdnanceRuntime {
         }
     }
 
+    /**
+     * Whole-battle deterministic guided-ordnance fingerprint.
+     *
+     * @param tick authoritative shared battle tick
+     * @param weaponFingerprint wrapped physical weapon/protection fingerprint
+     * @param sources canonical per-source guided ammunition projections
+     * @param targets canonical per-target guided impact projections
+     * @param bodies current active guided physical bodies
+     */
     public record BattleOrdnanceFingerprint(
             long tick,
             LiveTacticalBattleWeaponRuntime.BattleWeaponFingerprint weaponFingerprint,
             List<SourceGuidedFingerprint> sources,
             List<TargetGuidedFingerprint> targets,
             List<GuidedBodyFingerprint> bodies) {
+        /**
+         * Validates and freezes one whole-battle guided projection.
+         *
+         * @param tick authoritative shared battle tick
+         * @param weaponFingerprint wrapped physical weapon/protection fingerprint
+         * @param sources canonical per-source guided ammunition projections
+         * @param targets canonical per-target guided impact projections
+         * @param bodies current active guided physical bodies
+         */
         public BattleOrdnanceFingerprint {
             if (tick < 0L) {
                 throw new IllegalArgumentException("tick must be non-negative");
