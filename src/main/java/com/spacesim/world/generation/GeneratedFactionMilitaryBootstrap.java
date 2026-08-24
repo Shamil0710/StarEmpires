@@ -48,9 +48,9 @@ import java.util.TreeMap;
  *
  * <p>Every ship is an ordinary world fleet entity and therefore consumes the shared sequential
  * {@link FleetId} allocator, persists through {@code WorldState}, jumps through the ordinary fleet
- * FSM and disappears permanently when destroyed. The current A-E engineering fits are explicitly
- * provisional Stage-17.5/19 content; this bootstrap does not promote them into Stage-22 hull or
- * faction-doctrine canon.</p>
+ * FSM and disappears permanently when destroyed. The current A-E engineering baseline and explicit
+ * Stage-21 strategic-mobility variants are provisional Stage-17.5/19 content; this bootstrap does
+ * not promote them into Stage-22 hull or faction-doctrine canon.</p>
  */
 @SuppressWarnings("doclint:missing")
 public final class GeneratedFactionMilitaryBootstrap {
@@ -129,7 +129,7 @@ public final class GeneratedFactionMilitaryBootstrap {
                         localId,
                         doctrine.id(),
                         engineering.fit.hullId(),
-                        doctrine.fitId()));
+                        Stage175ICombatTestContentPack.stage21StrategicFitId(doctrine.fitId())));
             }
         }
         commissioned.sort(Comparator.comparing(CommissionedShip::fleetId));
@@ -155,7 +155,8 @@ public final class GeneratedFactionMilitaryBootstrap {
 
     private static EngineeringComponent engineering(Doctrine doctrine) {
         InstalledFit fit = InstalledFit.fromDemonstrator(
-                ENGINEERING.findDemonstratorFit(doctrine.fitId()));
+                ENGINEERING.findDemonstratorFit(
+                        Stage175ICombatTestContentPack.stage21StrategicFitId(doctrine.fitId())));
         HullDefinition hull = ENGINEERING.findHull(fit.hullId());
         ShipProtectionCatalog.HullDamageLayout layout =
                 PROTECTION.findHullDamageLayout(hull.id());
