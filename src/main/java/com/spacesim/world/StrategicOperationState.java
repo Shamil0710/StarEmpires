@@ -424,6 +424,9 @@ public record StrategicOperationState(long nextOperationId, List<OperationState>
             if (status == OperationStatus.ENGAGED && (encounter == null || !encounter.active())) {
                 throw new IllegalArgumentException("ENGAGED operation requires an active tactical encounter");
             }
+            if (encounter != null && encounter.active() && status != OperationStatus.ENGAGED) {
+                throw new IllegalArgumentException("active tactical encounter requires ENGAGED operation status");
+            }
         }
 
         /**
