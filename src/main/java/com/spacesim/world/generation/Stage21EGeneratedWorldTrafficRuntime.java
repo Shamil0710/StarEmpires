@@ -10,7 +10,8 @@ import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetJumpState;
 import com.spacesim.world.PhysicalWarfareOperationService;
 import com.spacesim.world.Stage21EOperationTrafficPolicy;
-import com.spacesim.world.Stage21EOperationTrafficPolicy.Availability;
+import com.spacesim.world.Stage21EOperationTrafficPolicy.EdgeAvailability;
+import com.spacesim.world.Stage21EOperationTrafficPolicy.HandlingAvailability;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StrategicOperationState;
 
@@ -85,9 +86,9 @@ public final class Stage21EGeneratedWorldTrafficRuntime {
         }
         StarSystemId from = fleet.currentSystemId();
         StarSystemId to = order.orderedSystems().get(nextIndex);
-        Availability availability = policy.edgeAvailability(
+        EdgeAvailability availability = policy.edgeAvailability(
                 current, from, to, trafficFactionId(fleet));
-        requireAvailable(availability, "freight route edge " + from + " -> " + to);
+        requireEdgeAvailable(availability, "freight route edge " + from + " -> " + to);
         return runtime.requestNextRouteHop(fleet.fleetId());
     }
 
@@ -113,7 +114,7 @@ public final class Stage21EGeneratedWorldTrafficRuntime {
         FreighterState fleet = requireFreighter(fleetId);
         TransportOrderState order = requireOrder(fleet);
         StarSystemId source = order.orderedSystems().get(0);
-        requireAvailable(
+        requireHandlingAvailable(
                 policy.handlingAvailability(current, source, trafficFactionId(fleet)),
                 "freight source handling in " + source);
         return runtime.transferOutpostToOrderSource(
@@ -142,7 +143,7 @@ public final class Stage21EGeneratedWorldTrafficRuntime {
         FreighterState fleet = requireFreighter(fleetId);
         TransportOrderState order = requireOrder(fleet);
         StarSystemId source = order.orderedSystems().get(0);
-        requireAvailable(
+        requireHandlingAvailable(
                 policy.handlingAvailability(current, source, trafficFactionId(fleet)),
                 "freight source handling in " + source);
         return runtime.loadAtOrderSource(
@@ -169,7 +170,7 @@ public final class Stage21EGeneratedWorldTrafficRuntime {
         FreighterState fleet = requireFreighter(fleetId);
         TransportOrderState order = requireOrder(fleet);
         StarSystemId destination = order.orderedSystems().get(order.orderedSystems().size() - 1);
-        requireAvailable(
+        requireHandlingAvailable(
                 policy.handlingAvailability(current, destination, trafficFactionId(fleet)),
                 "freight destination handling in " + destination);
         return runtime.unloadAtOrderDestination(
@@ -205,10 +206,22 @@ public final class Stage21EGeneratedWorldTrafficRuntime {
                 new PhysicalWarfareOperationService(live.world()));
     }
 
-    private static void requireAvailable(Availability availability, String action) {
-        Availability checked = Objects.requireNonNull(availability, "availability");
-        if (checked != Availability.AVAILABLE) {
-            throw new IllegalStateException(action + " denied by physical Stage-21E warfare: " + checked);
+    private static void requireEdgeAvailable(EdgeAvailability availability, String action) {
+        EdgeAvailability checked = Objects.requireNonNull(availability, "availability");
+        if (!checked.allowsTraffic()) {
+            throw new IllegalStateException(
+                    action + " denied by physical Stage-21E warfare: " + checked.availability()
+                            + " operation=" + checked.denyingOperationId()
+                            + " fleet=" + checked.denyingFleetId());
+        }
+    }
+
+    private static void requireHandlingAvailable(HandlingAvailability availability, String action) {
+        HandlingAvailability checked = Objects.requireNonNull(availability, "availability");
+        if (!checked.available()) {
+            throw new IllegalStateException(
+                    action + " denied by physical Stage-21E blockade: operation="
+                            + checked.denyingOperationId() + " fleet=" + checked.denyingFleetId());
         }
     }
 }
