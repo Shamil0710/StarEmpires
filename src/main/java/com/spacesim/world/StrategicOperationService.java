@@ -183,6 +183,39 @@ public final class StrategicOperationService {
     }
 
     /**
+     * Closes an ENGAGED reference after a synchronous Stage-19 authority committed all physical effects.
+     *
+     * <p>No tactical runtime remains hidden after this transition. The operation returns to ACTIVE so
+     * ordinary supply review, fresh contact acquisition or mission completion may proceed from the
+     * newly committed physical world.</p>
+     *
+     * @param state current operation state containing an active tactical reference
+     * @param operationId operation whose exact tactical exchange has returned
+     * @param currentTick authoritative non-negative resolution tick
+     * @return state with a resolved encounter reference and ACTIVE operation lifecycle
+     */
+    public StrategicOperationState resolveEngagement(
+            StrategicOperationState state,
+            long operationId,
+            long currentTick) {
+        Objects.requireNonNull(state, "state");
+        requireTick(currentTick);
+        OperationState operation = state.requireOperation(operationId);
+        if (operation.status() != OperationStatus.ENGAGED
+                || operation.encounter() == null
+                || !operation.encounter().active()) {
+            throw new IllegalStateException("engagement resolution requires an active Stage-19 encounter reference");
+        }
+        TacticalEncounterState resolved = resolvedEncounter(operation.encounter(), currentTick);
+        return state.replace(operation.withLifecycle(
+                OperationStatus.ACTIVE,
+                currentTick,
+                operation.unsupportedSinceTick(),
+                operation.contact(),
+                resolved));
+    }
+
+    /**
      * Re-evaluates physical readiness and supply without modifying those physical facts.
      *
      * @param state current persistent operation state
