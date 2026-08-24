@@ -10,6 +10,7 @@ import com.spacesim.persistence.Stage21DGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21EGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage21EGeneratedWorldRuntimePersistentState;
 import com.spacesim.world.DiplomaticLifecycleState;
+import com.spacesim.world.FactionActorObservationSnapshot.ObservationChannel;
 import com.spacesim.world.FactionStrategicIntentState;
 import com.spacesim.world.FleetCommandState;
 import com.spacesim.world.FleetCommandState.CommandGroupState;
@@ -22,11 +23,13 @@ import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.FleetReadinessState;
 import com.spacesim.world.StrategicOperationState;
+import com.spacesim.world.StrategicOperationState.ContactState;
 import com.spacesim.world.StrategicOperationState.OperationState;
 import com.spacesim.world.StrategicOperationState.OperationStatus;
 import com.spacesim.world.StrategicOperationState.OperationType;
 import com.spacesim.world.StrategicOperationState.RulesOfEngagement;
 import com.spacesim.world.StrategicOperationState.SupplyPolicy;
+import com.spacesim.world.StrategicOperationState.TacticalEncounterState;
 import com.spacesim.world.StrategicOperationState.WithdrawalPolicy;
 import org.junit.jupiter.api.Test;
 
@@ -108,6 +111,42 @@ class Stage21EGeneratedWorldRuntimePersistenceAcceptanceTest {
         Stage21EGeneratedWorldRuntimePersistentState historical = Stage21EGeneratedWorldRuntimePersistentState.compose(
                 stage21d, new StrategicOperationState(2L, List.of(terminal)));
         assertEquals(List.of(local.id(), missing), historical.operationState().requireOperation(1L).participantFleetIds());
+    }
+
+    @Test
+    void activeTransientTacticalEncounterCannotCrossFullCheckpointBoundary() {
+        Stage20GeneratedWorldRuntimeBridge.LiveRuntime stage20 = Stage20PlayableGeneratedWorldFactory.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
+        FleetPlacementState local = stage20.world().getFleetPlacements().stream()
+                .filter(value -> value.locationKind() == FleetLocationKind.IN_SYSTEM)
+                .filter(value -> authoritativeFactionId(stage20, value) >= 0)
+                .findFirst().orElseThrow();
+        int factionId = authoritativeFactionId(stage20, local);
+        long now = stage20.world().getAuthoritativeWorldTick();
+
+        CommandGroupState group = new CommandGroupState(
+                1L, factionId, "Tactical Save Guard", List.of(local.id()), local.systemId(),
+                false, false, FleetReadinessState.FULL);
+        FleetOrderState order = new FleetOrderState(
+                1L, group.id(), OrderType.INTERCEPT, OrderSource.AI, local.systemId(),
+                List.of(local.systemId()), 0, now, now + 100L, OrderStatus.ACTIVE);
+        Stage21DGeneratedWorldRuntimePersistentState stage21d = Stage21DGeneratedWorldRuntimePersistentState.compose(
+                stage21c(stage20), new FleetCommandState(2L, 2L, List.of(group), List.of(order)));
+        ContactState contact = new ContactState(
+                local.id(), local.systemId(), ObservationChannel.LOCAL_SENSOR_REPORT,
+                "acceptance:transient-encounter", now, now + 100L);
+        TacticalEncounterState encounter = new TacticalEncounterState(
+                1L, local.id(), local.systemId(), now, -1L);
+        OperationState engaged = new OperationState(
+                1L, OperationType.INTERCEPTION, group.id(), order.id(), factionId, List.of(local.id()),
+                local.systemId(), local.systemId(), "system:" + local.systemId().value(),
+                RulesOfEngagement.IDENTIFIED_HOSTILES,
+                new SupplyPolicy(0, 0, 100L),
+                new WithdrawalPolicy(local.systemId(), 0, true, true),
+                OperationStatus.ENGAGED, now, now, -1L, contact, encounter);
+
+        assertThrows(IllegalArgumentException.class, () -> Stage21EGeneratedWorldRuntimePersistentState.compose(
+                stage21d, new StrategicOperationState(2L, List.of(engaged))));
     }
 
     @Test
