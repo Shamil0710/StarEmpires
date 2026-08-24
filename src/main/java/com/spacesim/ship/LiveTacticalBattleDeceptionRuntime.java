@@ -2,7 +2,6 @@ package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
-import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedEngagementRole;
@@ -58,7 +57,7 @@ public final class LiveTacticalBattleDeceptionRuntime {
         defenseRuntime = new LiveTacticalBattleDefenseRuntime(ordnanceRuntime, decoyRuntime);
         beamRuntime = new LiveTacticalBattleBeamRuntime(ordnanceRuntime.weaponRuntime());
         orderingAudit = new Stage19GuidedImpactOrderingAudit();
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        engineeringCatalog = battleState().engineeringCatalog();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
         calculator = new DerivedShipCalculator(engineeringCatalog);
@@ -248,18 +247,6 @@ public final class LiveTacticalBattleDeceptionRuntime {
                 engineering.instanceState.damage().moduleDamage());
     }
 
-    /**
-     * Whole-runtime deterministic deception/defense/beam/ordering projection.
-     *
-     * @param tick authoritative shared battle tick
-     * @param automaticDeploymentsByEntityId automatic physical deployment counts by combatant
-     * @param decoyFingerprint authoritative physical decoy state
-     * @param defenseFingerprint actor-bounded physical defense/ordnance state
-     * @param beamFingerprint fitted directed-energy execution state
-     * @param auditedShipImpactCandidates cumulative ordering-audited ship-impact paths
-     * @param orderingAmbiguities cumulative physically earlier interceptor contacts
-     * @param lastOrderingAudit latest tick ordering evidence, nullable before first advancement
-     */
     public record DeceptionFingerprint(
             long tick,
             Map<Long, Long> automaticDeploymentsByEntityId,
@@ -269,18 +256,6 @@ public final class LiveTacticalBattleDeceptionRuntime {
             long auditedShipImpactCandidates,
             long orderingAmbiguities,
             Stage19GuidedImpactOrderingAudit.Result lastOrderingAudit) {
-        /**
-         * Validates and freezes one deterministic whole-combat projection.
-         *
-         * @param tick authoritative shared battle tick
-         * @param automaticDeploymentsByEntityId automatic deployment counts by combatant
-         * @param decoyFingerprint physical decoy projection
-         * @param defenseFingerprint physical defense projection
-         * @param beamFingerprint fitted directed-energy execution projection
-         * @param auditedShipImpactCandidates cumulative audited ship-impact paths
-         * @param orderingAmbiguities cumulative earlier interceptor contacts
-         * @param lastOrderingAudit latest ordering evidence, nullable before first advancement
-         */
         public DeceptionFingerprint {
             if (tick < 0L || auditedShipImpactCandidates < 0L || orderingAmbiguities < 0L) {
                 throw new IllegalArgumentException("invalid deception/ordering fingerprint counters");
