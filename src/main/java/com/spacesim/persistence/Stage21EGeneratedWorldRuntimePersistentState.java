@@ -40,7 +40,14 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
     /** Current Stage-21E runtime contract identifier. */
     public static final String CURRENT_RUNTIME_VERSION = "stage21e.generated-world-physical-operations.v8";
 
-    /** Validates operation references against the embedded ordinary world and command state. */
+    /**
+     * Validates operation references against the embedded ordinary world and command state.
+     *
+     * @param schemaVersion exact supported Stage-21E schema version
+     * @param runtimeVersion exact supported Stage-21E runtime contract identifier
+     * @param stage21DRuntime complete embedded Stage-21D runtime checkpoint
+     * @param operationState Stage-21E persistent operation metadata to cross-check
+     */
     public Stage21EGeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported Stage-21E checkpoint schema: " + schemaVersion);
@@ -90,7 +97,13 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
         }
     }
 
-    /** Composes a current Stage-21E checkpoint. */
+    /**
+     * Composes a current Stage-21E checkpoint.
+     *
+     * @param stage21D complete accepted Stage-21D generated-world runtime checkpoint
+     * @param operations persistent Stage-21E operation metadata
+     * @return validated current-version Stage-21E checkpoint wrapper
+     */
     public static Stage21EGeneratedWorldRuntimePersistentState compose(
             Stage21DGeneratedWorldRuntimePersistentState stage21D,
             StrategicOperationState operations) {
