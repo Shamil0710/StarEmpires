@@ -44,6 +44,32 @@ class LiveTacticalBattleStage21StrategicImportTest {
     }
 
     @Test
+    void exactStrategicVariantAdvancesDeterministicallyThroughCompleteStage19Stack() {
+        ShipEngineeringCatalog catalog = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
+        Doctrine alphaDoctrine = Stage175IFleetDoctrineCatalog.get(DoctrineId.A_KINETIC_LINE);
+        Doctrine betaDoctrine = Stage175IFleetDoctrineCatalog.get(DoctrineId.B_MISSILE_STRIKE);
+        InstalledFit alphaStrategic = InstalledFit.fromDemonstrator(catalog.findDemonstratorFit(
+                Stage175ICombatTestContentPack.stage21StrategicFitId(alphaDoctrine.fitId())));
+        InstalledFit betaStrategic = InstalledFit.fromDemonstrator(catalog.findDemonstratorFit(
+                Stage175ICombatTestContentPack.stage21StrategicFitId(betaDoctrine.fitId())));
+        EngineeringComponent alpha = component(catalog, alphaDoctrine, alphaStrategic);
+        EngineeringComponent beta = component(catalog, betaDoctrine, betaStrategic);
+        List<ImportedCombatantState> imported = List.of(
+                new ImportedCombatantState(101L, Side.ALPHA, alpha, 0d, 0d, 0d, 0d),
+                new ImportedCombatantState(202L, Side.BETA, beta, 50_000d, 0d, 0d, 0d));
+
+        Stage19ExactTacticalEncounterResolver resolver = new Stage19ExactTacticalEncounterResolver();
+        Stage19ExactTacticalEncounterResolver.Result first = resolver.resolve(imported, 4L);
+        Stage19ExactTacticalEncounterResolver.Result second = resolver.resolve(imported, 4L);
+
+        assertEquals(first, second);
+        assertEquals(4L, first.ticksExecuted());
+        assertEquals(Stage19ExactTacticalEncounterResolver.Termination.ENCOUNTER_HORIZON, first.termination());
+        assertEquals(alphaStrategic, first.require(101L).fit());
+        assertEquals(betaStrategic, first.require(202L).fit());
+    }
+
+    @Test
     void exactImportRejectsArbitrarySameHullFitEvenWhenItsPhysicalSnapshotIsOtherwiseValid() {
         ShipEngineeringCatalog catalog = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
         Doctrine alphaDoctrine = Stage175IFleetDoctrineCatalog.get(DoctrineId.A_KINETIC_LINE);
