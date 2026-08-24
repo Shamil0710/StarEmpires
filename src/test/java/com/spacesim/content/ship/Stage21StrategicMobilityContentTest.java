@@ -23,10 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage21StrategicMobilityContentTest {
     @Test
-    void stage19BaselineRemainsStableWhileStage21RegistersOnePhysicalFtlTradeoffPerDoctrine() {
+    void stage19BaselineRemainsStableWhileEveryStage21DoctrineGetsOneValidPhysicalFtlTradeoff() {
         ShipEngineeringCatalog baseline = Stage175ICombatTestContentPack.loadDoctrines();
         ShipEngineeringCatalog strategic = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
         ShipFittingValidator validator = new ShipFittingValidator(strategic);
+        ShipEngineeringRuntime runtime = new ShipEngineeringRuntime(strategic);
 
         assertNull(baseline.findModule(Stage175ICombatTestContentPack.STAGE21_STRATEGIC_FTL_MODULE_ID));
         assertNotNull(strategic.findModule(Stage175ICombatTestContentPack.STAGE21_STRATEGIC_FTL_MODULE_ID));
@@ -67,11 +68,19 @@ class Stage21StrategicMobilityContentTest {
                     DamageState.pristine());
             assertTrue(validation.isValid(),
                     () -> variant.id() + " must remain an ordinary physically valid fit: " + validation.issues());
+
+            var initialized = runtime.initialize(
+                    installed, doctrine.initialConsumables(), DamageState.pristine());
+            JumpPlan plan = runtime.planJump(installed, initialized, DamageState.pristine());
+            assertTrue(plan.allowed(),
+                    () -> variant.id() + " must be strategically mobile: " + plan.failure());
+            assertEquals("utility_datalink", plan.mountId());
+            assertTrue(plan.translatedMassKg() < 32_000_000d);
         }
     }
 
     @Test
-    void strategicFitPlansAndCommitsFinitePhysicalJumpCosts() {
+    void strategicFitCommitsFinitePhysicalJumpCosts() {
         ShipEngineeringCatalog catalog = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
         Doctrine doctrine = Stage175IFleetDoctrineCatalog.all().get(0);
         InstalledFit fit = InstalledFit.fromDemonstrator(catalog.findDemonstratorFit(
@@ -82,8 +91,6 @@ class Stage21StrategicMobilityContentTest {
         JumpPlan plan = runtime.planJump(fit, state, DamageState.pristine());
 
         assertTrue(plan.allowed(), () -> "strategic FTL plan rejected: " + plan.failure());
-        assertEquals("utility_datalink", plan.mountId());
-        assertTrue(plan.translatedMassKg() < 32_000_000d);
         assertTrue(plan.requiredEnergyJ() > 0d);
         assertTrue(plan.jumpHeatJ() > 0d);
         assertTrue(plan.cooldownSeconds() > 0d);
