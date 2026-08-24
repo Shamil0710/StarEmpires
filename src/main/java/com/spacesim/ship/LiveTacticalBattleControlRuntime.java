@@ -4,7 +4,6 @@ import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
-import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.flight.FlightDynamics;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
 import com.spacesim.ship.LiveTacticalBattleScenario.CombatantSpec;
@@ -132,7 +131,7 @@ public final class LiveTacticalBattleControlRuntime {
         this.battleState = Objects.requireNonNull(battleState, "battleState");
         Objects.requireNonNull(formationObjectives, "formationObjectives");
         Objects.requireNonNull(battleObjectives, "battleObjectives");
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        engineeringCatalog = this.battleState.engineeringCatalog();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         engineeringRuntime = new ShipEngineeringRuntime(engineeringCatalog);
         grantService = new ShipEngineeringGrantService(engineeringCatalog);
