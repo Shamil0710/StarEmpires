@@ -20,11 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 final class StrategicOperationStateCodecTest {
     @Test
     void roundTripPreservesMidOperationContactAndEncounterExactly() {
-        ContactState contact = new ContactState(
-                new FleetId(900L), new StarSystemId(7L), ObservationChannel.LOCAL_SENSOR_REPORT,
-                "track:900:42", 42L, 52L);
-        TacticalEncounterState encounter = new TacticalEncounterState(
-                77L, new FleetId(900L), new StarSystemId(7L), 45L, -1L);
+        ContactState contact = contact();
+        TacticalEncounterState encounter = activeEncounter();
         OperationState operation = new OperationState(
                 3L,
                 OperationType.INTERCEPTION,
@@ -55,6 +52,29 @@ final class StrategicOperationStateCodecTest {
     }
 
     @Test
+    void activeEncounterCannotExistOutsideEngagedLifecycle() {
+        assertThrows(IllegalArgumentException.class, () -> new OperationState(
+                3L,
+                OperationType.INTERCEPTION,
+                11L,
+                12L,
+                2,
+                List.of(new FleetId(100L)),
+                new StarSystemId(5L),
+                new StarSystemId(7L),
+                "system:7",
+                RulesOfEngagement.IDENTIFIED_HOSTILES,
+                new SupplyPolicy(4_000, 2_000, 300L),
+                new WithdrawalPolicy(new StarSystemId(5L), 2_500, true, true),
+                OperationStatus.CONTACT_CONFIRMED,
+                40L,
+                45L,
+                -1L,
+                contact(),
+                activeEncounter()));
+    }
+
+    @Test
     void corruptFutureAndTrailingPayloadsFailClosed() {
         StrategicOperationState state = StrategicOperationState.empty();
         byte[] encoded = StrategicOperationStateCodec.encode(state);
@@ -69,5 +89,16 @@ final class StrategicOperationStateCodecTest {
 
         byte[] trailing = Arrays.copyOf(encoded, encoded.length + 1);
         assertThrows(IllegalArgumentException.class, () -> StrategicOperationStateCodec.decode(trailing));
+    }
+
+    private static ContactState contact() {
+        return new ContactState(
+                new FleetId(900L), new StarSystemId(7L), ObservationChannel.LOCAL_SENSOR_REPORT,
+                "track:900:42", 42L, 52L);
+    }
+
+    private static TacticalEncounterState activeEncounter() {
+        return new TacticalEncounterState(
+                77L, new FleetId(900L), new StarSystemId(7L), 45L, -1L);
     }
 }
