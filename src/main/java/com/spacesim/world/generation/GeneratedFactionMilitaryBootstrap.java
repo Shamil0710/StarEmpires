@@ -62,7 +62,7 @@ public final class GeneratedFactionMilitaryBootstrap {
     // Stage-13 weapon projection only; EngineeringComponent remains physical ship authority.
     private static final String LEGACY_COMBAT_ARCHETYPE_ID = "ship.guard_frigate";
     private static final ShipEngineeringCatalog ENGINEERING =
-            Stage175ICombatTestContentPack.loadDoctrines();
+            Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
     private static final ShipProtectionCatalog PROTECTION =
             Stage175ICombatTestProtectionPack.load();
 
