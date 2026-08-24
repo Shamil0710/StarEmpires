@@ -21,7 +21,8 @@ import java.util.Objects;
  * encounter are not returned to a fleet inventory, so the boundary cannot recreate spent ordnance.</p>
  *
  * <p>The resolver mutates only detached tactical copies. A caller such as Stage 21E must explicitly
- * validate and commit returned physical engineering state to its ordinary world authority.</p>
+ * validate and commit returned physical engineering state and encounter-local kinematics to its
+ * ordinary world authority.</p>
  */
 public final class Stage19ExactTacticalEncounterResolver {
     /** Provisional Stage-19 encounter horizon: 120 exact simulation seconds. */
@@ -68,6 +69,10 @@ public final class Stage19ExactTacticalEncounterResolver {
                     combatant.engineering().fit,
                     combatant.engineering().runtimeState,
                     combatant.engineering().instanceState,
+                    combatant.transform().position.x,
+                    combatant.transform().position.y,
+                    combatant.transform().velocity.x,
+                    combatant.transform().velocity.y,
                     combatant.fullyDestroyed()));
         }
         results.sort(Comparator.comparingLong(CombatantResult::entityId));
@@ -105,6 +110,10 @@ public final class Stage19ExactTacticalEncounterResolver {
      * @param fit unchanged exact installed fit
      * @param runtimeState final physical consumables/power/thermal/propulsion state
      * @param instanceState final damage/shield/maintenance/weapon-continuity state
+     * @param xM final encounter-frame x coordinate in meters
+     * @param yM final encounter-frame y coordinate in meters
+     * @param velocityXMps final encounter-frame x velocity in meters per second
+     * @param velocityYMps final encounter-frame y velocity in meters per second
      * @param destroyed whether catastrophic physical destruction was reached
      */
     public record CombatantResult(
@@ -113,6 +122,10 @@ public final class Stage19ExactTacticalEncounterResolver {
             InstalledFit fit,
             RuntimeState runtimeState,
             ShipInstanceRuntimeState instanceState,
+            double xM,
+            double yM,
+            double velocityXMps,
+            double velocityYMps,
             boolean destroyed) {
         /**
          * Validates one final detached combatant result.
@@ -122,6 +135,10 @@ public final class Stage19ExactTacticalEncounterResolver {
          * @param fit unchanged exact installed fit
          * @param runtimeState final physical operating state
          * @param instanceState final physical local continuity state
+         * @param xM final finite encounter-frame x coordinate in meters
+         * @param yM final finite encounter-frame y coordinate in meters
+         * @param velocityXMps final finite x velocity in meters per second
+         * @param velocityYMps final finite y velocity in meters per second
          * @param destroyed catastrophic physical destruction flag
          */
         public CombatantResult {
@@ -130,6 +147,10 @@ public final class Stage19ExactTacticalEncounterResolver {
             Objects.requireNonNull(fit, "fit");
             Objects.requireNonNull(runtimeState, "runtimeState");
             Objects.requireNonNull(instanceState, "instanceState");
+            if (!Double.isFinite(xM) || !Double.isFinite(yM)
+                    || !Double.isFinite(velocityXMps) || !Double.isFinite(velocityYMps)) {
+                throw new IllegalArgumentException("final tactical kinematics must be finite");
+            }
         }
     }
 
