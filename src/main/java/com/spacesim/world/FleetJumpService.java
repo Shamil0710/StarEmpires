@@ -8,6 +8,7 @@ import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringRuntime.OperatingCommand;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
+import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.simulation.SimulationSession;
 
 import java.util.ArrayList;
@@ -519,7 +520,7 @@ final class FleetJumpService {
                 return runtime.advance(
                         component.fit,
                         component.runtimeState,
-                        component.instanceState.damage(),
+                        new DamageState(component.instanceState.damage().moduleDamage()),
                         OperatingCommand.idle(),
                         deltaSeconds).state();
             }
