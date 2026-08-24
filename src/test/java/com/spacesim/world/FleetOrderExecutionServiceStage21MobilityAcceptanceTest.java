@@ -145,7 +145,14 @@ class FleetOrderExecutionServiceStage21MobilityAcceptanceTest {
                 placement.transitState() == null ? null : placement.transitState().originSystemId(),
                 placement.transitState() == null ? null : placement.transitState().destinationSystemId(),
                 EntityStateMapper.capture(entity(runtime, placement)),
-                FleetReadinessState.FULL)));
+                new FleetReadinessState(
+                        FleetReadinessState.FULL,
+                        FleetReadinessState.FULL,
+                        FleetReadinessState.FULL,
+                        FleetReadinessState.FULL,
+                        FleetReadinessState.FULL,
+                        FleetReadinessState.FULL,
+                        FleetReadinessState.FULL))));
     }
 
     private static Entity entity(
