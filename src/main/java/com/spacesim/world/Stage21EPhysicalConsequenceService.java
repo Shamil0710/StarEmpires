@@ -84,7 +84,17 @@ public final class Stage21EPhysicalConsequenceService {
             FleetReadinessState afterReadiness,
             boolean destroyed,
             boolean physicalPayloadChanged) {
-        /** Validates a consequence row and forbids synthetic loss reports. */
+        /**
+         * Validates a consequence row and forbids synthetic loss reports.
+         *
+         * @param fleetId stable ordinary fleet identity
+         * @param beforeEntityId physical entity identity before the outcome
+         * @param afterEntityId physical entity identity after the outcome, or null for loss
+         * @param beforeReadiness readiness derived from the before physical payload
+         * @param afterReadiness readiness derived from the after physical payload, or null for loss
+         * @param destroyed whether the ordinary FleetId is absent afterwards
+         * @param physicalPayloadChanged whether the exact ordinary payload changed or disappeared
+         */
         public FleetConsequence {
             Objects.requireNonNull(fleetId, "fleetId");
             Objects.requireNonNull(beforeEntityId, "beforeEntityId");
@@ -131,7 +141,12 @@ public final class Stage21EPhysicalConsequenceService {
      * @param fleets participant rows in stable FleetId order
      */
     public record ConsequenceReport(long operationId, List<FleetConsequence> fleets) {
-        /** Validates and canonicalizes a consequence report. */
+        /**
+         * Validates and canonicalizes a consequence report.
+         *
+         * @param operationId positive strategic operation identity
+         * @param fleets physical participant outcome rows
+         */
         public ConsequenceReport {
             if (operationId <= 0L) {
                 throw new IllegalArgumentException("operationId must be positive");
@@ -163,7 +178,12 @@ public final class Stage21EPhysicalConsequenceService {
      * @param after post-effect physical entity payload, or null when the ordinary entity was destroyed
      */
     public record PhysicalPayloadPair(EntityState before, EntityState after) {
-        /** Validates the required pre-effect authority payload. */
+        /**
+         * Validates the required pre-effect authority payload.
+         *
+         * @param before pre-effect physical entity payload
+         * @param after post-effect physical entity payload, or null when destroyed
+         */
         public PhysicalPayloadPair {
             Objects.requireNonNull(before, "before");
         }
