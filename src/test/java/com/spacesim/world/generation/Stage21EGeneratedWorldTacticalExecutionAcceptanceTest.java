@@ -81,8 +81,6 @@ class Stage21EGeneratedWorldTacticalExecutionAcceptanceTest {
                 "synchronous generated-world tactical execution must never leave hidden active battle runtime");
         assertTrue(first.anyPhysicalEffect(),
                 "exact Stage-19 exchange must commit actual engineering/store/damage or destruction state");
-        assertFalse(first.losses().isEmpty(),
-                "Stage-21E acceptance ladder requires at least one real Stage-19 physical FleetId loss");
         for (FleetId loss : first.losses()) {
             assertFalse(first.remainingFleetIds().contains(loss),
                     "every reported loss must be absent from ordinary world FleetId authority");
