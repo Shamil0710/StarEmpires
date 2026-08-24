@@ -7,6 +7,7 @@ import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
+import com.spacesim.ship.ShipFittingValidator;
 import com.spacesim.ship.Stage175IFleetDoctrineCatalog;
 import com.spacesim.ship.Stage175IFleetDoctrineCatalog.Doctrine;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ class Stage21StrategicMobilityContentTest {
     void stage19BaselineRemainsStableWhileStage21RegistersOnePhysicalFtlTradeoffPerDoctrine() {
         ShipEngineeringCatalog baseline = Stage175ICombatTestContentPack.loadDoctrines();
         ShipEngineeringCatalog strategic = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
+        ShipFittingValidator validator = new ShipFittingValidator(strategic);
 
         assertNull(baseline.findModule(Stage175ICombatTestContentPack.STAGE21_STRATEGIC_FTL_MODULE_ID));
         assertNotNull(strategic.findModule(Stage175ICombatTestContentPack.STAGE21_STRATEGIC_FTL_MODULE_ID));
@@ -56,6 +58,15 @@ class Stage21StrategicMobilityContentTest {
                     .filter(value -> strategic.findModule(value.moduleId()).family() == ModuleFamily.FTL_JUMP)
                     .count();
             assertEquals(1L, ftlAssignments);
+
+            InstalledFit installed = InstalledFit.fromDemonstrator(variant);
+            var validation = validator.validate(
+                    strategic.findHull(installed.hullId()),
+                    installed,
+                    doctrine.initialConsumables(),
+                    DamageState.pristine());
+            assertTrue(validation.isValid(),
+                    () -> variant.id() + " must remain an ordinary physically valid fit: " + validation.issues());
         }
     }
 
