@@ -27,8 +27,8 @@ Stage 21E composes these existing owners rather than replacing them:
 - **Stage 21A actor observations** — `FactionActorObservationSnapshot` supplies provenance and freshness for target acquisition. The operation service has no hidden-world lookup path for discovering targets.
 - **Stage 21D fleet/command state** — `FleetCommandState`, `FleetForceRegistry`, `FleetReadinessState`, `FleetOrderSubmissionService` and ordinary movement remain the fleet identity, readiness, command and travel authorities.
 - **Stage 19 physical warfare** — `PhysicalWarfareOperation` and `PhysicalWarfareOperationService` decide whether blockade/interdiction has a real combat-capable physical anchor.
-- **Stage 19 exact-local tactical combat** — `Stage21ETacticalMaterializationService` hands exact current persistent `EntityState` payloads through `TacticalMaterializationAuthority`. The authority must fail closed if Stage 19 cannot represent the imported fit; substituting an acceptance doctrine, abstract strength or statistical resolver is forbidden.
-- **Stage 20 freight/routing/handling** — Stage 21E exposes binary physical route/handling availability for Stage-20 adapters. Cargo movement and handling remain owned by the ordinary freight/logistics path.
+- **Stage 19 exact-local tactical combat** — `Stage21ETacticalMaterializationService` hands exact current persistent `EntityState` payloads through `TacticalMaterializationAuthority`. `Stage19ExactTacticalEncounterResolver` imports detached exact engineering/runtime state and executes the existing control, kinetic, guided, defense, deception and beam stack. The authority fails closed if Stage 19 cannot represent the imported fit; substituting an acceptance doctrine, abstract strength or statistical resolver is forbidden.
+- **Stage 20 freight/routing/handling** — `Stage21EGeneratedWorldTrafficRuntime` performs only Stage-21E admission before delegating to the existing `Stage20GeneratedWorldRuntimeBridge.LiveRuntime`. Cargo movement, route progress, jump FSM and handling remain owned by the ordinary Stage-20/18 path.
 - **Stage 17.5/18 engineering and stores** — damage, ammunition, reaction mass, crew/service availability and fitted capability remain ordinary physical state and are re-derived into fleet readiness.
 
 ## 3. Persistent operation lifecycle
@@ -60,7 +60,7 @@ Allowed evidence channels are limited to actor-bounded sensor/intelligence/owned
 
 The tactical gate then performs a second check against physical placement. A formerly valid report cannot materialize a battle after the target has physically moved away from the reported system. This separates **what the actor knows** from **what is physically true at encounter time** without granting omniscience.
 
-## 5. Tactical materialization
+## 5. Tactical materialization and commit-back
 
 `Stage21ETacticalMaterializationService` requires:
 
@@ -74,9 +74,17 @@ The tactical gate then performs a second check against physical placement. A for
 
 The handoff contains the exact current `EntityState` for every combatant, including persisted engineering fit, damage, stores, ammunition and propellant. Stage 21E accepts only a positive encounter identity returned by the Stage-19 authority.
 
+`Stage21EGeneratedWorldStage19Authority` re-validates each handoff against the current ordinary fleet entity and Stage-20 exact local kinematics before importing detached tactical copies. After the bounded Stage-19 exchange:
+
+- surviving engineering/runtime state and exact local kinematics are committed to the **same** ordinary entity and `FleetId`;
+- catastrophic loss calls the ordinary `WorldSimulation.destroyEntity(...)` path and releases the Stage-20 physical sidecar;
+- no replacement `FleetId`, ammunition, propellant or repaired damage is generated;
+- the transient tactical encounter is resolved synchronously by `Stage21EGeneratedWorldTacticalExecutionService`, so a checkpoint cannot retain an encounter whose runtime exists only in memory;
+- `Stage21ECommandLossReconciliationService` removes physically destroyed fleet identities from live Stage-21D command membership while allowing terminal Stage-21E history to retain the lost participant identity.
+
 ## 6. Physical consequences
 
-`Stage21EPhysicalConsequenceService` is deliberately read-only. It compares before/after `FleetForceRegistry` reconstructions.
+`Stage21EPhysicalConsequenceService` is deliberately read-only. It compares before/after `FleetForceRegistry` reconstructions for operation participants and the confirmed hostile contact target.
 
 A loss is reported only when the exact ordinary `FleetId` is absent afterwards. Surviving-fleet damage/ammunition/propellant/crew deltas are derived from the before/after physical readiness projections and the report records whether the exact entity payload changed.
 
@@ -93,10 +101,17 @@ Therefore:
 
 - blockade denies endpoint handling/adjacent traffic only while `PhysicalWarfareOperationService` confirms a hostile operation fleet is physically present and combat-capable in the objective system;
 - interception denies an exact topology edge only while a hostile operation fleet physically anchors a valid Stage-19 interdiction on that edge;
-- friendly traffic is not denied by its own generic operation policy;
+- friendly traffic is not denied by its own operation policy;
 - there is no `-X% production`, `-X% trade` or generic route-risk debuff.
 
-Industrial/economic consequences must therefore arise downstream because actual freight cannot traverse/handle a denied physical route or because an ordinary physical asset was actually destroyed. Stage 21E does not directly mutate production output.
+`Stage21EGeneratedWorldTrafficRuntime` is the generated-world Stage-21E production admission boundary. It receives the current persistent `StrategicOperationState` on every call and, before any mutation:
+
+- checks source/destination handling before delegating to ordinary outpost-to-hub transfer, freight loading or unloading;
+- checks the exact next topology edge before delegating to `LiveRuntime.requestNextRouteHop(...)` and the ordinary jump FSM;
+- retains the denying operation ID and physical `FleetId` in failure diagnostics;
+- stores no copied blockade, route, cargo or station state.
+
+If admission is denied, the underlying Stage-20/18 mutation is not invoked. If admission is open, the exact existing mutation path performs its normal phase, storage, topology, placement and conservation validation. Industrial/economic consequences therefore arise because real freight physically cannot traverse or handle a denied route, or because an ordinary physical asset was actually destroyed. Stage 21E does not directly mutate production output.
 
 Territorial ownership mutation remains with the dedicated territorial authority. Stage 21E invasion/defense operations provide the physical fleets/objective state required by the next territorial-consolidation stage; they do not award territory from an operation score.
 
@@ -128,20 +143,25 @@ Current schema/runtime identity:
 - schema: `8`;
 - runtime: `stage21e.generated-world-physical-operations.v8`.
 
-Decode fails closed on invalid magic, future file/schema versions, corrupt bounds, incompatible group/order/system references and trailing bytes.
+Decode fails closed on invalid magic, future file/schema versions, corrupt bounds, incompatible active group/order/system references and trailing bytes.
 
-Historical participant identities may remain in operation metadata after a real physical loss. Existing surviving fleet owners are still cross-checked against the operation faction. This allows a post-battle checkpoint to remember which ordinary identity was lost without resurrecting it.
+Historical participant identities and terminal group/order references may remain in operation metadata after a real physical loss. Existing surviving fleet owners are still cross-checked against the operation faction. This allows a post-battle checkpoint to remember which ordinary identity was lost without resurrecting it or weakening the Stage-21D live-command validation contract.
 
 ## 10. Acceptance evidence
 
 Automated coverage includes:
 
-- deterministic operation-state roundtrip including retained contact and active tactical encounter;
+- deterministic operation-state roundtrip including retained contact and tactical encounter metadata;
 - corrupt magic, future payload version and trailing bytes fail closed;
 - current actor-bounded security evidence can create a contact;
 - stale evidence cannot reveal/materialize a target;
 - only the six Stage-21E roadmap operation families are admitted from Stage-21D orders;
-- full generated-world Stage-21E checkpoint roundtrip retains the complete Stage-21D world/command layer plus an active physical operation;
+- exact generated-world Stage-19 execution moves hostile fleets through ordinary topology hops, commits real damage/stores/losses to ordinary fleet authority, creates no replacement fleets and yields byte-identical repeated outcomes;
+- post-battle command cleanup removes destroyed `FleetId` references from live Stage-21D command state while terminal operation history remains valid;
+- full post-battle Stage-21E checkpoint roundtrip embeds the exact already-committed ordinary physical world and contains no hidden active tactical runtime;
+- a physically anchored hostile blockade prevents the actual Stage-20 source-loading mutation and leaves freight state unchanged;
+- a physically anchored hostile interception prevents the actual Stage-20 next-hop request before the ordinary jump FSM starts;
+- friendly operation presence does not deny its own ordinary freight handling;
 - future top-level file/schema versions fail closed.
 
 Repository `clean verify` remains the final acceptance gate and includes unit/integration tests, coverage checks, Javadoc and packaging.
