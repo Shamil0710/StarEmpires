@@ -115,10 +115,15 @@ public final class StrategicOperationService {
     }
 
     /**
-     * Acquires a target exclusively from an actor-bounded current security observation.
+     * Acquires a target exclusively from a current security observation owned by this operation's faction.
+     *
+     * <p>The Stage-17 faction identity directory is the authority that binds the operation's dense ECS
+     * faction slot to the stable faction identity carried by the Stage-21A observation. A valid report
+     * belonging to any other faction is rejected before its evidence is inspected.</p>
      *
      * @param state current persistent operation state
      * @param operationId active operation identity
+     * @param factionIdentities authoritative Stage-17 stable/runtime faction identity directory
      * @param observations actor-bounded observations already available to the owning faction
      * @param targetFleetId ordinary target FleetId reported by the actor's information layer
      * @param observedSystemId system reported by the actor-known observation adapter
@@ -128,11 +133,13 @@ public final class StrategicOperationService {
     public StrategicOperationState acquireContact(
             StrategicOperationState state,
             long operationId,
+            FactionIdentityResolver factionIdentities,
             FactionActorObservationSnapshot observations,
             FleetId targetFleetId,
             StarSystemId observedSystemId,
             long currentTick) {
         Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(factionIdentities, "factionIdentities");
         Objects.requireNonNull(observations, "observations");
         Objects.requireNonNull(targetFleetId, "targetFleetId");
         Objects.requireNonNull(observedSystemId, "observedSystemId");
@@ -140,6 +147,12 @@ public final class StrategicOperationService {
         OperationState operation = state.requireOperation(operationId);
         if (operation.status() != OperationStatus.ACTIVE && operation.status() != OperationStatus.CONTACT_CONFIRMED) {
             throw new IllegalStateException("operation is not available for contact acquisition");
+        }
+        String owningFactionStableId = factionIdentities.stableId(operation.factionId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "operation faction is absent from authoritative faction identity directory"));
+        if (!owningFactionStableId.equals(observations.factionContentId())) {
+            throw new IllegalArgumentException("actor-bounded observation belongs to a different faction");
         }
         ActorObservation matched = observations.security().stream()
                 .filter(observation -> observation.domain() == Domain.SECURITY)
