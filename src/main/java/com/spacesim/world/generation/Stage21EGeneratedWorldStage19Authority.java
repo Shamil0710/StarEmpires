@@ -93,20 +93,24 @@ public final class Stage21EGeneratedWorldStage19Authority implements TacticalMat
         ArrayList<BoundCombatant> bound = new ArrayList<>();
         for (PhysicalCombatant row : checked.combatants()) {
             FleetPlacementState placement = world.findFleet(row.fleetId())
-                    .orElseThrow(() -> new IllegalStateException("tactical FleetId disappeared before exact import: " + row.fleetId()));
+                    .orElseThrow(() -> new IllegalStateException(
+                            "tactical FleetId disappeared before exact import: " + row.fleetId()));
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
                     || !systemId.equals(placement.systemId())
                     || placement.localEntityId() == null) {
-                throw new IllegalStateException("tactical FleetId left the exact local system before import: " + row.fleetId());
+                throw new IllegalStateException(
+                        "tactical FleetId left the exact local system before import: " + row.fleetId());
             }
             Entity entity = session.getEntityRegistry().require(placement.localEntityId());
             EntityState actual = EntityStateMapper.capture(entity);
             if (!actual.equals(row.entityState())) {
-                throw new IllegalStateException("tactical handoff payload is stale for ordinary fleet: " + row.fleetId());
+                throw new IllegalStateException(
+                        "tactical handoff payload is stale for ordinary fleet: " + row.fleetId());
             }
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             if (engineering == null) {
-                throw new IllegalStateException("tactical ordinary fleet lacks engineering authority: " + row.fleetId());
+                throw new IllegalStateException(
+                        "tactical ordinary fleet lacks engineering authority: " + row.fleetId());
             }
             LocalPhysicalKinematics physical = runtime.arrival().materialization(systemId)
                     .physicalState(placement.localEntityId())
@@ -140,6 +144,10 @@ public final class Stage21EGeneratedWorldStage19Authority implements TacticalMat
         return Math.addExact(checked.materializedAtTick(), 1L);
     }
 
+    boolean fleetExists(FleetId fleetId) {
+        return runtime.world().findFleet(Objects.requireNonNull(fleetId, "fleetId")).isPresent();
+    }
+
     private void validateCommitBoundary(
             StarSystemId systemId,
             List<BoundCombatant> bound,
@@ -152,17 +160,20 @@ public final class Stage21EGeneratedWorldStage19Authority implements TacticalMat
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
                     || !systemId.equals(placement.systemId())
                     || !placement.localEntityId().equals(before.placement().localEntityId())) {
-                throw new IllegalStateException("ordinary fleet placement changed during detached tactical resolution");
+                throw new IllegalStateException(
+                        "ordinary fleet placement changed during detached tactical resolution");
             }
             Entity current = world.findSession(systemId).orElseThrow()
                     .getEntityRegistry().require(placement.localEntityId());
             if (!EntityStateMapper.capture(current).equals(before.entityState())) {
-                throw new IllegalStateException("ordinary physical payload changed during detached tactical resolution");
+                throw new IllegalStateException(
+                        "ordinary physical payload changed during detached tactical resolution");
             }
             CombatantResult after = result.require(before.row().fleetId().value());
             EngineeringComponent currentEngineering = current.getComponent(EngineeringComponent.class);
             if (currentEngineering == null || !currentEngineering.fit.equals(after.fit())) {
-                throw new IllegalStateException("tactical result attempts to replace the ordinary installed fit");
+                throw new IllegalStateException(
+                        "tactical result attempts to replace the ordinary installed fit");
             }
         }
     }
