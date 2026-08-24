@@ -1,5 +1,9 @@
 package com.spacesim.world;
 
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EngineeringComponent;
+import com.spacesim.persistence.EntityStateMapper;
+import com.spacesim.ship.ShipEngineeringRuntime.JumpFailure;
 import com.spacesim.world.FleetCommandState.CommandGroupState;
 import com.spacesim.world.FleetCommandState.FleetOrderState;
 import com.spacesim.world.FleetCommandState.OrderStatus;
@@ -18,6 +22,9 @@ import java.util.Objects;
  * consumables, damage or economy.</p>
  */
 public final class FleetOrderExecutionService {
+    private static final ProductionFittedJumpResolver FITTED_JUMP_READINESS =
+            new ProductionFittedJumpResolver();
+
     private final GalaxyTopology topology;
 
     /**
@@ -95,16 +102,19 @@ public final class FleetOrderExecutionService {
      * Applies only movement operations through the existing jump finite-state machine.
      *
      * <p>An already-active jump is accepted only when it is the same persisted route hop; in that
-     * case no duplicate request is created. A different active jump fails closed. This makes retry
-     * after a partially accepted multi-fleet dispatch deterministic without rolling back physical
-     * movement that the authoritative jump system has already accepted.</p>
+     * case no duplicate request is created. A different active jump fails closed. Fitted fleets that
+     * have physically arrived but are still in the ordinary engineering FTL cooldown remain on the
+     * current route node without a synthetic reset or replacement jump; a later dispatch attempt may
+     * start the next hop only after normal simulation time clears that cooldown. Other fitted-jump
+     * failures are still delegated to the authoritative jump boundary and therefore fail closed.</p>
      *
      * @param world authoritative world simulation that owns physical fleet jumps
      * @param commandState persistent strategic command state
      * @param forces current reconstruction of ordinary fleet placement and readiness
      * @param orderId active strategic order to dispatch
-     * @return updated command state with the order marked active after successful jump requests
-     * @throws IllegalStateException when a service operation is routed here or an active jump targets another hop
+     * @return updated command state with the order marked active after accepted or physically-waiting requests
+     * @throws IllegalStateException when a service operation is routed here, an active jump targets another hop,
+     *                               or ordinary jump authority rejects a non-cooldown movement request
      */
     public FleetCommandState dispatchMovementHop(
             WorldSimulation world,
@@ -132,6 +142,11 @@ public final class FleetOrderExecutionService {
             }
         }
         for (MovementOperation movement : pending) {
+            FleetForceRegistry.Entry force = forces.find(movement.fleetId())
+                    .orElseThrow(() -> new IllegalStateException("missing FleetId: " + movement.fleetId()));
+            if (waitingForFittedCooldown(force)) {
+                continue;
+            }
             world.requestFleetJump(movement.fleetId(), movement.destinationSystemId(), 0f, 0f);
         }
         FleetOrderState order = commandState.requireOrder(orderId);
@@ -169,6 +184,16 @@ public final class FleetOrderExecutionService {
                     : OrderStatus.COMPLETE);
         }
         return commandState.replaceOrder(advanced);
+    }
+
+    private static boolean waitingForFittedCooldown(FleetForceRegistry.Entry force) {
+        Entity entity = EntityStateMapper.restore(force.entityState());
+        EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
+        if (engineering == null) {
+            return false;
+        }
+        var plan = FITTED_JUMP_READINESS.plan(engineering);
+        return !plan.allowed() && plan.failure() == JumpFailure.COOLDOWN_ACTIVE;
     }
 
     /** Marker for ordinary operations projected from a validated strategic order. */
