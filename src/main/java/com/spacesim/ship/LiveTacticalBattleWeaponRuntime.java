@@ -59,7 +59,7 @@ public final class LiveTacticalBattleWeaponRuntime {
      */
     public LiveTacticalBattleWeaponRuntime(LiveTacticalBattleControlRuntime controlRuntime) {
         this.controlRuntime = Objects.requireNonNull(controlRuntime, "controlRuntime");
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        engineeringCatalog = battleState().engineeringCatalog();
         protectionCatalog = Stage175ICombatTestProtectionPack.load();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
