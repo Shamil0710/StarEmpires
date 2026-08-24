@@ -115,6 +115,51 @@ public final class ShipDamageRuntime {
     }
 
     /**
+     * Tests catastrophic physical destruction from local structure plus installed subsystem state.
+     *
+     * <p>A ship is destroyed only when every authored compartment has zero structural integrity and
+     * every module actually installed in each compartment has zero integrity. Uninstalled layout
+     * mounts are deliberately ignored so fitting choices cannot create immortal phantom subsystems.</p>
+     *
+     * @param hull authoritative fitted hull definition
+     * @param fit exact installed fit being evaluated
+     * @param layout explicit hull damage-routing layout
+     * @param snapshot current physical damage snapshot
+     * @return true only when all fitted physical structure and installed local subsystems are destroyed
+     */
+    public static boolean isFullyDestroyed(
+            HullDefinition hull,
+            InstalledFit fit,
+            HullDamageLayout layout,
+            Snapshot snapshot) {
+        HullDefinition checkedHull = Objects.requireNonNull(hull, "hull");
+        InstalledFit checkedFit = Objects.requireNonNull(fit, "fit");
+        HullDamageLayout checkedLayout = Objects.requireNonNull(layout, "layout");
+        Snapshot checkedSnapshot = Objects.requireNonNull(snapshot, "snapshot");
+        if (!checkedHull.id().equals(checkedFit.hullId()) || !checkedHull.id().equals(checkedLayout.hullId())) {
+            throw new IllegalArgumentException("Hull/fit/damage-layout ID mismatch");
+        }
+        Set<String> installedMounts = new TreeSet<>();
+        for (InstalledModuleDefinition installed : checkedFit.installedModules()) {
+            installedMounts.add(installed.mountId());
+        }
+        for (CompartmentDefinition compartment : checkedHull.compartments()) {
+            if (checkedSnapshot.compartmentIntegrityById().getOrDefault(compartment.id(), 1d) > 0d) {
+                return false;
+            }
+            for (MountDamageDefinition mount : checkedLayout.mounts()) {
+                if (mount.compartmentId().equals(compartment.id())
+                        && installedMounts.contains(mount.mountId())
+                        && checkedSnapshot.moduleDamage().moduleIntegrityByMount()
+                                .getOrDefault(mount.mountId(), 1d) > 0d) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
      * Applies one penetration/spall result at one hull-local position.
      *
      * @param hull authoritative hull definition
