@@ -9,7 +9,6 @@ import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringRuntime.OperatingCommand;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
-import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 
 import java.util.ArrayList;
@@ -74,7 +73,7 @@ final class ProductionFittedJumpResolver implements FleetJumpService.FittedJumpR
         return selected.runtime().advance(
                 checked.fit,
                 checked.runtimeState,
-                new DamageState(checked.instanceState.damage().moduleDamage()),
+                checked.instanceState.damage().moduleDamage(),
                 OperatingCommand.idle(),
                 deltaSeconds).state();
     }
