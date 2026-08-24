@@ -6,6 +6,7 @@ import com.spacesim.persistence.EntityState;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.TreeSet;
 
 /**
  * Deterministic Stage-21E reconciliation of operation consequences from ordinary physical fleets.
@@ -19,9 +20,13 @@ import java.util.Objects;
 public final class Stage21EPhysicalConsequenceService {
 
     /**
-     * Reconciles physical participants of one operation across an exact before/after boundary.
+     * Reconciles every operation participant plus the retained hostile contact across before/after state.
      *
-     * @param operation operation whose participant identities bound the comparison
+     * <p>The contact target is included when present so a physically destroyed opposing FleetId is
+     * represented by the same ordinary-world evidence rule as an operation participant. No target is
+     * inferred from hidden world truth.</p>
+     *
+     * @param operation operation whose explicit participant/contact identities bound the comparison
      * @param before physical force registry captured before tactical/ordinary effects
      * @param after physical force registry captured after those effects
      * @return canonical physical consequence report
@@ -33,11 +38,15 @@ public final class Stage21EPhysicalConsequenceService {
         Objects.requireNonNull(operation, "operation");
         Objects.requireNonNull(before, "before");
         Objects.requireNonNull(after, "after");
+        TreeSet<FleetId> combatants = new TreeSet<>(operation.participantFleetIds());
+        if (operation.contact() != null) {
+            combatants.add(operation.contact().targetFleetId());
+        }
         ArrayList<FleetConsequence> rows = new ArrayList<>();
-        for (FleetId fleetId : operation.participantFleetIds()) {
+        for (FleetId fleetId : combatants) {
             FleetForceRegistry.Entry previous = before.find(fleetId)
                     .orElseThrow(() -> new IllegalStateException(
-                            "operation participant was absent before physical reconciliation: " + fleetId));
+                            "operation/contact fleet was absent before physical reconciliation: " + fleetId));
             FleetForceRegistry.Entry current = after.find(fleetId).orElse(null);
             if (current == null) {
                 rows.add(new FleetConsequence(
@@ -51,7 +60,8 @@ public final class Stage21EPhysicalConsequenceService {
                 continue;
             }
             if (current.factionId() != previous.factionId()) {
-                throw new IllegalStateException("ordinary fleet ownership changed during consequence reconciliation: " + fleetId);
+                throw new IllegalStateException(
+                        "ordinary fleet ownership changed during consequence reconciliation: " + fleetId);
             }
             rows.add(new FleetConsequence(
                     fleetId,
@@ -135,17 +145,17 @@ public final class Stage21EPhysicalConsequenceService {
     }
 
     /**
-     * Canonical consequence set for one operation.
+     * Canonical consequence set for one operation encounter.
      *
      * @param operationId operation identity
-     * @param fleets participant rows in stable FleetId order
+     * @param fleets explicit participant/contact rows in stable FleetId order
      */
     public record ConsequenceReport(long operationId, List<FleetConsequence> fleets) {
         /**
          * Validates and canonicalizes a consequence report.
          *
          * @param operationId positive strategic operation identity
-         * @param fleets physical participant outcome rows
+         * @param fleets physical participant/contact outcome rows
          */
         public ConsequenceReport {
             if (operationId <= 0L) {
