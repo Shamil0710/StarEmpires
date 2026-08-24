@@ -127,6 +127,19 @@ public final class LiveTacticalBattleRuntimeState {
         return scenario;
     }
 
+    /**
+     * Returns the immutable engineering catalog that materialized this battle state.
+     *
+     * <p>Authored Stage-19 scenarios retain the stable baseline catalog, while exact strategic
+     * imports retain the registered Stage-21 strategic-mobility composition. Downstream tactical
+     * runtimes must reuse this catalog rather than silently loading a different content universe.</p>
+     *
+     * @return battle-local immutable engineering content authority
+     */
+    public ShipEngineeringCatalog engineeringCatalog() {
+        return engineeringCatalog;
+    }
+
     /** @return immutable combatants in canonical stable-identity order */
     public List<CombatantRuntime> combatants() {
         return List.copyOf(combatantsById.values());
