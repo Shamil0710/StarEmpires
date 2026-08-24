@@ -17,7 +17,15 @@ public final class Stage21EOperationTrafficPolicy {
         this.physicalWarfare = Objects.requireNonNull(physicalWarfare, "physicalWarfare");
     }
 
-    /** Evaluates one concrete topology edge for ordinary traffic. */
+    /**
+     * Evaluates one concrete topology edge for ordinary traffic.
+     *
+     * @param operations current persistent strategic operations
+     * @param from first concrete topology-edge endpoint
+     * @param to second concrete topology-edge endpoint
+     * @param trafficFactionId faction owning the traffic being evaluated
+     * @return physical edge availability and denying physical force identity when blocked
+     */
     public EdgeAvailability edgeAvailability(
             StrategicOperationState operations,
             StarSystemId from,
@@ -53,7 +61,14 @@ public final class Stage21EOperationTrafficPolicy {
         return EdgeAvailability.available();
     }
 
-    /** Evaluates physical loading/unloading/service handling inside one system. */
+    /**
+     * Evaluates physical loading, unloading and service handling inside one system.
+     *
+     * @param operations current persistent strategic operations
+     * @param systemId concrete endpoint system being evaluated
+     * @param trafficFactionId faction owning the traffic being handled
+     * @return physical endpoint handling availability and denying blockade identity when blocked
+     */
     public HandlingAvailability handlingAvailability(
             StrategicOperationState operations,
             StarSystemId systemId,
@@ -82,9 +97,21 @@ public final class Stage21EOperationTrafficPolicy {
         /** A hostile physical force interdicts the exact edge. */ DENIED_BY_PHYSICAL_INTERDICTION
     }
 
-    /** @param availability physical availability @param denyingOperationId operation or zero @param denyingFleetId fleet or null */
+    /**
+     * Physical availability result for one exact topology edge.
+     *
+     * @param availability physical availability category
+     * @param denyingOperationId denying operation identity, or zero when available
+     * @param denyingFleetId ordinary denying FleetId, or null when available
+     */
     public record EdgeAvailability(Availability availability, long denyingOperationId, FleetId denyingFleetId) {
-        /** Validates available/denied identity invariants. */
+        /**
+         * Validates available/denied identity invariants.
+         *
+         * @param availability physical availability category
+         * @param denyingOperationId denying operation identity, or zero when available
+         * @param denyingFleetId ordinary denying FleetId, or null when available
+         */
         public EdgeAvailability {
             Objects.requireNonNull(availability, "availability");
             if (availability == Availability.AVAILABLE) {
@@ -98,13 +125,26 @@ public final class Stage21EOperationTrafficPolicy {
 
         /** @return whether ordinary traffic may use the edge */
         public boolean allowsTraffic() { return availability == Availability.AVAILABLE; }
-        /** @return canonical available result */
+
+        /** @return canonical physically available edge result */
         public static EdgeAvailability available() { return new EdgeAvailability(Availability.AVAILABLE, 0L, null); }
     }
 
-    /** @param available physical handling availability @param denyingOperationId operation or zero @param denyingFleetId fleet or null */
+    /**
+     * Physical handling result for one concrete system endpoint.
+     *
+     * @param available whether ordinary endpoint handling remains physically available
+     * @param denyingOperationId denying blockade operation identity, or zero when available
+     * @param denyingFleetId ordinary denying FleetId, or null when available
+     */
     public record HandlingAvailability(boolean available, long denyingOperationId, FleetId denyingFleetId) {
-        /** Validates available/denied identity invariants. */
+        /**
+         * Validates available/denied identity invariants.
+         *
+         * @param available whether ordinary endpoint handling remains physically available
+         * @param denyingOperationId denying blockade operation identity, or zero when available
+         * @param denyingFleetId ordinary denying FleetId, or null when available
+         */
         public HandlingAvailability {
             if (available) {
                 if (denyingOperationId != 0L || denyingFleetId != null) {
