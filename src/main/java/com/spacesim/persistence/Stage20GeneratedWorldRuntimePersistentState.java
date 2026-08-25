@@ -1,6 +1,7 @@
 package com.spacesim.persistence;
 
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
+import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetJumpState;
 import com.spacesim.world.FleetLocationKind;
@@ -19,6 +20,11 @@ import java.util.Objects;
 /**
  * Atomic Stage-20.5 checkpoint joining the generated campaign, ordinary live world and physical
  * freight sidecar without turning any one of them into a second authority for the others.
+ *
+ * <p>{@code localFleetPhysicalStates} is the exact local-kinematics authority for every in-system
+ * ordinary fleet. The legacy physical field embedded in each local freight row is a compatibility
+ * mirror and is canonicalized from that authority at this atomic composition boundary. Route,
+ * cargo, ownership and lifecycle state remain owned exclusively by the freight sidecar.</p>
  *
  * @param schemaVersion checkpoint schema version
  * @param bridgeVersion exact runtime-composition contract
@@ -106,6 +112,9 @@ public record Stage20GeneratedWorldRuntimePersistentState(
                                 + placement.id());
             }
         }
+
+        freight = canonicalizeFreightPhysicalMirror(freight, physicalByFleet);
+
         Map<FleetId, FleetJumpState> jumps = new HashMap<>();
         for (FleetJumpState jump : worldState.fleetJumps()) {
             jumps.put(jump.fleetId(), jump);
@@ -128,6 +137,11 @@ public record Stage20GeneratedWorldRuntimePersistentState(
                     throw new IllegalArgumentException(
                             "local freight system differs between sidecar and ordinary world");
                 }
+                LocalFleetPhysicalState exact = physicalByFleet.get(fleet.fleetId());
+                if (exact == null || !fleet.physicalState().equals(exact.physicalState())) {
+                    throw new IllegalArgumentException(
+                            "local freight physical mirror differs from exact local fleet state");
+                }
                 continue;
             }
             if (placement.transitState() == null
@@ -144,6 +158,49 @@ public record Stage20GeneratedWorldRuntimePersistentState(
                         "transit freight placement lacks its ordinary jump FSM state");
             }
         }
+    }
+
+    private static Stage20FreightPersistentState canonicalizeFreightPhysicalMirror(
+            Stage20FreightPersistentState source,
+            Map<FleetId, LocalFleetPhysicalState> physicalByFleet) {
+        ArrayList<FreighterState> fleets = new ArrayList<>(source.freighters().size());
+        boolean changed = false;
+        for (FreighterState fleet : source.freighters()) {
+            LocalFleetPhysicalState exact = physicalByFleet.get(fleet.fleetId());
+            if (exact == null || fleet.physicalState().equals(exact.physicalState())) {
+                fleets.add(fleet);
+                continue;
+            }
+            fleets.add(new FreighterState(
+                    fleet.fleetId(),
+                    fleet.stableFactionId(),
+                    fleet.ownershipOrdinal(),
+                    fleet.hullId(),
+                    fleet.fitId(),
+                    fleet.cargoCapacityKg(),
+                    fleet.currentSystemId(),
+                    exact.physicalState(),
+                    fleet.phase(),
+                    fleet.activeOrderId(),
+                    fleet.routeIndex(),
+                    fleet.cargoStorage()));
+            changed = true;
+        }
+        if (!changed) {
+            return source;
+        }
+        return new Stage20FreightPersistentState(
+                source.schemaVersion(),
+                source.rootSeed(),
+                source.generatorVersion(),
+                source.worldFingerprint(),
+                source.materializationVersion(),
+                source.compatibilityAuthorityVersion(),
+                source.nextFleetIdValue(),
+                source.nextCargoLotOrdinal(),
+                fleets,
+                source.cargoLots(),
+                source.orders());
     }
 
     /** Exact persisted physical state owned by one ordinary in-system fleet placement. */
