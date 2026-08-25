@@ -30,9 +30,9 @@ public final class TerritorialTransitionService {
      *
      * <p>Territorial opposition stalls the occupation clock rather than creating synthetic resistance.
      * Missing, displaced, under-ready or under-supplied participants start an unsupported deadline,
-     * decay accumulated progress and withdraw any still-unestablished invasion claim through the
-     * existing Stage-17 authority. This prevents infrastructure alone from continuing a military
-     * stabilization after its occupation security/supply prerequisites disappear.</p>
+     * decay accumulated progress and withdraw only a still-unestablished claim that this exact
+     * occupation previously created through Stage 17. Pre-existing political claims remain owned by
+     * their original authority and are never revoked merely because a later invasion loses support.</p>
      *
      * <p>Only after the sustained occupation threshold is reached is an absent political claim
      * declared through Stage 17. Once Stage 17 actually establishes control, the occupation remembers
@@ -83,8 +83,8 @@ public final class TerritorialTransitionService {
         }
         if (previous == null || previous.operationId() != operationId) {
             previous = new OccupationState(
-                    factionId, systemId, operationId, currentTick, currentTick, 0L, -1L, false,
-                    OccupationStatus.OCCUPYING);
+                    factionId, systemId, operationId, currentTick, currentTick, 0L, -1L,
+                    false, false, OccupationStatus.OCCUPYING);
         }
         if (currentTick < previous.lastEvaluatedTick()) {
             throw new IllegalArgumentException("occupation evaluation cannot move backwards in time");
@@ -98,38 +98,61 @@ public final class TerritorialTransitionService {
                     currentTick,
                     Math.max(previous.securedTicks(), REQUIRED_OCCUPATION_TICKS),
                     -1L,
+                    previous.claimCreatedByOccupation(),
                     true,
                     OccupationStatus.SECURED);
             return new AdvanceResult(state.upsert(established), operations, established, false, true, true, false);
         }
         if (previous.controlEverEstablished() && controller != null && !controller.equals(factionId)) {
             OccupationState liberated = replacement(
-                    previous, currentTick, previous.securedTicks(), -1L, true, OccupationStatus.LIBERATED);
+                    previous,
+                    currentTick,
+                    previous.securedTicks(),
+                    -1L,
+                    previous.claimCreatedByOccupation(),
+                    true,
+                    OccupationStatus.LIBERATED);
             return new AdvanceResult(state.upsert(liberated), operations, liberated, false, false, false, false);
         }
 
         if (operation.status() == OperationStatus.FAILED) {
-            withdrawUnestablishedClaim(world, factionId, systemId);
+            boolean claimRetained = !withdrawOccupationClaim(world, previous);
             OccupationState collapsed = replacement(
-                    previous, currentTick, 0L, currentTick, previous.controlEverEstablished(), OccupationStatus.COLLAPSED);
+                    previous,
+                    currentTick,
+                    0L,
+                    currentTick,
+                    previous.claimCreatedByOccupation() && claimRetained,
+                    previous.controlEverEstablished(),
+                    OccupationStatus.COLLAPSED);
             return new AdvanceResult(state.upsert(collapsed), operations, collapsed, false, false, false, false);
         }
         if (operation.status() == OperationStatus.WITHDRAWING) {
-            withdrawUnestablishedClaim(world, factionId, systemId);
+            boolean claimRetained = !withdrawOccupationClaim(world, previous);
             long unsupportedSince = previous.unsupportedSinceTick() >= 0L
                     ? previous.unsupportedSinceTick() : currentTick;
             long progress = decay(previous.securedTicks(), elapsed);
             OccupationState withdrawing = replacement(
-                    previous, currentTick, progress, unsupportedSince, previous.controlEverEstablished(),
+                    previous,
+                    currentTick,
+                    progress,
+                    unsupportedSince,
+                    previous.claimCreatedByOccupation() && claimRetained,
+                    previous.controlEverEstablished(),
                     OccupationStatus.WITHDRAWING);
             return new AdvanceResult(state.upsert(withdrawing), operations, withdrawing, false, false, false, false);
         }
 
         PhysicalReview physical = reviewPhysical(operation, forces, world, identities);
         if (physical.rivalFleetPresent()) {
-            withdrawUnestablishedClaim(world, factionId, systemId);
+            boolean claimRetained = !withdrawOccupationClaim(world, previous);
             OccupationState contested = replacement(
-                    previous, currentTick, previous.securedTicks(), -1L, previous.controlEverEstablished(),
+                    previous,
+                    currentTick,
+                    previous.securedTicks(),
+                    -1L,
+                    previous.claimCreatedByOccupation() && claimRetained,
+                    previous.controlEverEstablished(),
                     OccupationStatus.CONTESTED);
             return new AdvanceResult(state.upsert(contested), operations, contested, false,
                     physical.securityReady(), physical.supplyReady(), true);
@@ -137,7 +160,7 @@ public final class TerritorialTransitionService {
 
         boolean supported = physical.securityReady() && physical.supplyReady();
         if (!supported) {
-            withdrawUnestablishedClaim(world, factionId, systemId);
+            boolean claimRetained = !withdrawOccupationClaim(world, previous);
             long unsupportedSince = previous.unsupportedSinceTick() >= 0L
                     ? previous.unsupportedSinceTick() : currentTick;
             long progress = decay(previous.securedTicks(), elapsed);
@@ -145,7 +168,13 @@ public final class TerritorialTransitionService {
                     ? OccupationStatus.COLLAPSED : OccupationStatus.OCCUPYING;
             if (status == OccupationStatus.COLLAPSED) progress = 0L;
             OccupationState unsupported = replacement(
-                    previous, currentTick, progress, unsupportedSince, previous.controlEverEstablished(), status);
+                    previous,
+                    currentTick,
+                    progress,
+                    unsupportedSince,
+                    previous.claimCreatedByOccupation() && claimRetained,
+                    previous.controlEverEstablished(),
+                    status);
             return new AdvanceResult(state.upsert(unsupported), operations, unsupported, false,
                     physical.securityReady(), physical.supplyReady(), false);
         }
@@ -153,6 +182,7 @@ public final class TerritorialTransitionService {
         long progress = Math.min(REQUIRED_OCCUPATION_TICKS, safeAdd(previous.securedTicks(), elapsed));
         boolean secured = progress >= REQUIRED_OCCUPATION_TICKS;
         boolean claimCreated = false;
+        boolean occupationOwnsClaim = previous.claimCreatedByOccupation();
         StrategicOperationState nextOperations = operations;
         OccupationStatus status = secured ? OccupationStatus.SECURED : OccupationStatus.OCCUPYING;
         if (secured) {
@@ -161,6 +191,7 @@ public final class TerritorialTransitionService {
             if (strategy.claimFor(systemId) == null) {
                 world.declareTerritorialClaim(factionId, systemId);
                 claimCreated = true;
+                occupationOwnsClaim = true;
             }
             if (operation.status().active()) {
                 OperationState completed = operation.withLifecycle(
@@ -173,7 +204,13 @@ public final class TerritorialTransitionService {
             }
         }
         OccupationState next = replacement(
-                previous, currentTick, progress, -1L, previous.controlEverEstablished(), status);
+                previous,
+                currentTick,
+                progress,
+                -1L,
+                occupationOwnsClaim,
+                previous.controlEverEstablished(),
+                status);
         return new AdvanceResult(state.upsert(next), nextOperations, next, claimCreated,
                 physical.securityReady(), physical.supplyReady(), false);
     }
@@ -279,15 +316,13 @@ public final class TerritorialTransitionService {
                 .orElse(false);
     }
 
-    private static void withdrawUnestablishedClaim(
-            WorldSimulation world,
-            String factionContentId,
-            StarSystemId systemId) {
-        FactionStrategicState strategy = world.findFactionStrategicState(factionContentId)
+    private static boolean withdrawOccupationClaim(WorldSimulation world, OccupationState occupation) {
+        if (!occupation.claimCreatedByOccupation()) return false;
+        FactionStrategicState strategy = world.findFactionStrategicState(occupation.factionContentId())
                 .orElseThrow(() -> new IllegalStateException("occupation faction has no Stage-17 strategic state"));
-        if (!strategy.controls(systemId) && strategy.claimFor(systemId) != null) {
-            world.withdrawTerritorialClaim(factionContentId, systemId);
-        }
+        if (strategy.controls(occupation.systemId())) return false;
+        if (strategy.claimFor(occupation.systemId()) == null) return false;
+        return world.withdrawTerritorialClaim(occupation.factionContentId(), occupation.systemId());
     }
 
     private static OccupationState replacement(
@@ -295,11 +330,13 @@ public final class TerritorialTransitionService {
             long currentTick,
             long securedTicks,
             long unsupportedSinceTick,
+            boolean claimCreatedByOccupation,
             boolean controlEverEstablished,
             OccupationStatus status) {
         return new OccupationState(
                 previous.factionContentId(), previous.systemId(), previous.operationId(), previous.startedTick(),
-                currentTick, securedTicks, unsupportedSinceTick, controlEverEstablished, status);
+                currentTick, securedTicks, unsupportedSinceTick, claimCreatedByOccupation,
+                controlEverEstablished, status);
     }
 
     private static long decay(long value, long elapsed) {
