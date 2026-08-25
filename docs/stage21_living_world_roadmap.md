@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
 > Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A, Stage 21B,
-> Stage 21C and **Stage 21D are complete; Stage 21E is OPEN/NEXT**.
+> Stage 21C, Stage 21D and **Stage 21E are complete; Stage 21F is OPEN/NEXT**.
 
 ## 1. Purpose
 
@@ -231,29 +231,38 @@ Exit criteria — accepted:
 
 Implementation and acceptance map: `docs/stage21d_fleet_readiness_command_movement.md`.
 
-### 21E — Strategic operations and physical warfare consequences — OPEN/NEXT
+### 21E — Strategic operations and physical warfare consequences — COMPLETE
 
 Objective: execute coercion and warfare through Stage-19/ordinary-world state.
 
-Deliverables:
+Delivered:
 
-- operation identities for escort, interception, raid, blockade, defense and invasion;
+- persistent operation identities for escort, interception, raid, blockade, defense and invasion;
 - participant, staging, objective, rules-of-engagement, supply and withdrawal state;
-- actor-bounded contact acquisition before interception or battle materialization;
-- appropriate Stage-19 tactical materialization for forces that physically meet;
-- deterministic return of ship damage, ammunition, propellant, losses and survivors;
-- blockade/interdiction consequences through actual traffic, handling and route availability;
-- industrial/territorial effects only from destroyed, denied or occupied physical assets;
-- reinforcement and retreat that respect route time and information latency.
+- owning-faction actor-bounded contact acquisition before interception or battle materialization;
+- exact Stage-19 tactical materialization for forces that physically meet, with synchronous commit-back
+  to the same ordinary entity/`FleetId` identities;
+- deterministic return of ship damage, ammunition, propellant, survivors and catastrophic losses;
+- a non-vacuous generated-world casualty path where only production Stage 19 destroys a valid surviving
+  ordinary target and the surviving operation fleet returns with less physical ammunition and/or reaction mass;
+- blockade/interdiction consequences through actual Stage-20/18 traffic, handling and route availability;
+- industrial consequences only from destroyed/denied physical assets; no generic production modifier;
+- reinforcement only after ordinary physical arrival and withdrawal decisions that respect real readiness,
+  propellant and normal Stage-21D movement authority;
+- schema-v8 deterministic persistence with fail-closed active-participant ownership, future/corrupt
+  payload validation and rejection of transient in-memory tactical encounters at the full checkpoint boundary.
 
-Exit criteria:
+Exit criteria — accepted:
 
 - no operation applies a generic remote production/combat percentage debuff;
 - every reported loss maps to a removed/damaged ordinary entity and conserved material outcome;
-- an unsupplied superior force can fail, withdraw or lose readiness;
-- tactical and strategic continuation remains deterministic through mid-operation save/load.
+- an unsupplied superior force can fail, withdraw or lose readiness without a resource grant;
+- operation acceptance proves a real Stage-19 loss and physical operation-store consumption;
+- tactical and strategic continuation remains deterministic through the supported operation checkpoint boundary.
 
-### 21F — Occupation, claims, stabilization and control transition
+Implementation and acceptance map: `docs/stage21e_strategic_operations_physical_consequences.md`.
+
+### 21F — Occupation, claims, stabilization and control transition — OPEN/NEXT
 
 Objective: make territorial expansion gradual, contestable and legally persistent.
 
@@ -405,8 +414,8 @@ supports multiple plausible histories without hidden exceptions.
 | 21B | **COMPLETE** | persistent strategic goals, feasibility, commitment and explainability |
 | 21C | **COMPLETE** | proposal/counter-offer/crisis/treaty/war legal lifecycle |
 | 21D | **COMPLETE** | physical readiness, command groups, lawful orders and neighbor-only movement |
-| 21E | **OPEN — next** | operations and exact physical consequences |
-| 21F | **OPEN** | occupation/stabilization/control transitions |
+| 21E | **COMPLETE** | persistent operations, exact Stage-19 consequences, physical losses/store consumption and traffic interdiction |
+| 21F | **OPEN — next** | occupation/stabilization/control transitions |
 | 21G | **OPEN** | peace/demobilization/repair/replacement |
 | 21H | **OPEN** | persistent NPCs, missions, reputation and discovery |
 | 21I | **OPEN** | integrated UI/migration/corpus/performance final gate |
@@ -438,10 +447,21 @@ Stage 21D accepts the finite force-command layer over real ordinary fleet state:
 7. movement delegates only to the existing jump FSM, including idempotent same-hop retry and recoverable staggered group progress;
 8. Stage-21D persistence composes Stage-21C while the Stage-20.5 checkpoint remains exact local/transit authority.
 
-Stage 21E is now the first remaining implementation slice. It must consume the accepted Stage-21D
-finite force identities, readiness and lawful routes, acquire actor-bounded contact, create persistent
-operation identity and materialize/return physical warfare consequences through Stage 19. It must not
-replace Stage-21D orders with abstract combat points or remote percentage debuffs.
+Stage 21E accepts the physical strategic-operation layer over those real force identities:
+
+1. six persistent operation families retain ordinary participant `FleetId` identities and explicit objective/ROE/supply/withdrawal metadata;
+2. contact acquisition is bounded to the owning faction's current Stage-21A evidence through the Stage-17 identity resolver;
+3. tactical materialization re-validates physical co-location and imports exact current entity/engineering state into production Stage 19;
+4. surviving damage, ammunition, propellant and kinematics commit back to the same ordinary identities while catastrophic loss uses ordinary destruction authority;
+5. dedicated generated-world acceptance proves a real Stage-19-created `FleetId` loss plus physical ammunition/reaction-mass consumption without replacement or replenishment grants;
+6. blockade/interdiction can deny only real Stage-20/18 handling or an exact route edge while physically anchored;
+7. reinforcement requires ordinary arrival and withdrawal remains an ordinary validated movement/service decision;
+8. Stage-21E persistence composes Stage-21D and rejects invalid active participants, future/corrupt state and transient active tactical runtime at checkpoint boundaries.
+
+Stage 21F is now the first remaining implementation slice. It must consume accepted Stage-21E
+physical operation outcomes and existing Stage-17 territorial law to model claim, occupation,
+stabilization, recognition and gradual control transition. It must not infer control from an abstract
+battle score or immediately recolour a system merely because a fleet arrived.
 
 ## 10. Suggested state ownership
 
@@ -509,9 +529,9 @@ Each item should remain separately reviewable and leave `main` green:
 6. **COMPLETE:** 21C war/peace legal lifecycle and persistence acceptance;
 7. **COMPLETE:** 21D readiness/command groups;
 8. **COMPLETE:** 21D orders/routing/service validation/persistence;
-9. **NEXT:** 21E operation lifecycle and contact/materialization seam;
-10. 21E physical consequence return/persistence;
-11. 21F occupation/stabilization/control;
+9. **COMPLETE:** 21E operation lifecycle and contact/materialization seam;
+10. **COMPLETE:** 21E physical consequence return/persistence;
+11. **NEXT:** 21F occupation/stabilization/control;
 12. 21G peace/demobilization/replacement;
 13. 21H NPC identity/knowledge/availability;
 14. 21H mission/escrow/objective/reputation;
