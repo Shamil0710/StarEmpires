@@ -11,6 +11,7 @@ import com.spacesim.persistence.Stage20SourceOutpostMaterializer.MaterializedExt
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
+import com.spacesim.world.GeneratedWorldFtlTestSupport;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StrategicOperationState;
 import com.spacesim.world.StrategicOperationState.OperationState;
@@ -232,6 +233,7 @@ class Stage21EGeneratedWorldTrafficRuntimeAcceptanceTest {
         FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
         List<StarSystemId> route = route(runtime, placement.systemId(), destination);
         for (int index = 1; index < route.size(); index++) {
+            GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, fleetId, route.get(index));
             runtime.world().requestFleetJump(fleetId, route.get(index));
             for (int attempt = 0; attempt < 400 && runtime.world().findFleetJump(fleetId).isPresent(); attempt++) {
                 runtime.advanceFrame(0.25f);
