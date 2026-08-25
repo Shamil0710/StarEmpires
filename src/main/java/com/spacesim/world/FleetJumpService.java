@@ -2,10 +2,11 @@ package com.spacesim.world;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.EngineeringComponent;
-import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.persistence.EntityId;
+import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
+import com.spacesim.ship.ShipEngineeringRuntime.OperatingCommand;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 import com.spacesim.simulation.SimulationSession;
 
@@ -28,7 +29,10 @@ import java.util.Optional;
  * <p>Physical fleet ownership remains in {@link FleetWorldService}; entering
  * {@link FleetJumpPhase#IN_TRANSIT} delegates to the Stage-10A detach boundary and leaving it
  * delegates to the matching attach boundary. Physical FTL consequences are committed exactly once,
- * immediately before detach. Cancelling or failing before that boundary spends no jump energy.</p>
+ * immediately before detach. Cancelling or failing before that boundary spends no jump energy.
+ * Active fitted cooldowns progress through the same {@link ShipEngineeringRuntime} on authoritative
+ * world time. A detached transit payload is caught up through that runtime before ordinary attach,
+ * so route time cools hardware without creating a second timer or mutable transit authority.</p>
  *
  * <p>Stage-10 callers historically used {@code (0,0)} as a placeholder arrival coordinate. The
  * current bounded local map treats that point as a viewport corner, so that legacy placeholder is
@@ -42,6 +46,7 @@ final class FleetJumpService {
     private final JumpTransitTiming timing;
     private final FittedJumpResolver fittedJumpResolver;
     private final Map<FleetId, FleetJumpState> jumpsByFleetId = new HashMap<>();
+    private long lastEngineeringWorldTick;
     private FleetArrivalAuthority arrivalAuthority;
 
     FleetJumpService(
@@ -55,7 +60,7 @@ final class FleetJumpService {
                 sessionsById,
                 fleetWorldService,
                 timing,
-                new ShipEngineeringRuntime(ShipEngineeringCatalogLoader.loadDefault()),
+                new ProductionFittedJumpResolver(),
                 initialStates);
     }
 
@@ -87,6 +92,10 @@ final class FleetJumpService {
         this.fleetWorldService = Objects.requireNonNull(fleetWorldService, "FleetWorldService не задан");
         this.timing = Objects.requireNonNull(timing, "JumpTransitTiming не задан");
         this.fittedJumpResolver = Objects.requireNonNull(fittedJumpResolver, "FittedJumpResolver не задан");
+        this.lastEngineeringWorldTick = this.sessionsById.values().stream()
+                .mapToLong(session -> session.getClock().getTick())
+                .max()
+                .orElse(0L);
         for (FleetJumpState state : Objects.requireNonNull(initialStates, "Jump states не заданы")) {
             FleetJumpState checked = Objects.requireNonNull(state, "FleetJumpState не задан");
             if (jumpsByFleetId.putIfAbsent(checked.fleetId(), checked) != null) {
@@ -152,6 +161,7 @@ final class FleetJumpService {
         if (worldTick < 0L) {
             throw new IllegalArgumentException("World tick не может быть отрицательным");
         }
+        advanceActiveFittedCooldowns(worldTick);
         List<FleetId> order = new ArrayList<>(jumpsByFleetId.keySet());
         order.sort(FleetId::compareTo);
         for (FleetId fleetId : order) {
@@ -258,6 +268,7 @@ final class FleetJumpService {
                                 addTicks(boundary, transitTicks)));
             }
             case IN_TRANSIT -> {
+                RuntimeState transitAdvancedState = advanceDetachedTransitEngineering(state);
                 FleetArrivalAuthority.ResolvedArrival exactArrival = arrivalAuthority == null
                         ? null
                         : requireExactArrival(
@@ -269,6 +280,9 @@ final class FleetJumpService {
                 if (arrived.locationKind() != FleetLocationKind.IN_SYSTEM
                         || !state.destinationSystemId().equals(arrived.systemId())) {
                     throw new IllegalStateException("Fleet arrival materialized in wrong system");
+                }
+                if (transitAdvancedState != null) {
+                    requireEngineeringComponent(arrived).setRuntimeState(transitAdvancedState);
                 }
                 if (exactArrival != null) {
                     arrivalAuthority.onArrived(
@@ -288,6 +302,98 @@ final class FleetJumpService {
         };
     }
 
+    private void advanceActiveFittedCooldowns(long worldTick) {
+        if (worldTick < lastEngineeringWorldTick) {
+            throw new IllegalStateException("Engineering world tick moved backwards");
+        }
+        long elapsedTicks = worldTick - lastEngineeringWorldTick;
+        if (elapsedTicks == 0L) {
+            return;
+        }
+        double deltaSeconds = elapsedTicks * (double) fixedStepSeconds();
+        if (!Double.isFinite(deltaSeconds) || deltaSeconds <= 0d) {
+            throw new IllegalStateException("Engineering elapsed world time is invalid");
+        }
+        ArrayList<EngineeringAdvance> pending = new ArrayList<>();
+        for (FleetPlacementState placement : fleetWorldService.snapshots()) {
+            if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+                continue;
+            }
+            SimulationSession session = requireSession(placement.systemId());
+            Entity entity = session.getEntityRegistry().find(placement.localEntityId());
+            if (entity == null) {
+                throw new IllegalStateException(
+                        "Fleet placement references missing local entity: " + placement.id());
+            }
+            EngineeringComponent component = entity.getComponent(EngineeringComponent.class);
+            if (!hasActiveFittedCooldown(component)) {
+                continue;
+            }
+            RuntimeState next = Objects.requireNonNull(
+                    fittedJumpResolver.advanceIdle(component, deltaSeconds),
+                    "FittedJumpResolver returned null idle state");
+            pending.add(new EngineeringAdvance(component, next));
+        }
+        for (EngineeringAdvance advance : pending) {
+            advance.component().setRuntimeState(advance.nextState());
+        }
+        lastEngineeringWorldTick = worldTick;
+    }
+
+    private RuntimeState advanceDetachedTransitEngineering(FleetJumpState state) {
+        FleetPlacementState placement = fleetWorldService.find(state.fleetId()).orElseThrow();
+        if (placement.locationKind() != FleetLocationKind.IN_TRANSIT || placement.transitState() == null) {
+            throw new IllegalStateException("Transit engineering catch-up requires detached fleet");
+        }
+        Entity detached = EntityStateMapper.restore(placement.transitState().entityState());
+        EngineeringComponent component = detached.getComponent(EngineeringComponent.class);
+        if (!hasActiveFittedCooldown(component)) {
+            return null;
+        }
+        long elapsedTicks = state.phaseEndsTick() - state.phaseStartedTick();
+        if (elapsedTicks <= 0L) {
+            throw new IllegalStateException("Transit engineering interval must be positive");
+        }
+        double deltaSeconds = elapsedTicks * (double) fixedStepSeconds();
+        return Objects.requireNonNull(
+                fittedJumpResolver.advanceIdle(component, deltaSeconds),
+                "FittedJumpResolver returned null transit idle state");
+    }
+
+    private EngineeringComponent requireEngineeringComponent(FleetPlacementState placement) {
+        SimulationSession session = requireSession(placement.systemId());
+        Entity entity = session.getEntityRegistry().find(placement.localEntityId());
+        if (entity == null) {
+            throw new IllegalStateException("Arrived FleetId references missing local entity: " + placement.id());
+        }
+        EngineeringComponent component = entity.getComponent(EngineeringComponent.class);
+        if (component == null) {
+            throw new IllegalStateException("Arrived fitted FleetId lost EngineeringComponent: " + placement.id());
+        }
+        return component;
+    }
+
+    private static boolean hasActiveFittedCooldown(EngineeringComponent component) {
+        if (component == null) {
+            return false;
+        }
+        if (component.runtimeState == null) {
+            throw new IllegalStateException("Fleet EngineeringComponent is missing runtime state");
+        }
+        return component.runtimeState.ftlCooldownSecondsByMount().values().stream()
+                .anyMatch(value -> value > 0d);
+    }
+
+    private float fixedStepSeconds() {
+        SimulationSession session = sessionsById.values().stream().findFirst().orElseThrow(
+                () -> new IllegalStateException("Fleet jump service has no simulation sessions"));
+        float step = session.getClock().getFixedStepSeconds();
+        if (!Float.isFinite(step) || step <= 0f) {
+            throw new IllegalStateException("Fleet jump fixed step must be positive and finite");
+        }
+        return step;
+    }
+
     private Optional<FittedJump> fittedJump(FleetId fleetId) {
         FleetPlacementState placement = fleetWorldService.find(fleetId).orElseThrow(
                 () -> new IllegalArgumentException("Unknown FleetId: " + fleetId));
@@ -303,7 +409,7 @@ final class FleetJumpService {
         if (component == null) {
             return Optional.empty();
         }
-        if (component.fit == null || component.runtimeState == null) {
+        if (component.fit == null || component.runtimeState == null || component.instanceState == null) {
             throw new IllegalStateException("Fleet EngineeringComponent is incomplete: " + fleetId);
         }
         JumpPlan plan = Objects.requireNonNull(
@@ -391,12 +497,31 @@ final class FleetJumpService {
         return new FittedJumpResolver() {
             @Override
             public JumpPlan plan(EngineeringComponent component) {
-                return runtime.planJump(component.fit, component.runtimeState);
+                if (component.instanceState == null) {
+                    throw new IllegalStateException("Fleet EngineeringComponent is missing instance state");
+                }
+                return runtime.planJump(
+                        component.fit,
+                        component.runtimeState,
+                        component.instanceState.damage().moduleDamage());
             }
 
             @Override
             public RuntimeState commit(EngineeringComponent component, JumpPlan plan) {
                 return runtime.commitJump(component.runtimeState, plan);
+            }
+
+            @Override
+            public RuntimeState advanceIdle(EngineeringComponent component, double deltaSeconds) {
+                if (component.instanceState == null) {
+                    throw new IllegalStateException("Fleet EngineeringComponent is missing instance state");
+                }
+                return runtime.advance(
+                        component.fit,
+                        component.runtimeState,
+                        component.instanceState.damage().moduleDamage(),
+                        OperatingCommand.idle(),
+                        deltaSeconds).state();
             }
         };
     }
@@ -433,6 +558,8 @@ final class FleetJumpService {
         JumpPlan plan(EngineeringComponent component);
 
         RuntimeState commit(EngineeringComponent component, JumpPlan plan);
+
+        RuntimeState advanceIdle(EngineeringComponent component, double deltaSeconds);
     }
 
     private record FittedJump(
@@ -445,6 +572,13 @@ final class FleetJumpService {
             if (!Float.isFinite(fixedStepSeconds) || fixedStepSeconds <= 0f) {
                 throw new IllegalArgumentException("fixedStepSeconds must be positive and finite");
             }
+        }
+    }
+
+    private record EngineeringAdvance(EngineeringComponent component, RuntimeState nextState) {
+        private EngineeringAdvance {
+            Objects.requireNonNull(component, "component");
+            Objects.requireNonNull(nextState, "nextState");
         }
     }
 }

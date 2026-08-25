@@ -44,7 +44,6 @@ import com.spacesim.world.calibration.Stage20StationPhysicalGeometryProfile;
 import com.spacesim.ship.DerivedShipCalculator;
 import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
-import com.spacesim.ship.Stage175IFleetDoctrineCatalog;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -63,7 +62,7 @@ public final class GeneratedWorldUiModel {
     private static final String INFRASTRUCTURE_DOMAIN = "INFRASTRUCTURE_PLACEMENT";
     private static final String SPECIAL_DOMAIN = "SPECIAL_LOCATION";
     private static final ShipEngineeringCatalog MILITARY_ENGINEERING =
-            Stage175ICombatTestContentPack.loadDoctrines();
+            Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
     private static final DerivedShipCalculator MILITARY_CALCULATOR =
             new DerivedShipCalculator(MILITARY_ENGINEERING);
 
@@ -591,10 +590,9 @@ public final class GeneratedWorldUiModel {
     }
 
     private static String provisionalFitId(InstalledFit fit) {
-        return Stage175IFleetDoctrineCatalog.all().stream()
-                .filter(value -> InstalledFit.fromDemonstrator(
-                        MILITARY_ENGINEERING.findDemonstratorFit(value.fitId())).equals(fit))
-                .map(Stage175IFleetDoctrineCatalog.Doctrine::fitId)
+        return MILITARY_ENGINEERING.getDemonstratorFits().stream()
+                .filter(value -> InstalledFit.fromDemonstrator(value).equals(fit))
+                .map(com.spacesim.content.ship.ShipEngineeringCatalog.DemonstratorFitDefinition::id)
                 .findFirst().orElse("fit.provisional.unknown");
     }
 

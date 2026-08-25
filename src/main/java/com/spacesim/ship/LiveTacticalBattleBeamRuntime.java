@@ -2,7 +2,6 @@ package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
-import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.ship.BeamWeaponRuntime.BeamSolution;
 import com.spacesim.ship.LiveTacticalBattleControlRuntime.ActorControlState;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
@@ -44,7 +43,7 @@ public final class LiveTacticalBattleBeamRuntime {
      */
     public LiveTacticalBattleBeamRuntime(LiveTacticalBattleWeaponRuntime weaponRuntime) {
         this.weaponRuntime = Objects.requireNonNull(weaponRuntime, "weaponRuntime");
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        engineeringCatalog = battleState().engineeringCatalog();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         weaponAdapter = new ShipWeaponEngineeringAdapter();
         beamService = new ShipBeamEngineeringService(engineeringCatalog);

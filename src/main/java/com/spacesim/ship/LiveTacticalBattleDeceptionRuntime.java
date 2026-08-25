@@ -58,7 +58,7 @@ public final class LiveTacticalBattleDeceptionRuntime {
         defenseRuntime = new LiveTacticalBattleDefenseRuntime(ordnanceRuntime, decoyRuntime);
         beamRuntime = new LiveTacticalBattleBeamRuntime(ordnanceRuntime.weaponRuntime());
         orderingAudit = new Stage19GuidedImpactOrderingAudit();
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        engineeringCatalog = battleState().engineeringCatalog();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
         calculator = new DerivedShipCalculator(engineeringCatalog);

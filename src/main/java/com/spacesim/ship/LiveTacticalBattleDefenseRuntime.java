@@ -90,7 +90,7 @@ public final class LiveTacticalBattleDefenseRuntime {
             throw new IllegalArgumentException("decoyRuntime must wrap the same ordnanceRuntime instance");
         }
         observationRuntime = new LiveTacticalOrdnanceObservationRuntime(ordnanceRuntime, decoyRuntime);
-        engineeringCatalog = Stage175ICombatTestContentPack.loadDoctrines();
+        engineeringCatalog = battleState().engineeringCatalog();
         ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
         launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
         calculator = new DerivedShipCalculator(engineeringCatalog);

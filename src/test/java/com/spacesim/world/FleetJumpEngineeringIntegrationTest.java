@@ -89,8 +89,9 @@ class FleetJumpEngineeringIntegrationTest {
         assertEquals(62_000_000d, destinationEngineering.runtimeState.sharedBusEnergyJ(), 0d);
         assertEquals(10_000_000d,
                 destinationEngineering.runtimeState.localHeatJByMount().get("core_ftl"), 0d);
-        assertEquals(60d,
-                destinationEngineering.runtimeState.ftlCooldownSecondsByMount().get("core_ftl"), 0d);
+        assertEquals(30d,
+                destinationEngineering.runtimeState.ftlCooldownSecondsByMount().get("core_ftl"), 1e-6,
+                "the physical 30 second edge transit must consume half of the 60 second cooldown");
         assertEquals(1, resolver.commitCalls);
     }
 
@@ -284,6 +285,21 @@ class FleetJumpEngineeringIntegrationTest {
                     state.sharedBusEnergyJ() - plan.storedEnergyDrawJ(),
                     state.shipHeatStoredJ(),
                     localHeat,
+                    state.thrustLimitNByMount(),
+                    state.coolantBusCapacityW(),
+                    cooldowns);
+        }
+
+        @Override
+        public RuntimeState advanceIdle(EngineeringComponent component, double deltaSeconds) {
+            RuntimeState state = component.runtimeState;
+            TreeMap<String, Double> cooldowns = new TreeMap<>(state.ftlCooldownSecondsByMount());
+            cooldowns.replaceAll((mountId, remaining) -> Math.max(0d, remaining - deltaSeconds));
+            return new RuntimeState(
+                    state.consumables(),
+                    state.sharedBusEnergyJ(),
+                    state.shipHeatStoredJ(),
+                    state.localHeatJByMount(),
                     state.thrustLimitNByMount(),
                     state.coolantBusCapacityW(),
                     cooldowns);
