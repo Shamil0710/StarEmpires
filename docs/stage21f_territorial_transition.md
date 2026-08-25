@@ -1,6 +1,6 @@
 # Stage 21F — Occupation, claims, stabilization and control transition
 
-**Status:** implementation closeout candidate. The implementation PR may merge only from an exact green head; canonical `COMPLETE` status is recorded only after the merge is verified on `main`.
+**Status: COMPLETE.** Implementation merged via PR #331 from exact green head `c198ddb4e3b45158e350220187327aa7ed98c8f5`; required CI run #5126 (`32883580620`) and Java 17 verification job `97918646553` completed successfully. Merge commit on `main`: `1294b908ec47c3b4ad9065db17dd5a8a55b4c763`. **Stage 21G is OPEN/NEXT and intentionally not implemented here.**
 
 ## 1. Scope
 
