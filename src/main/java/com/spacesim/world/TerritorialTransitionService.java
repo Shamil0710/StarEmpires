@@ -15,9 +15,9 @@ import java.util.Objects;
  *
  * <p>The service never writes controller flags, moves fleets, changes allegiance, creates resistance
  * forces or grants supplies. It observes exact ordinary {@link FleetForceRegistry} entries, persists
- * only occupation progress, and delegates political claim creation to
- * {@link WorldSimulation#declareTerritorialClaim(String, StarSystemId)}. Stabilization and control
- * acquisition/loss continue to be owned by the existing Stage-17 territorial runtime.</p>
+ * only occupation progress, and delegates political claim creation/withdrawal to the existing
+ * {@link WorldSimulation} Stage-17 territorial authority. Stabilization and control acquisition/loss
+ * remain owned by that Stage-17 runtime.</p>
  */
 public final class TerritorialTransitionService {
     /** Sustained supplied/security time required before an invasion has occupation evidence. */
@@ -28,13 +28,17 @@ public final class TerritorialTransitionService {
     /**
      * Advances one INVASION occupation attempt from ordinary physical fleet facts.
      *
-     * <p>Rival fleets stall the occupation clock rather than creating synthetic resistance. Missing,
-     * displaced, under-ready or under-supplied participants start an unsupported deadline and decay
-     * accumulated progress. Only after the sustained threshold is reached is an absent political
-     * claim declared through the existing Stage-17 authority. Once Stage-17 actually establishes
-     * control, the occupation remembers that fact but stops pretending the original invasion fleet
-     * is still the control authority. A later foreign controller is then a real liberation outcome,
-     * again observed from Stage-17 law rather than manufactured here.</p>
+     * <p>Territorial opposition stalls the occupation clock rather than creating synthetic resistance.
+     * Missing, displaced, under-ready or under-supplied participants start an unsupported deadline,
+     * decay accumulated progress and withdraw any still-unestablished invasion claim through the
+     * existing Stage-17 authority. This prevents infrastructure alone from continuing a military
+     * stabilization after its occupation security/supply prerequisites disappear.</p>
+     *
+     * <p>Only after the sustained occupation threshold is reached is an absent political claim
+     * declared through Stage 17. Once Stage 17 actually establishes control, the occupation remembers
+     * that fact but stops pretending the original invasion fleet is itself the sovereignty authority.
+     * A later foreign controller is then a real liberation outcome, again observed from Stage-17 law
+     * rather than manufactured here.</p>
      *
      * @param state persistent Stage-21F occupation metadata
      * @param world authoritative world/Stage-17 territorial boundary
@@ -105,11 +109,13 @@ public final class TerritorialTransitionService {
         }
 
         if (operation.status() == OperationStatus.FAILED) {
+            withdrawUnestablishedClaim(world, factionId, systemId);
             OccupationState collapsed = replacement(
                     previous, currentTick, 0L, currentTick, previous.controlEverEstablished(), OccupationStatus.COLLAPSED);
             return new AdvanceResult(state.upsert(collapsed), operations, collapsed, false, false, false, false);
         }
         if (operation.status() == OperationStatus.WITHDRAWING) {
+            withdrawUnestablishedClaim(world, factionId, systemId);
             long unsupportedSince = previous.unsupportedSinceTick() >= 0L
                     ? previous.unsupportedSinceTick() : currentTick;
             long progress = decay(previous.securedTicks(), elapsed);
@@ -119,8 +125,9 @@ public final class TerritorialTransitionService {
             return new AdvanceResult(state.upsert(withdrawing), operations, withdrawing, false, false, false, false);
         }
 
-        PhysicalReview physical = reviewPhysical(operation, forces);
+        PhysicalReview physical = reviewPhysical(operation, forces, world, identities);
         if (physical.rivalFleetPresent()) {
+            withdrawUnestablishedClaim(world, factionId, systemId);
             OccupationState contested = replacement(
                     previous, currentTick, previous.securedTicks(), -1L, previous.controlEverEstablished(),
                     OccupationStatus.CONTESTED);
@@ -130,6 +137,7 @@ public final class TerritorialTransitionService {
 
         boolean supported = physical.securityReady() && physical.supplyReady();
         if (!supported) {
+            withdrawUnestablishedClaim(world, factionId, systemId);
             long unsupportedSince = previous.unsupportedSinceTick() >= 0L
                     ? previous.unsupportedSinceTick() : currentTick;
             long progress = decay(previous.securedTicks(), elapsed);
@@ -225,7 +233,11 @@ public final class TerritorialTransitionService {
                 territory.recognitionCount());
     }
 
-    private static PhysicalReview reviewPhysical(OperationState operation, FleetForceRegistry forces) {
+    private static PhysicalReview reviewPhysical(
+            OperationState operation,
+            FleetForceRegistry forces,
+            WorldSimulation world,
+            FactionIdentityResolver identities) {
         List<FleetForceRegistry.Entry> survivors = new ArrayList<>();
         for (FleetId fleetId : operation.participantFleetIds()) {
             FleetForceRegistry.Entry force = forces.find(fleetId).orElse(null);
@@ -246,11 +258,36 @@ public final class TerritorialTransitionService {
                     && force.readiness().supplyAccessBps() >= operation.supplyPolicy().minimumSupplyAccessBps();
         }
         boolean rivalFleetPresent = forces.entries().stream()
-                .anyMatch(force -> force.factionId() >= 0
-                        && force.factionId() != operation.factionId()
-                        && force.locationKind() == FleetLocationKind.IN_SYSTEM
-                        && operation.objectiveSystemId().equals(force.systemId()));
+                .filter(force -> force.factionId() >= 0 && force.factionId() != operation.factionId())
+                .filter(force -> force.locationKind() == FleetLocationKind.IN_SYSTEM)
+                .filter(force -> operation.objectiveSystemId().equals(force.systemId()))
+                .anyMatch(force -> territorialOpponent(
+                        force.factionId(), operation.objectiveSystemId(), world, identities));
         return new PhysicalReview(securityReady, supplyReady, rivalFleetPresent);
+    }
+
+    private static boolean territorialOpponent(
+            int runtimeFactionId,
+            StarSystemId systemId,
+            WorldSimulation world,
+            FactionIdentityResolver identities) {
+        String stableFactionId = identities.stableId(runtimeFactionId).orElse(null);
+        if (stableFactionId == null) return false;
+        if (stableFactionId.equals(world.controllingFaction(systemId).orElse(null))) return true;
+        return world.findFactionStrategicState(stableFactionId)
+                .map(strategy -> strategy.claimFor(systemId) != null)
+                .orElse(false);
+    }
+
+    private static void withdrawUnestablishedClaim(
+            WorldSimulation world,
+            String factionContentId,
+            StarSystemId systemId) {
+        FactionStrategicState strategy = world.findFactionStrategicState(factionContentId)
+                .orElseThrow(() -> new IllegalStateException("occupation faction has no Stage-17 strategic state"));
+        if (!strategy.controls(systemId) && strategy.claimFor(systemId) != null) {
+            world.withdrawTerritorialClaim(factionContentId, systemId);
+        }
     }
 
     private static OccupationState replacement(
