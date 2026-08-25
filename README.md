@@ -19,7 +19,7 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-08-24 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21D COMPLETE; 21E NEXT.**
+**Последняя синхронизация README: 2026-08-25 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21E COMPLETE; 21F NEXT.**
 
 Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md).
 
@@ -29,16 +29,17 @@
 | **v0.2 Living Galactic Economy** | multi-system factions, logistics, construction, expansion | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining, combat, progression | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **COMPLETE** |
-| **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **ACTIVE — Stage 21 / 21E NEXT** |
+| **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **ACTIVE — Stage 21 / 21F NEXT** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | PLANNED |
 | **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED |
 
 На текущем roadmap завершены Stages **0–20**, включая **Stage 20A–20L physical-world generation**
 и обязательный **Stage 20.5 runtime + visual integration gate**. В Stage 21 завершены generated-world
 command foundation (21.0), living-actor kernel (21A), persistent strategic intent/goals (21B),
-дипломатия/crisis/alliance/legal-war lifecycle (21C) и **fleet readiness, command groups, lawful
-orders and strategic movement (21D)**. **Stage 21E strategic operations and physical warfare
-consequences является OPEN/NEXT.**
+дипломатия/crisis/alliance/legal-war lifecycle (21C), **fleet readiness, command groups, lawful
+orders and strategic movement (21D)** и **strategic operations with actor-bounded contact, exact
+Stage-19 physical losses/store consumption and physical blockade/interdiction (21E)**. **Stage 21F
+occupation, claims, stabilization and control transition является OPEN/NEXT.**
 
 ## Что уже реализовано
 
@@ -284,6 +285,7 @@ branch from exact green main
 - [`docs/stage21_living_world_roadmap.md`](docs/stage21_living_world_roadmap.md) — living factions/NPC/missions;
 - [`docs/stage21c_diplomacy_crisis_lifecycle.md`](docs/stage21c_diplomacy_crisis_lifecycle.md) — accepted Stage-21C diplomacy/crisis/alliance/legal-war implementation and acceptance map;
 - [`docs/stage21d_fleet_readiness_command_movement.md`](docs/stage21d_fleet_readiness_command_movement.md) — accepted Stage-21D readiness/command/order/movement implementation and acceptance map;
+- [`docs/stage21e_strategic_operations_physical_consequences.md`](docs/stage21e_strategic_operations_physical_consequences.md) — accepted Stage-21E strategic-operation/physical-consequence implementation and acceptance map;
 - [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — content/technology/balance alpha;
 - [`docs/content_production_plan_stage21_23.md`](docs/content_production_plan_stage21_23.md) — faction/ship/character/mission/media production;
 - [`docs/stage23_release_candidate_roadmap.md`](docs/stage23_release_candidate_roadmap.md) — polish, packaging and RC gate.
@@ -297,7 +299,7 @@ Stage 17 COMPLETE
 → Stage 19 warfare COMPLETE
 → Stage 20 world generation COMPLETE
 → Stage 20.5 runtime + visual integration COMPLETE
-→ Stage 21 living world ACTIVE — 21.0 + 21A + 21B + 21C + 21D COMPLETE; 21E NEXT; 21E–21I otherwise open
+→ Stage 21 living world ACTIVE — 21.0 + 21A + 21B + 21C + 21D + 21E COMPLETE; 21F NEXT; 21F–21I otherwise open
 → Stage 22 content/technology/balance alpha PLANNED
 → Stage 23 polish/release candidate PLANNED
 ```
