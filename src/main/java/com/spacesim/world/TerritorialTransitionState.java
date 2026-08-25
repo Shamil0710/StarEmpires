@@ -22,7 +22,11 @@ import java.util.Set;
  */
 public record TerritorialTransitionState(List<OccupationState> occupations) {
 
-    /** Validates and canonicalizes persistent occupation attempts. */
+    /**
+     * Validates and canonicalizes persistent occupation attempts.
+     *
+     * @param occupations canonical occupation attempts, unique by faction/system
+     */
     public TerritorialTransitionState {
         Objects.requireNonNull(occupations, "occupations");
         ArrayList<OccupationState> canonical = new ArrayList<>(occupations.size());
@@ -61,7 +65,12 @@ public record TerritorialTransitionState(List<OccupationState> occupations) {
                 .findFirst();
     }
 
-    /** Returns an immutable registry with the supplied faction/system attempt inserted or replaced. */
+    /**
+     * Returns an immutable registry with the supplied faction/system attempt inserted or replaced.
+     *
+     * @param replacement occupation attempt to insert or replace
+     * @return immutable canonical transition state containing the replacement
+     */
     public TerritorialTransitionState upsert(OccupationState replacement) {
         OccupationState checked = Objects.requireNonNull(replacement, "replacement");
         ArrayList<OccupationState> next = new ArrayList<>(occupations.size() + 1);
@@ -115,7 +124,20 @@ public record TerritorialTransitionState(List<OccupationState> occupations) {
             boolean controlEverEstablished,
             OccupationStatus status) {
 
-        /** Validates one persistent occupation attempt. */
+        /**
+         * Validates one persistent occupation attempt.
+         *
+         * @param factionContentId stable occupying faction identity
+         * @param systemId objective system
+         * @param operationId Stage-21E INVASION operation providing the physical participants
+         * @param startedTick first authoritative occupation evaluation tick
+         * @param lastEvaluatedTick latest authoritative occupation evaluation tick
+         * @param securedTicks cumulative continuous/surviving secure-presence progress
+         * @param unsupportedSinceTick first current unsupported tick, or -1 when supported/contested
+         * @param claimCreatedByOccupation whether this occupation created the current Stage-17 claim
+         * @param controlEverEstablished whether Stage-17 authority ever established control for this occupier
+         * @param status current physical occupation lifecycle
+         */
         public OccupationState {
             factionContentId = requireId(factionContentId);
             Objects.requireNonNull(systemId, "systemId");
