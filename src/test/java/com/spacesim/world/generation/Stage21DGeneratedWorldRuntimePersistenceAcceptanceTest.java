@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+import static com.spacesim.world.GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -57,6 +58,7 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
         StarSystemId origin = local.systemId();
         StarSystemId destination = stage20.world().getTopology().neighbors(origin).get(0);
 
+        placeAtOutgoingEndpoint(stage20, fleetId, destination);
         stage20.world().requestFleetJump(fleetId, destination);
         advanceUntilPhase(stage20, fleetId, FleetJumpPhase.IN_TRANSIT);
         FleetPlacementState inTransit = stage20.world().findFleet(fleetId).orElseThrow();
