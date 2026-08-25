@@ -1,6 +1,6 @@
 # Stage 21E — Strategic operations and physical warfare consequences
 
-**Status:** implementation/acceptance contract for Stage 21E  
+**Status: COMPLETE.** Implementation merged via PR #329 from exact green head `6475e1f34473d1cbaa97ea3db078deb26ec66b0a`; required CI run #4960 (`32817855323`) and Java 17 verification job `97709674911` completed successfully. Merge commit on `main`: `82f57f86cb8e7ed5b43af4a1205c2b4e7dc805be`. **Stage 21F is OPEN/NEXT and intentionally not implemented here.**  
 **Authority rule:** Stage 21E coordinates existing physical authorities; it does not create a second fleet, combat, logistics, economy or territory authority.
 
 ## 1. Purpose
@@ -181,7 +181,9 @@ Automated coverage includes:
 - current evidence belonging to another faction is rejected before contact creation;
 - stale evidence cannot reveal/materialize a target;
 - only the six Stage-21E roadmap operation families are admitted from Stage-21D orders;
-- exact generated-world Stage-19 execution moves hostile fleets through ordinary topology hops, commits real damage/stores and at least one real ordinary `FleetId` loss, creates no replacement fleets and yields byte-identical repeated outcomes;
+- exact generated-world Stage-19 execution moves hostile fleets through ordinary topology hops and commits real damage/store state without requiring every bounded exchange to end in a kill;
+- dedicated exact generated-world casualty acceptance starts from a valid surviving ordinary target, lets only the production Stage-19 resolver produce catastrophic destruction, removes exactly that ordinary `FleetId`, creates no replacement and proves the surviving operation `FleetId` returns with less physical ammunition and/or reaction mass than before the exchange;
+- Stage-20.5/18 traffic acceptance performs finite extraction, ordinary Stage-18 storage transfer and real freight loading before a physically anchored Stage-21E interdiction denies the exact next route hop;
 - Stage-19 exact import accepts the original doctrine fit and its one registered strategic variant while rejecting arbitrary same-hull mutation;
 - the Stage-17.5I/19 doctrine loader remains unchanged by Stage-21 content composition, while every registered strategic fit replaces exactly one datalink mount with one physical FTL module;
 - strategic FTL planning/commit is covered for translated mass, energy, local heat and cooldown, and destroyed FTL hardware fails the damage-aware production resolver;
@@ -197,7 +199,18 @@ Automated coverage includes:
 
 Repository `clean verify` remains the final acceptance gate and includes unit/integration tests, coverage checks, Javadoc and packaging.
 
-## 12. Stage boundary
+## 12. Closeout evidence
+
+- implementation PR: `#329`;
+- exact green implementation head: `6475e1f34473d1cbaa97ea3db078deb26ec66b0a`;
+- required CI: run `32817855323` / run #4960 — **SUCCESS**;
+- Java 17 verification job `97709674911` — **SUCCESS**;
+- merged implementation commit on `main`: `82f57f86cb8e7ed5b43af4a1205c2b4e7dc805be`;
+- review submissions, review threads and PR comments were empty at the merge gate;
+- the mandatory operation acceptance proves both a real Stage-19 physical loss and physical ammunition/reaction-mass consumption without hidden replenishment;
+- Stage 21F remains the next slice and has not been started by this closeout.
+
+## 13. Stage boundary
 
 Intentionally **not** owned by Stage 21E:
 
