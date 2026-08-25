@@ -115,7 +115,6 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
                     fileVersion >= PHYSICAL_SIDECAR_FILE_FORMAT_VERSION
                     ? readLocalFleetPhysicalStates(input)
                     : migrateLegacyLocalFleetPhysicalStates(world, freight);
-            validateLocalFreightPhysicalMirror(freight, localPhysical);
             if (fileVersion >= FILE_FORMAT_VERSION) {
                 world = readAndApplyEngineeringInstanceStates(input, world);
             }
@@ -140,37 +139,6 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
                 throw illegalArgumentException;
             }
             throw new IllegalArgumentException("Invalid Stage-20.5 runtime checkpoint", exception);
-        }
-    }
-
-    /**
-     * Rejects a serialized freight compatibility mirror that disagrees with the separately encoded
-     * exact local-fleet physical authority before checkpoint construction can canonicalize a live
-     * capture. This keeps external/corrupt save bytes fail-closed while allowing the atomic runtime
-     * composition boundary to refresh its redundant freight mirror during an ordinary capture.
-     */
-    static void validateLocalFreightPhysicalMirror(
-            Stage20FreightPersistentState freight,
-            List<LocalFleetPhysicalState> localPhysical) {
-        Objects.requireNonNull(freight, "freight");
-        Objects.requireNonNull(localPhysical, "localPhysical");
-        Map<FleetId, LocalPhysicalKinematics> exactByFleet = new HashMap<>();
-        for (LocalFleetPhysicalState state : localPhysical) {
-            LocalPhysicalKinematics previous = exactByFleet.putIfAbsent(
-                    state.fleetId(), state.physicalState());
-            if (previous != null) {
-                throw new IllegalArgumentException(
-                        "duplicate local fleet physical state while validating freight mirror: "
-                                + state.fleetId());
-            }
-        }
-        for (Stage20FreightPersistentState.FreighterState fleet : freight.freighters()) {
-            LocalPhysicalKinematics exact = exactByFleet.get(fleet.fleetId());
-            if (exact != null && !fleet.physicalState().equals(exact)) {
-                throw new IllegalArgumentException(
-                        "serialized freight physical mirror differs from exact local fleet state: "
-                                + fleet.fleetId());
-            }
         }
     }
 
