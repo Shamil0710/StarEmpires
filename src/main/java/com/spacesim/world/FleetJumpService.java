@@ -31,7 +31,8 @@ import java.util.Optional;
  * to the origin endpoint of the requested edge. This is not a second movement lifecycle: the same
  * persisted jump state owns approach timing and the same authority advances exact local kinematics.
  * A route such as A→B→C therefore arrives at B's A-facing endpoint and must physically cross B to
- * B's C-facing endpoint before spool and detached FTL transit can begin.</p>
+ * B's C-facing endpoint before spool and detached FTL transit can begin. The authority receives a
+ * final fail-closed readiness check before physical FTL consequences are committed.</p>
  *
  * <p>Physical fleet ownership remains in {@link FleetWorldService}; entering
  * {@link FleetJumpPhase#IN_TRANSIT} delegates to the Stage-10A detach boundary and leaving it
@@ -265,6 +266,19 @@ final class FleetJumpService {
                                 addTicks(boundary, pendingTicks)));
             }
             case JUMP_PENDING -> {
+                FleetPlacementState readyPlacement = fleetWorldService.find(state.fleetId()).orElseThrow();
+                if (arrivalAuthority != null) {
+                    if (readyPlacement.locationKind() != FleetLocationKind.IN_SYSTEM
+                            || !state.originSystemId().equals(readyPlacement.systemId())) {
+                        throw new IllegalStateException("FTL readiness check requires fleet in origin system");
+                    }
+                    arrivalAuthority.validateDepartureReady(
+                            state.fleetId(),
+                            state.originSystemId(),
+                            state.destinationSystemId(),
+                            readyPlacement.localEntityId());
+                }
+
                 Optional<FittedJump> fitted = fittedJump(state.fleetId());
                 if (fitted.isPresent() && !fitted.orElseThrow().plan().allowed()) {
                     yield cancel(state);
