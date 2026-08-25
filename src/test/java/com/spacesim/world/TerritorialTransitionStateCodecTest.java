@@ -15,12 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class TerritorialTransitionStateCodecTest {
     @Test
-    void roundTripPreservesExactProgressDeadlineAndEstablishedControlDeterministically() {
+    void roundTripPreservesExactProgressDeadlineClaimProvenanceAndEstablishedControlDeterministically() {
         TerritorialTransitionState state = new TerritorialTransitionState(List.of(
-                new OccupationState("faction.b", new StarSystemId(9L), 12L, 100L, 180L, 80L, 170L, false,
-                        OccupationStatus.OCCUPYING),
-                new OccupationState("faction.a", new StarSystemId(3L), 11L, 90L, 190L, 300L, -1L, true,
-                        OccupationStatus.SECURED)));
+                new OccupationState("faction.b", new StarSystemId(9L), 12L, 100L, 180L, 80L, 170L,
+                        false, false, OccupationStatus.OCCUPYING),
+                new OccupationState("faction.a", new StarSystemId(3L), 11L, 90L, 190L, 300L, -1L,
+                        true, true, OccupationStatus.SECURED)));
 
         byte[] first = TerritorialTransitionStateCodec.encode(state);
         TerritorialTransitionState restored = TerritorialTransitionStateCodec.decode(first);
@@ -31,6 +31,7 @@ final class TerritorialTransitionStateCodecTest {
         assertEquals(80L, restored.occupationFor("faction.b", new StarSystemId(9L)).orElseThrow().securedTicks());
         assertEquals(170L,
                 restored.occupationFor("faction.b", new StarSystemId(9L)).orElseThrow().unsupportedSinceTick());
+        assertTrue(restored.occupationFor("faction.a", new StarSystemId(3L)).orElseThrow().claimCreatedByOccupation());
         assertTrue(restored.occupationFor("faction.a", new StarSystemId(3L)).orElseThrow().controlEverEstablished());
     }
 
@@ -56,16 +57,18 @@ final class TerritorialTransitionStateCodecTest {
     @Test
     void duplicateFactionSystemTransitionIsRejected() {
         OccupationState first = new OccupationState(
-                "faction.same", new StarSystemId(4L), 1L, 0L, 0L, 0L, -1L, false, OccupationStatus.OCCUPYING);
+                "faction.same", new StarSystemId(4L), 1L, 0L, 0L, 0L, -1L,
+                false, false, OccupationStatus.OCCUPYING);
         OccupationState second = new OccupationState(
-                "faction.same", new StarSystemId(4L), 2L, 10L, 10L, 0L, -1L, false, OccupationStatus.OCCUPYING);
+                "faction.same", new StarSystemId(4L), 2L, 10L, 10L, 0L, -1L,
+                false, false, OccupationStatus.OCCUPYING);
         assertThrows(IllegalArgumentException.class, () -> new TerritorialTransitionState(List.of(first, second)));
     }
 
     @Test
     void liberationCannotBeInventedWithoutPriorEstablishedControl() {
         assertThrows(IllegalArgumentException.class, () -> new OccupationState(
-                "faction.same", new StarSystemId(4L), 1L, 0L, 10L, 300L, -1L, false,
-                OccupationStatus.LIBERATED));
+                "faction.same", new StarSystemId(4L), 1L, 0L, 10L, 300L, -1L,
+                false, false, OccupationStatus.LIBERATED));
     }
 }
