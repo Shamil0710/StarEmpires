@@ -27,9 +27,10 @@ import java.util.Optional;
  *
  * <p>Authoritative Stage-20 physical kinematics are retained in the accepted hierarchical/double
  * representation rather than being reconstructed from legacy global-float {@link TransformComponent}
- * values. When a physical entity is currently materialized, registration/update also refreshes the
- * existing float transform as a non-authoritative local render/legacy-simulation projection. The
- * hierarchical cell identity never gets collapsed into a global float.</p>
+ * values. When a live physical entity actually advances, physical-state updates also refresh the
+ * existing float transform as a non-authoritative local render/legacy-simulation projection. Mere
+ * authority registration or representation wake-up does not rewrite the independent persistent ECS
+ * snapshot. The hierarchical cell identity never gets collapsed into a global float.</p>
  */
 public final class Stage20MaterializationService {
     /** Synchronous materialization completes within the calling simulation boundary. */
@@ -81,7 +82,6 @@ public final class Stage20MaterializationService {
         if (previous != null) {
             throw new IllegalStateException("Physical authority already registered for entity: " + checkedId);
         }
-        projectLiveTransform(registry.require(checkedId), checkedPhysical);
     }
 
     /**
@@ -194,7 +194,6 @@ public final class Stage20MaterializationService {
             throw new IllegalStateException("Materialized entity was not registered under its persistent ID: " + checkedId);
         }
         dematerializedStates.remove(checkedId, snapshot);
-        projectLiveTransform(restored, physical);
         return restored;
     }
 
