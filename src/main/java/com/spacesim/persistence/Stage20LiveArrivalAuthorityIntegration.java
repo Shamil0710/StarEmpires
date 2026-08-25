@@ -1,16 +1,21 @@
 package com.spacesim.persistence;
 
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState.CanonicalRow;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState.OpenRuntimeBoundary;
 import com.spacesim.simulation.Stage20MaterializationService;
 import com.spacesim.world.FleetArrivalAuthority;
 import com.spacesim.world.FleetId;
+import com.spacesim.world.FleetLocationKind;
+import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.JumpConnection;
 import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldSimulation;
+import com.spacesim.world.calibration.Stage20LocalRouteSemanticBandCatalog.BandId;
 
 import java.util.HashSet;
 import java.util.List;
@@ -23,44 +28,63 @@ import java.util.TreeMap;
  * Stage-20.5D adapter from persisted Stage-20D jump-edge endpoints to the live ordinary fleet jump
  * FSM and Stage-20 hierarchical/double materialization authority.
  *
- * <p>The adapter parses only the saved Stage-20K canonical rows. It does not regenerate edge
- * geometry, alter the topology, bypass intermediate systems, change fitted jump constraints or
- * grant discovery. The legacy float transform receives a non-authoritative local projection solely
- * so the existing Ashley representation can remain renderable; exact physical position and
- * velocity are installed unchanged in {@link Stage20MaterializationService}.</p>
+ * <p>The adapter parses only saved Stage-20K canonical rows. It does not regenerate edge geometry,
+ * alter topology, bypass intermediate systems, change fitted jump constraints or grant discovery.
+ * Current resolved generated worlds also persist the accepted jump-anchor-to-hub local-route
+ * calibration. That evidence gives the existing {@code MOVING_TO_JUMP} phase deterministic physical
+ * duration and exact local motion to the outgoing endpoint instead of the historical one-tick
+ * placeholder.</p>
+ *
+ * <p>Local approach speed is not a new arbitrary balance constant. For commercial/mining hulls the
+ * adapter uses the persisted conservative civilian-routine upper travel-time envelope; combat hulls
+ * use the persisted conservative military-response upper envelope. The saved reference time is
+ * scaled by actual exact distance relative to that anchor's calibrated hub distance. Exact position
+ * remains hierarchical/double authority in {@link Stage20MaterializationService}; legacy float
+ * transforms are only a render projection.</p>
  */
 @SuppressWarnings("doclint:missing")
 public final class Stage20LiveArrivalAuthorityIntegration implements FleetArrivalAuthority {
     /** Stable live-arrival integration contract version. */
-    public static final String CURRENT_VERSION = "stage20_5.live-arrival-authority.v1";
+    public static final String CURRENT_VERSION = "stage20_5.live-arrival-authority.v2";
     /** Current persisted scalar arrival velocity uses this stable local +X orientation convention. */
     public static final String VELOCITY_ORIENTATION_CONVENTION =
             "stage20d.persisted-arrival-speed.local-positive-x.v1";
 
     private static final String JUMP_EDGE_DOMAIN = "JUMP_EDGE";
+    private static final String LOCAL_CONNECTION_DOMAIN = "LOCAL_CONNECTION";
     private static final int MINIMUM_JUMP_EDGE_VALUE_COUNT = 26;
+    private static final int MINIMUM_LOCAL_CONNECTION_VALUE_COUNT = 17;
 
     private final long rootSeed;
     private final String generatorVersion;
     private final String worldFingerprint;
     private final Map<EdgeKey, PersistedEdge> edges;
+    private final Map<ApproachKey, LocalApproachCalibration> approaches;
     private final Map<StarSystemId, Stage20MaterializationService> materializationBySystem;
     private final Set<FleetId> liveDepartures = new HashSet<>();
     private boolean bound;
+    private WorldSimulation boundWorld;
 
     private Stage20LiveArrivalAuthorityIntegration(
             long rootSeed,
             String generatorVersion,
             String worldFingerprint,
             Map<EdgeKey, PersistedEdge> edges,
+            Map<ApproachKey, LocalApproachCalibration> approaches,
             Map<StarSystemId, Stage20MaterializationService> materializationBySystem) {
         this.rootSeed = rootSeed;
         this.generatorVersion = requireText(generatorVersion, "generatorVersion");
         this.worldFingerprint = requireText(worldFingerprint, "worldFingerprint");
         this.edges = Map.copyOf(edges);
+        this.approaches = Map.copyOf(approaches);
         this.materializationBySystem = Map.copyOf(materializationBySystem);
-        if (this.edges.isEmpty() || this.materializationBySystem.isEmpty()) {
-            throw new IllegalArgumentException("live arrival integration requires edges and local runtimes");
+        if (this.edges.isEmpty() || this.approaches.isEmpty() || this.materializationBySystem.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "live arrival integration requires edges, local approach calibration and runtimes");
+        }
+        for (PersistedEdge edge : this.edges.values()) {
+            requireApproach(edge.firstEndpoint());
+            requireApproach(edge.secondEndpoint());
         }
     }
 
@@ -80,13 +104,19 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
             throw new IllegalArgumentException("saved campaign lacks live arrival authority boundary");
         }
         TreeMap<EdgeKey, PersistedEdge> edges = new TreeMap<>();
+        TreeMap<ApproachKey, LocalApproachCalibration> approaches = new TreeMap<>();
         for (CanonicalRow row : state.materializedWorld().worldRows()) {
-            if (!JUMP_EDGE_DOMAIN.equals(row.domain())) {
-                continue;
-            }
-            PersistedEdge edge = parseEdge(row);
-            if (edges.putIfAbsent(edge.key(), edge) != null) {
-                throw malformed(row, "duplicate ordinary edge endpoints");
+            if (JUMP_EDGE_DOMAIN.equals(row.domain())) {
+                PersistedEdge edge = parseEdge(row);
+                if (edges.putIfAbsent(edge.key(), edge) != null) {
+                    throw malformed(row, "duplicate ordinary edge endpoints");
+                }
+            } else if (LOCAL_CONNECTION_DOMAIN.equals(row.domain())) {
+                LocalApproachCalibration approach = parseApproach(row);
+                if (approach != null
+                        && approaches.putIfAbsent(approach.key(), approach) != null) {
+                    throw malformed(row, "duplicate jump-anchor local approach calibration");
+                }
             }
         }
         return new Stage20LiveArrivalAuthorityIntegration(
@@ -94,6 +124,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
                 state.generationIdentity().generatorVersion(),
                 state.materializedWorld().worldFingerprint(),
                 edges,
+                approaches,
                 Objects.requireNonNull(materializationBySystem, "materializationBySystem"));
     }
 
@@ -138,6 +169,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
             }
         }
         runtime.bindFleetArrivalAuthority(this);
+        boundWorld = runtime;
         bound = true;
     }
 
@@ -189,13 +221,142 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         PersistedEndpoint endpoint = edge.endpoint(to);
         LocalPhysicalKinematics exact = new LocalPhysicalKinematics(
                 endpoint.position(), endpoint.arrivalVelocityMps(), 0d);
-        return new ResolvedArrival(
-                from,
-                to,
-                endpoint.anchorId(),
-                exact,
-                exactFloat(endpoint.position().offsetXM(), "legacyProjectionX"),
-                exactFloat(endpoint.position().offsetYM(), "legacyProjectionY"));
+        return resolved(from, to, endpoint, exact);
+    }
+
+    @Override
+    public long beginDepartureApproach(
+            FleetId fleetId,
+            StarSystemId originSystemId,
+            StarSystemId destinationSystemId,
+            EntityId localEntityId,
+            long worldTick,
+            float fixedStepSeconds) {
+        requireNonNegativeTick(worldTick, "worldTick");
+        requirePositiveFixedStep(fixedStepSeconds);
+        FleetPlacementState placement = requireLocalPlacement(
+                fleetId, originSystemId, localEntityId);
+        PersistedEndpoint departure = requireEdge(originSystemId, destinationSystemId)
+                .endpoint(originSystemId);
+        LocalApproachCalibration calibration = requireApproach(departure);
+        LocalPhysicalKinematics current = materialization(originSystemId)
+                .physicalState(localEntityId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "generated-world fleet lacks exact local physical state before FTL approach: " + fleetId));
+        double distanceM = current.position().distanceTo(departure.position());
+        boolean military = isCombatShip(placement);
+        double referenceSeconds = military
+                ? calibration.militaryResponseTimeMaxS()
+                : calibration.civilianRoutineTravelTimeMaxS();
+        double travelSeconds = referenceSeconds * distanceM / calibration.referenceDistanceM();
+        long ticks = travelSeconds <= 0d ? 1L : secondsToTicks(travelSeconds, fixedStepSeconds);
+        double durationSeconds = ticks * (double) fixedStepSeconds;
+        var displacement = current.position().displacementTo(departure.position());
+        materialization(originSystemId).updatePhysicalState(
+                localEntityId,
+                new LocalPhysicalKinematics(
+                        current.position(),
+                        displacement.deltaXM() / durationSeconds,
+                        displacement.deltaYM() / durationSeconds));
+        return ticks;
+    }
+
+    @Override
+    public void advanceDepartureApproach(
+            FleetId fleetId,
+            StarSystemId originSystemId,
+            StarSystemId destinationSystemId,
+            EntityId localEntityId,
+            long previousWorldTick,
+            long worldTick,
+            long phaseEndsTick,
+            float fixedStepSeconds) {
+        requireNonNegativeTick(previousWorldTick, "previousWorldTick");
+        requireNonNegativeTick(worldTick, "worldTick");
+        requireNonNegativeTick(phaseEndsTick, "phaseEndsTick");
+        requirePositiveFixedStep(fixedStepSeconds);
+        if (worldTick < previousWorldTick || phaseEndsTick < previousWorldTick) {
+            throw new IllegalStateException("generated-world FTL approach tick order is invalid");
+        }
+        requireLocalPlacement(fleetId, originSystemId, localEntityId);
+        PersistedEndpoint departure = requireEdge(originSystemId, destinationSystemId)
+                .endpoint(originSystemId);
+        LocalPhysicalKinematics current = materialization(originSystemId)
+                .physicalState(localEntityId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "generated-world fleet lost exact local state during FTL approach: " + fleetId));
+
+        long fromTick = Math.min(previousWorldTick, phaseEndsTick);
+        long toTick = Math.min(worldTick, phaseEndsTick);
+        if (toTick <= fromTick) {
+            return;
+        }
+        long remainingBefore = phaseEndsTick - fromTick;
+        if (remainingBefore <= 0L) {
+            materialization(originSystemId).updatePhysicalState(
+                    localEntityId, LocalPhysicalKinematics.stationary(departure.position()));
+            return;
+        }
+        long elapsedTicks = toTick - fromTick;
+        double fraction = Math.min(1d, elapsedTicks / (double) remainingBefore);
+        var displacement = current.position().displacementTo(departure.position());
+        LocalPhysicalPosition nextPosition = fraction >= 1d
+                ? departure.position()
+                : current.position().translated(
+                        displacement.deltaXM() * fraction,
+                        displacement.deltaYM() * fraction);
+        long remainingAfter = phaseEndsTick - toTick;
+        LocalPhysicalKinematics next;
+        if (remainingAfter <= 0L) {
+            next = LocalPhysicalKinematics.stationary(departure.position());
+        } else {
+            var remaining = nextPosition.displacementTo(departure.position());
+            double remainingSeconds = remainingAfter * (double) fixedStepSeconds;
+            next = new LocalPhysicalKinematics(
+                    nextPosition,
+                    remaining.deltaXM() / remainingSeconds,
+                    remaining.deltaYM() / remainingSeconds);
+        }
+        materialization(originSystemId).updatePhysicalState(localEntityId, next);
+    }
+
+    /**
+     * Requires exact local arrival at the requested origin-side FTL endpoint before detach.
+     *
+     * <p>Both position and velocity are checked. The approach integrator snaps to the persisted
+     * endpoint with zero local velocity at its deterministic boundary, so any mismatch means the
+     * normal physical approach did not complete or restored state is inconsistent. FTL therefore
+     * fails closed instead of detaching the fleet from elsewhere in the system.</p>
+     *
+     * @param fleetId stable world fleet identity
+     * @param originSystemId current local system
+     * @param destinationSystemId directly connected destination
+     * @param localEntityId current origin-local persistent entity identity
+     */
+    @Override
+    public void validateDepartureReady(
+            FleetId fleetId,
+            StarSystemId originSystemId,
+            StarSystemId destinationSystemId,
+            EntityId localEntityId) {
+        requireLocalPlacement(fleetId, originSystemId, localEntityId);
+        PersistedEndpoint departure = requireEdge(originSystemId, destinationSystemId)
+                .endpoint(originSystemId);
+        LocalPhysicalKinematics current = materialization(originSystemId)
+                .physicalState(localEntityId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "generated-world fleet lost exact local state before FTL detach: " + fleetId));
+        if (!current.position().equals(departure.position())) {
+            throw new IllegalStateException(
+                    "generated-world fleet has not reached outgoing FTL endpoint: " + fleetId
+                            + " edge=" + originSystemId + "->" + destinationSystemId
+                            + " remainingM=" + current.position().distanceTo(departure.position()));
+        }
+        if (Double.compare(current.velocityXMps(), 0d) != 0
+                || Double.compare(current.velocityYMps(), 0d) != 0) {
+            throw new IllegalStateException(
+                    "generated-world fleet reached outgoing FTL endpoint without settling: " + fleetId);
+        }
     }
 
     /**
@@ -240,6 +401,71 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         materialization(exact.destinationSystemId()).registerPhysicalState(
                 destinationLocalEntityId,
                 exact.physicalState());
+    }
+
+    private FleetPlacementState requireLocalPlacement(
+            FleetId fleetId,
+            StarSystemId originSystemId,
+            EntityId localEntityId) {
+        if (!bound || boundWorld == null) {
+            throw new IllegalStateException("generated-world FTL approach requires a bound world");
+        }
+        FleetId id = Objects.requireNonNull(fleetId, "fleetId");
+        StarSystemId origin = Objects.requireNonNull(originSystemId, "originSystemId");
+        EntityId local = Objects.requireNonNull(localEntityId, "localEntityId");
+        FleetPlacementState placement = boundWorld.findFleet(id).orElseThrow(
+                () -> new IllegalArgumentException("unknown generated-world FleetId: " + id));
+        if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                || !origin.equals(placement.systemId())
+                || !local.equals(placement.localEntityId())) {
+            throw new IllegalStateException("generated-world FTL approach requires matching local fleet placement");
+        }
+        return placement;
+    }
+
+    private boolean isCombatShip(FleetPlacementState placement) {
+        Entity entity = boundWorld.findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().find(placement.localEntityId());
+        if (entity == null) {
+            throw new IllegalStateException("generated-world fleet placement references missing local entity");
+        }
+        ShipComponent ship = entity.getComponent(ShipComponent.class);
+        return ship != null && ship.type != null && ship.type.isCombat();
+    }
+
+    private PersistedEdge requireEdge(StarSystemId first, StarSystemId second) {
+        PersistedEdge edge = edges.get(new EdgeKey(
+                Objects.requireNonNull(first, "first"),
+                Objects.requireNonNull(second, "second")));
+        if (edge == null) {
+            throw new IllegalArgumentException("saved world has no ordinary direct edge: " + first + " -> " + second);
+        }
+        return edge;
+    }
+
+    private LocalApproachCalibration requireApproach(PersistedEndpoint endpoint) {
+        LocalApproachCalibration result = approaches.get(new ApproachKey(
+                endpoint.systemId(), endpoint.anchorId()));
+        if (result == null) {
+            throw new IllegalArgumentException(
+                    "saved jump endpoint lacks accepted local approach calibration: "
+                            + endpoint.systemId() + ':' + endpoint.anchorId());
+        }
+        return result;
+    }
+
+    private static ResolvedArrival resolved(
+            StarSystemId origin,
+            StarSystemId destination,
+            PersistedEndpoint endpoint,
+            LocalPhysicalKinematics exact) {
+        return new ResolvedArrival(
+                origin,
+                destination,
+                endpoint.anchorId(),
+                exact,
+                exactFloat(endpoint.position().offsetXM(), "legacyProjectionX"),
+                exactFloat(endpoint.position().offsetYM(), "legacyProjectionY"));
     }
 
     private void validateTopology(GalaxyTopology topology) {
@@ -296,6 +522,29 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
                 requireText(values.get(offset + 8), "jumpArrivalCalibrationVersion"));
     }
 
+    private static LocalApproachCalibration parseApproach(CanonicalRow row) {
+        List<String> values = row.values();
+        if (values.size() < MINIMUM_LOCAL_CONNECTION_VALUE_COUNT) {
+            throw malformed(row, "local connection row is truncated");
+        }
+        if (!BandId.JUMP_ARRIVAL_TO_MAJOR_HUB.name().equals(values.get(3))) {
+            return null;
+        }
+        StarSystemId systemId = new StarSystemId(parsePositiveLong(values.get(0), row, "systemId"));
+        String anchorId = requireText(values.get(1), "fromId");
+        double referenceDistanceM = parsePositiveDouble(values.get(4), row, "distanceM");
+        double civilianRoutineTravelTimeMaxS = parsePositiveDouble(
+                values.get(9), row, "civilianRoutineTravelTimeMaxS");
+        double militaryResponseTimeMaxS = parsePositiveDouble(
+                values.get(11), row, "militaryResponseTimeMaxS");
+        return new LocalApproachCalibration(
+                new ApproachKey(systemId, anchorId),
+                referenceDistanceM,
+                civilianRoutineTravelTimeMaxS,
+                militaryResponseTimeMaxS,
+                requireText(values.get(16), "sourceProfileVersion"));
+    }
+
     private record PersistedEdge(
             EdgeKey key,
             PersistedEndpoint firstEndpoint,
@@ -324,6 +573,35 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
             double arrivalVelocityMps,
             String localInfrastructureVersion,
             String jumpArrivalCalibrationVersion) { }
+
+    private record LocalApproachCalibration(
+            ApproachKey key,
+            double referenceDistanceM,
+            double civilianRoutineTravelTimeMaxS,
+            double militaryResponseTimeMaxS,
+            String sourceProfileVersion) {
+        private LocalApproachCalibration {
+            Objects.requireNonNull(key, "key");
+            requirePositive(referenceDistanceM, "referenceDistanceM");
+            requirePositive(civilianRoutineTravelTimeMaxS, "civilianRoutineTravelTimeMaxS");
+            requirePositive(militaryResponseTimeMaxS, "militaryResponseTimeMaxS");
+            requireText(sourceProfileVersion, "sourceProfileVersion");
+        }
+    }
+
+    private record ApproachKey(StarSystemId systemId, String anchorId)
+            implements Comparable<ApproachKey> {
+        private ApproachKey {
+            Objects.requireNonNull(systemId, "systemId");
+            anchorId = requireText(anchorId, "anchorId");
+        }
+
+        @Override
+        public int compareTo(ApproachKey other) {
+            int result = systemId.compareTo(other.systemId);
+            return result != 0 ? result : anchorId.compareTo(other.anchorId);
+        }
+    }
 
     private record EdgeKey(StarSystemId first, StarSystemId second)
             implements Comparable<EdgeKey> {
@@ -355,6 +633,16 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         return projection;
     }
 
+    private static long secondsToTicks(double seconds, float fixedStepSeconds) {
+        requirePositive(seconds, "travelSeconds");
+        requirePositiveFixedStep(fixedStepSeconds);
+        double ticks = StrictMath.ceil(seconds / fixedStepSeconds);
+        if (!Double.isFinite(ticks) || ticks > Long.MAX_VALUE) {
+            throw new IllegalArgumentException("generated-world local FTL approach duration is not representable");
+        }
+        return Math.max(1L, (long) ticks);
+    }
+
     private static long parsePositiveLong(String value, CanonicalRow row, String field) {
         long parsed = parseLong(value, row, field);
         if (parsed <= 0L) {
@@ -371,6 +659,14 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         }
     }
 
+    private static double parsePositiveDouble(String value, CanonicalRow row, String field) {
+        double parsed = parseDouble(value, row, field);
+        if (parsed <= 0d) {
+            throw malformed(row, field + " must be positive");
+        }
+        return parsed;
+    }
+
     private static double parseDouble(String value, CanonicalRow row, String field) {
         try {
             double parsed = Double.parseDouble(value);
@@ -380,6 +676,24 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
             return parsed;
         } catch (NumberFormatException exception) {
             throw malformed(row, field + " is invalid", exception);
+        }
+    }
+
+    private static void requireNonNegativeTick(long value, String field) {
+        if (value < 0L) {
+            throw new IllegalArgumentException(field + " must be non-negative");
+        }
+    }
+
+    private static void requirePositiveFixedStep(float value) {
+        if (!Float.isFinite(value) || value <= 0f) {
+            throw new IllegalArgumentException("fixedStepSeconds must be positive and finite");
+        }
+    }
+
+    private static void requirePositive(double value, String field) {
+        if (!Double.isFinite(value) || value <= 0d) {
+            throw new IllegalArgumentException(field + " must be positive and finite");
         }
     }
 

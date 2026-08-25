@@ -30,10 +30,16 @@ import java.util.Objects;
  * Deterministically binds an accepted ordinary topology to Stage-20C destination-local arrival
  * anchors and produces exact-coverage {@link Stage20JumpEdgeCatalog} metadata.
  *
- * <p>One local jump-arrival anchor is required per incident ordinary edge. The materializer never
- * falls back to the legacy viewport {@code (0,0)} arrival and never reuses one local lane across
- * multiple ordinary edges. If upstream local geometry supplies too few calibrated anchors, world
- * assembly fails explicitly and must regenerate/reject before materialization.</p>
+ * <p>One local jump-arrival anchor is required per incident ordinary edge. Current generated worlds
+ * use the canonical neighbor-specific identity from {@link Stage20DirectionalJumpAnchorLayout}, so
+ * edge-to-anchor binding is independent of lexicographic list ordering. Historical hand-authored
+ * Stage-20C fixtures that contain none of those canonical IDs retain the deterministic sorted-anchor
+ * compatibility path; a mixed partial canonical mapping fails closed.</p>
+ *
+ * <p>The materializer never falls back to the legacy viewport {@code (0,0)} arrival and never reuses
+ * one local lane across multiple ordinary edges. If upstream local geometry supplies too few
+ * calibrated anchors, world assembly fails explicitly and must regenerate/reject before
+ * materialization.</p>
  *
  * <p>Stage-20A explicitly does not author a generated per-edge transit-time distribution. V1
  * therefore records multiplier {@code 1.0} over the live fitted edge transit. Hazard/security data
@@ -159,13 +165,50 @@ public final class Stage20JumpEdgeStateMaterializer {
                     + " distinct jump-arrival anchors but Stage-20C layout supplies " + anchors.size());
         }
 
+        HashMap<String, InfrastructurePlacement> anchorById = new HashMap<>();
+        for (InfrastructurePlacement anchor : anchors) {
+            anchorById.put(anchor.id(), anchor);
+        }
+        int canonicalMatches = 0;
+        for (JumpConnection edge : incident) {
+            StarSystemId neighbor = neighborOf(systemId, edge);
+            if (anchorById.containsKey(Stage20DirectionalJumpAnchorLayout.anchorId(systemId, neighbor))) {
+                canonicalMatches++;
+            }
+        }
+        if (canonicalMatches > 0 && canonicalMatches != incident.size()) {
+            throw new IllegalStateException(
+                    "system " + systemId + " contains a partial canonical neighbor-specific jump-anchor mapping");
+        }
+
         HashMap<JumpConnection, InfrastructurePlacement> result = new HashMap<>();
+        if (canonicalMatches == incident.size()) {
+            for (JumpConnection edge : incident) {
+                StarSystemId neighbor = neighborOf(systemId, edge);
+                InfrastructurePlacement anchor = anchorById.get(
+                        Stage20DirectionalJumpAnchorLayout.anchorId(systemId, neighbor));
+                requireCalibratedArrivalConnection(layout, anchor, localRoutes, arrivalBand);
+                result.put(edge, anchor);
+            }
+            return Map.copyOf(result);
+        }
+
         for (int index = 0; index < incident.size(); index++) {
             InfrastructurePlacement anchor = anchors.get(index);
             requireCalibratedArrivalConnection(layout, anchor, localRoutes, arrivalBand);
             result.put(incident.get(index), anchor);
         }
         return Map.copyOf(result);
+    }
+
+    private static StarSystemId neighborOf(StarSystemId systemId, JumpConnection edge) {
+        if (edge.first().equals(systemId)) {
+            return edge.second();
+        }
+        if (edge.second().equals(systemId)) {
+            return edge.first();
+        }
+        throw new IllegalArgumentException("edge is not incident to system " + systemId + ": " + edge);
     }
 
     private static void requireCalibratedArrivalConnection(

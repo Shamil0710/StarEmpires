@@ -530,7 +530,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
 
         /**
          * Captures a self-consistent campaign/world/freight checkpoint, rebinding only the freight
-         * envelope fingerprint after finite source reserve changes.
+         * envelope fingerprint after finite source reserve changes and refreshing the redundant
+         * local freight physical mirror from the exact Stage-20 physical sidecar.
          *
          * @return complete atomic current runtime checkpoint
          */
@@ -540,8 +541,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     infrastructure.captureInto(campaignAuthority);
             Stage20GeneratedCampaignPersistentState campaign =
                     industry.captureCampaignState(withInfrastructure);
+            List<LocalFleetPhysicalState> localPhysical = captureLocalFleetPhysicalStates();
             Stage20FreightPersistentState freightState = rebindFreightFingerprint(
                     freight.capture(), campaign.materializedWorld().worldFingerprint());
+            freightState = synchronizeFreightPhysicalMirrors(freightState, localPhysical);
             return new Stage20GeneratedWorldRuntimePersistentState(
                     Stage20GeneratedWorldRuntimePersistentState.CURRENT_VERSION,
                     CURRENT_VERSION,
@@ -549,7 +552,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     world.snapshot(),
                     world.getActiveSystemId(),
                     freightState,
-                    captureLocalFleetPhysicalStates());
+                    localPhysical);
         }
 
         private List<LocalFleetPhysicalState> captureLocalFleetPhysicalStates() {
@@ -568,6 +571,66 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             }
             result.sort(java.util.Comparator.comparing(LocalFleetPhysicalState::fleetId));
             return List.copyOf(result);
+        }
+
+        private static Stage20FreightPersistentState synchronizeFreightPhysicalMirrors(
+                Stage20FreightPersistentState source,
+                List<LocalFleetPhysicalState> localPhysical) {
+            Map<FleetId, LocalFleetPhysicalState> exactByFleet = new HashMap<>();
+            for (LocalFleetPhysicalState state : localPhysical) {
+                if (exactByFleet.putIfAbsent(state.fleetId(), state) != null) {
+                    throw new IllegalStateException(
+                            "duplicate exact local fleet state while capturing freight mirror: "
+                                    + state.fleetId());
+                }
+            }
+            ArrayList<FreighterState> fleets = new ArrayList<>(source.freighters().size());
+            boolean changed = false;
+            for (FreighterState fleetState : source.freighters()) {
+                LocalFleetPhysicalState exact = exactByFleet.get(fleetState.fleetId());
+                if (exact == null) {
+                    fleets.add(fleetState);
+                    continue;
+                }
+                if (!fleetState.currentSystemId().equals(exact.systemId())) {
+                    throw new IllegalStateException(
+                            "local freight system differs from exact physical capture: "
+                                    + fleetState.fleetId());
+                }
+                if (fleetState.physicalState().equals(exact.physicalState())) {
+                    fleets.add(fleetState);
+                    continue;
+                }
+                fleets.add(new FreighterState(
+                        fleetState.fleetId(),
+                        fleetState.stableFactionId(),
+                        fleetState.ownershipOrdinal(),
+                        fleetState.hullId(),
+                        fleetState.fitId(),
+                        fleetState.cargoCapacityKg(),
+                        fleetState.currentSystemId(),
+                        exact.physicalState(),
+                        fleetState.phase(),
+                        fleetState.activeOrderId(),
+                        fleetState.routeIndex(),
+                        fleetState.cargoStorage()));
+                changed = true;
+            }
+            if (!changed) {
+                return source;
+            }
+            return new Stage20FreightPersistentState(
+                    source.schemaVersion(),
+                    source.rootSeed(),
+                    source.generatorVersion(),
+                    source.worldFingerprint(),
+                    source.materializationVersion(),
+                    source.compatibilityAuthorityVersion(),
+                    source.nextFleetIdValue(),
+                    source.nextCargoLotOrdinal(),
+                    fleets,
+                    source.cargoLots(),
+                    source.orders());
         }
 
         private void synchronizeCompletedHops() {

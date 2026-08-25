@@ -32,6 +32,7 @@ import com.spacesim.world.FleetOperationalAvailability;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.FleetReadinessEvaluator;
 import com.spacesim.world.FleetReadinessState;
+import com.spacesim.world.GeneratedWorldFtlTestSupport;
 import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.Stage21EPhysicalConsequenceService;
 import com.spacesim.world.StarSystemId;
@@ -254,6 +255,7 @@ class Stage21EGeneratedWorldTacticalExecutionAcceptanceTest {
         FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
         List<StarSystemId> route = route(runtime, placement.systemId(), destination);
         for (int index = 1; index < route.size(); index++) {
+            GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, fleetId, route.get(index));
             runtime.world().requestFleetJump(fleetId, route.get(index));
             for (int attempt = 0; attempt < 400 && runtime.world().findFleetJump(fleetId).isPresent(); attempt++) {
                 runtime.advanceFrame(0.25f);

@@ -76,9 +76,9 @@ UI может позволять выбрать удалённую систем�
 
 ## 4. Stage 20 world-generation requirement
 
-Будущий Stage 20 generator обязан генерировать **jump graph**, а не произвольную функцию расстояния, допускающую direct travel между любыми системами.
+Stage 20 generator генерирует **jump graph**, а не произвольную функцию расстояния, допускающую direct travel между любыми системами.
 
-Для каждой системы generator определяет explicit neighbor set через `JumpConnection`/будущий эквивалентный authoritative edge type.
+Для каждой системы generator определяет explicit neighbor set через `JumpConnection`/эквивалентный authoritative edge type.
 
 Generated topology должна поддерживать:
 
@@ -93,6 +93,85 @@ Generated topology должна поддерживать:
 - возможность физической блокады маршрутов.
 
 Generator не должен автоматически соединять каждую систему со всеми ближайшими по евклидовой карте системами. Geometry и graph topology связаны design constraints, но jump edge остаётся explicit authoritative объектом.
+
+### 4.1 Один соседний edge — одна локальная FTL-точка
+
+Для каждого incident topology edge система обязана иметь **ровно одну соответствующую локальную FTL entry/exit point**.
+
+Если:
+
+```text
+neighbors(B) = {A, C, D}
+```
+
+то внутри `B` существуют три различные точки:
+
+```text
+B↔A endpoint
+B↔C endpoint
+B↔D endpoint
+```
+
+Нельзя заменять их одной универсальной `jump point`, случайным arrival point или выбором endpoint по индексу списка.
+
+Canonical generated identity должна однозначно связывать локальную точку с парой `local system + neighbor system`. Текущий Stage-20 materialization использует neighbor-specific identity вида:
+
+```text
+jump-arrival.<local-system>.<neighbor-system>
+```
+
+Количество таких точек в системе обязано точно совпадать с degree этой системы в authoritative topology.
+
+### 4.2 Directional placement
+
+FTL-точка размещается на стороне системы, соответствующей macro-направлению на связанного соседа.
+
+Для outgoing перехода `B → C` точка `B↔C` ориентирована по направлению `B → C` на macro map.
+
+Для arrival `A → B` корабль появляется в `B` у точки `B↔A`, то есть на стороне `B`, обращённой назад к `A`.
+
+Следствие для маршрута:
+
+```text
+A → B → C
+```
+
+```text
+arrival A→B
+→ fleet materializes at B↔A endpoint
+→ fleet remains physically inside B
+→ fleet crosses B to B↔C endpoint
+→ only there may B→C spool/transit begin
+```
+
+Таким образом промежуточная система не является zero-time routing node.
+
+### 4.3 Generated geometry is persistent authority
+
+Directional FTL geometry создаётся deterministic Stage-20 generation/materialization и затем сохраняется как часть accepted generated world.
+
+Runtime обязан:
+
+- читать persisted endpoint identity, position и calibrated connection/approach data;
+- не перегенерировать azimuth, radial placement или neighbor pairing при load;
+- не подменять generated endpoint случайной runtime coordinate;
+- использовать одну и ту же геометрию для player, AI, freight и military fleets;
+- сохранять exact local physical state во время approach так, чтобы save/load не менял маршрут или положение.
+
+Legacy ECS `Transform` является live presentation/simulation projection exact hierarchical/double physical state, а не отдельным источником FTL geometry.
+
+### 4.4 Physical departure readiness
+
+Ordinary jump request не означает мгновенный detach из текущей системы.
+
+Если fleet находится не на outgoing endpoint, existing `FleetJumpService` использует `MOVING_TO_JUMP` как физическую локальную approach phase. Fitted FTL energy commit, spool/transit detach и последующий межсистемный переход не могут начаться, пока arrival/departure authority не подтвердит точное достижение persisted outgoing endpoint и stationary departure readiness.
+
+Запрещено:
+
+- мгновенно переносить fleet на outgoing endpoint при jump request;
+- начинать spool вдали от endpoint;
+- списывать FTL energy и detach fleet до authoritative departure-readiness check;
+- перескакивать из incoming endpoint напрямую в следующий edge при multi-hop route.
 
 ## 5. Исключительные способы перемещения
 
@@ -109,7 +188,7 @@ Generator не должен автоматически соединять каж
 
 ## 6. Player / AI parity
 
-Player и AI должны использовать один graph.
+Player и AI должны использовать один graph и одну generated FTL geometry.
 
 Запрещено:
 
@@ -117,9 +196,10 @@ Player и AI должны использовать один graph.
 - AI strategic teleport для ускорения симуляции;
 - abstract fleet relocation, пропускающая hops;
 - mission relocation без физического transition semantics;
-- «fast travel», создающий другое authoritative положение корабля без прохождения маршрута.
+- «fast travel», создающий другое authoritative положение корабля без прохождения маршрута;
+- AI/freight-only универсальная jump point, отличная от player-visible generated endpoints.
 
-Simulation LOD может агрегировать вычисления времени между событиями, но не менять последовательность посещённых edges и систем.
+Simulation LOD может агрегировать вычисления времени между событиями, но не менять последовательность посещённых edges, систем или обязательных physical transition endpoints.
 
 ## 7. UI contract для live demo
 
@@ -166,6 +246,22 @@ navigation UI model
 
 Stage-20 generated graph
 → every ordinary executed inter-system hop corresponds to one explicit edge
+
+every generated system
+→ exactly one distinct local FTL endpoint per direct neighbor
+→ endpoint is deterministically placed on the neighbor-facing side
+
+arrival A→B
+→ exact B↔A endpoint
+
+continuation B→C
+→ physical MOVING_TO_JUMP crossing from B↔A to B↔C
+→ departure cannot commit away from B↔C
+
+save/load during MOVING_TO_JUMP
+→ exact hierarchical position + velocity round-trip
+→ continuation reaches the same persisted outgoing endpoint
+→ no process-local hidden approach state
 ```
 
 ## 9. Gameplay consequence
@@ -175,14 +271,15 @@ Stage-20 generated graph
 ```text
 jump topology
 → реальные маршруты торговли
+→ физические entry/exit approaches внутри систем
 → транзитные системы
 → узкие места
 → границы
 → логистические расстояния
 → время подкреплений
 → ценность баз и складов
-→ возможность блокады
+→ возможность блокады и перехвата у конкретных transition points
 → стратегическое значение территории
 ```
 
-Поэтому neighbor-only travel является фундаментальным правилом мира Star Empires, а не временным ограничением текущего demo UI.
+Поэтому neighbor-only travel и directional physical FTL endpoints являются фундаментальными правилами мира Star Empires, а не временным ограничением текущего demo UI.

@@ -14,6 +14,7 @@ import com.spacesim.world.DestructionPolicy;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetJumpPhase;
 import com.spacesim.world.FleetLocationKind;
+import com.spacesim.world.GeneratedWorldFtlTestSupport;
 import com.spacesim.world.StarSystemId;
 import org.junit.jupiter.api.Test;
 
@@ -124,9 +125,9 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
                 .findFleet(militaryFleetId).orElseThrow();
         assertEquals(destroyedMilitaryPlacement.localEntityId(),
                 destroyedMilitaryBranch.world().destroyEntity(
-                destroyedMilitaryPlacement.systemId(),
-                destroyedMilitaryPlacement.localEntityId(),
-                DestructionPolicy.destroyAll()).destroyedEntityId());
+                        destroyedMilitaryPlacement.systemId(),
+                        destroyedMilitaryPlacement.localEntityId(),
+                        DestructionPolicy.destroyAll()).destroyedEntityId());
         destroyedMilitaryBranch.arrival().materialization(destroyedMilitaryPlacement.systemId())
                 .releasePhysicalStateForWorldTransfer(destroyedMilitaryPlacement.localEntityId());
         LiveRuntime restoredWithoutMilitary = Stage20GeneratedWorldRuntimeBridge.restore(
@@ -142,6 +143,7 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
             StarSystemId origin = candidate.order().orderedSystems().get(hop - 1);
             StarSystemId destination = candidate.order().orderedSystems().get(hop);
             var expectedArrival = delivery.arrival().resolve(origin, destination).physicalState();
+            GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(delivery, fleetId, destination);
             delivery.requestNextRouteHop(fleetId);
             if (!restoredInTransit) {
                 advanceUntilPhase(delivery, fleetId, FleetJumpPhase.IN_TRANSIT);

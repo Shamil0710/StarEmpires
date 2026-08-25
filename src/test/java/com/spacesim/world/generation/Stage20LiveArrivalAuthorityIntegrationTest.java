@@ -1,6 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.persistence.EntityId;
@@ -16,7 +17,6 @@ import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetJumpPhase;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.LocalPhysicalKinematics;
-import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState;
 import com.spacesim.world.Stage20SpecialLocationGenerator;
 import com.spacesim.world.StarSystemId;
@@ -51,13 +51,11 @@ class Stage20LiveArrivalAuthorityIntegrationTest {
         StarSystemId originSystem = source.systemId();
         StarSystemId destinationSystem = world.getTopology().neighbors(originSystem).get(0);
         var expected = integration.resolve(originSystem, destinationSystem);
+        var outgoing = integration.resolve(destinationSystem, originSystem);
         EntityId formerLocalId = source.localEntityId();
-        LocalPhysicalKinematics originPhysical = new LocalPhysicalKinematics(
-                new LocalPhysicalPosition(9_000_000_000L, -8_000_000_000L, 42.5d, -73.25d),
-                810d,
-                -215d);
         integration.materialization(originSystem).registerPhysicalState(
-                formerLocalId, originPhysical);
+                formerLocalId,
+                LocalPhysicalKinematics.stationary(outgoing.physicalState().position()));
         var discoveryBefore = campaign.discoveryState();
 
         var requested = world.requestFleetJump(source.id(), destinationSystem, 999f, -777f);
@@ -95,6 +93,93 @@ class Stage20LiveArrivalAuthorityIntegrationTest {
     }
 
     @Test
+    void routeThroughIntermediateSystemArrivesFromOriginSideAndMustFlyToNextFtlPoint() {
+        CadenceFixture fixture = fixture();
+        Stage20GeneratedCampaignPersistentState campaign = savedState(fixture);
+        WorldSimulation world = world(fixture);
+        Stage20LiveArrivalAuthorityIntegration integration =
+                Stage20LiveArrivalAuthorityIntegration.restoreAndBind(campaign, world);
+        RouteFixture route = routeFixture(world);
+        FleetPlacementState source = route.sourceFleet();
+
+        var aOutgoingToB = integration.resolve(route.middle(), route.origin());
+        integration.materialization(route.origin()).registerPhysicalState(
+                source.localEntityId(),
+                LocalPhysicalKinematics.stationary(aOutgoingToB.physicalState().position()));
+        world.requestFleetJump(source.id(), route.middle());
+        advanceUntilArrived(world, source.id());
+
+        FleetPlacementState inMiddle = world.findFleet(source.id()).orElseThrow();
+        var bIncomingFromA = integration.resolve(route.origin(), route.middle());
+        var bOutgoingToC = integration.resolve(route.destination(), route.middle());
+        assertEquals(route.middle(), inMiddle.systemId());
+        assertEquals(
+                bIncomingFromA.physicalState().position(),
+                integration.materialization(route.middle())
+                        .physicalState(inMiddle.localEntityId()).orElseThrow().position());
+        assertNotEquals(
+                bIncomingFromA.physicalState().position(),
+                bOutgoingToC.physicalState().position(),
+                "different neighboring systems must use different local FTL endpoints");
+
+        var secondJump = world.requestFleetJump(source.id(), route.destination());
+        assertEquals(FleetJumpPhase.MOVING_TO_JUMP, secondJump.phase());
+        assertTrue(secondJump.phaseEndsTick() - secondJump.phaseStartedTick() > 1L,
+                "cross-system local traversal must not collapse to the legacy one-tick approach");
+        assertEquals(FleetLocationKind.IN_SYSTEM, world.findFleet(source.id()).orElseThrow().locationKind());
+        assertEquals(route.middle(), world.findFleet(source.id()).orElseThrow().systemId());
+
+        var before = integration.materialization(route.middle())
+                .physicalState(inMiddle.localEntityId()).orElseThrow();
+        world.advanceFrame(SimulationSession.DEFAULT_FIXED_STEP_SECONDS);
+        var after = integration.materialization(route.middle())
+                .physicalState(inMiddle.localEntityId()).orElseThrow();
+        assertNotEquals(before.position(), after.position(),
+                "MOVING_TO_JUMP must physically advance toward the next outgoing endpoint");
+        assertTrue(after.position().distanceTo(bOutgoingToC.physicalState().position())
+                < before.position().distanceTo(bOutgoingToC.physicalState().position()));
+        assertEquals(FleetLocationKind.IN_SYSTEM, world.findFleet(source.id()).orElseThrow().locationKind());
+        assertEquals(route.middle(), world.findFleet(source.id()).orElseThrow().systemId());
+
+        Entity live = world.findSession(route.middle()).orElseThrow()
+                .getEntityRegistry().find(inMiddle.localEntityId());
+        TransformComponent transform = live.getComponent(TransformComponent.class);
+        assertEquals((float) after.position().offsetXM(), transform.position.x, 0f);
+        assertEquals((float) after.position().offsetYM(), transform.position.y, 0f);
+        assertEquals((float) after.velocityXMps(), transform.velocity.x, 0f);
+        assertEquals((float) after.velocityYMps(), transform.velocity.y, 0f);
+    }
+
+    @Test
+    void departureReadinessRejectsFleetAwayFromOutgoingFtlPoint() {
+        CadenceFixture fixture = fixture();
+        Stage20GeneratedCampaignPersistentState campaign = savedState(fixture);
+        WorldSimulation world = world(fixture);
+        Stage20LiveArrivalAuthorityIntegration integration =
+                Stage20LiveArrivalAuthorityIntegration.restoreAndBind(campaign, world);
+        FleetPlacementState source = sourceFleetWithNeighbor(world);
+        StarSystemId origin = source.systemId();
+        StarSystemId destination = world.getTopology().neighbors(origin).get(0);
+        var outgoing = integration.resolve(destination, origin);
+        var displaced = outgoing.physicalState().position().translated(123d, -45d);
+        integration.materialization(origin).registerPhysicalState(
+                source.localEntityId(),
+                LocalPhysicalKinematics.stationary(displaced));
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> integration.validateDepartureReady(
+                        source.id(), origin, destination, source.localEntityId()));
+        assertTrue(failure.getMessage().contains("has not reached outgoing FTL endpoint"));
+
+        integration.materialization(origin).updatePhysicalState(
+                source.localEntityId(),
+                LocalPhysicalKinematics.stationary(outgoing.physicalState().position()));
+        integration.validateDepartureReady(
+                source.id(), origin, destination, source.localEntityId());
+    }
+
+    @Test
     void liveAuthorityRejectsNonNeighbor() {
         CadenceFixture fixture = fixture();
         Stage20GeneratedCampaignPersistentState campaign = savedState(fixture);
@@ -127,12 +212,10 @@ class Stage20LiveArrivalAuthorityIntegrationTest {
         FleetPlacementState source = sourceFleetWithNeighbor(original);
         StarSystemId destination = original.getTopology().neighbors(source.systemId()).get(0);
         var expected = originalIntegration.resolve(source.systemId(), destination);
+        var outgoing = originalIntegration.resolve(destination, source.systemId());
         originalIntegration.materialization(source.systemId()).registerPhysicalState(
                 source.localEntityId(),
-                new LocalPhysicalKinematics(
-                        new LocalPhysicalPosition(3L, -4L, 5d, -6d),
-                        7d,
-                        -8d));
+                LocalPhysicalKinematics.stationary(outgoing.physicalState().position()));
 
         original.requestFleetJump(source.id(), destination);
         advanceUntilPhase(original, source.id(), FleetJumpPhase.IN_TRANSIT);
@@ -177,6 +260,28 @@ class Stage20LiveArrivalAuthorityIntegrationTest {
             world.advanceFrame(0.25f);
         }
         throw new AssertionError("ordinary jump did not reach phase " + phase);
+    }
+
+    private static RouteFixture routeFixture(WorldSimulation world) {
+        for (FleetPlacementState fleet : world.getFleetPlacements()) {
+            if (fleet.locationKind() != FleetLocationKind.IN_SYSTEM) {
+                continue;
+            }
+            Entity entity = world.findSession(fleet.systemId()).orElseThrow()
+                    .getEntityRegistry().find(fleet.localEntityId());
+            if (entity == null) {
+                continue;
+            }
+            for (StarSystemId middle : world.getTopology().neighbors(fleet.systemId())) {
+                StarSystemId destination = world.getTopology().neighbors(middle).stream()
+                        .filter(value -> !value.equals(fleet.systemId()))
+                        .findFirst().orElse(null);
+                if (destination != null) {
+                    return new RouteFixture(fleet, fleet.systemId(), middle, destination);
+                }
+            }
+        }
+        throw new AssertionError("generated acceptance world lacks fleet route A->B->C");
     }
 
     private static FleetPlacementState sourceFleetWithNeighbor(WorldSimulation world) {
@@ -229,4 +334,10 @@ class Stage20LiveArrivalAuthorityIntegrationTest {
         }
         return sharedFixture;
     }
+
+    private record RouteFixture(
+            FleetPlacementState sourceFleet,
+            StarSystemId origin,
+            StarSystemId middle,
+            StarSystemId destination) { }
 }

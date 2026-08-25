@@ -20,6 +20,12 @@ import java.util.Objects;
  * Atomic Stage-20.5 checkpoint joining the generated campaign, ordinary live world and physical
  * freight sidecar without turning any one of them into a second authority for the others.
  *
+ * <p>{@code localFleetPhysicalStates} is the exact local-kinematics authority for every in-system
+ * ordinary fleet. The physical field embedded in each local freight row is only a compatibility
+ * mirror, but a persisted checkpoint must already contain the same exact value. Live capture is
+ * responsible for refreshing that mirror before construction; decode never silently repairs a
+ * cross-envelope mismatch. Route, cargo, ownership and lifecycle state remain freight-owned.</p>
+ *
  * @param schemaVersion checkpoint schema version
  * @param bridgeVersion exact runtime-composition contract
  * @param campaign current generated campaign and Stage-18 industrial state
@@ -106,6 +112,7 @@ public record Stage20GeneratedWorldRuntimePersistentState(
                                 + placement.id());
             }
         }
+
         Map<FleetId, FleetJumpState> jumps = new HashMap<>();
         for (FleetJumpState jump : worldState.fleetJumps()) {
             jumps.put(jump.fleetId(), jump);
@@ -127,6 +134,11 @@ public record Stage20GeneratedWorldRuntimePersistentState(
                 if (!fleet.currentSystemId().equals(placement.systemId())) {
                     throw new IllegalArgumentException(
                             "local freight system differs between sidecar and ordinary world");
+                }
+                LocalFleetPhysicalState exact = physicalByFleet.get(fleet.fleetId());
+                if (exact == null || !fleet.physicalState().equals(exact.physicalState())) {
+                    throw new IllegalArgumentException(
+                            "local freight physical mirror differs from exact local fleet state");
                 }
                 continue;
             }
