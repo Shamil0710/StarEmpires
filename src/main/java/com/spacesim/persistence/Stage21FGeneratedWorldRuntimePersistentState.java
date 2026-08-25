@@ -9,7 +9,9 @@ import com.spacesim.world.TerritorialTransitionState;
 import com.spacesim.world.TerritorialTransitionState.OccupationState;
 import com.spacesim.world.WorldState;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -40,7 +42,8 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
      * Validates every Stage-21F transition against embedded Stage-21E operation and Stage-17 world law.
      *
      * <p>Occupation metadata may reference only a persisted Stage-21E {@code INVASION} operation with
-     * the same objective system and exact stable/runtime owner identity. The current generated-world
+     * the same objective system and exact stable/runtime owner identity. Claim-provenance metadata is
+     * accepted only while the corresponding Stage-17 claim actually exists. The current generated-world
      * checkpoint is bound to the default authored content catalog plus persisted world-defined
      * identities, matching the production resolver used by the generated runtime. No mapping is
      * duplicated into Stage-21F state.</p>
@@ -60,9 +63,9 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
                 .stage21ARuntime().stage20Runtime().worldState();
         Set<com.spacesim.world.StarSystemId> systems = new HashSet<>();
         world.topology().systems().forEach(system -> systems.add(system.id()));
-        Set<String> strategicFactions = new HashSet<>();
+        Map<String, FactionStrategicState> strategyByFaction = new HashMap<>();
         for (FactionStrategicState strategy : world.factionStrategies()) {
-            strategicFactions.add(strategy.factionContentId());
+            strategyByFaction.put(strategy.factionContentId(), strategy);
         }
         FactionIdentityResolver identities = FactionIdentityResolver.createDefault(
                 ContentCatalogLoader.loadDefault(), world.factionIdentities());
@@ -72,7 +75,8 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
                 throw new IllegalArgumentException(
                         "Stage-21F occupation references unknown objective system: " + occupation.systemId());
             }
-            if (!strategicFactions.contains(occupation.factionContentId())) {
+            FactionStrategicState strategy = strategyByFaction.get(occupation.factionContentId());
+            if (strategy == null) {
                 throw new IllegalArgumentException(
                         "Stage-21F occupation references unknown strategic faction: "
                                 + occupation.factionContentId());
@@ -99,6 +103,10 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
             if (!operationFaction.equals(occupation.factionContentId())) {
                 throw new IllegalArgumentException(
                         "Stage-21F occupation faction differs from Stage-21E invasion owner: " + operation.id());
+            }
+            if (occupation.claimCreatedByOccupation() && strategy.claimFor(occupation.systemId()) == null) {
+                throw new IllegalArgumentException(
+                        "Stage-21F occupation claims provenance for a missing Stage-17 claim: " + operation.id());
             }
         }
     }
