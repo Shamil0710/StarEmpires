@@ -1,16 +1,23 @@
 package com.spacesim.world.generation;
 
 import com.spacesim.content.Stage18StationInfrastructureCatalogLoader;
+import com.spacesim.world.GalaxyTopology;
+import com.spacesim.world.Stage20DirectionalJumpAnchorLayout;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator.Assignment;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator.PlacementResult;
 import com.spacesim.world.Stage20FactionStartPlacementGenerator.PlacementStatus;
 import com.spacesim.world.Stage20GeneratedWorldSeedAcceptance;
+import com.spacesim.world.Stage20JumpEdgeCatalog;
+import com.spacesim.world.Stage20JumpEdgeStateMaterializer;
+import com.spacesim.world.Stage20LocalInfrastructureLayout;
 import com.spacesim.world.Stage20PhysicalFreightRouteEvaluator;
 import com.spacesim.world.Stage20ResolvedFreightAcceptance;
+import com.spacesim.world.StarSystemId;
 import com.spacesim.world.calibration.Stage20CoordinatedFreightAcceptanceProfile;
 import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.ProbeResult;
 import com.spacesim.world.generation.Stage20RepresentativeGeneratedWorldProbeProfileV3.DerivedProfile;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,19 +27,25 @@ import java.util.TreeMap;
  * Stage-20E production probe whose authoritative whole-seed decision uses coordinated finite freight.
  *
  * <p>The existing {@link Stage20GeneratedWorldProductionProbe} remains the reproducible physical
- * generation/evidence pipeline for v1/v2 profiles. This wrapper consumes its exact generated topology,
- * local layouts, resources, supply closure, candidate evaluations and placement once, then replaces
- * only the final economic acceptance authority for v3: accepted placement is evaluated by
- * {@link Stage20ResolvedFreightAcceptance}, and whole-seed status is composed through resolved-freight
- * v2 semantics.</p>
+ * generation/evidence pipeline for v1/v2 profiles. The current resolved wrapper additionally composes
+ * the accepted macro topology with Stage-20C local geometry before final freight evaluation: each
+ * canonical jump-arrival anchor keeps its generated calibrated hub distance but is rotated onto the
+ * side of the system facing the neighbor represented by that ordinary edge. Stage-20D edge metadata
+ * is then rematerialized from those exact aligned local layouts.</p>
+ *
+ * <p>This topology-facing finalization changes only jump-anchor azimuth. Hub-to-anchor radial distance,
+ * accepted local-route bands, resources, supply closure, candidate evaluations and placement remain
+ * the source probe's deterministic evidence. Coordinated freight is evaluated against the finalized
+ * layouts and exact rematerialized jump endpoints, so the playable/persisted resolved world cannot
+ * silently fall back to randomly oriented entry lanes.</p>
  *
  * <p>The historical single-supplier result embedded in the source probe remains diagnostic evidence;
- * it is not consulted when deciding the resolved v3 whole-seed status. No generated layer is rerun,
- * repaired or mutated after observing coordinated freight.</p>
+ * it is not consulted when deciding the resolved v3 whole-seed status. No failed economic result may
+ * request another resource, station, topology edge or root seed through this wrapper.</p>
  */
 public final class Stage20ResolvedGeneratedWorldProductionProbe {
     /** Stable resolved production-probe version. */
-    public static final String CURRENT_VERSION = "stage20e.resolved-production-seed-probe.v1";
+    public static final String CURRENT_VERSION = "stage20e.resolved-production-seed-probe.v2";
 
     private Stage20ResolvedGeneratedWorldProductionProbe() {
         throw new AssertionError("No instances");
@@ -45,7 +58,7 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
      * @param rootSeed exact root seed
      * @param sourceProbeVersion preserved physical generation probe version
      * @param representativeProfileVersion v3 representative profile version
-     * @param generation unchanged underlying generated-world evidence
+     * @param generation finalized generated-world evidence with topology-facing jump endpoints
      * @param coordinatedFreightAcceptance present exactly for accepted faction-start placement
      * @param seedAcceptance authoritative resolved-freight whole-seed result
      */
@@ -64,7 +77,7 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
          * @param rootSeed exact root seed
          * @param sourceProbeVersion preserved physical generation probe version
          * @param representativeProfileVersion v3 representative profile version
-         * @param generation unchanged underlying generated-world evidence
+         * @param generation finalized generated-world evidence
          * @param coordinatedFreightAcceptance present exactly for accepted faction-start placement
          * @param seedAcceptance authoritative resolved-freight whole-seed result
          */
@@ -118,21 +131,22 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
      */
     public static ResolvedProbeResult run(long rootSeed, DerivedProfile profile) {
         DerivedProfile authority = Objects.requireNonNull(profile, "profile");
-        ProbeResult generation = Stage20GeneratedWorldProductionProbe.run(rootSeed, authority.inputs());
-        if (generation.topology().status() == Stage20JumpTopologyGenerationResult.Status.REJECTED_SEED) {
+        ProbeResult sourceGeneration = Stage20GeneratedWorldProductionProbe.run(rootSeed, authority.inputs());
+        if (sourceGeneration.topology().status() == Stage20JumpTopologyGenerationResult.Status.REJECTED_SEED) {
             Stage20GeneratedWorldSeedAcceptance.SeedResult seedAcceptance =
                     Stage20GeneratedWorldSeedAcceptance.composeResolvedFreight(
-                            generation.topology(), Optional.empty(), Optional.empty());
+                            sourceGeneration.topology(), Optional.empty(), Optional.empty());
             return new ResolvedProbeResult(
                     CURRENT_VERSION,
                     rootSeed,
-                    generation.version(),
+                    sourceGeneration.version(),
                     authority.version(),
-                    generation,
+                    sourceGeneration,
                     Optional.empty(),
                     seedAcceptance);
         }
 
+        ProbeResult generation = withDirectionalJumpAnchors(sourceGeneration);
         PlacementResult placement = generation.placement().orElseThrow();
         Optional<Stage20ResolvedFreightAcceptance.AcceptanceReport> freight = Optional.empty();
         if (placement.status() == PlacementStatus.ACCEPTED) {
@@ -178,6 +192,33 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
      */
     public static ResolvedProbeResult runCurrent(long rootSeed) {
         return run(rootSeed, Stage20RepresentativeGeneratedWorldProbeProfileV3.deriveCurrent());
+    }
+
+    private static ProbeResult withDirectionalJumpAnchors(ProbeResult source) {
+        GalaxyTopology topology = source.topology().requireAcceptedTopology();
+        List<Stage20LocalInfrastructureLayout> layouts = Stage20DirectionalJumpAnchorLayout.alignAll(
+                topology, source.localLayouts().orElseThrow());
+        TreeMap<StarSystemId, Stage20LocalInfrastructureLayout> bySystem = new TreeMap<>();
+        for (Stage20LocalInfrastructureLayout layout : layouts) {
+            bySystem.put(layout.systemId(), layout);
+        }
+        Stage20JumpEdgeCatalog jumpEdges = Stage20JumpEdgeStateMaterializer.materializeCurrent(
+                topology, bySystem);
+        return new ProbeResult(
+                source.version(),
+                source.rootSeed(),
+                source.macroGeometry(),
+                source.topology(),
+                Optional.of(jumpEdges),
+                Optional.of(layouts),
+                source.physicalHosts(),
+                source.resourceWorld(),
+                source.logisticsReport(),
+                source.supplyThroughput(),
+                source.candidateEvaluations(),
+                source.placement(),
+                source.economicAcceptance(),
+                source.seedAcceptance());
     }
 
     private static Map<String, Integer> freightBudgets(PlacementResult placement, int perStartCapacity) {
