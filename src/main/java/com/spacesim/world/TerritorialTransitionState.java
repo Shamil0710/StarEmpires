@@ -13,9 +13,10 @@ import java.util.Set;
  *
  * <p>This state never owns claims or sovereignty. Claim/stabilization/control remain in
  * {@link FactionStrategicState} and {@link TerritorialControlRuntime}. The only durable facts kept
- * here are the physical occupation attempt, its exact sustained-security progress and the deadline
- * of an unsupported interval. This lets save/load resume an invasion transition without inventing
- * a second territorial authority.</p>
+ * here are the physical occupation attempt, its exact sustained-security progress, the deadline of
+ * an unsupported interval and whether Stage-17 control was ever actually established. This lets
+ * save/load resume an invasion transition and distinguish later liberation without inventing a
+ * second territorial authority.</p>
  *
  * @param occupations canonical occupation attempts, unique by faction/system
  */
@@ -85,7 +86,7 @@ public record TerritorialTransitionState(List<OccupationState> occupations) {
         /** Sustained supplied physical security threshold was reached; Stage-17 claim may stabilize. */ SECURED,
         /** Surviving participants are leaving through ordinary movement/order authority. */ WITHDRAWING,
         /** Physical support failed for long enough that occupation progress collapsed. */ COLLAPSED,
-        /** Another controller remains/returns after the occupation has physically ended. */ LIBERATED
+        /** Stage-17 control once existed for the occupier and has since passed to another controller. */ LIBERATED
     }
 
     /**
@@ -98,6 +99,7 @@ public record TerritorialTransitionState(List<OccupationState> occupations) {
      * @param lastEvaluatedTick latest authoritative occupation evaluation tick
      * @param securedTicks cumulative continuous/surviving secure-presence progress
      * @param unsupportedSinceTick first current unsupported tick, or -1 when supported/contested
+     * @param controlEverEstablished whether Stage-17 authority ever established control for this occupier
      * @param status current physical occupation lifecycle
      */
     public record OccupationState(
@@ -108,6 +110,7 @@ public record TerritorialTransitionState(List<OccupationState> occupations) {
             long lastEvaluatedTick,
             long securedTicks,
             long unsupportedSinceTick,
+            boolean controlEverEstablished,
             OccupationStatus status) {
 
         /** Validates one persistent occupation attempt. */
@@ -125,9 +128,13 @@ public record TerritorialTransitionState(List<OccupationState> occupations) {
                     || (unsupportedSinceTick > lastEvaluatedTick)) {
                 throw new IllegalArgumentException("invalid unsupportedSinceTick");
             }
-            if ((status == OccupationStatus.SECURED || status == OccupationStatus.CONTESTED)
+            if ((status == OccupationStatus.SECURED || status == OccupationStatus.CONTESTED
+                    || status == OccupationStatus.LIBERATED)
                     && unsupportedSinceTick >= 0L) {
-                throw new IllegalArgumentException("secure/contested occupation cannot retain unsupported deadline");
+                throw new IllegalArgumentException("secure/contested/liberated occupation cannot retain unsupported deadline");
+            }
+            if (status == OccupationStatus.LIBERATED && !controlEverEstablished) {
+                throw new IllegalArgumentException("liberated occupation requires prior established Stage-17 control");
             }
         }
     }
