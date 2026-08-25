@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class Stage21FTerritorialInterestAcceptanceTest {
@@ -50,5 +51,16 @@ final class Stage21FTerritorialInterestAcceptanceTest {
 
         assertTrue(TerritorialInterestObservationAdapter.observe(
                 world, actor.factionContentId(), unrelated, world.getAuthoritativeWorldTick()).isEmpty());
+    }
+
+    @Test
+    void ledgerAdapterRejectsNonAuthoritativeObservationTick() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_612L);
+        FactionStrategicState actor = world.snapshot().factionStrategies().stream().findFirst().orElseThrow();
+        StarSystemId systemId = world.getTopology().systems().get(0).id();
+        long authoritativeTick = world.getAuthoritativeWorldTick();
+
+        assertThrows(IllegalArgumentException.class, () -> TerritorialInterestObservationAdapter.observe(
+                world, actor.factionContentId(), systemId, authoritativeTick + 1L));
     }
 }
