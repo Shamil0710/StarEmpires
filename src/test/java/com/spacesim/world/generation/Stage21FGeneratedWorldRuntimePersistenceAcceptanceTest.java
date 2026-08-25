@@ -78,7 +78,7 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
     }
 
     @Test
-    void occupationMustReferenceExactPersistedInvasionAndObjective() {
+    void occupationMustReferenceExactPersistedInvasionObjectiveAndFaction() {
         Fixture fixture = fixture();
         OccupationState unknownOperation = new OccupationState(
                 fixture.stableFactionId(), fixture.local().systemId(), 99L,
@@ -98,6 +98,18 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> Stage21FGeneratedWorldRuntimePersistentState.compose(
                         fixture.stage21E(), new TerritorialTransitionState(List.of(wrongObjective))));
+
+        String differentExistingFaction = fixture.stage21E().stage21DRuntime().stage21CRuntime().stage21BRuntime()
+                .stage21ARuntime().stage20Runtime().worldState().factionStrategies().stream()
+                .map(strategy -> strategy.factionContentId())
+                .filter(factionId -> !factionId.equals(fixture.stableFactionId()))
+                .findFirst().orElseThrow();
+        OccupationState wrongFaction = new OccupationState(
+                differentExistingFaction, fixture.local().systemId(), 1L,
+                fixture.now(), fixture.now(), 0L, -1L, false, OccupationStatus.OCCUPYING);
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage21FGeneratedWorldRuntimePersistentState.compose(
+                        fixture.stage21E(), new TerritorialTransitionState(List.of(wrongFaction))));
 
         OperationState blockade = new OperationState(
                 1L,
