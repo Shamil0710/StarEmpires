@@ -63,6 +63,7 @@ class FleetOrderExecutionServiceStage21MobilityAcceptanceTest {
         FleetCommandState command = new FleetCommandState(2L, 2L, List.of(group), List.of(order));
         FleetOrderExecutionService service = new FleetOrderExecutionService(runtime.world().getTopology());
 
+        GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, fleetId, route.get(1));
         FleetCommandState firstDispatched = service.dispatchMovementHop(
                 runtime.world(), command, forces(runtime, start), order.id());
         assertTrue(runtime.world().findFleetJump(fleetId).isPresent());
@@ -85,6 +86,7 @@ class FleetOrderExecutionServiceStage21MobilityAcceptanceTest {
 
         awaitFittedCooldown(runtime, fleetId);
         FleetPlacementState ready = runtime.world().findFleet(fleetId).orElseThrow();
+        GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, fleetId, route.get(2));
         FleetCommandState secondDispatched = service.dispatchMovementHop(
                 runtime.world(), waiting, forces(runtime, ready), order.id());
         assertTrue(runtime.world().findFleetJump(fleetId).isPresent(),
