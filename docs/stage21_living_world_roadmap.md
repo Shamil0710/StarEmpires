@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
 > Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A, Stage 21B,
-> Stage 21C, Stage 21D and **Stage 21E are complete; Stage 21F is OPEN/NEXT**.
+> Stage 21C, Stage 21D, Stage 21E and **Stage 21F are complete; Stage 21G is OPEN/NEXT**.
 
 ## 1. Purpose
 
@@ -262,11 +262,11 @@ Exit criteria — accepted:
 
 Implementation and acceptance map: `docs/stage21e_strategic_operations_physical_consequences.md`.
 
-### 21F — Occupation, claims, stabilization and control transition — OPEN/NEXT
+### 21F — Occupation, claims, stabilization and control transition — COMPLETE
 
 Objective: make territorial expansion gradual, contestable and legally persistent.
 
-Deliverables:
+Delivered:
 
 - occupation evidence from sustained physical presence and defeated/withdrawn opposition;
 - claim creation through the existing Stage-17 claim authority;
@@ -277,14 +277,19 @@ Deliverables:
 - liberation, withdrawal and contested-control paths;
 - global-map projection distinguishing claim, occupation, stabilization and recognized control.
 
-Exit criteria:
+Exit criteria — accepted:
 
 - entering a system cannot immediately recolour it;
 - occupation without supply/security can stall or collapse;
 - save/load preserves exact transition progress and deadlines;
 - control changes update future faction interests, access and economic routes causally.
 
-### 21G — Peace, demobilization, recovery and replacement
+Implementation and acceptance map: `docs/stage21f_territorial_transition.md`.
+Accepted through PR #331 from exact green head `c198ddb4e3b45158e350220187327aa7ed98c8f5`;
+CI run #5126 (`32883580620`), Java 17 verification job `97918646553`, completed successfully.
+Implementation merge commit on `main`: `1294b908ec47c3b4ad9065db17dd5a8a55b4c763`.
+
+### 21G — Peace, demobilization, recovery and replacement — OPEN/NEXT
 
 Objective: close conflict loops without resetting the world.
 
@@ -415,8 +420,8 @@ supports multiple plausible histories without hidden exceptions.
 | 21C | **COMPLETE** | proposal/counter-offer/crisis/treaty/war legal lifecycle |
 | 21D | **COMPLETE** | physical readiness, command groups, lawful orders and neighbor-only movement |
 | 21E | **COMPLETE** | persistent operations, exact Stage-19 consequences, physical losses/store consumption and traffic interdiction |
-| 21F | **OPEN — next** | occupation/stabilization/control transitions |
-| 21G | **OPEN** | peace/demobilization/repair/replacement |
+| 21F | **COMPLETE** | occupation/stabilization/control transitions |
+| 21G | **OPEN — next** | peace/demobilization/repair/replacement |
 | 21H | **OPEN** | persistent NPCs, missions, reputation and discovery |
 | 21I | **OPEN** | integrated UI/migration/corpus/performance final gate |
 
@@ -458,10 +463,23 @@ Stage 21E accepts the physical strategic-operation layer over those real force i
 7. reinforcement requires ordinary arrival and withdrawal remains an ordinary validated movement/service decision;
 8. Stage-21E persistence composes Stage-21D and rejects invalid active participants, future/corrupt state and transient active tactical runtime at checkpoint boundaries.
 
-Stage 21F is now the first remaining implementation slice. It must consume accepted Stage-21E
-physical operation outcomes and existing Stage-17 territorial law to model claim, occupation,
-stabilization, recognition and gradual control transition. It must not infer control from an abstract
-battle score or immediately recolour a system merely because a fleet arrived.
+Stage 21F accepts the territorial transition layer over those physical operation outcomes and existing
+Stage-17 territory law:
+
+1. sustained supplied/security occupation evidence is persisted without creating a second control authority;
+2. claims are created or withdrawn only through Stage-17 APIs, with exact provenance protecting pre-existing political claims;
+3. real rival claimant/controller fleets can contest occupation while unrelated co-located fleets do not become synthetic resistance;
+4. recognition can shorten only qualifying Stage-17 stabilization and cannot replace physical infrastructure/security evidence;
+5. control and liberation remain Stage-17 outcomes; Stage 21F records transition history and never recolours territory directly;
+6. tariff, construction and future actor-interest consequences flow through existing legal/economic authorities without station or ordinary FleetId allegiance seizure;
+7. schema-v9 generated-world persistence composes the accepted Stage-21E checkpoint and fails closed on invalid operation/objective/faction/provenance/time state;
+8. deterministic incremental/lumped reconciliation and mid-transition save/load continuation preserve exact progress and deadlines.
+
+Stage 21G is now the first remaining implementation slice. It must close conflict loops through the
+accepted Stage-21C peace authority, Stage-21D movement/service commands, Stage-18 physical
+repair/rearm/refuel/industry/shipyard state and conserved treasury/material transfers. It must not
+repair, refill or recreate fleets merely because a war ended. This Stage-21F closeout intentionally
+does not start Stage 21G implementation.
 
 ## 10. Suggested state ownership
 
@@ -531,8 +549,8 @@ Each item should remain separately reviewable and leave `main` green:
 8. **COMPLETE:** 21D orders/routing/service validation/persistence;
 9. **COMPLETE:** 21E operation lifecycle and contact/materialization seam;
 10. **COMPLETE:** 21E physical consequence return/persistence;
-11. **NEXT:** 21F occupation/stabilization/control;
-12. 21G peace/demobilization/replacement;
+11. **COMPLETE:** 21F occupation/stabilization/control;
+12. **NEXT:** 21G peace/demobilization/replacement;
 13. 21H NPC identity/knowledge/availability;
 14. 21H mission/escrow/objective/reputation;
 15. 21H authored gold-slice content;
