@@ -321,6 +321,45 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
     }
 
     /**
+     * Requires exact local arrival at the requested origin-side FTL endpoint before detach.
+     *
+     * <p>Both position and velocity are checked. The approach integrator snaps to the persisted
+     * endpoint with zero local velocity at its deterministic boundary, so any mismatch means the
+     * normal physical approach did not complete or restored state is inconsistent. FTL therefore
+     * fails closed instead of detaching the fleet from elsewhere in the system.</p>
+     *
+     * @param fleetId stable world fleet identity
+     * @param originSystemId current local system
+     * @param destinationSystemId directly connected destination
+     * @param localEntityId current origin-local persistent entity identity
+     */
+    @Override
+    public void validateDepartureReady(
+            FleetId fleetId,
+            StarSystemId originSystemId,
+            StarSystemId destinationSystemId,
+            EntityId localEntityId) {
+        requireLocalPlacement(fleetId, originSystemId, localEntityId);
+        PersistedEndpoint departure = requireEdge(originSystemId, destinationSystemId)
+                .endpoint(originSystemId);
+        LocalPhysicalKinematics current = materialization(originSystemId)
+                .physicalState(localEntityId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "generated-world fleet lost exact local state before FTL detach: " + fleetId));
+        if (!current.position().equals(departure.position())) {
+            throw new IllegalStateException(
+                    "generated-world fleet has not reached outgoing FTL endpoint: " + fleetId
+                            + " edge=" + originSystemId + "->" + destinationSystemId
+                            + " remainingM=" + current.position().distanceTo(departure.position()));
+        }
+        if (Double.compare(current.velocityXMps(), 0d) != 0
+                || Double.compare(current.velocityYMps(), 0d) != 0) {
+            throw new IllegalStateException(
+                    "generated-world fleet reached outgoing FTL endpoint without settling: " + fleetId);
+        }
+    }
+
+    /**
      * Releases the detached entity's exact origin-local physical sidecar.
      *
      * @param fleetId stable world fleet identity
