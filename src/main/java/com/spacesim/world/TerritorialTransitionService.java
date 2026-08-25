@@ -31,8 +31,10 @@ public final class TerritorialTransitionService {
      * <p>Rival fleets stall the occupation clock rather than creating synthetic resistance. Missing,
      * displaced, under-ready or under-supplied participants start an unsupported deadline and decay
      * accumulated progress. Only after the sustained threshold is reached is an absent political
-     * claim declared through the existing Stage-17 authority. The operation may then complete, while
-     * Stage-17 evidence continues to decide whether the claim stabilizes and eventually controls.</p>
+     * claim declared through the existing Stage-17 authority. Once Stage-17 actually establishes
+     * control, the occupation remembers that fact but stops pretending the original invasion fleet
+     * is still the control authority. A later foreign controller is then a real liberation outcome,
+     * again observed from Stage-17 law rather than manufactured here.</p>
      *
      * @param state persistent Stage-21F occupation metadata
      * @param world authoritative world/Stage-17 territorial boundary
@@ -74,7 +76,7 @@ public final class TerritorialTransitionService {
         }
         if (previous == null || previous.operationId() != operationId) {
             previous = new OccupationState(
-                    factionId, systemId, operationId, currentTick, currentTick, 0L, -1L,
+                    factionId, systemId, operationId, currentTick, currentTick, 0L, -1L, false,
                     OccupationStatus.OCCUPYING);
         }
         if (currentTick < previous.lastEvaluatedTick()) {
@@ -82,8 +84,26 @@ public final class TerritorialTransitionService {
         }
         long elapsed = currentTick - previous.lastEvaluatedTick();
 
+        String controller = world.controllingFaction(systemId).orElse(null);
+        if (factionId.equals(controller)) {
+            OccupationState established = replacement(
+                    previous,
+                    currentTick,
+                    Math.max(previous.securedTicks(), REQUIRED_OCCUPATION_TICKS),
+                    -1L,
+                    true,
+                    OccupationStatus.SECURED);
+            return new AdvanceResult(state.upsert(established), operations, established, false, true, true, false);
+        }
+        if (previous.controlEverEstablished() && controller != null && !controller.equals(factionId)) {
+            OccupationState liberated = replacement(
+                    previous, currentTick, previous.securedTicks(), -1L, true, OccupationStatus.LIBERATED);
+            return new AdvanceResult(state.upsert(liberated), operations, liberated, false, false, false, false);
+        }
+
         if (operation.status() == OperationStatus.FAILED) {
-            OccupationState collapsed = replacement(previous, currentTick, 0L, currentTick, OccupationStatus.COLLAPSED);
+            OccupationState collapsed = replacement(
+                    previous, currentTick, 0L, currentTick, previous.controlEverEstablished(), OccupationStatus.COLLAPSED);
             return new AdvanceResult(state.upsert(collapsed), operations, collapsed, false, false, false, false);
         }
         if (operation.status() == OperationStatus.WITHDRAWING) {
@@ -91,14 +111,16 @@ public final class TerritorialTransitionService {
                     ? previous.unsupportedSinceTick() : currentTick;
             long progress = decay(previous.securedTicks(), elapsed);
             OccupationState withdrawing = replacement(
-                    previous, currentTick, progress, unsupportedSince, OccupationStatus.WITHDRAWING);
+                    previous, currentTick, progress, unsupportedSince, previous.controlEverEstablished(),
+                    OccupationStatus.WITHDRAWING);
             return new AdvanceResult(state.upsert(withdrawing), operations, withdrawing, false, false, false, false);
         }
 
         PhysicalReview physical = reviewPhysical(operation, forces);
         if (physical.rivalFleetPresent()) {
             OccupationState contested = replacement(
-                    previous, currentTick, previous.securedTicks(), -1L, OccupationStatus.CONTESTED);
+                    previous, currentTick, previous.securedTicks(), -1L, previous.controlEverEstablished(),
+                    OccupationStatus.CONTESTED);
             return new AdvanceResult(state.upsert(contested), operations, contested, false,
                     physical.securityReady(), physical.supplyReady(), true);
         }
@@ -111,7 +133,8 @@ public final class TerritorialTransitionService {
             OccupationStatus status = currentTick - unsupportedSince >= OCCUPATION_COLLAPSE_GRACE_TICKS
                     ? OccupationStatus.COLLAPSED : OccupationStatus.OCCUPYING;
             if (status == OccupationStatus.COLLAPSED) progress = 0L;
-            OccupationState unsupported = replacement(previous, currentTick, progress, unsupportedSince, status);
+            OccupationState unsupported = replacement(
+                    previous, currentTick, progress, unsupportedSince, previous.controlEverEstablished(), status);
             return new AdvanceResult(state.upsert(unsupported), operations, unsupported, false,
                     physical.securityReady(), physical.supplyReady(), false);
         }
@@ -138,7 +161,8 @@ public final class TerritorialTransitionService {
                 nextOperations = operations.replace(completed);
             }
         }
-        OccupationState next = replacement(previous, currentTick, progress, -1L, status);
+        OccupationState next = replacement(
+                previous, currentTick, progress, -1L, previous.controlEverEstablished(), status);
         return new AdvanceResult(state.upsert(next), nextOperations, next, claimCreated,
                 physical.securityReady(), physical.supplyReady(), false);
     }
@@ -166,6 +190,8 @@ public final class TerritorialTransitionService {
         if (territory.controlledByFaction()) {
             phase = territory.recognitionCount() > 0
                     ? ProjectionPhase.RECOGNIZED_CONTROL : ProjectionPhase.CONTROL;
+        } else if (occupation != null && occupation.status() == OccupationStatus.LIBERATED) {
+            phase = ProjectionPhase.LIBERATED;
         } else if (occupation != null && occupation.status() == OccupationStatus.CONTESTED) {
             phase = ProjectionPhase.CONTESTED;
         } else if (territory.claimStatus() == TerritorialClaimState.Status.CONTESTED) {
@@ -229,10 +255,11 @@ public final class TerritorialTransitionService {
             long currentTick,
             long securedTicks,
             long unsupportedSinceTick,
+            boolean controlEverEstablished,
             OccupationStatus status) {
         return new OccupationState(
                 previous.factionContentId(), previous.systemId(), previous.operationId(), previous.startedTick(),
-                currentTick, securedTicks, unsupportedSinceTick, status);
+                currentTick, securedTicks, unsupportedSinceTick, controlEverEstablished, status);
     }
 
     private static long decay(long value, long elapsed) {
@@ -284,7 +311,8 @@ public final class TerritorialTransitionService {
         STABILIZATION,
         CONTESTED,
         CONTROL,
-        RECOGNIZED_CONTROL
+        RECOGNIZED_CONTROL,
+        LIBERATED
     }
 
     /**
