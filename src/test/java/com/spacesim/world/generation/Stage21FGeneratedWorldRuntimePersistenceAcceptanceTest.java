@@ -1,5 +1,6 @@
 package com.spacesim.world.generation;
 
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.persistence.Stage19ConflictState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
@@ -107,12 +108,12 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
                 fixture.operation().participantFleetIds(),
                 fixture.operation().stagingSystemId(),
                 fixture.operation().objectiveSystemId(),
-                fixture.operation().objectiveIdentity(),
+                fixture.operation().objectiveId(),
                 fixture.operation().rulesOfEngagement(),
                 fixture.operation().supplyPolicy(),
                 fixture.operation().withdrawalPolicy(),
                 fixture.operation().status(),
-                fixture.operation().startedTick(),
+                fixture.operation().createdAtTick(),
                 fixture.operation().lastTransitionTick(),
                 fixture.operation().unsupportedSinceTick(),
                 fixture.operation().contact(),
@@ -181,7 +182,7 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
                 .findFirst().orElseThrow();
         int factionId = authoritativeFactionId(stage20, local);
         String stableFactionId = FactionIdentityResolver.createDefault(
-                        stage20.world().getContentCatalog(), stage20.world().snapshot().factionIdentities())
+                        ContentCatalogLoader.loadDefault(), stage20.world().snapshot().factionIdentities())
                 .stableId(factionId).orElseThrow();
         long now = stage20.world().getAuthoritativeWorldTick();
 
