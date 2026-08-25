@@ -363,7 +363,17 @@ public final class TerritorialTransitionService {
 
     private record PhysicalReview(boolean securityReady, boolean supplyReady, boolean rivalFleetPresent) {}
 
-    /** Read-only audit result of one occupation reconciliation. */
+    /**
+     * Read-only audit result of one occupation reconciliation.
+     *
+     * @param transitions resulting persistent Stage-21F transition registry
+     * @param operations resulting persistent Stage-21E operation registry
+     * @param occupation resulting occupation attempt
+     * @param claimCreated whether this reconciliation created a Stage-17 claim
+     * @param securityReady whether surviving participants satisfy physical security requirements
+     * @param supplyReady whether surviving participants satisfy supply requirements
+     * @param rivalFleetPresent whether a real territorial rival fleet is present at the objective
+     */
     public record AdvanceResult(
             TerritorialTransitionState transitions,
             StrategicOperationState operations,
@@ -372,7 +382,17 @@ public final class TerritorialTransitionService {
             boolean securityReady,
             boolean supplyReady,
             boolean rivalFleetPresent) {
-        /** Validates a complete Stage-21F reconciliation result. */
+        /**
+         * Validates a complete Stage-21F reconciliation result.
+         *
+         * @param transitions resulting persistent Stage-21F transition registry
+         * @param operations resulting persistent Stage-21E operation registry
+         * @param occupation resulting occupation attempt
+         * @param claimCreated whether this reconciliation created a Stage-17 claim
+         * @param securityReady whether surviving participants satisfy physical security requirements
+         * @param supplyReady whether surviving participants satisfy supply requirements
+         * @param rivalFleetPresent whether a real territorial rival fleet is present at the objective
+         */
         public AdvanceResult {
             Objects.requireNonNull(transitions, "transitions");
             Objects.requireNonNull(operations, "operations");
@@ -382,14 +402,23 @@ public final class TerritorialTransitionService {
 
     /** Global-map territorial phase; this is presentation/read state only. */
     public enum ProjectionPhase {
+        /** No claim, physical presence, occupation or control is visible for the assessed faction. */
         UNCLAIMED,
+        /** Ordinary physical faction presence exists without a territorial claim. */
         PRESENCE,
+        /** A Stage-17 territorial claim exists without active occupation/stabilization projection. */
         CLAIM,
+        /** A Stage-21F physical occupation attempt is active. */
         OCCUPATION,
+        /** Stage-17 stabilization is actively progressing for the assessed claim. */
         STABILIZATION,
+        /** Territorial evidence is contested by a real rival claim or ordinary fleet. */
         CONTESTED,
+        /** Stage-17 authority currently grants control to the assessed faction. */
         CONTROL,
+        /** Stage-17 control exists and has relevant directed political recognition. */
         RECOGNIZED_CONTROL,
+        /** Previously established Stage-17 control has passed to another controller. */
         LIBERATED
     }
 
@@ -416,7 +445,19 @@ public final class TerritorialTransitionService {
             long occupationTicks,
             long unsupportedSinceTick,
             int recognitionCount) {
-        /** Validates one read-only projection. */
+        /**
+         * Validates one read-only projection.
+         *
+         * @param systemId assessed system
+         * @param factionContentId assessed faction
+         * @param phase derived presentation phase
+         * @param controllingFactionContentId actual Stage-17 controller, or null
+         * @param claimStatus actual Stage-17 claim status, or null
+         * @param stabilizationTicks actual Stage-17 stabilization progress
+         * @param occupationTicks Stage-21F sustained physical occupation progress
+         * @param unsupportedSinceTick Stage-21F unsupported occupation deadline watermark, or -1
+         * @param recognitionCount directed political recognitions relevant to current claim/control
+         */
         public TerritorialProjection {
             Objects.requireNonNull(systemId, "systemId");
             factionContentId = Objects.requireNonNull(factionContentId, "factionContentId").strip();
