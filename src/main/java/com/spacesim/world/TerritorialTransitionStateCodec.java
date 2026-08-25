@@ -25,7 +25,12 @@ public final class TerritorialTransitionStateCodec {
         throw new AssertionError("No instances");
     }
 
-    /** Encodes canonical Stage-21F transition metadata deterministically. */
+    /**
+     * Encodes canonical Stage-21F transition metadata deterministically.
+     *
+     * @param state canonical transition state to encode
+     * @return deterministic bounded binary payload
+     */
     public static byte[] encode(TerritorialTransitionState state) {
         TerritorialTransitionState checked = Objects.requireNonNull(state, "state");
         if (checked.occupations().size() > MAX_OCCUPATIONS) {
@@ -60,7 +65,12 @@ public final class TerritorialTransitionStateCodec {
         }
     }
 
-    /** Decodes canonical Stage-21F state and fails closed on corrupt, future or trailing data. */
+    /**
+     * Decodes canonical Stage-21F state and fails closed on corrupt, future or trailing data.
+     *
+     * @param bytes bounded binary transition payload
+     * @return decoded canonical transition state
+     */
     public static TerritorialTransitionState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
         if (bytes.length <= 0 || bytes.length > MAX_BYTES) {
