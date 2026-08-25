@@ -24,7 +24,9 @@ import java.util.Set;
  * <p>All evidence is derived from physical ECS state. The runtime never creates stations, fleets,
  * money or cargo. A political claim merely opens a stabilization clock; control is produced only
  * after continuous qualifying infrastructure, and is lost only after a persistent unsupported
- * grace period. Stable faction IDs are used at this layer and converted through the unified
+ * grace period. Stage-21F recognition can shorten the required qualifying duration through
+ * persistent Stage-17 recognition rows, but can never substitute for physical evidence. Stable
+ * faction IDs are used at this layer and converted through the unified
  * {@link FactionIdentityResolver} only while reading local ECS ownership.</p>
  */
 final class TerritorialControlRuntime {
@@ -369,6 +371,11 @@ final class TerritorialControlRuntime {
                 boolean controls = strategy.controls(claim.systemId());
                 boolean contested = !controls && isMateriallyContested(
                         strategy.factionContentId(), claim.systemId(), evidence);
+                long requiredStabilization = TerritorialRecognitionStabilizationPolicy.requiredTicks(
+                        strategies,
+                        strategy.factionContentId(),
+                        claim.systemId(),
+                        REQUIRED_STABILIZATION_TICKS);
                 long stabilization = claim.stabilizationTicks();
                 TerritorialClaimState.Status status;
                 if (controls) {
@@ -378,7 +385,7 @@ final class TerritorialControlRuntime {
                     status = TerritorialClaimState.Status.CONTESTED;
                 } else if (own.qualifiesForControl()) {
                     stabilization = Math.min(
-                            REQUIRED_STABILIZATION_TICKS,
+                            requiredStabilization,
                             safeAdd(stabilization, elapsed));
                     status = TerritorialClaimState.Status.STABILIZING;
                 } else {
@@ -453,8 +460,13 @@ final class TerritorialControlRuntime {
                 TerritorialClaimState claim = strategy.claimFor(systemId);
                 Evidence own = evidence.getOrDefault(
                         new EvidenceKey(strategy.factionContentId(), systemId), Evidence.NONE);
+                long requiredStabilization = TerritorialRecognitionStabilizationPolicy.requiredTicks(
+                        strategies,
+                        strategy.factionContentId(),
+                        systemId,
+                        REQUIRED_STABILIZATION_TICKS);
                 if (claim != null
-                        && claim.stabilizationTicks() >= REQUIRED_STABILIZATION_TICKS
+                        && claim.stabilizationTicks() >= requiredStabilization
                         && own.qualifiesForControl()) {
                     eligible.add(strategy.factionContentId());
                 }
