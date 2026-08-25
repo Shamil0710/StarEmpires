@@ -27,12 +27,14 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class Stage21FTerritorialTransitionAcceptanceTest {
     private static final String PLAYER_FACTION = "faction.player.stage21f";
     private static final int PLAYER_RUNTIME_ID = Constants.LEGACY_FACTION_COUNT;
     private static final String RECOGNIZER = "faction.trade_league";
+    private static final String NEUTRAL = "faction.neutral";
     private static final StarSystemId TARGET = DemoGalaxyFactory.FRONTIER_SYSTEM_ID;
     private static final FleetId INVADER = new FleetId(21_600L);
 
@@ -59,16 +61,13 @@ final class Stage21FTerritorialTransitionAcceptanceTest {
         assertEquals(OccupationStatus.SECURED, secured.occupation().status());
         assertTrue(secured.claimCreated());
         assertEquals(OperationStatus.COMPLETED, secured.operations().requireOperation(1L).status());
-        assertTrue(fixture.world.findFactionStrategicState(PLAYER_FACTION).orElseThrow().claimFor(TARGET) != null);
+        assertNotNull(fixture.world.findFactionStrategicState(PLAYER_FACTION).orElseThrow().claimFor(TARGET));
         assertTrue(fixture.world.controllingFaction(TARGET).isEmpty(),
                 "occupation/claim must not immediately recolour sovereignty");
         assertEquals(ProjectionPhase.OCCUPATION,
                 service.project(fixture.world, secured.transitions(), PLAYER_FACTION, TARGET).phase());
 
-        fixture.world.createEntity(TARGET, new Entity()
-                .add(new IdentityComponent("Occupation Logistics Anchor", IdentityComponent.Kind.STATION))
-                .add(new MarketComponent())
-                .add(new FactionComponent(PLAYER_RUNTIME_ID)));
+        createOperationalAnchor(fixture.world, PLAYER_RUNTIME_ID, "Occupation Logistics Anchor");
         fixture.world.advanceFrame(1.0f);
         assertEquals(ProjectionPhase.STABILIZATION,
                 service.project(fixture.world, secured.transitions(), PLAYER_FACTION, TARGET).phase());
@@ -128,12 +127,48 @@ final class Stage21FTerritorialTransitionAcceptanceTest {
     }
 
     @Test
-    void realRivalFleetContestsOccupationAndWithdrawalUsesOperationLifecycleWithoutFreeResistance() {
+    void losingSupplyAfterClaimWithdrawsUnestablishedClaimAndStopsInfrastructureOnlyStabilization() {
+        Fixture fixture = fixture(21_604L);
+        TerritorialTransitionService service = new TerritorialTransitionService();
+        StrategicOperationState operations = operations(activeInvasion(INVADER));
+        FleetForceRegistry supplied = registry(entry(INVADER, PLAYER_RUNTIME_ID, TARGET, ready(10_000)));
+        FleetForceRegistry unsupplied = registry(entry(INVADER, PLAYER_RUNTIME_ID, TARGET, ready(0)));
+        createOperationalAnchor(fixture.world, PLAYER_RUNTIME_ID, "Post-claim Anchor");
+
+        long start = fixture.world.getAuthoritativeWorldTick();
+        AdvanceResult initial = service.advance(
+                TerritorialTransitionState.empty(), fixture.world, operations, supplied, fixture.identities, 1L, start);
+        advanceToAtLeast(fixture.world, start + TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS);
+        AdvanceResult secured = service.advance(
+                initial.transitions(), fixture.world, initial.operations(), supplied, fixture.identities,
+                1L, fixture.world.getAuthoritativeWorldTick());
+        assertTrue(secured.claimCreated());
+        assertNotNull(fixture.world.findFactionStrategicState(PLAYER_FACTION).orElseThrow().claimFor(TARGET));
+
+        fixture.world.advanceFrame(1.0f);
+        AdvanceResult unsupported = service.advance(
+                secured.transitions(), fixture.world, secured.operations(), unsupplied, fixture.identities,
+                1L, fixture.world.getAuthoritativeWorldTick());
+        assertFalse(unsupported.supplyReady());
+        assertTrue(fixture.world.findFactionStrategicState(PLAYER_FACTION).orElseThrow().claimFor(TARGET) == null,
+                "military claim must not keep stabilizing after the occupation loses supply");
+
+        long lostSupport = fixture.world.getAuthoritativeWorldTick();
+        advanceToAtLeast(
+                fixture.world,
+                lostSupport + TerritorialControlRuntime.REQUIRED_STABILIZATION_TICKS + 100L);
+        assertTrue(fixture.world.controllingFaction(TARGET).isEmpty(),
+                "infrastructure without a supported invasion claim must not establish control");
+    }
+
+    @Test
+    void realTerritorialRivalFleetContestsOccupationAndWithdrawalUsesOperationLifecycleWithoutFreeResistance() {
         Fixture fixture = fixture(21_602L);
         TerritorialTransitionService service = new TerritorialTransitionService();
         OperationState invasion = activeInvasion(INVADER);
         StrategicOperationState operations = operations(invasion);
         int rivalFaction = fixture.world.findFactionRuntimeId(RECOGNIZER).orElseThrow();
+        fixture.world.declareTerritorialClaim(RECOGNIZER, TARGET);
         FleetForceRegistry contestedForces = registry(
                 entry(INVADER, PLAYER_RUNTIME_ID, TARGET, ready(10_000)),
                 entry(new FleetId(21_601L), rivalFaction, TARGET, ready(10_000)));
@@ -163,6 +198,58 @@ final class Stage21FTerritorialTransitionAcceptanceTest {
                 fixture.identities, 1L, fixture.world.getAuthoritativeWorldTick());
         assertEquals(OccupationStatus.WITHDRAWING, withdrawal.occupation().status());
         assertTrue(fixture.world.findFactionStrategicState(PLAYER_FACTION).orElseThrow().claimFor(TARGET) == null);
+    }
+
+    @Test
+    void unrelatedForeignFleetDoesNotBecomeSyntheticResistance() {
+        Fixture fixture = fixture(21_605L);
+        TerritorialTransitionService service = new TerritorialTransitionService();
+        int neutralRuntimeId = fixture.world.findFactionRuntimeId(NEUTRAL).orElseThrow();
+        FleetForceRegistry forces = registry(
+                entry(INVADER, PLAYER_RUNTIME_ID, TARGET, ready(10_000)),
+                entry(new FleetId(21_605L), neutralRuntimeId, TARGET, ready(10_000)));
+        StrategicOperationState operations = operations(activeInvasion(INVADER));
+
+        long start = fixture.world.getAuthoritativeWorldTick();
+        AdvanceResult initial = service.advance(
+                TerritorialTransitionState.empty(), fixture.world, operations, forces,
+                fixture.identities, 1L, start);
+        advanceToAtLeast(fixture.world, start + TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS);
+        AdvanceResult secured = service.advance(
+                initial.transitions(), fixture.world, initial.operations(), forces,
+                fixture.identities, 1L, fixture.world.getAuthoritativeWorldTick());
+
+        assertFalse(secured.rivalFleetPresent());
+        assertEquals(OccupationStatus.SECURED, secured.occupation().status());
+        assertTrue(secured.claimCreated());
+    }
+
+    @Test
+    void persistedClaimRecognitionReducesRequiredPhysicalStabilizationWithoutCreatingControlByItself() {
+        Fixture unrecognized = fixture(21_606L);
+        createOperationalAnchor(unrecognized.world, PLAYER_RUNTIME_ID, "Unrecognized Anchor");
+        unrecognized.world.declareTerritorialClaim(PLAYER_FACTION, TARGET);
+        long unrecognizedStart = unrecognized.world.getAuthoritativeWorldTick();
+        advanceToAtLeast(unrecognized.world, unrecognizedStart + 550L);
+        assertTrue(unrecognized.world.controllingFaction(TARGET).isEmpty(),
+                "base unrecognized claim must still require the ordinary 600-tick stabilization");
+
+        Fixture recognized = fixture(21_607L);
+        createOperationalAnchor(recognized.world, PLAYER_RUNTIME_ID, "Recognized Anchor");
+        recognized.world.declareTerritorialClaim(PLAYER_FACTION, TARGET);
+        recognized.world.recognizeTerritorialClaim(RECOGNIZER, PLAYER_FACTION, TARGET);
+        long recognizedStart = recognized.world.getAuthoritativeWorldTick();
+        advanceToAtLeast(recognized.world, recognizedStart + 550L);
+        assertEquals(PLAYER_FACTION, recognized.world.controllingFaction(TARGET).orElseThrow(),
+                "one persisted claim recognition should reduce the required qualifying duration by 60 ticks");
+
+        Fixture noInfrastructure = fixture(21_608L);
+        noInfrastructure.world.declareTerritorialClaim(PLAYER_FACTION, TARGET);
+        noInfrastructure.world.recognizeTerritorialClaim(RECOGNIZER, PLAYER_FACTION, TARGET);
+        long noInfrastructureStart = noInfrastructure.world.getAuthoritativeWorldTick();
+        advanceToAtLeast(noInfrastructure.world, noInfrastructureStart + 700L);
+        assertTrue(noInfrastructure.world.controllingFaction(TARGET).isEmpty(),
+                "political recognition must never replace qualifying physical infrastructure");
     }
 
     @Test
@@ -196,6 +283,13 @@ final class Stage21FTerritorialTransitionAcceptanceTest {
         assertEquals(progressed.operations(), restoredOperations);
         assertEquals(progressed.occupation(),
                 restoredTransitions.occupationFor(PLAYER_FACTION, TARGET).orElseThrow());
+    }
+
+    private static EntityId createOperationalAnchor(WorldSimulation world, int runtimeFactionId, String name) {
+        return world.createEntity(TARGET, new Entity()
+                .add(new IdentityComponent(name, IdentityComponent.Kind.STATION))
+                .add(new MarketComponent())
+                .add(new FactionComponent(runtimeFactionId)));
     }
 
     private static Fixture fixture(long seed) {
