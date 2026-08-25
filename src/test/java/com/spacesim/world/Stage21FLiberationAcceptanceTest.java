@@ -71,7 +71,7 @@ final class Stage21FLiberationAcceptanceTest {
                 transitions,
                 world,
                 operations,
-                FleetForceRegistry.empty(),
+                new FleetForceRegistry(List.of()),
                 FactionIdentityResolver.createDefault(ContentCatalogLoader.loadDefault(), world.snapshot().factionIdentities()),
                 1L,
                 tick);
