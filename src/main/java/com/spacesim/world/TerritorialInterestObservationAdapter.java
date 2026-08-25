@@ -38,7 +38,7 @@ public final class TerritorialInterestObservationAdapter {
      * @param world authoritative world used only through persistent territory law
      * @param factionContentId observing faction stable identity
      * @param systemId public territory-ledger system
-     * @param observedAtTick tick at which the actor reads the ledger
+     * @param observedAtTick authoritative tick at which the actor reads the ledger; must equal the world's current tick
      * @return zero or one canonical actor-bounded territory observations
      */
     public static List<ActorObservation> observe(
@@ -51,6 +51,9 @@ public final class TerritorialInterestObservationAdapter {
         StarSystemId system = Objects.requireNonNull(systemId, "systemId");
         if (observedAtTick < 0L) {
             throw new IllegalArgumentException("observedAtTick must be non-negative");
+        }
+        if (observedAtTick != checkedWorld.getAuthoritativeWorldTick()) {
+            throw new IllegalArgumentException("observedAtTick must equal the authoritative world tick");
         }
         FactionStrategicState strategy = checkedWorld.findFactionStrategicState(faction)
                 .orElseThrow(() -> new IllegalArgumentException("unknown faction: " + faction));
