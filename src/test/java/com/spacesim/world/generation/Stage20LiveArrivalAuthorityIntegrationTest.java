@@ -151,6 +151,35 @@ class Stage20LiveArrivalAuthorityIntegrationTest {
     }
 
     @Test
+    void departureReadinessRejectsFleetAwayFromOutgoingFtlPoint() {
+        CadenceFixture fixture = fixture();
+        Stage20GeneratedCampaignPersistentState campaign = savedState(fixture);
+        WorldSimulation world = world(fixture);
+        Stage20LiveArrivalAuthorityIntegration integration =
+                Stage20LiveArrivalAuthorityIntegration.restoreAndBind(campaign, world);
+        FleetPlacementState source = sourceFleetWithNeighbor(world);
+        StarSystemId origin = source.systemId();
+        StarSystemId destination = world.getTopology().neighbors(origin).get(0);
+        var outgoing = integration.resolve(destination, origin);
+        var displaced = outgoing.physicalState().position().translated(123d, -45d);
+        integration.materialization(origin).registerPhysicalState(
+                source.localEntityId(),
+                LocalPhysicalKinematics.stationary(displaced));
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> integration.validateDepartureReady(
+                        source.id(), origin, destination, source.localEntityId()));
+        assertTrue(failure.getMessage().contains("has not reached outgoing FTL endpoint"));
+
+        integration.materialization(origin).updatePhysicalState(
+                source.localEntityId(),
+                LocalPhysicalKinematics.stationary(outgoing.physicalState().position()));
+        integration.validateDepartureReady(
+                source.id(), origin, destination, source.localEntityId());
+    }
+
+    @Test
     void liveAuthorityRejectsNonNeighbor() {
         CadenceFixture fixture = fixture();
         Stage20GeneratedCampaignPersistentState campaign = savedState(fixture);
