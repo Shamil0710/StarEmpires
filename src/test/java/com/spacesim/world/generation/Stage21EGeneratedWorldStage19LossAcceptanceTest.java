@@ -54,19 +54,23 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Non-vacuous Stage-21E operation acceptance proving a catastrophic loss created by Stage 19 itself.
+ * Non-vacuous Stage-21E operation acceptance proving catastrophic loss and physical supply
+ * consumption created by Stage 19 itself.
  *
  * <p>The scenario uses only ordinary generated fleets carrying exact Stage-21 strategic variants of
  * the provisional Stage-17.5I/19 doctrine fits. The hostile target begins in a valid, persisted,
  * heavily damaged and shield-depleted physical state but is explicitly not destroyed. Only the
  * production exact Stage-19 resolver is allowed to apply the final combat effects. Stage 21E then
  * has to commit that result by removing the same ordinary target {@link FleetId}; no fixture combat
- * score, statistical kill grant or replacement fleet is allowed.</p>
+ * score, statistical kill grant or replacement fleet is allowed. The surviving attacker must also
+ * return with less physical ammunition and/or reaction mass than it carried before the exchange,
+ * proving that operation supply is consumed from ordinary stores rather than hidden replenishment.</p>
  */
 class Stage21EGeneratedWorldStage19LossAcceptanceTest {
     private static final double CRITICAL_INTEGRITY = 1e-6d;
     private static final String LAST_LIVE_MOUNT = "utility_storage";
     private static final double ENGAGEMENT_SEPARATION_M = 600d;
+    private static final double MASS_EPSILON_KG = 1e-9d;
 
     @Test
     void exactStrategicFitOperationProducesRealStage19FleetLossWithoutReplacement() {
@@ -79,6 +83,12 @@ class Stage21EGeneratedWorldStage19LossAcceptanceTest {
         FleetPlacementState attackerPlacement = runtime.world().findFleet(attacker.fleetId()).orElseThrow();
         FleetPlacementState targetPlacement = runtime.world().findFleet(target.fleetId()).orElseThrow();
         assertEquals(attacker.systemId(), targetPlacement.systemId());
+
+        EngineeringComponent attackerEngineering = engineering(runtime, attacker.fleetId());
+        double ammunitionBeforeKg = attackerEngineering.runtimeState.consumables().ammunitionMassKg();
+        double reactionMassBeforeKg = attackerEngineering.runtimeState.consumables().reactionMassKg();
+        assertTrue(ammunitionBeforeKg > 0d || reactionMassBeforeKg > 0d,
+                "acceptance attacker must begin with physical operation supply to consume");
 
         Entity targetEntity = runtime.world().findSession(attacker.systemId()).orElseThrow()
                 .getEntityRegistry().require(targetPlacement.localEntityId());
@@ -172,6 +182,15 @@ class Stage21EGeneratedWorldStage19LossAcceptanceTest {
                 "the operation fleet must remain an ordinary surviving FleetId");
         assertEquals(beforeFleetCount - 1, runtime.world().getFleetPlacements().size(),
                 "Stage 21E may remove the Stage-19 casualty but must not allocate any replacement");
+
+        EngineeringComponent survivingAttacker = engineering(runtime, attacker.fleetId());
+        double ammunitionAfterKg = survivingAttacker.runtimeState.consumables().ammunitionMassKg();
+        double reactionMassAfterKg = survivingAttacker.runtimeState.consumables().reactionMassKg();
+        assertTrue(
+                ammunitionAfterKg + MASS_EPSILON_KG < ammunitionBeforeKg
+                        || reactionMassAfterKg + MASS_EPSILON_KG < reactionMassBeforeKg,
+                "exact Stage-19 operation must consume physical ammunition and/or reaction mass from the surviving FleetId");
+
         assertFalse(executed.owningGroupDestroyed());
         assertEquals(List.of(attacker.fleetId()),
                 executed.commandState().requireGroup(group.id()).memberFleetIds());
@@ -211,6 +230,22 @@ class Stage21EGeneratedWorldStage19LossAcceptanceTest {
                 previous.maintenance(),
                 previous.weaponLoadout(),
                 previous.weaponMountRuntime()));
+    }
+
+    private static EngineeringComponent engineering(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
+            FleetId fleetId) {
+        FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
+        if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+            throw new AssertionError("operation supply inspection requires an in-system ordinary FleetId");
+        }
+        Entity entity = runtime.world().findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().require(placement.localEntityId());
+        EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
+        if (engineering == null) {
+            throw new AssertionError("ordinary military FleetId lacks physical engineering state");
+        }
+        return engineering;
     }
 
     private static MilitaryFleet doctrineFleet(
