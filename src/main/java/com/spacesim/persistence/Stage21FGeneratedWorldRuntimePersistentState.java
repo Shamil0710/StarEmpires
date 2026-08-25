@@ -43,10 +43,11 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
      *
      * <p>Occupation metadata may reference only a persisted Stage-21E {@code INVASION} operation with
      * the same objective system and exact stable/runtime owner identity. Claim-provenance metadata is
-     * accepted only while the corresponding Stage-17 claim actually exists. The current generated-world
-     * checkpoint is bound to the default authored content catalog plus persisted world-defined
-     * identities, matching the production resolver used by the generated runtime. No mapping is
-     * duplicated into Stage-21F state.</p>
+     * accepted only while the corresponding Stage-17 claim actually exists. Occupation evaluation
+     * ticks may not run ahead of the embedded active-system authoritative clock. The current
+     * generated-world checkpoint is bound to the default authored content catalog plus persisted
+     * world-defined identities, matching the production resolver used by the generated runtime. No
+     * mapping is duplicated into Stage-21F state.</p>
      */
     public Stage21FGeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
@@ -59,8 +60,17 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
         Objects.requireNonNull(stage21ERuntime, "stage21ERuntime");
         Objects.requireNonNull(territorialTransitions, "territorialTransitions");
 
-        WorldState world = stage21ERuntime.stage21DRuntime().stage21CRuntime().stage21BRuntime()
-                .stage21ARuntime().stage20Runtime().worldState();
+        Stage20GeneratedWorldRuntimePersistentState stage20 = stage21ERuntime.stage21DRuntime()
+                .stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime();
+        WorldState world = stage20.worldState();
+        long authoritativeWorldTick = world.systems().stream()
+                .filter(system -> system.systemId().equals(stage20.activeSystemId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Stage-21F checkpoint active system is absent from saved world state"))
+                .simulationState()
+                .clock()
+                .tick();
         Set<com.spacesim.world.StarSystemId> systems = new HashSet<>();
         world.topology().systems().forEach(system -> systems.add(system.id()));
         Map<String, FactionStrategicState> strategyByFaction = new HashMap<>();
@@ -71,6 +81,11 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
                 ContentCatalogLoader.loadDefault(), world.factionIdentities());
 
         for (OccupationState occupation : territorialTransitions.occupations()) {
+            if (occupation.lastEvaluatedTick() > authoritativeWorldTick) {
+                throw new IllegalArgumentException(
+                        "Stage-21F occupation evaluation is ahead of authoritative world time: "
+                                + occupation.operationId());
+            }
             if (!systems.contains(occupation.systemId())) {
                 throw new IllegalArgumentException(
                         "Stage-21F occupation references unknown objective system: " + occupation.systemId());
