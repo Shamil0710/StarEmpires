@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Comparator;
 
+import static com.spacesim.world.GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,6 +41,7 @@ class Stage21EGeneratedMilitaryMobilityAcceptanceTest {
         var beforeState = beforeEngineering.runtimeState;
         InstalledFit beforeFit = beforeEngineering.fit;
 
+        placeAtOutgoingEndpoint(runtime, fleetId, destination);
         runtime.world().requestFleetJump(fleetId, destination);
         assertTrue(runtime.world().findFleetJump(fleetId).isPresent(),
                 "ordinary WorldSimulation request must start the existing FleetJumpService FSM");
