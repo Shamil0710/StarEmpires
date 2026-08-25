@@ -57,6 +57,7 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
                 120L,
                 -1L,
                 false,
+                false,
                 OccupationStatus.OCCUPYING);
         Stage21FGeneratedWorldRuntimePersistentState expected = Stage21FGeneratedWorldRuntimePersistentState.compose(
                 fixture.stage21E(), new TerritorialTransitionState(List.of(occupation)));
@@ -82,7 +83,7 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
         Fixture fixture = fixture();
         OccupationState unknownOperation = new OccupationState(
                 fixture.stableFactionId(), fixture.local().systemId(), 99L,
-                fixture.now(), fixture.now(), 0L, -1L, false, OccupationStatus.OCCUPYING);
+                fixture.now(), fixture.now(), 0L, -1L, false, false, OccupationStatus.OCCUPYING);
         assertThrows(IllegalArgumentException.class,
                 () -> Stage21FGeneratedWorldRuntimePersistentState.compose(
                         fixture.stage21E(), new TerritorialTransitionState(List.of(unknownOperation))));
@@ -94,7 +95,7 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
                 .findFirst().orElseThrow();
         OccupationState wrongObjective = new OccupationState(
                 fixture.stableFactionId(), anotherSystem, 1L,
-                fixture.now(), fixture.now(), 0L, -1L, false, OccupationStatus.OCCUPYING);
+                fixture.now(), fixture.now(), 0L, -1L, false, false, OccupationStatus.OCCUPYING);
         assertThrows(IllegalArgumentException.class,
                 () -> Stage21FGeneratedWorldRuntimePersistentState.compose(
                         fixture.stage21E(), new TerritorialTransitionState(List.of(wrongObjective))));
@@ -106,7 +107,7 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
                 .findFirst().orElseThrow();
         OccupationState wrongFaction = new OccupationState(
                 differentExistingFaction, fixture.local().systemId(), 1L,
-                fixture.now(), fixture.now(), 0L, -1L, false, OccupationStatus.OCCUPYING);
+                fixture.now(), fixture.now(), 0L, -1L, false, false, OccupationStatus.OCCUPYING);
         assertThrows(IllegalArgumentException.class,
                 () -> Stage21FGeneratedWorldRuntimePersistentState.compose(
                         fixture.stage21E(), new TerritorialTransitionState(List.of(wrongFaction))));
@@ -134,7 +135,7 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
                 fixture.stage21E().stage21DRuntime(), new StrategicOperationState(2L, List.of(blockade)));
         OccupationState referencesBlockade = new OccupationState(
                 fixture.stableFactionId(), fixture.local().systemId(), 1L,
-                fixture.now(), fixture.now(), 0L, -1L, false, OccupationStatus.OCCUPYING);
+                fixture.now(), fixture.now(), 0L, -1L, false, false, OccupationStatus.OCCUPYING);
         assertThrows(IllegalArgumentException.class,
                 () -> Stage21FGeneratedWorldRuntimePersistentState.compose(
                         wrongType, new TerritorialTransitionState(List.of(referencesBlockade))));
@@ -151,6 +152,7 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
                 fixture.now(),
                 0L,
                 -1L,
+                false,
                 false,
                 OccupationStatus.OCCUPYING);
         assertThrows(IllegalArgumentException.class,
