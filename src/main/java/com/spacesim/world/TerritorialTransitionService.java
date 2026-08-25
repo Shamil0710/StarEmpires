@@ -116,19 +116,19 @@ public final class TerritorialTransitionService {
         }
 
         if (operation.status() == OperationStatus.FAILED) {
-            boolean claimRetained = !withdrawOccupationClaim(world, previous);
+            withdrawOccupationClaim(world, previous);
             OccupationState collapsed = replacement(
                     previous,
                     currentTick,
                     0L,
                     currentTick,
-                    previous.claimCreatedByOccupation() && claimRetained,
+                    false,
                     previous.controlEverEstablished(),
                     OccupationStatus.COLLAPSED);
             return new AdvanceResult(state.upsert(collapsed), operations, collapsed, false, false, false, false);
         }
         if (operation.status() == OperationStatus.WITHDRAWING) {
-            boolean claimRetained = !withdrawOccupationClaim(world, previous);
+            withdrawOccupationClaim(world, previous);
             long unsupportedSince = previous.unsupportedSinceTick() >= 0L
                     ? previous.unsupportedSinceTick() : currentTick;
             long progress = decay(previous.securedTicks(), elapsed);
@@ -137,7 +137,7 @@ public final class TerritorialTransitionService {
                     currentTick,
                     progress,
                     unsupportedSince,
-                    previous.claimCreatedByOccupation() && claimRetained,
+                    false,
                     previous.controlEverEstablished(),
                     OccupationStatus.WITHDRAWING);
             return new AdvanceResult(state.upsert(withdrawing), operations, withdrawing, false, false, false, false);
@@ -145,13 +145,13 @@ public final class TerritorialTransitionService {
 
         PhysicalReview physical = reviewPhysical(operation, forces, world, identities);
         if (physical.rivalFleetPresent()) {
-            boolean claimRetained = !withdrawOccupationClaim(world, previous);
+            withdrawOccupationClaim(world, previous);
             OccupationState contested = replacement(
                     previous,
                     currentTick,
                     previous.securedTicks(),
                     -1L,
-                    previous.claimCreatedByOccupation() && claimRetained,
+                    false,
                     previous.controlEverEstablished(),
                     OccupationStatus.CONTESTED);
             return new AdvanceResult(state.upsert(contested), operations, contested, false,
@@ -160,7 +160,7 @@ public final class TerritorialTransitionService {
 
         boolean supported = physical.securityReady() && physical.supplyReady();
         if (!supported) {
-            boolean claimRetained = !withdrawOccupationClaim(world, previous);
+            withdrawOccupationClaim(world, previous);
             long unsupportedSince = previous.unsupportedSinceTick() >= 0L
                     ? previous.unsupportedSinceTick() : currentTick;
             long progress = decay(previous.securedTicks(), elapsed);
@@ -172,7 +172,7 @@ public final class TerritorialTransitionService {
                     currentTick,
                     progress,
                     unsupportedSince,
-                    previous.claimCreatedByOccupation() && claimRetained,
+                    false,
                     previous.controlEverEstablished(),
                     status);
             return new AdvanceResult(state.upsert(unsupported), operations, unsupported, false,
@@ -316,13 +316,14 @@ public final class TerritorialTransitionService {
                 .orElse(false);
     }
 
-    private static boolean withdrawOccupationClaim(WorldSimulation world, OccupationState occupation) {
-        if (!occupation.claimCreatedByOccupation()) return false;
+    private static void withdrawOccupationClaim(WorldSimulation world, OccupationState occupation) {
+        if (!occupation.claimCreatedByOccupation()) return;
         FactionStrategicState strategy = world.findFactionStrategicState(occupation.factionContentId())
                 .orElseThrow(() -> new IllegalStateException("occupation faction has no Stage-17 strategic state"));
-        if (strategy.controls(occupation.systemId())) return false;
-        if (strategy.claimFor(occupation.systemId()) == null) return false;
-        return world.withdrawTerritorialClaim(occupation.factionContentId(), occupation.systemId());
+        if (strategy.controls(occupation.systemId()) || strategy.claimFor(occupation.systemId()) == null) return;
+        if (!world.withdrawTerritorialClaim(occupation.factionContentId(), occupation.systemId())) {
+            throw new IllegalStateException("Stage-17 authority refused an owned unestablished occupation claim withdrawal");
+        }
     }
 
     private static OccupationState replacement(
