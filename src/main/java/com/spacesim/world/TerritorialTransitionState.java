@@ -14,9 +14,9 @@ import java.util.Set;
  * <p>This state never owns claims or sovereignty. Claim/stabilization/control remain in
  * {@link FactionStrategicState} and {@link TerritorialControlRuntime}. The only durable facts kept
  * here are the physical occupation attempt, its exact sustained-security progress, the deadline of
- * an unsupported interval and whether Stage-17 control was ever actually established. This lets
- * save/load resume an invasion transition and distinguish later liberation without inventing a
- * second territorial authority.</p>
+ * an unsupported interval, whether this occupation created its Stage-17 claim, and whether Stage-17
+ * control was ever actually established. This lets save/load resume an invasion transition and
+ * distinguish later liberation without inventing a second territorial authority.</p>
  *
  * @param occupations canonical occupation attempts, unique by faction/system
  */
@@ -99,6 +99,7 @@ public record TerritorialTransitionState(List<OccupationState> occupations) {
      * @param lastEvaluatedTick latest authoritative occupation evaluation tick
      * @param securedTicks cumulative continuous/surviving secure-presence progress
      * @param unsupportedSinceTick first current unsupported tick, or -1 when supported/contested
+     * @param claimCreatedByOccupation whether this occupation created the current Stage-17 claim
      * @param controlEverEstablished whether Stage-17 authority ever established control for this occupier
      * @param status current physical occupation lifecycle
      */
@@ -110,6 +111,7 @@ public record TerritorialTransitionState(List<OccupationState> occupations) {
             long lastEvaluatedTick,
             long securedTicks,
             long unsupportedSinceTick,
+            boolean claimCreatedByOccupation,
             boolean controlEverEstablished,
             OccupationStatus status) {
 
