@@ -142,6 +142,26 @@ class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
     }
 
     @Test
+    void futureOccupationEvaluationFailsClosedAgainstEmbeddedAuthoritativeWorldTick() {
+        Fixture fixture = fixture();
+        OccupationState futureOccupation = new OccupationState(
+                fixture.stableFactionId(),
+                fixture.local().systemId(),
+                1L,
+                fixture.now(),
+                fixture.now() + 1L,
+                0L,
+                -1L,
+                false,
+                false,
+                OccupationStatus.OCCUPYING);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage21FGeneratedWorldRuntimePersistentState.compose(
+                        fixture.stage21E(), new TerritorialTransitionState(List.of(futureOccupation))));
+    }
+
+    @Test
     void unknownStrategicFactionAndFutureOrCorruptTopLevelPayloadFailClosed() {
         Fixture fixture = fixture();
         OccupationState unknownFaction = new OccupationState(
