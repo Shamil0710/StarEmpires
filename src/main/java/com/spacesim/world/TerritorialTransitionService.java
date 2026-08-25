@@ -42,7 +42,7 @@ public final class TerritorialTransitionService {
      * @param forces ordinary physical fleet reconstruction
      * @param identities authoritative stable/runtime faction identity directory
      * @param operationId INVASION operation to reconcile
-     * @param currentTick authoritative non-negative tick
+     * @param currentTick authoritative non-negative tick; must equal the world's current authoritative tick
      * @return updated transition/operation state and audit facts
      */
     public AdvanceResult advance(
@@ -59,6 +59,9 @@ public final class TerritorialTransitionService {
         Objects.requireNonNull(forces, "forces");
         Objects.requireNonNull(identities, "identities");
         if (currentTick < 0L) throw new IllegalArgumentException("currentTick must be non-negative");
+        if (currentTick != world.getAuthoritativeWorldTick()) {
+            throw new IllegalArgumentException("currentTick must equal the authoritative world tick");
+        }
 
         OperationState operation = operations.requireOperation(operationId);
         if (operation.type() != OperationType.INVASION) {
