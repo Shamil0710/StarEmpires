@@ -64,6 +64,7 @@ final class Stage21FLiberationAcceptanceTest {
                 TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS,
                 -1L,
                 true,
+                true,
                 OccupationStatus.SECURED)));
         int fleetsBefore = world.snapshot().fleets().size();
 
