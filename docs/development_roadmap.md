@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-25 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21E COMPLETE; 21F NEXT.**
+> **Последняя синхронизация: 2026-08-25 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21F COMPLETE; 21G NEXT.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -43,7 +43,7 @@
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21 / 21F NEXT** |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21 / 21G NEXT** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
@@ -479,7 +479,7 @@ Canonical completion evidence:
 
 ## 9. Stage 21 — RPG / Living World
 
-**ACTIVE — Stage 20/20.5 and Stage 21.0–21E are complete; Stage 21F is OPEN/NEXT.**
+**ACTIVE — Stage 20/20.5 and Stage 21.0–21F are complete; Stage 21G is OPEN/NEXT.**
 
 NPCs, missions, discovery and reputation consume authoritative physical/economic/political state rather than a disconnected scripted world.
 
@@ -514,8 +514,10 @@ The mandatory Stage-21 closure chain is now:
   owning-faction actor-bounded contact, exact Stage-19 materialization/commit-back, real ordinary
   `FleetId` loss plus physical ammunition/reaction-mass consumption, traffic-based blockade/interdiction
   and deterministic operation persistence;
-- **21F — NEXT** — claims, occupation, stabilization, recognition and gradual control transition;
-- **21G** — peace, demobilization, repair, rearmament and economy-funded replacement;
+- **21F — COMPLETE** — persistent supplied/security occupation, Stage-17 claim provenance,
+  stabilization/recognition/control composition, liberation and causal territorial tariff/construction/
+  actor-interest consequences without allegiance seizure or synthetic resistance;
+- **21G — NEXT** — peace, demobilization, repair, rearmament and economy-funded replacement;
 - **21H** — persistent NPCs, missions, discovery and reputation grounded in living-world state;
 - **21I** — command UI, save migration, representative corpus, performance and long-run final gate.
 
@@ -530,6 +532,9 @@ Accepted Stage-21D implementation/acceptance map:
 
 Accepted Stage-21E implementation/acceptance map:
 `docs/stage21e_strategic_operations_physical_consequences.md`.
+
+Accepted Stage-21F implementation/acceptance map:
+`docs/stage21f_territorial_transition.md`.
 
 Stage 21 is not complete when factions merely own systems and patrols. Completion requires the
 causal loop `interests → diplomacy/crisis → physical fleet operation → losses/territory → political
@@ -619,17 +624,18 @@ Stage 17 COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
-→ Stage 21 RPG / Living World ACTIVE — 21.0 + 21A + 21B + 21C + 21D + 21E COMPLETE; 21F NEXT
+→ Stage 21 RPG / Living World ACTIVE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F COMPLETE; 21G NEXT
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 21F.** Stage 21E now supplies persistent physical
-operation identity, owning-faction actor-bounded contact, exact Stage-19 tactical materialization and
-commit-back, real ordinary losses/store consumption, traffic-grounded blockade/interdiction and
-compositional persistence over the accepted Stage-21D force-command layer. Stage 21F must consume
-those physical operation outcomes to model occupation, claims, stabilization, recognition and gradual
-control transition; it is identified as NEXT here but is intentionally not started by the Stage-21E closeout.
+**Immediate implementation priority is Stage 21G.** Stage 21F now composes physical Stage-21E
+invasions with the existing Stage-17 territorial authority through persistent occupation evidence,
+claim provenance, stabilization/recognition/control transition, liberation, deterministic persistence
+and causal tariff/construction/future-interest consequences without synthetic resources or allegiance
+seizure. Stage 21G must close peace, demobilization, repair, rearmament and economy-funded replacement
+through existing Stage-17/18/19/21D/21E/21F authorities; it is identified as NEXT here but is
+intentionally not started by the Stage-21F closeout.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
 file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.
