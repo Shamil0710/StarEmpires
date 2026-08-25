@@ -114,7 +114,7 @@ final class Stage21FControlConsequencesAcceptanceTest {
         assertFalse(TerritorialConstructionAuthorization.evaluate(world, FOREIGN_FACTION, TARGET).allowed());
 
         FactionComponent foreignFaction = foreignStation.getComponent(FactionComponent.class);
-        assertEquals(foreignRuntimeId, foreignFaction.getFactionId());
+        assertEquals(foreignRuntimeId, foreignFaction.factionId);
         assertEquals(100_000L, foreignWallet.getBalanceMilliCredits(),
                 "control transfer must not seize an existing foreign station wallet");
 
