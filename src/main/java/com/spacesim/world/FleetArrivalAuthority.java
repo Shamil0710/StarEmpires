@@ -79,6 +79,28 @@ public interface FleetArrivalAuthority {
     }
 
     /**
+     * Fails closed unless the fleet has physically reached the exact outgoing endpoint.
+     *
+     * <p>The ordinary jump FSM invokes this immediately before FTL consequences are committed and
+     * the fleet is detached. The default is a compatibility no-op for worlds without exact local
+     * geometry. Generated-world implementations use it as the hard invariant that prevents a
+     * delayed callback, malformed restore or other runtime bug from teleporting a fleet into FTL
+     * before it reaches the requested lane.</p>
+     *
+     * @param fleetId stable world fleet identity
+     * @param originSystemId current local system
+     * @param destinationSystemId directly connected destination
+     * @param localEntityId current origin-local persistent entity identity
+     */
+    default void validateDepartureReady(
+            FleetId fleetId,
+            StarSystemId originSystemId,
+            StarSystemId destinationSystemId,
+            EntityId localEntityId) {
+        // Compatibility path: no exact local geometry is owned by this authority.
+    }
+
+    /**
      * Releases origin-local physical authority after the ordinary fleet service has detached it.
      *
      * @param fleetId stable world fleet identity
