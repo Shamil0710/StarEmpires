@@ -1,16 +1,15 @@
 package com.spacesim.persistence;
 
+import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.world.FactionIdentityResolver;
 import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.StrategicOperationState.OperationState;
 import com.spacesim.world.StrategicOperationState.OperationType;
 import com.spacesim.world.TerritorialTransitionState;
 import com.spacesim.world.TerritorialTransitionState.OccupationState;
-import com.spacesim.world.WorldFactionIdentityState;
 import com.spacesim.world.WorldState;
 
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -41,10 +40,10 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
      * Validates every Stage-21F transition against embedded Stage-21E operation and Stage-17 world law.
      *
      * <p>Occupation metadata may reference only a persisted Stage-21E {@code INVASION} operation with
-     * the same objective system. The stable faction must exist in Stage-17 strategic state. For
-     * world-defined factions, whose stable/runtime mapping is itself persisted in {@link WorldState},
-     * the operation runtime faction ID is cross-checked exactly. Authored faction mapping remains an
-     * immutable content-catalog concern and is therefore not duplicated into this checkpoint.</p>
+     * the same objective system and exact stable/runtime owner identity. The current generated-world
+     * checkpoint is bound to the default authored content catalog plus persisted world-defined
+     * identities, matching the production resolver used by the generated runtime. No mapping is
+     * duplicated into Stage-21F state.</p>
      */
     public Stage21FGeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
@@ -65,10 +64,8 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
         for (FactionStrategicState strategy : world.factionStrategies()) {
             strategicFactions.add(strategy.factionContentId());
         }
-        Map<String, Integer> dynamicRuntimeByStable = new HashMap<>();
-        for (WorldFactionIdentityState identity : world.factionIdentities()) {
-            dynamicRuntimeByStable.put(identity.stableFactionId(), identity.runtimeFactionId());
-        }
+        FactionIdentityResolver identities = FactionIdentityResolver.createDefault(
+                ContentCatalogLoader.loadDefault(), world.factionIdentities());
 
         for (OccupationState occupation : territorialTransitions.occupations()) {
             if (!systems.contains(occupation.systemId())) {
@@ -96,10 +93,12 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
                 throw new IllegalArgumentException(
                         "Stage-21F occupation objective differs from Stage-21E invasion: " + operation.id());
             }
-            Integer dynamicRuntime = dynamicRuntimeByStable.get(occupation.factionContentId());
-            if (dynamicRuntime != null && dynamicRuntime != operation.factionId()) {
+            String operationFaction = identities.stableId(operation.factionId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Stage-21F invasion references unknown runtime faction: " + operation.factionId()));
+            if (!operationFaction.equals(occupation.factionContentId())) {
                 throw new IllegalArgumentException(
-                        "Stage-21F dynamic faction differs from Stage-21E invasion owner: " + operation.id());
+                        "Stage-21F occupation faction differs from Stage-21E invasion owner: " + operation.id());
             }
         }
     }
