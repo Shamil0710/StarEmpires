@@ -1,6 +1,7 @@
 package com.spacesim.world;
 
 import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.world.StrategicOperationState.OperationState;
 import com.spacesim.world.StrategicOperationState.OperationStatus;
 import com.spacesim.world.StrategicOperationState.OperationType;
@@ -71,7 +72,7 @@ final class Stage21FLiberationAcceptanceTest {
                 world,
                 operations,
                 FleetForceRegistry.empty(),
-                FactionIdentityResolver.createDefault(world.getContentCatalog(), world.snapshot().factionIdentities()),
+                FactionIdentityResolver.createDefault(ContentCatalogLoader.loadDefault(), world.snapshot().factionIdentities()),
                 1L,
                 tick);
 
