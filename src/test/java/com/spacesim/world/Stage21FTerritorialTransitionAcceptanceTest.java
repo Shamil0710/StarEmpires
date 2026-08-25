@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class Stage21FTerritorialTransitionAcceptanceTest {
     private static final String PLAYER_FACTION = "faction.player.stage21f";
     private static final int PLAYER_RUNTIME_ID = Constants.LEGACY_FACTION_COUNT;
-    private static final String RECOGNIZER = "faction.neutral";
+    private static final String RECOGNIZER = "faction.trade_league";
     private static final StarSystemId TARGET = DemoGalaxyFactory.FRONTIER_SYSTEM_ID;
     private static final FleetId INVADER = new FleetId(21_600L);
 
@@ -78,12 +78,16 @@ final class Stage21FTerritorialTransitionAcceptanceTest {
                 fixture.world,
                 stabilizationStart + TerritorialControlRuntime.REQUIRED_STABILIZATION_TICKS + 50L);
         assertEquals(PLAYER_FACTION, fixture.world.controllingFaction(TARGET).orElseThrow());
+        AdvanceResult established = service.advance(
+                secured.transitions(), fixture.world, secured.operations(), supplied, fixture.identities,
+                1L, fixture.world.getAuthoritativeWorldTick());
+        assertTrue(established.occupation().controlEverEstablished());
         assertEquals(ProjectionPhase.CONTROL,
-                service.project(fixture.world, secured.transitions(), PLAYER_FACTION, TARGET).phase());
+                service.project(fixture.world, established.transitions(), PLAYER_FACTION, TARGET).phase());
 
         fixture.world.recognizeTerritorialControl(RECOGNIZER, PLAYER_FACTION, TARGET);
         assertEquals(ProjectionPhase.RECOGNIZED_CONTROL,
-                service.project(fixture.world, secured.transitions(), PLAYER_FACTION, TARGET).phase());
+                service.project(fixture.world, established.transitions(), PLAYER_FACTION, TARGET).phase());
     }
 
     @Test
@@ -162,7 +166,7 @@ final class Stage21FTerritorialTransitionAcceptanceTest {
     }
 
     @Test
-    void worldAndOccupationRoundTripPreserveExactTransitionProgress() {
+    void worldOperationAndOccupationRoundTripPreserveExactTransitionProgress() {
         Fixture fixture = fixture(21_603L);
         TerritorialTransitionService service = new TerritorialTransitionService();
         StrategicOperationState operations = operations(activeInvasion(INVADER));
@@ -176,8 +180,10 @@ final class Stage21FTerritorialTransitionAcceptanceTest {
                 1L, fixture.world.getAuthoritativeWorldTick());
 
         byte[] worldBytes = WorldStateCodec.encode(fixture.world.snapshot());
+        byte[] operationBytes = StrategicOperationStateCodec.encode(progressed.operations());
         byte[] transitionBytes = TerritorialTransitionStateCodec.encode(progressed.transitions());
         WorldState restoredWorldState = WorldStateCodec.decode(worldBytes);
+        StrategicOperationState restoredOperations = StrategicOperationStateCodec.decode(operationBytes);
         TerritorialTransitionState restoredTransitions = TerritorialTransitionStateCodec.decode(transitionBytes);
         WorldSimulation restored = WorldSimulation.restore(
                 restoredWorldState,
@@ -187,6 +193,7 @@ final class Stage21FTerritorialTransitionAcceptanceTest {
                 WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME);
 
         assertEquals(fixture.world.getAuthoritativeWorldTick(), restored.getAuthoritativeWorldTick());
+        assertEquals(progressed.operations(), restoredOperations);
         assertEquals(progressed.occupation(),
                 restoredTransitions.occupationFor(PLAYER_FACTION, TARGET).orElseThrow());
     }
