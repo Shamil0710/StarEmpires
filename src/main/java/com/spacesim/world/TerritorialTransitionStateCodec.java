@@ -45,6 +45,7 @@ public final class TerritorialTransitionStateCodec {
                     out.writeLong(occupation.lastEvaluatedTick());
                     out.writeLong(occupation.securedTicks());
                     out.writeLong(occupation.unsupportedSinceTick());
+                    out.writeBoolean(occupation.claimCreatedByOccupation());
                     out.writeBoolean(occupation.controlEverEstablished());
                     writeText(out, occupation.status().name());
                 }
@@ -82,6 +83,7 @@ public final class TerritorialTransitionStateCodec {
                         in.readLong(),
                         in.readLong(),
                         in.readLong(),
+                        in.readBoolean(),
                         in.readBoolean(),
                         enumValue(OccupationStatus.class, readText(in), "occupation status")));
             }
