@@ -48,6 +48,11 @@ public record Stage21FGeneratedWorldRuntimePersistentState(
      * generated-world checkpoint is bound to the default authored content catalog plus persisted
      * world-defined identities, matching the production resolver used by the generated runtime. No
      * mapping is duplicated into Stage-21F state.</p>
+     *
+     * @param schemaVersion exact Stage-21F checkpoint schema version
+     * @param runtimeVersion exact Stage-21F runtime contract identifier
+     * @param stage21ERuntime complete embedded Stage-21E checkpoint
+     * @param territorialTransitions Stage-21F persistent occupation-transition metadata
      */
     public Stage21FGeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
