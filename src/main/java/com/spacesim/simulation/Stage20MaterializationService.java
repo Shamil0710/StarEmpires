@@ -2,6 +2,7 @@ package com.spacesim.simulation;
 
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.TransformComponent;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityRegistry;
 import com.spacesim.persistence.EntityState;
@@ -25,9 +26,10 @@ import java.util.Optional;
  * stores, relocate the physical body or allocate a replacement ID.</p>
  *
  * <p>Authoritative Stage-20 physical kinematics are retained in the accepted hierarchical/double
- * representation rather than being reconstructed from legacy global-float {@code TransformComponent}
- * values. This slice provides a lossless in-memory runtime round-trip and deterministic persistence
- * seams for both ECS and Stage-20 physical state.</p>
+ * representation rather than being reconstructed from legacy global-float {@link TransformComponent}
+ * values. When a physical entity is currently materialized, registration/update also refreshes the
+ * existing float transform as a non-authoritative local render/legacy-simulation projection. The
+ * hierarchical cell identity never gets collapsed into a global float.</p>
  */
 public final class Stage20MaterializationService {
     /** Synchronous materialization completes within the calling simulation boundary. */
@@ -68,38 +70,45 @@ public final class Stage20MaterializationService {
      */
     public void registerPhysicalState(EntityId id, LocalPhysicalKinematics physicalState) {
         EntityId checkedId = Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(physicalState, "physicalState");
+        LocalPhysicalKinematics checkedPhysical = Objects.requireNonNull(physicalState, "physicalState");
         if (!registry.contains(checkedId)) {
             throw new IllegalStateException("Physical authority can only be registered for a live persistent entity: " + checkedId);
         }
         if (dematerializedStates.containsKey(checkedId)) {
             throw new IllegalStateException("Entity cannot be live and dematerialized simultaneously: " + checkedId);
         }
-        LocalPhysicalKinematics previous = physicalStates.putIfAbsent(checkedId, physicalState);
+        LocalPhysicalKinematics previous = physicalStates.putIfAbsent(checkedId, checkedPhysical);
         if (previous != null) {
             throw new IllegalStateException("Physical authority already registered for entity: " + checkedId);
         }
+        projectLiveTransform(registry.require(checkedId), checkedPhysical);
     }
 
     /**
      * Updates physical kinematics for a known Stage-20 entity in either live or dematerialized form.
      *
-     * <p>This allows future STRATEGIC/ACTIVE_LOCAL representations to advance authoritative physical
-     * state without materializing a full Ashley entity merely to move it.</p>
+     * <p>This allows STRATEGIC/ACTIVE_LOCAL representations to advance authoritative physical state
+     * without materializing a full Ashley entity merely to move it. If the entity is live, its
+     * existing float {@link TransformComponent} is updated from the exact local offset and velocity
+     * strictly as a projection; exact hierarchical/double state remains the authority.</p>
      *
      * @param id stable persistent entity ID
      * @param physicalState replacement authoritative kinematics
      */
     public void updatePhysicalState(EntityId id, LocalPhysicalKinematics physicalState) {
         EntityId checkedId = Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(physicalState, "physicalState");
+        LocalPhysicalKinematics checkedPhysical = Objects.requireNonNull(physicalState, "physicalState");
         if (!physicalStates.containsKey(checkedId)) {
             throw new IllegalStateException("Stage-20 physical state is not registered: " + checkedId);
         }
-        if (!registry.contains(checkedId) && !dematerializedStates.containsKey(checkedId)) {
+        boolean live = registry.contains(checkedId);
+        if (!live && !dematerializedStates.containsKey(checkedId)) {
             throw new IllegalStateException("Physical entity has no live or dematerialized persistent representation: " + checkedId);
         }
-        physicalStates.put(checkedId, physicalState);
+        physicalStates.put(checkedId, checkedPhysical);
+        if (live) {
+            projectLiveTransform(registry.require(checkedId), checkedPhysical);
+        }
     }
 
     /**
@@ -173,7 +182,8 @@ public final class Stage20MaterializationService {
         if (snapshot == null) {
             throw new IllegalStateException("No dematerialized snapshot exists for entity: " + checkedId);
         }
-        if (!physicalStates.containsKey(checkedId)) {
+        LocalPhysicalKinematics physical = physicalStates.get(checkedId);
+        if (physical == null) {
             throw new IllegalStateException("Dematerialized entity lost Stage-20 physical authority: " + checkedId);
         }
 
@@ -184,6 +194,7 @@ public final class Stage20MaterializationService {
             throw new IllegalStateException("Materialized entity was not registered under its persistent ID: " + checkedId);
         }
         dematerializedStates.remove(checkedId, snapshot);
+        projectLiveTransform(restored, physical);
         return restored;
     }
 
@@ -264,6 +275,27 @@ public final class Stage20MaterializationService {
         }
         result.sort(Comparator.comparing(PhysicalStateSnapshot::id));
         return List.copyOf(result);
+    }
+
+    private static void projectLiveTransform(Entity entity, LocalPhysicalKinematics physical) {
+        TransformComponent transform = entity.getComponent(TransformComponent.class);
+        if (transform == null) {
+            return;
+        }
+        transform.position.set(
+                exactFloat(physical.position().offsetXM(), "legacyProjectionX"),
+                exactFloat(physical.position().offsetYM(), "legacyProjectionY"));
+        transform.velocity.set(
+                exactFloat(physical.velocityXMps(), "legacyVelocityX"),
+                exactFloat(physical.velocityYMps(), "legacyVelocityY"));
+    }
+
+    private static float exactFloat(double value, String field) {
+        float projection = (float) value;
+        if (!Float.isFinite(projection)) {
+            throw new IllegalArgumentException(field + " is outside legacy float projection range");
+        }
+        return projection;
     }
 
     /**
