@@ -26,6 +26,13 @@ import java.util.Optional;
  * mass, shared-bus energy, jump heat, cooldown and edge-transit time come only from the fitted
  * Stage-17.5 capability.</p>
  *
+ * <p>When an exact {@link FleetArrivalAuthority} supplies generated-world local geometry, the
+ * existing {@link FleetJumpPhase#MOVING_TO_JUMP} phase also becomes the physical in-system approach
+ * to the origin endpoint of the requested edge. This is not a second movement lifecycle: the same
+ * persisted jump state owns approach timing and the same authority advances exact local kinematics.
+ * A route such as A→B→C therefore arrives at B's A-facing endpoint and must physically cross B to
+ * B's C-facing endpoint before spool and detached FTL transit can begin.</p>
+ *
  * <p>Physical fleet ownership remains in {@link FleetWorldService}; entering
  * {@link FleetJumpPhase#IN_TRANSIT} delegates to the Stage-10A detach boundary and leaving it
  * delegates to the matching attach boundary. Physical FTL consequences are committed exactly once,
@@ -143,7 +150,24 @@ final class FleetJumpService {
         float resolvedArrivalY = exactArrival == null
                 ? LocalSystemCoordinates.resolveArrivalY(arrivalX, arrivalY)
                 : exactArrival.legacyProjectionY();
-        long endTick = addTicks(worldTick, timing.approachTicks());
+        long approachTicks = timing.approachTicks();
+        if (arrivalAuthority != null) {
+            float fixedStep = requireSession(origin).getClock().getFixedStepSeconds();
+            long exactApproachTicks = arrivalAuthority.beginDepartureApproach(
+                    id,
+                    origin,
+                    destination,
+                    placement.localEntityId(),
+                    worldTick,
+                    fixedStep);
+            if (exactApproachTicks < 0L) {
+                throw new IllegalStateException("FleetArrivalAuthority returned negative departure approach ticks");
+            }
+            if (exactApproachTicks > 0L) {
+                approachTicks = exactApproachTicks;
+            }
+        }
+        long endTick = addTicks(worldTick, approachTicks);
         FleetJumpState state = new FleetJumpState(
                 id,
                 FleetJumpPhase.MOVING_TO_JUMP,
@@ -161,11 +185,17 @@ final class FleetJumpService {
         if (worldTick < 0L) {
             throw new IllegalArgumentException("World tick не может быть отрицательным");
         }
+        long previousWorldTick = lastEngineeringWorldTick;
         advanceActiveFittedCooldowns(worldTick);
         List<FleetId> order = new ArrayList<>(jumpsByFleetId.keySet());
         order.sort(FleetId::compareTo);
         for (FleetId fleetId : order) {
             FleetJumpState state = jumpsByFleetId.get(fleetId);
+            if (state != null
+                    && state.phase() == FleetJumpPhase.MOVING_TO_JUMP
+                    && arrivalAuthority != null) {
+                advanceExactDeparture(state, previousWorldTick, worldTick);
+            }
             while (state != null && worldTick >= state.phaseEndsTick()) {
                 state = transition(state);
             }
@@ -192,6 +222,26 @@ final class FleetJumpService {
 
     boolean remove(FleetId fleetId) {
         return fleetId != null && jumpsByFleetId.remove(fleetId) != null;
+    }
+
+    private void advanceExactDeparture(
+            FleetJumpState state,
+            long previousWorldTick,
+            long worldTick) {
+        FleetPlacementState placement = fleetWorldService.find(state.fleetId()).orElseThrow();
+        if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                || !placement.systemId().equals(state.originSystemId())) {
+            throw new IllegalStateException("Exact departure approach requires fleet in origin system");
+        }
+        arrivalAuthority.advanceDepartureApproach(
+                state.fleetId(),
+                state.originSystemId(),
+                state.destinationSystemId(),
+                placement.localEntityId(),
+                previousWorldTick,
+                worldTick,
+                state.phaseEndsTick(),
+                requireSession(state.originSystemId()).getClock().getFixedStepSeconds());
     }
 
     private FleetJumpState transition(FleetJumpState state) {
