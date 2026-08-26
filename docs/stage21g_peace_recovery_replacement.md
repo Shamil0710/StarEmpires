@@ -1,6 +1,6 @@
 # Stage 21G — Peace, demobilization, recovery and replacement
 
-**Status:** implementation closeout candidate. The implementation PR may merge only from an exact green head. Canonical `COMPLETE` status is recorded only after the implementation merge is verified on `main`.
+**Status: COMPLETE.** Implementation merged via PR #333 from exact green head `206a197a4fbe0db2d8c72f99b26f1ca7f6abb459`; required CI run #5225 (`32956435219`) and Java 17 verification job `98139009665` completed successfully. Merge commit on `main`: `98f3ec58be0c57a95868a6c824076181c1bf1b2d`. **Stage 21H is OPEN/NEXT and intentionally not implemented here.**
 
 ## 1. Scope
 
@@ -265,4 +265,4 @@ Stage 21G intentionally does **not** implement:
 - a second territory, economy, fleet, damage, consumable, treaty or cooldown authority;
 - Stage-21I command-UI/final long-run closure work.
 
-Stage 21H may consume the accepted post-war world state only after Stage 21G is formally closed and merged.
+Stage 21H is now **OPEN/NEXT** and may consume the accepted post-war world state. Its implementation is intentionally not started by this Stage-21G closeout.
