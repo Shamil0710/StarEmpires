@@ -1,6 +1,7 @@
 package com.spacesim.world;
 
 import com.spacesim.components.WalletComponent;
+import com.spacesim.persistence.Stage20FreightPersistentState;
 import com.spacesim.world.FactionActorObservationSnapshot.ActorObservation;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticKnowledge;
@@ -192,9 +193,12 @@ public final class Stage21HNpcMissionService {
     }
 
     /**
-     * Creates one fully funded mission offer after validating NPC role, availability and source facts.
+     * Creates one fully funded mission offer only while its ordinary target is real and still pending.
      *
      * @param world ordinary world/treasury authority
+     * @param freight Stage-20 physical freight authority when the objective uses freight
+     * @param issuerDiscovery issuer-faction Stage-20 discovery authority when required
+     * @param operations Stage-21E operation authority when required
      * @param issuerNpcId issuing NPC
      * @param template authored template
      * @param objective ordinary-authority predicate
@@ -205,6 +209,9 @@ public final class Stage21HNpcMissionService {
      */
     public MissionContract offerMission(
             WorldSimulation world,
+            Stage20FreightPersistentState freight,
+            Stage20DiscoveryKnowledgeState issuerDiscovery,
+            StrategicOperationState operations,
             String issuerNpcId,
             MissionTemplate template,
             MissionObjective objective,
@@ -235,6 +242,9 @@ public final class Stage21HNpcMissionService {
                     "Mission reward exceeds issuer faction spendable treasury: " + issuer.factionContentId());
         }
         List<String> factIds = List.copyOf(Objects.requireNonNull(sourceKnowledgeFactIds, "Source facts not set"));
+        if (factIds.isEmpty()) {
+            throw new IllegalArgumentException("Mission requires at least one current issuer-known source fact");
+        }
         for (String factId : factIds) {
             NpcKnowledgeFact fact = issuer.knowledge().stream()
                     .filter(value -> value.factId().equals(factId))
@@ -243,6 +253,13 @@ public final class Stage21HNpcMissionService {
             if (!fact.currentAt(tick)) {
                 throw new IllegalArgumentException("Mission cannot be generated from stale issuer fact: " + factId);
             }
+        }
+        MissionObjective checkedObjective = Objects.requireNonNull(objective, "Mission objective not set");
+        Observation initialObservation = Stage21HMissionAuthority.evaluate(
+                checkedWorld, freight, issuerDiscovery, operations, checkedObjective);
+        if (initialObservation.result() != Result.PENDING) {
+            throw new IllegalStateException(
+                    "Mission may be offered only for a real unresolved objective: " + initialObservation.authorityCode());
         }
 
         String missionId = "mission.stage21h." + state.nextMissionSequence();
@@ -264,7 +281,7 @@ public final class Stage21HNpcMissionService {
                 issuer.npcId(),
                 issuer.factionContentId(),
                 factIds,
-                Objects.requireNonNull(objective, "Mission objective not set"),
+                checkedObjective,
                 tick,
                 deadlineTick,
                 MissionStatus.OFFERED,
@@ -309,7 +326,8 @@ public final class Stage21HNpcMissionService {
         if (nowTick > mission.deadlineTick()) {
             throw new IllegalStateException("Expired mission cannot be accepted before expiry reconciliation");
         }
-        MissionContract accepted = replaceStatus(mission, MissionStatus.ACCEPTED, nowTick, "accepted", mission.pendingWakeups());
+        MissionContract accepted = replaceStatus(
+                mission, MissionStatus.ACCEPTED, nowTick, "accepted", mission.pendingWakeups());
         replaceMission(accepted, nowTick);
         return accepted;
     }
@@ -360,6 +378,7 @@ public final class Stage21HNpcMissionService {
      * Reconciles one mission against ordinary authority and performs exact terminal escrow handling.
      *
      * @param world ordinary world/treasury authority
+     * @param freight Stage-20 physical freight authority when required
      * @param issuerDiscovery issuer-faction Stage-20 discovery knowledge when needed
      * @param operations Stage-21E operation registry when needed
      * @param missionId mission identity
@@ -369,6 +388,7 @@ public final class Stage21HNpcMissionService {
      */
     public MissionContract reconcileMission(
             WorldSimulation world,
+            Stage20FreightPersistentState freight,
             Stage20DiscoveryKnowledgeState issuerDiscovery,
             StrategicOperationState operations,
             String missionId,
@@ -385,7 +405,7 @@ public final class Stage21HNpcMissionService {
             return refundAndTerminate(checkedWorld, mission, MissionStatus.EXPIRED, tick, "deadline.expired");
         }
         Observation observation = Stage21HMissionAuthority.evaluate(
-                checkedWorld, issuerDiscovery, operations, mission.objective());
+                checkedWorld, freight, issuerDiscovery, operations, mission.objective());
         if (observation.result() == Result.PENDING) {
             MissionContract retained = copyMission(
                     mission, mission.status(), mission.statusUpdatedTick(), mission.escrowMilliCredits(),
