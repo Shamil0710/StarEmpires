@@ -31,7 +31,11 @@ import java.util.Set;
 public final class Stage21GPeaceOutcomePolicy {
     private final StrategicWarPolicyService policyService;
 
-    /** Creates the bridge over the existing Stage-19 policy authority. */
+    /**
+     * Creates the bridge over the existing Stage-19 policy authority.
+     *
+     * @param policyService existing Stage-19 settlement decision authority
+     */
     public Stage21GPeaceOutcomePolicy(StrategicWarPolicyService policyService) {
         this.policyService = Objects.requireNonNull(policyService, "policyService");
     }
