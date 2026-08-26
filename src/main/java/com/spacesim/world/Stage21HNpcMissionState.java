@@ -185,7 +185,10 @@ public record Stage21HNpcMissionState(
             }
         }
 
-        /** @param nowTick authoritative tick @return whether the retained fact is currently usable */
+        /**
+         * @param nowTick authoritative tick
+         * @return whether the retained fact is currently usable
+         */
         public boolean currentAt(long nowTick) {
             requireNonNegative(nowTick, "Current tick");
             return nowTick >= receivedTick && (freshUntilTick < 0L || nowTick <= freshUntilTick);
@@ -238,13 +241,19 @@ public record Stage21HNpcMissionState(
             knowledge = canonical(knowledge, Comparator.naturalOrder(), NpcKnowledgeFact::factId, "NPC knowledge");
         }
 
-        /** @param factId knowledge ID @return whether this NPC owns that retained fact */
+        /**
+         * @param factId knowledge ID
+         * @return whether this NPC owns that retained fact
+         */
         public boolean knows(String factId) {
             String checked = requireText(factId, "Knowledge fact ID");
             return knowledge.stream().anyMatch(value -> value.factId().equals(checked));
         }
 
-        /** @param nowTick authoritative tick @return current dialogue-safe facts only */
+        /**
+         * @param nowTick authoritative tick
+         * @return current dialogue-safe facts only
+         */
         public List<NpcKnowledgeFact> currentKnowledge(long nowTick) {
             return knowledge.stream().filter(value -> value.currentAt(nowTick)).toList();
         }
@@ -669,7 +678,10 @@ public record Stage21HNpcMissionState(
         }
     }
 
-    /** @param simulationTick authoritative starting tick @return empty current-schema Stage-21H state */
+    /**
+     * @param simulationTick authoritative starting tick
+     * @return empty current-schema Stage-21H state
+     */
     public static Stage21HNpcMissionState empty(long simulationTick) {
         requireNonNegative(simulationTick, "Stage-21H simulation tick");
         return new Stage21HNpcMissionState(
