@@ -64,7 +64,8 @@ Treasury payment is deliberately different: Stage 21C accepts it as a bounded pr
 `Stage21GPeaceAuthorityAcceptanceTest` proves both boundaries:
 
 - accepting/opening peace with a reparation promise leaves the complete physical/economic world snapshot unchanged until the explicit payment executor runs;
-- a peace market-access clause is already effective through Stage-17 treaty law before Stage-21G recovery opens, and recovery does not apply it a second time.
+- a peace market-access clause is already effective through Stage-17 treaty law before Stage-21G recovery opens, and recovery does not apply it a second time;
+- territorial recognition and foreign construction rights are applied by existing Stage-17 territorial authority before recovery, and Stage 21G does not duplicate those mutations.
 
 ## 5. Reparations and conservation
 
@@ -108,7 +109,8 @@ Validation requires:
 - the exact Stage-21E operation ID;
 - the exact ordinary lost `FleetId` referenced by the operation/consequence;
 - stable/runtime faction identity matching one of the settlement participants;
-- one immutable loss row per destroyed `FleetId`.
+- one immutable loss row per destroyed `FleetId`;
+- every replacement demand to bind to the **same settlement** and the **same stable loss owner** as that exact physical loss.
 
 A replacement request is legal only after that loss exists. It stores a deterministic SHA-256 fingerprint of the requested ordinary installed fit and starts as `DEMANDED`; it does not spawn an entity or fleet.
 
@@ -120,6 +122,8 @@ A replacement request is legal only after that loss exists. It stores a determin
 - a fleet without a persisted physical loss cannot request replacement;
 - the demand carries no commissioned fleet identity or completed build entity;
 - the destroyed `FleetId` is never restored by the demand path.
+
+`SettlementRecoveryStateCodecTest.replacementDemandCannotReattributeLossAcrossSettlementOrFaction` additionally proves that a forged recovery aggregate cannot move a physical loss to another peace settlement or attribute its replacement to the other participant.
 
 ## 8. Repair, rearm and refuel
 
@@ -177,7 +181,7 @@ Stage 21C remains the sole legal owner of peace hysteresis and the minimum re-es
 
 This gives future Stage-21B/21C reasoning persisted treaty-performance and loss/grievance evidence while avoiding an unbounded synthetic war-score ledger.
 
-`Stage21GPostWarMemoryServiceTest` proves existing cooldown preservation, bilateral treaty-performance memory, asymmetric loss grievance, exact-once repeat behavior and the grievance cap.
+`Stage21GPostWarMemoryServiceTest` proves existing cooldown preservation, bilateral treaty-performance memory, asymmetric loss grievance, exact-once repeat behavior, the grievance cap, and that completed post-war memory changes a later `DiplomaticLifecycleService.selectOutcome(...)` result after operations have ended.
 
 ## 11. Persistence contract
 
@@ -190,6 +194,7 @@ This gives future Stage-21B/21C reasoning persisted treaty-performance and loss/
 - future row ticks;
 - orphan obligations;
 - replacement demand without a physical loss;
+- replacement demand whose settlement or faction differs from the exact physical loss provenance;
 - multiple demands for one loss;
 - commissioned replacement reusing a lost `FleetId`;
 - invalid lifecycle combinations.
@@ -220,10 +225,10 @@ Cross-layer validation requires:
 | Stage-21G requirement | Accepted implementation/evidence |
 |---|---|
 | peace outcomes tied to goals, losses, exhaustion, leverage and visible offers | `Stage21GPeaceOutcomePolicy`, `Stage21GPeaceOutcomePolicyTest` |
-| recognition/access/legal terms reuse existing law | Stage-21C acceptance path + `Stage21GPeaceAuthorityAcceptanceTest` proves Stage-17 access effect exists before recovery and is not replayed |
+| recognition/access/legal terms reuse existing law | Stage-21C acceptance path + `Stage21GPeaceAuthorityAcceptanceTest` proves Stage-17 access, territorial recognition and construction effects exist before recovery and are not replayed |
 | reparations conserve treasury transfers | `SettlementRecoveryService.executePayments`, `SettlementRecoveryServiceTest` |
 | surviving fleets demobilize through ordinary orders | `SettlementRecoveryService.submitReturnOrder`, `Stage21GRecoveryAuthorityAcceptanceTest` |
-| physical loss continuity / no fleet resurrection | `recordPhysicalLosses`, replacement provenance and acceptance test |
+| physical loss continuity / no fleet resurrection | `recordPhysicalLosses`, exact replacement provenance and acceptance tests |
 | repair/rearm/refuel require physical facility/stock | `Stage21GPhysicalRecoveryService`, physical recovery tests |
 | replacement uses existing industrial/shipyard planning | ordinary Stage-18 build settlement + ordinary entity/fleet commissioning test |
 | no automatic pre-war fleet restoration | no spawn in demand path; failed build changes no fleet count; commissioned FleetId must be fresh |
@@ -246,7 +251,7 @@ Accepted by the Stage-21E physical-loss gate, demand-only state, failed-yard no-
 
 ### War changes later decisions after operations end
 
-Accepted by persisted positive treaty-performance plus bounded loss/grievance relation memory after completed recovery while Stage-21C peace cooldown remains intact. Those existing Stage-21C relation memories are inputs to later diplomatic/strategic decisions rather than transient UI history.
+Accepted by persisted treaty-performance plus bounded loss/grievance relation memory after completed recovery while Stage-21C peace cooldown remains intact. `Stage21GPostWarMemoryServiceTest.completedWarMemoryChangesLaterDiplomaticOutcomeAfterOperationsEnd` feeds the persisted post-war relation back into the existing Stage-21C outcome selector and proves the later diplomatic result changes without a new Stage-21G scoring authority.
 
 ## 14. Explicitly deferred to later stages
 
