@@ -83,7 +83,7 @@ class Stage21GRecoveryAuthorityAcceptanceTest {
         recovery.finalizeRecoveryPlan(1L, 20L);
 
         FleetCommandState command = new FleetCommandState(
-                2L,
+                groupId + 1L,
                 1L,
                 List.of(new CommandGroupState(
                         groupId, ownerRuntimeId, "Surviving Group", List.of(fleet), ALPHA,
