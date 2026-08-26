@@ -1,13 +1,13 @@
 package com.spacesim.world;
 
 import com.spacesim.warfare.StrategicWarPolicyService;
-import com.spacesim.warfare.StrategicWarPolicyService.DecisionResult;
 import com.spacesim.warfare.StrategicWarPolicyService.EscalationLevel;
 import com.spacesim.warfare.StrategicWarPolicyService.Input;
 import com.spacesim.warfare.StrategicWarPolicyService.ObjectiveAssessment;
 import com.spacesim.warfare.StrategicWarPolicyService.ObjectiveEvidence;
 import com.spacesim.warfare.StrategicWarPolicyService.PhysicalWarEvidence;
 import com.spacesim.warfare.StrategicWarPolicyService.Policy;
+import com.spacesim.warfare.StrategicWarPolicyService.Result;
 import com.spacesim.warfare.StrategicWarPolicyService.SettlementOffer;
 import com.spacesim.warfare.StrategicWarPolicyService.WarObjective;
 import com.spacesim.world.DiplomaticLifecycleState.War;
@@ -48,7 +48,7 @@ public final class Stage21GPeaceOutcomePolicy {
      * @param offer actor-visible offer coverage, or {@link SettlementOffer#none()}
      * @return unmodified Stage-19 decision result
      */
-    public DecisionResult evaluate(
+    public Result evaluate(
             War war,
             String actorFactionId,
             EscalationLevel escalation,
@@ -67,7 +67,7 @@ public final class Stage21GPeaceOutcomePolicy {
 
         ArrayList<WarGoal> actorGoals = new ArrayList<>();
         for (WarGoal goal : checkedWar.goals()) {
-            if (actor.equals(goal.sponsorFactionId())) {
+            if (actor.equals(goal.claimantFactionId())) {
                 actorGoals.add(goal);
             }
         }
@@ -84,7 +84,7 @@ public final class Stage21GPeaceOutcomePolicy {
                     new WarObjective(goal.goalId(), goal.subjectId(), goal.mandatory()),
                     evidence.getOrDefault(goal.goalId(), ObjectiveEvidence.UNKNOWN)));
         }
-        if (!legalGoalIds.containsAll(checkedOffer.grantedObjectiveIds())) {
+        if (!legalGoalIds.containsAll(checkedOffer.objectiveIdsGrantedToActor())) {
             throw new IllegalArgumentException("Visible settlement offer claims unknown/non-actor legal war goals");
         }
         for (String goalId : evidence.keySet()) {
