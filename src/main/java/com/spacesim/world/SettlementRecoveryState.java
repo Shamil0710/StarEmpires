@@ -290,7 +290,7 @@ public record SettlementRecoveryState(
      * @param recipientFactionId faction whose ordinary treasury receives
      * @param amountMilliCredits exact positive amount
      * @param status current execution status
-     * @param completedTick completion tick, or zero until complete
+     * @param completedTick completion tick; zero is also valid when completion occurs at simulation tick zero
      */
     public record PaymentObligation(
             long settlementId,
@@ -309,7 +309,7 @@ public record SettlementRecoveryState(
          * @param recipientFactionId recipient faction
          * @param amountMilliCredits exact amount
          * @param status lifecycle status
-         * @param completedTick completion tick or zero
+         * @param completedTick completion tick; pending/stalled obligations use zero
          */
         public PaymentObligation {
             if (settlementId <= 0L || ordinal < 0 || amountMilliCredits <= 0L) {
@@ -321,8 +321,11 @@ public record SettlementRecoveryState(
                 throw new IllegalArgumentException("payment payer and recipient must differ");
             }
             Objects.requireNonNull(status, "status");
-            if ((status == ObligationStatus.COMPLETE) != (completedTick > 0L)) {
-                throw new IllegalArgumentException("completed payment requires a positive completion tick only");
+            if (completedTick < 0L) {
+                throw new IllegalArgumentException("payment completion tick must be non-negative");
+            }
+            if (status != ObligationStatus.COMPLETE && completedTick != 0L) {
+                throw new IllegalArgumentException("pending/stalled payment cannot carry a completion tick");
             }
         }
     }
@@ -334,7 +337,7 @@ public record SettlementRecoveryState(
      * @param commandGroupId existing Stage-21D command-group identity
      * @param factionContentId stable owning faction identity
      * @param returnOrderId accepted Stage-21D RETURN order identity, or zero before submission
-     * @param status lifecycle status
+     * @param status current lifecycle status
      * @param updatedTick latest reconciliation tick
      */
     public record DemobilizationDirective(
