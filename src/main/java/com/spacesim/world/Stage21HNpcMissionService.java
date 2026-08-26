@@ -1,6 +1,7 @@
 package com.spacesim.world;
 
 import com.spacesim.components.WalletComponent;
+import com.spacesim.persistence.Stage18IndustrialState;
 import com.spacesim.persistence.Stage20FreightPersistentState;
 import com.spacesim.world.FactionActorObservationSnapshot.ActorObservation;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence;
@@ -22,6 +23,7 @@ import com.spacesim.world.Stage21HNpcMissionState.ReputationEvent;
 import com.spacesim.world.Stage21HNpcMissionState.ReputationEventKind;
 import com.spacesim.world.Stage21HNpcMissionState.ReputationState;
 import com.spacesim.world.Stage21HNpcMissionState.StoryChainState;
+import com.spacesim.world.Stage21HNpcMissionState.StoryChainStatus;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,7 +37,8 @@ import java.util.Objects;
  * <p>The service owns mission escrow wallets because escrow is explicitly contract state. Every
  * escrow unit first leaves an ordinary faction treasury through {@link WorldSimulation}; terminal
  * refund returns through the same treasury boundary, while successful payout transfers the exact
- * escrow balance to a caller-owned authoritative wallet. No source/sink method is used.</p>
+ * escrow balance to a caller-owned authoritative wallet. No source/sink method is used. Mission
+ * completion is always read from ordinary simulation authorities and never accepted as a UI flag.</p>
  */
 public final class Stage21HNpcMissionService {
     private Stage21HNpcMissionState state;
@@ -193,10 +196,12 @@ public final class Stage21HNpcMissionService {
     }
 
     /**
-     * Creates one fully funded mission offer only while its ordinary target is real and still pending.
+     * Creates one fully funded mission offer only while its ordinary target is real, issuer-controlled
+     * where control is required, and still unresolved.
      *
      * @param world ordinary world/treasury authority
-     * @param freight Stage-20 physical freight authority when the objective uses freight
+     * @param freight Stage-20 physical freight authority when required
+     * @param industry Stage-18 finite industrial/salvage authority when required
      * @param issuerDiscovery issuer-faction Stage-20 discovery authority when required
      * @param operations Stage-21E operation authority when required
      * @param issuerNpcId issuing NPC
@@ -210,6 +215,7 @@ public final class Stage21HNpcMissionService {
     public MissionContract offerMission(
             WorldSimulation world,
             Stage20FreightPersistentState freight,
+            Stage18IndustrialState industry,
             Stage20DiscoveryKnowledgeState issuerDiscovery,
             StrategicOperationState operations,
             String issuerNpcId,
@@ -255,8 +261,16 @@ public final class Stage21HNpcMissionService {
             }
         }
         MissionObjective checkedObjective = Objects.requireNonNull(objective, "Mission objective not set");
+        Stage21HMissionAuthority.requireIssuerAuthority(
+                checkedWorld,
+                freight,
+                industry,
+                issuerDiscovery,
+                operations,
+                issuer.factionContentId(),
+                checkedObjective);
         Observation initialObservation = Stage21HMissionAuthority.evaluate(
-                checkedWorld, freight, issuerDiscovery, operations, checkedObjective);
+                checkedWorld, freight, industry, issuerDiscovery, operations, checkedObjective);
         if (initialObservation.result() != Result.PENDING) {
             throw new IllegalStateException(
                     "Mission may be offered only for a real unresolved objective: " + initialObservation.authorityCode());
@@ -333,6 +347,45 @@ public final class Stage21HNpcMissionService {
     }
 
     /**
+     * Rejects a still-open offer and returns its exact escrow to the issuer treasury.
+     *
+     * @param world ordinary treasury authority
+     * @param missionId offered contract identity
+     * @return rejected terminal contract
+     */
+    public MissionContract rejectMission(WorldSimulation world, String missionId) {
+        WorldSimulation checkedWorld = Objects.requireNonNull(world, "World simulation not set");
+        long tick = checkedWorld.getAuthoritativeWorldTick();
+        requireAdvancingOrEqualTick(tick);
+        MissionContract mission = requireMission(missionId);
+        if (mission.status() != MissionStatus.OFFERED) {
+            throw new IllegalStateException("Only OFFERED mission may be rejected");
+        }
+        return refundAndTerminate(checkedWorld, mission, MissionStatus.REJECTED, tick, "rejected");
+    }
+
+    /**
+     * Cancels one active contract and returns its exact remaining escrow to the issuer treasury.
+     *
+     * <p>Cancellation itself does not invent a reputation event. A character may remember it only
+     * after an explicit observed fact is delivered through {@link #recordObservedReputation}.</p>
+     *
+     * @param world ordinary treasury authority
+     * @param missionId active contract identity
+     * @return cancelled terminal contract
+     */
+    public MissionContract cancelMission(WorldSimulation world, String missionId) {
+        WorldSimulation checkedWorld = Objects.requireNonNull(world, "World simulation not set");
+        long tick = checkedWorld.getAuthoritativeWorldTick();
+        requireAdvancingOrEqualTick(tick);
+        MissionContract mission = requireMission(missionId);
+        if (!mission.active()) {
+            throw new IllegalStateException("Only active mission may be cancelled");
+        }
+        return refundAndTerminate(checkedWorld, mission, MissionStatus.CANCELLED, tick, "cancelled");
+    }
+
+    /**
      * Adds a deduplicated relevant world-event wakeup to one active mission.
      *
      * @param missionId active mission identity
@@ -379,16 +432,18 @@ public final class Stage21HNpcMissionService {
      *
      * @param world ordinary world/treasury authority
      * @param freight Stage-20 physical freight authority when required
+     * @param industry Stage-18 finite industrial/salvage authority when required
      * @param issuerDiscovery issuer-faction Stage-20 discovery knowledge when needed
      * @param operations Stage-21E operation registry when needed
      * @param missionId mission identity
      * @param rewardRecipient authoritative wallet receiving a successful accepted reward
-     * @param subjectActorId player/player-faction identity used for observed completion reputation
+     * @param subjectActorId player/player-faction identity used for observed contract reputation
      * @return resulting contract state
      */
     public MissionContract reconcileMission(
             WorldSimulation world,
             Stage20FreightPersistentState freight,
+            Stage18IndustrialState industry,
             Stage20DiscoveryKnowledgeState issuerDiscovery,
             StrategicOperationState operations,
             String missionId,
@@ -402,10 +457,13 @@ public final class Stage21HNpcMissionService {
             return mission;
         }
         if (tick > mission.deadlineTick()) {
-            return refundAndTerminate(checkedWorld, mission, MissionStatus.EXPIRED, tick, "deadline.expired");
+            MissionContract terminal = refundAndTerminate(
+                    checkedWorld, mission, MissionStatus.EXPIRED, tick, "deadline.expired");
+            rememberAcceptedFailure(mission, subjectActorId, tick);
+            return terminal;
         }
         Observation observation = Stage21HMissionAuthority.evaluate(
-                checkedWorld, freight, issuerDiscovery, operations, mission.objective());
+                checkedWorld, freight, industry, issuerDiscovery, operations, mission.objective());
         if (observation.result() == Result.PENDING) {
             MissionContract retained = copyMission(
                     mission, mission.status(), mission.statusUpdatedTick(), mission.escrowMilliCredits(),
@@ -414,7 +472,10 @@ public final class Stage21HNpcMissionService {
             return retained;
         }
         if (observation.result() == Result.FAILED) {
-            return refundAndTerminate(checkedWorld, mission, MissionStatus.FAILED, tick, observation.authorityCode());
+            MissionContract terminal = refundAndTerminate(
+                    checkedWorld, mission, MissionStatus.FAILED, tick, observation.authorityCode());
+            rememberAcceptedFailure(mission, subjectActorId, tick);
+            return terminal;
         }
         if (mission.status() == MissionStatus.OFFERED) {
             return refundAndTerminate(
@@ -485,22 +546,115 @@ public final class Stage21HNpcMissionService {
         return state;
     }
 
+    /**
+     * Links one already-created mission as the next authored step without creating its target or result.
+     *
+     * @param chainId persistent story-chain identity
+     * @param missionId existing Stage-21H mission identity
+     * @return updated chain progress
+     */
+    public StoryChainState linkMissionToStoryChain(String chainId, String missionId) {
+        StoryChainState chain = requireStoryChain(chainId);
+        if (chain.status() == StoryChainStatus.COMPLETED || chain.status() == StoryChainStatus.CLOSED_BY_WORLD) {
+            throw new IllegalStateException("Terminal story chain cannot receive another mission");
+        }
+        if (chain.currentStep() >= chain.totalSteps()) {
+            throw new IllegalStateException("Story chain has no remaining authored step");
+        }
+        MissionContract mission = requireMission(missionId);
+        if (chain.missionIds().contains(mission.missionId())) {
+            throw new IllegalArgumentException("Story chain already contains mission: " + mission.missionId());
+        }
+        if (!chain.missionIds().isEmpty()) {
+            MissionContract previous = requireMission(chain.missionIds().get(chain.missionIds().size() - 1));
+            if (previous.active()) {
+                throw new IllegalStateException("Previous story-chain mission is still active");
+            }
+            if (previous.status() != MissionStatus.COMPLETED) {
+                throw new IllegalStateException("World-closed story chain cannot issue a later authored step");
+            }
+        }
+        ArrayList<String> missions = new ArrayList<>(chain.missionIds());
+        missions.add(mission.missionId());
+        StoryChainState replacement = new StoryChainState(
+                chain.chainId(), chain.currentStep() + 1, chain.totalSteps(), StoryChainStatus.ACTIVE, missions);
+        replaceStoryChain(replacement);
+        return replacement;
+    }
+
+    /**
+     * Reconciles authored-chain progress from the terminal state of its most recently issued mission.
+     *
+     * <p>The method never opens the next mission or changes the live world. A non-success terminal
+     * outcome closes the chain honestly; a successful final step marks it complete.</p>
+     *
+     * @param chainId persistent story-chain identity
+     * @return current derived chain lifecycle
+     */
+    public StoryChainState reconcileStoryChain(String chainId) {
+        StoryChainState chain = requireStoryChain(chainId);
+        if (chain.status() == StoryChainStatus.AVAILABLE
+                || chain.status() == StoryChainStatus.COMPLETED
+                || chain.status() == StoryChainStatus.CLOSED_BY_WORLD) {
+            return chain;
+        }
+        if (chain.missionIds().isEmpty()) {
+            throw new IllegalStateException("Active story chain has no issued mission");
+        }
+        MissionContract latest = requireMission(chain.missionIds().get(chain.missionIds().size() - 1));
+        if (latest.active()) {
+            return chain;
+        }
+        StoryChainStatus status;
+        if (latest.status() != MissionStatus.COMPLETED) {
+            status = StoryChainStatus.CLOSED_BY_WORLD;
+        } else if (chain.currentStep() == chain.totalSteps()) {
+            status = StoryChainStatus.COMPLETED;
+        } else {
+            status = StoryChainStatus.ACTIVE;
+        }
+        StoryChainState replacement = new StoryChainState(
+                chain.chainId(), chain.currentStep(), chain.totalSteps(), status, chain.missionIds());
+        replaceStoryChain(replacement);
+        return replacement;
+    }
+
     private MissionContract refundAndTerminate(
             WorldSimulation world,
             MissionContract mission,
             MissionStatus terminal,
             long tick,
             String outcomeCode) {
+        if (!mission.active()) {
+            throw new IllegalStateException("Only active mission may settle escrow");
+        }
         WalletComponent escrow = requireEscrow(mission);
+        long amount = mission.escrowMilliCredits();
         if (!world.transferToFactionTreasury(
                 mission.issuerFactionId(), escrow, "mission-escrow:" + mission.missionId(),
-                mission.rewardMilliCredits(), "stage21h-mission-escrow-refund")) {
+                amount, "stage21h-mission-escrow-refund")) {
             throw new IllegalStateException("Mission escrow refund cannot return exact funds to issuer treasury");
         }
         escrowByMissionId.remove(mission.missionId());
         MissionContract replacement = copyMission(mission, terminal, tick, 0L, outcomeCode, List.of());
         replaceMission(replacement, tick);
         return requireMission(mission.missionId());
+    }
+
+    private void rememberAcceptedFailure(MissionContract original, String subjectActorId, long tick) {
+        if (original.status() != MissionStatus.ACCEPTED) {
+            return;
+        }
+        addReputationEvent(
+                original.issuerNpcId(),
+                requireText(subjectActorId, "Reputation subject actor"),
+                new ReputationEvent(
+                        "reputation." + original.missionId() + ".failed",
+                        ReputationEventKind.CONTRACT_FAILED,
+                        -8,
+                        tick,
+                        original.missionId()),
+                tick);
     }
 
     private WalletComponent requireEscrow(MissionContract mission) {
@@ -567,6 +721,18 @@ public final class Stage21HNpcMissionService {
                 state.nextMissionSequence(), state.npcs(), missions, state.reputations(), state.storyChains());
     }
 
+    private void replaceStoryChain(StoryChainState replacement) {
+        ArrayList<StoryChainState> chains = new ArrayList<>(state.storyChains());
+        boolean removed = chains.removeIf(value -> value.chainId().equals(replacement.chainId()));
+        if (!removed) {
+            throw new IllegalArgumentException("Unknown story chain: " + replacement.chainId());
+        }
+        chains.add(replacement);
+        state = new Stage21HNpcMissionState(
+                Stage21HNpcMissionState.CURRENT_VERSION, state.simulationTick(), state.nextMissionSequence(),
+                state.npcs(), state.missions(), state.reputations(), chains);
+    }
+
     private MissionContract replaceStatus(
             MissionContract mission,
             MissionStatus status,
@@ -604,6 +770,12 @@ public final class Stage21HNpcMissionService {
         String checked = requireText(missionId, "Mission ID");
         return state.missions().stream().filter(value -> value.missionId().equals(checked)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown mission: " + checked));
+    }
+
+    private StoryChainState requireStoryChain(String chainId) {
+        String checked = requireText(chainId, "Story chain ID");
+        return state.storyChains().stream().filter(value -> value.chainId().equals(checked)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown story chain: " + checked));
     }
 
     private void requireAdvancingOrEqualTick(long tick) {
