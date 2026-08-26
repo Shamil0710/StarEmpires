@@ -90,6 +90,29 @@ class SettlementRecoveryStateCodecTest {
     }
 
     @Test
+    void replacementDemandCannotReattributeLossAcrossSettlementOrFaction() {
+        Settlement first = new Settlement(1L, "proposal.1", "war.1", "faction.a", "faction.b",
+                10L, 20L, SettlementStatus.PENDING, false);
+        Settlement second = new Settlement(2L, "proposal.2", "war.2", "faction.a", "faction.b",
+                10L, 20L, SettlementStatus.PENDING, false);
+        FleetId lostFleetId = new FleetId(10L);
+        FleetLossRecord loss = new FleetLossRecord(1L, 5L, lostFleetId, "faction.a", 15L);
+        ReplacementDemand wrongSettlement = new ReplacementDemand(
+                1L, 2L, lostFleetId, "faction.a", "fit.sha",
+                16L, 20L, ReplacementStatus.DEMANDED, null, 0L, null);
+        ReplacementDemand wrongFaction = new ReplacementDemand(
+                1L, 1L, lostFleetId, "faction.b", "fit.sha",
+                16L, 20L, ReplacementStatus.DEMANDED, null, 0L, null);
+
+        assertThrows(IllegalArgumentException.class, () -> new SettlementRecoveryState(
+                1, 20L, 3L, 2L,
+                List.of(first, second), List.of(), List.of(), List.of(loss), List.of(wrongSettlement)));
+        assertThrows(IllegalArgumentException.class, () -> new SettlementRecoveryState(
+                1, 20L, 3L, 2L,
+                List.of(first, second), List.of(), List.of(), List.of(loss), List.of(wrongFaction)));
+    }
+
+    @Test
     void corruptTruncatedAndTrailingPayloadsAreRejected() {
         byte[] bytes = SettlementRecoveryStateCodec.encode(SettlementRecoveryState.empty(5L));
         byte[] corruptMagic = bytes.clone();
