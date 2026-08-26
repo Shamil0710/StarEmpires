@@ -65,6 +65,16 @@ class Stage21GRecoveryAuthorityAcceptanceTest {
         assertEquals(demand.id(), recovery.requestReplacement(1L, lostFleet, installedFit, 10L).id(),
                 "one destroyed FleetId owns at most one replacement demand");
 
+        ConsequenceReport conflictingReport = new ConsequenceReport(
+                report.operationId() + 1L, report.fleets());
+        assertThrows(IllegalStateException.class, () -> recovery.recordPhysicalLosses(
+                1L, conflictingReport.operationId(), conflictingReport, before, identities, 10L));
+
+        var conflictingFit = new com.spacesim.ship.ShipEngineeringState.InstalledFit(
+                installedFit.hullId(), List.of());
+        assertThrows(IllegalStateException.class, () -> recovery.requestReplacement(
+                1L, lostFleet, conflictingFit, 10L));
+
         assertThrows(IllegalArgumentException.class, () -> recovery.requestReplacement(
                 1L, new FleetId(21_710_999L), installedFit, 10L));
     }
