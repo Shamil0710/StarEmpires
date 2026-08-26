@@ -3,6 +3,7 @@ package com.spacesim.world;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.persistence.Stage18IndustrialState;
 import com.spacesim.persistence.Stage20FreightPersistentState;
+import com.spacesim.player.PlayerState;
 import com.spacesim.world.FactionActorObservationSnapshot.ActorObservation;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticKnowledge;
@@ -36,9 +37,10 @@ import java.util.Objects;
  *
  * <p>The service owns mission escrow wallets because escrow is explicitly contract state. Every
  * escrow unit first leaves an ordinary faction treasury through {@link WorldSimulation}; terminal
- * refund returns through the same treasury boundary, while successful payout transfers the exact
- * escrow balance to a caller-owned authoritative wallet. No source/sink method is used. Mission
- * completion is always read from ordinary simulation authorities and never accepted as a UI flag.</p>
+ * refund returns through the same treasury boundary, while successful player payout requires both
+ * an ordinary satisfied world predicate and independent contractor participation proven by
+ * {@link Stage21HPlayerMissionAuthority}. No source/sink method is used. Mission completion is
+ * always read from ordinary simulation authorities and never accepted as a UI flag.</p>
  */
 public final class Stage21HNpcMissionService {
     private Stage21HNpcMissionState state;
@@ -428,7 +430,11 @@ public final class Stage21HNpcMissionService {
     }
 
     /**
-     * Reconciles one mission against ordinary authority and performs exact terminal escrow handling.
+     * Legacy fail-closed reconciliation overload retained only for source compatibility.
+     *
+     * <p>A caller-provided reward wallet and actor string cannot prove that the human player caused
+     * an ordinary world outcome. Stage 21H therefore refuses this path instead of allowing UI/input
+     * code to self-certify contractor completion.</p>
      *
      * @param world ordinary world/treasury authority
      * @param freight Stage-20 physical freight authority when required
@@ -436,9 +442,9 @@ public final class Stage21HNpcMissionService {
      * @param issuerDiscovery issuer-faction Stage-20 discovery knowledge when needed
      * @param operations Stage-21E operation registry when needed
      * @param missionId mission identity
-     * @param rewardRecipient authoritative wallet receiving a successful accepted reward
-     * @param subjectActorId player/player-faction identity used for observed contract reputation
-     * @return resulting contract state
+     * @param rewardRecipient caller-provided reward wallet; never trusted by this overload
+     * @param subjectActorId caller-provided actor identity; never trusted by this overload
+     * @return never returns because contractor authority is absent
      */
     public MissionContract reconcileMission(
             WorldSimulation world,
@@ -449,7 +455,44 @@ public final class Stage21HNpcMissionService {
             String missionId,
             WalletComponent rewardRecipient,
             String subjectActorId) {
+        Objects.requireNonNull(world, "World simulation not set");
+        Objects.requireNonNull(missionId, "Mission ID not set");
+        throw new IllegalStateException(
+                "Player mission reconciliation requires authoritative PlayerState contractor evidence");
+    }
+
+    /**
+     * Reconciles one player-facing mission against ordinary authority and performs exact escrow handling.
+     *
+     * <p>An ordinary {@link Result#SATISFIED} observation proves only that the living world reached
+     * the objective. Accepted payout additionally requires {@link Stage21HPlayerMissionAuthority}
+     * to prove bounded participation from persistent player ownership/affiliation and, where needed,
+     * owner-local Stage-20 discovery. If the world solved the accepted objective without such proof,
+     * the contract fails/refunds rather than paying for somebody else's work.</p>
+     *
+     * @param world ordinary world/treasury authority
+     * @param freight Stage-20 physical freight authority when required
+     * @param industry Stage-18 finite industrial/salvage authority when required
+     * @param issuerDiscovery issuer-faction Stage-20 discovery knowledge when needed
+     * @param contractorDiscovery player-local Stage-20 discovery knowledge when needed
+     * @param operations Stage-21E operation registry when needed
+     * @param contractorState authoritative persistent human-player ownership/affiliation state
+     * @param missionId mission identity
+     * @param rewardRecipient authoritative wallet receiving a successful accepted reward
+     * @return resulting contract state
+     */
+    public MissionContract reconcilePlayerMission(
+            WorldSimulation world,
+            Stage20FreightPersistentState freight,
+            Stage18IndustrialState industry,
+            Stage20DiscoveryKnowledgeState issuerDiscovery,
+            Stage20DiscoveryKnowledgeState contractorDiscovery,
+            StrategicOperationState operations,
+            PlayerState contractorState,
+            String missionId,
+            WalletComponent rewardRecipient) {
         WorldSimulation checkedWorld = Objects.requireNonNull(world, "World simulation not set");
+        PlayerState checkedContractor = Objects.requireNonNull(contractorState, "Player contractor state not set");
         long tick = checkedWorld.getAuthoritativeWorldTick();
         requireAdvancingOrEqualTick(tick);
         MissionContract mission = requireMission(missionId);
@@ -459,7 +502,7 @@ public final class Stage21HNpcMissionService {
         if (tick > mission.deadlineTick()) {
             MissionContract terminal = refundAndTerminate(
                     checkedWorld, mission, MissionStatus.EXPIRED, tick, "deadline.expired");
-            rememberAcceptedFailure(mission, subjectActorId, tick);
+            rememberAcceptedFailure(mission, Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID, tick);
             return terminal;
         }
         Observation observation = Stage21HMissionAuthority.evaluate(
@@ -474,12 +517,25 @@ public final class Stage21HNpcMissionService {
         if (observation.result() == Result.FAILED) {
             MissionContract terminal = refundAndTerminate(
                     checkedWorld, mission, MissionStatus.FAILED, tick, observation.authorityCode());
-            rememberAcceptedFailure(mission, subjectActorId, tick);
+            rememberAcceptedFailure(mission, Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID, tick);
             return terminal;
         }
         if (mission.status() == MissionStatus.OFFERED) {
             return refundAndTerminate(
                     checkedWorld, mission, MissionStatus.FAILED, tick, "opportunity.resolved-without-player");
+        }
+
+        Stage21HPlayerMissionAuthority.Observation participation = Stage21HPlayerMissionAuthority.evaluate(
+                checkedWorld, freight, contractorDiscovery, operations, checkedContractor, mission.objective());
+        if (participation.result() != Stage21HPlayerMissionAuthority.Result.PARTICIPATED) {
+            MissionContract terminal = refundAndTerminate(
+                    checkedWorld,
+                    mission,
+                    MissionStatus.FAILED,
+                    tick,
+                    "opportunity.resolved-without-contractor:" + participation.authorityCode());
+            rememberAcceptedFailure(mission, Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID, tick);
+            return terminal;
         }
 
         WalletComponent recipient = Objects.requireNonNull(rewardRecipient, "Reward recipient wallet not set");
@@ -493,7 +549,7 @@ public final class Stage21HNpcMissionService {
         replaceMission(completed, tick);
         addReputationEvent(
                 mission.issuerNpcId(),
-                requireText(subjectActorId, "Reputation subject actor"),
+                Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID,
                 new ReputationEvent(
                         "reputation." + mission.missionId() + ".completed",
                         ReputationEventKind.CONTRACT_COMPLETED,
