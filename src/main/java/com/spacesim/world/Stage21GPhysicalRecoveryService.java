@@ -8,10 +8,12 @@ import com.spacesim.components.TransformComponent;
 import com.spacesim.content.Stage18ShipConsumableCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.economy.Stage18ShipConsumableService;
 import com.spacesim.economy.Stage18ShipyardRuntime;
 import com.spacesim.economy.Stage18StationStorage;
+import com.spacesim.economy.Stage19WarfareSupplyService;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.ship.ShieldFieldRuntime;
 import com.spacesim.ship.ShipDamageRuntime.Snapshot;
@@ -27,6 +29,7 @@ import com.spacesim.ship.ShipyardEngineeringService.BuildCompletion;
 import com.spacesim.ship.ShipyardEngineeringService.MaintenanceState;
 import com.spacesim.ship.ShipyardEngineeringService.RepairCompletion;
 import com.spacesim.ship.ShipyardEngineeringService.WorkPlan;
+import com.spacesim.ship.WeaponDefinition.Launcher;
 import com.spacesim.ship.WeaponLoadoutState;
 import com.spacesim.ship.WeaponMountRuntime;
 import com.spacesim.world.FleetCommandState.OrderType;
@@ -35,24 +38,23 @@ import com.spacesim.world.SettlementRecoveryState.ReplacementDemand;
 import com.spacesim.world.SettlementRecoveryState.ReplacementStatus;
 import com.spacesim.world.SettlementRecoveryState.SettlementStatus;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Stage-21G adapter that executes recovery only through existing Stage-18/17.5 physical authority.
+ * Stage-21G adapter that executes recovery only through existing Stage-18/19/17.5 physical authority.
  *
- * <p>Consumables are loaded only after canonical stock consumption and are committed to the same
- * ordinary {@link EngineeringComponent}. Repair preserves the existing ordinary entity identity,
- * requires real yard inputs/work and changes only the settled damage state; it does not refill
- * propellant, ammunition, electrical storage or shield reserve. Replacement first settles an
- * ordinary Stage-18 build, then materializes the completed fit as a normal system-local ECS fleet
- * with a fresh {@link FleetId}. Stage 21G stores only provenance linking the loss demand to that
- * ordinary asset and fleet.</p>
+ * <p>Reaction mass is loaded through Stage-18I commodity stock and countable ammunition through the
+ * existing Stage-19F manufactured-ordnance bridge. Both results are committed to the same ordinary
+ * {@link EngineeringComponent}. Repair preserves existing ordinary entity identity, consumes real
+ * yard material/work and changes only settled damage. Replacement first settles an ordinary Stage-18
+ * build, then materializes the completed fit as a normal system-local ECS fleet with a fresh
+ * {@link FleetId}. Stage 21G stores only provenance linking a loss demand to that ordinary asset.</p>
  */
 public final class Stage21GPhysicalRecoveryService {
     private final Stage18ShipConsumableCatalog consumableCatalog;
     private final Stage18ShipConsumableService consumables;
+    private final Stage19WarfareSupplyService warfareSupply;
     private final ShipyardEngineeringService engineering;
     private final Stage18ShipyardRuntime shipyards;
     private final ShipEngineeringCatalog engineeringCatalog;
@@ -61,11 +63,11 @@ public final class Stage21GPhysicalRecoveryService {
     private final ShieldFieldRuntime shieldRuntime = new ShieldFieldRuntime();
 
     /**
-     * Creates the Stage-21G physical recovery adapter over the already-authoritative Stage-18 and
-     * Stage-17.5 services.
+     * Creates the Stage-21G physical recovery adapter over already-authoritative services.
      *
      * @param consumableCatalog Stage-18I commodity/interface bindings
-     * @param consumables Stage-18I stock-bound loading authority
+     * @param consumables Stage-18I reaction-mass loading authority
+     * @param warfareSupply Stage-19F manufactured-ammunition loading authority
      * @param engineering Stage-17.5G shipyard planning/completion authority
      * @param shipyards Stage-18G finite material/work settlement authority
      * @param engineeringCatalog immutable Stage-17.5 engineering definitions used by materialization
@@ -73,19 +75,21 @@ public final class Stage21GPhysicalRecoveryService {
     public Stage21GPhysicalRecoveryService(
             Stage18ShipConsumableCatalog consumableCatalog,
             Stage18ShipConsumableService consumables,
+            Stage19WarfareSupplyService warfareSupply,
             ShipyardEngineeringService engineering,
             Stage18ShipyardRuntime shipyards,
             ShipEngineeringCatalog engineeringCatalog) {
         this.consumableCatalog = Objects.requireNonNull(consumableCatalog, "consumableCatalog");
         this.consumables = Objects.requireNonNull(consumables, "consumables");
+        this.warfareSupply = Objects.requireNonNull(warfareSupply, "warfareSupply");
         this.engineering = Objects.requireNonNull(engineering, "engineering");
         this.shipyards = Objects.requireNonNull(shipyards, "shipyards");
         this.engineeringCatalog = Objects.requireNonNull(engineeringCatalog, "engineeringCatalog");
         this.engineeringRuntime = new ShipEngineeringRuntime(engineeringCatalog);
     }
 
-    /** Executes one existing REFUEL/REARM service request from canonical station stock. */
-    public Stage18ShipConsumableService.LoadResult serviceConsumable(
+    /** Executes one existing REFUEL service request from canonical Stage-18 commodity stock. */
+    public Stage18ShipConsumableService.LoadResult refuel(
             ServiceOperation operation,
             String bindingId,
             String mountId,
@@ -93,32 +97,22 @@ public final class Stage21GPhysicalRecoveryService {
             InstalledFit fit,
             ConsumableState current,
             Stage18StationStorage station) {
-        ServiceOperation checked = Objects.requireNonNull(operation, "operation");
-        if (checked.serviceType() != OrderType.REFUEL && checked.serviceType() != OrderType.REARM) {
-            throw new IllegalArgumentException("Consumable recovery requires REFUEL or REARM service request");
-        }
+        requireServiceType(operation, OrderType.REFUEL);
         Stage18ShipConsumableCatalog.ShipConsumableBinding binding = consumableCatalog.findBinding(bindingId);
-        if (binding == null) {
-            return consumables.load(bindingId, mountId, requestedMassKg, fit, current, station);
-        }
-        InterfaceKind required = checked.serviceType() == OrderType.REFUEL
-                ? InterfaceKind.REACTION_MASS
-                : InterfaceKind.AMMUNITION;
-        if (binding.interfaceKind() != required) {
-            throw new IllegalArgumentException(
-                    checked.serviceType() + " cannot consume a " + binding.interfaceKind() + " binding");
+        if (binding != null && binding.interfaceKind() != InterfaceKind.REACTION_MASS) {
+            throw new IllegalArgumentException("REFUEL cannot consume a " + binding.interfaceKind() + " binding");
         }
         return consumables.load(bindingId, mountId, requestedMassKg, fit, current, station);
     }
 
     /**
-     * Executes and commits one REFUEL/REARM request to the same ordinary physical ship component.
+     * Executes and commits one REFUEL request to the same ordinary physical ship component.
      *
      * <p>A rejected Stage-18 load leaves both station stock and ship state unchanged. A committed
-     * load replaces only the authoritative consumable payload; power, heat, damage, shields,
-     * maintenance and weapon-cycle continuity are preserved.</p>
+     * load replaces only authoritative consumables; power, heat, damage, shields, maintenance and
+     * launcher continuity are preserved.</p>
      */
-    public Stage18ShipConsumableService.LoadResult serviceConsumable(
+    public Stage18ShipConsumableService.LoadResult refuel(
             ServiceOperation operation,
             String bindingId,
             String mountId,
@@ -127,7 +121,7 @@ public final class Stage21GPhysicalRecoveryService {
             Stage18StationStorage station) {
         EngineeringComponent checkedShip = Objects.requireNonNull(ship, "ship");
         RuntimeState before = Objects.requireNonNull(checkedShip.runtimeState, "ship.runtimeState");
-        Stage18ShipConsumableService.LoadResult result = serviceConsumable(
+        Stage18ShipConsumableService.LoadResult result = refuel(
                 operation,
                 bindingId,
                 mountId,
@@ -136,14 +130,39 @@ public final class Stage21GPhysicalRecoveryService {
                 before.consumables(),
                 station);
         if (result.committed()) {
-            checkedShip.setRuntimeState(new RuntimeState(
-                    result.consumables(),
-                    before.sharedBusEnergyJ(),
-                    before.shipHeatStoredJ(),
-                    before.localHeatJByMount(),
-                    before.thrustLimitNByMount(),
-                    before.coolantBusCapacityW(),
-                    before.ftlCooldownSecondsByMount()));
+            commitConsumables(checkedShip, before, result.consumables());
+        }
+        return result;
+    }
+
+    /**
+     * Executes and commits one REARM request through the existing Stage-19F countable-ammunition seam.
+     *
+     * <p>Finished rounds are removed from canonical Stage-18 station product stock and loaded into
+     * the same Stage-17.5 consumable feed consumed by combat. Rejected requests mutate neither side.</p>
+     */
+    public Stage19WarfareSupplyService.AmmunitionLoadResult rearm(
+            ServiceOperation operation,
+            String productId,
+            String mountId,
+            int requestedRounds,
+            Launcher launcher,
+            InterfaceDefinition ammunitionInterface,
+            EngineeringComponent ship,
+            Stage18StationStorage station) {
+        requireServiceType(operation, OrderType.REARM);
+        EngineeringComponent checkedShip = Objects.requireNonNull(ship, "ship");
+        RuntimeState before = Objects.requireNonNull(checkedShip.runtimeState, "ship.runtimeState");
+        Stage19WarfareSupplyService.AmmunitionLoadResult result = warfareSupply.loadAmmunition(
+                productId,
+                mountId,
+                requestedRounds,
+                Objects.requireNonNull(launcher, "launcher"),
+                Objects.requireNonNull(ammunitionInterface, "ammunitionInterface"),
+                before.consumables(),
+                Objects.requireNonNull(station, "station"));
+        if (result.committed()) {
+            commitConsumables(checkedShip, before, result.consumables());
         }
         return result;
     }
@@ -210,25 +229,10 @@ public final class Stage21GPhysicalRecoveryService {
      * Physically builds and ordinarily commissions one replacement for a persisted loss demand.
      *
      * <p>There is no caller-supplied EntityId or FleetId. After Stage-18 atomically consumes physical
-     * inputs and finite yard work, the ordinary local-system lifecycle allocates the EntityId and
-     * registers the fleet through the existing world fleet authority. The new ship starts pristine but
-     * with empty propellant/ammunition and empty shield reserve; later servicing must use the ordinary
-     * Stage-18 loading/recharge paths. Failure to settle the yard creates neither an entity nor a FleetId.</p>
-     *
-     * @param recovery Stage-21G metadata coordinator
-     * @param demandId persisted replacement-demand identity
-     * @param world ordinary world/entity/fleet authority
-     * @param identities stable/runtime faction identity resolver
-     * @param buildSystemId system containing the physical yard/output berth
-     * @param displayName ordinary display name for the commissioned replacement
-     * @param x output-berth x position
-     * @param y output-berth y position
-     * @param targetFit requested replacement fit
-     * @param station canonical Stage-18F source storage
-     * @param yard active Stage-18G yard projection
-     * @param budget finite Stage-18G engineering-work budget
-     * @param currentTick authoritative tick
-     * @return build result; unsuccessful physical settlement never creates ordinary assets
+     * inputs and finite yard work, the ordinary local-system lifecycle allocates EntityId and FleetId.
+     * The new ship starts pristine but with empty propellant/ammunition and empty shield reserve;
+     * later servicing must use the ordinary Stage-18/19 stock-bound paths. Failure to settle the yard
+     * creates neither an entity nor a FleetId.</p>
      */
     public BuildResult buildReplacement(
             SettlementRecoveryService recovery,
@@ -301,6 +305,20 @@ public final class Stage21GPhysicalRecoveryService {
             }
             throw exception;
         }
+    }
+
+    private static void commitConsumables(
+            EngineeringComponent ship,
+            RuntimeState before,
+            ConsumableState consumables) {
+        ship.setRuntimeState(new RuntimeState(
+                consumables,
+                before.sharedBusEnergyJ(),
+                before.shipHeatStoredJ(),
+                before.localHeatJByMount(),
+                before.thrustLimitNByMount(),
+                before.coolantBusCapacityW(),
+                before.ftlCooldownSecondsByMount()));
     }
 
     private void applyRepair(
