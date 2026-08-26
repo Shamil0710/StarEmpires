@@ -303,13 +303,25 @@ public final class SettlementRecoveryService {
         requireTick(currentTick);
         ArrayList<FleetLossRecord> losses = new ArrayList<>(state.losses());
         for (FleetId fleetId : report.losses()) {
-            if (losses.stream().anyMatch(row -> row.lostFleetId().equals(fleetId))) continue;
             FleetForceRegistry.Entry previous = before.find(fleetId)
                     .orElseThrow(() -> new IllegalStateException("Lost FleetId missing from before registry: " + fleetId));
             String owner = identities.stableId(previous.factionId())
                     .orElseThrow(() -> new IllegalStateException("Lost fleet has unknown stable faction: " + fleetId));
             if (!owner.equals(settlement.factionA()) && !owner.equals(settlement.factionB())) {
                 throw new IllegalStateException("Physical loss owner is not a settlement participant: " + owner);
+            }
+            FleetLossRecord existing = losses.stream()
+                    .filter(row -> row.lostFleetId().equals(fleetId))
+                    .findFirst()
+                    .orElse(null);
+            if (existing != null) {
+                if (existing.settlementId() != settlementId
+                        || existing.operationId() != operationId
+                        || !existing.factionContentId().equals(owner)) {
+                    throw new IllegalStateException(
+                            "Physical loss replay does not match persisted provenance: " + fleetId);
+                }
+                continue;
             }
             losses.add(new FleetLossRecord(settlementId, operationId, fleetId, owner, currentTick));
         }
@@ -333,12 +345,20 @@ public final class SettlementRecoveryService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Replacement demand requires a persisted physical FleetId loss"));
+        String targetFitFingerprint = fitFingerprint(targetFit);
         for (ReplacementDemand existing : state.replacementDemands()) {
-            if (existing.lostFleetId().equals(lostFleetId)) return existing;
+            if (!existing.lostFleetId().equals(lostFleetId)) continue;
+            if (existing.settlementId() != settlementId
+                    || !existing.factionContentId().equals(loss.factionContentId())
+                    || !existing.targetFitFingerprint().equals(targetFitFingerprint)) {
+                throw new IllegalStateException(
+                        "Replacement demand replay does not match persisted loss/fit provenance: " + lostFleetId);
+            }
+            return existing;
         }
         long id = state.nextReplacementDemandId();
         ReplacementDemand demand = new ReplacementDemand(
-                id, settlementId, lostFleetId, loss.factionContentId(), fitFingerprint(targetFit),
+                id, settlementId, lostFleetId, loss.factionContentId(), targetFitFingerprint,
                 currentTick, currentTick, ReplacementStatus.DEMANDED, null, 0L, null);
         ArrayList<ReplacementDemand> demands = new ArrayList<>(state.replacementDemands());
         demands.add(demand);
