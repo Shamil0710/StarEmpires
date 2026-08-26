@@ -183,7 +183,7 @@ class Stage21GPhysicalRecoveryServiceTest {
         var beforeMaintenance = ship.instanceState.maintenance();
         var beforeWeaponRuntime = ship.instanceState.weaponMountRuntime();
         EntityId assetId = new EntityId(21_001L);
-        loadRepairInputs(industrialStation.storage(), fit, damaged);
+        Stage18StationStorage repairStorage = repairInputStorage(fit, damaged);
         var plan = engineeringService.planRepair(
                 assetId, fit, carried, damaged, yard.plannerCapability());
         var budget = yard.openInterval(
@@ -192,7 +192,7 @@ class Stage21GPhysicalRecoveryServiceTest {
                 new FleetId(3L), new StarSystemId(1L), OrderType.REPAIR);
 
         var result = service.repair(
-                operation, assetId, ship, industrialStation.storage(), yard, budget);
+                operation, assetId, ship, repairStorage, yard, budget);
 
         assertTrue(result.settlement().settled());
         assertEquals(assetId, result.completion().assetId());
@@ -247,12 +247,12 @@ class Stage21GPhysicalRecoveryServiceTest {
         assertEquals(ReplacementStatus.DEMANDED,
                 recovery.snapshot().requireReplacementDemand(1L).status());
 
-        loadBuildInputs(industrialStation.storage(), fit);
+        Stage18StationStorage buildStorage = buildInputStorage(fit);
         var successBudget = yard.openInterval(
                 plan.requirements().totalWorkSeconds() / yard.plannerCapability().workRate() + 1d);
         var built = service.buildReplacement(
                 recovery, 1L, world, identities, buildSystem, "Replacement Test",
-                50f, -25f, fit, industrialStation.storage(), yard, successBudget, now);
+                50f, -25f, fit, buildStorage, yard, successBudget, now);
 
         assertTrue(built.settlement().settled());
         assertNotNull(built.commissionedFleetId());
@@ -324,14 +324,18 @@ class Stage21GPhysicalRecoveryServiceTest {
         return result;
     }
 
-    private void loadBuildInputs(Stage18StationStorage storage, InstalledFit targetFit) {
+    private Stage18StationStorage buildInputStorage(InstalledFit targetFit) {
+        Map<String, Double> commodityMass = new LinkedHashMap<>();
+        Map<String, Integer> productCounts = new LinkedHashMap<>();
         var hull = shipyardCatalog.findHullProfile(targetFit.hullId());
-        hull.buildInputsKg().forEach(input -> storage.addCommodity(input.commodityId(), input.massKg()));
-        targetFit.installedModules().forEach(assignment -> storage.addProduct(assignment.moduleId(), 1));
+        hull.buildInputsKg().forEach(input ->
+                commodityMass.merge(input.commodityId(), input.massKg(), Double::sum));
+        targetFit.installedModules().forEach(assignment ->
+                productCounts.merge(assignment.moduleId(), 1, Integer::sum));
+        return storageWithInputs(commodityMass, productCounts);
     }
 
-    private void loadRepairInputs(
-            Stage18StationStorage storage,
+    private Stage18StationStorage repairInputStorage(
             InstalledFit targetFit,
             ShipDamageRuntime.Snapshot damage) {
         Map<String, Double> required = new LinkedHashMap<>();
@@ -352,7 +356,20 @@ class Stage21GPhysicalRecoveryServiceTest {
             shipyardCatalog.findModuleProfile(moduleId).repairInputsAtFullLossKg().forEach(input ->
                     required.merge(input.commodityId(), input.massKg() * loss, Double::sum));
         }
-        required.forEach(storage::addCommodity);
+        return storageWithInputs(required, Map.of());
+    }
+
+    private Stage18StationStorage storageWithInputs(
+            Map<String, Double> commodityMass,
+            Map<String, Integer> productCounts) {
+        Stage18StationStorage base = industrialStation.storage();
+        return new Stage18StationStorage(
+                ontology,
+                products,
+                base.stationId(),
+                base.snapshotCapacityByStorageClassKg(),
+                commodityMass,
+                productCounts);
     }
 
     private static ShipDamageRuntime.Snapshot pristineDamage() {
