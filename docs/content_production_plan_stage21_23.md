@@ -1,9 +1,17 @@
 # Star Empires — content production plan for Stages 21–23
 
-> Статус: **CANONICAL PLANNED CONTENT CONTRACT**.
+> Статус: **CANONICAL PLANNED CONTENT CONTRACT**.  
 > Scope: authored data, factions, ships, stations, characters, missions, world locations, UI art,
 > VFX, audio, localization and validation required to turn the accepted simulation into an alpha and
-> then a release candidate.
+> then a release candidate.  
+> **Production-complete sovereign faction scope through Stage 23: Империя + Индустриальный Союз.**
+
+Faction roster/horizon authority:
+
+- `docs/factions/faction_roster_and_development_horizon.md`;
+- `docs/factions/empire_systemic_identity.md`;
+- `docs/factions/industrial_union_systemic_identity.md`;
+- `docs/factions/post_core_faction_horizon.md`.
 
 ## 1. Purpose
 
@@ -41,17 +49,22 @@ At the start of Stage 21 the repository contains:
 - a production-oriented master prompt for grounded hand-painted character illustrations;
 - responsive command UI and deterministic generated-world runtime.
 
-The principal gaps are:
+The eight generated identities are **runtime compatibility actors**, not an automatic release roster.
+The canonical design decision of 2026-08-26 narrows the production-complete sovereign scope to two
+core factions while preserving five additional major factions as post-core horizon concepts.
 
-- the eight faction identities do not yet form eight reviewed political/content packages;
-- only the Imperial visual language is defined; recolouring it is not faction differentiation;
+The principal gaps are therefore:
+
+- exact mapping/disposition of existing generated faction IDs to final core/runtime roles has not yet
+  passed Stage-22.0 migration and reverse-reference review;
+- only the Imperial visual language is production-defined; Industrial Union needs its own full bible;
 - provisional combat test IDs are not automatically canon;
-- no production NPC/character roster, mission library or dialogue/event vocabulary exists;
+- no production-wide NPC/character roster, mission library or dialogue/event vocabulary exists;
 - no release-wide ship/station/location art inventory exists;
 - VFX, audio, icons, localization and asset provenance are not governed as one pipeline;
-- current five-item catalog names are compatibility-era abstractions and must not bypass the
-  Stage-18 ontology during expansion;
-- content breadth has no shared cut priority or measurable completion floor.
+- current five-item catalog names are compatibility-era abstractions and must not bypass the Stage-18
+  ontology during expansion;
+- content breadth needs one shared cut priority and a measurable **core-pair** completion floor.
 
 ## 3. Content invariants
 
@@ -70,42 +83,57 @@ The principal gaps are:
 11. All shipped assets have authorship/license/provenance metadata.
 12. Russian and English player-facing text use stable localization keys; no final copy is embedded in
     simulation logic.
+13. Existing generated-world faction IDs cannot be silently repurposed because their current display
+    names resemble a later lore faction.
+14. Post-core faction requirements cannot expand Stage 22/23 unless a common core/player need independently justifies the architecture change.
 
 ## 4. Canonical faction roster decision
 
-The existing generated large-world profile already provides the least disruptive release roster.
-Stage 22.0 must review, rename only through migration, and then accept or explicitly replace it.
+### 4.1 Production-complete core pair
 
-### Proposed sovereign major factions
+The main development stage through Stage 23 ships two reviewed sovereign major-faction packages:
 
-| Stable ID | Current name | Production role |
+| Canonical faction | Current runtime lineage candidate | Production role |
 |---|---|---|
-| `faction.imperial_directorate` | Имперский директорат | old hierarchical state; heavy, redundant and serviceable engineering |
-| `faction.frontier_union` | Союз пограничных миров | decentralized frontier defense, adaptable/refittable craft |
-| `faction.industrial_combine` | Промышленный комбинат | mass production, towing, armor, logistics and industrial leverage |
-| `faction.free_ports` | Лига свободных портов | trade access, modular ships, long-range commerce and private security |
-| `faction.research_consortium` | Исследовательский консорциум | precision systems, sensors/EW, complex maintenance and scarce components |
+| **Империя** | `faction.imperial_directorate` lineage | primary gold slice; hierarchical state, heavy redundant/serviceable engineering, reserves and state procurement |
+| **Индустриальный Союз** | `faction.industrial_combine` lineage | mandatory contrast; standardized mass production, repeated series, bulk logistics and resource/bottleneck pressure |
 
-### Proposed minor/transnational organizations
+The table records **design intent, not an already-approved rename/migration**. Stage 22.0 must inspect
+all reverse references and supported saves before deciding whether to retain a stable ID with a new
+display identity, add an alias/migration, or use another compatible mapping.
 
-| Stable ID | Current name | Production role |
-|---|---|---|
-| `faction.neutral` | Нейтралы | independent settlements/non-aligned civil authority, not one magic empire |
-| `faction.trade_league` | Торговая лига | commercial association, contracts, arbitration and convoy services |
-| `faction.miners` | Шахтёры | extraction cooperatives/guilds and resource-frontier interests |
+### 4.2 Canonical post-core major-faction horizon
 
-The three legacy actors must be modelled deliberately: if they are organizations rather than
-territorial sovereigns, diplomacy and territory UI must say so. They must not accidentally receive
-all major-state behavior merely because they occupy a dense runtime slot.
+These factions are fixed as future major designs but are **not Stage-22/23 content packages**:
 
-The accepted “Империя” visual bible applies to `faction.imperial_directorate`. Before art breadth,
-each other major faction requires an equivalent bible covering visual idea, palette, material
-language, ship silhouette, stations, people/rank, heraldry, UI accents, wear, forbidden motifs and
-game-scale checklist. Minor organizations may use a narrower identity sheet but not a random recolor.
+1. **Директорат** — precision/automation/high-complexity industrial model;
+2. **Лига Свободных Систем** — private economy/freight/risk/credit horizon;
+3. **Пограничная Конфедерация** — salvage/refit/substitution/scarcity resilience;
+4. **Консорциум** — ownership/concessions/debt separate from sovereignty;
+5. **Кочевой Флот** — mobile economic nodes and non-territorial civilization.
 
-## 5. What constitutes a complete faction content package
+Their future requirements are preserved in `docs/factions/post_core_faction_horizon.md`. No production
+sprite quota, NPC quota, hull roster or stable-ID migration is required for them before Stage 23.
 
-Every major faction package contains:
+### 4.3 Existing minor/transnational runtime actors
+
+Existing actors such as:
+
+- `faction.neutral`;
+- `faction.trade_league`;
+- `faction.miners`;
+
+must be modelled deliberately. If they are organizations, cooperatives or independent-settlement
+abstractions rather than territorial sovereigns, diplomacy and territory UI must say so. They must
+not accidentally receive all major-state behavior merely because they occupy runtime faction slots.
+
+They may receive a reduced identity/contact/content sheet needed for the civilian ecosystem; that is
+not equivalent to a third/fourth/fifth production-complete sovereign package.
+
+## 5. What constitutes a complete major-faction content package
+
+This package definition applies to the two core factions now and becomes the template for any future
+post-core faction when that faction is activated for development.
 
 ### Political and systemic identity
 
@@ -138,12 +166,12 @@ Every major faction package contains:
 - silhouette grammar for small/medium/large ships;
 - station/interior/equipment language;
 - rank, profession, condition and regional variation rules;
-- actual-size comparison sheet against every other faction;
+- actual-size comparison sheet against the other shipped core faction and shared civilian content;
 - UI accent usage that preserves shared usability semantics.
 
 ### Human and narrative identity
 
-- at least six recurring named NPCs for a major faction;
+- at least six recurring named NPCs per core faction;
 - role/archetype pool for generated officials, military, commerce, labor, science and fringe actors;
 - speaking style, terms of address, taboo/values and institutional vocabulary;
 - two short faction story chains grounded in ordinary world events;
@@ -157,10 +185,11 @@ Every major faction package contains:
 - one peaceful/diplomatic and one conflict/recovery history;
 - one reference fleet plus industrial/logistics support;
 - one player progression/access path;
+- pairwise comparison against the other shipped core faction;
 - content-reference, localization, asset, fingerprint and save tests.
 
-Minor organizations may ship a reduced package: identity sheet, doctrine/legal role, three recurring
-contacts, four operational ship/station roles, contract vocabulary and full authority validation.
+Minor/transnational organizations may ship a reduced package: explicit legal/systemic role, limited
+visual identity, contacts and contract vocabulary, shared civilian assets where lawful, and full authority validation.
 
 ## 6. Production breadth target
 
@@ -168,78 +197,96 @@ These are alpha floors used for planning and cut decisions, not permission to ad
 
 | Content family | Stage-22 alpha floor | RC rule |
 |---|---:|---|
-| reviewed major factions | 5 | all packages complete |
-| reviewed minor/transnational organizations | 3 | political role explicit |
-| major-faction visual bibles | 5 | no placeholder bible |
-| recurring named NPCs | 39 (6×5 + 3×3) | portrait/copy/authority complete |
-| generated NPC role archetypes | 40+ | faction, role, knowledge and availability coverage |
-| military base hulls | 30 (6×5) | every role/faction niche justified |
-| faction civilian/support base hulls | 15 (3×5) | may share lawful modules/components |
-| neutral/licensed civilian hulls | 8+ | common market/progression path |
-| station exterior roles | 10+ | industrial capability readable |
-| faction signature station variants | 15 (3×5) | not required to duplicate every functional role |
+| production-complete sovereign core factions | **2** | Империя + Индустриальный Союз complete |
+| production-complete post-core major factions | **0 required** | explicitly outside core RC |
+| core-faction visual bibles | **2** | no placeholder bible |
+| recurring named core-faction NPCs | **12 (6×2)** | portrait/copy/authority complete |
+| shared/minor/independent recurring contacts | 6+ where gameplay requires | legal role explicit; no fake sovereign package |
+| generated NPC role archetypes | 24+ | core faction, role, knowledge and availability coverage |
+| military base hulls | **12 (6×2)** | every role/faction niche justified |
+| faction civilian/support base hulls | **6 (3×2)** | may share lawful modules/components |
+| neutral/licensed/shared civilian hulls | 8+ | common market/progression path |
+| station exterior roles | 10+ combined | industrial capability readable |
+| faction signature station variants | **6 (3×2)** | not required to duplicate every functional role |
 | special-location archetypes | 20+ | discovery/salvage/mission hooks validated |
-| parametric mission templates | 48+ | all derive from real world state |
-| authored faction story chains | 10 (2×5) | no frozen-world outcome scripting |
-| public/private event templates | 80+ | information-scope tags required |
-| core UI/status icons | 120+ as needed | semantic/readability audit, not count chasing |
-| audio event families | 60+ as needed | state-aligned and mix-budgeted |
+| parametric mission templates | 48+ game-wide | all derive from real world state |
+| authored core-faction story chains | **4 (2×2)** | no frozen-world outcome scripting |
+| public/private event templates | 60+ as needed | information-scope tags required |
+| core UI/status icons | as needed | semantic/readability audit, not count chasing |
+| audio event families | as needed | state-aligned and mix-budgeted |
 
 Base hull count does not include fit-only variants. A variant needs new art only when external
 geometry or readable silhouette actually changes. This keeps mechanical breadth from multiplying
 asset cost without player value.
 
+The five horizon factions do not contribute to any Stage-22 alpha quota.
+
 ## 7. Content production order
 
-### Wave 0 — Governance and inventory
+### Wave 0 — Governance, inventory and migration
 
 - enumerate every current content ID and runtime reference;
 - classify each as `PROTOTYPE`, `CANDIDATE`, `ALPHA` or `RC`;
 - for Stage-17.5/19 definitions record `PROMOTE`, `REAUTHOR`, `REPLACE` or `RETIRE`;
 - build reverse-reference report: definition → fit/fixture/save/world/art;
+- audit every current generated faction stable ID/display name;
+- record explicit core-pair mapping/migration and legacy actor disposition;
+- reserve the five post-core faction concepts without forcing stable runtime IDs now;
 - define schemas/manifests before bulk authoring;
 - lock units, naming and localization conventions.
 
 ### Wave 1 — Imperial gold slice
 
-Use the accepted Imperial visual bible to finish one end-to-end faction package first:
+Use the accepted Imperial visual/systemic bibles to finish one end-to-end faction package first:
 
 - political and engineering doctrine;
 - one complete industrial chain and market access path;
 - six military and three civilian/support hulls;
-- three station roles;
+- three signature station variants;
 - six recurring NPCs and core generated roles;
-- ten mission templates and two short story chains;
+- ten faction-facing mission templates and two short story chains;
 - production UI accents, icons, VFX and audio subset;
 - peaceful, crisis, battle, loss, recovery and save/load acceptance.
 
-The gold slice proves pipeline quality and actual cost before multiplying work across factions.
+The gold slice proves pipeline quality and actual cost before multiplying work.
 
-### Wave 2 — Contrast pair
+### Wave 2 — Industrial Union contrast pair
 
-Complete the faction whose engineering and politics contrast most strongly with the Empire. Validate:
+The contrast faction is no longer selected later: it is canonically **Индустриальный Союз**.
+
+Complete:
+
+- systemic/political/industrial identity;
+- production-series/commonality implementation or the minimum reusable extension proven necessary;
+- independent visual bible, not an Imperial recolor;
+- six military and three civilian/support hulls;
+- three signature station variants;
+- reference industrial network, fleet and logistics train;
+- six recurring NPCs;
+- ten faction-facing mission templates and two short story chains;
+- production UI accents, icons, VFX and audio subset;
+- peaceful, crisis, battle, bottleneck disruption, loss, replacement and save/load acceptance.
+
+Pairwise validation must prove:
 
 - silhouette recognition without color/heraldry;
-- different lawful strategic decisions under the same world evidence;
-- different fleet solution without magic modifiers;
-- different NPC voice and visual hierarchy without breaking common art style;
-- cross-faction diplomacy, trade and conflict content.
+- different lawful strategic decisions under at least one shared world condition;
+- lawful convergence under at least one shared optimum;
+- different viable fleet/industrial solution without magic modifiers;
+- different NPC voice and visual hierarchy without breaking common project art style;
+- cross-faction diplomacy, trade and conflict content;
+- no globally dominant faction across combat + economy + logistics + recovery.
 
-### Wave 3 — Five-major-faction breadth
-
-- finalize remaining three major visual/systemic packages;
-- close fleet/industry role matrix rather than duplicating equal rosters;
-- integrate named NPCs, missions, relations and player access;
-- run cross-faction comparison/anti-dominance matrix after each package.
-
-### Wave 4 — Minor organizations and civilian world
+### Wave 3 — Shared civilian/minor ecosystem
 
 - clarify legacy neutral/trade/miner political roles;
 - build common/licensed civilian hull and station ecosystem;
 - add independent contacts, disputes, contracts and access networks;
-- ensure peaceful play has equal content density to war play.
+- integrate cross-faction markets, repair/refit and manufacturers;
+- ensure peaceful play has content density comparable to war play;
+- do **not** open production packages for the five post-core factions.
 
-### Wave 5 — World locations and campaign variety
+### Wave 4 — World locations and campaign variety
 
 - special locations, derelicts, anomalies and infrastructure variants;
 - regional names, manufacturers, condition states and service histories;
@@ -247,12 +294,14 @@ Complete the faction whose engineering and politics contrast most strongly with 
 - news/event vocabulary and discovery presentation;
 - representative-seed distribution and repetition checks.
 
-### Wave 6 — Alpha balance and content freeze
+### Wave 5 — Core-pair alpha balance and content freeze
 
 - full economy/logistics/combat/progression soaks;
+- pairwise Imperial/Industrial Union comparison;
 - remove dead content and universal best choices;
 - settle market availability, rarity and replacement cadence;
 - freeze stable IDs and alpha fingerprints;
+- run post-core architecture compatibility checklist without implementing the five horizon factions;
 - enter Stage 23 only with an explicit remaining production-art list.
 
 ## 8. Ship content pipeline
@@ -309,7 +358,9 @@ explicit global migration, not a per-artist guess.
 7. performance/texture budget;
 8. save/load rebinding by stable ID.
 
-## 9. Imperial ship and object rules
+## 9. Core faction visual/systemic production rules
+
+### 9.1 Империя
 
 The Imperial production pack follows the accepted formula:
 
@@ -334,8 +385,35 @@ Required qualities:
 - old hull/new subsystem continuity through replacement panels and service markings;
 - no fantasy wings, baroque ornament, steampunk, neon or random surface noise.
 
-The same language extends to stations, equipment, interiors, icons and characters. It must not be
-copied to other factions with a hue shift.
+Systemic authority: `docs/factions/empire_systemic_identity.md`.
+
+### 9.2 Индустриальный Союз
+
+Before Wave 2 bulk art, create an equivalent production visual bible.
+
+Already locked systemic visual requirements:
+
+```text
+standardized family resemblance
++ repeatable modular construction
++ visible industrial handling/service interfaces
++ practical mass-production grammar
++ strong freight/yard identity
++ no aristocratic Imperial silhouette language
+```
+
+Required constraints:
+
+- not a hue-shifted Imperial ship family;
+- related hull classes should visibly share manufactured subassemblies/structural grammar where physically plausible;
+- industrial and logistics vessels are signature assets, not generic background craft;
+- practical maintainability/assembly cues must correspond to actual module/compartment/service geometry;
+- no fantasy factory aesthetic, arbitrary pipes or decorative machinery that cannot be serviced or justified.
+
+Exact palette, heraldry, uniforms and social-symbol vocabulary remain Wave-2 visual-bible authoring,
+not something to invent as a simulation stat.
+
+Systemic authority: `docs/factions/industrial_union_systemic_identity.md`.
 
 ## 10. Stations, infrastructure and special locations
 
@@ -391,6 +469,12 @@ The five compatibility-era commodities remain only where their abstraction is st
 New economy content must reference the richer Stage-18 resource/component/facility grammar and must
 not create duplicate “ore/steel/weapons” chains beside it.
 
+Core-faction technology distinction must remain manufacturable:
+
+- Imperial preferences may spend mass/volume/cost on redundancy, serviceability and mature support;
+- Industrial Union preferences may spend flexibility/tooling freedom on standardization, throughput and commonality;
+- neither preference grants output or performance by faction name.
+
 ## 12. Character and portrait pipeline
 
 ### Shared project style lock
@@ -428,7 +512,7 @@ from saved identity and cannot reroll on load.
 
 ### Art production
 
-- produce five separate candidate variants for a recurring character;
+- produce five separate candidate variants for a recurring character where a new production character visual is being selected;
 - select for face distinctiveness, faction identity, role identity and restraint;
 - derive UI portrait crop from the accepted master illustration where possible;
 - validate transparent alpha and absence of accidental checkerboard/background;
@@ -437,7 +521,7 @@ from saved identity and cannot reroll on load.
 
 ## 13. NPC roster architecture
 
-Each major faction should cover at least:
+Each production-complete core faction covers at least:
 
 - senior political/diplomatic representative;
 - fleet/defense commander;
@@ -452,9 +536,12 @@ medics/rescue crews, salvagers, scientists, inspectors, smugglers, mercenaries a
 The roster must include disagreement within a faction. NPC personality changes offers, risk,
 language and priorities within lawful bounds; it does not add magic combat/economy bonuses.
 
+Minor/transnational actors receive only the contacts necessary for their real gameplay role and do
+not need to mimic the six-role sovereign structure.
+
 ## 14. Mission and narrative content
 
-### Mission families and alpha floor
+### Mission families and game-wide alpha floor
 
 | Family | Minimum templates | World-state sources |
 |---|---:|---|
@@ -465,10 +552,13 @@ language and priorities within lawful bounds; it does not add magic combat/econo
 | combat/coercion | 6 | raid, interception, blockade, bounty, defense operation |
 | industry/construction/repair | 6 | real site inputs, yard queue, damaged asset, capability gap |
 | diplomacy/access/reputation | 4 | proposal, treaty, crisis, recognition, prisoner/aid exchange |
-| faction story-chain steps | 4 reusable structural patterns | living actors plus authored character conflicts |
+| faction/story structural patterns | 4 reusable patterns | living actors plus authored character conflicts |
 
-The table yields at least 48 parametric templates. It is a coverage floor; a template that merely
-changes a noun does not count as a different gameplay contract.
+The table yields at least 48 parametric templates. It is a game-wide coverage floor; a template that
+merely changes a faction name or noun does not count as a different gameplay contract.
+
+Each core faction package must exercise at least ten suitable templates; the remaining templates may
+be shared/independent where the same lawful world-state contract applies.
 
 ### Mission contract
 
@@ -492,7 +582,7 @@ co-presence and arrival; “negotiate” to an accepted political state transiti
 
 ### Authored story chains
 
-Each major faction receives two compact chains, ideally 3–5 steps each:
+Each core faction receives two compact chains, ideally 3–5 steps each:
 
 - one internal/economic/institutional conflict;
 - one external/diplomatic/security conflict.
@@ -500,6 +590,8 @@ Each major faction receives two compact chains, ideally 3–5 steps each:
 Authored characters supply motives and interpretation, while branch outcomes remain grounded in
 the live economy, relations, travel, battles and territorial state. If the world already resolved or
 destroyed a required object, the chain adapts or closes honestly; it must not respawn a prop.
+
+Future horizon factions receive equivalent chains only when their post-core packages enter active production.
 
 ## 15. Names, copy and procedural text
 
@@ -630,6 +722,8 @@ Every asset pack manifest records:
 
 Filenames are not simulation identity. Renaming a source file cannot silently create a new ship.
 
+Post-core horizon factions do not need empty asset directories or placeholder IDs before their own production phase.
+
 ## 21. Automated validation
 
 Content CI must fail on:
@@ -646,7 +740,9 @@ Content CI must fail on:
 - mission without issuer authority, target predicate, deadline policy or reward source;
 - NPC/dialogue fact outside declared knowledge scope;
 - unsupported save alias/removal;
-- unexpected semantic fingerprint change.
+- unexpected semantic fingerprint change;
+- a production core faction missing its required systemic/visual/content manifest;
+- a faction profile granting hidden authoritative resources/capability by faction name.
 
 Human review remains required for silhouette, role readability, faction identity, language quality,
 audio mix and actual gameplay value.
@@ -662,12 +758,19 @@ Content is accepted as a system, using:
 - peaceful economy and wartime logistics soaks;
 - player progression paths across lawful markets, reputation, salvage and own industry;
 - faction decision/outcome diversity over representative seeds;
+- Imperial/Industrial Union pairwise industrial, fleet, logistics and recovery comparison;
+- at least one pairwise scenario where their lawful priorities diverge and one where they converge;
 - content repetition telemetry from long campaigns;
 - actual-size visual captures under normal and saturated scenes;
 - save/load continuity after content migration.
 
-No arbitrary equal win-rate target is required between asymmetric factions. Each faction must have
-credible strengths, costs, counters and recovery paths within the same laws.
+No arbitrary equal win-rate target is required between asymmetric factions. Each shipped core faction
+must have credible strengths, costs, counters and recovery paths within the same laws.
+
+The post-core horizon is checked only for obvious architecture lockout: Stage-22 code/content schemas
+must not unnecessarily encode assumptions such as “every sovereign economy is centralized” or “all
+industrial nodes are permanently static” when a more general representation is equally practical.
+This is compatibility review, not implementation.
 
 ## 23. Stage mapping
 
@@ -675,19 +778,21 @@ credible strengths, costs, counters and recovery paths within the same laws.
 
 - minimum actor/faction vocabulary required to explain interests and decisions;
 - NPC identity, role, knowledge, availability and reputation semantics;
-- mission templates and two gold-slice character chains needed to prove the living-world loop;
+- mission templates and Imperial gold-slice character content needed to prove the living-world loop;
+- Stage-21I systemic core-pair decision/corpus fixtures;
 - UI projections for living actors, missions, information scope and consequences;
 - no mass final hull/technology roster.
 
 ### Stage 22 owns
 
-- faction roster review and all faction content packages;
+- core-pair roster/migration review and production-complete packages for **Империя + Индустриальный Союз**;
 - production technology/module/material/facility catalog;
-- hull, fit, station and fleet-composition breadth;
-- full NPC/mission/location breadth and world distribution;
-- alpha art/icon/VFX/audio set sufficient for all shipped content;
+- hull, fit, station and fleet-composition breadth for the core pair and shared civilian ecosystem;
+- full game-wide NPC/mission/location breadth needed for alpha without requiring post-core sovereign packages;
+- alpha art/icon/VFX/audio set sufficient for shipped content;
 - balance, progression, long-run content and fingerprint freeze;
-- explicit disposition of every provisional Stage-17.5/19 definition.
+- explicit disposition of every provisional Stage-17.5/19 definition;
+- explicit disposition of legacy generated-world faction IDs/roles.
 
 ### Stage 23 owns
 
@@ -695,7 +800,20 @@ credible strengths, costs, counters and recovery paths within the same laws.
 - UI/audio/VFX consistency, accessibility and localization closure;
 - onboarding/editorial polish;
 - content-reference, package, migration and clean-machine release validation;
-- no unbounded new content family after freeze.
+- no unbounded new content family after freeze;
+- RC completion with the two sovereign core factions, not the five post-core horizon packages.
+
+### Post-core development owns
+
+Each future major faction receives a separate architecture/content package after the main stage:
+
+- Directorate;
+- League of Free Systems;
+- Frontier Confederation;
+- Consortium;
+- Nomad Fleet.
+
+Their activation requires a fresh architecture audit and may add reusable mechanics only through normal authority/change policy.
 
 ## 24. Cut priority
 
@@ -704,28 +822,38 @@ When time or production capacity is limited, cut in this order:
 1. duplicate cosmetic variants with no gameplay/readability value;
 2. additional expression/paint variants;
 3. extra special-location themes beyond coverage floor;
-4. third/later story chain per faction;
+4. third/later story chain per core faction;
 5. niche hull that duplicates an existing role;
 6. minor-organization bespoke visuals that can lawfully use common civilian manufacture;
-7. optional music breadth.
+7. optional music breadth;
+8. nonessential content prototypes for post-core factions — they should normally not enter core production at all.
 
 Do not cut:
 
 - authority/persistence/knowledge correctness;
-- one complete Imperial gold slice and one contrast faction;
+- one complete Imperial gold slice;
+- one complete Industrial Union contrast package;
 - role/counterplay coverage;
 - readable object selection/inspection;
 - mission reward/target conservation;
-- faction distinction without color;
+- core-faction distinction without color;
 - save/content migration and provenance;
-- required accessibility/localization path.
+- required accessibility/localization path;
+- post-core architectural extensibility where preserving it is low-cost and does not expand scope.
 
 ## 25. Definition of content-complete RC
 
 Content is RC-complete when every shipped definition is physically/economically valid, reachable
 through the live world, visually and verbally readable, bound by stable identity, localized,
-licensed, save-compatible and exercised by representative campaigns; all five major factions and
-three minor organizations have intentional identities; the Imperial package follows its accepted
-visual bible; character art follows the shared grounded hand-painted style; provisional content has
-an explicit final disposition; and no shipped mission, asset or text invents state outside simulation
-authority.
+licensed, save-compatible and exercised by representative campaigns; **Империя and Индустриальный
+Союз are both production-complete sovereign faction packages with intentional and mechanically
+non-magical identities**; legacy minor/transnational actors have explicit lawful roles sufficient for
+the shipped civilian ecosystem; the Imperial package follows its accepted visual/systemic bibles;
+the Industrial Union has an independent reviewed visual/systemic bible; character art follows the
+shared grounded hand-painted style; provisional content has an explicit final disposition; supported
+faction/content IDs have explicit migration policy; and no shipped mission, asset or text invents
+state outside simulation authority.
+
+The five canonical post-core factions — Директорат, Лига Свободных Систем, Пограничная Конфедерация,
+Консорциум and Кочевой Флот — remain documented future expansion horizons and are **not required for
+content-complete Stage-23 RC**.
