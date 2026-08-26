@@ -25,6 +25,13 @@ actor-bounded observations
 Stage 21 is not allowed to substitute scripted map colour changes, arbitrary random wars or hidden
 NPC resources for this chain.
 
+The production core-pair reference is now **Империя + Индустриальный Союз**. Stage 21 must prove that
+one shared living-world decision chain can express meaningfully different lawful priorities for this
+pair without faction-only resource, combat, movement or information authority. Final engineering,
+hull, visual and broad narrative differentiation remains Stage 22.
+
+Canonical faction scope: `docs/factions/faction_roster_and_development_horizon.md`.
+
 ## 2. Upstream authority consumed by Stage 21
 
 | Existing stage | Authority reused by Stage 21 |
@@ -61,6 +68,8 @@ combat-stat system, territory flag, fleet registry, economy, cargo store or move
     not be forced into total war.
 16. Provisional Stage-17.5/19 combat fits remain explicitly temporary until Stage 22 reviews them.
 17. UI and missions project authoritative state and never become simulation authority.
+18. Faction doctrine/institutional preference may rank goals and lawful policy choices, but cannot act
+    as a hidden production/combat/sensor multiplier or bypass ordinary feasibility/cost authority.
 
 ## 4. Runtime model and cadence
 
@@ -367,15 +376,28 @@ Deliverables:
 - deterministic new-world, mid-crisis, mid-transit, mid-operation and post-war save/load tests;
 - representative seed corpus covering peaceful coexistence, alliance, coercion, limited war,
   territorial transition, recovery and renewed trade;
+- **core-pair corpus:** Империя and Индустриальный Союз must be given equivalent lawful simulation
+  opportunities but sufficiently different institutional/doctrine priorities that at least one
+  deterministic scenario produces different explainable strategic ranking/commitment without
+  faction-only resources, omniscience, combat multipliers or scripted outcome grants;
+- the same core-pair corpus must include at least one case where shared physical shortage/route evidence
+  produces a common rational goal, proving differentiation is preference/institutional rather than
+  forced opposition in every circumstance;
 - bounded-performance evidence for increasing faction/system/fleet/NPC counts;
 - long-run soak with physical production, losses, diplomacy and territory continuing without
   resource creation, ID duplication, deadline loss or decision oscillation.
+
+The Stage-21I core-pair proof may use provisional Stage-17.5/19 hull/fits and minimal systemic profile
+fixtures. It must **not** pull final Imperial/Industrial Union hull breadth or visual production forward
+from Stage 22.
 
 Exit criteria:
 
 - every visible strategic value traces to authoritative state;
 - UI actions cannot mutate simulation except through explicit validated commands;
 - corpus tests prove outcome diversity without seed-specific exceptions;
+- core-pair traces prove both meaningful divergence and lawful convergence from actor-bounded evidence;
+- no core-pair acceptance outcome depends on a faction-name production/combat/sensor modifier;
 - final checkpoint restore continues byte/determinism and identity invariants;
 - all Stage-21 hard invariants have non-vacuous acceptance evidence.
 
@@ -391,6 +413,8 @@ Exit criteria:
 8. NPC/mission tests proving real issuer authority, knowledge and world-state completion.
 9. Mid-chain save/load tests at every state-machine boundary.
 10. Representative generated-seed corpus and bounded long-run performance soak.
+11. Core-pair doctrine/institution acceptance proving Империя/Индустриальный Союз divergence and
+    convergence through the same observation/goal/command authorities without hidden stat cheats.
 
 Acceptance must be non-vacuous: a green test that never creates a crisis, moves a military FleetId,
 consumes supply, records damage, changes a territorial state or resolves a mission is not evidence for
@@ -403,7 +427,11 @@ causality. Stage 22 owns final hull families, faction engineering doctrine, modu
 fleet composition and manufacturable content review.
 
 Stage 21 therefore decides **why, when and where** a faction acts and proves that the action is
-physical. Stage 22 finalizes **what production-quality ships and technologies** each faction fields.
+physical. Stage 22 finalizes **what production-quality ships and technologies** the core factions field.
+
+The Stage-22 production-complete major-faction scope is intentionally limited to **Империя and
+Индустриальный Союз**. Директорат, Лига Свободных Систем, Пограничная Конфедерация, Консорциум and
+Кочевой Флот are canonical post-core horizon factions and do not block Stage-21 completion.
 
 ## 8. Definition of Stage-21 completion
 
@@ -423,6 +451,11 @@ run a physical economy
 → continue deterministically through a bounded long-run soak
 ```
 
+Additionally, the final representative corpus must prove that the core pair can interpret the same
+lawful world evidence differently where institutions/doctrine justify it, and identically where the
+physical optimum is shared. Faction identity is therefore a preference/institutional layer over common
+authorities, not a script forcing opposite outcomes.
+
 No single seed is required to exercise every political outcome naturally. Targeted deterministic
 fixtures prove individual branches; the representative corpus proves that the combined system
 supports multiple plausible histories without hidden exceptions.
@@ -440,7 +473,7 @@ supports multiple plausible histories without hidden exceptions.
 | 21F | **COMPLETE** | occupation/stabilization/control transitions |
 | 21G | **COMPLETE** | peace/demobilization/finite recovery/loss-backed replacement/post-war memory |
 | 21H | **COMPLETE** | persistent NPCs, actor-bounded knowledge, funded missions, reputation and discovery |
-| 21I | **OPEN — next** | integrated UI/migration/corpus/performance final gate |
+| 21I | **OPEN — next** | integrated UI/migration/core-pair corpus/performance final gate |
 
 Stage 21A accepted the deliberately narrow actor foundation: stable faction-bound lifecycle state,
 immutable actor-bounded observations, measurable interests, deterministic traces, ordered wakeups,
@@ -518,8 +551,10 @@ Stage 21H accepts the RPG-side participant layer without introducing a quest-onl
 
 Stage 21I is now the first remaining implementation slice. It must project the accepted full living-world
 state through command/inspection UI, supported-save migration, representative corpus, bounded-performance
-evidence and the final long-run Stage-21 acceptance gate. It must not turn UI, migration or presentation
-into simulation authority. The Stage-21H closeout intentionally does not start Stage 21I implementation.
+evidence and the final long-run Stage-21 acceptance gate. It must also add the deliberately bounded
+Империя/Индустриальный Союз institutional/doctrine acceptance proof without pulling final Stage-22
+engineering or visual content forward. It must not turn UI, migration, presentation or faction profile
+selection into simulation authority. The Stage-21H closeout intentionally does not start Stage 21I implementation.
 
 ## 10. Suggested state ownership
 
@@ -552,6 +587,20 @@ Stage 21 needs enough authored content to prove mechanics, but not the final Sta
 - character art may begin with accepted production candidates, but identity/state cannot depend on
   whether art is loaded.
 
+The completed Stage-21H authored gold slice remains intentionally Imperial. Stage 21I does not reopen
+21H merely to duplicate the full NPC package for the contrast faction.
+
+### Core-pair Stage-21I fixtures
+
+For Индустриальный Союз, Stage 21I needs only enough deterministic systemic identity to prove the
+shared decision machinery:
+
+- stable faction/profile reference suitable for persistence/migration audit;
+- bounded doctrine/institution preferences traceable in decision diagnostics;
+- strategic shortage/route/industrial evidence fixtures using ordinary Stage-18/20 state;
+- at least one divergent and one convergent outcome against Imperial reference behavior;
+- no final hull roster, visual bible or NPC quota before Stage 22.2.
+
 ### First eight mission contracts
 
 1. emergency physical supply delivery;
@@ -572,7 +621,7 @@ A compact 3–5-step Imperial chain should combine a real supply dependency, ins
 access negotiation and possible escort/crisis outcome. Characters provide interpretation and
 choice; the live world decides whether cargo, route, treaty, fleet and target still exist.
 
-Full faction/NPC/mission/location breadth remains Stage 22 and follows
+Full core-pair faction/NPC/mission/location breadth remains Stage 22 and follows
 `docs/content_production_plan_stage21_23.md`.
 
 ## 12. Pull-request decomposition
@@ -595,7 +644,7 @@ Each item should remain separately reviewable and leave `main` green:
 14. **COMPLETE:** 21H mission/escrow/objective/reputation;
 15. **COMPLETE:** 21H authored gold-slice content;
 16. **NEXT:** 21I command UI/overlays/timeline;
-17. 21I migration/corpus/performance/soak and completion record.
+17. 21I migration/core-pair corpus/performance/soak and completion record.
 
 A PR may combine adjacent items only when the resulting authority boundary and acceptance evidence
 remain independently reviewable.
