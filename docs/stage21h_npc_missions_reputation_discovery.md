@@ -1,6 +1,6 @@
 # Stage 21H — NPCs, missions, reputation and discovery grounded in the living world
 
-**Status:** implementation/acceptance candidate. Canonical `COMPLETE` is recorded only after the implementation PR merges from an exact green head and the resulting `main` is verified. Stage 21I is intentionally out of scope here.
+**Status:** **COMPLETE**. Accepted through PR #335 from exact green implementation head `d57a71b351a22af52e005499a214e41db0701f85`; implementation merge commit on `main`: `ecc57ad27a653d823da4294d121414aeab7c72e9`. Stage 21I is intentionally out of scope here and remains the next Stage-21 closure slice.
 
 ## 1. Objective
 
@@ -175,7 +175,7 @@ Focused tests include:
 - `Stage21HStoryChainTest` — successful bounded progression and honest world-closed chain;
 - `Stage21HGeneratedWorldRuntimePersistenceAcceptanceTest` — active funded mission round-trip over complete Stage 21G, exact lower-ledger escrow provenance and corrupt/future reference rejection.
 
-Final acceptance still requires the exact implementation HEAD to pass the repository's complete Java 17 verification workflow (tests, coverage, Javadoc and desktop package) and the implementation PR to pass merge/review/base gates.
+Acceptance evidence is green on implementation head `d57a71b351a22af52e005499a214e41db0701f85`: CI run #5307 (`32978603732`), Java 17 verification job `98209354294`, including repository tests, coverage checks, Javadoc and desktop packaging. PR #335 passed the inspected merge/base/review gates and was merged to `main` as `ecc57ad27a653d823da4294d121414aeab7c72e9`.
 
 ## 13. Stage 21H exit map
 
