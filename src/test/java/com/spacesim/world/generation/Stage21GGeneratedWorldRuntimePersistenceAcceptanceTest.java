@@ -141,6 +141,20 @@ class Stage21GGeneratedWorldRuntimePersistenceAcceptanceTest {
         String first = initial.worldState().factions().get(0).factionContentId();
         String second = initial.worldState().factions().get(1).factionContentId();
         long now = stage20.world().getAuthoritativeWorldTick();
+        long requiredReparations = 25_000L;
+        var firstEconomy = stage20.world().findFactionEconomicState(first).orElseThrow();
+        long spendable = Math.max(0L,
+                firstEconomy.treasuryMilliCredits() - firstEconomy.treasuryReserveFloorMilliCredits());
+        long topUp = Math.max(0L, requiredReparations - spendable);
+        if (topUp > 0L) {
+            var sourceWallet = new com.spacesim.components.WalletComponent(topUp);
+            assertTrue(stage20.world().transferToFactionTreasury(
+                    first,
+                    sourceWallet,
+                    "stage21g-persistence-fixture",
+                    topUp,
+                    "stage21g-persistence-treasury-fixture"));
+        }
 
         Stage19ConflictRuntime warfare = new Stage19ConflictRuntime(Stage19ConflictState.empty(now));
         DiplomaticLifecycleService diplomacy = new DiplomaticLifecycleService(
@@ -160,7 +174,7 @@ class Stage21GGeneratedWorldRuntimePersistenceAcceptanceTest {
                 ProposalKind.PEACE,
                 war.warId(),
                 List.of(),
-                List.of(new Term(TermKind.TREASURY_PAYMENT, "reparations.stage21g", 25_000L)),
+                List.of(new Term(TermKind.TREASURY_PAYMENT, "reparations.stage21g", requiredReparations)),
                 now + 120L));
         peace = diplomacy.accept(peace.proposalId());
 
