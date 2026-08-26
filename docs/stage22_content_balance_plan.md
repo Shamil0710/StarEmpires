@@ -8,9 +8,15 @@
 Canonical faction scope and horizon:
 
 - `docs/factions/faction_roster_and_development_horizon.md`;
+- `docs/factions/faction_gameplay_visual_balance_bible.md`;
 - `docs/factions/empire_systemic_identity.md`;
+- `docs/factions/empire_visual_bible.md`;
 - `docs/factions/industrial_union_systemic_identity.md`;
-- `docs/factions/post_core_faction_horizon.md`.
+- `docs/factions/industrial_union_visual_bible.md`;
+- `docs/factions/post_core_faction_horizon.md`;
+- `docs/factions/faction_balance_validation_framework.md`;
+- `docs/factions/faction_implementation_roadmap.md`;
+- `docs/characters/character_master_prompt.md`.
 
 Директорат, Лига Свободных Систем, Пограничная Конфедерация, Консорциум и Кочевой Флот являются
 каноническим **post-core horizon** и не входят в Stage-22/23 completion blocker set.
@@ -857,7 +863,9 @@ technology/content/institutional choice
 Визуальная основа — принятый код «Империи»: тяжёлая ремонтопригодная осевая инженерия,
 центральная цитадель, сдержанная иерархия, graphite/ivory/burgundy/brass и отсутствие fantasy decor.
 
-Systemic authority: `docs/factions/empire_systemic_identity.md`.
+Systemic authority: `docs/factions/empire_systemic_identity.md`.  
+Visual authority: `docs/factions/empire_visual_bible.md`.  
+Character authority: `docs/characters/character_master_prompt.md`.
 
 ## 22.2 — Industrial Union contrast slice
 
@@ -884,7 +892,9 @@ Pairwise acceptance against the Empire must prove:
 - measurable standardization benefit and retooling/bottleneck cost;
 - отсутствие одного доминирующего fit/faction across combined metrics.
 
-Systemic authority: `docs/factions/industrial_union_systemic_identity.md`.
+Systemic authority: `docs/factions/industrial_union_systemic_identity.md`.  
+Visual authority: `docs/factions/industrial_union_visual_bible.md`.  
+Character authority: `docs/characters/character_master_prompt.md`.
 
 ## 22.3 — shared civilian/minor ecosystem and cross-market integration
 
@@ -929,6 +939,15 @@ UI art, VFX, audio, localization, manifests, quotas и cut rules:
 Faction roster/horizon authority:
 
 `docs/factions/faction_roster_and_development_horizon.md`.
+
+Faction gameplay/visual/counterplay contract:
+
+`docs/factions/faction_gameplay_visual_balance_bible.md`.
+
+Detailed execution and evidence gates:
+
+- `docs/factions/faction_implementation_roadmap.md`;
+- `docs/factions/faction_balance_validation_framework.md`.
 
 При конфликте:
 
