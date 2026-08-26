@@ -35,6 +35,24 @@
 - отдельная simplified large-battle physics только потому, что в бою много кораблей;
 - viewer-owned movement/targeting/combat authority.
 
+### 1.1 Канонический faction scope основного этапа
+
+Основной этап разработки до Stage 23 production-complete реализует две reference factions:
+
+- **Империя** — primary gold slice;
+- **Индустриальный Союз** — mandatory contrast faction.
+
+Пять следующих крупных фракций — **Директорат, Лига Свободных Систем, Пограничная Конфедерация, Консорциум и Кочевой Флот** — закреплены как post-core development horizon и **не являются Stage-21/22/23 exit criteria**.
+
+Faction differentiation обязана возникать из общих institutions/policy/industry/geography/procurement/logistics/engineering/AI rules, а не из faction-name modifiers или отдельных simulation authorities.
+
+Canonical faction contracts:
+
+- `docs/factions/faction_roster_and_development_horizon.md`;
+- `docs/factions/empire_systemic_identity.md`;
+- `docs/factions/industrial_union_systemic_identity.md`;
+- `docs/factions/post_core_faction_horizon.md`.
+
 ## 2. Milestones
 
 | Milestone | Цель | Stages | Статус |
@@ -44,7 +62,7 @@
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21 / 21I NEXT** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
 Manual merge gate remains mandatory while `main` is unprotected:
@@ -523,7 +541,9 @@ The mandatory Stage-21 closure chain is now:
 - **21H — COMPLETE** — persistent NPC identities, actor-bounded knowledge/dialogue, living-world-grounded
   funded missions, independent player participation proof, observed RPG reputation, bounded event scheduling
   and deterministic schema-v11 persistence over Stage 21G;
-- **21I — NEXT** — command UI, save migration, representative corpus, performance and long-run final gate.
+- **21I — NEXT** — command UI, save migration, representative corpus, performance and long-run final gate,
+  including a core-pair acceptance corpus proving explainable divergent Империя/Индустриальный Союз
+  decisions without faction-only resource, combat or information advantages.
 
 Canonical detailed plan and exit criteria:
 `docs/stage21_living_world_roadmap.md`.
@@ -551,6 +571,10 @@ causal loop `interests → diplomacy/crisis → physical fleet operation → los
 outcome → recovery → grounded NPC/mission/reputation consequences`, followed by deterministic
 mid-chain persistence, representative corpus and long-run acceptance without hidden grants.
 
+Core-faction note: Stage 21 final acceptance must prove that the same Stage-21 machinery can express
+meaningfully different lawful priorities for the Империя and Индустриальный Союз. Stage 21 does **not**
+own their final ship/technology/visual breadth; that remains Stage 22.
+
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
 **PLANNED after Stage 21.**
@@ -570,6 +594,20 @@ Expands the accepted physical/manufacturable language:
 
 Stage 22 explicitly owns the content review of the Stage-17.5/19 provisional Combat Test Content Pack. Test hulls/modules/ammunition/fits and provisional calibration definitions must be re-authored, rebalanced, replaced or explicitly promoted according to the accepted technology ladder, Stage-18 industrial ontology, faction engineering doctrine and faction visual language. **Prototype identity is never automatic canon.**
 
+### Stage-22 faction scope lock
+
+Stage 22 production-complete major-faction scope is intentionally limited to:
+
+1. **Империя** — `22.1` gold slice;
+2. **Индустриальный Союз** — `22.2` contrast slice.
+
+Stage 22 must implement their differentiation through common mechanics and then perform pairwise fleet,
+industry, logistics, economy, NPC/content and long-run balance. It must **not** require production-complete
+Директорат / Лигу Свободных Систем / Пограничную Конфедерацию / Консорциум / Кочевой Флот.
+
+Stage 22.0 also owns explicit migration/disposition of legacy generated-world faction IDs so existing
+runtime identities are not silently reinterpreted as final lore identities.
+
 No isolated `Mk II = +25% all stats` parallel system.
 
 Detailed plan: `docs/stage22_content_balance_plan.md`.
@@ -577,6 +615,9 @@ Detailed plan: `docs/stage22_content_balance_plan.md`.
 Cross-media production plan for faction packages, ships, stations, NPCs, missions, locations,
 characters, UI art, VFX, audio, localization, manifests, alpha floors and cut rules:
 `docs/content_production_plan_stage21_23.md`.
+
+Faction design authority:
+`docs/factions/faction_roster_and_development_horizon.md`.
 
 ## 11. Stage 23 — Polish / Release Candidate
 
@@ -600,6 +641,9 @@ Mandatory closure chain:
 - **23J** — exact-package Release Candidate acceptance gate.
 
 Canonical detailed plan: `docs/stage23_release_candidate_roadmap.md`.
+
+Stage 23 core faction release gate requires production-complete **Империю и Индустриальный Союз**.
+The five post-core horizon factions are explicitly outside the Stage-23 blocker set.
 
 Stage 23 is not complete when the source tree merely builds. The exact distributable package must
 launch on a clean supported machine, remain readable across the accepted display envelope, preserve
@@ -636,8 +680,9 @@ Stage 17 COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
 → Stage 21 RPG / Living World ACTIVE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H COMPLETE; 21I NEXT
-→ Stage 22 Content / Balance Alpha + re-author/review provisional combat content
-→ Stage 23 RC / final presentation replacement and polish
+→ Stage 22 Content / Balance Alpha — Imperial gold slice + Industrial Union contrast + shared ecosystem + pairwise balance
+→ Stage 23 RC / final presentation replacement and polish for the core pair
+→ Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
 
 **Immediate implementation priority is Stage 21I.** Stage 21H now closes the RPG-side participant
@@ -646,7 +691,9 @@ read-only ordinary-authority objective evaluation, independent player participat
 RPG reputation, bounded wakeup scheduling and schema-v11 generated-world persistence over Stage 21G.
 Stage 21I must expose and harden the complete living-world chain through command/inspection UI,
 supported-save migration, representative corpus, bounded-performance evidence and the final long-run
-Stage-21 acceptance gate; it is NEXT here and intentionally not started by the Stage-21H closeout.
+Stage-21 acceptance gate; the representative corpus must include the core-pair differentiation proof
+without prematurely importing final Stage-22 ship/content breadth. Stage 21I remains NEXT and was
+intentionally not started by the Stage-21H closeout.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
 file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.
