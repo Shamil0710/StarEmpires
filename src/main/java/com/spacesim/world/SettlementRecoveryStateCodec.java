@@ -23,7 +23,7 @@ import java.util.Objects;
 /** Deterministic bounded binary codec for {@link SettlementRecoveryState}. */
 public final class SettlementRecoveryStateCodec {
     private static final int MAGIC = 0x53323147; // S21G
-    private static final int FILE_VERSION = 1;
+    private static final int FILE_VERSION = 2;
     private static final int MAX_BYTES = 64 * 1024 * 1024;
     private static final int MAX_ROWS = 1_000_000;
     private static final int MAX_TEXT_BYTES = 16 * 1024;
@@ -209,6 +209,7 @@ public final class SettlementRecoveryStateCodec {
             out.writeLong(row.createdTick());
             out.writeLong(row.updatedTick());
             out.writeInt(row.status().ordinal());
+            out.writeLong(row.completedAssetSystemId() == null ? 0L : row.completedAssetSystemId().value());
             out.writeLong(row.completedAssetIdValue());
             out.writeLong(row.commissionedFleetId() == null ? 0L : row.commissionedFleetId().value());
         }
@@ -226,11 +227,13 @@ public final class SettlementRecoveryStateCodec {
             long createdTick = in.readLong();
             long updatedTick = in.readLong();
             ReplacementStatus status = readEnum(in, ReplacementStatus.values());
+            long assetSystemId = in.readLong();
             long assetId = in.readLong();
             long commissioned = in.readLong();
             rows.add(new ReplacementDemand(
                     id, settlementId, lostFleetId, factionId, fingerprint, createdTick, updatedTick,
-                    status, assetId, commissioned == 0L ? null : new FleetId(commissioned)));
+                    status, assetSystemId == 0L ? null : new StarSystemId(assetSystemId), assetId,
+                    commissioned == 0L ? null : new FleetId(commissioned)));
         }
         return rows;
     }
