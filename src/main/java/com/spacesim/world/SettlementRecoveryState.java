@@ -2,8 +2,10 @@ package com.spacesim.world;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -110,10 +112,10 @@ public record SettlementRecoveryState(
             }
         }
 
-        Set<FleetId> lostFleetIds = new HashSet<>();
+        Map<FleetId, FleetLossRecord> lossesByFleet = new HashMap<>();
         for (FleetLossRecord loss : losses) {
             requireSettlement(settlementIds, loss.settlementId(), "loss");
-            if (!lostFleetIds.add(loss.lostFleetId())) {
+            if (lossesByFleet.putIfAbsent(loss.lostFleetId(), loss) != null) {
                 throw new IllegalArgumentException("FleetId loss recorded more than once: " + loss.lostFleetId());
             }
             if (loss.recordedTick() > simulationTick) {
@@ -126,8 +128,17 @@ public record SettlementRecoveryState(
         long maxDemand = 0L;
         for (ReplacementDemand demand : replacementDemands) {
             requireSettlement(settlementIds, demand.settlementId(), "replacement demand");
-            if (!lostFleetIds.contains(demand.lostFleetId())) {
+            FleetLossRecord loss = lossesByFleet.get(demand.lostFleetId());
+            if (loss == null) {
                 throw new IllegalArgumentException("Replacement demand has no persisted physical loss: "
+                        + demand.lostFleetId());
+            }
+            if (loss.settlementId() != demand.settlementId()) {
+                throw new IllegalArgumentException("Replacement demand settlement differs from physical loss: "
+                        + demand.lostFleetId());
+            }
+            if (!loss.factionContentId().equals(demand.factionContentId())) {
+                throw new IllegalArgumentException("Replacement demand faction differs from physical loss owner: "
                         + demand.lostFleetId());
             }
             if (!demandIds.add(demand.id())) {
@@ -140,7 +151,7 @@ public record SettlementRecoveryState(
             if (demand.updatedTick() > simulationTick) {
                 throw new IllegalArgumentException("Replacement demand is ahead of Stage-21G simulation tick");
             }
-            if (demand.commissionedFleetId() != null && lostFleetIds.contains(demand.commissionedFleetId())) {
+            if (demand.commissionedFleetId() != null && lossesByFleet.containsKey(demand.commissionedFleetId())) {
                 throw new IllegalArgumentException("Destroyed FleetId cannot be reused as a commissioned replacement");
             }
             maxDemand = Math.max(maxDemand, demand.id());
@@ -186,7 +197,7 @@ public record SettlementRecoveryState(
      * Resolves one settlement or fails closed.
      *
      * @param settlementId positive settlement identifier
-     * @return matching settlement
+     * @return matching persistent settlement
      */
     public Settlement requireSettlement(long settlementId) {
         for (Settlement settlement : settlements) {
