@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-26 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21G COMPLETE; 21H NEXT.**
+> **Последняя синхронизация: 2026-08-26 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21H COMPLETE; 21I NEXT.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -43,7 +43,7 @@
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21 / 21H NEXT** |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21 / 21I NEXT** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | 22 | PLANNED |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
@@ -479,7 +479,7 @@ Canonical completion evidence:
 
 ## 9. Stage 21 — RPG / Living World
 
-**ACTIVE — Stage 20/20.5 and Stage 21.0–21G are complete; Stage 21H is OPEN/NEXT.**
+**ACTIVE — Stage 20/20.5 and Stage 21.0–21H are complete; Stage 21I is OPEN/NEXT.**
 
 NPCs, missions, discovery and reputation consume authoritative physical/economic/political state rather than a disconnected scripted world.
 
@@ -520,8 +520,10 @@ The mandatory Stage-21 closure chain is now:
 - **21G — COMPLETE** — causal ceasefire/peace outcomes, conserved reparations, ordinary Stage-21D
   demobilization, finite repair/rearm/refuel, Stage-21E loss provenance, economy-funded shipyard
   replacement with fresh `FleetId`, post-war cooldown/grievance/treaty memory and deterministic persistence;
-- **21H — NEXT** — persistent NPCs, missions, discovery and reputation grounded in living-world state;
-- **21I** — command UI, save migration, representative corpus, performance and long-run final gate.
+- **21H — COMPLETE** — persistent NPC identities, actor-bounded knowledge/dialogue, living-world-grounded
+  funded missions, independent player participation proof, observed RPG reputation, bounded event scheduling
+  and deterministic schema-v11 persistence over Stage 21G;
+- **21I — NEXT** — command UI, save migration, representative corpus, performance and long-run final gate.
 
 Canonical detailed plan and exit criteria:
 `docs/stage21_living_world_roadmap.md`.
@@ -541,9 +543,13 @@ Accepted Stage-21F implementation/acceptance map:
 Accepted Stage-21G implementation/acceptance map:
 `docs/stage21g_peace_recovery_replacement.md`.
 
+Accepted Stage-21H implementation/acceptance map:
+`docs/stage21h_npc_missions_reputation_discovery.md`.
+
 Stage 21 is not complete when factions merely own systems and patrols. Completion requires the
 causal loop `interests → diplomacy/crisis → physical fleet operation → losses/territory → political
-outcome → recovery`, with deterministic persistence and no hidden grants.
+outcome → recovery → grounded NPC/mission/reputation consequences`, followed by deterministic
+mid-chain persistence, representative corpus and long-run acceptance without hidden grants.
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
@@ -629,18 +635,18 @@ Stage 17 COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
-→ Stage 21 RPG / Living World ACTIVE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G COMPLETE; 21H NEXT
+→ Stage 21 RPG / Living World ACTIVE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H COMPLETE; 21I NEXT
 → Stage 22 Content / Balance Alpha + re-author/review provisional combat content
 → Stage 23 RC / final presentation replacement and polish
 ```
 
-**Immediate implementation priority is Stage 21H.** Stage 21G now closes the post-conflict recovery
-loop through the accepted Stage-21C peace authority, conserved Stage-17 treasury transfers, ordinary
-Stage-21D return orders, Stage-21E physical loss provenance, finite Stage-18/19 service stocks and
-shipyard work, fresh replacement identities and persistent post-war diplomatic memory without reset,
-free restoration or a parallel authority. Stage 21H must build persistent NPC identity/knowledge,
-missions, reputation and discovery on that accepted living-world state; it is identified as NEXT here
-but is intentionally not started by the Stage-21G closeout.
+**Immediate implementation priority is Stage 21I.** Stage 21H now closes the RPG-side participant
+layer through persistent NPC identity/knowledge, living-world-grounded funded mission contracts,
+read-only ordinary-authority objective evaluation, independent player participation proof, observed
+RPG reputation, bounded wakeup scheduling and schema-v11 generated-world persistence over Stage 21G.
+Stage 21I must expose and harden the complete living-world chain through command/inspection UI,
+supported-save migration, representative corpus, bounded-performance evidence and the final long-run
+Stage-21 acceptance gate; it is NEXT here and intentionally not started by the Stage-21H closeout.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
 file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.
