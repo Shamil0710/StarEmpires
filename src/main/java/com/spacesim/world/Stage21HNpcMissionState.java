@@ -35,6 +35,7 @@ public record Stage21HNpcMissionState(
 
     /** Current Stage-21H sidecar schema. */
     public static final int CURRENT_VERSION = 1;
+    private static final String MISSION_SEQUENCE_PREFIX = "mission.stage21h.";
 
     /** Six canonical Stage-21H role archetypes. */
     public enum NpcRole {
@@ -85,6 +86,7 @@ public record Stage21HNpcMissionState(
 
     /** Ordinary authority domain consulted for objective evaluation. */
     public enum ObjectiveAuthority {
+        /** Ordinary Stage-20 physical freight/order authority. */ FREIGHT,
         /** Ordinary fleet placement/identity authority. */ FLEET,
         /** Stage-20 owner-local discovery authority. */ DISCOVERY,
         /** Ordinary construction-project authority. */ CONSTRUCTION,
@@ -95,6 +97,7 @@ public record Stage21HNpcMissionState(
 
     /** Predicate vocabulary whose truth must be read from an ordinary authority. */
     public enum ObjectiveKind {
+        /** One ordinary Stage-20 transport order must deliver at least the requested whole kilograms. */ FREIGHT_ORDER_DELIVERED_KG_AT_LEAST,
         /** A stable FleetId must be present in the specified StarSystem. */ FLEET_PRESENT_IN_SYSTEM,
         /** A stable FleetId must no longer exist in ordinary world placement. */ FLEET_ABSENT,
         /** Owner-local discovery must reach at least the requested static state. */ DISCOVERY_AT_LEAST,
@@ -225,7 +228,7 @@ public record Stage21HNpcMissionState(
      *
      * @param authority ordinary authority domain
      * @param kind predicate kind
-     * @param subjectId stable FleetId/project/treaty/operation/faction/object identity
+     * @param subjectId stable order/FleetId/project/treaty/operation/faction/object identity
      * @param systemId target StarSystem value, or 0 when the predicate is not system-scoped
      * @param threshold non-negative numeric threshold used by the predicate
      * @param requiredState optional enum/state token interpreted only by the owning production adapter
@@ -348,6 +351,12 @@ public record Stage21HNpcMissionState(
             }
             outcomeCode = Objects.requireNonNull(outcomeCode, "Mission outcome code not set").strip();
             pendingWakeups = canonical(pendingWakeups, Comparator.naturalOrder(), MissionWakeup::eventId, "Mission wakeups");
+            if (!active && !pendingWakeups.isEmpty()) {
+                throw new IllegalArgumentException("Terminal mission cannot retain pending wakeups");
+            }
+            if (!active && outcomeCode.isEmpty()) {
+                throw new IllegalArgumentException("Terminal mission requires an explicit outcome code");
+            }
         }
 
         /** @return whether the contract still requires world-state reconciliation */
@@ -438,7 +447,7 @@ public record Stage21HNpcMissionState(
      * @param currentStep zero-based next authored step index
      * @param totalSteps fixed authored step count
      * @param status current chain status
-     * @param missionIds mission identities already issued by this chain
+     * @param missionIds mission identities already issued by this chain in authored order
      */
     public record StoryChainState(
             String chainId,
@@ -453,9 +462,12 @@ public record Stage21HNpcMissionState(
                 throw new IllegalArgumentException("Story chain must contain 3-5 steps with valid progress");
             }
             Objects.requireNonNull(status, "Story chain status not set");
-            missionIds = canonicalStrings(missionIds, "Story chain mission IDs");
+            missionIds = orderedUniqueStrings(missionIds, "Story chain mission IDs");
             if (missionIds.size() > currentStep) {
                 throw new IllegalArgumentException("Story chain cannot retain more mission IDs than resolved/issued steps");
+            }
+            if (status == StoryChainStatus.AVAILABLE && (currentStep != 0 || !missionIds.isEmpty())) {
+                throw new IllegalArgumentException("Available story chain cannot already contain progress");
             }
             if (status == StoryChainStatus.COMPLETED && currentStep != totalSteps) {
                 throw new IllegalArgumentException("Completed story chain must reach its final step");
@@ -489,10 +501,18 @@ public record Stage21HNpcMissionState(
         Map<String, NpcState> npcById = new HashMap<>();
         for (NpcState npc : npcs) {
             npcById.put(npc.npcId(), npc);
+            for (NpcKnowledgeFact fact : npc.knowledge()) {
+                if (fact.receivedTick() > simulationTick) {
+                    throw new IllegalArgumentException("NPC knowledge is newer than Stage-21H sidecar: " + fact.factId());
+                }
+            }
         }
         Set<String> missionIds = new HashSet<>();
+        long maximumAllocatedMissionSequence = 0L;
         for (MissionContract mission : missions) {
             missionIds.add(mission.missionId());
+            maximumAllocatedMissionSequence = Math.max(
+                    maximumAllocatedMissionSequence, allocatedMissionSequence(mission.missionId()));
             NpcState issuer = npcById.get(mission.issuerNpcId());
             if (issuer == null) {
                 throw new IllegalArgumentException("Mission references missing issuer NPC: " + mission.missionId());
@@ -503,9 +523,31 @@ public record Stage21HNpcMissionState(
             if (mission.createdTick() > simulationTick || mission.statusUpdatedTick() > simulationTick) {
                 throw new IllegalArgumentException("Mission is newer than Stage-21H sidecar time");
             }
+            for (MissionWakeup wakeup : mission.pendingWakeups()) {
+                if (wakeup.observedTick() > simulationTick) {
+                    throw new IllegalArgumentException("Mission wakeup is newer than Stage-21H sidecar: " + wakeup.eventId());
+                }
+            }
             for (String factId : mission.sourceKnowledgeFactIds()) {
-                if (!issuer.knows(factId)) {
-                    throw new IllegalArgumentException("Mission cites fact absent from issuer NPC knowledge: " + factId);
+                NpcKnowledgeFact fact = issuer.knowledge().stream()
+                        .filter(value -> value.factId().equals(factId))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Mission cites fact absent from issuer NPC knowledge: " + factId));
+                if (!fact.currentAt(mission.createdTick())) {
+                    throw new IllegalArgumentException(
+                            "Mission source fact was unavailable or stale at mission creation: " + factId);
+                }
+            }
+        }
+        if (nextMissionSequence <= maximumAllocatedMissionSequence) {
+            throw new IllegalArgumentException("Next mission sequence must be above every allocated Stage-21H mission ID");
+        }
+        for (ReputationState reputation : reputations) {
+            for (ReputationEvent event : reputation.events()) {
+                if (event.observedTick() > simulationTick) {
+                    throw new IllegalArgumentException(
+                            "Reputation evidence is newer than Stage-21H sidecar: " + event.eventId());
                 }
             }
         }
@@ -532,6 +574,8 @@ public record Stage21HNpcMissionState(
             long threshold,
             String requiredState) {
         boolean valid = switch (kind) {
+            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> authority == ObjectiveAuthority.FREIGHT
+                    && systemId == 0L && threshold > 0L && requiredState.isEmpty();
             case FLEET_PRESENT_IN_SYSTEM -> authority == ObjectiveAuthority.FLEET && systemId > 0L;
             case FLEET_ABSENT -> authority == ObjectiveAuthority.FLEET && systemId == 0L;
             case DISCOVERY_AT_LEAST -> authority == ObjectiveAuthority.DISCOVERY
@@ -548,6 +592,22 @@ public record Stage21HNpcMissionState(
         }
     }
 
+    private static long allocatedMissionSequence(String missionId) {
+        if (!missionId.startsWith(MISSION_SEQUENCE_PREFIX)) {
+            return 0L;
+        }
+        String suffix = missionId.substring(MISSION_SEQUENCE_PREFIX.length());
+        try {
+            long value = Long.parseLong(suffix);
+            if (value <= 0L) {
+                throw new IllegalArgumentException("Allocated Stage-21H mission sequence must be positive");
+            }
+            return value;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Malformed allocated Stage-21H mission ID: " + missionId, exception);
+        }
+    }
+
     private static List<String> canonicalStrings(List<String> values, String label) {
         ArrayList<String> copy = new ArrayList<>(Objects.requireNonNull(values, label + " not set"));
         for (int i = 0; i < copy.size(); i++) {
@@ -556,6 +616,19 @@ public record Stage21HNpcMissionState(
         copy.sort(String::compareTo);
         if (new HashSet<>(copy).size() != copy.size()) {
             throw new IllegalArgumentException("Duplicate " + label);
+        }
+        return List.copyOf(copy);
+    }
+
+    private static List<String> orderedUniqueStrings(List<String> values, String label) {
+        ArrayList<String> copy = new ArrayList<>(Objects.requireNonNull(values, label + " not set"));
+        Set<String> unique = new HashSet<>();
+        for (int i = 0; i < copy.size(); i++) {
+            String value = requireText(copy.get(i), label + " entry");
+            copy.set(i, value);
+            if (!unique.add(value)) {
+                throw new IllegalArgumentException("Duplicate " + label);
+            }
         }
         return List.copyOf(copy);
     }
