@@ -14,9 +14,10 @@ import java.util.Objects;
  * Minimum authored Stage-21H Imperial gold slice.
  *
  * <p>The definitions provide stable identities, localization keys, lawful issuer roles and the
- * ordinary authority each mission template must observe. They deliberately do not instantiate a
- * mission, create a target, fund a reward or force a story outcome. Live world evidence is still
- * required before {@link Stage21HNpcMissionService} can create and resolve a contract.</p>
+ * ordinary authority each mission template must observe. Physical delivery, two-fleet escort,
+ * reaction-mass refuel and derelict salvage are deliberately bound to their accepted simulation
+ * authorities rather than quest flags. These definitions never instantiate a mission, create a
+ * target, fund a reward or force a story outcome.</p>
  */
 public final class Stage21HImperialGoldSlice {
     /** Stable faction identity already used by the generated-world Imperial Directorate. */
@@ -47,7 +48,16 @@ public final class Stage21HImperialGoldSlice {
             ObjectiveKind objectiveKind,
             String titleKey) {
 
-        /** Validates one authored contract definition. */
+        /**
+         * Validates one authored contract definition.
+         *
+         * @param template canonical template
+         * @param issuerRole lawful issuer role
+         * @param opportunityClaimCode required actor-known opportunity family
+         * @param objectiveAuthority ordinary authority domain
+         * @param objectiveKind objective predicate family
+         * @param titleKey localization title key
+         */
         public ContractBlueprint {
             Objects.requireNonNull(template, "Mission template not set");
             Objects.requireNonNull(issuerRole, "Mission issuer role not set");
@@ -76,7 +86,16 @@ public final class Stage21HImperialGoldSlice {
             String requiredLivingWorldSignal,
             String adaptationRule) {
 
-        /** Validates one non-scripted story-chain definition. */
+        /**
+         * Validates one non-scripted story-chain definition.
+         *
+         * @param ordinal authored position
+         * @param stepId stable step ID
+         * @param issuerRole responsible contact role
+         * @param missionTemplate mission family
+         * @param requiredLivingWorldSignal required actor-known signal
+         * @param adaptationRule bounded world-change behavior
+         */
         public ChainStep {
             if (ordinal <= 0) {
                 throw new IllegalArgumentException("Story-chain ordinal must be positive");
@@ -112,9 +131,10 @@ public final class Stage21HImperialGoldSlice {
     /**
      * Returns the exact first eight Stage-21H contract blueprints required by the roadmap.
      *
-     * <p>Each blueprint names an ordinary authority/predicate family. Some physical contracts share
-     * the same predicate family because their distinct gameplay source and issuer role are different;
-     * the blueprint never claims that a label alone completed the work.</p>
+     * <p>Each blueprint names the production authority that must certify completion. Supply and
+     * procurement use actual Stage-20 freight delivery, escort requires two real FleetIds at the
+     * destination, rescue observes real reaction-mass stores, and derelict work combines owner-local
+     * Stage-20 discovery with depletion of a finite Stage-18 salvage stream.</p>
      *
      * @return canonical eight-template content floor
      */
@@ -139,14 +159,14 @@ public final class Stage21HImperialGoldSlice {
                         NpcRole.MILITARY,
                         "SECURITY.ROUTE_EXPOSURE",
                         ObjectiveAuthority.FLEET,
-                        ObjectiveKind.FLEET_PRESENT_IN_SYSTEM,
+                        ObjectiveKind.ESCORT_FLEETS_PRESENT_IN_SYSTEM,
                         "mission.stage21h.convoy-escort.title"),
                 new ContractBlueprint(
                         MissionTemplate.STRANDED_FLEET_RESCUE_REFUEL,
                         NpcRole.INDEPENDENT_FRONTIER,
                         "SECURITY.ROUTE_EXPOSURE",
                         ObjectiveAuthority.FLEET,
-                        ObjectiveKind.FLEET_PRESENT_IN_SYSTEM,
+                        ObjectiveKind.FLEET_REACTION_MASS_KG_AT_LEAST,
                         "mission.stage21h.stranded-rescue.title"),
                 new ContractBlueprint(
                         MissionTemplate.SYSTEM_OBJECT_RECONNAISSANCE,
@@ -159,8 +179,8 @@ public final class Stage21HImperialGoldSlice {
                         MissionTemplate.DERELICT_INVESTIGATION_RECOVERY,
                         NpcRole.EXPLORATION_INTELLIGENCE,
                         "DISCOVERY.SPECIAL_LOCATION",
-                        ObjectiveAuthority.DISCOVERY,
-                        ObjectiveKind.DISCOVERY_AT_LEAST,
+                        ObjectiveAuthority.INDUSTRY,
+                        ObjectiveKind.DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST,
                         "mission.stage21h.derelict-investigation.title"),
                 new ContractBlueprint(
                         MissionTemplate.INTERCEPTION_DEFENSE,
@@ -182,7 +202,7 @@ public final class Stage21HImperialGoldSlice {
      * Returns the compact Imperial chain required to prove authored narrative over changing world state.
      *
      * <p>Every step is gated by a live signal and carries an adaptation rule. No step creates its
-     * shortage, treaty, convoy or crisis target.</p>
+     * shortage, project, treaty, convoy or crisis target.</p>
      *
      * @return exact four-step Imperial gold-slice chain
      */
