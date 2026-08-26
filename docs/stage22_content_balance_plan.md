@@ -2,7 +2,18 @@
 
 > Статус: **PLANNED**  
 > Основание: production Stage 17.5 + Stage 18 industrial foundation + Stages 19–21 world/war/RPG layers  
-> Назначение: расширить мир, корабли, модули, технологии и faction differentiation, не создавая вторую систему правил и не ломая Stage-18 resource/industry ontology.
+> Назначение: расширить мир, корабли, модули, технологии и faction differentiation, не создавая вторую систему правил и не ломая Stage-18 resource/industry ontology.  
+> **Production-complete sovereign faction scope Stage 22: Империя + Индустриальный Союз.**
+
+Canonical faction scope and horizon:
+
+- `docs/factions/faction_roster_and_development_horizon.md`;
+- `docs/factions/empire_systemic_identity.md`;
+- `docs/factions/industrial_union_systemic_identity.md`;
+- `docs/factions/post_core_faction_horizon.md`.
+
+Директорат, Лига Свободных Систем, Пограничная Конфедерация, Консорциум и Кочевой Флот являются
+каноническим **post-core horizon** и не входят в Stage-22/23 completion blocker set.
 
 ---
 
@@ -16,6 +27,17 @@
 
 Stage 18 создаёт **minimum complete economic language**; Stage 22 создаёт широкий playable vocabulary внутри него.
 
+Фракционная асимметрия следует той же логике:
+
+```text
+shared world + shared authorities
+→ institutions / policy / industrial structure / engineering choices
+→ different procurement and fleet solutions
+→ different physical costs and vulnerabilities
+```
+
+Не допускается `factionName → hidden production/combat/sensor multiplier` как основа идентичности.
+
 ---
 
 # 2. Входные условия
@@ -27,11 +49,15 @@ Stage 18 создаёт **minimum complete economic language**; Stage 22 соз�
 - Stage 19 strategic warfare/coercive diplomacy/advanced combat behavior;
 - Stage 20 physically calibrated world generation;
 - Stage 21 NPC/missions/reputation/living-world mechanics;
+- Stage-21I core-pair decision/corpus acceptance;
 - v1.0 schema and capability APIs;
 - real construction/refit/repair/maintenance seams;
 - baseline industrial resource/component/facility graph.
 
 Stage 22 может получать early content prototypes раньше, но массовая балансировка не должна строиться поверх временных mechanics.
+
+Stage 22.0 обязан отдельно проверить, какие существующие generated-world stable faction IDs являются
+runtime compatibility identities, и не переименовывать/переосмысливать их без migration.
 
 ---
 
@@ -355,7 +381,7 @@ Hull Size
 → Variant/Refit
 ```
 
-Минимально покрыть:
+Минимально покрыть роли:
 
 ### Military
 
@@ -380,6 +406,10 @@ Hull Size
 - fleet tanker;
 - colony/industrial transport where setting needs.
 
+Stage-22 product floor does not require every listed role to receive a unique faction hull in both
+core factions. The faction package floor remains six military + three civilian/support base hulls per
+core faction, supplemented by shared/licensed hulls where the market and manufacturers justify it.
+
 ## Anti-obsolescence invariant
 
 Larger hull не должен автоматически отменять меньший.
@@ -398,26 +428,35 @@ Larger hull не должен автоматически отменять мен
 
 ---
 
-# 12. Stage 22I — faction engineering doctrines
+# 12. Stage 22I — faction engineering and industrial doctrines
 
-Faction differentiation должна возникать из content choices, а не faction magic bonuses.
+Stage-22 production acceptance обязана различить **Империю** и **Индустриальный Союз** через content choices and industrial behavior, а не faction magic bonuses.
 
-Например faction может предпочитать:
+## Империя — required systemic direction
 
-- high-thrust engines;
-- heavy passive armor;
-- strong shields;
-- missile saturation;
-- precision kinetics;
-- carrier doctrine;
-- recon/EW networks;
-- automation/high capital cost;
-- manpower-heavy low-tech maintenance;
-- logistics endurance.
+- heavy, serviceable axial engineering;
+- redundancy and protected central citadel;
+- long service life and refit continuity;
+- strategic reserves and state procurement;
+- mature support/repair network;
+- willingness to carry higher mass/cost/maintenance footprint for survivability and continuity.
 
-Faction doctrine определяет design preferences, procurement, fleet composition и industrial investments.
+## Индустриальный Союз — required systemic direction
 
-Допустимый bounded commander/policy modifier не должен переписывать фундаментальную физику.
+- standardized platform/component families;
+- repeated production series;
+- high bulk throughput;
+- strong replacement/logistics culture;
+- production specialization and common spare families;
+- strategic resource hunger and vulnerability to concentrated bottlenecks/retooling.
+
+For both factions, doctrine defines design preferences, procurement, fleet composition and industrial
+investment. A bounded commander/policy preference may influence ranking; it may not rewrite fundamental
+physics or materialize output.
+
+If Stage-18 current manufacturing authority cannot express repeated-series specialization for the
+Industrial Union, Stage 22 may introduce the **minimum reusable common extension** after explicit code
+and authority audit. An `IndustrialUnionProductionSystem` is prohibited.
 
 ---
 
@@ -437,7 +476,8 @@ Facility axes:
 - ammunition/warhead capability;
 - work rate;
 - automation/labor;
-- repair capability.
+- repair capability;
+- production-series/changeover capability **only if the Stage-22.0/22.2 authority audit proves a common missing seam**.
 
 Technology ladder должен создавать real component bottlenecks.
 
@@ -472,13 +512,19 @@ War sustainability становится экономическим outcome.
 
 Fleet может выиграть бой и проиграть campaign, если ammunition/repair/replacement network не выдерживает attrition.
 
+Core-pair balance должен отдельно проверить:
+
+- Imperial repair/refit continuity versus its higher capital/logistics burden;
+- Industrial Union replacement throughput versus its resource/route/retooling dependence;
+- отсутствие бесплатного восстановления capability у обеих сторон.
+
 ---
 
 # 15. Stage 22L — fleet composition and doctrine balance
 
 Проверять не 1v1 ships только, а fleet systems.
 
-Required archetypal fleets:
+Required archetypal fleet roles across the combined catalog:
 
 - patrol/security;
 - convoy escort;
@@ -501,6 +547,8 @@ Metrics:
 - OPEX;
 - replacement cost/time;
 - vulnerability to different doctrines.
+
+Pairwise acceptance must show two viable fleet ecosystems, not one globally optimal doctrine wearing two palettes.
 
 ---
 
@@ -555,9 +603,14 @@ Outputs:
 - carrier aviation stores;
 - fleet reinforcement;
 - capital ship reaction mass;
-- shipyard component supply.
+- shipyard component supply;
+- Imperial reserve/repair network pressure;
+- Industrial Union bulk-flow/series-production pressure.
 
 Distance должен создавать measurable economic geography.
+
+At least one pairwise fixture must demonstrate that route disruption hurts the two core factions through
+different **real dependency graphs**, not through different remote debuffs.
 
 ---
 
@@ -579,7 +632,9 @@ Headless runs должны выявлять:
 - idle shipyards;
 - unbounded ammunition accumulation;
 - pathological concentration of Stage-18 strategic resources;
-- precision-component deadlocks.
+- precision-component deadlocks;
+- Imperial reserve hoarding that starves ordinary economy without policy reason;
+- Industrial Union runaway production or impossible retooling lock-in.
 
 Diagnostics должны показывать причинную цепочку, а не только final score.
 
@@ -609,7 +664,9 @@ Required tests:
 - high delta-v vs payload;
 - automation vs cost/power/vulnerability;
 - carrier wing vs direct weapons;
-- logistics fit vs combat fit.
+- logistics fit vs combat fit;
+- Imperial durability/serviceability vs mass/cost;
+- Industrial Union commonality/throughput vs flexibility/bottleneck exposure.
 
 ---
 
@@ -623,15 +680,19 @@ Technology tiers должны создавать niches.
 - advanced equipment требует rarer components/facilities;
 - high-performance components могут быть hotter/complex/expensive;
 - smaller hulls сохраняют useful roles;
-- faction industrial base влияет на viable technology.
+- faction industrial base влияет на viable technology;
+- Imperial modernization can keep mature hulls useful without making old equipment universally best;
+- Industrial Union standard families can remain economical without forbidding specialized alternatives.
 
 Полная линейная замена допустима для отдельных mature components, но не должна автоматически превращать всю игру в `highest tier = only rational choice`.
 
 ---
 
-# 21. Stage 22R — faction differentiation acceptance
+# 21. Stage 22R — core-faction differentiation acceptance
 
-Для каждой major faction сгенерировать reference fleets и industrial support.
+Production-complete acceptance выполняется для **двух core factions**: Империи и Индустриального Союза.
+
+Для каждой core faction сгенерировать reference fleet, industrial support and recovery/replacement chain.
 
 Faction identity должна быть видна по:
 
@@ -644,8 +705,23 @@ Faction identity должна быть видна по:
 - logistics endurance;
 - production chains;
 - fleet composition;
+- procurement/maintenance/replacement behavior;
+- lawful strategic decisions from Stage-21 evidence.
 
-но все factions используют одну физику и одну Stage-18 material/economic grammar.
+Но обе factions используют одну физику и одну Stage-18 material/economic grammar.
+
+Mandatory pairwise proofs:
+
+1. silhouette recognition without color/heraldry;
+2. different viable engineering/fleet solution under the same physical rules;
+3. different industrial/logistics pressure under at least one shared world condition;
+4. at least one shared world condition where both choose the same rational response;
+5. no hidden faction production/combat/sensor modifier;
+6. no dominant faction across economy + warfare + recovery metrics;
+7. player access to both ecosystems through real markets/relations/industry.
+
+The five post-core factions are referenced only as architecture-compatibility horizons and are not
+required fixtures for Stage 22R.
 
 ---
 
@@ -660,6 +736,9 @@ Faction identity должна быть видна по:
 - component availability;
 - salvage/capture where legal;
 - research/progression systems Stage 21+.
+
+Core-pair content must support meaningful player access to both Imperial and Industrial Union markets
+without making faction choice a menu-only unlock.
 
 Не выдавать high-tier fit через menu unlock без physical/economic source, если это не explicit RPG abstraction.
 
@@ -676,7 +755,8 @@ Machine-readable content benchmark должен фиксировать:
 - cost/material inputs;
 - combat matrices;
 - world logistics matrices;
-- long-run economy metrics.
+- long-run economy metrics;
+- core-pair reference fleets and industrial-support fingerprints.
 
 Изменение content fingerprint требует явного review expected consequences.
 
@@ -695,8 +775,12 @@ Machine-readable content benchmark должен фиксировать:
 5. нужен ли persistence?
 6. влияет ли на world/economy scale?
 7. требует ли migration?
+8. нужен ли он обеим core factions или как минимум остаётся reusable для player/future factions?
+9. является ли request на самом деле post-core requirement, который не должен расширять Stage 22?
 
 Если это действительно fundamental new axis — создать explicit architecture proposal + benchmarks + regression, а не добавлять hidden field.
+
+Потребности пяти horizon factions не являются основанием prematurely добавить private-economy/debt/mobile-industry/etc. в Stage 22, если core pair и player gameplay этого не требуют.
 
 ---
 
@@ -705,17 +789,20 @@ Machine-readable content benchmark должен фиксировать:
 Stage 22 COMPLETE, когда:
 
 - content catalog достаточно широк для alpha;
+- **Империя и Индустриальный Союз production-complete как две sovereign core faction packages**;
 - major technology families имеют meaningful tradeoffs;
 - Stage-18 resource/industry graph выдерживает expanded content без hidden supply;
-- factions различимы через engineering/economy doctrine;
+- core factions различимы через engineering/economy/institutional doctrine;
 - civilian + military roles имеют viable designs;
 - no universal dominant fit;
 - no automatic large-hull obsolescence of small hulls;
 - high-tier production имеет реальные resource/component/facility bottlenecks;
 - ammunition/reaction mass/repair logistics работают в long-run;
+- Imperial repair/reserve model and Industrial Union series/throughput model have measurable benefits and costs;
 - Stage-20 world-scale economy стабильна на representative seeds;
 - strategic wars создают replacement/economic consequences;
 - save/load/soak остаются bounded;
+- post-core factions remain architecturally unblocked but are **not required to be implemented**;
 - full CI + long-run benchmark gates green.
 
 ---
@@ -723,16 +810,16 @@ Stage 22 COMPLETE, когда:
 # 26. Итоговый Stage 22 invariant
 
 ```text
-technology/content choice
-→ changes physical/component capability
+technology/content/institutional choice
+→ changes physical/component/production capability
 → changes Stage-18 material/component/facility requirements
-→ changes fitted ship budgets
-→ changes movement/signature/combat/endurance
+→ changes fitted ship budgets or lawful industrial workflow
+→ changes movement/signature/combat/endurance/throughput
 → changes construction/maintenance/logistics cost
 → changes fleet doctrine and Stage-20 economic geography
 ```
 
-Если technology или module минует эту цепочку и просто добавляет abstract bonus, он нарушает accepted design baseline.
+Если technology, module или faction feature минует эту цепочку и просто добавляет abstract bonus, он нарушает accepted design baseline.
 
 ---
 
@@ -741,16 +828,19 @@ technology/content choice
 Буквенные work packages 22A–22T задают полный scope, но не означают, что двадцать независимых
 каталогов следует писать параллельно. Канонический порядок поставки:
 
-## 22.0 — content inventory and governance gate
+## 22.0 — content inventory, faction identity and governance gate
 
 - machine-readable inventory всех существующих content IDs и обратных ссылок;
 - решение `PROMOTE / REAUTHOR / REPLACE / RETIRE` для каждого Stage-17.5/19 provisional ID;
-- review пяти major и трёх minor/transnational faction identities;
+- audit current generated-world stable faction IDs and display names;
+- explicit disposition/migration mapping for the Imperial and industrial runtime lineages;
+- mark the five canonical horizon factions as **reserved post-core concepts**, not Stage-22 packages;
+- classify legacy `neutral` / `trade_league` / `miners` actors as minor/transnational/test/runtime organizations where appropriate rather than silently treating them as sovereign peers;
 - schemas/manifests для art, NPC, mission, localization, VFX/audio bindings;
 - automated validation и semantic fingerprint policy;
-- утверждённые alpha floors и cut priority.
+- утверждённые core-pair alpha floors и cut priority.
 
-Без 22.0 запрещено массово генерировать ассеты или переименовывать content IDs.
+Без 22.0 запрещено массово генерировать ассеты или переименовывать stable content/faction IDs.
 
 ## 22.1 — Imperial gold slice
 
@@ -767,40 +857,67 @@ technology/content choice
 Визуальная основа — принятый код «Империи»: тяжёлая ремонтопригодная осевая инженерия,
 центральная цитадель, сдержанная иерархия, graphite/ivory/burgundy/brass и отсутствие fantasy decor.
 
-## 22.2 — contrast faction
+Systemic authority: `docs/factions/empire_systemic_identity.md`.
 
-Вторая faction выбирается за максимальный mechanical/political/visual contrast. Pairwise acceptance
-обязана доказать:
+## 22.2 — Industrial Union contrast slice
+
+Вторая core faction **зафиксирована**: Индустриальный Союз.
+
+Package end-to-end:
+
+- exact systemic/political/industrial profile and stable-ID mapping;
+- production-series/commonality authority audit and only the minimum reusable extension if current Stage-18 seams are insufficient;
+- минимум шесть military и три civilian/support base hulls;
+- три signature station variants;
+- standardized doctrine fits, reference fleet and logistics train;
+- physical material/component/route dependencies and replacement chain;
+- visual bible, sprites/characters/icons/VFX/audio subset;
+- шесть recurring NPCs, десять mission templates и две короткие faction chains;
+- peaceful, crisis, battle, loss, bottleneck disruption, replacement and save/load acceptance.
+
+Pairwise acceptance against the Empire must prove:
 
 - различимый силуэт без цвета и герба;
 - другую viable engineering/fleet solution в одной физике;
-- иные интересы/переговоры без scripted personality бонусов;
-- реальную торговую зависимость, конфликт и counterplay;
-- отсутствие одного доминирующего fit между обеими сторонами.
+- иные lawful procurement/industrial choices without scripted personality bonuses;
+- реальную торговую/ресурсную зависимость, conflict incentives and counterplay;
+- measurable standardization benefit and retooling/bottleneck cost;
+- отсутствие одного доминирующего fit/faction across combined metrics.
 
-## 22.3 — full major-faction breadth
+Systemic authority: `docs/factions/industrial_union_systemic_identity.md`.
 
-- ещё три major packages, по одной за review iteration;
+## 22.3 — shared civilian/minor ecosystem and cross-market integration
+
+После core pair не создаются ещё три sovereign packages.
+
+Scope:
+
+- lawful shared/licensed civilian hulls and components where manufacturers/markets justify them;
+- political role audit for legacy `neutral`, `trade_league`, `miners` runtime actors;
+- contracts, market access, extraction, arbitration, convoy and independent-settlement content;
+- shared repair/refit/service infrastructure;
 - cross-faction module/industry availability;
-- roster/fleet/station/character/mission coverage;
-- pairwise и representative-corpus validation после каждой package;
-- общий civilian licensed/shared content там, где это объяснимо производителем и рынком.
-
-## 22.4 — minor organizations and civilian ecosystem
-
-- политическая роль `neutral`, `trade_league`, `miners`;
-- contracts, market access, extraction, arbitration, convoy и independent-settlement content;
-- peaceful/economic careers с плотностью контента, сопоставимой с military path;
+- peaceful/economic careers with content density comparable to military play;
 - special locations, regional manufacturers and service-history variants.
 
-## 22.5 — combined alpha balance
+Legacy organizations may receive reduced identity/contact packages sufficient for runtime clarity; they
+are not promoted into additional production-complete sovereign factions by this Stage.
 
-- 22L–R fleet/combat/logistics/economy/faction matrices;
+## 22.4 — core-pair combined alpha balance
+
+- 22L–R fleet/combat/logistics/economy/core-faction matrices;
 - 22S progression/market access;
 - 22T benchmark/fingerprint governance;
 - NPC/mission/location distribution and repetition audit;
-- финальное решение по каждому provisional ID;
-- explicit finite list оставшихся prototype visuals для Stage 23.
+- final decision for every provisional ID;
+- representative-seed pairwise economic and war/recovery soak;
+- explicit finite list of remaining prototype visuals for Stage 23;
+- post-core compatibility checklist confirming no Stage-22 hardcode makes the five horizon factions impossible.
+
+There is no Stage-22 work package for production-complete Directorate/League/Frontier Confederation/
+Consortium/Nomad Fleet. Their implementation begins only after the main core stage is complete.
+
+---
 
 # 28. Content breadth authority
 
@@ -809,54 +926,70 @@ UI art, VFX, audio, localization, manifests, quotas и cut rules:
 
 `docs/content_production_plan_stage21_23.md`.
 
-Он дополняет, но не заменяет engineering authority этого документа. При конфликте:
+Faction roster/horizon authority:
+
+`docs/factions/faction_roster_and_development_horizon.md`.
+
+При конфликте:
 
 - physical/economic параметр и manufacturability определяются Stage-17.5/18/22 contracts;
+- faction roster/core-vs-horizon scope определяется faction roster contract;
 - faction/asset/narrative production workflow определяется content production plan;
 - world behavior, knowledge и mission completion определяются Stage 21;
 - release packaging/accessibility/recovery определяются Stage 23.
+
+---
 
 # 29. Stage-22 PR/workstream decomposition
 
 Recommended reviewable sequence:
 
 1. inventory/provisional disposition schema;
-2. content/asset/localization manifest validation;
-3. faction roster and Imperial systemic doctrine;
-4. 22A material/component production catalog;
-5. 22B–D power/propulsion/thermal gold-slice families;
-6. 22E–G sensor/EW/weapon/protection gold-slice families;
-7. 22H Imperial hulls/fits and physical anchors;
-8. 22J–K yard/facility/cost/replacement chain;
-9. Imperial visuals/characters/missions/runtime binding;
-10. Imperial reference fleet/campaign acceptance;
-11. contrast faction systemic package;
-12. contrast hull/station/content package and pairwise acceptance;
-13. remaining major factions one package at a time;
-14. minor organizations/common civilian ecosystem;
-15. special locations/events/full mission breadth;
-16. 22L–M fleet/saturation matrices;
-17. 22N–O world logistics/macro soak;
-18. 22P–S anti-dominance/faction/progression closure;
-19. 22T fingerprint/performance baselines;
-20. Stage-22 alpha completion record and Stage-23 handoff manifest.
+2. stable faction-ID/display-name migration/disposition audit;
+3. content/asset/localization manifest validation;
+4. Imperial systemic doctrine + roster lock;
+5. 22A material/component production catalog;
+6. 22B–D power/propulsion/thermal Imperial gold-slice families;
+7. 22E–G sensor/EW/weapon/protection Imperial gold-slice families;
+8. 22H Imperial hulls/fits and physical anchors;
+9. 22J–K yard/facility/cost/replacement chain;
+10. Imperial visuals/characters/missions/runtime binding;
+11. Imperial reference fleet/campaign acceptance;
+12. Industrial Union systemic package + production-series/commonality authority audit;
+13. Industrial Union engineering/hulls/stations/content package;
+14. Industrial Union visuals/characters/missions/runtime binding;
+15. core-pair fleet/industry/logistics/recovery acceptance;
+16. shared civilian/minor organization ecosystem;
+17. special locations/events/full mission breadth;
+18. 22L–M fleet/saturation matrices;
+19. 22N–O world logistics/macro soak;
+20. 22P–S anti-dominance/core-faction/progression closure;
+21. 22T fingerprint/performance baselines;
+22. Stage-22 alpha completion record and Stage-23 handoff manifest.
+
+Post-core faction packages are intentionally absent from this sequence.
+
+---
 
 # 30. Quantified alpha acceptance floor
 
 Stage 22 не закрывается одним большим каталогом. Минимальный product-level floor:
 
-- five reviewed sovereign major-faction packages;
-- three reviewed minor/transnational organization packages;
-- six signature military and three faction civilian/support base hulls per major faction;
-- at least eight neutral/licensed civilian hulls across ordinary markets;
-- ten functional station exterior roles and three signature variants per major faction;
-- thirty-nine recurring named NPCs across major/minor actors;
-- forty-eight mechanically distinct mission templates;
-- twenty special-location archetypes;
+- **two reviewed production-complete sovereign core-faction packages: Империя + Индустриальный Союз**;
+- **zero required production-complete post-core faction packages**;
+- two production visual bibles with silhouette/material/character/UI rules;
+- six signature military + three faction civilian/support base hulls per core faction (**12 military + 6 faction civilian/support total**);
+- at least eight neutral/licensed/shared civilian hulls across ordinary markets;
+- ten functional station exterior roles across the combined game and three signature variants per core faction (**6 signature faction station variants total**);
+- at least twelve recurring named core-faction NPCs (**6×2**), plus enough shared/minor/independent contacts to cover required Stage-22 civilian gameplay without forcing another sovereign package;
+- at least twenty mechanically distinct mission templates across the two core faction packages (**10×2**) plus shared mission breadth sufficient to reach the final game-wide mission library target defined by the content production plan;
+- four authored core-faction story chains (**2×2**);
+- twenty special-location archetypes unless later cut by an explicit product-scope review;
 - RU source copy and complete EN localization path;
 - production-valid art/metadata for every alpha-facing definition;
 - no unresolved provisional content decision;
-- combined combat, economy, logistics, progression, save and long-run acceptance.
+- combined combat, economy, logistics, progression, save and long-run acceptance;
+- explicit post-core architecture compatibility review with no requirement to author those factions' production content.
 
 Количество является floor покрытия, а не KPI наполнения. Дубликат существующего role, filler text
 или paint-only variant не засчитывается как новая механическая единица.
