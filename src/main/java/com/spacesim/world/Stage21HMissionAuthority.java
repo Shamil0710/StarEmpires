@@ -135,8 +135,10 @@ public final class Stage21HMissionAuthority {
             }
             case FLEET_PRESENT_IN_SYSTEM, FLEET_ABSENT, FLEET_REACTION_MASS_KG_AT_LEAST ->
                     requireFleetOwner(checkedWorld, checked.subjectId(), issuer);
-            case ESCORT_FLEETS_PRESENT_IN_SYSTEM ->
-                    requireFleetOwner(checkedWorld, checked.subjectId(), issuer);
+            case ESCORT_FLEETS_PRESENT_IN_SYSTEM -> {
+                requireDistinctEscortFleets(checked);
+                requireFleetOwner(checkedWorld, checked.subjectId(), issuer);
+            }
             case DISCOVERY_AT_LEAST -> requireDiscoveryOwner(discovery, issuer);
             case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST -> {
                 requireDiscoveryOwner(discovery, issuer);
@@ -216,6 +218,7 @@ public final class Stage21HMissionAuthority {
             WorldSimulation world,
             MissionObjective objective,
             long tick) {
+        requireDistinctEscortFleets(objective);
         FleetPlacementState convoy = world.findFleet(fleetId(objective.subjectId())).orElse(null);
         FleetPlacementState escort = world.findFleet(fleetId(objective.requiredState())).orElse(null);
         if (convoy == null) {
@@ -473,6 +476,12 @@ public final class Stage21HMissionAuthority {
 
     private static FleetId fleetId(String value) {
         return new FleetId(parsePositiveLong(value, "FleetId"));
+    }
+
+    private static void requireDistinctEscortFleets(MissionObjective objective) {
+        if (objective.subjectId().equals(objective.requiredState())) {
+            throw new IllegalArgumentException("Escort convoy and contracted escort FleetIds must differ");
+        }
     }
 
     private static void requireDiscoveryOwner(Stage20DiscoveryKnowledgeState discovery, String issuer) {
