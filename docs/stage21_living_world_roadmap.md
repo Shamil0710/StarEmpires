@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
 > Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A, Stage 21B,
-> Stage 21C, Stage 21D, Stage 21E and **Stage 21F are complete; Stage 21G is OPEN/NEXT**.
+> Stage 21C, Stage 21D, Stage 21E, Stage 21F and **Stage 21G are complete; Stage 21H is OPEN/NEXT**.
 
 ## 1. Purpose
 
@@ -289,29 +289,35 @@ Accepted through PR #331 from exact green head `c198ddb4e3b45158e350220187327aa7
 CI run #5126 (`32883580620`), Java 17 verification job `97918646553`, completed successfully.
 Implementation merge commit on `main`: `1294b908ec47c3b4ad9065db17dd5a8a55b4c763`.
 
-### 21G — Peace, demobilization, recovery and replacement — OPEN/NEXT
+### 21G — Peace, demobilization, recovery and replacement — COMPLETE
 
 Objective: close conflict loops without resetting the world.
 
-Deliverables:
+Delivered:
 
-- ceasefire and peace outcomes tied to war goals, losses, exhaustion, leverage and offers;
-- recognition, access, reparations and territorial terms using existing legal/treasury authority;
-- demobilization and return/redeployment orders for surviving fleets;
-- persistent loss and veteran/damage continuity where supported by ordinary entity state;
-- repair, rearm and refuel through physical facilities and stocks;
-- replacement demand submitted to existing industrial/shipyard planning;
-- no automatic restoration to pre-war fleet composition;
-- post-war cooldown, grievance and treaty memory feeding future interests.
+- ceasefire and peace outcomes tied to persisted war goals, actor-known objective evidence, physical losses/exhaustion/leverage and visible settlement offers;
+- recognition, access and territorial terms left under existing Stage-17/21C legal authority, with reparations executed through ordinary conserved treasury transfers;
+- demobilization and return orders for surviving command groups through the existing Stage-21D order boundary;
+- exact Stage-21E physical loss provenance with destroyed `FleetId` continuity and no resurrection/re-attribution;
+- repair, rearm and refuel through physical Stage-18/19 facilities, stocks and service capability;
+- replacement demand backed by an exact physical loss and fulfilled only through ordinary shipyard planning/settlement plus fresh `FleetId` commissioning;
+- no automatic restoration to pre-war fleet composition or stores;
+- Stage-21C post-war cooldown retained as authority, with bounded exact-once treaty-performance and loss/grievance memory feeding later diplomacy;
+- deterministic standalone recovery persistence and schema-v10 generated-world checkpoint over the accepted Stage-21F runtime.
 
-Exit criteria:
+Exit criteria — accepted:
 
 - peace does not repair ships, refill stores or recreate destroyed fleets;
 - reparations conserve treasury/material transfers;
 - destroyed capability returns only after an ordinary production and commissioning chain;
 - a war changes later diplomatic/economic decisions even after operations end.
 
-### 21H — NPCs, missions, reputation and discovery grounded in the living world
+Implementation and acceptance map: `docs/stage21g_peace_recovery_replacement.md`.
+Accepted through PR #333 from exact green head `206a197a4fbe0db2d8c72f99b26f1ca7f6abb459`;
+CI run #5225 (`32956435219`), Java 17 verification job `98139009665`, completed successfully.
+Implementation merge commit on `main`: `98f3ec58be0c57a95868a6c824076181c1bf1b2d`.
+
+### 21H — NPCs, missions, reputation and discovery grounded in the living world — OPEN/NEXT
 
 Objective: make the RPG layer a participant in the autonomous world rather than a disconnected
 quest generator.
@@ -421,8 +427,8 @@ supports multiple plausible histories without hidden exceptions.
 | 21D | **COMPLETE** | physical readiness, command groups, lawful orders and neighbor-only movement |
 | 21E | **COMPLETE** | persistent operations, exact Stage-19 consequences, physical losses/store consumption and traffic interdiction |
 | 21F | **COMPLETE** | occupation/stabilization/control transitions |
-| 21G | **OPEN — next** | peace/demobilization/repair/replacement |
-| 21H | **OPEN** | persistent NPCs, missions, reputation and discovery |
+| 21G | **COMPLETE** | peace/demobilization/finite recovery/loss-backed replacement/post-war memory |
+| 21H | **OPEN — next** | persistent NPCs, missions, reputation and discovery |
 | 21I | **OPEN** | integrated UI/migration/corpus/performance final gate |
 
 Stage 21A accepted the deliberately narrow actor foundation: stable faction-bound lifecycle state,
@@ -475,11 +481,23 @@ Stage-17 territory law:
 7. schema-v9 generated-world persistence composes the accepted Stage-21E checkpoint and fails closed on invalid operation/objective/faction/provenance/time state;
 8. deterministic incremental/lumped reconciliation and mid-transition save/load continuation preserve exact progress and deadlines.
 
-Stage 21G is now the first remaining implementation slice. It must close conflict loops through the
-accepted Stage-21C peace authority, Stage-21D movement/service commands, Stage-18 physical
-repair/rearm/refuel/industry/shipyard state and conserved treasury/material transfers. It must not
-repair, refill or recreate fleets merely because a war ended. This Stage-21F closeout intentionally
-does not start Stage 21G implementation.
+Stage 21G accepts the conflict-closeout and recovery layer without resetting any upstream authority:
+
+1. `Stage21GPeaceOutcomePolicy` derives settlement behavior from persisted legal goals, actor-known evidence and Stage-19 physical exhaustion/leverage;
+2. Stage-21C remains legal peace/treaty/cooldown authority and Stage-17 remains treasury/access/territory authority;
+3. reparations use exact ordinary treasury debit/credit with reserve-floor stall, rollback and exact-once completion;
+4. surviving groups demobilize only through ordinary Stage-21D `RETURN` orders;
+5. Stage-21E losses become immutable replacement provenance, never resurrected FleetIds;
+6. refuel/rearm/repair use finite Stage-18/19 stocks and shipyard capability;
+7. replacement requires ordinary yard settlement and receives a fresh ordinary FleetId with fresh runtime stores;
+8. bounded treaty-performance/grievance memory feeds later Stage-21C outcome selection without creating war score;
+9. schema-v10 generated-world persistence composes Stage-21F and fails closed on invalid settlement/payment/group/loss/build/time state.
+
+Stage 21H is now the first remaining implementation slice. It must add persistent NPC identity,
+actor-bounded knowledge, mission authority/escrow/objectives, reputation and discovery over the
+accepted living-world state. It must not create a quest-only economy, omniscient dialogue knowledge,
+UI-certified completion or hidden rewards. This Stage-21G closeout intentionally does not start
+Stage 21H implementation.
 
 ## 10. Suggested state ownership
 
@@ -550,8 +568,8 @@ Each item should remain separately reviewable and leave `main` green:
 9. **COMPLETE:** 21E operation lifecycle and contact/materialization seam;
 10. **COMPLETE:** 21E physical consequence return/persistence;
 11. **COMPLETE:** 21F occupation/stabilization/control;
-12. **NEXT:** 21G peace/demobilization/replacement;
-13. 21H NPC identity/knowledge/availability;
+12. **COMPLETE:** 21G peace/demobilization/replacement;
+13. **NEXT:** 21H NPC identity/knowledge/availability;
 14. 21H mission/escrow/objective/reputation;
 15. 21H authored gold-slice content;
 16. 21I command UI/overlays/timeline;
