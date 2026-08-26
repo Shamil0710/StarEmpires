@@ -335,6 +335,9 @@ Stage 23 полирует и выпускает production-complete **core pair*
 
 Это **не lore ranking** и не окончательный production order. Перед каждой post-core faction выполняется свежий architecture audit.
 
+Подробный package cycle, dependency order и PR decomposition:
+`docs/factions/faction_implementation_roadmap.md`.
+
 ---
 
 ## 10. Документное разбиение
@@ -342,11 +345,18 @@ Stage 23 полирует и выпускает production-complete **core pair*
 Канонический пакет состоит из:
 
 - `docs/factions/faction_roster_and_development_horizon.md` — roster, scope, core/horizon boundary;
+- `docs/factions/faction_gameplay_visual_balance_bible.md` — gameplay formula, costs, counters, ship/character direction и 21 pairwise interaction;
 - `docs/factions/empire_systemic_identity.md` — полная core specification Империи;
+- `docs/factions/empire_visual_bible.md` — production visual authority Империи;
 - `docs/factions/industrial_union_systemic_identity.md` — полная core specification Индустриального Союза;
-- `docs/factions/post_core_faction_horizon.md` — закреплённые концепты пяти последующих фракций и required future mechanics.
+- `docs/factions/industrial_union_visual_bible.md` — production visual authority Индустриального Союза;
+- `docs/factions/post_core_faction_horizon.md` — закреплённые концепты пяти последующих фракций и required future mechanics;
+- `docs/factions/faction_balance_validation_framework.md` — scenario/metric/evidence gates;
+- `docs/factions/faction_implementation_roadmap.md` — phased implementation, migration и PR decomposition;
+- `docs/characters/character_master_prompt.md` — shared character-art authority.
 
-Visual-specific production bibles могут существовать отдельно, но обязаны ссылаться на systemic identity и не могут менять simulation rules.
+Visual bibles обязаны ссылаться на systemic identity, использовать Character Master Prompt как верхний
+character-style layer и не могут менять simulation rules.
 
 ---
 

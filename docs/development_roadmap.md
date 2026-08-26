@@ -49,9 +49,15 @@ Faction differentiation обязана возникать из общих instit
 Canonical faction contracts:
 
 - `docs/factions/faction_roster_and_development_horizon.md`;
+- `docs/factions/faction_gameplay_visual_balance_bible.md`;
 - `docs/factions/empire_systemic_identity.md`;
+- `docs/factions/empire_visual_bible.md`;
 - `docs/factions/industrial_union_systemic_identity.md`;
-- `docs/factions/post_core_faction_horizon.md`.
+- `docs/factions/industrial_union_visual_bible.md`;
+- `docs/factions/post_core_faction_horizon.md`;
+- `docs/factions/faction_balance_validation_framework.md`;
+- `docs/factions/faction_implementation_roadmap.md`;
+- `docs/characters/character_master_prompt.md`.
 
 ## 2. Milestones
 
@@ -684,6 +690,11 @@ Stage 17 COMPLETE
 → Stage 23 RC / final presentation replacement and polish for the core pair
 → Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
+
+Detailed faction/content execution, ID migration and post-core package sequencing are defined in
+`docs/factions/faction_implementation_roadmap.md`; evidence gates are defined in
+`docs/factions/faction_balance_validation_framework.md`. These documents refine the sequence without
+changing the live stage status in this roadmap.
 
 **Immediate implementation priority is Stage 21I.** Stage 21H now closes the RPG-side participant
 layer through persistent NPC identity/knowledge, living-world-grounded funded mission contracts,
