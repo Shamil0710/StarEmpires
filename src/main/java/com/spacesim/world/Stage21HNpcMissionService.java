@@ -225,6 +225,15 @@ public final class Stage21HNpcMissionService {
         if (deadlineTick <= tick || rewardMilliCredits <= 0L) {
             throw new IllegalArgumentException("Mission deadline/reward is invalid");
         }
+        FactionEconomicState economy = checkedWorld.findFactionEconomicState(issuer.factionContentId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Mission issuer faction lacks ordinary economic authority: " + issuer.factionContentId()));
+        long spendable = Math.max(0L,
+                economy.treasuryMilliCredits() - economy.treasuryReserveFloorMilliCredits());
+        if (rewardMilliCredits > spendable) {
+            throw new IllegalStateException(
+                    "Mission reward exceeds issuer faction spendable treasury: " + issuer.factionContentId());
+        }
         List<String> factIds = List.copyOf(Objects.requireNonNull(sourceKnowledgeFactIds, "Source facts not set"));
         for (String factId : factIds) {
             NpcKnowledgeFact fact = issuer.knowledge().stream()
@@ -471,18 +480,6 @@ public final class Stage21HNpcMissionService {
         escrowByMissionId.remove(mission.missionId());
         MissionContract replacement = copyMission(mission, terminal, tick, 0L, outcomeCode, List.of());
         replaceMission(replacement, tick);
-        if (mission.status() == MissionStatus.ACCEPTED && terminal == MissionStatus.FAILED) {
-            addReputationEvent(
-                    mission.issuerNpcId(),
-                    "actor.contract-holder",
-                    new ReputationEvent(
-                            "reputation." + mission.missionId() + ".failed",
-                            ReputationEventKind.CONTRACT_FAILED,
-                            -8,
-                            tick,
-                            mission.missionId()),
-                    tick);
-        }
         return requireMission(mission.missionId());
     }
 
