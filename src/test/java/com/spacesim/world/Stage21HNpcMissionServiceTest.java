@@ -6,6 +6,7 @@ import com.spacesim.persistence.Stage18IndustrialState;
 import com.spacesim.persistence.Stage20FreightPersistentState;
 import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState;
+import com.spacesim.player.PlayerState;
 import com.spacesim.world.Stage21HNpcMissionState.KnowledgeKind;
 import com.spacesim.world.Stage21HNpcMissionState.MissionContract;
 import com.spacesim.world.Stage21HNpcMissionState.MissionObjective;
@@ -53,7 +54,7 @@ class Stage21HNpcMissionServiceTest {
     }
 
     @Test
-    void acceptedPhysicalDeliveryPaysExactEscrowAndCreatesObservedContractReputation() {
+    void acceptedPlayerOwnedPhysicalDeliveryPaysExactEscrowAndCreatesObservedContractReputation() {
         Fixture fixture = fixture();
         ensureSpendable(fixture.world(), fixture.order().stableFactionId(), REWARD);
         Stage21HNpcMissionService service = service(fixture);
@@ -63,16 +64,62 @@ class Stage21HNpcMissionServiceTest {
         Stage20FreightPersistentState delivered = withDeliveredMass(
                 fixture.freight(), fixture.order().orderId(), threshold);
         WalletComponent playerWallet = new WalletComponent();
+        PlayerState player = playerState(fixture.order().fleetId());
 
-        MissionContract completed = service.reconcileMission(
-                fixture.world(), delivered, fixture.industry(), fixture.discovery(),
-                StrategicOperationState.empty(), offered.missionId(), playerWallet, "actor.player");
+        MissionContract completed = service.reconcilePlayerMission(
+                fixture.world(), delivered, fixture.industry(), fixture.discovery(), null,
+                StrategicOperationState.empty(), player, offered.missionId(), playerWallet);
 
         assertEquals(MissionStatus.COMPLETED, completed.status());
         assertEquals(REWARD, playerWallet.getBalanceMilliCredits());
         assertEquals(0L, completed.escrowMilliCredits());
         assertEquals(10, service.snapshot().reputations().get(0).derivedValue());
+        assertEquals(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID,
+                service.snapshot().reputations().get(0).subjectActorId());
         assertNoStage21HMoneySourceOrSink(fixture.world());
+    }
+
+    @Test
+    void acceptedMissionSolvedByWorldWithoutPlayerParticipationRefundsInsteadOfPaying() {
+        Fixture fixture = fixture();
+        ensureSpendable(fixture.world(), fixture.order().stableFactionId(), REWARD);
+        long before = treasury(fixture.world(), fixture.order().stableFactionId());
+        Stage21HNpcMissionService service = service(fixture);
+        MissionContract offered = offer(service, fixture);
+        service.acceptMission(offered.missionId(), fixture.world().getAuthoritativeWorldTick());
+        Stage20FreightPersistentState delivered = withDeliveredMass(
+                fixture.freight(), fixture.order().orderId(), offered.objective().threshold());
+        WalletComponent playerWallet = new WalletComponent();
+
+        MissionContract failed = service.reconcilePlayerMission(
+                fixture.world(), delivered, fixture.industry(), fixture.discovery(), null,
+                StrategicOperationState.empty(), playerState(), offered.missionId(), playerWallet);
+
+        assertEquals(MissionStatus.FAILED, failed.status());
+        assertEquals(0L, failed.escrowMilliCredits());
+        assertEquals(0L, playerWallet.getBalanceMilliCredits());
+        assertEquals(before, treasury(fixture.world(), fixture.order().stableFactionId()));
+        assertTrue(failed.outcomeCode().startsWith("opportunity.resolved-without-contractor:"));
+        assertEquals(-8, service.snapshot().reputations().get(0).derivedValue());
+        assertFalse(service.snapshot().reputations().get(0).events().stream()
+                .anyMatch(value -> value.kind() == ReputationEventKind.CONTRACT_COMPLETED));
+    }
+
+    @Test
+    void legacyCallerWalletAndActorCannotSelfCertifyAcceptedCompletion() {
+        Fixture fixture = fixture();
+        ensureSpendable(fixture.world(), fixture.order().stableFactionId(), REWARD);
+        Stage21HNpcMissionService service = service(fixture);
+        MissionContract offered = offer(service, fixture);
+        service.acceptMission(offered.missionId(), fixture.world().getAuthoritativeWorldTick());
+        Stage20FreightPersistentState delivered = withDeliveredMass(
+                fixture.freight(), fixture.order().orderId(), offered.objective().threshold());
+
+        assertThrows(IllegalStateException.class, () -> service.reconcileMission(
+                fixture.world(), delivered, fixture.industry(), fixture.discovery(),
+                StrategicOperationState.empty(), offered.missionId(), new WalletComponent(), "actor.ui-claim"));
+        assertEquals(MissionStatus.ACCEPTED, service.snapshot().missions().get(0).status());
+        assertEquals(REWARD, service.snapshot().missions().get(0).escrowMilliCredits());
     }
 
     @Test
@@ -85,9 +132,9 @@ class Stage21HNpcMissionServiceTest {
         Stage20FreightPersistentState delivered = withDeliveredMass(
                 fixture.freight(), fixture.order().orderId(), offered.objective().threshold());
 
-        MissionContract resolvedWithoutPlayer = service.reconcileMission(
-                fixture.world(), delivered, fixture.industry(), fixture.discovery(),
-                StrategicOperationState.empty(), offered.missionId(), new WalletComponent(), "actor.player");
+        MissionContract resolvedWithoutPlayer = service.reconcilePlayerMission(
+                fixture.world(), delivered, fixture.industry(), fixture.discovery(), null,
+                StrategicOperationState.empty(), playerState(), offered.missionId(), new WalletComponent());
 
         assertEquals(MissionStatus.FAILED, resolvedWithoutPlayer.status());
         assertEquals("opportunity.resolved-without-player", resolvedWithoutPlayer.outcomeCode());
@@ -113,9 +160,10 @@ class Stage21HNpcMissionServiceTest {
                 "reputation.betrayal.test", ReputationEventKind.BETRAYAL, -12,
                 now, "action.betrayal.test");
         assertThrows(IllegalArgumentException.class, () -> service.recordObservedReputation(
-                fixture.npc().npcId(), "actor.player", "fact.absent", betrayal));
+                fixture.npc().npcId(), Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID, "fact.absent", betrayal));
         assertEquals(-12, service.recordObservedReputation(
-                fixture.npc().npcId(), "actor.player", fixture.fact().factId(), betrayal).derivedValue());
+                fixture.npc().npcId(), Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID,
+                fixture.fact().factId(), betrayal).derivedValue());
     }
 
     @Test
@@ -213,6 +261,19 @@ class Stage21HNpcMissionServiceTest {
                 posting,
                 NpcAvailability.AVAILABLE,
                 List.of(fact));
+    }
+
+    private static PlayerState playerState(FleetId... ownedFleets) {
+        List<FleetId> fleets = List.of(ownedFleets);
+        return new PlayerState(
+                0L,
+                null,
+                List.of(),
+                fleets,
+                fleets.isEmpty() ? null : fleets.get(0),
+                List.of(),
+                List.of(),
+                null);
     }
 
     private static Stage20FreightPersistentState withDeliveredMass(
