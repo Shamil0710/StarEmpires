@@ -1,10 +1,13 @@
 package com.spacesim.world;
 
+import com.spacesim.persistence.Stage20FreightPersistentState;
+import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
+import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
+import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef;
 import com.spacesim.world.Stage21HNpcMissionState.MissionObjective;
-import com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind;
 import com.spacesim.world.StrategicOperationState.OperationState;
 import com.spacesim.world.StrategicOperationState.OperationStatus;
 
@@ -13,9 +16,9 @@ import java.util.Objects;
 /**
  * Read-only Stage-21H mission-objective adapter over ordinary simulation authorities.
  *
- * <p>No caller supplies a boolean completion flag. The adapter reads the same fleet, construction,
- * diplomacy, economy, Stage-20 discovery and Stage-21E operation state used by the simulation and
- * returns an observation that the mission lifecycle may consume.</p>
+ * <p>No caller supplies a boolean completion flag. The adapter reads the same Stage-20 physical
+ * freight, fleet, construction, diplomacy, economy, discovery and Stage-21E operation state used by
+ * the simulation and returns an observation that the mission lifecycle may consume.</p>
  */
 public final class Stage21HMissionAuthority {
     private Stage21HMissionAuthority() {
@@ -51,6 +54,7 @@ public final class Stage21HMissionAuthority {
      * Evaluates one objective from existing authorities only.
      *
      * @param world ordinary live world authority
+     * @param freight Stage-20 physical freight/order authority when required
      * @param discovery owner-local Stage-20 discovery knowledge for the mission issuer
      * @param operations accepted Stage-21E operation registry
      * @param objective declarative mission predicate
@@ -58,6 +62,7 @@ public final class Stage21HMissionAuthority {
      */
     public static Observation evaluate(
             WorldSimulation world,
+            Stage20FreightPersistentState freight,
             Stage20DiscoveryKnowledgeState discovery,
             StrategicOperationState operations,
             MissionObjective objective) {
@@ -65,6 +70,7 @@ public final class Stage21HMissionAuthority {
         MissionObjective checked = Objects.requireNonNull(objective, "Mission objective not set");
         long tick = checkedWorld.getAuthoritativeWorldTick();
         return switch (checked.kind()) {
+            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> freightDelivered(freight, checked, tick);
             case FLEET_PRESENT_IN_SYSTEM -> fleetPresent(checkedWorld, checked, tick);
             case FLEET_ABSENT -> fleetAbsent(checkedWorld, checked, tick);
             case DISCOVERY_AT_LEAST -> discoveryAtLeast(discovery, checked, tick);
@@ -74,6 +80,30 @@ public final class Stage21HMissionAuthority {
             case OPERATION_STATUS -> operationStatus(operations, checked, tick);
             case FACTION_TREASURY_AT_LEAST -> treasuryAtLeast(checkedWorld, checked, tick);
         };
+    }
+
+    private static Observation freightDelivered(
+            Stage20FreightPersistentState freight,
+            MissionObjective objective,
+            long tick) {
+        Stage20FreightPersistentState checked = Objects.requireNonNull(
+                freight, "Freight state required by physical delivery mission");
+        TransportOrderState order = checked.orders().stream()
+                .filter(value -> value.orderId().equals(objective.subjectId()))
+                .findFirst().orElse(null);
+        if (order == null) {
+            return new Observation(Result.FAILED, "freight.order-missing", tick);
+        }
+        if (order.deliveredMassKg() >= objective.threshold()) {
+            return new Observation(Result.SATISFIED, "freight.delivery-satisfied", tick);
+        }
+        FreighterState freighter = checked.freighters().stream()
+                .filter(value -> value.fleetId().equals(order.fleetId()))
+                .findFirst().orElse(null);
+        if (freighter == null || freighter.phase() == FreightPhase.DESTROYED) {
+            return new Observation(Result.FAILED, "freight.delivery-capability-lost", tick);
+        }
+        return new Observation(Result.PENDING, "freight.delivery-pending", tick);
     }
 
     private static Observation fleetPresent(WorldSimulation world, MissionObjective objective, long tick) {
