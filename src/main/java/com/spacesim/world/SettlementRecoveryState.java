@@ -210,9 +210,9 @@ public record SettlementRecoveryState(
 
     /** Settlement lifecycle status. */
     public enum SettlementStatus {
-        /** Accepted legal settlement has executable recovery obligations. */ PENDING,
-        /** At least one obligation has executed while other obligations remain. */ EXECUTING,
-        /** Every registered Stage-21G obligation has completed. */ COMPLETE,
+        /** Accepted legal settlement is still collecting its finite recovery plan. */ PENDING,
+        /** Recovery plan is finalized and at least one obligation remains or has executed. */ EXECUTING,
+        /** Every registered Stage-21G obligation has completed after explicit plan finalization. */ COMPLETE,
         /** Current physical/economic authority cannot satisfy one or more obligations. */ STALLED
     }
 
@@ -226,8 +226,8 @@ public record SettlementRecoveryState(
     /** Replacement-demand lifecycle status. */
     public enum ReplacementStatus {
         /** Demand exists but no physical shipyard settlement has completed. */ DEMANDED,
-        /** Existing Stage-18 shipyard work settled and produced a completed asset payload. */ YARD_SETTLED,
-        /** Ordinary world authority commissioned a distinct replacement FleetId. */ COMMISSIONED,
+        /** Existing Stage-18 shipyard work settled and its ordinary built entity is persisted. */ YARD_SETTLED,
+        /** The exact built ordinary entity has received a distinct replacement FleetId. */ COMMISSIONED,
         /** Demand was explicitly abandoned without restoring capability. */ CANCELLED
     }
 
@@ -278,6 +278,9 @@ public record SettlementRecoveryState(
                 throw new IllegalArgumentException("settlement ticks are invalid");
             }
             Objects.requireNonNull(status, "status");
+            if (status != SettlementStatus.COMPLETE && memoryRecorded) {
+                throw new IllegalArgumentException("post-war memory cannot be recorded before settlement completion");
+            }
         }
     }
 
@@ -413,7 +416,8 @@ public record SettlementRecoveryState(
      * @param createdTick demand creation tick
      * @param updatedTick latest lifecycle tick
      * @param status replacement lifecycle
-     * @param completedAssetIdValue Stage-17.5/18 build completion EntityId value, or zero before settlement
+     * @param completedAssetSystemId exact system containing the ordinary built entity, or null before settlement
+     * @param completedAssetIdValue system-local built EntityId value, or zero before settlement
      * @param commissionedFleetId distinct ordinary commissioned FleetId, or null before commissioning
      */
     public record ReplacementDemand(
@@ -425,6 +429,7 @@ public record SettlementRecoveryState(
             long createdTick,
             long updatedTick,
             ReplacementStatus status,
+            StarSystemId completedAssetSystemId,
             long completedAssetIdValue,
             FleetId commissionedFleetId) {
         /**
@@ -438,6 +443,7 @@ public record SettlementRecoveryState(
          * @param createdTick creation tick
          * @param updatedTick latest update tick
          * @param status lifecycle status
+         * @param completedAssetSystemId system containing the built entity or null
          * @param completedAssetIdValue completed EntityId value or zero
          * @param commissionedFleetId replacement FleetId or null
          */
@@ -450,9 +456,15 @@ public record SettlementRecoveryState(
             factionContentId = requireText(factionContentId, "factionContentId");
             targetFitFingerprint = requireText(targetFitFingerprint, "targetFitFingerprint");
             Objects.requireNonNull(status, "status");
-            if ((status == ReplacementStatus.YARD_SETTLED || status == ReplacementStatus.COMMISSIONED)
-                    != (completedAssetIdValue > 0L)) {
-                throw new IllegalArgumentException("yard-settled/commissioned demand requires completed asset identity");
+            boolean assetRequired = status == ReplacementStatus.YARD_SETTLED
+                    || status == ReplacementStatus.COMMISSIONED;
+            boolean assetPresent = completedAssetSystemId != null && completedAssetIdValue > 0L;
+            if (assetRequired != assetPresent) {
+                throw new IllegalArgumentException(
+                        "yard-settled/commissioned demand requires exact built system/entity identity");
+            }
+            if (!assetRequired && (completedAssetSystemId != null || completedAssetIdValue != 0L)) {
+                throw new IllegalArgumentException("unsettled/cancelled demand cannot carry built asset identity");
             }
             if ((status == ReplacementStatus.COMMISSIONED) != (commissionedFleetId != null)) {
                 throw new IllegalArgumentException("commissioned status and FleetId must appear together");
