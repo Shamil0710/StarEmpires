@@ -1,5 +1,10 @@
 package com.spacesim.world;
 
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EngineeringComponent;
+import com.spacesim.components.FactionComponent;
+import com.spacesim.components.IdentityComponent;
+import com.spacesim.components.TransformComponent;
 import com.spacesim.content.Stage18ShipConsumableCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.economy.Stage18ShipConsumableService;
@@ -16,17 +21,19 @@ import com.spacesim.ship.ShipyardEngineeringService.WorkPlan;
 import com.spacesim.world.FleetCommandState.OrderType;
 import com.spacesim.world.FleetOrderExecutionService.ServiceOperation;
 import com.spacesim.world.SettlementRecoveryState.ReplacementDemand;
+import com.spacesim.world.SettlementRecoveryState.ReplacementStatus;
+import com.spacesim.world.SettlementRecoveryState.SettlementStatus;
 
 import java.util.Objects;
 
 /**
  * Stage-21G adapter that executes recovery only through existing Stage-18/17.5 physical authority.
  *
- * <p>The adapter never changes an ordinary fleet or ECS entity directly. Consumable service returns
- * a new engineering consumable state only after canonical station stock was consumed. Repair returns
- * the existing identity-preserving Stage-17.5 completion only after Stage-18 yard inputs/work settle.
- * Replacement returns a build completion for later ordinary-world commissioning and records only the
- * Stage-21G demand lifecycle; it cannot allocate or insert a FleetId.</p>
+ * <p>Consumables are loaded only after canonical stock consumption. Repair preserves the existing
+ * ordinary entity identity and requires real yard inputs/work. Replacement first settles an ordinary
+ * Stage-18 build, then materializes the completed engineering state as a normal system-local ECS
+ * entity and finally obtains a fresh FleetId from {@link FleetWorldService}. Stage 21G stores only
+ * provenance linking the loss demand to that ordinary asset and fleet.</p>
  */
 public final class Stage21GPhysicalRecoveryService {
     private final Stage18ShipConsumableCatalog consumableCatalog;
@@ -34,14 +41,6 @@ public final class Stage21GPhysicalRecoveryService {
     private final ShipyardEngineeringService engineering;
     private final Stage18ShipyardRuntime shipyards;
 
-    /**
-     * Creates the physical recovery adapter.
-     *
-     * @param consumableCatalog authored Stage-18I commodity/interface binding authority
-     * @param consumables existing Stage-18I ship-consumable service
-     * @param engineering existing Stage-17.5G shipyard planning/completion authority
-     * @param shipyards existing Stage-18G physical shipyard settlement authority
-     */
     public Stage21GPhysicalRecoveryService(
             Stage18ShipConsumableCatalog consumableCatalog,
             Stage18ShipConsumableService consumables,
@@ -53,18 +52,7 @@ public final class Stage21GPhysicalRecoveryService {
         this.shipyards = Objects.requireNonNull(shipyards, "shipyards");
     }
 
-    /**
-     * Executes one existing REFUEL/REARM service request from canonical station stock.
-     *
-     * @param operation Stage-21D service request
-     * @param bindingId authored Stage-18I binding
-     * @param mountId fitted module mount receiving the load
-     * @param requestedMassKg positive physical commodity mass
-     * @param fit current installed fit
-     * @param current current engineering consumables
-     * @param station canonical Stage-18F storage
-     * @return Stage-18I result; rejected calls mutate neither ship state nor station stock
-     */
+    /** Executes one existing REFUEL/REARM service request from canonical station stock. */
     public Stage18ShipConsumableService.LoadResult serviceConsumable(
             ServiceOperation operation,
             String bindingId,
@@ -91,19 +79,7 @@ public final class Stage21GPhysicalRecoveryService {
         return consumables.load(bindingId, mountId, requestedMassKg, fit, current, station);
     }
 
-    /**
-     * Plans, physically settles and completes one existing-identity repair request.
-     *
-     * @param operation Stage-21D REPAIR request
-     * @param assetId existing physical ship entity identity
-     * @param fit current installed fit
-     * @param currentConsumables current physical loads
-     * @param damage authoritative current damage snapshot
-     * @param station canonical Stage-18F source storage
-     * @param yard active Stage-18G yard projection
-     * @param budget finite Stage-18G engineering-work budget
-     * @return repair result including physical settlement and identity-preserving completion
-     */
+    /** Plans, physically settles and completes one existing-identity repair request. */
     public RepairResult repair(
             ServiceOperation operation,
             EntityId assetId,
@@ -131,51 +107,94 @@ public final class Stage21GPhysicalRecoveryService {
     }
 
     /**
-     * Plans and physically settles a replacement build for one persisted loss demand.
+     * Physically builds and ordinarily commissions one replacement for a persisted loss demand.
      *
-     * <p>The caller supplies an already allocated new {@link EntityId}; allocation remains outside
-     * Stage 21G. A successful result is only a completed physical asset payload. Ordinary fleet
-     * commissioning must still create a distinct FleetId before the demand can become commissioned.</p>
+     * <p>There is no caller-supplied EntityId or FleetId. After Stage-18 atomically consumes physical
+     * inputs and finite yard work, the ordinary local-system lifecycle allocates the EntityId. The
+     * completed Stage-17.5 engineering state is attached to that entity; only then is the entity given
+     * fleet identity and registered through the existing {@link FleetWorldService}, which allocates a
+     * fresh FleetId. Failure to settle the yard creates neither an entity nor a FleetId.</p>
      *
      * @param recovery Stage-21G metadata coordinator
      * @param demandId persisted replacement-demand identity
-     * @param newAssetId newly allocated ordinary entity identity
+     * @param world ordinary world/entity/fleet authority
+     * @param identities stable/runtime faction identity resolver
+     * @param buildSystemId system containing the physical yard/output berth
+     * @param displayName ordinary display name for the commissioned replacement
+     * @param x output-berth x position
+     * @param y output-berth y position
      * @param targetFit requested replacement fit
      * @param station canonical Stage-18F source storage
      * @param yard active Stage-18G yard projection
      * @param budget finite Stage-18G engineering-work budget
      * @param currentTick authoritative tick
-     * @return build result including physical settlement and build completion when successful
+     * @return build result; unsuccessful physical settlement never creates ordinary assets
      */
     public BuildResult buildReplacement(
             SettlementRecoveryService recovery,
             long demandId,
-            EntityId newAssetId,
+            WorldSimulation world,
+            FactionIdentityResolver identities,
+            StarSystemId buildSystemId,
+            String displayName,
+            float x,
+            float y,
             InstalledFit targetFit,
             Stage18StationStorage station,
             Stage18ShipyardRuntime.YardCapabilitySnapshot yard,
             Stage18ShipyardRuntime.YardWorkBudget budget,
             long currentTick) {
         SettlementRecoveryService checkedRecovery = Objects.requireNonNull(recovery, "recovery");
+        WorldSimulation checkedWorld = Objects.requireNonNull(world, "world");
+        FactionIdentityResolver checkedIdentities = Objects.requireNonNull(identities, "identities");
+        StarSystemId checkedSystem = Objects.requireNonNull(buildSystemId, "buildSystemId");
+        String checkedName = requireText(displayName, "displayName");
+        if (!Float.isFinite(x) || !Float.isFinite(y)) {
+            throw new IllegalArgumentException("Replacement berth coordinates must be finite");
+        }
         ReplacementDemand demand = checkedRecovery.snapshot().requireReplacementDemand(demandId);
+        if (demand.status() != ReplacementStatus.DEMANDED) {
+            throw new IllegalStateException("Replacement demand has already left the planning queue");
+        }
+        if (checkedRecovery.snapshot().requireSettlement(demand.settlementId()).status() == SettlementStatus.PENDING) {
+            throw new IllegalStateException("Replacement build requires a finalized Stage-21G recovery plan");
+        }
         String fingerprint = SettlementRecoveryService.fitFingerprint(
                 Objects.requireNonNull(targetFit, "targetFit"));
         if (!demand.targetFitFingerprint().equals(fingerprint)) {
             throw new IllegalArgumentException("Replacement fit differs from persisted demand fingerprint");
         }
+        int runtimeFactionId = checkedIdentities.runtimeId(demand.factionContentId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Replacement owner lacks runtime faction identity: " + demand.factionContentId()));
+
         WorkPlan plan = engineering.planBuild(targetFit, Objects.requireNonNull(yard, "yard").plannerCapability());
         Stage18ShipyardRuntime.SettlementResult settlement = shipyards.settleBuild(
                 plan, Objects.requireNonNull(station, "station"), yard,
                 Objects.requireNonNull(budget, "budget"));
         if (!settlement.settled()) {
-            return new BuildResult(plan, settlement, null, checkedRecovery.snapshot());
+            return new BuildResult(plan, settlement, null, null, null, checkedRecovery.snapshot());
         }
-        BuildCompletion completion = engineering.completeBuild(
-                Objects.requireNonNull(newAssetId, "newAssetId"),
-                plan,
-                settlement.compatibilitySettlement());
-        checkedRecovery.markYardSettled(demandId, completion.assetId().value(), currentTick);
-        return new BuildResult(plan, settlement, completion, checkedRecovery.snapshot());
+
+        Entity asset = new Entity().add(new FactionComponent(runtimeFactionId));
+        TransformComponent transform = new TransformComponent();
+        transform.position.set(x, y);
+        asset.add(transform);
+        EntityId assetId = checkedWorld.createEntity(checkedSystem, asset);
+        try {
+            BuildCompletion completion = engineering.completeBuild(
+                    assetId, plan, settlement.compatibilitySettlement());
+            asset.add(new EngineeringComponent(completion.initialEngineeringState()));
+            asset.add(new IdentityComponent(checkedName, IdentityComponent.Kind.FLEET));
+            FleetId fleetId = checkedWorld.fleetWorldService().registerFleetAtSystem(checkedSystem, assetId);
+            checkedRecovery.markYardSettled(demandId, checkedSystem, completion.assetId().value(), currentTick);
+            checkedRecovery.markCommissioned(demandId, fleetId, currentTick);
+            return new BuildResult(
+                    plan, settlement, completion, checkedSystem, fleetId, checkedRecovery.snapshot());
+        } catch (RuntimeException exception) {
+            checkedWorld.destroyEntity(checkedSystem, assetId);
+            throw exception;
+        }
     }
 
     private static void requireServiceType(ServiceOperation operation, OrderType expected) {
@@ -185,18 +204,18 @@ public final class Stage21GPhysicalRecoveryService {
         }
     }
 
-    /**
-     * Physical repair attempt result.
-     *
-     * @param plan Stage-17.5G repair plan
-     * @param settlement Stage-18G physical settlement result
-     * @param completion identity-preserving repair completion, or null when settlement failed
-     */
+    private static String requireText(String value, String label) {
+        String normalized = Objects.requireNonNull(value, label).strip();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(label + " must not be blank");
+        }
+        return normalized;
+    }
+
     public record RepairResult(
             WorkPlan plan,
             Stage18ShipyardRuntime.SettlementResult settlement,
             RepairCompletion completion) {
-        /** Validates one repair result. */
         public RepairResult {
             Objects.requireNonNull(plan, "plan");
             Objects.requireNonNull(settlement, "settlement");
@@ -206,26 +225,25 @@ public final class Stage21GPhysicalRecoveryService {
         }
     }
 
-    /**
-     * Physical replacement build attempt result.
-     *
-     * @param plan Stage-17.5G build plan
-     * @param settlement Stage-18G physical settlement result
-     * @param completion physical build completion, or null when settlement failed
-     * @param recoveryState current Stage-21G metadata after the attempt
-     */
+    /** Result of a physical replacement attempt and ordinary commissioning. */
     public record BuildResult(
             WorkPlan plan,
             Stage18ShipyardRuntime.SettlementResult settlement,
             BuildCompletion completion,
+            StarSystemId builtSystemId,
+            FleetId commissionedFleetId,
             SettlementRecoveryState recoveryState) {
-        /** Validates one replacement build result. */
         public BuildResult {
             Objects.requireNonNull(plan, "plan");
             Objects.requireNonNull(settlement, "settlement");
             Objects.requireNonNull(recoveryState, "recoveryState");
-            if (settlement.settled() != (completion != null)) {
+            boolean completed = completion != null;
+            if (settlement.settled() != completed) {
                 throw new IllegalArgumentException("Build completion must exist exactly when physical settlement succeeds");
+            }
+            if (completed != (builtSystemId != null) || completed != (commissionedFleetId != null)) {
+                throw new IllegalArgumentException(
+                        "Settled replacement must carry exact system and commissioned FleetId provenance");
             }
         }
     }
