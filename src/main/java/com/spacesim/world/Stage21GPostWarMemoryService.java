@@ -2,10 +2,8 @@ package com.spacesim.world;
 
 import com.spacesim.world.DiplomaticLifecycleState.RelationEvent;
 import com.spacesim.world.DiplomaticLifecycleState.RelationFactor;
-import com.spacesim.world.DiplomaticLifecycleState.RelationMemory;
 import com.spacesim.world.DiplomaticLifecycleState.War;
 import com.spacesim.world.DiplomaticLifecycleState.WarStatus;
-import com.spacesim.world.SettlementRecoveryState.FleetLossRecord;
 import com.spacesim.world.SettlementRecoveryState.Settlement;
 import com.spacesim.world.SettlementRecoveryState.SettlementStatus;
 
