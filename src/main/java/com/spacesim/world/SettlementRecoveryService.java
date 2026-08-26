@@ -46,15 +46,32 @@ import java.util.Objects;
 public final class SettlementRecoveryService {
     private SettlementRecoveryState state;
 
+    /**
+     * Creates a recovery coordinator over an already validated persistent state.
+     *
+     * @param state current Stage-21G settlement/recovery state
+     */
     public SettlementRecoveryService(SettlementRecoveryState state) {
         this.state = Objects.requireNonNull(state, "state");
     }
 
+    /**
+     * Returns the current immutable recovery snapshot.
+     *
+     * @return current Stage-21G settlement/recovery state
+     */
     public SettlementRecoveryState snapshot() {
         return state;
     }
 
-    /** Opens recovery for one already-accepted Stage-21C ceasefire or peace proposal. */
+    /**
+     * Opens recovery for one already-accepted Stage-21C ceasefire or peace proposal.
+     *
+     * @param diplomacy existing Stage-21C diplomatic lifecycle authority
+     * @param proposalId accepted ceasefire/peace proposal identity
+     * @param currentTick authoritative current tick
+     * @return existing or newly opened Stage-21G settlement
+     */
     public Settlement openAcceptedSettlement(
             DiplomaticLifecycleService diplomacy,
             String proposalId,
@@ -116,6 +133,10 @@ public final class SettlementRecoveryService {
      * physical-loss records and replacement demands. Once finalized, no new recovery obligations may
      * be appended; execution can therefore use ordinary all-complete checks without the empty-stream
      * completion bug. An intentionally empty plan completes only through this explicit transition.</p>
+     *
+     * @param settlementId settlement whose finite recovery plan is finalized
+     * @param currentTick authoritative current tick
+     * @return finalized settlement after status reconciliation
      */
     public Settlement finalizeRecoveryPlan(long settlementId, long currentTick) {
         requireTick(currentTick);
@@ -131,7 +152,14 @@ public final class SettlementRecoveryService {
         return state.requireSettlement(settlementId);
     }
 
-    /** Executes every still-due treasury payment exactly once through ordinary faction treasuries. */
+    /**
+     * Executes every still-due treasury payment exactly once through ordinary faction treasuries.
+     *
+     * @param world existing world/treasury authority
+     * @param settlementId finalized settlement whose payments are reconciled
+     * @param currentTick authoritative current tick
+     * @return updated Stage-21G recovery state
+     */
     public SettlementRecoveryState executePayments(
             WorldSimulation world,
             long settlementId,
@@ -201,7 +229,15 @@ public final class SettlementRecoveryService {
         return refreshSettlementStatus(settlementId, currentTick);
     }
 
-    /** Registers one surviving command group while the finite recovery plan is still open. */
+    /**
+     * Registers one surviving command group while the finite recovery plan is still open.
+     *
+     * @param settlementId planning settlement that owns the directive
+     * @param commandGroupId existing Stage-21D command-group identity
+     * @param factionContentId stable owning faction identity
+     * @param currentTick authoritative current tick
+     * @return existing idempotent directive or newly registered directive
+     */
     public DemobilizationDirective registerDemobilization(
             long settlementId,
             long commandGroupId,
@@ -230,7 +266,22 @@ public final class SettlementRecoveryService {
         return created;
     }
 
-    /** Cancels a remaining active war commitment and submits an ordinary Stage-21D RETURN order. */
+    /**
+     * Cancels a remaining active war commitment and submits an ordinary Stage-21D RETURN order.
+     *
+     * @param commandState existing Stage-21D command state
+     * @param forces ordinary fleet-force registry used by order submission
+     * @param identities stable/runtime faction identity authority
+     * @param submission existing Stage-21D order submission authority
+     * @param settlementId finalized settlement that owns the demobilization directive
+     * @param commandGroupId surviving command group to return home
+     * @param source provenance source for the ordinary RETURN order
+     * @param currentTick authoritative current tick
+     * @param accessPolicy existing strategic transit-access policy
+     * @param servicePolicy existing strategic service-capability policy
+     * @param riskPolicy existing strategic route-risk policy
+     * @return updated command/recovery state and accepted ordinary RETURN order
+     */
     public DemobilizationResult submitReturnOrder(
             FleetCommandState commandState,
             FleetForceRegistry forces,
@@ -285,7 +336,17 @@ public final class SettlementRecoveryService {
         return new DemobilizationResult(accepted.state(), state, accepted.order());
     }
 
-    /** Records only real FleetId losses reported by Stage-21E while the recovery plan is open. */
+    /**
+     * Records only real FleetId losses reported by Stage-21E while the recovery plan is open.
+     *
+     * @param settlementId planning settlement that owns the loss provenance
+     * @param operationId exact Stage-21E operation identity
+     * @param report Stage-21E physical consequence report containing destroyed FleetIds
+     * @param before ordinary fleet registry snapshot before the physical consequences were applied
+     * @param identities stable/runtime faction identity authority
+     * @param currentTick authoritative current tick
+     * @return updated recovery state containing idempotent physical-loss provenance
+     */
     public SettlementRecoveryState recordPhysicalLosses(
             long settlementId,
             long operationId,
@@ -330,7 +391,15 @@ public final class SettlementRecoveryService {
         return state;
     }
 
-    /** Creates one replacement demand for a persisted physical loss while planning is open. */
+    /**
+     * Creates one replacement demand for a persisted physical loss while planning is open.
+     *
+     * @param settlementId planning settlement that owns the loss
+     * @param lostFleetId exact destroyed ordinary FleetId
+     * @param targetFit exact replacement fit whose canonical fingerprint is persisted
+     * @param currentTick authoritative current tick
+     * @return existing idempotent demand or newly created replacement demand
+     */
     public ReplacementDemand requestReplacement(
             long settlementId,
             FleetId lostFleetId,
@@ -430,7 +499,14 @@ public final class SettlementRecoveryService {
         return updated;
     }
 
-    /** Emits deterministic bilateral treaty-performance memory once settlement obligations are complete. */
+    /**
+     * Emits deterministic bilateral treaty-performance memory once settlement obligations are complete.
+     *
+     * @param diplomacy existing Stage-21C diplomatic lifecycle authority
+     * @param settlementId completed settlement whose performance memory is emitted
+     * @param currentTick authoritative current tick
+     * @return completed settlement with memory emission recorded
+     */
     public Settlement recordCompletionMemory(
             DiplomaticLifecycleService diplomacy,
             long settlementId,
@@ -455,7 +531,12 @@ public final class SettlementRecoveryService {
         return updated;
     }
 
-    /** Deterministically fingerprints hull + sorted mount/module assignments. */
+    /**
+     * Deterministically fingerprints hull and sorted mount/module assignments.
+     *
+     * @param fit installed hull/module fit to fingerprint
+     * @return lowercase SHA-256 hexadecimal fingerprint of the canonical fit representation
+     */
     public static String fitFingerprint(InstalledFit fit) {
         InstalledFit checked = Objects.requireNonNull(fit, "fit");
         StringBuilder canonical = new StringBuilder(checked.hullId()).append('\n');
@@ -625,10 +706,24 @@ public final class SettlementRecoveryService {
         if (tick < 0L) throw new IllegalArgumentException("Stage-21G tick must be non-negative");
     }
 
+    /**
+     * Result of submitting or reusing an ordinary demobilization RETURN order.
+     *
+     * @param commandState updated Stage-21D command state
+     * @param recoveryState updated Stage-21G recovery state
+     * @param returnOrder accepted ordinary RETURN order
+     */
     public record DemobilizationResult(
             FleetCommandState commandState,
             SettlementRecoveryState recoveryState,
             FleetOrderState returnOrder) {
+        /**
+         * Validates that the result carries non-null state and an ordinary RETURN order.
+         *
+         * @param commandState updated Stage-21D command state
+         * @param recoveryState updated Stage-21G recovery state
+         * @param returnOrder accepted ordinary RETURN order
+         */
         public DemobilizationResult {
             Objects.requireNonNull(commandState, "commandState");
             Objects.requireNonNull(recoveryState, "recoveryState");
