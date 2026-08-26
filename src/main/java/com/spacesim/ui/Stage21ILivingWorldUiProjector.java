@@ -27,7 +27,13 @@ import java.util.stream.Collectors;
  * missions or knowledge while preparing UI state.</p>
  */
 public final class Stage21ILivingWorldUiProjector {
-    /** Projects one immutable actor-bounded UI snapshot. */
+    /**
+     * Projects one immutable actor-bounded UI snapshot.
+     *
+     * @param checkpoint accepted Stage-21H checkpoint containing the Stage-21A..H authority chain
+     * @param viewerFactionId faction whose bounded knowledge and owned commands are being inspected
+     * @return deterministic read-only presentation snapshot for the requested viewer
+     */
     public Stage21ILivingWorldUiSnapshot project(
             Stage21HGeneratedWorldRuntimePersistentState checkpoint,
             String viewerFactionId) {
