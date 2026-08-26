@@ -23,6 +23,10 @@ public final class Stage21GPostWarMemoryService {
     static final int GRIEVANCE_PER_LOST_FLEET = 8;
     static final int MAX_GRIEVANCE = 40;
 
+    /** Creates the stateless Stage-21G post-war memory bridge. */
+    public Stage21GPostWarMemoryService() {
+    }
+
     /**
      * Records all Stage-21G post-war memory for one completed settlement.
      *
