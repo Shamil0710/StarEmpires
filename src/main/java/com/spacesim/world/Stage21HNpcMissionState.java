@@ -14,7 +14,8 @@ import java.util.Set;
  *
  * <p>The aggregate owns only NPC identity/availability/received knowledge, mission lifecycle and
  * escrow bookkeeping, bounded RPG reputation evidence, and authored chain progress. It never owns
- * treasury, cargo, fleets, construction, diplomacy, operations, territory or discovery truth.</p>
+ * treasury, cargo, fleets, construction, diplomacy, operations, territory, industrial inventory or
+ * discovery truth.</p>
  *
  * @param schemaVersion exact Stage-21H sidecar schema
  * @param simulationTick latest authoritative world tick represented by this sidecar
@@ -77,6 +78,7 @@ public record Stage21HNpcMissionState(
     /** Mission lifecycle. */
     public enum MissionStatus {
         /** Funded opportunity exists but has not been accepted. */ OFFERED,
+        /** Offer was explicitly rejected before acceptance. */ REJECTED,
         /** Contract was accepted and remains active. */ ACCEPTED,
         /** Authoritative world state satisfied the objective. */ COMPLETED,
         /** Authoritative world state made the objective impossible or failed. */ FAILED,
@@ -87,21 +89,30 @@ public record Stage21HNpcMissionState(
     /** Ordinary authority domain consulted for objective evaluation. */
     public enum ObjectiveAuthority {
         /** Ordinary Stage-20 physical freight/order authority. */ FREIGHT,
-        /** Ordinary fleet placement/identity authority. */ FLEET,
+        /** Ordinary fleet placement/identity/engineering authority. */ FLEET,
         /** Stage-20 owner-local discovery authority. */ DISCOVERY,
         /** Ordinary construction-project authority. */ CONSTRUCTION,
+        /** Stage-18 finite salvage-source authority plus Stage-20 discovery. */ INDUSTRY,
         /** Stage-17 treaty/access authority. */ DIPLOMACY,
         /** Stage-21E operation authority. */ OPERATION,
         /** Ordinary economic state. */ ECONOMY
     }
 
-    /** Predicate vocabulary whose truth must be read from an ordinary authority. */
+    /** Predicate vocabulary whose truth must be read from ordinary authorities. */
     public enum ObjectiveKind {
-        /** One ordinary Stage-20 transport order must deliver at least the requested whole kilograms. */ FREIGHT_ORDER_DELIVERED_KG_AT_LEAST,
+        /** One ordinary Stage-20 transport order must deliver at least the requested whole kilograms. */
+        FREIGHT_ORDER_DELIVERED_KG_AT_LEAST,
         /** A stable FleetId must be present in the specified StarSystem. */ FLEET_PRESENT_IN_SYSTEM,
         /** A stable FleetId must no longer exist in ordinary world placement. */ FLEET_ABSENT,
+        /** Issuer-owned convoy and contracted escort FleetId must be co-present at the destination. */
+        ESCORT_FLEETS_PRESENT_IN_SYSTEM,
+        /** A stable FleetId must carry at least the requested reaction-mass kilograms. */
+        FLEET_REACTION_MASS_KG_AT_LEAST,
         /** Owner-local discovery must reach at least the requested static state. */ DISCOVERY_AT_LEAST,
-        /** An ordinary construction project must have at least the requested delivered units. */ CONSTRUCTION_DELIVERED_UNITS_AT_LEAST,
+        /** A finite Stage-18 salvage source must be discovered and actually depleted by the requested kilograms. */
+        DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST,
+        /** An ordinary construction project must have at least the requested delivered units. */
+        CONSTRUCTION_DELIVERED_UNITS_AT_LEAST,
         /** An ordinary construction project must be terminal COMPLETED. */ CONSTRUCTION_COMPLETED,
         /** Existing diplomacy must currently grant legal market access. */ MARKET_ACCESS_ALLOWED,
         /** A Stage-21E operation must reach the requested terminal status. */ OPERATION_STATUS,
@@ -147,7 +158,18 @@ public record Stage21HNpcMissionState(
             long receivedTick,
             long freshUntilTick) implements Comparable<NpcKnowledgeFact> {
 
-        /** Validates one bounded NPC-known fact. */
+        /**
+         * Validates one bounded NPC-known fact.
+         *
+         * @param factId stable fact identity
+         * @param subjectId actor-known subject
+         * @param kind provenance family
+         * @param claimCode bounded semantic claim
+         * @param magnitudeBasisPoints bounded magnitude
+         * @param provenanceId originating evidence identity
+         * @param receivedTick receipt tick
+         * @param freshUntilTick inclusive freshness or -1
+         */
         public NpcKnowledgeFact {
             factId = requireText(factId, "Knowledge fact ID");
             subjectId = requireText(subjectId, "Knowledge subject");
@@ -195,7 +217,17 @@ public record Stage21HNpcMissionState(
             NpcAvailability availability,
             List<NpcKnowledgeFact> knowledge) implements Comparable<NpcState> {
 
-        /** Validates and canonicalizes one NPC row. */
+        /**
+         * Validates and canonicalizes one NPC row.
+         *
+         * @param npcId stable NPC identity
+         * @param nameKey localization/name key
+         * @param role role archetype
+         * @param factionContentId affiliation
+         * @param locationSystemId current system
+         * @param availability availability state
+         * @param knowledge retained facts
+         */
         public NpcState {
             npcId = requireText(npcId, "NPC ID");
             nameKey = requireText(nameKey, "NPC name key");
@@ -226,9 +258,14 @@ public record Stage21HNpcMissionState(
     /**
      * One objective predicate. The mission stores references and thresholds, never cached truth.
      *
+     * <p>For {@link ObjectiveKind#ESCORT_FLEETS_PRESENT_IN_SYSTEM}, {@code subjectId} is the convoy
+     * FleetId and {@code requiredState} is the contracted escort FleetId. For
+     * {@link ObjectiveKind#DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST}, {@code subjectId} is
+     * {@code staticObjectId|salvageSourceId} and {@code requiredState} is {@code KIND:STATE}.</p>
+     *
      * @param authority ordinary authority domain
      * @param kind predicate kind
-     * @param subjectId stable order/FleetId/project/treaty/operation/faction/object identity
+     * @param subjectId stable order/FleetId/project/operation/faction/object identity
      * @param systemId target StarSystem value, or 0 when the predicate is not system-scoped
      * @param threshold non-negative numeric threshold used by the predicate
      * @param requiredState optional enum/state token interpreted only by the owning production adapter
@@ -241,7 +278,16 @@ public record Stage21HNpcMissionState(
             long threshold,
             String requiredState) {
 
-        /** Validates one declarative ordinary-authority predicate. */
+        /**
+         * Validates one declarative ordinary-authority predicate.
+         *
+         * @param authority authority domain
+         * @param kind predicate kind
+         * @param subjectId stable subject
+         * @param systemId system value or zero
+         * @param threshold numeric threshold
+         * @param requiredState bounded state token
+         */
         public MissionObjective {
             Objects.requireNonNull(authority, "Objective authority not set");
             Objects.requireNonNull(kind, "Objective kind not set");
@@ -250,7 +296,7 @@ public record Stage21HNpcMissionState(
                 throw new IllegalArgumentException("Objective numeric values cannot be negative");
             }
             requiredState = Objects.requireNonNull(requiredState, "Objective required state not set").strip();
-            validateObjectiveShape(authority, kind, systemId, threshold, requiredState);
+            validateObjectiveShape(authority, kind, subjectId, systemId, threshold, requiredState);
         }
     }
 
@@ -263,7 +309,13 @@ public record Stage21HNpcMissionState(
      */
     public record MissionWakeup(String eventId, long observedTick, long eligibleTick)
             implements Comparable<MissionWakeup> {
-        /** Validates one wakeup. */
+        /**
+         * Validates one wakeup.
+         *
+         * @param eventId world-event identity
+         * @param observedTick observation tick
+         * @param eligibleTick reconciliation eligibility tick
+         */
         public MissionWakeup {
             eventId = requireText(eventId, "Mission wakeup event ID");
             requireNonNegative(observedTick, "Mission wakeup observation tick");
@@ -317,7 +369,25 @@ public record Stage21HNpcMissionState(
             String outcomeCode,
             List<MissionWakeup> pendingWakeups) implements Comparable<MissionContract> {
 
-        /** Validates and canonicalizes one funded contract. */
+        /**
+         * Validates and canonicalizes one funded contract.
+         *
+         * @param missionId contract identity
+         * @param template template family
+         * @param templateVersion template version
+         * @param issuerNpcId issuer NPC
+         * @param issuerFactionId issuer faction
+         * @param sourceKnowledgeFactIds source knowledge IDs
+         * @param objective ordinary-authority predicate
+         * @param createdTick creation tick
+         * @param deadlineTick deadline
+         * @param status lifecycle status
+         * @param statusUpdatedTick latest status tick
+         * @param rewardMilliCredits promised reward
+         * @param escrowMilliCredits currently retained escrow
+         * @param outcomeCode outcome/diagnostic code
+         * @param pendingWakeups bounded pending event wakeups
+         */
         public MissionContract {
             missionId = requireText(missionId, "Mission ID");
             Objects.requireNonNull(template, "Mission template not set");
@@ -331,6 +401,7 @@ public record Stage21HNpcMissionState(
                 throw new IllegalArgumentException("Mission must retain at least one issuer-known source fact");
             }
             Objects.requireNonNull(objective, "Mission objective not set");
+            validateTemplateObjective(template, objective.kind());
             requireNonNegative(createdTick, "Mission creation tick");
             if (deadlineTick <= createdTick) {
                 throw new IllegalArgumentException("Mission deadline must follow creation");
@@ -385,7 +456,15 @@ public record Stage21HNpcMissionState(
             int delta,
             long observedTick,
             String subjectId) implements Comparable<ReputationEvent> {
-        /** Validates one observed reputation event. */
+        /**
+         * Validates one observed reputation event.
+         *
+         * @param eventId event identity
+         * @param kind event family
+         * @param delta bounded signed delta
+         * @param observedTick observation tick
+         * @param subjectId event subject/provenance
+         */
         public ReputationEvent {
             eventId = requireText(eventId, "Reputation event ID");
             Objects.requireNonNull(kind, "Reputation event kind not set");
@@ -413,7 +492,13 @@ public record Stage21HNpcMissionState(
             String ownerId,
             String subjectActorId,
             List<ReputationEvent> events) implements Comparable<ReputationState> {
-        /** Validates one directed reputation row. */
+        /**
+         * Validates one directed reputation row.
+         *
+         * @param ownerId reputation owner
+         * @param subjectActorId remembered actor
+         * @param events observed evidence events
+         */
         public ReputationState {
             ownerId = requireText(ownerId, "Reputation owner");
             subjectActorId = requireText(subjectActorId, "Reputation subject actor");
@@ -444,7 +529,7 @@ public record Stage21HNpcMissionState(
      * Persistent progress of one compact authored chain.
      *
      * @param chainId stable chain identity
-     * @param currentStep zero-based next authored step index
+     * @param currentStep zero-based number of authored steps already issued
      * @param totalSteps fixed authored step count
      * @param status current chain status
      * @param missionIds mission identities already issued by this chain in authored order
@@ -455,7 +540,15 @@ public record Stage21HNpcMissionState(
             int totalSteps,
             StoryChainStatus status,
             List<String> missionIds) implements Comparable<StoryChainState> {
-        /** Validates one authored-chain progress row. */
+        /**
+         * Validates one authored-chain progress row.
+         *
+         * @param chainId chain identity
+         * @param currentStep issued-step count
+         * @param totalSteps authored step count
+         * @param status lifecycle state
+         * @param missionIds linked missions in authored order
+         */
         public StoryChainState {
             chainId = requireText(chainId, "Story chain ID");
             if (totalSteps < 3 || totalSteps > 5 || currentStep < 0 || currentStep > totalSteps) {
@@ -463,10 +556,10 @@ public record Stage21HNpcMissionState(
             }
             Objects.requireNonNull(status, "Story chain status not set");
             missionIds = orderedUniqueStrings(missionIds, "Story chain mission IDs");
-            if (missionIds.size() > currentStep) {
-                throw new IllegalArgumentException("Story chain cannot retain more mission IDs than resolved/issued steps");
+            if (missionIds.size() != currentStep) {
+                throw new IllegalArgumentException("Story chain issued-step count must equal linked mission count");
             }
-            if (status == StoryChainStatus.AVAILABLE && (currentStep != 0 || !missionIds.isEmpty())) {
+            if (status == StoryChainStatus.AVAILABLE && currentStep != 0) {
                 throw new IllegalArgumentException("Available story chain cannot already contain progress");
             }
             if (status == StoryChainStatus.COMPLETED && currentStep != totalSteps) {
@@ -480,7 +573,17 @@ public record Stage21HNpcMissionState(
         }
     }
 
-    /** Validates and canonicalizes the complete Stage-21H sidecar. */
+    /**
+     * Validates and canonicalizes the complete Stage-21H sidecar.
+     *
+     * @param schemaVersion sidecar schema
+     * @param simulationTick sidecar authoritative tick
+     * @param nextMissionSequence next mission allocator sequence
+     * @param npcs persistent NPC rows
+     * @param missions persistent mission rows
+     * @param reputations persistent reputation rows
+     * @param storyChains persistent story-chain rows
+     */
     public Stage21HNpcMissionState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported Stage-21H sidecar schema: " + schemaVersion);
@@ -570,25 +673,60 @@ public record Stage21HNpcMissionState(
     private static void validateObjectiveShape(
             ObjectiveAuthority authority,
             ObjectiveKind kind,
+            String subjectId,
             long systemId,
             long threshold,
             String requiredState) {
         boolean valid = switch (kind) {
             case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> authority == ObjectiveAuthority.FREIGHT
                     && systemId == 0L && threshold > 0L && requiredState.isEmpty();
-            case FLEET_PRESENT_IN_SYSTEM -> authority == ObjectiveAuthority.FLEET && systemId > 0L;
-            case FLEET_ABSENT -> authority == ObjectiveAuthority.FLEET && systemId == 0L;
+            case FLEET_PRESENT_IN_SYSTEM -> authority == ObjectiveAuthority.FLEET
+                    && systemId > 0L && threshold == 0L && requiredState.isEmpty();
+            case FLEET_ABSENT -> authority == ObjectiveAuthority.FLEET
+                    && systemId == 0L && threshold == 0L && requiredState.isEmpty();
+            case ESCORT_FLEETS_PRESENT_IN_SYSTEM -> authority == ObjectiveAuthority.FLEET
+                    && systemId > 0L && threshold == 0L && isPositiveLong(requiredState);
+            case FLEET_REACTION_MASS_KG_AT_LEAST -> authority == ObjectiveAuthority.FLEET
+                    && systemId == 0L && threshold > 0L && requiredState.isEmpty();
             case DISCOVERY_AT_LEAST -> authority == ObjectiveAuthority.DISCOVERY
-                    && systemId > 0L && !requiredState.isEmpty();
+                    && systemId > 0L && threshold == 0L && !requiredState.isEmpty();
+            case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST -> authority == ObjectiveAuthority.INDUSTRY
+                    && systemId > 0L && threshold > 0L && requiredState.split(":", -1).length == 2
+                    && subjectId.split("\\|", -1).length == 2;
             case CONSTRUCTION_DELIVERED_UNITS_AT_LEAST -> authority == ObjectiveAuthority.CONSTRUCTION
-                    && threshold > 0L;
-            case CONSTRUCTION_COMPLETED -> authority == ObjectiveAuthority.CONSTRUCTION;
-            case MARKET_ACCESS_ALLOWED -> authority == ObjectiveAuthority.DIPLOMACY && !requiredState.isEmpty();
-            case OPERATION_STATUS -> authority == ObjectiveAuthority.OPERATION && !requiredState.isEmpty();
-            case FACTION_TREASURY_AT_LEAST -> authority == ObjectiveAuthority.ECONOMY;
+                    && systemId == 0L && threshold > 0L && requiredState.isEmpty();
+            case CONSTRUCTION_COMPLETED -> authority == ObjectiveAuthority.CONSTRUCTION
+                    && systemId == 0L && threshold == 0L && requiredState.isEmpty();
+            case MARKET_ACCESS_ALLOWED -> authority == ObjectiveAuthority.DIPLOMACY
+                    && systemId == 0L && threshold == 0L && !requiredState.isEmpty();
+            case OPERATION_STATUS -> authority == ObjectiveAuthority.OPERATION
+                    && systemId == 0L && threshold == 0L && !requiredState.isEmpty();
+            case FACTION_TREASURY_AT_LEAST -> authority == ObjectiveAuthority.ECONOMY
+                    && systemId == 0L && requiredState.isEmpty();
         };
         if (!valid) {
             throw new IllegalArgumentException("Objective kind is incompatible with its authority/parameters: " + kind);
+        }
+    }
+
+    private static void validateTemplateObjective(MissionTemplate template, ObjectiveKind kind) {
+        boolean valid = switch (template) {
+            case EMERGENCY_SUPPLY_DELIVERY, ORDINARY_MARKET_PROCUREMENT ->
+                    kind == ObjectiveKind.FREIGHT_ORDER_DELIVERED_KG_AT_LEAST;
+            case CONVOY_ESCORT -> kind == ObjectiveKind.ESCORT_FLEETS_PRESENT_IN_SYSTEM;
+            case STRANDED_FLEET_RESCUE_REFUEL -> kind == ObjectiveKind.FLEET_REACTION_MASS_KG_AT_LEAST;
+            case SYSTEM_OBJECT_RECONNAISSANCE -> kind == ObjectiveKind.DISCOVERY_AT_LEAST;
+            case DERELICT_INVESTIGATION_RECOVERY ->
+                    kind == ObjectiveKind.DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST;
+            case INTERCEPTION_DEFENSE -> kind == ObjectiveKind.OPERATION_STATUS;
+            case CONSTRUCTION_REPAIR_INPUT_DELIVERY ->
+                    kind == ObjectiveKind.CONSTRUCTION_DELIVERED_UNITS_AT_LEAST
+                            || kind == ObjectiveKind.FREIGHT_ORDER_DELIVERED_KG_AT_LEAST;
+            case IMPERIAL_ACCESS_NEGOTIATION -> kind == ObjectiveKind.MARKET_ACCESS_ALLOWED;
+        };
+        if (!valid) {
+            throw new IllegalArgumentException(
+                    "Mission template cannot use the supplied ordinary-authority predicate: " + template + "/" + kind);
         }
     }
 
@@ -605,6 +743,14 @@ public record Stage21HNpcMissionState(
             return value;
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Malformed allocated Stage-21H mission ID: " + missionId, exception);
+        }
+    }
+
+    private static boolean isPositiveLong(String value) {
+        try {
+            return Long.parseLong(value) > 0L;
+        } catch (NumberFormatException exception) {
+            return false;
         }
     }
 
