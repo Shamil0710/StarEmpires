@@ -62,17 +62,13 @@ class Stage21HMissionAuthorityCoverageTest {
         assertEquals(Result.FAILED, Stage21HMissionAuthority.evaluate(
                 world, null, null, null, StrategicOperationState.empty(), objective).result());
 
-        MissionObjective selfEscort = new MissionObjective(
+        assertThrows(IllegalArgumentException.class, () -> new MissionObjective(
                 ObjectiveAuthority.FLEET,
                 ObjectiveKind.ESCORT_FLEETS_PRESENT_IN_SYSTEM,
                 Long.toString(convoy.value()),
                 system.value(),
                 0L,
-                Long.toString(convoy.value()));
-        assertThrows(IllegalArgumentException.class, () -> Stage21HMissionAuthority.requireIssuerAuthority(
-                world, null, null, null, StrategicOperationState.empty(), TRADE_LEAGUE, selfEscort));
-        assertThrows(IllegalArgumentException.class, () -> Stage21HMissionAuthority.evaluate(
-                world, null, null, null, StrategicOperationState.empty(), selfEscort));
+                Long.toString(convoy.value())));
     }
 
     @Test
