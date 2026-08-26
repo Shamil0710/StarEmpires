@@ -123,6 +123,58 @@ class Stage21GPostWarMemoryServiceTest {
                 diplomacy.derivedRelation(TRADE_LEAGUE, MINERS));
     }
 
+    @Test
+    void completedWarMemoryChangesLaterDiplomaticOutcomeAfterOperationsEnd() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_794L);
+        DiplomaticLifecycleService diplomacy = diplomacy(world);
+        var war = diplomacy.declareWarFromObservedAttack(
+                TRADE_LEAGUE, MINERS, "observed.attack.memory.decision.21g",
+                world.getAuthoritativeWorldTick(), goals());
+        long now = world.getAuthoritativeWorldTick();
+        var peace = diplomacy.propose(new DiplomaticLifecycleService.ProposalRequest(
+                "goal.peace.memory.decision.21g", TRADE_LEAGUE, MINERS, ProposalKind.PEACE, war.warId(),
+                List.of(), List.of(), now + 100L));
+        peace = diplomacy.accept(peace.proposalId());
+        Settlement settlement = new Settlement(
+                1L, peace.proposalId(), war.warId(), TRADE_LEAGUE, MINERS,
+                now, now, SettlementStatus.COMPLETE, false);
+        SettlementRecoveryService recovery = new SettlementRecoveryService(new SettlementRecoveryState(
+                SettlementRecoveryState.CURRENT_VERSION,
+                now,
+                2L,
+                1L,
+                List.of(settlement),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()));
+
+        var before = DiplomaticLifecycleService.selectOutcome(
+                new DiplomaticLifecycleService.DiplomaticSituation(
+                        diplomacy.derivedRelation(TRADE_LEAGUE, MINERS),
+                        4_900,
+                        2_500,
+                        2_500,
+                        DiplomaticLifecycleState.CrisisEscalation.RESOLVED,
+                        false),
+                0L);
+        assertEquals(DiplomaticLifecycleService.StrategicOutcome.DETERRENCE, before);
+
+        new Stage21GPostWarMemoryService().recordPostWarMemory(recovery, diplomacy, settlement.id(), now);
+
+        var after = DiplomaticLifecycleService.selectOutcome(
+                new DiplomaticLifecycleService.DiplomaticSituation(
+                        diplomacy.derivedRelation(TRADE_LEAGUE, MINERS),
+                        4_900,
+                        2_500,
+                        2_500,
+                        DiplomaticLifecycleState.CrisisEscalation.RESOLVED,
+                        false),
+                0L);
+        assertEquals(12, diplomacy.derivedRelation(TRADE_LEAGUE, MINERS));
+        assertEquals(DiplomaticLifecycleService.StrategicOutcome.TRADE, after);
+    }
+
     private static DiplomaticLifecycleService diplomacy(WorldSimulation world) {
         return new DiplomaticLifecycleService(
                 world,
