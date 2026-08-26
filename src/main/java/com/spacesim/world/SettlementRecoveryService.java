@@ -46,32 +46,15 @@ import java.util.Objects;
 public final class SettlementRecoveryService {
     private SettlementRecoveryState state;
 
-    /**
-     * Restores a Stage-21G recovery coordinator.
-     *
-     * @param state validated persistent recovery metadata
-     */
     public SettlementRecoveryService(SettlementRecoveryState state) {
         this.state = Objects.requireNonNull(state, "state");
     }
 
-    /** @return current immutable Stage-21G recovery metadata */
     public SettlementRecoveryState snapshot() {
         return state;
     }
 
-    /**
-     * Opens recovery for one already-accepted Stage-21C ceasefire or peace proposal.
-     *
-     * <p>Non-monetary access/recognition/territorial effects are intentionally not re-executed here;
-     * Stage 21C already delegates those effects to Stage-17 authorities. Only treasury promises are
-     * materialized into Stage-21G payment obligations.</p>
-     *
-     * @param diplomacy existing Stage-21C lifecycle authority
-     * @param proposalId accepted ceasefire/peace proposal identity
-     * @param currentTick authoritative reconciliation tick
-     * @return existing or newly created settlement
-     */
+    /** Opens recovery for one already-accepted Stage-21C ceasefire or peace proposal. */
     public Settlement openAcceptedSettlement(
             DiplomaticLifecycleService diplomacy,
             String proposalId,
@@ -117,9 +100,8 @@ public final class SettlementRecoveryService {
         ArrayList<Settlement> settlements = new ArrayList<>(state.settlements());
         settlements.add(settlement);
         ArrayList<PaymentObligation> payments = new ArrayList<>(state.payments());
-        int ordinal = 0;
-        ordinal = addPayments(payments, settlementId, proposal.proposerFactionId(),
-                proposal.recipientFactionId(), proposal.concessions(), ordinal);
+        int ordinal = addPayments(payments, settlementId, proposal.proposerFactionId(),
+                proposal.recipientFactionId(), proposal.concessions(), 0);
         addPayments(payments, settlementId, proposal.recipientFactionId(),
                 proposal.proposerFactionId(), proposal.demands(), ordinal);
         state = rebuild(currentTick, Math.addExact(settlementId, 1L), state.nextReplacementDemandId(),
@@ -128,25 +110,35 @@ public final class SettlementRecoveryService {
     }
 
     /**
-     * Executes every still-due treasury payment in one settlement exactly once.
+     * Closes the finite recovery-plan authoring window.
      *
-     * <p>Each transfer uses a zero-balance transient clearing wallet solely to compose the two existing
-     * faction-treasury transfer boundaries. No source/sink is called. The payer is rechecked against its
-     * current reserve-protected spendable treasury; insufficient funds stall the obligation without a
-     * partial transfer. A recipient-credit failure is rolled back to the same payer before failing closed.</p>
-     *
-     * @param world authoritative ordinary treasury owner
-     * @param settlementId settlement to reconcile
-     * @param currentTick authoritative reconciliation tick
-     * @return immutable updated recovery state
+     * <p>Before this transition payment terms may be accompanied by demobilization directives,
+     * physical-loss records and replacement demands. Once finalized, no new recovery obligations may
+     * be appended; execution can therefore use ordinary all-complete checks without the empty-stream
+     * completion bug. An intentionally empty plan completes only through this explicit transition.</p>
      */
+    public Settlement finalizeRecoveryPlan(long settlementId, long currentTick) {
+        requireTick(currentTick);
+        Settlement current = state.requireSettlement(settlementId);
+        if (current.status() != SettlementStatus.PENDING) {
+            return current;
+        }
+        Settlement finalized = new Settlement(
+                current.id(), current.proposalId(), current.warId(), current.factionA(), current.factionB(),
+                current.openedTick(), currentTick, SettlementStatus.EXECUTING, current.memoryRecorded());
+        replaceSettlement(finalized, currentTick);
+        refreshSettlementStatus(settlementId, currentTick);
+        return state.requireSettlement(settlementId);
+    }
+
+    /** Executes every still-due treasury payment exactly once through ordinary faction treasuries. */
     public SettlementRecoveryState executePayments(
             WorldSimulation world,
             long settlementId,
             long currentTick) {
         Objects.requireNonNull(world, "world");
         requireTick(currentTick);
-        state.requireSettlement(settlementId);
+        requireFinalizedSettlement(settlementId);
         ArrayList<PaymentObligation> next = new ArrayList<>(state.payments().size());
         for (PaymentObligation payment : state.payments()) {
             if (payment.settlementId() != settlementId || payment.status() == ObligationStatus.COMPLETE) {
@@ -209,21 +201,13 @@ public final class SettlementRecoveryService {
         return refreshSettlementStatus(settlementId, currentTick);
     }
 
-    /**
-     * Registers one surviving command group for post-war return without mutating the fleet.
-     *
-     * @param settlementId owning settlement
-     * @param commandGroupId existing Stage-21D command-group identity
-     * @param factionContentId stable owning faction identity
-     * @param currentTick authoritative tick
-     * @return current or newly registered directive
-     */
+    /** Registers one surviving command group while the finite recovery plan is still open. */
     public DemobilizationDirective registerDemobilization(
             long settlementId,
             long commandGroupId,
             String factionContentId,
             long currentTick) {
-        Settlement settlement = state.requireSettlement(settlementId);
+        Settlement settlement = requirePlanningSettlement(settlementId);
         String faction = requireText(factionContentId, "factionContentId");
         if (!faction.equals(settlement.factionA()) && !faction.equals(settlement.factionB())) {
             throw new IllegalArgumentException("Demobilized group faction is not a settlement participant");
@@ -246,22 +230,7 @@ public final class SettlementRecoveryService {
         return created;
     }
 
-    /**
-     * Cancels a remaining active war commitment and submits an ordinary Stage-21D RETURN order.
-     *
-     * @param commandState current Stage-21D command metadata
-     * @param forces current ordinary fleet reconstruction
-     * @param identities unified stable/runtime faction identity resolver
-     * @param submission existing shared player/AI order validator
-     * @param settlementId owning settlement
-     * @param commandGroupId command group to return home
-     * @param source player or AI source using the same Stage-21D boundary
-     * @param currentTick authoritative tick
-     * @param accessPolicy existing lawful route policy
-     * @param servicePolicy existing Stage-18 service observation
-     * @param riskPolicy existing strategic risk observation
-     * @return updated command state, recovery state and accepted RETURN order
-     */
+    /** Cancels a remaining active war commitment and submits an ordinary Stage-21D RETURN order. */
     public DemobilizationResult submitReturnOrder(
             FleetCommandState commandState,
             FleetForceRegistry forces,
@@ -279,9 +248,12 @@ public final class SettlementRecoveryService {
         Objects.requireNonNull(identities, "identities");
         Objects.requireNonNull(submission, "submission");
         Objects.requireNonNull(source, "source");
-        registerDemobilization(settlementId, commandGroupId,
-                stableFaction(commandState.requireGroup(commandGroupId), identities), currentTick);
+        requireFinalizedSettlement(settlementId);
         DemobilizationDirective directive = findDirective(settlementId, commandGroupId);
+        String actualOwner = stableFaction(commandState.requireGroup(commandGroupId), identities);
+        if (!directive.factionContentId().equals(actualOwner)) {
+            throw new IllegalStateException("Demobilization directive no longer matches command-group owner");
+        }
         if (directive.status() == ObligationStatus.COMPLETE) {
             return new DemobilizationResult(commandState, state,
                     commandState.requireOrder(directive.returnOrderId()));
@@ -296,6 +268,7 @@ public final class SettlementRecoveryService {
                         settlementId, commandGroupId, directive.factionContentId(), current.id(),
                         ObligationStatus.COMPLETE, currentTick);
                 replaceDirective(completed, currentTick);
+                refreshSettlementStatus(settlementId, currentTick);
                 return new DemobilizationResult(nextCommand, state, current);
             }
             nextCommand = nextCommand.replaceOrder(current.withStatus(OrderStatus.CANCELLED));
@@ -312,17 +285,7 @@ public final class SettlementRecoveryService {
         return new DemobilizationResult(accepted.state(), state, accepted.order());
     }
 
-    /**
-     * Records only real FleetId losses reported by the accepted Stage-21E physical consequence authority.
-     *
-     * @param settlementId settlement whose recovery accounts for the loss
-     * @param operationId Stage-21E operation identity
-     * @param report physical before/after consequence report
-     * @param before pre-consequence force registry used to resolve exact loss-time owner
-     * @param identities unified stable/runtime faction identities
-     * @param currentTick authoritative tick
-     * @return immutable updated recovery state
-     */
+    /** Records only real FleetId losses reported by Stage-21E while the recovery plan is open. */
     public SettlementRecoveryState recordPhysicalLosses(
             long settlementId,
             long operationId,
@@ -330,7 +293,7 @@ public final class SettlementRecoveryService {
             FleetForceRegistry before,
             FactionIdentityResolver identities,
             long currentTick) {
-        Settlement settlement = state.requireSettlement(settlementId);
+        Settlement settlement = requirePlanningSettlement(settlementId);
         Objects.requireNonNull(report, "report");
         Objects.requireNonNull(before, "before");
         Objects.requireNonNull(identities, "identities");
@@ -355,21 +318,13 @@ public final class SettlementRecoveryService {
         return state;
     }
 
-    /**
-     * Creates one replacement demand for a persisted physical loss.
-     *
-     * @param settlementId owning settlement
-     * @param lostFleetId exact destroyed FleetId
-     * @param targetFit requested physical replacement fit
-     * @param currentTick authoritative tick
-     * @return existing or newly created replacement demand
-     */
+    /** Creates one replacement demand for a persisted physical loss while planning is open. */
     public ReplacementDemand requestReplacement(
             long settlementId,
             FleetId lostFleetId,
             InstalledFit targetFit,
             long currentTick) {
-        state.requireSettlement(settlementId);
+        requirePlanningSettlement(settlementId);
         Objects.requireNonNull(lostFleetId, "lostFleetId");
         Objects.requireNonNull(targetFit, "targetFit");
         requireTick(currentTick);
@@ -384,7 +339,7 @@ public final class SettlementRecoveryService {
         long id = state.nextReplacementDemandId();
         ReplacementDemand demand = new ReplacementDemand(
                 id, settlementId, lostFleetId, loss.factionContentId(), fitFingerprint(targetFit),
-                currentTick, currentTick, ReplacementStatus.DEMANDED, 0L, null);
+                currentTick, currentTick, ReplacementStatus.DEMANDED, null, 0L, null);
         ArrayList<ReplacementDemand> demands = new ArrayList<>(state.replacementDemands());
         demands.add(demand);
         state = rebuild(currentTick, state.nextSettlementId(), Math.addExact(id, 1L),
@@ -392,24 +347,26 @@ public final class SettlementRecoveryService {
         return state.requireReplacementDemand(id);
     }
 
-    /**
-     * Marks a demand only after existing shipyard authority returned a completed physical asset identity.
-     *
-     * @param demandId replacement-demand identity
-     * @param completedAssetIdValue positive ordinary EntityId value returned by shipyard completion
-     * @param currentTick authoritative tick
-     * @return updated demand
-     */
-    public ReplacementDemand markYardSettled(long demandId, long completedAssetIdValue, long currentTick) {
+    /** Internal proof transition used only after Stage-18 settlement and ordinary Entity materialization. */
+    ReplacementDemand markYardSettled(
+            long demandId,
+            StarSystemId completedAssetSystemId,
+            long completedAssetIdValue,
+            long currentTick) {
         ReplacementDemand current = state.requireReplacementDemand(demandId);
-        if (completedAssetIdValue <= 0L) throw new IllegalArgumentException("completedAssetIdValue must be positive");
+        Objects.requireNonNull(completedAssetSystemId, "completedAssetSystemId");
+        if (completedAssetIdValue <= 0L) {
+            throw new IllegalArgumentException("completedAssetIdValue must be positive");
+        }
         requireTick(currentTick);
+        requireFinalizedSettlement(current.settlementId());
         if (current.status() == ReplacementStatus.COMMISSIONED) return current;
         if (current.status() == ReplacementStatus.CANCELLED) {
             throw new IllegalStateException("Cancelled replacement demand cannot settle");
         }
         if (current.status() == ReplacementStatus.YARD_SETTLED) {
-            if (current.completedAssetIdValue() != completedAssetIdValue) {
+            if (!current.completedAssetSystemId().equals(completedAssetSystemId)
+                    || current.completedAssetIdValue() != completedAssetIdValue) {
                 throw new IllegalStateException("Replacement demand already settled to another physical asset");
             }
             return current;
@@ -417,29 +374,20 @@ public final class SettlementRecoveryService {
         ReplacementDemand updated = new ReplacementDemand(
                 current.id(), current.settlementId(), current.lostFleetId(), current.factionContentId(),
                 current.targetFitFingerprint(), current.createdTick(), currentTick,
-                ReplacementStatus.YARD_SETTLED, completedAssetIdValue, null);
+                ReplacementStatus.YARD_SETTLED, completedAssetSystemId, completedAssetIdValue, null);
         replaceDemand(updated, currentTick);
         return updated;
     }
 
-    /**
-     * Records ordinary-world commissioning only for a distinct existing FleetId.
-     *
-     * @param demandId replacement-demand identity
-     * @param commissionedFleetId distinct ordinary replacement FleetId
-     * @param fleetExists ordinary-world FleetId existence policy
-     * @param currentTick authoritative tick
-     * @return updated commissioned demand
-     */
-    public ReplacementDemand markCommissioned(
+    /** Internal proof transition used only after exact ordinary entity-to-FleetId registration. */
+    ReplacementDemand markCommissioned(
             long demandId,
             FleetId commissionedFleetId,
-            Stage21ECommandLossReconciliationService.FleetExistencePolicy fleetExists,
             long currentTick) {
         ReplacementDemand current = state.requireReplacementDemand(demandId);
         Objects.requireNonNull(commissionedFleetId, "commissionedFleetId");
-        Objects.requireNonNull(fleetExists, "fleetExists");
         requireTick(currentTick);
+        requireFinalizedSettlement(current.settlementId());
         if (current.status() == ReplacementStatus.COMMISSIONED) {
             if (!current.commissionedFleetId().equals(commissionedFleetId)) {
                 throw new IllegalStateException("Replacement demand already commissioned as another FleetId");
@@ -449,26 +397,20 @@ public final class SettlementRecoveryService {
         if (current.status() != ReplacementStatus.YARD_SETTLED) {
             throw new IllegalStateException("Replacement cannot commission before physical shipyard settlement");
         }
-        if (current.lostFleetId().equals(commissionedFleetId) || !fleetExists.exists(commissionedFleetId)) {
-            throw new IllegalStateException("Commissioning requires a distinct existing ordinary FleetId");
+        if (current.lostFleetId().equals(commissionedFleetId)) {
+            throw new IllegalStateException("Replacement cannot reuse the destroyed FleetId");
         }
         ReplacementDemand updated = new ReplacementDemand(
                 current.id(), current.settlementId(), current.lostFleetId(), current.factionContentId(),
                 current.targetFitFingerprint(), current.createdTick(), currentTick,
-                ReplacementStatus.COMMISSIONED, current.completedAssetIdValue(), commissionedFleetId);
+                ReplacementStatus.COMMISSIONED, current.completedAssetSystemId(),
+                current.completedAssetIdValue(), commissionedFleetId);
         replaceDemand(updated, currentTick);
         refreshSettlementStatus(current.settlementId(), currentTick);
         return updated;
     }
 
-    /**
-     * Emits deterministic bilateral treaty-performance memory once settlement obligations are complete.
-     *
-     * @param diplomacy existing Stage-21C memory authority
-     * @param settlementId completed settlement identity
-     * @param currentTick authoritative tick
-     * @return updated settlement with memory marker
-     */
+    /** Emits deterministic bilateral treaty-performance memory once settlement obligations are complete. */
     public Settlement recordCompletionMemory(
             DiplomaticLifecycleService diplomacy,
             long settlementId,
@@ -493,12 +435,7 @@ public final class SettlementRecoveryService {
         return updated;
     }
 
-    /**
-     * Deterministically fingerprints an installed fit for replacement-demand persistence.
-     *
-     * @param fit requested installed fit
-     * @return lower-case SHA-256 fingerprint over hull and sorted mount/module assignments
-     */
+    /** Deterministically fingerprints hull + sorted mount/module assignments. */
     public static String fitFingerprint(InstalledFit fit) {
         InstalledFit checked = Objects.requireNonNull(fit, "fit");
         StringBuilder canonical = new StringBuilder(checked.hullId()).append('\n');
@@ -519,6 +456,9 @@ public final class SettlementRecoveryService {
 
     private SettlementRecoveryState refreshSettlementStatus(long settlementId, long currentTick) {
         Settlement current = state.requireSettlement(settlementId);
+        if (current.status() == SettlementStatus.PENDING) {
+            return state;
+        }
         boolean stalled = state.payments().stream().anyMatch(row -> row.settlementId() == settlementId
                 && row.status() == ObligationStatus.STALLED);
         boolean paymentsComplete = state.payments().stream().filter(row -> row.settlementId() == settlementId)
@@ -533,19 +473,28 @@ public final class SettlementRecoveryService {
         SettlementStatus status;
         if (stalled) status = SettlementStatus.STALLED;
         else if (paymentsComplete && demobilizationComplete && replacementComplete) status = SettlementStatus.COMPLETE;
-        else if (state.payments().stream().anyMatch(row -> row.settlementId() == settlementId
-                    && row.status() == ObligationStatus.COMPLETE)
-                || state.demobilizations().stream().anyMatch(row -> row.settlementId() == settlementId
-                    && row.status() == ObligationStatus.COMPLETE)
-                || state.replacementDemands().stream().anyMatch(row -> row.settlementId() == settlementId
-                    && row.status() != ReplacementStatus.DEMANDED)) {
-            status = SettlementStatus.EXECUTING;
-        } else status = SettlementStatus.PENDING;
+        else status = SettlementStatus.EXECUTING;
         Settlement updated = new Settlement(
                 current.id(), current.proposalId(), current.warId(), current.factionA(), current.factionB(),
                 current.openedTick(), currentTick, status, current.memoryRecorded());
         replaceSettlement(updated, currentTick);
         return state;
+    }
+
+    private Settlement requirePlanningSettlement(long settlementId) {
+        Settlement settlement = state.requireSettlement(settlementId);
+        if (settlement.status() != SettlementStatus.PENDING) {
+            throw new IllegalStateException("Stage-21G recovery plan is already finalized");
+        }
+        return settlement;
+    }
+
+    private Settlement requireFinalizedSettlement(long settlementId) {
+        Settlement settlement = state.requireSettlement(settlementId);
+        if (settlement.status() == SettlementStatus.PENDING) {
+            throw new IllegalStateException("Stage-21G recovery plan must be finalized before execution");
+        }
+        return settlement;
     }
 
     private static int addPayments(
@@ -577,7 +526,8 @@ public final class SettlementRecoveryService {
         return state.demobilizations().stream()
                 .filter(row -> row.settlementId() == settlementId && row.commandGroupId() == commandGroupId)
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Demobilization directive vanished"));
+                .orElseThrow(() -> new IllegalStateException(
+                        "Demobilization must be registered before recovery-plan finalization"));
     }
 
     private void replaceDirective(DemobilizationDirective replacement, long tick) {
@@ -655,24 +605,10 @@ public final class SettlementRecoveryService {
         if (tick < 0L) throw new IllegalArgumentException("Stage-21G tick must be non-negative");
     }
 
-    /**
-     * Result of submitting one demobilization RETURN order.
-     *
-     * @param commandState updated Stage-21D command state
-     * @param recoveryState updated Stage-21G recovery state
-     * @param returnOrder accepted ordinary RETURN order
-     */
     public record DemobilizationResult(
             FleetCommandState commandState,
             SettlementRecoveryState recoveryState,
             FleetOrderState returnOrder) {
-        /**
-         * Validates one demobilization result.
-         *
-         * @param commandState updated command state
-         * @param recoveryState updated recovery state
-         * @param returnOrder accepted RETURN order
-         */
         public DemobilizationResult {
             Objects.requireNonNull(commandState, "commandState");
             Objects.requireNonNull(recoveryState, "recoveryState");
