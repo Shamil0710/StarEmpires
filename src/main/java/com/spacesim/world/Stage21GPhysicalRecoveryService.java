@@ -6,50 +6,82 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.Stage18ShipConsumableCatalog;
+import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.economy.Stage18ShipConsumableService;
 import com.spacesim.economy.Stage18ShipyardRuntime;
 import com.spacesim.economy.Stage18StationStorage;
 import com.spacesim.persistence.EntityId;
+import com.spacesim.ship.ShieldFieldRuntime;
 import com.spacesim.ship.ShipDamageRuntime.Snapshot;
+import com.spacesim.ship.ShipEngineeringRuntime;
+import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 import com.spacesim.ship.ShipEngineeringState.ConsumableState;
+import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
+import com.spacesim.ship.ShipInstanceRuntimeState;
+import com.spacesim.ship.ShipShieldEngineeringAdapter;
 import com.spacesim.ship.ShipyardEngineeringService;
 import com.spacesim.ship.ShipyardEngineeringService.BuildCompletion;
+import com.spacesim.ship.ShipyardEngineeringService.MaintenanceState;
 import com.spacesim.ship.ShipyardEngineeringService.RepairCompletion;
 import com.spacesim.ship.ShipyardEngineeringService.WorkPlan;
+import com.spacesim.ship.WeaponLoadoutState;
+import com.spacesim.ship.WeaponMountRuntime;
 import com.spacesim.world.FleetCommandState.OrderType;
 import com.spacesim.world.FleetOrderExecutionService.ServiceOperation;
 import com.spacesim.world.SettlementRecoveryState.ReplacementDemand;
 import com.spacesim.world.SettlementRecoveryState.ReplacementStatus;
 import com.spacesim.world.SettlementRecoveryState.SettlementStatus;
 
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * Stage-21G adapter that executes recovery only through existing Stage-18/17.5 physical authority.
  *
- * <p>Consumables are loaded only after canonical stock consumption. Repair preserves the existing
- * ordinary entity identity and requires real yard inputs/work. Replacement first settles an ordinary
- * Stage-18 build, then materializes the completed engineering state as a normal system-local ECS
- * entity and finally obtains a fresh FleetId from {@link FleetWorldService}. Stage 21G stores only
- * provenance linking the loss demand to that ordinary asset and fleet.</p>
+ * <p>Consumables are loaded only after canonical stock consumption and are committed to the same
+ * ordinary {@link EngineeringComponent}. Repair preserves the existing ordinary entity identity,
+ * requires real yard inputs/work and changes only the settled damage state; it does not refill
+ * propellant, ammunition, electrical storage or shield reserve. Replacement first settles an
+ * ordinary Stage-18 build, then materializes the completed fit as a normal system-local ECS fleet
+ * with a fresh {@link FleetId}. Stage 21G stores only provenance linking the loss demand to that
+ * ordinary asset and fleet.</p>
  */
 public final class Stage21GPhysicalRecoveryService {
     private final Stage18ShipConsumableCatalog consumableCatalog;
     private final Stage18ShipConsumableService consumables;
     private final ShipyardEngineeringService engineering;
     private final Stage18ShipyardRuntime shipyards;
+    private final ShipEngineeringCatalog engineeringCatalog;
+    private final ShipEngineeringRuntime engineeringRuntime;
+    private final ShipShieldEngineeringAdapter shieldAdapter = new ShipShieldEngineeringAdapter();
+    private final ShieldFieldRuntime shieldRuntime = new ShieldFieldRuntime();
 
+    /**
+     * Creates the Stage-21G physical recovery adapter over the already-authoritative Stage-18 and
+     * Stage-17.5 services.
+     *
+     * @param consumableCatalog Stage-18I commodity/interface bindings
+     * @param consumables Stage-18I stock-bound loading authority
+     * @param engineering Stage-17.5G shipyard planning/completion authority
+     * @param shipyards Stage-18G finite material/work settlement authority
+     * @param engineeringCatalog immutable Stage-17.5 engineering definitions used by materialization
+     */
     public Stage21GPhysicalRecoveryService(
             Stage18ShipConsumableCatalog consumableCatalog,
             Stage18ShipConsumableService consumables,
             ShipyardEngineeringService engineering,
-            Stage18ShipyardRuntime shipyards) {
+            Stage18ShipyardRuntime shipyards,
+            ShipEngineeringCatalog engineeringCatalog) {
         this.consumableCatalog = Objects.requireNonNull(consumableCatalog, "consumableCatalog");
         this.consumables = Objects.requireNonNull(consumables, "consumables");
         this.engineering = Objects.requireNonNull(engineering, "engineering");
         this.shipyards = Objects.requireNonNull(shipyards, "shipyards");
+        this.engineeringCatalog = Objects.requireNonNull(engineeringCatalog, "engineeringCatalog");
+        this.engineeringRuntime = new ShipEngineeringRuntime(engineeringCatalog);
     }
 
     /** Executes one existing REFUEL/REARM service request from canonical station stock. */
@@ -77,6 +109,43 @@ public final class Stage21GPhysicalRecoveryService {
                     checked.serviceType() + " cannot consume a " + binding.interfaceKind() + " binding");
         }
         return consumables.load(bindingId, mountId, requestedMassKg, fit, current, station);
+    }
+
+    /**
+     * Executes and commits one REFUEL/REARM request to the same ordinary physical ship component.
+     *
+     * <p>A rejected Stage-18 load leaves both station stock and ship state unchanged. A committed
+     * load replaces only the authoritative consumable payload; power, heat, damage, shields,
+     * maintenance and weapon-cycle continuity are preserved.</p>
+     */
+    public Stage18ShipConsumableService.LoadResult serviceConsumable(
+            ServiceOperation operation,
+            String bindingId,
+            String mountId,
+            double requestedMassKg,
+            EngineeringComponent ship,
+            Stage18StationStorage station) {
+        EngineeringComponent checkedShip = Objects.requireNonNull(ship, "ship");
+        RuntimeState before = Objects.requireNonNull(checkedShip.runtimeState, "ship.runtimeState");
+        Stage18ShipConsumableService.LoadResult result = serviceConsumable(
+                operation,
+                bindingId,
+                mountId,
+                requestedMassKg,
+                Objects.requireNonNull(checkedShip.fit, "ship.fit"),
+                before.consumables(),
+                station);
+        if (result.committed()) {
+            checkedShip.setRuntimeState(new RuntimeState(
+                    result.consumables(),
+                    before.sharedBusEnergyJ(),
+                    before.shipHeatStoredJ(),
+                    before.localHeatJByMount(),
+                    before.thrustLimitNByMount(),
+                    before.coolantBusCapacityW(),
+                    before.ftlCooldownSecondsByMount()));
+        }
+        return result;
     }
 
     /** Plans, physically settles and completes one existing-identity repair request. */
@@ -107,13 +176,44 @@ public final class Stage21GPhysicalRecoveryService {
     }
 
     /**
+     * Physically repairs and applies the settled damage state to one surviving ordinary ship.
+     *
+     * <p>The existing EntityId and fitted modules remain unchanged. Repair may restore structural and
+     * subsystem integrity only after Stage-18 material/work settlement. It never refills consumables,
+     * shared electrical energy or shield reserve and never resets maintenance or launcher cooldowns.</p>
+     */
+    public RepairResult repair(
+            ServiceOperation operation,
+            EntityId assetId,
+            EngineeringComponent ship,
+            Stage18StationStorage station,
+            Stage18ShipyardRuntime.YardCapabilitySnapshot yard,
+            Stage18ShipyardRuntime.YardWorkBudget budget) {
+        EngineeringComponent checkedShip = Objects.requireNonNull(ship, "ship");
+        ShipInstanceRuntimeState before = Objects.requireNonNull(checkedShip.instanceState, "ship.instanceState");
+        RepairResult result = repair(
+                operation,
+                assetId,
+                Objects.requireNonNull(checkedShip.fit, "ship.fit"),
+                Objects.requireNonNull(checkedShip.runtimeState, "ship.runtimeState").consumables(),
+                before.damage(),
+                station,
+                yard,
+                budget);
+        if (result.completion() != null) {
+            applyRepair(assetId, checkedShip, result.completion());
+        }
+        return result;
+    }
+
+    /**
      * Physically builds and ordinarily commissions one replacement for a persisted loss demand.
      *
      * <p>There is no caller-supplied EntityId or FleetId. After Stage-18 atomically consumes physical
-     * inputs and finite yard work, the ordinary local-system lifecycle allocates the EntityId. The
-     * completed Stage-17.5 engineering state is attached to that entity; only then is the entity given
-     * fleet identity and registered through the existing {@link FleetWorldService}, which allocates a
-     * fresh FleetId. Failure to settle the yard creates neither an entity nor a FleetId.</p>
+     * inputs and finite yard work, the ordinary local-system lifecycle allocates the EntityId and
+     * registers the fleet through the existing world fleet authority. The new ship starts pristine but
+     * with empty propellant/ammunition and empty shield reserve; later servicing must use the ordinary
+     * Stage-18 loading/recharge paths. Failure to settle the yard creates neither an entity nor a FleetId.</p>
      *
      * @param recovery Stage-21G metadata coordinator
      * @param demandId persisted replacement-demand identity
@@ -176,7 +276,9 @@ public final class Stage21GPhysicalRecoveryService {
             return new BuildResult(plan, settlement, null, null, null, checkedRecovery.snapshot());
         }
 
-        Entity asset = new Entity().add(new FactionComponent(runtimeFactionId));
+        Entity asset = new Entity()
+                .add(new FactionComponent(runtimeFactionId))
+                .add(new IdentityComponent(checkedName, IdentityComponent.Kind.FLEET));
         TransformComponent transform = new TransformComponent();
         transform.position.set(x, y);
         asset.add(transform);
@@ -184,17 +286,82 @@ public final class Stage21GPhysicalRecoveryService {
         try {
             BuildCompletion completion = engineering.completeBuild(
                     assetId, plan, settlement.compatibilitySettlement());
-            asset.add(new EngineeringComponent(completion.initialEngineeringState()));
-            asset.add(new IdentityComponent(checkedName, IdentityComponent.Kind.FLEET));
-            FleetId fleetId = checkedWorld.fleetWorldService().registerFleetAtSystem(checkedSystem, assetId);
+            asset.add(materializeNewEngineering(completion.fit()));
+            FleetId fleetId = checkedWorld.findFleetByLocal(checkedSystem, assetId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Ordinary replacement fleet registration did not produce a FleetId"));
             checkedRecovery.markYardSettled(demandId, checkedSystem, completion.assetId().value(), currentTick);
             checkedRecovery.markCommissioned(demandId, fleetId, currentTick);
             return new BuildResult(
                     plan, settlement, completion, checkedSystem, fleetId, checkedRecovery.snapshot());
         } catch (RuntimeException exception) {
-            checkedWorld.destroyEntity(checkedSystem, assetId);
+            if (!checkedWorld.removeEntity(checkedSystem, assetId)) {
+                exception.addSuppressed(new IllegalStateException(
+                        "Replacement rollback could not remove ordinary built asset: " + assetId));
+            }
             throw exception;
         }
+    }
+
+    private void applyRepair(
+            EntityId assetId,
+            EngineeringComponent ship,
+            RepairCompletion completion) {
+        EntityId checkedId = Objects.requireNonNull(assetId, "assetId");
+        RepairCompletion checkedCompletion = Objects.requireNonNull(completion, "completion");
+        if (!checkedId.equals(checkedCompletion.assetId())) {
+            throw new IllegalArgumentException("repair completion belongs to another physical asset");
+        }
+        ShipInstanceRuntimeState before = Objects.requireNonNull(ship.instanceState, "ship.instanceState");
+        RuntimeState operating = Objects.requireNonNull(ship.runtimeState, "ship.runtimeState");
+        var derived = engineeringRuntime.derive(
+                Objects.requireNonNull(ship.fit, "ship.fit"),
+                operating,
+                checkedCompletion.damage().moduleDamage());
+        TreeMap<String, ShieldFieldRuntime.State> shields = new TreeMap<>();
+        for (ShipShieldEngineeringAdapter.FittedShield fitted : shieldAdapter.derive(derived)) {
+            ShieldFieldRuntime.State existing = before.shieldStatesByMount().get(fitted.mountId());
+            if (existing == null) {
+                existing = new ShieldFieldRuntime.State(0d, 0d, true, 0d, fitted.emitterIntegrity());
+            }
+            shields.put(fitted.mountId(), shieldRuntime.withEmitterIntegrity(
+                    fitted.definition(), existing, fitted.emitterIntegrity()));
+        }
+        ship.setInstanceState(new ShipInstanceRuntimeState(
+                checkedCompletion.damage(),
+                shields,
+                before.maintenance(),
+                before.weaponLoadout(),
+                before.weaponMountRuntime()));
+    }
+
+    private EngineeringComponent materializeNewEngineering(InstalledFit fit) {
+        InstalledFit checkedFit = Objects.requireNonNull(fit, "fit");
+        HullDefinition hull = engineeringCatalog.findHull(checkedFit.hullId());
+        if (hull == null) {
+            throw new IllegalStateException("Built replacement hull is absent from engineering catalog: "
+                    + checkedFit.hullId());
+        }
+        TreeMap<String, Double> compartments = new TreeMap<>();
+        hull.compartments().forEach(compartment -> compartments.put(compartment.id(), 1d));
+        Snapshot damage = new Snapshot(compartments, DamageState.pristine());
+        RuntimeState operating = engineeringRuntime.initialize(
+                checkedFit, ConsumableState.empty(), damage.moduleDamage());
+        var derived = engineeringRuntime.derive(checkedFit, operating, damage.moduleDamage());
+        TreeMap<String, ShieldFieldRuntime.State> shields = new TreeMap<>();
+        for (ShipShieldEngineeringAdapter.FittedShield fitted : shieldAdapter.derive(derived)) {
+            ShieldFieldRuntime.State empty = new ShieldFieldRuntime.State(
+                    0d, 0d, true, 0d, fitted.emitterIntegrity());
+            shields.put(fitted.mountId(), shieldRuntime.withEmitterIntegrity(
+                    fitted.definition(), empty, fitted.emitterIntegrity()));
+        }
+        ShipInstanceRuntimeState instance = new ShipInstanceRuntimeState(
+                damage,
+                shields,
+                MaintenanceState.initial(),
+                WeaponLoadoutState.empty(),
+                WeaponMountRuntime.RuntimeState.empty());
+        return new EngineeringComponent(checkedFit, operating, instance);
     }
 
     private static void requireServiceType(ServiceOperation operation, OrderType expected) {
@@ -212,6 +379,7 @@ public final class Stage21GPhysicalRecoveryService {
         return normalized;
     }
 
+    /** Result of one physically attempted repair. */
     public record RepairResult(
             WorkPlan plan,
             Stage18ShipyardRuntime.SettlementResult settlement,
