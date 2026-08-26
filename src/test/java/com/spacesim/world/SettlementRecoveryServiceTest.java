@@ -40,6 +40,10 @@ class SettlementRecoveryServiceTest {
         SettlementRecoveryService recovery = new SettlementRecoveryService(
                 SettlementRecoveryState.empty(world.getAuthoritativeWorldTick()));
         var settlement = recovery.openAcceptedSettlement(diplomacy, peace.proposalId(), world.getAuthoritativeWorldTick());
+        assertEquals(SettlementStatus.PENDING, recovery.snapshot().requireSettlement(settlement.id()).status());
+        assertThrows(IllegalStateException.class,
+                () -> recovery.executePayments(world, settlement.id(), world.getAuthoritativeWorldTick()));
+        recovery.finalizeRecoveryPlan(settlement.id(), world.getAuthoritativeWorldTick());
         long payerBefore = world.findFactionEconomicState(TRADE_LEAGUE).orElseThrow().treasuryMilliCredits();
         long recipientBefore = world.findFactionEconomicState(MINERS).orElseThrow().treasuryMilliCredits();
 
@@ -65,6 +69,28 @@ class SettlementRecoveryServiceTest {
     }
 
     @Test
+    void emptyRecoveryPlanCannotCompleteUntilExplicitFinalization() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_703L);
+        DiplomaticLifecycleService diplomacy = diplomacy(world);
+        var war = diplomacy.declareWarFromObservedAttack(
+                TRADE_LEAGUE, MINERS, "observed.attack.empty",
+                world.getAuthoritativeWorldTick(), goals());
+        long now = world.getAuthoritativeWorldTick();
+        var peace = diplomacy.propose(new DiplomaticLifecycleService.ProposalRequest(
+                "goal.peace.empty", TRADE_LEAGUE, MINERS, ProposalKind.PEACE, war.warId(),
+                List.of(), List.of(), now + 100L));
+        peace = diplomacy.accept(peace.proposalId());
+        SettlementRecoveryService recovery = new SettlementRecoveryService(SettlementRecoveryState.empty(now));
+        var settlement = recovery.openAcceptedSettlement(diplomacy, peace.proposalId(), now);
+
+        assertEquals(SettlementStatus.PENDING, recovery.snapshot().requireSettlement(settlement.id()).status());
+        assertThrows(IllegalStateException.class, () -> recovery.executePayments(world, settlement.id(), now));
+
+        recovery.finalizeRecoveryPlan(settlement.id(), now);
+        assertEquals(SettlementStatus.COMPLETE, recovery.snapshot().requireSettlement(settlement.id()).status());
+    }
+
+    @Test
     void paymentStallsWithoutViolatingTreasuryReserveOrPartiallyTransferring() {
         WorldSimulation world = DemoGalaxyFactory.create(21_701L);
         DiplomaticLifecycleService diplomacy = diplomacy(world);
@@ -81,6 +107,7 @@ class SettlementRecoveryServiceTest {
         peace = diplomacy.accept(peace.proposalId());
         SettlementRecoveryService recovery = new SettlementRecoveryService(SettlementRecoveryState.empty(now));
         var settlement = recovery.openAcceptedSettlement(diplomacy, peace.proposalId(), now);
+        recovery.finalizeRecoveryPlan(settlement.id(), now);
 
         WalletComponent drain = new WalletComponent();
         assertTrue(world.transferFromFactionTreasury(
