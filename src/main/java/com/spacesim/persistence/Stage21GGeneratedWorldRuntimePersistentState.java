@@ -42,6 +42,11 @@ import java.util.Set;
  * <p>The complete accepted Stage-21F runtime is embedded unchanged. Stage 21G adds only peace and
  * recovery obligation/provenance metadata. Legal war state, treasury, fleets, damage, consumables,
  * shipyard inventory/work and territory remain persisted by their existing authorities.</p>
+ *
+ * @param schemaVersion exact Stage-21G generated-world checkpoint schema
+ * @param runtimeVersion exact Stage-21G runtime contract identifier
+ * @param stage21FRuntime complete accepted Stage-21F runtime checkpoint
+ * @param settlementRecovery Stage-21G settlement/recovery obligation and provenance state
  */
 public record Stage21GGeneratedWorldRuntimePersistentState(
         int schemaVersion,
@@ -49,9 +54,20 @@ public record Stage21GGeneratedWorldRuntimePersistentState(
         Stage21FGeneratedWorldRuntimePersistentState stage21FRuntime,
         SettlementRecoveryState settlementRecovery) {
 
+    /** Current Stage-21G generated-world checkpoint schema version. */
     public static final int CURRENT_VERSION = 10;
+
+    /** Current Stage-21G generated-world runtime contract identifier. */
     public static final String CURRENT_RUNTIME_VERSION = "stage21g.generated-world-peace-recovery.v10";
 
+    /**
+     * Validates the complete Stage-21G checkpoint and all cross-layer provenance links.
+     *
+     * @param schemaVersion exact Stage-21G generated-world checkpoint schema
+     * @param runtimeVersion exact Stage-21G runtime contract identifier
+     * @param stage21FRuntime complete accepted Stage-21F runtime checkpoint
+     * @param settlementRecovery Stage-21G settlement/recovery obligation and provenance state
+     */
     public Stage21GGeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported Stage-21G checkpoint schema: " + schemaVersion);
@@ -214,6 +230,13 @@ public record Stage21GGeneratedWorldRuntimePersistentState(
         }
     }
 
+    /**
+     * Composes the complete Stage-21G checkpoint from the accepted Stage-21F runtime and recovery state.
+     *
+     * @param stage21F complete accepted Stage-21F runtime checkpoint
+     * @param recovery Stage-21G settlement/recovery obligation and provenance state
+     * @return validated Stage-21G generated-world checkpoint
+     */
     public static Stage21GGeneratedWorldRuntimePersistentState compose(
             Stage21FGeneratedWorldRuntimePersistentState stage21F,
             SettlementRecoveryState recovery) {
