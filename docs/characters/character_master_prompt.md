@@ -41,10 +41,13 @@ Add the relevant faction-specific rules after the base style.
 
 Current canonical references include:
 
+- **Empire:** `docs/factions/empire_visual_bible.md`, especially character sections and `IMPERIAL CHARACTER DESIGN`;
+- **Empire systemic context:** `docs/factions/empire_systemic_identity.md`;
 - **Industrial Union:** `docs/factions/industrial_union_visual_bible.md`, especially character sections and `INDUSTRIAL UNION CHARACTER DESIGN`;
 - **Industrial Union systemic context:** `docs/factions/industrial_union_systemic_identity.md`;
-- **Empire systemic context:** `docs/factions/empire_systemic_identity.md` plus the accepted Imperial visual-language authority when a dedicated repository visual bible is present;
-- future factions: their approved visual bible / faction prompt after that faction enters active production.
+- **future factions:** their dedicated approved visual bible after that faction enters active production.
+  The pre-production overlays in `docs/factions/faction_gameplay_visual_balance_bible.md` define
+  differentiation direction, but do not replace the required production visual-bible review.
 
 If no dedicated faction visual bible exists yet, use only already-approved faction visual rules. Do not invent a new faction aesthetic merely to complete the prompt.
 

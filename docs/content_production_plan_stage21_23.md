@@ -9,9 +9,15 @@
 Faction roster/horizon authority:
 
 - `docs/factions/faction_roster_and_development_horizon.md`;
+- `docs/factions/faction_gameplay_visual_balance_bible.md`;
 - `docs/factions/empire_systemic_identity.md`;
+- `docs/factions/empire_visual_bible.md`;
 - `docs/factions/industrial_union_systemic_identity.md`;
-- `docs/factions/post_core_faction_horizon.md`.
+- `docs/factions/industrial_union_visual_bible.md`;
+- `docs/factions/post_core_faction_horizon.md`;
+- `docs/factions/faction_balance_validation_framework.md`;
+- `docs/factions/faction_implementation_roadmap.md`;
+- `docs/characters/character_master_prompt.md`.
 
 ## 1. Purpose
 
@@ -38,15 +44,15 @@ no readable player-facing identity is not production-complete content.
 
 ## 2. Current inventory and gaps
 
-At the start of Stage 21 the repository contains:
+At the current pre-Stage-22 baseline the repository contains:
 
 - eight persistent faction identities in the large generated-world profile;
 - five legacy economic commodities and a much richer Stage-18 physical ontology;
 - provisional Stage-17.5/19 engineering, protection, weapon, ammunition and doctrine packs;
 - a minimum Stage-20.5 Imperial sprite pack for utility, freight, mining, two combat roles, three
   station roles, four resource-body regions and a derelict;
-- one detailed Imperial visual language;
-- a production-oriented master prompt for grounded hand-painted character illustrations;
+- reviewed, independent core-faction visual bibles for the Empire and Industrial Union;
+- a canonical master prompt for grounded hand-painted character illustrations;
 - responsive command UI and deterministic generated-world runtime.
 
 The eight generated identities are **runtime compatibility actors**, not an automatic release roster.
@@ -57,7 +63,8 @@ The principal gaps are therefore:
 
 - exact mapping/disposition of existing generated faction IDs to final core/runtime roles has not yet
   passed Stage-22.0 migration and reverse-reference review;
-- only the Imperial visual language is production-defined; Industrial Union needs its own full bible;
+- both core visual languages are documented, but production assets still need fit binding, manifests,
+  real-scale review and full runtime coverage;
 - provisional combat test IDs are not automatically canon;
 - no production-wide NPC/character roster, mission library or dialogue/event vocabulary exists;
 - no release-wide ship/station/location art inventory exists;
@@ -385,13 +392,16 @@ Required qualities:
 - old hull/new subsystem continuity through replacement panels and service markings;
 - no fantasy wings, baroque ornament, steampunk, neon or random surface noise.
 
-Systemic authority: `docs/factions/empire_systemic_identity.md`.
+Systemic authority: `docs/factions/empire_systemic_identity.md`.  
+Visual authority: `docs/factions/empire_visual_bible.md`.  
+Character authority: `docs/characters/character_master_prompt.md`.
 
 ### 9.2 Индустриальный Союз
 
-Before Wave 2 bulk art, create an equivalent production visual bible.
+Wave 2 bulk art must use the reviewed production visual bible rather than inventing a new palette,
+silhouette or status language per asset.
 
-Already locked systemic visual requirements:
+Canonical visual formula:
 
 ```text
 standardized family resemblance
@@ -410,10 +420,12 @@ Required constraints:
 - practical maintainability/assembly cues must correspond to actual module/compartment/service geometry;
 - no fantasy factory aesthetic, arbitrary pipes or decorative machinery that cannot be serviced or justified.
 
-Exact palette, heraldry, uniforms and social-symbol vocabulary remain Wave-2 visual-bible authoring,
-not something to invent as a simulation stat.
+Palette, materials, markings, uniforms, ship hierarchy and negative prompts are authoritative in
+`docs/factions/industrial_union_visual_bible.md`; they remain presentation rules, not simulation stats.
 
-Systemic authority: `docs/factions/industrial_union_systemic_identity.md`.
+Systemic authority: `docs/factions/industrial_union_systemic_identity.md`.  
+Visual authority: `docs/factions/industrial_union_visual_bible.md`.  
+Character authority: `docs/characters/character_master_prompt.md`.
 
 ## 10. Stations, infrastructure and special locations
 
@@ -748,6 +760,9 @@ Human review remains required for silhouette, role readability, faction identity
 audio mix and actual gameplay value.
 
 ## 22. Balance and content-quality acceptance
+
+The reproducible protocol, result vectors, scenario suite and gates are authoritative in
+`docs/factions/faction_balance_validation_framework.md`.
 
 Content is accepted as a system, using:
 

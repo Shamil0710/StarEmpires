@@ -4,6 +4,15 @@
 > Scope: пять крупных фракций, намеренно отложенных до завершения основного этапа разработки.  
 > Цель документа — сохранить их идентичность и заранее зафиксировать архитектурные требования, не реализуя prematurely новые fundamental systems.
 
+Cross-faction gameplay/visual direction:
+`docs/factions/faction_gameplay_visual_balance_bible.md`.
+
+Detailed activation order, package cycle and PR gates:
+`docs/factions/faction_implementation_roadmap.md`.
+
+Validation protocol:
+`docs/factions/faction_balance_validation_framework.md`.
+
 ---
 
 ## 1. Общая граница
@@ -489,6 +498,11 @@ Review обязан ответить:
 
 Если ответ на пункт 10 — «нет», требуется отдельное архитектурное обоснование.
 
+Visual directions, palette anchors and character overlays in the cross-faction bible are canonical
+**pre-production direction**. When a faction enters active development, they must be expanded into a
+dedicated production visual bible and pass grayscale differentiation against every released faction.
+They cannot be used to claim a complete package before that gate.
+
 ---
 
 # 9. Production package requirement after core release
@@ -505,6 +519,7 @@ Review обязан ответить:
 - player access/progression path;
 - peaceful + crisis + war + loss + recovery history;
 - pairwise acceptance against already-shipped factions;
+- balance evidence report under `docs/factions/faction_balance_validation_framework.md`;
 - macro economy/logistics soak;
 - persistence/migration tests;
 - asset/localization/audio manifests.
