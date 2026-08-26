@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
 > Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A, Stage 21B,
-> Stage 21C, Stage 21D, Stage 21E, Stage 21F and **Stage 21G are complete; Stage 21H is OPEN/NEXT**.
+> Stage 21C, Stage 21D, Stage 21E, Stage 21F, Stage 21G and **Stage 21H are complete; Stage 21I is OPEN/NEXT**.
 
 ## 1. Purpose
 
@@ -317,12 +317,12 @@ Accepted through PR #333 from exact green head `206a197a4fbe0db2d8c72f99b26f1ca7
 CI run #5225 (`32956435219`), Java 17 verification job `98139009665`, completed successfully.
 Implementation merge commit on `main`: `98f3ec58be0c57a95868a6c824076181c1bf1b2d`.
 
-### 21H — NPCs, missions, reputation and discovery grounded in the living world — OPEN/NEXT
+### 21H — NPCs, missions, reputation and discovery grounded in the living world — COMPLETE
 
 Objective: make the RPG layer a participant in the autonomous world rather than a disconnected
 quest generator.
 
-Deliverables:
+Delivered:
 
 - persistent NPC identities, roles, affiliations, location, knowledge and availability;
 - actor-bounded NPC knowledge and dialogue facts;
@@ -332,16 +332,27 @@ Deliverables:
 - discovery/intelligence missions that respect Stage-17.5/20 information boundaries;
 - event-driven mission wakeups and bounded relevance instead of polling every possible NPC;
 - mission completion that delegates to ordinary cargo, combat, construction, diplomacy or discovery
-  state and cannot self-certify from UI input.
+  state and cannot self-certify from UI input;
+- independent player-contractor proof from persistent `PlayerState`, owned `FleetId`/construction/operation
+  participation and owner-local Stage-20 discovery before player-facing escrow payout;
+- deterministic standalone sidecar persistence and schema-v11 generated-world checkpoint composed over
+  the complete Stage-21G runtime with exact escrow-ledger provenance validation.
 
-Exit criteria:
+Exit criteria — accepted:
 
 - a mission cannot promise cargo, money, access or ships the issuer does not lawfully control;
 - destroying or moving the underlying target updates/fails the mission deterministically;
 - NPCs never reveal facts absent from their knowledge state;
-- ignoring a mission does not freeze the world; factions may solve, lose or change the opportunity.
+- ignoring a mission does not freeze the world; factions may solve, lose or change the opportunity;
+- a satisfied world predicate cannot pay a player contract unless existing persistent authorities also
+  prove bounded player participation.
 
-### 21I — Command UI, persistence, corpus and long-run final gate
+Implementation and acceptance map: `docs/stage21h_npc_missions_reputation_discovery.md`.
+Accepted through PR #335 from exact green head `d57a71b351a22af52e005499a214e41db0701f85`;
+CI run #5307 (`32978603732`), Java 17 verification job `98209354294`, completed successfully.
+Implementation merge commit on `main`: `ecc57ad27a653d823da4294d121414aeab7c72e9`.
+
+### 21I — Command UI, persistence, corpus and long-run final gate — OPEN/NEXT
 
 Objective: make the full living-world chain inspectable, resumable and robust.
 
@@ -428,8 +439,8 @@ supports multiple plausible histories without hidden exceptions.
 | 21E | **COMPLETE** | persistent operations, exact Stage-19 consequences, physical losses/store consumption and traffic interdiction |
 | 21F | **COMPLETE** | occupation/stabilization/control transitions |
 | 21G | **COMPLETE** | peace/demobilization/finite recovery/loss-backed replacement/post-war memory |
-| 21H | **OPEN — next** | persistent NPCs, missions, reputation and discovery |
-| 21I | **OPEN** | integrated UI/migration/corpus/performance final gate |
+| 21H | **COMPLETE** | persistent NPCs, actor-bounded knowledge, funded missions, reputation and discovery |
+| 21I | **OPEN — next** | integrated UI/migration/corpus/performance final gate |
 
 Stage 21A accepted the deliberately narrow actor foundation: stable faction-bound lifecycle state,
 immutable actor-bounded observations, measurable interests, deterministic traces, ordered wakeups,
@@ -493,11 +504,22 @@ Stage 21G accepts the conflict-closeout and recovery layer without resetting any
 8. bounded treaty-performance/grievance memory feeds later Stage-21C outcome selection without creating war score;
 9. schema-v10 generated-world persistence composes Stage-21F and fails closed on invalid settlement/payment/group/loss/build/time state.
 
-Stage 21H is now the first remaining implementation slice. It must add persistent NPC identity,
-actor-bounded knowledge, mission authority/escrow/objectives, reputation and discovery over the
-accepted living-world state. It must not create a quest-only economy, omniscient dialogue knowledge,
-UI-certified completion or hidden rewards. This Stage-21G closeout intentionally does not start
-Stage 21H implementation.
+Stage 21H accepts the RPG-side participant layer without introducing a quest-only authority:
+
+1. stable NPC identities retain role, faction affiliation, location, availability and only explicitly received actor-bounded knowledge;
+2. dialogue facts are projected only from retained current NPC knowledge rather than hidden world truth;
+3. mission opportunities require causally compatible current issuer-known evidence and a real unresolved ordinary target;
+4. issuer authority is checked against existing freight, fleet, discovery, construction, diplomacy, industrial and Stage-21E operation ownership/law;
+5. rewards are funded from real faction treasury into exact mission escrow and terminal refund/payout conserves that balance;
+6. ordinary objective satisfaction is separate from player-contractor proof, preventing UI/caller self-certification or payout for work completed by other actors;
+7. reputation is bounded observed RPG social memory and remains separate from Stage-17/21C legal relations;
+8. mission processing uses deduplicated event/deadline wakeups plus explicit work budgets instead of global polling;
+9. schema-v11 generated-world persistence composes Stage-21G and validates active escrow against exact ordinary ledger provenance.
+
+Stage 21I is now the first remaining implementation slice. It must project the accepted full living-world
+state through command/inspection UI, supported-save migration, representative corpus, bounded-performance
+evidence and the final long-run Stage-21 acceptance gate. It must not turn UI, migration or presentation
+into simulation authority. The Stage-21H closeout intentionally does not start Stage 21I implementation.
 
 ## 10. Suggested state ownership
 
@@ -569,10 +591,10 @@ Each item should remain separately reviewable and leave `main` green:
 10. **COMPLETE:** 21E physical consequence return/persistence;
 11. **COMPLETE:** 21F occupation/stabilization/control;
 12. **COMPLETE:** 21G peace/demobilization/replacement;
-13. **NEXT:** 21H NPC identity/knowledge/availability;
-14. 21H mission/escrow/objective/reputation;
-15. 21H authored gold-slice content;
-16. 21I command UI/overlays/timeline;
+13. **COMPLETE:** 21H NPC identity/knowledge/availability;
+14. **COMPLETE:** 21H mission/escrow/objective/reputation;
+15. **COMPLETE:** 21H authored gold-slice content;
+16. **NEXT:** 21I command UI/overlays/timeline;
 17. 21I migration/corpus/performance/soak and completion record.
 
 A PR may combine adjacent items only when the resulting authority boundary and acceptance evidence
