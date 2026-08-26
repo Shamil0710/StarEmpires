@@ -48,6 +48,24 @@ class SettlementRecoveryStateCodecTest {
     }
 
     @Test
+    void completedPaymentAtTickZeroRoundTripsWithoutAmbiguousNonCompleteTimestamp() {
+        Settlement settlement = new Settlement(
+                1L, "proposal.zero", "war.zero", "faction.a", "faction.b",
+                0L, 0L, SettlementStatus.COMPLETE, false);
+        PaymentObligation completedAtZero = new PaymentObligation(
+                1L, 0, "faction.a", "faction.b", 1_000L, ObligationStatus.COMPLETE, 0L);
+        SettlementRecoveryState state = new SettlementRecoveryState(
+                SettlementRecoveryState.CURRENT_VERSION, 0L, 2L, 1L,
+                List.of(settlement), List.of(completedAtZero), List.of(), List.of(), List.of());
+
+        assertEquals(state, SettlementRecoveryStateCodec.decode(SettlementRecoveryStateCodec.encode(state)));
+        assertThrows(IllegalArgumentException.class, () -> new PaymentObligation(
+                1L, 0, "faction.a", "faction.b", 1_000L, ObligationStatus.PENDING, 1L));
+        assertThrows(IllegalArgumentException.class, () -> new PaymentObligation(
+                1L, 0, "faction.a", "faction.b", 1_000L, ObligationStatus.COMPLETE, -1L));
+    }
+
+    @Test
     void duplicateLossReplacementAndFutureStateFailClosed() {
         Settlement settlement = new Settlement(1L, "proposal.1", "war.1", "faction.a", "faction.b",
                 10L, 20L, SettlementStatus.PENDING, false);
