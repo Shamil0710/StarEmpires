@@ -95,11 +95,62 @@ class Stage21GPeaceAuthorityAcceptanceTest {
                 recovery.snapshot().requireSettlement(settlement.id()).status());
     }
 
+    @Test
+    void peaceRecognitionAndConstructionTermsUseExistingStage17TerritorialAuthority() {
+        WorldSimulation world = DemoGalaxyFactory.create(21_799L);
+        StarSystemId tradeSystem = controlledSystem(world, TRADE_LEAGUE);
+        StarSystemId minersSystem = controlledSystem(world, MINERS);
+        DiplomaticLifecycleService diplomacy = diplomacy(world);
+        var war = diplomacy.declareWarFromObservedAttack(
+                TRADE_LEAGUE, MINERS, "observed.attack.stage21g.territory",
+                world.getAuthoritativeWorldTick(), goals());
+        long now = world.getAuthoritativeWorldTick();
+        var peace = diplomacy.propose(new DiplomaticLifecycleService.ProposalRequest(
+                "goal.peace.stage21g.territory",
+                TRADE_LEAGUE,
+                MINERS,
+                ProposalKind.PEACE,
+                war.warId(),
+                List.of(),
+                List.of(
+                        new Term(TermKind.TERRITORIAL_RECOGNITION,
+                                Long.toString(minersSystem.value()), 0L),
+                        new Term(TermKind.CONSTRUCTION_RIGHT,
+                                Long.toString(tradeSystem.value()), 0L)),
+                now + 100L));
+
+        peace = diplomacy.accept(peace.proposalId());
+        FactionStrategicState tradeState = world.snapshot().factionStrategies().stream()
+                .filter(state -> state.factionContentId().equals(TRADE_LEAGUE))
+                .findFirst().orElseThrow();
+        assertTrue(tradeState.territorialRecognitions().contains(new TerritorialRecognitionState(
+                MINERS, minersSystem, TerritorialRecognitionState.Kind.CONTROL)));
+        assertTrue(tradeState.constructionRightsGranted().stream().anyMatch(right ->
+                right.granteeFactionContentId().equals(MINERS)
+                        && right.systemId().equals(tradeSystem)
+                        && right.activeAt(now)));
+        var afterLegalAcceptance = world.snapshot();
+
+        SettlementRecoveryService recovery = new SettlementRecoveryService(SettlementRecoveryState.empty(now));
+        var settlement = recovery.openAcceptedSettlement(diplomacy, peace.proposalId(), now);
+        recovery.finalizeRecoveryPlan(settlement.id(), now);
+
+        assertEquals(afterLegalAcceptance, world.snapshot(),
+                "Stage-21G recovery must not duplicate territorial recognition/construction grants");
+    }
+
     private static DiplomaticLifecycleService diplomacy(WorldSimulation world) {
         Stage19ConflictRuntime warfare = new Stage19ConflictRuntime(
                 Stage19ConflictState.empty(world.getAuthoritativeWorldTick()));
         return new DiplomaticLifecycleService(
                 world, warfare, DiplomaticLifecycleState.empty(world.getAuthoritativeWorldTick()));
+    }
+
+    private static StarSystemId controlledSystem(WorldSimulation world, String factionId) {
+        return world.snapshot().factionStrategies().stream()
+                .filter(state -> state.factionContentId().equals(factionId))
+                .flatMap(state -> state.controlledSystems().stream())
+                .findFirst().orElseThrow();
     }
 
     private static List<WarGoal> goals() {
