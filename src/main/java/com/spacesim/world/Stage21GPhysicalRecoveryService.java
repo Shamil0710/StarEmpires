@@ -8,8 +8,10 @@ import com.spacesim.components.TransformComponent;
 import com.spacesim.content.Stage18ShipConsumableCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
+import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleDefinition;
 import com.spacesim.economy.Stage18ShipConsumableService;
 import com.spacesim.economy.Stage18ShipyardRuntime;
 import com.spacesim.economy.Stage18StationStorage;
@@ -31,6 +33,7 @@ import com.spacesim.ship.ShipyardEngineeringService.RepairCompletion;
 import com.spacesim.ship.ShipyardEngineeringService.WorkPlan;
 import com.spacesim.ship.WeaponDefinition.Launcher;
 import com.spacesim.ship.WeaponLoadoutState;
+import com.spacesim.ship.WeaponLoadoutState.FeedBinding;
 import com.spacesim.ship.WeaponMountRuntime;
 import com.spacesim.world.FleetCommandState.OrderType;
 import com.spacesim.world.FleetOrderExecutionService.ServiceOperation;
@@ -38,6 +41,7 @@ import com.spacesim.world.SettlementRecoveryState.ReplacementDemand;
 import com.spacesim.world.SettlementRecoveryState.ReplacementStatus;
 import com.spacesim.world.SettlementRecoveryState.SettlementStatus;
 
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.TreeMap;
 
@@ -62,16 +66,7 @@ public final class Stage21GPhysicalRecoveryService {
     private final ShipShieldEngineeringAdapter shieldAdapter = new ShipShieldEngineeringAdapter();
     private final ShieldFieldRuntime shieldRuntime = new ShieldFieldRuntime();
 
-    /**
-     * Creates the Stage-21G physical recovery adapter over already-authoritative services.
-     *
-     * @param consumableCatalog Stage-18I commodity/interface bindings
-     * @param consumables Stage-18I reaction-mass loading authority
-     * @param warfareSupply Stage-19F manufactured-ammunition loading authority
-     * @param engineering Stage-17.5G shipyard planning/completion authority
-     * @param shipyards Stage-18G finite material/work settlement authority
-     * @param engineeringCatalog immutable Stage-17.5 engineering definitions used by materialization
-     */
+    /** Creates the Stage-21G physical recovery adapter over already-authoritative services. */
     public Stage21GPhysicalRecoveryService(
             Stage18ShipConsumableCatalog consumableCatalog,
             Stage18ShipConsumableService consumables,
@@ -105,13 +100,7 @@ public final class Stage21GPhysicalRecoveryService {
         return consumables.load(bindingId, mountId, requestedMassKg, fit, current, station);
     }
 
-    /**
-     * Executes and commits one REFUEL request to the same ordinary physical ship component.
-     *
-     * <p>A rejected Stage-18 load leaves both station stock and ship state unchanged. A committed
-     * load replaces only authoritative consumables; power, heat, damage, shields, maintenance and
-     * launcher continuity are preserved.</p>
-     */
+    /** Executes and commits one REFUEL request to the same ordinary physical ship component. */
     public Stage18ShipConsumableService.LoadResult refuel(
             ServiceOperation operation,
             String bindingId,
@@ -138,8 +127,9 @@ public final class Stage21GPhysicalRecoveryService {
     /**
      * Executes and commits one REARM request through the existing Stage-19F countable-ammunition seam.
      *
-     * <p>Finished rounds are removed from canonical Stage-18 station product stock and loaded into
-     * the same Stage-17.5 consumable feed consumed by combat. Rejected requests mutate neither side.</p>
+     * <p>The physical feed is resolved from the fitted Stage-17.5 module rather than accepted from the
+     * caller. A feed already bound to another ammunition identity rejects before any station mutation.
+     * On success, finished rounds and their identity are committed together to the ordinary ship.</p>
      */
     public Stage19WarfareSupplyService.AmmunitionLoadResult rearm(
             ServiceOperation operation,
@@ -147,22 +137,42 @@ public final class Stage21GPhysicalRecoveryService {
             String mountId,
             int requestedRounds,
             Launcher launcher,
-            InterfaceDefinition ammunitionInterface,
             EngineeringComponent ship,
             Stage18StationStorage station) {
         requireServiceType(operation, OrderType.REARM);
         EngineeringComponent checkedShip = Objects.requireNonNull(ship, "ship");
         RuntimeState before = Objects.requireNonNull(checkedShip.runtimeState, "ship.runtimeState");
+        ShipInstanceRuntimeState instance = Objects.requireNonNull(checkedShip.instanceState, "ship.instanceState");
+        Launcher checkedLauncher = Objects.requireNonNull(launcher, "launcher");
+        InterfaceDefinition feed = requireFittedAmmunitionInterface(
+                Objects.requireNonNull(checkedShip.fit, "ship.fit"), mountId, checkedLauncher.ammunitionInterfaceId());
+        String existingIdentity = instance.weaponLoadout()
+                .ammunitionContentId(mountId, feed.id()).orElse(null);
+        if (existingIdentity != null && !existingIdentity.equals(productId)) {
+            throw new IllegalStateException("Physical ammunition feed already contains another ammunition identity");
+        }
+
         Stage19WarfareSupplyService.AmmunitionLoadResult result = warfareSupply.loadAmmunition(
                 productId,
                 mountId,
                 requestedRounds,
-                Objects.requireNonNull(launcher, "launcher"),
-                Objects.requireNonNull(ammunitionInterface, "ammunitionInterface"),
+                checkedLauncher,
+                feed,
                 before.consumables(),
                 Objects.requireNonNull(station, "station"));
-        if (result.committed()) {
-            commitConsumables(checkedShip, before, result.consumables());
+        if (!result.committed()) {
+            return result;
+        }
+        commitConsumables(checkedShip, before, result.consumables());
+        if (existingIdentity == null) {
+            ArrayList<FeedBinding> feeds = new ArrayList<>(instance.weaponLoadout().feeds());
+            feeds.add(new FeedBinding(mountId, feed.id(), productId));
+            checkedShip.setInstanceState(new ShipInstanceRuntimeState(
+                    instance.damage(),
+                    instance.shieldStatesByMount(),
+                    instance.maintenance(),
+                    new WeaponLoadoutState(feeds),
+                    instance.weaponMountRuntime()));
         }
         return result;
     }
@@ -194,13 +204,7 @@ public final class Stage21GPhysicalRecoveryService {
         return new RepairResult(plan, settlement, completion);
     }
 
-    /**
-     * Physically repairs and applies the settled damage state to one surviving ordinary ship.
-     *
-     * <p>The existing EntityId and fitted modules remain unchanged. Repair may restore structural and
-     * subsystem integrity only after Stage-18 material/work settlement. It never refills consumables,
-     * shared electrical energy or shield reserve and never resets maintenance or launcher cooldowns.</p>
-     */
+    /** Physically repairs and applies the settled damage state to one surviving ordinary ship. */
     public RepairResult repair(
             ServiceOperation operation,
             EntityId assetId,
@@ -225,15 +229,7 @@ public final class Stage21GPhysicalRecoveryService {
         return result;
     }
 
-    /**
-     * Physically builds and ordinarily commissions one replacement for a persisted loss demand.
-     *
-     * <p>There is no caller-supplied EntityId or FleetId. After Stage-18 atomically consumes physical
-     * inputs and finite yard work, the ordinary local-system lifecycle allocates EntityId and FleetId.
-     * The new ship starts pristine but with empty propellant/ammunition and empty shield reserve;
-     * later servicing must use the ordinary Stage-18/19 stock-bound paths. Failure to settle the yard
-     * creates neither an entity nor a FleetId.</p>
-     */
+    /** Physically builds and ordinarily commissions one replacement for a persisted loss demand. */
     public BuildResult buildReplacement(
             SettlementRecoveryService recovery,
             long demandId,
@@ -307,6 +303,27 @@ public final class Stage21GPhysicalRecoveryService {
         }
     }
 
+    private InterfaceDefinition requireFittedAmmunitionInterface(
+            InstalledFit fit,
+            String mountId,
+            String interfaceId) {
+        String checkedMount = requireText(mountId, "mountId");
+        String checkedInterface = requireText(interfaceId, "interfaceId");
+        InstalledModuleDefinition installed = fit.installedModules().stream()
+                .filter(value -> value.mountId().equals(checkedMount))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Ammunition mount is not installed: " + checkedMount));
+        ModuleDefinition module = engineeringCatalog.findModule(installed.moduleId());
+        if (module == null) {
+            throw new IllegalStateException("Installed ammunition module is absent from engineering catalog");
+        }
+        return module.interfaces().stream()
+                .filter(value -> value.kind() == InterfaceKind.AMMUNITION && value.id().equals(checkedInterface))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Installed module has no requested ammunition interface: " + checkedMount + "/" + checkedInterface));
+    }
+
     private static void commitConsumables(
             EngineeringComponent ship,
             RuntimeState before,
@@ -363,8 +380,16 @@ public final class Stage21GPhysicalRecoveryService {
         TreeMap<String, Double> compartments = new TreeMap<>();
         hull.compartments().forEach(compartment -> compartments.put(compartment.id(), 1d));
         Snapshot damage = new Snapshot(compartments, DamageState.pristine());
-        RuntimeState operating = engineeringRuntime.initialize(
+        RuntimeState initialized = engineeringRuntime.initialize(
                 checkedFit, ConsumableState.empty(), damage.moduleDamage());
+        RuntimeState operating = new RuntimeState(
+                initialized.consumables(),
+                0d,
+                initialized.shipHeatStoredJ(),
+                initialized.localHeatJByMount(),
+                initialized.thrustLimitNByMount(),
+                initialized.coolantBusCapacityW(),
+                initialized.ftlCooldownSecondsByMount());
         var derived = engineeringRuntime.derive(checkedFit, operating, damage.moduleDamage());
         TreeMap<String, ShieldFieldRuntime.State> shields = new TreeMap<>();
         for (ShipShieldEngineeringAdapter.FittedShield fitted : shieldAdapter.derive(derived)) {
