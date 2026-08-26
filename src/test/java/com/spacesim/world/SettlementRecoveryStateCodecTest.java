@@ -33,7 +33,7 @@ class SettlementRecoveryStateCodecTest {
         ReplacementDemand demand = new ReplacementDemand(
                 1L, 1L, new FleetId(80L), "faction.a", "fit.sha",
                 26L, 40L, ReplacementStatus.COMMISSIONED,
-                new StarSystemId("system.alpha"), 900L, new FleetId(81L));
+                new StarSystemId(1L), 900L, new FleetId(81L));
         SettlementRecoveryState first = new SettlementRecoveryState(
                 SettlementRecoveryState.CURRENT_VERSION, 40L, 3L, 2L,
                 List.of(b, a), List.of(payment), List.of(demobilization), List.of(loss), List.of(demand));
@@ -75,7 +75,7 @@ class SettlementRecoveryStateCodecTest {
         assertThrows(IllegalArgumentException.class, () -> new ReplacementDemand(
                 1L, 1L, new FleetId(80L), "faction.a", "fit.sha",
                 26L, 40L, ReplacementStatus.YARD_SETTLED,
-                new StarSystemId("system.alpha"), 0L, null));
+                new StarSystemId(1L), 0L, null));
     }
 
     @Test
