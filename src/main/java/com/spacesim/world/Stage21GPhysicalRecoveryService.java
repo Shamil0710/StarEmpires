@@ -66,7 +66,16 @@ public final class Stage21GPhysicalRecoveryService {
     private final ShipShieldEngineeringAdapter shieldAdapter = new ShipShieldEngineeringAdapter();
     private final ShieldFieldRuntime shieldRuntime = new ShieldFieldRuntime();
 
-    /** Creates the Stage-21G physical recovery adapter over already-authoritative services. */
+    /**
+     * Creates the Stage-21G physical recovery adapter over already-authoritative services.
+     *
+     * @param consumableCatalog existing Stage-18 ship-consumable binding catalog
+     * @param consumables existing Stage-18 finite consumable-loading authority
+     * @param warfareSupply existing Stage-19 finite warfare-supply authority
+     * @param engineering existing shipyard engineering planning/completion authority
+     * @param shipyards existing Stage-18 shipyard material/work settlement authority
+     * @param engineeringCatalog existing Stage-17.5 ship engineering content catalog
+     */
     public Stage21GPhysicalRecoveryService(
             Stage18ShipConsumableCatalog consumableCatalog,
             Stage18ShipConsumableService consumables,
@@ -83,7 +92,18 @@ public final class Stage21GPhysicalRecoveryService {
         this.engineeringRuntime = new ShipEngineeringRuntime(engineeringCatalog);
     }
 
-    /** Executes one existing REFUEL service request from canonical Stage-18 commodity stock. */
+    /**
+     * Executes one existing REFUEL service request from canonical Stage-18 commodity stock.
+     *
+     * @param operation existing service operation, required to be REFUEL
+     * @param bindingId canonical Stage-18 consumable binding identity
+     * @param mountId fitted mount receiving reaction mass
+     * @param requestedMassKg requested positive reaction-mass load
+     * @param fit current installed ship fit
+     * @param current current ship consumable state
+     * @param station ordinary station storage that supplies the commodity
+     * @return existing Stage-18 load result without a parallel inventory mutation
+     */
     public Stage18ShipConsumableService.LoadResult refuel(
             ServiceOperation operation,
             String bindingId,
@@ -100,7 +120,17 @@ public final class Stage21GPhysicalRecoveryService {
         return consumables.load(bindingId, mountId, requestedMassKg, fit, current, station);
     }
 
-    /** Executes and commits one REFUEL request to the same ordinary physical ship component. */
+    /**
+     * Executes and commits one REFUEL request to the same ordinary physical ship component.
+     *
+     * @param operation existing service operation, required to be REFUEL
+     * @param bindingId canonical Stage-18 consumable binding identity
+     * @param mountId fitted mount receiving reaction mass
+     * @param requestedMassKg requested positive reaction-mass load
+     * @param ship ordinary engineering component whose consumables are updated on success
+     * @param station ordinary station storage that supplies the commodity
+     * @return existing Stage-18 load result and commit outcome
+     */
     public Stage18ShipConsumableService.LoadResult refuel(
             ServiceOperation operation,
             String bindingId,
@@ -130,6 +160,15 @@ public final class Stage21GPhysicalRecoveryService {
      * <p>The physical feed is resolved from the fitted Stage-17.5 module rather than accepted from the
      * caller. A feed already bound to another ammunition identity rejects before any station mutation.
      * On success, finished rounds and their identity are committed together to the ordinary ship.</p>
+     *
+     * @param operation existing service operation, required to be REARM
+     * @param productId canonical manufactured ammunition product identity
+     * @param mountId fitted launcher mount receiving ammunition
+     * @param requestedRounds requested positive round count
+     * @param launcher existing launcher definition governing the feed
+     * @param ship ordinary engineering component whose ammunition state is updated on success
+     * @param station ordinary station storage supplying manufactured ammunition
+     * @return existing Stage-19 ammunition load result and commit outcome
      */
     public Stage19WarfareSupplyService.AmmunitionLoadResult rearm(
             ServiceOperation operation,
@@ -177,7 +216,19 @@ public final class Stage21GPhysicalRecoveryService {
         return result;
     }
 
-    /** Plans, physically settles and completes one existing-identity repair request. */
+    /**
+     * Plans, physically settles and completes one existing-identity repair request.
+     *
+     * @param operation existing service operation, required to be REPAIR
+     * @param assetId ordinary physical asset identity being repaired
+     * @param fit current installed ship fit
+     * @param currentConsumables current ship consumable state used by engineering planning
+     * @param damage current ordinary physical damage snapshot
+     * @param station ordinary station storage supplying repair materials
+     * @param yard existing Stage-18 yard capability snapshot
+     * @param budget finite Stage-18 yard work budget
+     * @return repair plan, physical settlement result and completion when settlement succeeds
+     */
     public RepairResult repair(
             ServiceOperation operation,
             EntityId assetId,
@@ -204,7 +255,17 @@ public final class Stage21GPhysicalRecoveryService {
         return new RepairResult(plan, settlement, completion);
     }
 
-    /** Physically repairs and applies the settled damage state to one surviving ordinary ship. */
+    /**
+     * Physically repairs and applies the settled damage state to one surviving ordinary ship.
+     *
+     * @param operation existing service operation, required to be REPAIR
+     * @param assetId ordinary physical asset identity being repaired
+     * @param ship ordinary engineering component whose damage state is updated on success
+     * @param station ordinary station storage supplying repair materials
+     * @param yard existing Stage-18 yard capability snapshot
+     * @param budget finite Stage-18 yard work budget
+     * @return repair plan, settlement and applied completion state
+     */
     public RepairResult repair(
             ServiceOperation operation,
             EntityId assetId,
@@ -229,7 +290,24 @@ public final class Stage21GPhysicalRecoveryService {
         return result;
     }
 
-    /** Physically builds and ordinarily commissions one replacement for a persisted loss demand. */
+    /**
+     * Physically builds and ordinarily commissions one replacement for a persisted loss demand.
+     *
+     * @param recovery existing Stage-21G settlement/recovery coordinator
+     * @param demandId persisted replacement-demand identity
+     * @param world existing ordinary world/entity/fleet authority
+     * @param identities stable/runtime faction identity authority
+     * @param buildSystemId system in which the ordinary replacement entity is materialized
+     * @param displayName ordinary display name for the replacement fleet entity
+     * @param x local-system berth x-coordinate
+     * @param y local-system berth y-coordinate
+     * @param targetFit exact replacement fit matching the persisted demand fingerprint
+     * @param station ordinary station storage supplying build materials
+     * @param yard existing Stage-18 yard capability snapshot
+     * @param budget finite Stage-18 yard work budget
+     * @param currentTick authoritative current tick
+     * @return physical build/commissioning result and updated recovery provenance
+     */
     public BuildResult buildReplacement(
             SettlementRecoveryService recovery,
             long demandId,
@@ -422,11 +500,24 @@ public final class Stage21GPhysicalRecoveryService {
         return normalized;
     }
 
-    /** Result of one physically attempted repair. */
+    /**
+     * Result of one physically attempted repair.
+     *
+     * @param plan existing engineering work plan
+     * @param settlement existing Stage-18 material/work settlement result
+     * @param completion physical repair completion, or null when settlement did not complete
+     */
     public record RepairResult(
             WorkPlan plan,
             Stage18ShipyardRuntime.SettlementResult settlement,
             RepairCompletion completion) {
+        /**
+         * Validates repair settlement/completion consistency.
+         *
+         * @param plan existing engineering work plan
+         * @param settlement existing Stage-18 material/work settlement result
+         * @param completion physical repair completion, or null when settlement did not complete
+         */
         public RepairResult {
             Objects.requireNonNull(plan, "plan");
             Objects.requireNonNull(settlement, "settlement");
@@ -436,7 +527,16 @@ public final class Stage21GPhysicalRecoveryService {
         }
     }
 
-    /** Result of a physical replacement attempt and ordinary commissioning. */
+    /**
+     * Result of a physical replacement attempt and ordinary commissioning.
+     *
+     * @param plan existing engineering build work plan
+     * @param settlement existing Stage-18 material/work settlement result
+     * @param completion physical build completion, or null when settlement did not complete
+     * @param builtSystemId exact system containing the completed ordinary asset, or null before completion
+     * @param commissionedFleetId fresh ordinary FleetId, or null before completion
+     * @param recoveryState updated Stage-21G recovery provenance
+     */
     public record BuildResult(
             WorkPlan plan,
             Stage18ShipyardRuntime.SettlementResult settlement,
@@ -444,6 +544,16 @@ public final class Stage21GPhysicalRecoveryService {
             StarSystemId builtSystemId,
             FleetId commissionedFleetId,
             SettlementRecoveryState recoveryState) {
+        /**
+         * Validates physical settlement, build and commissioning provenance consistency.
+         *
+         * @param plan existing engineering build work plan
+         * @param settlement existing Stage-18 material/work settlement result
+         * @param completion physical build completion, or null when settlement did not complete
+         * @param builtSystemId exact system containing the completed ordinary asset, or null before completion
+         * @param commissionedFleetId fresh ordinary FleetId, or null before completion
+         * @param recoveryState updated Stage-21G recovery provenance
+         */
         public BuildResult {
             Objects.requireNonNull(plan, "plan");
             Objects.requireNonNull(settlement, "settlement");
