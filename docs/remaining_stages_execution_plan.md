@@ -21,9 +21,15 @@ Canonical faction decision:
 Faction authority documents:
 
 - `docs/factions/faction_roster_and_development_horizon.md`;
+- `docs/factions/faction_gameplay_visual_balance_bible.md`;
 - `docs/factions/empire_systemic_identity.md`;
+- `docs/factions/empire_visual_bible.md`;
 - `docs/factions/industrial_union_systemic_identity.md`;
-- `docs/factions/post_core_faction_horizon.md`.
+- `docs/factions/industrial_union_visual_bible.md`;
+- `docs/factions/post_core_faction_horizon.md`;
+- `docs/factions/faction_balance_validation_framework.md`;
+- `docs/factions/faction_implementation_roadmap.md`;
+- `docs/characters/character_master_prompt.md`.
 
 ## 2. Product outcome
 
@@ -57,6 +63,10 @@ The five horizon factions are preserved for later expansion and must not cause s
 8. **23A–23E:** scope lock, production UX, accessibility, onboarding and final media.
 9. **23F–23J:** performance, saves, packaging, QA and exact RC gate.
 10. **Post-core:** activate horizon faction packages one at a time after fresh architecture review.
+
+Detailed milestone dependencies, legacy-ID disposition, package cycles and reviewable PR order are
+defined in `docs/factions/faction_implementation_roadmap.md`; balance evidence follows
+`docs/factions/faction_balance_validation_framework.md`.
 
 Stage-22 concept/art preparation may begin before Stage 21 closes, but cannot define hidden mechanics or
 mass-balance against temporary interfaces. Stage 23 polish may prototype early, but final acceptance waits for Stage-22 fingerprints.
