@@ -631,6 +631,7 @@ public record Stage21HNpcMissionState(
                     throw new IllegalArgumentException("Mission wakeup is newer than Stage-21H sidecar: " + wakeup.eventId());
                 }
             }
+            boolean opportunityGrounded = false;
             for (String factId : mission.sourceKnowledgeFactIds()) {
                 NpcKnowledgeFact fact = issuer.knowledge().stream()
                         .filter(value -> value.factId().equals(factId))
@@ -641,6 +642,11 @@ public record Stage21HNpcMissionState(
                     throw new IllegalArgumentException(
                             "Mission source fact was unavailable or stale at mission creation: " + factId);
                 }
+                opportunityGrounded |= supportsOpportunity(mission.template(), fact.claimCode());
+            }
+            if (!opportunityGrounded) {
+                throw new IllegalArgumentException(
+                        "Mission has no causally compatible issuer-known opportunity fact: " + mission.missionId());
             }
         }
         if (nextMissionSequence <= maximumAllocatedMissionSequence) {
@@ -685,7 +691,8 @@ public record Stage21HNpcMissionState(
             case FLEET_ABSENT -> authority == ObjectiveAuthority.FLEET
                     && systemId == 0L && threshold == 0L && requiredState.isEmpty();
             case ESCORT_FLEETS_PRESENT_IN_SYSTEM -> authority == ObjectiveAuthority.FLEET
-                    && systemId > 0L && threshold == 0L && isPositiveLong(requiredState);
+                    && systemId > 0L && threshold == 0L && isPositiveLong(subjectId)
+                    && isPositiveLong(requiredState) && !subjectId.equals(requiredState);
             case FLEET_REACTION_MASS_KG_AT_LEAST -> authority == ObjectiveAuthority.FLEET
                     && systemId == 0L && threshold > 0L && requiredState.isEmpty();
             case DISCOVERY_AT_LEAST -> authority == ObjectiveAuthority.DISCOVERY
@@ -728,6 +735,25 @@ public record Stage21HNpcMissionState(
             throw new IllegalArgumentException(
                     "Mission template cannot use the supplied ordinary-authority predicate: " + template + "/" + kind);
         }
+    }
+
+    private static boolean supportsOpportunity(MissionTemplate template, String claimCode) {
+        String claim = requireText(claimCode, "Mission opportunity claim code");
+        return switch (template) {
+            case EMERGENCY_SUPPLY_DELIVERY -> claim.equals("ECONOMIC.RESOURCE_DEFICIT");
+            case ORDINARY_MARKET_PROCUREMENT -> claim.equals("ECONOMIC.SUPPLY_DEPENDENCY")
+                    || claim.equals("ECONOMIC.RESOURCE_DEFICIT");
+            case CONVOY_ESCORT, STRANDED_FLEET_RESCUE_REFUEL -> claim.equals("SECURITY.ROUTE_EXPOSURE");
+            case SYSTEM_OBJECT_RECONNAISSANCE -> claim.equals("DISCOVERY.STATIC_OBJECT")
+                    || claim.startsWith("DISCOVERY.");
+            case DERELICT_INVESTIGATION_RECOVERY -> claim.equals("DISCOVERY.SPECIAL_LOCATION")
+                    || claim.startsWith("DISCOVERY.SPECIAL_LOCATION.");
+            case INTERCEPTION_DEFENSE -> claim.equals("SECURITY.BORDER_SECURITY")
+                    || claim.equals("SECURITY.ROUTE_EXPOSURE");
+            case CONSTRUCTION_REPAIR_INPUT_DELIVERY -> claim.equals("ECONOMIC.RESOURCE_DEFICIT")
+                    || claim.equals("ECONOMIC.SUPPLY_DEPENDENCY");
+            case IMPERIAL_ACCESS_NEGOTIATION -> claim.equals("DIPLOMATIC.MARKET_ACCESS");
+        };
     }
 
     private static long allocatedMissionSequence(String missionId) {
