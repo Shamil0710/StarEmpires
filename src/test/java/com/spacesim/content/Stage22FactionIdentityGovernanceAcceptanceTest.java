@@ -7,7 +7,6 @@ import com.spacesim.world.WorldFactionIdentityState;
 import com.spacesim.world.WorldState;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -17,11 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage22FactionIdentityGovernanceAcceptanceTest {
     @Test
-    void governanceExactlyCoversCurrentAuthoredAndLargeWorldCompatibilityIdentities() {
+    void governanceCoversAuthoredLargeDemoAndSeparateGeneratedWorldCompatibilityLineages() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldState state = LargeDemoGalaxyFactory.createState(22_000L, content);
         Stage22ContentGovernanceCatalog governance = Stage22ContentGovernanceLoader.loadDefault();
@@ -32,7 +30,7 @@ class Stage22FactionIdentityGovernanceAcceptanceTest {
         Set<String> bootstrap = state.factionIdentities().stream()
                 .map(WorldFactionIdentityState::stableFactionId)
                 .collect(Collectors.toSet());
-        Set<String> runtimeIdentities = java.util.stream.Stream.concat(authored.stream(), bootstrap.stream())
+        Set<String> largeDemoIdentities = java.util.stream.Stream.concat(authored.stream(), bootstrap.stream())
                 .collect(Collectors.toUnmodifiableSet());
         Set<String> governed = governance.getFactionIdentities().stream()
                 .map(Stage22ContentGovernanceCatalog.FactionIdentityDefinition::stableFactionId)
@@ -40,8 +38,10 @@ class Stage22FactionIdentityGovernanceAcceptanceTest {
 
         assertEquals(3, authored.size());
         assertEquals(5, bootstrap.size());
-        assertEquals(8, runtimeIdentities.size());
-        assertEquals(runtimeIdentities, governed);
+        assertEquals(8, largeDemoIdentities.size());
+        assertEquals(Set.of("faction.alpha", "faction.beta"),
+                governed.stream().filter(id -> !largeDemoIdentities.contains(id)).collect(Collectors.toSet()));
+        assertEquals(10, governed.size());
     }
 
     @Test
@@ -78,10 +78,12 @@ class Stage22FactionIdentityGovernanceAcceptanceTest {
         assertNull(governance.canonicalPackageKey("faction.frontier_union"));
         assertNull(governance.canonicalPackageKey("faction.free_ports"));
         assertNull(governance.canonicalPackageKey("faction.research_consortium"));
+        assertNull(governance.canonicalPackageKey("faction.alpha"));
+        assertNull(governance.canonicalPackageKey("faction.beta"));
     }
 
     @Test
-    void worldSaveRoundTripKeepsStableIdsRuntimeSlotsAndExactBytes() {
+    void largeDemoWorldSaveRoundTripKeepsStableIdsRuntimeSlotsAndExactBytes() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldState before = LargeDemoGalaxyFactory.createState(22_002L, content);
         Stage22ContentGovernanceCatalog governance = Stage22ContentGovernanceLoader.loadDefault();
@@ -106,6 +108,5 @@ class Stage22FactionIdentityGovernanceAcceptanceTest {
                     governance.canonicalDisplayName(id, restoredResolver.displayName(id).orElse(id)),
                     id);
         }
-        assertTrue(Arrays.equals(firstBytes, secondBytes));
     }
 }
