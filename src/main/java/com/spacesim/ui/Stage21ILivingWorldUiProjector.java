@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
  * missions or knowledge while preparing UI state.</p>
  */
 public final class Stage21ILivingWorldUiProjector {
+    private static final String UNOBSERVED_PHYSICAL_STATE = "UNOBSERVED_IN_STAGE21H_CHECKPOINT";
+
     /**
      * Projects one immutable actor-bounded UI snapshot.
      *
@@ -154,10 +156,10 @@ public final class Stage21ILivingWorldUiProjector {
             long tick) {
         return diplomacyStates.stream()
                 .flatMap(owner -> owner.treaties().stream()
-                        .filter(treaty -> owner.factionContentId().equals(viewer)
-                                        && treaty.counterpartyFactionContentId().equals(counterparty)
-                                || owner.factionContentId().equals(counterparty)
-                                        && treaty.counterpartyFactionContentId().equals(viewer))
+                        .filter(treaty -> (owner.factionContentId().equals(viewer)
+                                        && treaty.counterpartyFactionContentId().equals(counterparty))
+                                || (owner.factionContentId().equals(counterparty)
+                                        && treaty.counterpartyFactionContentId().equals(viewer)))
                         .filter(treaty -> treaty.activeAt(tick))
                         .map(treaty -> treaty.treatyId()
                                 + ":" + treaty.status()
@@ -173,8 +175,8 @@ public final class Stage21ILivingWorldUiProjector {
 
     private static boolean includesPair(DiplomaticLifecycleState.War war, String viewer, String other) {
         if (viewer.equals(other)) return false;
-        return war.factionA().equals(viewer) && war.factionB().equals(other)
-                || war.factionB().equals(viewer) && war.factionA().equals(other);
+        return (war.factionA().equals(viewer) && war.factionB().equals(other))
+                || (war.factionB().equals(viewer) && war.factionA().equals(other));
     }
 
     private static List<Stage21ILivingWorldUiSnapshot.MilitaryRow> projectMilitary(
@@ -198,12 +200,12 @@ public final class Stage21ILivingWorldUiProjector {
                             group.name(),
                             group.memberFleetIds().stream().map(Object::toString).toList(),
                             order == null ? "IDLE" : order.id() + ":" + order.type() + ":" + order.status(),
-                            "PHYSICAL_FLEET_AUTHORITY",
+                            UNOBSERVED_PHYSICAL_STATE,
                             route,
-                            "PHYSICAL_LOGISTICS_AUTHORITY",
+                            UNOBSERVED_PHYSICAL_STATE,
                             operation == null ? "NONE" : operation.id() + ":" + operation.status(),
                             order == null ? group.homeSystemId().toString() : order.targetSystemId().toString(),
-                            "stage21d.command+stage21e.operation;readiness/supply=ordinary-physical-authority");
+                            "stage21d.command+stage21e.operation;readiness/supply=unobserved-in-final-checkpoint");
                 })
                 .sorted(Comparator.comparingLong(Stage21ILivingWorldUiSnapshot.MilitaryRow::commandGroupId))
                 .toList();
