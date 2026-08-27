@@ -1,6 +1,6 @@
 package com.spacesim.ui;
 
-import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage21GeneratedMilitaryEngineeringCatalog;
 import com.spacesim.persistence.Stage19ConflictState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
 import com.spacesim.persistence.Stage21AGeneratedWorldRuntimeBridge;
@@ -36,7 +36,7 @@ class Stage21IFinalLivingWorldUiProjectorAcceptanceTest {
         LiveRuntime stage20 = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED + 41L).runtime();
         var world = stage20.captureState().worldState();
-        var evaluator = new FleetReadinessEvaluator(ShipEngineeringCatalogLoader.loadDefault());
+        var evaluator = new FleetReadinessEvaluator(Stage21GeneratedMilitaryEngineeringCatalog.load());
         FleetOperationalAvailability acceptanceObservation = new FleetOperationalAvailability(1_000_000, 7_500);
         FleetForceRegistry bootstrapForces = FleetForceRegistry.reconstruct(world, evaluator, Map.of());
         var selected = bootstrapForces.entries().stream()
@@ -45,7 +45,7 @@ class Stage21IFinalLivingWorldUiProjectorAcceptanceTest {
                 .filter(entry -> evaluator.evaluate(entry.entityState(), acceptanceObservation).supplyAccessBps() == 7_500)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError(
-                        "generated world must contain an in-system FleetId with resolvable Stage-21D engineering authority"));
+                        "generated world must contain an in-system FleetId with resolvable Stage-21 engineering authority"));
         String viewer = world.factionIdentities().stream()
                 .filter(identity -> identity.runtimeFactionId() == selected.factionId())
                 .map(identity -> identity.stableFactionId())
@@ -90,7 +90,7 @@ class Stage21IFinalLivingWorldUiProjectorAcceptanceTest {
         LiveRuntime stage20 = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED + 43L).runtime();
         var world = stage20.captureState().worldState();
-        var evaluator = new FleetReadinessEvaluator(ShipEngineeringCatalogLoader.loadDefault());
+        var evaluator = new FleetReadinessEvaluator(Stage21GeneratedMilitaryEngineeringCatalog.load());
         FleetForceRegistry forces = FleetForceRegistry.reconstruct(world, evaluator, Map.of());
         var selected = forces.entries().stream()
                 .filter(entry -> entry.factionId() >= 0)
