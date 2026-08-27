@@ -19,6 +19,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage21ILivingWorldUiProjectorAcceptanceTest {
 
@@ -67,7 +68,7 @@ class Stage21ILivingWorldUiProjectorAcceptanceTest {
                 .findFirst()
                 .orElseThrow();
         assertFalse(counterpartyRow.treaties().isEmpty());
-        assertEquals(proposal.linkedTreatyId(), counterpartyRow.treaties().get(0).split(":", 2)[0]);
+        assertTrue(counterpartyRow.treaties().get(0).startsWith(proposal.linkedTreatyId() + ":"));
         assertEquals(List.of(), first.factions().stream()
                 .filter(row -> row.factionId().equals(viewer))
                 .findFirst()
