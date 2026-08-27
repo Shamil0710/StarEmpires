@@ -15,24 +15,16 @@ public record Stage21ILivingWorldUiSnapshot(
         long simulationTick,
         List<FactionRow> factions,
         List<MilitaryRow> military,
+        List<OverlayRow> overlays,
         List<TimelineRow> timeline,
         List<NpcMissionRow> npcMissions) {
 
-    /**
-     * Validates and freezes all top-level actor-bounded presentation collections.
-     *
-     * @param viewerFactionId stable faction id of the requesting viewer
-     * @param simulationTick authoritative simulation tick represented by the projection
-     * @param factions actor-bounded faction rows
-     * @param military viewer-owned military rows
-     * @param timeline actor-bounded event rows
-     * @param npcMissions viewer-visible NPC and mission rows
-     */
     public Stage21ILivingWorldUiSnapshot {
         viewerFactionId = requireText(viewerFactionId, "viewerFactionId");
         if (simulationTick < 0L) throw new IllegalArgumentException("simulationTick cannot be negative");
         factions = immutable(factions, "factions");
         military = immutable(military, "military");
+        overlays = immutable(overlays, "overlays");
         timeline = immutable(timeline, "timeline");
         npcMissions = immutable(npcMissions, "npcMissions");
     }
@@ -49,20 +41,6 @@ public record Stage21ILivingWorldUiSnapshot(
             List<String> goals,
             List<String> decisionEvidence,
             String authorityRef) {
-        /**
-         * Validates and freezes one faction-facing presentation row.
-         *
-         * @param factionId stable faction identity
-         * @param displayName actor-visible display name
-         * @param relation actor-visible relation summary
-         * @param interests actor-visible interests
-         * @param treaties actor-visible treaty summaries
-         * @param crises actor-visible diplomatic crises
-         * @param wars actor-visible active wars
-         * @param goals private goals when the row belongs to the viewer, otherwise empty
-         * @param decisionEvidence bounded causal evidence visible to the viewer
-         * @param authorityRef provenance reference for the projection
-         */
         public FactionRow {
             factionId = requireText(factionId, "factionId");
             displayName = requireText(displayName, "displayName");
@@ -89,20 +67,6 @@ public record Stage21ILivingWorldUiSnapshot(
             String operation,
             String destination,
             String authorityRef) {
-        /**
-         * Validates and freezes one viewer-owned military presentation row.
-         *
-         * @param commandGroupId stable command-group id
-         * @param commandGroupName display label of the command group
-         * @param fleetIds member fleet ids
-         * @param order accepted strategic order summary
-         * @param readiness simulation-backed readiness summary
-         * @param route ordered route waypoints
-         * @param supply simulation-backed supply summary
-         * @param operation active strategic operation summary
-         * @param destination current destination summary
-         * @param authorityRef provenance reference for the projection
-         */
         public MilitaryRow {
             if (commandGroupId <= 0L) throw new IllegalArgumentException("commandGroupId must be positive");
             commandGroupName = requireText(commandGroupName, "commandGroupName");
@@ -117,6 +81,37 @@ public record Stage21ILivingWorldUiSnapshot(
         }
     }
 
+    /** One global-map overlay fact with explicit authority provenance and actor-bounded visibility. */
+    public record OverlayRow(
+            String kind,
+            String subjectId,
+            String actorId,
+            String state,
+            List<String> details,
+            String visibility,
+            String authorityRef) implements Comparable<OverlayRow> {
+        public OverlayRow {
+            kind = requireText(kind, "kind");
+            subjectId = requireText(subjectId, "subjectId");
+            actorId = requireText(actorId, "actorId");
+            state = requireText(state, "state");
+            details = immutable(details, "details");
+            visibility = requireText(visibility, "visibility");
+            authorityRef = requireText(authorityRef, "authorityRef");
+        }
+
+        @Override
+        public int compareTo(OverlayRow other) {
+            int kindOrder = kind.compareTo(other.kind);
+            if (kindOrder != 0) return kindOrder;
+            int subjectOrder = subjectId.compareTo(other.subjectId);
+            if (subjectOrder != 0) return subjectOrder;
+            int actorOrder = actorId.compareTo(other.actorId);
+            if (actorOrder != 0) return actorOrder;
+            return state.compareTo(other.state);
+        }
+    }
+
     /** Actor-bounded event row. */
     public record TimelineRow(
             long tick,
@@ -125,16 +120,6 @@ public record Stage21ILivingWorldUiSnapshot(
             String eventType,
             String summary,
             String evidenceRef) {
-        /**
-         * Validates one actor-bounded timeline presentation row.
-         *
-         * @param tick event observation tick
-         * @param visibility actor-bounded visibility classification
-         * @param actorId stable actor id associated with the event
-         * @param eventType stable event type
-         * @param summary presentation summary derived from visible evidence
-         * @param evidenceRef provenance reference for the event
-         */
         public TimelineRow {
             if (tick < 0L) throw new IllegalArgumentException("timeline tick cannot be negative");
             visibility = requireText(visibility, "visibility");
@@ -160,23 +145,6 @@ public record Stage21ILivingWorldUiSnapshot(
             long deadlineTick,
             long escrowMilliCredits,
             String authorityRef) {
-        /**
-         * Validates and freezes one NPC/mission inspection row.
-         *
-         * @param npcId stable NPC id
-         * @param npcNameKey localization key for the NPC name
-         * @param npcRole stable NPC role
-         * @param availability current NPC availability
-         * @param locationSystemId current NPC system id
-         * @param knownFacts knowledge facts already received by this NPC
-         * @param missionId active or historical mission id, or an empty string when absent
-         * @param missionTemplate mission template id, or an empty string when absent
-         * @param missionStatus mission lifecycle status, or an empty string when absent
-         * @param objective mission objective summary, or an empty string when absent
-         * @param deadlineTick mission deadline, or {@code -1} when absent
-         * @param escrowMilliCredits currently reserved mission reward
-         * @param authorityRef provenance reference for NPC and objective truth
-         */
         public NpcMissionRow {
             npcId = requireText(npcId, "npcId");
             npcNameKey = requireText(npcNameKey, "npcNameKey");
