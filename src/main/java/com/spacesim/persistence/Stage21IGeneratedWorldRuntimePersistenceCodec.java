@@ -23,7 +23,12 @@ public final class Stage21IGeneratedWorldRuntimePersistenceCodec {
         throw new AssertionError("No instances");
     }
 
-    /** Encodes one complete final Stage-21 checkpoint deterministically. */
+    /**
+     * Encodes one complete final Stage-21 checkpoint deterministically.
+     *
+     * @param state complete final Stage-21 checkpoint
+     * @return deterministic bounded checkpoint bytes
+     */
     public static byte[] encode(Stage21IGeneratedWorldRuntimePersistentState state) {
         Stage21IGeneratedWorldRuntimePersistentState checked = Objects.requireNonNull(state, "state");
         byte[] stage21H = Stage21HGeneratedWorldRuntimePersistenceCodec.encode(checked.stage21HRuntime());
@@ -50,7 +55,12 @@ public final class Stage21IGeneratedWorldRuntimePersistenceCodec {
         }
     }
 
-    /** Decodes and fail-closed validates one native Stage-21I checkpoint. */
+    /**
+     * Decodes and fail-closed validates one native Stage-21I checkpoint.
+     *
+     * @param bytes native Stage-21I checkpoint bytes
+     * @return validated final Stage-21 checkpoint
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
         if (bytes.length <= 0 || bytes.length > MAX_BYTES) {
@@ -110,7 +120,13 @@ public final class Stage21IGeneratedWorldRuntimePersistenceCodec {
         return Stage21IGeneratedWorldRuntimeMigration.migrateSupported(bytes);
     }
 
-    /** Atomically writes a final Stage-21 checkpoint when the filesystem supports atomic replace. */
+    /**
+     * Atomically writes a final Stage-21 checkpoint when the filesystem supports atomic replace.
+     *
+     * @param path destination checkpoint path
+     * @param state complete final Stage-21 checkpoint
+     * @throws IOException when filesystem persistence fails
+     */
     public static void write(Path path, Stage21IGeneratedWorldRuntimePersistentState state) throws IOException {
         Path target = Objects.requireNonNull(path, "path").toAbsolutePath();
         byte[] bytes = encode(state);
@@ -135,7 +151,13 @@ public final class Stage21IGeneratedWorldRuntimePersistenceCodec {
         }
     }
 
-    /** Reads a bounded checkpoint file and accepts supported migration sources. */
+    /**
+     * Reads a bounded checkpoint file and accepts supported migration sources.
+     *
+     * @param path native or supported legacy checkpoint path
+     * @return current final Stage-21 checkpoint
+     * @throws IOException when checkpoint bytes cannot be read
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState readOrMigrate(Path path) throws IOException {
         Path source = Objects.requireNonNull(path, "path").toAbsolutePath();
         long size = Files.size(source);
@@ -145,7 +167,13 @@ public final class Stage21IGeneratedWorldRuntimePersistenceCodec {
         return decodeOrMigrate(Files.readAllBytes(source));
     }
 
-    /** Reads only a native final Stage-21I checkpoint file. */
+    /**
+     * Reads only a native final Stage-21I checkpoint file.
+     *
+     * @param path native Stage-21I checkpoint path
+     * @return validated final Stage-21 checkpoint
+     * @throws IOException when checkpoint bytes cannot be read
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState read(Path path) throws IOException {
         Path source = Objects.requireNonNull(path, "path").toAbsolutePath();
         long size = Files.size(source);
