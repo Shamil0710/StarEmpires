@@ -3,10 +3,13 @@ package com.spacesim.ui;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.persistence.Stage21HGeneratedWorldRuntimePersistentState;
 import com.spacesim.world.DiplomaticLifecycleState;
+import com.spacesim.world.DiplomaticMarketAccessResolver;
 import com.spacesim.world.FactionDiplomacyState;
 import com.spacesim.world.FactionIdentityResolver;
 import com.spacesim.world.FactionStrategicIntentState;
+import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.FleetCommandState;
+import com.spacesim.world.Stage20DiscoveryKnowledgeState;
 import com.spacesim.world.Stage21HNpcMissionState;
 import com.spacesim.world.StrategicGoalState;
 import com.spacesim.world.StrategicOperationState;
@@ -20,23 +23,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Deterministic actor-bounded Stage-21I presentation projector.
- *
- * <p>This adapter only reads accepted Stage-20/21A..H persistence authorities. It deliberately has no
- * command methods and therefore cannot mutate diplomacy, fleets, economy, operations, territory,
- * missions or knowledge while preparing UI state.</p>
- */
+/** Deterministic actor-bounded Stage-21I presentation projector over accepted simulation authorities. */
 public final class Stage21ILivingWorldUiProjector {
     private static final String UNOBSERVED_PHYSICAL_STATE = "UNOBSERVED_IN_STAGE21H_CHECKPOINT";
 
-    /**
-     * Projects one immutable actor-bounded UI snapshot.
-     *
-     * @param checkpoint accepted Stage-21H checkpoint containing the Stage-21A..H authority chain
-     * @param viewerFactionId faction whose bounded knowledge and owned commands are being inspected
-     * @return deterministic read-only presentation snapshot for the requested viewer
-     */
     public Stage21ILivingWorldUiSnapshot project(
             Stage21HGeneratedWorldRuntimePersistentState checkpoint,
             String viewerFactionId) {
@@ -50,7 +40,8 @@ public final class Stage21ILivingWorldUiProjector {
         var stage21C = stage21D.stage21CRuntime();
         var stage21B = stage21C.stage21BRuntime();
         var stage21A = stage21B.stage21ARuntime();
-        var world = stage21A.stage20Runtime().worldState();
+        var stage20 = stage21A.stage20Runtime();
+        var world = stage20.worldState();
 
         Set<String> actorIds = stage21A.livingActors().stream()
                 .map(actor -> actor.factionContentId())
@@ -69,14 +60,19 @@ public final class Stage21ILivingWorldUiProjector {
         DiplomaticLifecycleState diplomacy = stage21C.diplomacyLifecycle();
 
         List<Stage21ILivingWorldUiSnapshot.FactionRow> factions = projectFactions(
-                actorIds,
-                viewer,
-                identities,
-                intentsByFaction,
-                diplomacy,
-                world.factionDiplomacyStates());
+                actorIds, viewer, identities, intentsByFaction, diplomacy, world.factionDiplomacyStates());
         List<Stage21ILivingWorldUiSnapshot.MilitaryRow> military = projectMilitary(
                 viewerRuntimeId, stage21D.fleetCommandState(), stage21E.operationState());
+        List<Stage21ILivingWorldUiSnapshot.OverlayRow> overlays = projectOverlays(
+                actorIds,
+                viewer,
+                world.factionStrategies(),
+                world.factionDiplomacyStates(),
+                diplomacy,
+                stage21E.operationState(),
+                stage21F.territorialTransitions(),
+                stage20.campaign().discoveryState().knowledgeFor(viewer),
+                viewerRuntimeId);
         List<Stage21ILivingWorldUiSnapshot.TimelineRow> timeline = projectTimeline(
                 viewer, intentsByFaction.get(viewer), diplomacy, checkpoint.npcMissionState());
         List<Stage21ILivingWorldUiSnapshot.NpcMissionRow> npcMissions = projectNpcMissions(
@@ -87,6 +83,7 @@ public final class Stage21ILivingWorldUiProjector {
                 checkpoint.npcMissionState().simulationTick(),
                 factions,
                 military,
+                overlays,
                 timeline,
                 npcMissions);
     }
@@ -122,9 +119,7 @@ public final class Stage21ILivingWorldUiProjector {
                     .filter(war -> includesPair(war, viewer, factionId))
                     .map(war -> war.warId() + ":" + war.status())
                     .sorted().toList();
-            List<String> interests = visibleGoals.stream()
-                    .map(goal -> goal.type().toString())
-                    .distinct().sorted().toList();
+            List<String> interests = visibleGoals.stream().map(goal -> goal.type().toString()).distinct().sorted().toList();
             List<String> goals = visibleGoals.stream()
                     .map(goal -> goal.goalId() + ":" + goal.type() + ":" + goal.targetId() + ":" + goal.lifecycle())
                     .sorted().toList();
@@ -161,16 +156,9 @@ public final class Stage21ILivingWorldUiProjector {
                                 || (owner.factionContentId().equals(counterparty)
                                         && treaty.counterpartyFactionContentId().equals(viewer)))
                         .filter(treaty -> treaty.activeAt(tick))
-                        .map(treaty -> treaty.treatyId()
-                                + ":" + treaty.status()
-                                + ":" + treaty.clauses().stream()
-                                        .map(clause -> clause.kind().toString())
-                                        .distinct()
-                                        .sorted()
-                                        .collect(Collectors.joining(","))))
-                .distinct()
-                .sorted()
-                .toList();
+                        .map(treaty -> treaty.treatyId() + ":" + treaty.status() + ":" + treaty.clauses().stream()
+                                .map(clause -> clause.kind().toString()).distinct().sorted().collect(Collectors.joining(","))))
+                .distinct().sorted().toList();
     }
 
     private static boolean includesPair(DiplomaticLifecycleState.War war, String viewer, String other) {
@@ -196,9 +184,7 @@ public final class Stage21ILivingWorldUiProjector {
                     var operation = operationByGroup.get(group.id());
                     List<String> route = order == null ? List.of() : order.route().stream().map(Object::toString).toList();
                     return new Stage21ILivingWorldUiSnapshot.MilitaryRow(
-                            group.id(),
-                            group.name(),
-                            group.memberFleetIds().stream().map(Object::toString).toList(),
+                            group.id(), group.name(), group.memberFleetIds().stream().map(Object::toString).toList(),
                             order == null ? "IDLE" : order.id() + ":" + order.type() + ":" + order.status(),
                             UNOBSERVED_PHYSICAL_STATE,
                             route,
@@ -209,6 +195,95 @@ public final class Stage21ILivingWorldUiProjector {
                 })
                 .sorted(Comparator.comparingLong(Stage21ILivingWorldUiSnapshot.MilitaryRow::commandGroupId))
                 .toList();
+    }
+
+    private static List<Stage21ILivingWorldUiSnapshot.OverlayRow> projectOverlays(
+            Set<String> actorIds,
+            String viewer,
+            List<FactionStrategicState> strategies,
+            List<FactionDiplomacyState> institutionalDiplomacy,
+            DiplomaticLifecycleState diplomacy,
+            StrategicOperationState operations,
+            com.spacesim.world.TerritorialTransitionState transitions,
+            Stage20DiscoveryKnowledgeState knowledge,
+            int viewerRuntimeId) {
+        ArrayList<Stage21ILivingWorldUiSnapshot.OverlayRow> rows = new ArrayList<>();
+
+        actorIds.stream().sorted().forEach(marketOwner -> {
+            DiplomaticMarketAccessResolver.Decision access = DiplomaticMarketAccessResolver.evaluate(
+                    strategies, institutionalDiplomacy, marketOwner, viewer, diplomacy.simulationTick());
+            rows.add(new Stage21ILivingWorldUiSnapshot.OverlayRow(
+                    "MARKET_ACCESS",
+                    marketOwner,
+                    viewer,
+                    access.allowed() ? "ALLOWED" : "DENIED",
+                    List.of("reason=" + access.reason(), "instrument=" + access.instrumentId()),
+                    "PRIVATE",
+                    "stage20.institutional-diplomacy+stage17.strategic-market-access"));
+        });
+
+        for (FactionStrategicState strategy : strategies) {
+            strategy.territorialClaims().forEach(claim -> rows.add(new Stage21ILivingWorldUiSnapshot.OverlayRow(
+                    "TERRITORIAL_CLAIM",
+                    claim.systemId().toString(),
+                    strategy.factionContentId(),
+                    claim.status().toString(),
+                    List.of("declaredTick=" + claim.declaredTick(), "lastEvaluatedTick=" + claim.lastEvaluatedTick()),
+                    "PUBLIC",
+                    "stage17.territorial-claim")));
+            strategy.controlledSystems().forEach(systemId -> rows.add(new Stage21ILivingWorldUiSnapshot.OverlayRow(
+                    "TERRITORIAL_CONTROL",
+                    systemId.toString(),
+                    strategy.factionContentId(),
+                    "CONTROLLED",
+                    List.of(),
+                    "PUBLIC",
+                    "stage17.faction-strategic-control")));
+        }
+
+        transitions.occupations().forEach(occupation -> rows.add(new Stage21ILivingWorldUiSnapshot.OverlayRow(
+                "OCCUPATION",
+                occupation.systemId().toString(),
+                occupation.factionContentId(),
+                occupation.status().toString(),
+                List.of("operationId=" + occupation.operationId(), "securedTicks=" + occupation.securedTicks()),
+                "PUBLIC",
+                "stage21f.territorial-transition")));
+
+        diplomacy.wars().forEach(war -> rows.add(new Stage21ILivingWorldUiSnapshot.OverlayRow(
+                "WAR",
+                war.warId(),
+                war.factionA() + "<->" + war.factionB(),
+                war.status().toString(),
+                List.of(),
+                "PUBLIC",
+                "stage21c.diplomatic-war")));
+
+        operations.operations().stream()
+                .filter(operation -> operation.factionId() == viewerRuntimeId)
+                .forEach(operation -> rows.add(new Stage21ILivingWorldUiSnapshot.OverlayRow(
+                        "FRONT",
+                        operation.objectiveSystemId().toString(),
+                        viewer,
+                        operation.status().toString(),
+                        List.of("operationId=" + operation.id(), "type=" + operation.type(), "objective=" + operation.objectiveId()),
+                        "PRIVATE",
+                        "stage21e.viewer-operation")));
+
+        knowledge.entries().forEach(entry -> rows.add(new Stage21ILivingWorldUiSnapshot.OverlayRow(
+                "KNOWN_INTELLIGENCE",
+                entry.object().systemId() + ":" + entry.object().kind() + ":" + entry.object().objectId(),
+                viewer,
+                entry.state().toString(),
+                List.of(
+                        "classification=" + entry.classificationId().orElse("UNKNOWN"),
+                        "resourceKnowledge=" + entry.resourceKnowledge().level(),
+                        "lastUpdatedSeconds=" + entry.lastUpdatedSeconds()),
+                "PRIVATE",
+                "stage20.discovery.owner-local")));
+
+        rows.sort(Comparator.naturalOrder());
+        return List.copyOf(rows);
     }
 
     private static List<Stage21ILivingWorldUiSnapshot.TimelineRow> projectTimeline(
