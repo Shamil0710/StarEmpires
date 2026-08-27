@@ -9,7 +9,7 @@ import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
-import com.spacesim.content.ship.Stage175ICombatTestContentPack;
+import com.spacesim.content.ship.Stage21GeneratedMilitaryEngineeringCatalog;
 import com.spacesim.economy.Stage18StationStorage;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityStateMapper;
@@ -62,7 +62,7 @@ public final class GeneratedWorldUiModel {
     private static final String INFRASTRUCTURE_DOMAIN = "INFRASTRUCTURE_PLACEMENT";
     private static final String SPECIAL_DOMAIN = "SPECIAL_LOCATION";
     private static final ShipEngineeringCatalog MILITARY_ENGINEERING =
-            Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
+            Stage21GeneratedMilitaryEngineeringCatalog.load();
     private static final DerivedShipCalculator MILITARY_CALCULATOR =
             new DerivedShipCalculator(MILITARY_ENGINEERING);
 
