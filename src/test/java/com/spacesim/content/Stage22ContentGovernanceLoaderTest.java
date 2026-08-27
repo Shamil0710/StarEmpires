@@ -21,13 +21,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage22ContentGovernanceLoaderTest {
     @Test
-    void defaultBaselineLocksEntryInventoryCoreBindingsAndAlphaFloor() {
+    void defaultBaselineLocksEntryInventoryCoreBindingsGeneratedCompatibilityAndAlphaFloor() {
         Stage22ContentGovernanceCatalog catalog = Stage22ContentGovernanceLoader.loadDefault();
 
         assertEquals(1, catalog.getSchemaVersion());
         assertEquals(20, catalog.getSources().size());
-        assertEquals(11, catalog.getHardcodedDefinitions().size());
-        assertEquals(8, catalog.getFactionIdentities().size());
+        assertEquals(13, catalog.getHardcodedDefinitions().size());
+        assertEquals(10, catalog.getFactionIdentities().size());
         assertEquals(64, catalog.getFingerprint().length());
 
         assertEquals("core.empire", catalog.canonicalPackageKey("faction.imperial_directorate"));
@@ -38,6 +38,8 @@ class Stage22ContentGovernanceLoaderTest {
         assertNull(catalog.canonicalPackageKey("faction.frontier_union"));
         assertNull(catalog.canonicalPackageKey("faction.free_ports"));
         assertNull(catalog.canonicalPackageKey("faction.research_consortium"));
+        assertNull(catalog.canonicalPackageKey("faction.alpha"));
+        assertNull(catalog.canonicalPackageKey("faction.beta"));
         assertEquals("fallback", catalog.canonicalDisplayName("faction.player.dynamic", "fallback"));
 
         assertEquals(IdentityClass.MINOR_AUTHORED,
@@ -46,6 +48,10 @@ class Stage22ContentGovernanceLoaderTest {
                 catalog.findFactionIdentity("faction.trade_league").identityClass());
         assertEquals(IdentityClass.MINOR_AUTHORED,
                 catalog.findFactionIdentity("faction.miners").identityClass());
+        assertEquals(IdentityClass.WORLD_GENERATED,
+                catalog.findFactionIdentity("faction.alpha").identityClass());
+        assertEquals(IdentityClass.WORLD_GENERATED,
+                catalog.findFactionIdentity("faction.beta").identityClass());
         assertTrue(catalog.getFactionIdentities().stream()
                 .allMatch(identity -> identity.disposition() == IdentityDisposition.PRESERVE));
         assertTrue(catalog.getFactionIdentities().stream()
@@ -102,6 +108,10 @@ class Stage22ContentGovernanceLoaderTest {
         assertTrue(provisionalDecisions.contains(ContentDisposition.REAUTHOR));
         assertEquals(ContentDisposition.REPLACE,
                 catalog.findHardcodedDefinition("module.test_stage21_strategic_ftl_v1").disposition());
+        assertEquals(ContentDisposition.PRESERVE,
+                catalog.findHardcodedDefinition("faction.alpha").disposition());
+        assertEquals(ContentDisposition.PRESERVE,
+                catalog.findHardcodedDefinition("faction.beta").disposition());
     }
 
     @Test
