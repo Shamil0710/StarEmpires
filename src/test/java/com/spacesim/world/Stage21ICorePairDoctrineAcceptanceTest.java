@@ -125,7 +125,7 @@ class Stage21ICorePairDoctrineAcceptanceTest {
                 type,
                 target,
                 evidence,
-                evidence.severityBasisPoints(),
+                evidence.priorityBasisPoints(),
                 8_500,
                 8_500,
                 doctrinePreferenceBps,
