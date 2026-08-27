@@ -3,6 +3,7 @@ package com.spacesim.ui;
 import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.persistence.Stage21HGeneratedWorldRuntimePersistentState;
 import com.spacesim.world.DiplomaticLifecycleState;
+import com.spacesim.world.FactionDiplomacyState;
 import com.spacesim.world.FactionIdentityResolver;
 import com.spacesim.world.FactionStrategicIntentState;
 import com.spacesim.world.FleetCommandState;
@@ -22,7 +23,7 @@ import java.util.stream.Collectors;
 /**
  * Deterministic actor-bounded Stage-21I presentation projector.
  *
- * <p>This adapter only reads accepted Stage-21A..H persistence authorities. It deliberately has no
+ * <p>This adapter only reads accepted Stage-20/21A..H persistence authorities. It deliberately has no
  * command methods and therefore cannot mutate diplomacy, fleets, economy, operations, territory,
  * missions or knowledge while preparing UI state.</p>
  */
@@ -66,7 +67,12 @@ public final class Stage21ILivingWorldUiProjector {
         DiplomaticLifecycleState diplomacy = stage21C.diplomacyLifecycle();
 
         List<Stage21ILivingWorldUiSnapshot.FactionRow> factions = projectFactions(
-                actorIds, viewer, identities, intentsByFaction, diplomacy);
+                actorIds,
+                viewer,
+                identities,
+                intentsByFaction,
+                diplomacy,
+                world.factionDiplomacyStates());
         List<Stage21ILivingWorldUiSnapshot.MilitaryRow> military = projectMilitary(
                 viewerRuntimeId, stage21D.fleetCommandState(), stage21E.operationState());
         List<Stage21ILivingWorldUiSnapshot.TimelineRow> timeline = projectTimeline(
@@ -88,7 +94,8 @@ public final class Stage21ILivingWorldUiProjector {
             String viewer,
             FactionIdentityResolver identities,
             Map<String, FactionStrategicIntentState> intentsByFaction,
-            DiplomaticLifecycleState diplomacy) {
+            DiplomaticLifecycleState diplomacy,
+            List<FactionDiplomacyState> institutionalDiplomacy) {
         Map<String, DiplomaticLifecycleState.RelationMemory> viewerRelations = new HashMap<>();
         diplomacy.relationMemories().stream()
                 .filter(memory -> memory.ownerFactionId().equals(viewer))
@@ -102,6 +109,9 @@ public final class Stage21ILivingWorldUiProjector {
             DiplomaticLifecycleState.RelationMemory relation = viewerRelations.get(factionId);
             String relationValue = own ? "SELF" : relation == null ? "UNKNOWN" : Integer.toString(relation.derivedRelation());
 
+            List<String> treaties = own
+                    ? List.of()
+                    : projectActiveTreaties(viewer, factionId, institutionalDiplomacy, diplomacy.simulationTick());
             List<String> crises = diplomacy.crises().stream()
                     .filter(crisis -> crisis.includes(viewer) && crisis.includes(factionId))
                     .map(crisis -> crisis.crisisId() + ":" + crisis.escalation())
@@ -125,14 +135,40 @@ public final class Stage21ILivingWorldUiProjector {
                     identities.displayName(factionId).orElse(factionId),
                     relationValue,
                     interests,
-                    List.of(),
+                    treaties,
                     crises,
                     wars,
                     goals,
                     evidence,
-                    own ? "stage21b.strategic-intents+stage21c.viewer-diplomacy" : "stage21c.viewer-diplomacy"));
+                    own
+                            ? "stage21b.strategic-intents+stage20.institutional-diplomacy+stage21c.viewer-diplomacy"
+                            : "stage20.institutional-diplomacy+stage21c.viewer-diplomacy"));
         });
         return List.copyOf(result);
+    }
+
+    private static List<String> projectActiveTreaties(
+            String viewer,
+            String counterparty,
+            List<FactionDiplomacyState> diplomacyStates,
+            long tick) {
+        return diplomacyStates.stream()
+                .flatMap(owner -> owner.treaties().stream()
+                        .filter(treaty -> owner.factionContentId().equals(viewer)
+                                        && treaty.counterpartyFactionContentId().equals(counterparty)
+                                || owner.factionContentId().equals(counterparty)
+                                        && treaty.counterpartyFactionContentId().equals(viewer))
+                        .filter(treaty -> treaty.activeAt(tick))
+                        .map(treaty -> treaty.treatyId()
+                                + ":" + treaty.status()
+                                + ":" + treaty.clauses().stream()
+                                        .map(clause -> clause.kind().toString())
+                                        .distinct()
+                                        .sorted()
+                                        .collect(Collectors.joining(","))))
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     private static boolean includesPair(DiplomaticLifecycleState.War war, String viewer, String other) {
