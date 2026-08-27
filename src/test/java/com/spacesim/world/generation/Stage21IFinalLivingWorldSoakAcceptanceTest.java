@@ -540,6 +540,14 @@ final class Stage21IFinalLivingWorldSoakAcceptanceTest {
         for (int hop = 0; hop < 64; hop++) {
             FreighterState current = runtime.freight().findFreighter(fleetId).orElseThrow();
             if (current.phase() == terminalPhase) return;
+            TransportOrderState order = runtime.freight().findOrder(current.activeOrderId()).orElseThrow();
+            int nextIndex = current.phase() == FreightPhase.OUTBOUND
+                    ? current.routeIndex() + 1 : current.routeIndex() - 1;
+            // Stage-20 exact-arrival acceptance already owns multi-day local endpoint traversal. This
+            // final causal soak starts each requested edge at that accepted departure boundary so its
+            // work budget measures the ordinary spool/transit/arrival FSM rather than empty local cruise.
+            GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(
+                    runtime, fleetId, order.orderedSystems().get(nextIndex));
             runtime.requestNextRouteHop(fleetId);
             for (int attempt = 0; attempt < 4_000 && runtime.world().findFleetJump(fleetId).isPresent(); attempt++) {
                 runtime.advanceFrame(1.0f);
