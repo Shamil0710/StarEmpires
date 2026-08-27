@@ -19,12 +19,13 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage21ILivingWorldUiProjectorAcceptanceTest {
 
     @Test
-    void projectionIsDeterministicReadOnlyAndUsesAuthoritativeActiveTreaties() {
+    void projectionIsDeterministicReadOnlyAndUsesAuthoritativeActiveTreatiesAndOverlays() {
         LiveRuntime stage20 = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED + 31L).runtime();
         var initial = stage20.captureState();
@@ -63,6 +64,7 @@ class Stage21ILivingWorldUiProjectorAcceptanceTest {
 
         assertEquals(first, second);
         assertArrayEquals(before, Stage21HGeneratedWorldRuntimePersistenceCodec.encode(checkpoint));
+
         var counterpartyRow = first.factions().stream()
                 .filter(row -> row.factionId().equals(counterparty))
                 .findFirst()
@@ -74,6 +76,23 @@ class Stage21ILivingWorldUiProjectorAcceptanceTest {
                 .findFirst()
                 .orElseThrow()
                 .treaties());
+
+        assertEquals(2L, first.overlays().stream()
+                .filter(row -> row.kind().equals("MARKET_ACCESS"))
+                .count());
+        assertTrue(first.overlays().stream()
+                .filter(row -> row.kind().equals("MARKET_ACCESS"))
+                .allMatch(row -> row.actorId().equals(viewer) && row.visibility().equals("PRIVATE")));
+        assertTrue(first.overlays().stream()
+                .filter(row -> row.kind().equals("KNOWN_INTELLIGENCE"))
+                .allMatch(row -> row.actorId().equals(viewer) && row.visibility().equals("PRIVATE")));
+        assertTrue(first.overlays().stream()
+                .filter(row -> row.kind().equals("TERRITORIAL_CLAIM")
+                        || row.kind().equals("TERRITORIAL_CONTROL")
+                        || row.kind().equals("OCCUPATION")
+                        || row.kind().equals("WAR"))
+                .allMatch(row -> row.visibility().equals("PUBLIC")));
+        assertThrows(IllegalArgumentException.class, () -> projector.project(checkpoint, "faction.not-a-living-actor"));
     }
 
     private static Stage21BGeneratedWorldRuntimePersistentState stage21b(
