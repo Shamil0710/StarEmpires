@@ -27,6 +27,13 @@ import java.util.stream.Collectors;
 public final class Stage21ILivingWorldUiProjector {
     private static final String UNOBSERVED_PHYSICAL_STATE = "UNOBSERVED_IN_STAGE21H_CHECKPOINT";
 
+    /**
+     * Projects the accepted Stage-21H checkpoint into a read-only view for one known faction.
+     *
+     * @param checkpoint accepted simulation checkpoint to inspect
+     * @param viewerFactionId content id of the actor whose bounded knowledge is projected
+     * @return deterministic presentation snapshot with explicit authority provenance
+     */
     public Stage21ILivingWorldUiSnapshot project(
             Stage21HGeneratedWorldRuntimePersistentState checkpoint,
             String viewerFactionId) {
