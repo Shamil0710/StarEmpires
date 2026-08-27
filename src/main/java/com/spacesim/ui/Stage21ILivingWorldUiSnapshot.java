@@ -19,6 +19,7 @@ public record Stage21ILivingWorldUiSnapshot(
         List<TimelineRow> timeline,
         List<NpcMissionRow> npcMissions) {
 
+    /** Validates and freezes the complete actor-bounded UI snapshot. */
     public Stage21ILivingWorldUiSnapshot {
         viewerFactionId = requireText(viewerFactionId, "viewerFactionId");
         if (simulationTick < 0L) throw new IllegalArgumentException("simulationTick cannot be negative");
@@ -41,6 +42,7 @@ public record Stage21ILivingWorldUiSnapshot(
             List<String> goals,
             List<String> decisionEvidence,
             String authorityRef) {
+        /** Validates and freezes one faction-facing presentation row. */
         public FactionRow {
             factionId = requireText(factionId, "factionId");
             displayName = requireText(displayName, "displayName");
@@ -67,6 +69,7 @@ public record Stage21ILivingWorldUiSnapshot(
             String operation,
             String destination,
             String authorityRef) {
+        /** Validates and freezes one viewer-owned military presentation row. */
         public MilitaryRow {
             if (commandGroupId <= 0L) throw new IllegalArgumentException("commandGroupId must be positive");
             commandGroupName = requireText(commandGroupName, "commandGroupName");
@@ -90,6 +93,7 @@ public record Stage21ILivingWorldUiSnapshot(
             List<String> details,
             String visibility,
             String authorityRef) implements Comparable<OverlayRow> {
+        /** Validates and freezes one authoritative overlay presentation row. */
         public OverlayRow {
             kind = requireText(kind, "kind");
             subjectId = requireText(subjectId, "subjectId");
@@ -120,6 +124,7 @@ public record Stage21ILivingWorldUiSnapshot(
             String eventType,
             String summary,
             String evidenceRef) {
+        /** Validates one actor-bounded timeline row and its evidence reference. */
         public TimelineRow {
             if (tick < 0L) throw new IllegalArgumentException("timeline tick cannot be negative");
             visibility = requireText(visibility, "visibility");
@@ -145,6 +150,7 @@ public record Stage21ILivingWorldUiSnapshot(
             long deadlineTick,
             long escrowMilliCredits,
             String authorityRef) {
+        /** Validates and freezes one viewer-visible NPC and optional mission row. */
         public NpcMissionRow {
             npcId = requireText(npcId, "npcId");
             npcNameKey = requireText(npcNameKey, "npcNameKey");
