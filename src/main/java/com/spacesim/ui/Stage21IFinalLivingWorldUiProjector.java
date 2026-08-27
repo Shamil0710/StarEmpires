@@ -1,6 +1,6 @@
 package com.spacesim.ui;
 
-import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage21GeneratedMilitaryEngineeringCatalog;
 import com.spacesim.persistence.Stage21HGeneratedWorldRuntimePersistentState;
 import com.spacesim.world.FleetForceRegistry;
 import com.spacesim.world.FleetId;
@@ -26,10 +26,13 @@ public final class Stage21IFinalLivingWorldUiProjector {
     private final Stage21ILivingWorldUiProjector baseProjector;
     private final FleetReadinessEvaluator readinessEvaluator;
 
-    /** Creates the final projector with the production ship-engineering catalog. */
+    /**
+     * Creates the final generated-world projector with the same provisional engineering catalog
+     * authority used to materialize Stage-21 generated military fleets.
+     */
     public Stage21IFinalLivingWorldUiProjector() {
         this(new Stage21ILivingWorldUiProjector(),
-                new FleetReadinessEvaluator(ShipEngineeringCatalogLoader.loadDefault()));
+                new FleetReadinessEvaluator(Stage21GeneratedMilitaryEngineeringCatalog.load()));
     }
 
     Stage21IFinalLivingWorldUiProjector(
