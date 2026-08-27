@@ -1,6 +1,6 @@
 # Stage 21I — Living World final gate completion record
 
-> Status: **COMPLETE pending exact-head merge gate only**. This record documents the implementation and acceptance evidence carried by PR #340. The stage may be merged only after the exact PR head containing this record completes the repository Java-17 `clean verify` successfully.
+> Status: **COMPLETE**. Stage 21I was accepted on exact PR head `dba31932a29fa0fc4262db5d4f5b7fc6e300cafa`, merged through PR #340, and the resulting `main` implementation merge `64beb15b9e31d764247f8da3e82ea01a6db1fba7` passed the full post-merge Java-17 repository gate. Stage 21 is therefore formally closed; Stage 22 is OPEN/NEXT and intentionally not implemented here.
 
 ## 1. Scope
 
@@ -18,6 +18,9 @@ accepted generated world
 → bounded workload evidence
 → non-vacuous physical long-run soak
 → deterministic final checkpoint
+→ exact-head CI
+→ merge
+→ post-merge main CI
 ```
 
 ## 2. Production seams delivered
@@ -46,7 +49,7 @@ Acceptance:
 
 ### 2.2 One Stage-21 military engineering content boundary
 
-Generated-world strategic military bootstrap, FTL mobility tests and the generated UI now consume provisional Stage-17.5/19 engineering definitions through `Stage21GeneratedMilitaryEngineeringCatalog`.
+Generated-world strategic military bootstrap, FTL mobility tests and the generated UI consume provisional Stage-17.5/19 engineering definitions through `Stage21GeneratedMilitaryEngineeringCatalog`.
 
 This is a boundary cleanup, not Stage-22 content promotion: the underlying definitions remain explicitly provisional until Stage 22 performs production content review.
 
@@ -194,18 +197,36 @@ The final gate has non-vacuous evidence for the Stage-21 hard invariants:
 - UI and missions remain downstream of simulation authority;
 - doctrine changes preference/ranking, not hidden physical stats.
 
-## 9. Verification evidence before closeout documentation
+## 9. Final verification and merge evidence
 
-Two exact code heads were verified during final gap closure:
+The final gap-closure sequence was verified on exact repository SHAs:
 
-- `d942ad558e609fcbeb008894d01aeae7814a759d` — adds the representative TRADE/ALLIANCE cooperation corpus; full Java-17 verification completed successfully.
-- `26b738bc27ad74056dae311b23507c912445b1a9` — additionally routes the legacy generated-world UI read model through `Stage21GeneratedMilitaryEngineeringCatalog`; GitHub Actions run `33098813757`, Java-17 verification job `98610716141`, completed successfully.
+1. `d942ad558e609fcbeb008894d01aeae7814a759d` — representative `TRADE`/`ALLIANCE` cooperation corpus; full Java-17 verification succeeded.
+2. `26b738bc27ad74056dae311b23507c912445b1a9` — legacy generated-world UI routed through `Stage21GeneratedMilitaryEngineeringCatalog`; CI run `33098813757`, Java-17 verification job `98610716141`, succeeded.
+3. `dba31932a29fa0fc4262db5d4f5b7fc6e300cafa` — exact final PR #340 head containing implementation and synchronized Stage-21 completion documentation; CI run #5445 (`33115670008`), Java-17 verification job `98669554287`, succeeded.
+4. PR #340 was merged successfully. The resulting implementation merge commit on `main` is `64beb15b9e31d764247f8da3e82ea01a6db1fba7`.
+5. Post-merge CI run #5446 (`33117043414`) executed on that exact `main` SHA; Java-17 verification job `98674237353` completed successfully, including tests, coverage, Javadoc and desktop packaging.
 
-The exact PR head containing this completion record must also be green before merge. Documentation-only changes are not treated as exempt from the final repository gate.
+No blocking review submissions, unresolved review threads or requested changes existed at the final merge gate. The PR base remained the exact then-current `main`, and the verified head SHA did not move before merge.
 
-## 10. Stage boundary after completion
+## 10. Formal Stage-21 closure checklist
 
-With this record accepted, **Stage 21 is COMPLETE**.
+- [x] All Stage-21 deliverables implemented.
+- [x] Stage-21A–21I acceptance and exit criteria satisfied.
+- [x] Persistence/save-load and supported migration verified.
+- [x] Determinism, actor-bounded information and conservation invariants retained.
+- [x] Integration with Stage 17–20.5 authorities verified.
+- [x] No known mandatory Stage-21 authority seam remains open.
+- [x] README and canonical roadmaps synchronized.
+- [x] Exact final PR head passed mandatory repository CI.
+- [x] PR #340 had no blocking review issue and was merged.
+- [x] New implementation `main` HEAD was fetched and verified.
+- [x] Post-merge CI on the exact implementation merge SHA passed.
+- [x] Stage 22 identified as OPEN/NEXT but not started.
+
+## 11. Stage boundary after completion
+
+**Stage 21 is COMPLETE.**
 
 The next stage is **Stage 22 — Content / Technology / Balance Alpha**, with the production-complete core-faction scope locked to:
 
@@ -218,7 +239,8 @@ Stage 22 owns, and Stage 21I intentionally does not pull forward:
 - final faction engineering doctrine/content breadth;
 - technology/module rebalance and manufacturability review;
 - replacement/promotion of provisional Stage-17.5/19 combat content;
+- legacy generated-world faction-ID disposition where required by the Stage-22 plan;
 - full production visual packages;
 - pairwise content/economy/fleet balance breadth.
 
-No Stage-22 implementation is part of PR #340.
+No Stage-22 implementation is part of Stage 21 closeout.
