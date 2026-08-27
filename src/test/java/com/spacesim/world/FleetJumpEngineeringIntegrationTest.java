@@ -137,6 +137,22 @@ class FleetJumpEngineeringIntegrationTest {
     }
 
     @Test
+    void ordinaryWorldTimeRecoversTemporaryStoredEnergyFailureWithoutActiveCooldown() {
+        FakeResolver resolver = new FakeResolver(100_000_000_000d);
+        Fixture fixture = fixture(JumpTransitTiming.DEFAULT, resolver);
+        FleetPlacementState source = fleetIn(fixture.fleets(), ALPHA);
+        EngineeringComponent engineering = installEngineering(
+                fixture, source, withSharedEnergy(healthyState(), 0d));
+
+        fixture.jumps().advance(1L);
+
+        assertEquals(100_000_000d, engineering.runtimeState.sharedBusEnergyJ(), 0d);
+        assertEquals(1, resolver.idleAdvanceCalls);
+        assertTrue(resolver.plan(engineering).allowed(),
+                "ordinary elapsed world time must restore a temporary fitted FTL energy boundary");
+    }
+
+    @Test
     void physicalStateChangeDuringApproachCancelsBeforeCommit() {
         FakeResolver resolver = new FakeResolver();
         Fixture fixture = fixture(new JumpTransitTiming(2L, 1L, 1L, 0.01d), resolver);
@@ -246,7 +262,20 @@ class FleetJumpEngineeringIntegrationTest {
     }
 
     private static final class FakeResolver implements FleetJumpService.FittedJumpResolver {
+        private final double rechargePowerW;
         private int commitCalls;
+        private int idleAdvanceCalls;
+
+        private FakeResolver() {
+            this(0d);
+        }
+
+        private FakeResolver(double rechargePowerW) {
+            if (!Double.isFinite(rechargePowerW) || rechargePowerW < 0d) {
+                throw new IllegalArgumentException("rechargePowerW must be finite and non-negative");
+            }
+            this.rechargePowerW = rechargePowerW;
+        }
 
         @Override
         public JumpPlan plan(EngineeringComponent component) {
@@ -292,12 +321,16 @@ class FleetJumpEngineeringIntegrationTest {
 
         @Override
         public RuntimeState advanceIdle(EngineeringComponent component, double deltaSeconds) {
+            idleAdvanceCalls++;
             RuntimeState state = component.runtimeState;
             TreeMap<String, Double> cooldowns = new TreeMap<>(state.ftlCooldownSecondsByMount());
             cooldowns.replaceAll((mountId, remaining) -> Math.max(0d, remaining - deltaSeconds));
+            double energy = Math.min(
+                    100_000_000d,
+                    state.sharedBusEnergyJ() + rechargePowerW * deltaSeconds);
             return new RuntimeState(
                     state.consumables(),
-                    state.sharedBusEnergyJ(),
+                    energy,
                     state.shipHeatStoredJ(),
                     state.localHeatJByMount(),
                     state.thrustLimitNByMount(),

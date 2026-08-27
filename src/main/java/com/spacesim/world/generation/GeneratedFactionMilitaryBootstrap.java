@@ -13,6 +13,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
 import com.spacesim.content.ship.ShipProtectionCatalog;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.ship.Stage175ICombatTestProtectionPack;
+import com.spacesim.content.ship.Stage21GeneratedMilitaryEngineeringCatalog;
 import com.spacesim.model.ShipType;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
@@ -62,7 +63,7 @@ public final class GeneratedFactionMilitaryBootstrap {
     // Stage-13 weapon projection only; EngineeringComponent remains physical ship authority.
     private static final String LEGACY_COMBAT_ARCHETYPE_ID = "ship.guard_frigate";
     private static final ShipEngineeringCatalog ENGINEERING =
-            Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
+            Stage21GeneratedMilitaryEngineeringCatalog.load();
     private static final ShipProtectionCatalog PROTECTION =
             Stage175ICombatTestProtectionPack.load();
 

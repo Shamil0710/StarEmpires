@@ -5,6 +5,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinitio
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
+import com.spacesim.ship.ShipEngineeringRuntime.OperatingCommand;
 import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipFittingValidator;
@@ -106,6 +107,45 @@ class Stage21StrategicMobilityContentTest {
                 1e-6d);
         assertEquals(plan.cooldownSeconds(), committed.ftlCooldownSecondsByMount().get(plan.mountId()), 1e-9d);
         assertFalse(committed.equals(state));
+    }
+
+    @Test
+    void everyStrategicFitCanRejectRepeatedJumpHeatThroughOrdinaryIdleEngineering() {
+        ShipEngineeringCatalog catalog = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
+        ShipEngineeringRuntime runtime = new ShipEngineeringRuntime(catalog);
+        var ftl = catalog.findModule(Stage175ICombatTestContentPack.STAGE21_STRATEGIC_FTL_MODULE_ID);
+        assertEquals(
+                Stage175ICombatTestContentPack.STAGE21_STRATEGIC_FTL_COOLANT_TRANSFER_W,
+                ftl.coolantTransferDemandW(),
+                0d);
+        assertTrue(ftl.coolantTransferDemandW() > ftl.wasteHeatW(),
+                "provisional FTL must retain a physical local-cooling margin");
+
+        for (Doctrine doctrine : Stage175IFleetDoctrineCatalog.all()) {
+            InstalledFit fit = InstalledFit.fromDemonstrator(catalog.findDemonstratorFit(
+                    Stage175ICombatTestContentPack.stage21StrategicFitId(doctrine.fitId())));
+            var state = runtime.initialize(fit, doctrine.initialConsumables(), DamageState.pristine());
+            for (int jump = 0; jump < 8; jump++) {
+                JumpPlan plan = runtime.planJump(fit, state, DamageState.pristine());
+                assertTrue(plan.allowed(),
+                        doctrine.id() + " jump " + jump + " rejected: " + plan.failure());
+                state = runtime.commitJump(state, plan);
+                double committedHeatJ = state.localHeatJByMount().get(plan.mountId());
+
+                JumpPlan recovered = runtime.planJump(fit, state, DamageState.pristine());
+                for (int step = 0; step < 400 && !recovered.allowed(); step++) {
+                    state = runtime.advance(
+                            fit, state, DamageState.pristine(), OperatingCommand.idle(), 0.25d).state();
+                    recovered = runtime.planJump(fit, state, DamageState.pristine());
+                }
+
+                assertTrue(recovered.allowed(),
+                        doctrine.id() + " did not physically recover after jump " + jump
+                                + ": " + recovered.failure());
+                assertTrue(state.localHeatJByMount().get(plan.mountId()) < committedHeatJ,
+                        "ordinary coolant/radiator authority must reduce committed FTL local heat");
+            }
+        }
     }
 
     private static Map<String, String> assignments(DemonstratorFitDefinition fit) {

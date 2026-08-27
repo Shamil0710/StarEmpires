@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-26 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21H COMPLETE; 21I NEXT.**
+> **Последняя синхронизация: 2026-08-27 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 OPEN/NEXT.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -67,8 +67,8 @@ Canonical faction contracts:
 | **v0.2 Living Galactic Economy** | multi-system factions/logistics/construction/expansion | 7–11 + 8.5 | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
-| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **ACTIVE — Stage 21 / 21I NEXT** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance | 22 | PLANNED |
+| **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **COMPLETE** |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance | 22 | **OPEN/NEXT** |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
 Manual merge gate remains mandatory while `main` is unprotected:
@@ -376,7 +376,7 @@ The Stage-17.5/19 combat content remains provisional. Stage 22 still owns final 
 
 **COMPLETE — Stage 20A–20L accepted; Stage 20.5 runtime/visual integration gate accepted.**
 
-Stage 20 answers **where the already-defined world exists**. It must calibrate generated geometry around the physical/industrial/tactical behavior proven by Stages 17.5–19, rather than inventing map distances first and forcing combat/logistics to fit afterward.
+Stage 20 answers **where the already-defined world exists**. It calibrates generated geometry around the physical/industrial/tactical behavior proven by Stages 17.5–19, rather than inventing map distances first and forcing combat/logistics to fit afterward.
 
 Canonical generation contracts:
 
@@ -503,20 +503,18 @@ Canonical completion evidence:
 
 ## 9. Stage 21 — RPG / Living World
 
-**ACTIVE — Stage 20/20.5 and Stage 21.0–21H are complete; Stage 21I is OPEN/NEXT.**
+**COMPLETE — Stage 21.0 and Stage 21A–21I accepted.**
 
 NPCs, missions, discovery and reputation consume authoritative physical/economic/political state rather than a disconnected scripted world.
 
-Living-world state must use persistent identity, relevance/cadence/event wakeups and deterministic deadlines; no `all NPCs × full AI × every tick` architecture.
+Living-world state uses persistent identity, relevance/cadence/event wakeups and deterministic deadlines; no `all NPCs × full AI × every tick` architecture.
 
-Stage-21 entry foundation now exposes the accepted generated world through a production-facing
-command interface rather than the old schematic test harness:
+Stage-21 entry foundation exposes the accepted generated world through a production-facing command interface rather than the old schematic test harness:
 
 - resolution-aware TTF typography and independent UI scale;
 - selectable local objects with read-only physical/economic/fit/route inspection;
 - separate current-system, galaxy, faction, military-forces and logistics tabs;
-- finite generated-faction patrols as ordinary persistent `FleetId` combat entities, with no free
-  replacement and an explicit provisional-content boundary before Stage 22;
+- finite generated-faction patrols as ordinary persistent `FleetId` combat entities, with no free replacement and an explicit provisional-content boundary before Stage 22;
 - cursor-anchored wheel zoom, middle-button map panning and double-click fleet camera focus;
 - real Stage-20.5 sprites and exact generated positions downstream of simulation authority;
 - ordinary finite extraction/freight/jump circulation;
@@ -525,31 +523,17 @@ command interface rather than the old schematic test harness:
 
 Canonical UI/launcher contract: `docs/generated_world_command_ui.md`.
 
-The mandatory Stage-21 closure chain is now:
+The completed Stage-21 closure chain is:
 
-- **21A — COMPLETE** — persistent living-actor cadence, actor-bounded observations, interest
-  evidence, bounded scheduling and exact generated-runtime checkpoint continuation;
+- **21A — COMPLETE** — persistent living-actor cadence, actor-bounded observations, interest evidence, bounded scheduling and exact generated-runtime checkpoint continuation;
 - **21B — COMPLETE** — explainable strategic goals, feasibility, commitment and anti-oscillation;
-- **21C — COMPLETE** — diplomacy, counter-offers, treaties, crises, alliances, causal war declarations,
-  ceasefire/peace hysteresis and compositional persistence;
-- **21D — COMPLETE** — finite physical readiness, persistent command groups, shared PLAYER/AI order validation,
-  legal neighbor routing, recoverable ordinary jump dispatch and compositional persistence;
-- **21E — COMPLETE** — persistent escort/interception/raid/blockade/defense/invasion operations,
-  owning-faction actor-bounded contact, exact Stage-19 materialization/commit-back, real ordinary
-  `FleetId` loss plus physical ammunition/reaction-mass consumption, traffic-based blockade/interdiction
-  and deterministic operation persistence;
-- **21F — COMPLETE** — persistent supplied/security occupation, Stage-17 claim provenance,
-  stabilization/recognition/control composition, liberation and causal territorial tariff/construction/
-  actor-interest consequences without allegiance seizure or synthetic resistance;
-- **21G — COMPLETE** — causal ceasefire/peace outcomes, conserved reparations, ordinary Stage-21D
-  demobilization, finite repair/rearm/refuel, Stage-21E loss provenance, economy-funded shipyard
-  replacement with fresh `FleetId`, post-war cooldown/grievance/treaty memory and deterministic persistence;
-- **21H — COMPLETE** — persistent NPC identities, actor-bounded knowledge/dialogue, living-world-grounded
-  funded missions, independent player participation proof, observed RPG reputation, bounded event scheduling
-  and deterministic schema-v11 persistence over Stage 21G;
-- **21I — NEXT** — command UI, save migration, representative corpus, performance and long-run final gate,
-  including a core-pair acceptance corpus proving explainable divergent Империя/Индустриальный Союз
-  decisions without faction-only resource, combat or information advantages.
+- **21C — COMPLETE** — diplomacy, counter-offers, treaties, crises, alliances, causal war declarations, ceasefire/peace hysteresis and compositional persistence;
+- **21D — COMPLETE** — finite physical readiness, persistent command groups, shared PLAYER/AI order validation, legal neighbor routing, recoverable ordinary jump dispatch and compositional persistence;
+- **21E — COMPLETE** — persistent escort/interception/raid/blockade/defense/invasion operations, owning-faction actor-bounded contact, exact Stage-19 materialization/commit-back, real ordinary `FleetId` loss plus physical ammunition/reaction-mass consumption, traffic-based blockade/interdiction and deterministic operation persistence;
+- **21F — COMPLETE** — persistent supplied/security occupation, Stage-17 claim provenance, stabilization/recognition/control composition, liberation and causal territorial tariff/construction/actor-interest consequences without allegiance seizure or synthetic resistance;
+- **21G — COMPLETE** — causal ceasefire/peace outcomes, conserved reparations, ordinary Stage-21D demobilization, finite repair/rearm/refuel, Stage-21E loss provenance, economy-funded shipyard replacement with fresh `FleetId`, post-war cooldown/grievance/treaty memory and deterministic persistence;
+- **21H — COMPLETE** — persistent NPC identities, actor-bounded knowledge/dialogue, living-world-grounded funded missions, independent player participation proof, observed RPG reputation, bounded event scheduling and deterministic schema-v11 persistence over Stage 21G;
+- **21I — COMPLETE** — read-only integrated living-world projection, one provisional Stage-21 military engineering catalog boundary, schema-v12 supported-save migration/composition, representative peaceful trade/alliance plus coercion/war/territory/recovery corpus, core-pair divergence/convergence proof, bounded workload envelope and final non-vacuous physical soak.
 
 Canonical detailed plan and exit criteria:
 `docs/stage21_living_world_roadmap.md`.
@@ -572,18 +556,16 @@ Accepted Stage-21G implementation/acceptance map:
 Accepted Stage-21H implementation/acceptance map:
 `docs/stage21h_npc_missions_reputation_discovery.md`.
 
-Stage 21 is not complete when factions merely own systems and patrols. Completion requires the
-causal loop `interests → diplomacy/crisis → physical fleet operation → losses/territory → political
-outcome → recovery → grounded NPC/mission/reputation consequences`, followed by deterministic
-mid-chain persistence, representative corpus and long-run acceptance without hidden grants.
+Final Stage-21I completion evidence:
+`docs/stage21i_living_world_final_gate_completion_record.md`.
 
-Core-faction note: Stage 21 final acceptance must prove that the same Stage-21 machinery can express
-meaningfully different lawful priorities for the Империя and Индустриальный Союз. Stage 21 does **not**
-own their final ship/technology/visual breadth; that remains Stage 22.
+Stage 21 completion is proven by the causal loop `interests → diplomacy/cooperation/crisis → physical fleet operation → losses/territory → political outcome → recovery → grounded NPC/mission/reputation consequences`, deterministic supported persistence, representative outcome diversity, core-pair institutional behavior and a bounded long-run final soak without hidden grants.
+
+Core-faction note: the same Stage-21 machinery expresses meaningfully different lawful priorities for Империя and Индустриальный Союз while also allowing shared physical evidence to produce the same rational goal. Stage 21 does **not** own their final ship/technology/visual breadth; that remains Stage 22.
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
-**PLANNED after Stage 21.**
+**OPEN/NEXT after completed Stage 21. Implementation has not started in the Stage-21 closeout PR.**
 
 Expands the accepted physical/manufacturable language:
 
@@ -685,26 +667,21 @@ Stage 17 COMPLETE
    → Stage 19J Tactical Validation Viewer / Scenario Coverage / Readability / Inspection COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
-→ Stage 21 RPG / Living World ACTIVE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H COMPLETE; 21I NEXT
-→ Stage 22 Content / Balance Alpha — Imperial gold slice + Industrial Union contrast + shared ecosystem + pairwise balance
-→ Stage 23 RC / final presentation replacement and polish for the core pair
+→ Stage 21 RPG / Living World COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
+→ Stage 22 Content / Balance Alpha OPEN/NEXT — Imperial gold slice + Industrial Union contrast + shared ecosystem + pairwise balance
+→ Stage 23 RC / final presentation replacement and polish for the core pair PLANNED
 → Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
 
 Detailed faction/content execution, ID migration and post-core package sequencing are defined in
 `docs/factions/faction_implementation_roadmap.md`; evidence gates are defined in
-`docs/factions/faction_balance_validation_framework.md`. These documents refine the sequence without
-changing the live stage status in this roadmap.
+`docs/factions/faction_balance_validation_framework.md`. These documents refine the sequence without changing the live stage status in this roadmap.
 
-**Immediate implementation priority is Stage 21I.** Stage 21H now closes the RPG-side participant
-layer through persistent NPC identity/knowledge, living-world-grounded funded mission contracts,
-read-only ordinary-authority objective evaluation, independent player participation proof, observed
-RPG reputation, bounded wakeup scheduling and schema-v11 generated-world persistence over Stage 21G.
-Stage 21I must expose and harden the complete living-world chain through command/inspection UI,
-supported-save migration, representative corpus, bounded-performance evidence and the final long-run
-Stage-21 acceptance gate; the representative corpus must include the core-pair differentiation proof
-without prematurely importing final Stage-22 ship/content breadth. Stage 21I remains NEXT and was
-intentionally not started by the Stage-21H closeout.
+**Immediate next implementation priority is Stage 22.** It must begin only after the Stage-21I PR has
+passed the exact-head merge gate and the resulting `main` has been checked. Stage 22 owns production
+content review/re-authoring of provisional Stage-17.5/19 definitions, explicit legacy generated-faction
+ID disposition, Imperial gold-slice content, Industrial Union contrast content and pairwise balance.
+No Stage-22 production code is included in the Stage-21 closeout.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
 file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.

@@ -1,7 +1,7 @@
 # Stage 21 — Living World / Autonomous Factions roadmap
 
-> Status: **ACTIVE**. Stage 20 and Stage 20.5 are complete. Stage 21.0, Stage 21A, Stage 21B,
-> Stage 21C, Stage 21D, Stage 21E, Stage 21F, Stage 21G and **Stage 21H are complete; Stage 21I is OPEN/NEXT**.
+> Status: **COMPLETE**. Stage 20 and Stage 20.5 are complete. Stage 21.0 and Stage 21A–21I are complete.
+> **Stage 22 — Content / Technology / Balance Alpha is OPEN/NEXT and is not implemented by this stage.**
 
 ## 1. Purpose
 
@@ -25,7 +25,7 @@ actor-bounded observations
 Stage 21 is not allowed to substitute scripted map colour changes, arbitrary random wars or hidden
 NPC resources for this chain.
 
-The production core-pair reference is now **Империя + Индустриальный Союз**. Stage 21 must prove that
+The production core-pair reference is now **Империя + Индустриальный Союз**. Stage 21 proves that
 one shared living-world decision chain can express meaningfully different lawful priorities for this
 pair without faction-only resource, combat, movement or information authority. Final engineering,
 hull, visual and broad narrative differentiation remains Stage 22.
@@ -162,7 +162,7 @@ Accepted evidence:
 - Stage-21B v5 persistence wraps the accepted Stage-21A checkpoint without rewriting its authority;
 - future/corrupt actor-review watermarks fail closed during composition validation.
 
-Exit criteria:
+Exit criteria — accepted:
 
 - goals are reconstructible from saved evidence and never inferred from a UI label;
 - impossible goals are rejected or deferred with a reason;
@@ -361,70 +361,63 @@ Accepted through PR #335 from exact green head `d57a71b351a22af52e005499a214e41d
 CI run #5307 (`32978603732`), Java 17 verification job `98209354294`, completed successfully.
 Implementation merge commit on `main`: `ecc57ad27a653d823da4294d121414aeab7c72e9`.
 
-### 21I — Command UI, persistence, corpus and long-run final gate — OPEN/NEXT
+### 21I — Command UI, persistence, corpus and long-run final gate — COMPLETE
 
 Objective: make the full living-world chain inspectable, resumable and robust.
 
-Deliverables:
+Delivered:
 
-- faction UI for interests, relations, treaties, crises, wars, goals and decision evidence;
-- military UI for command group, order, readiness, route, supply, operation and destination;
-- global overlays for access, claims, occupation, control, wars, fronts and known intelligence;
-- timeline/event log with actor-bounded public/private presentation;
-- selectable NPC, mission and discovery inspection;
-- backward migration for supported Stage-20.5/21.0 generated-world saves;
-- deterministic new-world, mid-crisis, mid-transit, mid-operation and post-war save/load tests;
-- representative seed corpus covering peaceful coexistence, alliance, coercion, limited war,
-  territorial transition, recovery and renewed trade;
-- **core-pair corpus:** Империя and Индустриальный Союз must be given equivalent lawful simulation
-  opportunities but sufficiently different institutional/doctrine priorities that at least one
-  deterministic scenario produces different explainable strategic ranking/commitment without
-  faction-only resources, omniscience, combat multipliers or scripted outcome grants;
-- the same core-pair corpus must include at least one case where shared physical shortage/route evidence
-  produces a common rational goal, proving differentiation is preference/institutional rather than
-  forced opposition in every circumstance;
-- bounded-performance evidence for increasing faction/system/fleet/NPC counts;
-- long-run soak with physical production, losses, diplomacy and territory continuing without
-  resource creation, ID duplication, deadline loss or decision oscillation.
+- read-only integrated faction projection for interests, relations, treaties, crises, wars, goals and decision evidence;
+- military projection for command groups, orders, readiness, routes, supply/operation context and destinations;
+- global territorial/access/war/intelligence projection and actor-bounded timeline/event information;
+- persistent NPC, mission, reputation and discovery inspection on the same final read model;
+- `Stage21GeneratedMilitaryEngineeringCatalog` as the single Stage-21 boundary for provisional generated military engineering content, including bootstrap, FTL and legacy generated UI reads;
+- schema-v12 final generated-world checkpoint through `Stage21IGeneratedWorldRuntimePersistentState`, codec and migration;
+- supported migration that preserves accepted earlier generated-runtime authority rather than regenerating the world or inventing later decisions;
+- deterministic final restore/re-encode and fail-closed validation for incompatible/corrupt/future state;
+- representative generated-seed boundedness evidence;
+- representative positive cooperation corpus with real Stage-21C → Stage-17 `TRADE` and `ALLIANCE` treaty authority and byte-stable final checkpoints;
+- core-pair Империя/Индустриальный Союз acceptance proving explainable lawful divergence and convergence without faction-name resource/combat/sensor/movement cheats;
+- increasing faction/system/fleet/NPC workload-envelope acceptance retaining bounded work authority;
+- non-vacuous long-run soak crossing ordinary FTL, production Stage-19 loss/store consumption, occupation/control, peace/demobilization, continued physical freight and grounded mission/reputation consequences.
 
-The Stage-21I core-pair proof may use provisional Stage-17.5/19 hull/fits and minimal systemic profile
-fixtures. It must **not** pull final Imperial/Industrial Union hull breadth or visual production forward
-from Stage 22.
+Exit criteria — accepted:
 
-Exit criteria:
+- every visible strategic value is projected from authoritative state and the projector is read-only;
+- UI projection cannot mutate treasury, diplomacy, territory, fleet, warfare or mission state;
+- representative tests support peaceful trade, alliance, coercion/war, territorial transition, recovery and renewed trade without seed-specific simulation exceptions;
+- core-pair traces prove both institutional/doctrine divergence and lawful convergence from actor-bounded evidence;
+- no core-pair outcome depends on a faction-name production/combat/sensor/movement modifier;
+- the schema-v12 checkpoint preserves deterministic restore/re-encode and stable identity invariants;
+- supported earlier Stage-21 checkpoint authorities are composed/migrated rather than rewritten;
+- bounded-performance acceptance preserves scheduled/event-driven work instead of world-wide full-rate AI;
+- the final soak is non-vacuous: a real ordinary military `FleetId` moves, production Stage 19 creates physical loss/store consumption, territorial law advances, peace/demobilization occurs, physical economy continues and Stage-21H consequences resolve;
+- all Stage-21 hard invariants have non-vacuous acceptance evidence across the final Stage-21 suite.
 
-- every visible strategic value traces to authoritative state;
-- UI actions cannot mutate simulation except through explicit validated commands;
-- corpus tests prove outcome diversity without seed-specific exceptions;
-- core-pair traces prove both meaningful divergence and lawful convergence from actor-bounded evidence;
-- no core-pair acceptance outcome depends on a faction-name production/combat/sensor modifier;
-- final checkpoint restore continues byte/determinism and identity invariants;
-- all Stage-21 hard invariants have non-vacuous acceptance evidence.
+Canonical closeout: `docs/stage21i_living_world_final_gate_completion_record.md`.
 
-## 6. Mandatory acceptance ladder
+## 6. Mandatory acceptance ladder — COMPLETE
 
-1. Pure deterministic tests for interests, goals, deadlines and anti-oscillation.
-2. Actor-knowledge tests proving hidden state cannot leak into decisions.
-3. Diplomacy lifecycle tests from proposal through expiry, breach, crisis, war and peace.
-4. Fleet-order tests for feasibility, routing, service, cancellation and persistence.
-5. Operation tests with real Stage-19 losses and Stage-18 supply consumption.
-6. Territorial tests covering claim, contest, occupation, stabilization and control.
-7. Replacement tests proving shipyard/material/time/treasury conservation.
-8. NPC/mission tests proving real issuer authority, knowledge and world-state completion.
-9. Mid-chain save/load tests at every state-machine boundary.
-10. Representative generated-seed corpus and bounded long-run performance soak.
-11. Core-pair doctrine/institution acceptance proving Империя/Индустриальный Союз divergence and
-    convergence through the same observation/goal/command authorities without hidden stat cheats.
+1. Pure deterministic tests for interests, goals, deadlines and anti-oscillation — accepted.
+2. Actor-knowledge tests proving hidden state cannot leak into decisions — accepted.
+3. Diplomacy lifecycle tests from proposal through expiry, breach, crisis, war and peace — accepted.
+4. Fleet-order tests for feasibility, routing, service, cancellation and persistence — accepted.
+5. Operation tests with real Stage-19 losses and Stage-18 supply consumption — accepted.
+6. Territorial tests covering claim, contest, occupation, stabilization and control — accepted.
+7. Replacement tests proving shipyard/material/time/treasury conservation — accepted.
+8. NPC/mission tests proving real issuer authority, knowledge and world-state completion — accepted.
+9. Mid-chain save/load tests at state-machine boundaries — accepted through the owning Stage-21C–H persistence suites and final schema-v12 composition.
+10. Representative generated-seed corpus and bounded long-run performance soak — accepted in Stage 21I.
+11. Core-pair doctrine/institution acceptance proving Империя/Индустриальный Союз divergence and convergence through the same observation/goal/command authorities without hidden stat cheats — accepted in Stage 21I.
 
-Acceptance must be non-vacuous: a green test that never creates a crisis, moves a military FleetId,
-consumes supply, records damage, changes a territorial state or resolves a mission is not evidence for
-the corresponding slice.
+Acceptance is non-vacuous: the final suite includes real crisis/diplomatic state, military movement,
+physical Stage-19 loss and store consumption, territorial transition, continued freight and mission/reputation resolution.
 
 ## 7. Stage-22 boundary
 
-Stage 21 may use the explicit provisional Stage-17.5/19 combat test pack to validate living-world
-causality. Stage 22 owns final hull families, faction engineering doctrine, module/content balance,
-fleet composition and manufacturable content review.
+Stage 21 uses the explicit provisional Stage-17.5/19 combat test pack behind the final
+`Stage21GeneratedMilitaryEngineeringCatalog` boundary to validate living-world causality. Stage 22 owns
+final hull families, faction engineering doctrine, module/content balance, fleet composition and manufacturable content review.
 
 Stage 21 therefore decides **why, when and where** a faction acts and proves that the action is
 physical. Stage 22 finalizes **what production-quality ships and technologies** the core factions field.
@@ -433,10 +426,9 @@ The Stage-22 production-complete major-faction scope is intentionally limited to
 Индустриальный Союз**. Директорат, Лига Свободных Систем, Пограничная Конфедерация, Консорциум and
 Кочевой Флот are canonical post-core horizon factions and do not block Stage-21 completion.
 
-## 8. Definition of Stage-21 completion
+## 8. Definition of Stage-21 completion — SATISFIED
 
-Stage 21 is complete only when at least one accepted generated campaign can, without scripted
-outcome grants:
+Stage 21 is complete because the accepted implementation and final corpus demonstrate, without scripted outcome grants:
 
 ```text
 run a physical economy
@@ -451,18 +443,18 @@ run a physical economy
 → continue deterministically through a bounded long-run soak
 ```
 
-Additionally, the final representative corpus must prove that the core pair can interpret the same
-lawful world evidence differently where institutions/doctrine justify it, and identically where the
-physical optimum is shared. Faction identity is therefore a preference/institutional layer over common
+The final representative corpus additionally proves that the core pair can interpret the same lawful
+world evidence differently where institutions/doctrine justify it, and identically where the physical
+optimum is shared. Faction identity is therefore a preference/institutional layer over common
 authorities, not a script forcing opposite outcomes.
 
 No single seed is required to exercise every political outcome naturally. Targeted deterministic
-fixtures prove individual branches; the representative corpus proves that the combined system
-supports multiple plausible histories without hidden exceptions.
+fixtures prove individual branches; the representative corpus proves that the combined system supports
+multiple plausible histories without hidden exceptions.
 
-## 9. Verified implementation status and first code sequence
+## 9. Verified implementation status
 
-| Slice | Status | First production seam |
+| Slice | Status | Accepted production seam |
 |---|---|---|
 | 21.0 | **COMPLETE** | generated runtime/UI/fleets/navigation/save/launcher |
 | 21A | **COMPLETE** | persistent actor cadence, bounded observations and interest evidence |
@@ -473,92 +465,22 @@ supports multiple plausible histories without hidden exceptions.
 | 21F | **COMPLETE** | occupation/stabilization/control transitions |
 | 21G | **COMPLETE** | peace/demobilization/finite recovery/loss-backed replacement/post-war memory |
 | 21H | **COMPLETE** | persistent NPCs, actor-bounded knowledge, funded missions, reputation and discovery |
-| 21I | **OPEN — next** | integrated UI/migration/core-pair corpus/performance final gate |
+| 21I | **COMPLETE** | integrated read-only UI, schema-v12 migration, cooperation/conflict corpus, core-pair proof, workload envelope and final physical soak |
 
-Stage 21A accepted the deliberately narrow actor foundation: stable faction-bound lifecycle state,
-immutable actor-bounded observations, measurable interests, deterministic traces, ordered wakeups,
-bounded top-K scheduling and exact checkpoint continuation.
+Stage 21I accepts the final integration/hardening layer without inventing a new authority:
 
-Stage 21B accepts stable evidence-bound strategic goals, explicit scoring inputs and cost ceilings,
-multidimensional feasibility/budget arbitration, persistent lifecycle and cancellation consequences,
-minimum commitment, one-shot material-change re-evaluation, read-only explainability and exact v5
-checkpoint continuation. It deliberately does not create diplomatic legal state, fleet orders,
-physical operations or territory changes.
+1. `Stage21ILivingWorldUiProjector` / `Stage21IFinalLivingWorldUiProjector` expose accepted A–H state read-only;
+2. `Stage21GeneratedMilitaryEngineeringCatalog` centralizes provisional Stage-21 military content consumption without promoting it to Stage 22 canon;
+3. schema-v12 persistence composes supported generated-world state and deterministic migration rather than regenerating campaigns;
+4. the representative cooperation corpus proves real lawful `TRADE` and `ALLIANCE` outcomes through Stage-21C/17 authority;
+5. the bounded seed corpus proves stable generated-world behavior without seed-specific physical cheats;
+6. the core-pair test proves both explainable doctrine divergence and physical-optimum convergence;
+7. the workload test retains bounded work as actor/system/fleet/NPC populations grow;
+8. the final soak crosses real fitted FTL, Stage-19 loss/store consumption, territorial transition, peace/demobilization, physical freight and Stage-21H consequences before deterministic schema-v12 restore.
 
-Stage 21C accepts the political/legal layer: accepted Stage-21B goals and actor-known diplomatic
-memory become bounded proposals/counter-offers, crises, guarantees and causal legal wars. Executable
-treaty/access/tariff/territory effects stay in Stage 17; actor-perspective conflict records stay in
-Stage 19; Stage-21C persistence composes those authorities and proves exact mid-lifecycle
-continuation. Random/tie-break input cannot create war.
+Full Stage-21I evidence map: `docs/stage21i_living_world_final_gate_completion_record.md`.
 
-Stage 21D accepts the finite force-command layer over real ordinary fleet state:
-
-1. `FleetForceRegistry` reconstructs read-only force state from existing placements and fitted payloads;
-2. readiness derives from damage, ammunition, propellant, crew, sensors, maintenance and supply access;
-3. persistent command groups retain member `FleetId` identities rather than replacing them;
-4. all fifteen strategic order families share the same PLAYER/AI validation boundary;
-5. routing is deterministic, neighbor-only and constrained by existing legal access;
-6. reserve, home-defense, risk, service and duplicate-assignment constraints fail closed;
-7. movement delegates only to the existing jump FSM, including idempotent same-hop retry and recoverable staggered group progress;
-8. Stage-21D persistence composes Stage-21C while the Stage-20.5 checkpoint remains exact local/transit authority.
-
-Stage 21E accepts the physical strategic-operation layer over those real force identities:
-
-1. six persistent operation families retain ordinary participant `FleetId` identities and explicit objective/ROE/supply/withdrawal metadata;
-2. contact acquisition is bounded to the owning faction's current Stage-21A evidence through the Stage-17 identity resolver;
-3. tactical materialization re-validates physical co-location and imports exact current entity/engineering state into production Stage 19;
-4. surviving damage, ammunition, propellant and kinematics commit back to the same ordinary identities while catastrophic loss uses ordinary destruction authority;
-5. dedicated generated-world acceptance proves a real Stage-19-created `FleetId` loss plus physical ammunition/reaction-mass consumption without replacement or replenishment grants;
-6. blockade/interdiction can deny only real Stage-20/18 handling or an exact route edge while physically anchored;
-7. reinforcement requires ordinary arrival and withdrawal remains an ordinary validated movement/service decision;
-8. Stage-21E persistence composes Stage-21D and rejects invalid active participants, future/corrupt state and transient active tactical runtime at checkpoint boundaries.
-
-Stage 21F accepts the territorial transition layer over those physical operation outcomes and existing
-Stage-17 territory law:
-
-1. sustained supplied/security occupation evidence is persisted without creating a second control authority;
-2. claims are created or withdrawn only through Stage-17 APIs, with exact provenance protecting pre-existing political claims;
-3. real rival claimant/controller fleets can contest occupation while unrelated co-located fleets do not become synthetic resistance;
-4. recognition can shorten only qualifying Stage-17 stabilization and cannot replace physical infrastructure/security evidence;
-5. control and liberation remain Stage-17 outcomes; Stage 21F records transition history and never recolours territory directly;
-6. tariff, construction and future actor-interest consequences flow through existing legal/economic authorities without station or ordinary FleetId allegiance seizure;
-7. schema-v9 generated-world persistence composes the accepted Stage-21E checkpoint and fails closed on invalid operation/objective/faction/provenance/time state;
-8. deterministic incremental/lumped reconciliation and mid-transition save/load continuation preserve exact progress and deadlines.
-
-Stage 21G accepts the conflict-closeout and recovery layer without resetting any upstream authority:
-
-1. `Stage21GPeaceOutcomePolicy` derives settlement behavior from persisted legal goals, actor-known evidence and Stage-19 physical exhaustion/leverage;
-2. Stage-21C remains legal peace/treaty/cooldown authority and Stage-17 remains treasury/access/territory authority;
-3. reparations use exact ordinary treasury debit/credit with reserve-floor stall, rollback and exact-once completion;
-4. surviving groups demobilize only through ordinary Stage-21D `RETURN` orders;
-5. Stage-21E losses become immutable replacement provenance, never resurrected FleetIds;
-6. refuel/rearm/repair use finite Stage-18/19 stocks and shipyard capability;
-7. replacement requires ordinary yard settlement and receives a fresh ordinary FleetId with fresh runtime stores;
-8. bounded treaty-performance/grievance memory feeds later Stage-21C outcome selection without creating war score;
-9. schema-v10 generated-world persistence composes Stage-21F and fails closed on invalid settlement/payment/group/loss/build/time state.
-
-Stage 21H accepts the RPG-side participant layer without introducing a quest-only authority:
-
-1. stable NPC identities retain role, faction affiliation, location, availability and only explicitly received actor-bounded knowledge;
-2. dialogue facts are projected only from retained current NPC knowledge rather than hidden world truth;
-3. mission opportunities require causally compatible current issuer-known evidence and a real unresolved ordinary target;
-4. issuer authority is checked against existing freight, fleet, discovery, construction, diplomacy, industrial and Stage-21E operation ownership/law;
-5. rewards are funded from real faction treasury into exact mission escrow and terminal refund/payout conserves that balance;
-6. ordinary objective satisfaction is separate from player-contractor proof, preventing UI/caller self-certification or payout for work completed by other actors;
-7. reputation is bounded observed RPG social memory and remains separate from Stage-17/21C legal relations;
-8. mission processing uses deduplicated event/deadline wakeups plus explicit work budgets instead of global polling;
-9. schema-v11 generated-world persistence composes Stage-21G and validates active escrow against exact ordinary ledger provenance.
-
-Stage 21I is now the first remaining implementation slice. It must project the accepted full living-world
-state through command/inspection UI, supported-save migration, representative corpus, bounded-performance
-evidence and the final long-run Stage-21 acceptance gate. It must also add the deliberately bounded
-Империя/Индустриальный Союз institutional/doctrine acceptance proof without pulling final Stage-22
-engineering or visual content forward. It must not turn UI, migration, presentation or faction profile
-selection into simulation authority. The Stage-21H closeout intentionally does not start Stage 21I implementation.
-
-## 10. Suggested state ownership
-
-Names below describe responsibilities; exact Java names may change during implementation.
+## 10. Suggested state ownership — retained after completion
 
 | State/Service | Owns | Must not own |
 |---|---|---|
@@ -570,63 +492,49 @@ Names below describe responsibilities; exact Java names may change during implem
 | operation state | objective, participants, supply/withdrawal and outcome refs | abstract untraceable combat loss |
 | mission state | issuer, target refs, predicates, deadline, escrow and outcome | UI-certified completion |
 | NPC state | identity, affiliation, role, knowledge, location, availability | global truth or free rewards |
+| Stage-21I final projection | immutable inspection/read model | any simulation mutation |
+| Stage-21I persistence envelope | composition/migration/version validation | replacement upstream economy/politics/combat authority |
 
 Existing treasury, diplomacy, territory, fleet placement, jump FSM, Stage-18 industry and Stage-19
 combat remain their respective authorities.
 
-## 11. Minimum Stage-21 authored content
+## 11. Minimum Stage-21 authored content — accepted scope
 
-Stage 21 needs enough authored content to prove mechanics, but not the final Stage-22 breadth.
+Stage 21 contains enough authored content to prove mechanics without pulling final Stage-22 breadth forward.
 
 ### Gold-slice actors
 
 - six persistent NPC role archetypes: official, military, trade/logistics, industry/yard,
   exploration/intelligence and independent/frontier;
-- at least one recurring Imperial contact for each role;
-- deterministic names, affiliation, authority, location, availability and knowledge boundaries;
-- character art may begin with accepted production candidates, but identity/state cannot depend on
-  whether art is loaded.
+- recurring Imperial contacts for the accepted role slice;
+- deterministic identity/affiliation/authority/location/availability/knowledge boundaries;
+- identity/state independent of whether character art is loaded.
 
 The completed Stage-21H authored gold slice remains intentionally Imperial. Stage 21I does not reopen
 21H merely to duplicate the full NPC package for the contrast faction.
 
 ### Core-pair Stage-21I fixtures
 
-For Индустриальный Союз, Stage 21I needs only enough deterministic systemic identity to prove the
+For Индустриальный Союз, Stage 21I implements only enough deterministic systemic identity to prove the
 shared decision machinery:
 
 - stable faction/profile reference suitable for persistence/migration audit;
 - bounded doctrine/institution preferences traceable in decision diagnostics;
-- strategic shortage/route/industrial evidence fixtures using ordinary Stage-18/20 state;
-- at least one divergent and one convergent outcome against Imperial reference behavior;
-- no final hull roster, visual bible or NPC quota before Stage 22.2.
+- strategic shortage/route/industrial evidence fixtures using ordinary state;
+- divergent and convergent outcomes against Imperial reference behavior;
+- no final hull roster, visual bible runtime package or NPC quota before Stage 22.2.
 
-### First eight mission contracts
+### Mission/content boundary
 
-1. emergency physical supply delivery;
-2. ordinary market procurement;
-3. convoy escort;
-4. stranded-fleet rescue/refuel;
-5. system/object reconnaissance;
-6. derelict investigation and finite recovery;
-7. interception/defense tied to a real threat;
-8. construction or repair input delivery.
-
-Every contract must prove issuer authority, saved target identity, objective observation, deadline,
-real reward source and deterministic failure/update when the underlying world changes.
-
-### First narrative chain
-
-A compact 3–5-step Imperial chain should combine a real supply dependency, institutional conflict,
-access negotiation and possible escort/crisis outcome. Characters provide interpretation and
-choice; the live world decides whether cargo, route, treaty, fleet and target still exist.
+Stage-21H owns the accepted first mission/content slice. Stage 21I only projects and exercises it in the
+final soak; it does not create a second final-content package.
 
 Full core-pair faction/NPC/mission/location breadth remains Stage 22 and follows
 `docs/content_production_plan_stage21_23.md`.
 
-## 12. Pull-request decomposition
+## 12. Pull-request decomposition — COMPLETE
 
-Each item should remain separately reviewable and leave `main` green:
+Each item was kept behind the same authority boundaries and accepted without requiring future-stage content breadth:
 
 1. **COMPLETE:** 21A actor state/cadence/persistence;
 2. **COMPLETE:** 21A observation/evidence/interest derivation;
@@ -643,8 +551,7 @@ Each item should remain separately reviewable and leave `main` green:
 13. **COMPLETE:** 21H NPC identity/knowledge/availability;
 14. **COMPLETE:** 21H mission/escrow/objective/reputation;
 15. **COMPLETE:** 21H authored gold-slice content;
-16. **NEXT:** 21I command UI/overlays/timeline;
-17. 21I migration/core-pair corpus/performance/soak and completion record.
+16. **COMPLETE:** 21I command UI/overlays/timeline/final read projection;
+17. **COMPLETE:** 21I migration/core-pair corpus/performance/soak and completion record.
 
-A PR may combine adjacent items only when the resulting authority boundary and acceptance evidence
-remain independently reviewable.
+Stage 21 is closed. **Do not start Stage 22 from this closeout PR.**

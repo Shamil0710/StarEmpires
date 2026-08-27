@@ -38,8 +38,9 @@ import java.util.Optional;
  * {@link FleetJumpPhase#IN_TRANSIT} delegates to the Stage-10A detach boundary and leaving it
  * delegates to the matching attach boundary. Physical FTL consequences are committed exactly once,
  * immediately before detach. Cancelling or failing before that boundary spends no jump energy.
- * Active fitted cooldowns progress through the same {@link ShipEngineeringRuntime} on authoritative
- * world time. A detached transit payload is caught up through that runtime before ordinary attach,
+ * Temporarily unavailable fitted FTL state (cooldown, stored-energy deficit or thermal limit)
+ * progresses through the same {@link ShipEngineeringRuntime} on authoritative world time. A detached
+ * transit payload is caught up through that runtime before ordinary attach,
  * so route time cools hardware without creating a second timer or mutable transit authority.</p>
  *
  * <p>Stage-10 callers historically used {@code (0,0)} as a placeholder arrival coordinate. The
@@ -187,7 +188,7 @@ final class FleetJumpService {
             throw new IllegalArgumentException("World tick не может быть отрицательным");
         }
         long previousWorldTick = lastEngineeringWorldTick;
-        advanceActiveFittedCooldowns(worldTick);
+        advanceRecoverableFittedState(worldTick);
         List<FleetId> order = new ArrayList<>(jumpsByFleetId.keySet());
         order.sort(FleetId::compareTo);
         for (FleetId fleetId : order) {
@@ -366,7 +367,7 @@ final class FleetJumpService {
         };
     }
 
-    private void advanceActiveFittedCooldowns(long worldTick) {
+    private void advanceRecoverableFittedState(long worldTick) {
         if (worldTick < lastEngineeringWorldTick) {
             throw new IllegalStateException("Engineering world tick moved backwards");
         }
@@ -390,7 +391,7 @@ final class FleetJumpService {
                         "Fleet placement references missing local entity: " + placement.id());
             }
             EngineeringComponent component = entity.getComponent(EngineeringComponent.class);
-            if (!hasActiveFittedCooldown(component)) {
+            if (!requiresFittedRecovery(component)) {
                 continue;
             }
             RuntimeState next = Objects.requireNonNull(
@@ -435,6 +436,25 @@ final class FleetJumpService {
             throw new IllegalStateException("Arrived fitted FleetId lost EngineeringComponent: " + placement.id());
         }
         return component;
+    }
+
+    private boolean requiresFittedRecovery(EngineeringComponent component) {
+        if (component == null) {
+            return false;
+        }
+        if (component.runtimeState == null) {
+            throw new IllegalStateException("Fleet EngineeringComponent is missing runtime state");
+        }
+        if (component.runtimeState.ftlCooldownSecondsByMount().isEmpty()) {
+            return false;
+        }
+        if (hasActiveFittedCooldown(component)) {
+            return true;
+        }
+        JumpPlan plan = Objects.requireNonNull(
+                fittedJumpResolver.plan(component), "FittedJumpResolver returned null recovery plan");
+        return plan.failure() == ShipEngineeringRuntime.JumpFailure.STORED_ENERGY_UNAVAILABLE
+                || plan.failure() == ShipEngineeringRuntime.JumpFailure.THERMAL_LIMIT;
     }
 
     private static boolean hasActiveFittedCooldown(EngineeringComponent component) {

@@ -19,7 +19,7 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-08-26 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 ACTIVE; 21A–21G COMPLETE; 21H NEXT.**
+**Последняя синхронизация README: 2026-08-27 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 OPEN/NEXT.**
 
 Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md).
 
@@ -29,20 +29,22 @@
 | **v0.2 Living Galactic Economy** | multi-system factions, logistics, construction, expansion | **COMPLETE** |
 | **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining, combat, progression | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **COMPLETE** |
-| **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **ACTIVE — Stage 21 / 21H NEXT** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | PLANNED |
+| **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **COMPLETE — Stage 20–21** |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | **OPEN/NEXT — Stage 22** |
 | **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED |
 
-На текущем roadmap завершены Stages **0–20**, включая **Stage 20A–20L physical-world generation**
-и обязательный **Stage 20.5 runtime + visual integration gate**. В Stage 21 завершены generated-world
-command foundation (21.0), living-actor kernel (21A), persistent strategic intent/goals (21B),
-дипломатия/crisis/alliance/legal-war lifecycle (21C), **fleet readiness, command groups, lawful
-orders and strategic movement (21D)**, **strategic operations with actor-bounded contact, exact
-Stage-19 physical losses/store consumption and physical blockade/interdiction (21E)**, **occupation,
-claims, stabilization, recognition and gradual Stage-17 control transition with deterministic
-persistence and causal territorial consequences (21F)** и **peace, demobilization, finite physical
-repair/rearm/refuel, economy-funded replacement and persistent post-war memory (21G)**. **Stage 21H
-persistent NPCs, missions, reputation and discovery grounded in living-world state является OPEN/NEXT.**
+На текущем roadmap завершены Stages **0–21**, включая **Stage 20A–20L physical-world generation**,
+обязательный **Stage 20.5 runtime + visual integration gate** и полный **Stage 21 Living World**.
+Stage 21 закрывает generated-world command foundation (21.0), living-actor kernel (21A), persistent
+strategic intent/goals (21B), diplomacy/crisis/alliance/legal-war lifecycle (21C), fleet readiness,
+command groups and lawful strategic movement (21D), actor-bounded strategic operations with exact
+Stage-19 physical losses/store consumption (21E), occupation/claims/stabilization/control transition
+through Stage-17 law (21F), peace/demobilization/finite recovery/economy-funded replacement (21G),
+persistent NPCs/missions/reputation/discovery grounded in living-world state (21H) and the final 21I
+gate: read-only integrated UI projection, supported-save migration, representative cooperation/conflict
+corpus, core-pair doctrine acceptance, bounded workload evidence and non-vacuous long-run soak.
+
+**Stage 22 Content / Technology / Balance Alpha теперь OPEN/NEXT, но его реализация ещё не начата.**
 
 ## Что уже реализовано
 
@@ -70,7 +72,13 @@ persistent NPCs, missions, reputation and discovery grounded in living-world sta
 - physical construction/destruction;
 - inter-system supply chains;
 - autonomous expansion;
-- persistent territorial, diplomatic and access state.
+- persistent territorial, diplomatic and access state;
+- actor-bounded living-world observations and explainable strategic intent;
+- causal diplomacy, alliance, crisis, legal war and peace;
+- finite military readiness, command groups and physical strategic operations;
+- gradual occupation/stabilization/control transition;
+- post-war demobilization, repair/rearm/refuel and loss-backed replacement;
+- persistent NPCs, missions, reputation and discovery tied to ordinary world state.
 
 ### Игрок и корабль
 
@@ -144,7 +152,8 @@ Current nested versions:
 
 - local `GameState` schema **v3**;
 - strategic `WorldState` schema **v9**, world file format **v8**;
-- `PlayableWorldState` schema **v5**, playable file format **v1**.
+- `PlayableWorldState` schema **v5**, playable file format **v1**;
+- final generated-world Stage-21 checkpoint schema **v12**, composing the accepted Stage-21A–21H sidecars over the unchanged physical runtime authority.
 
 `PlayableWorldState` остаётся v5 осознанно: Stage 17 не добавил новых serialized `PlayerState` fields; institutional faction state versioned внутри `WorldState`.
 
@@ -158,6 +167,7 @@ Current nested versions:
 6. **Persistent identity переживает materialization, affiliation, ownership changes и save/load.**
 7. **Determinism и conservation покрываются acceptance tests.**
 8. **Производительность не достигается второй fake economy для distant world.** Используются simulation LOD, scheduled/event-driven transitions и deterministic materialization.
+9. **Living-world UI, missions and doctrine remain downstream of ordinary authority** и не создают faction-name combat/resource/information cheats.
 
 Scalability contract: [`docs/simulation_scalability_architecture.md`](docs/simulation_scalability_architecture.md).
 
@@ -291,7 +301,9 @@ branch from exact green main
 - [`docs/stage21e_strategic_operations_physical_consequences.md`](docs/stage21e_strategic_operations_physical_consequences.md) — accepted Stage-21E strategic-operation/physical-consequence implementation and acceptance map;
 - [`docs/stage21f_territorial_transition.md`](docs/stage21f_territorial_transition.md) — accepted Stage-21F occupation/claim/stabilization/control-transition implementation and acceptance map;
 - [`docs/stage21g_peace_recovery_replacement.md`](docs/stage21g_peace_recovery_replacement.md) — accepted Stage-21G peace/demobilization/physical-recovery/replacement implementation and acceptance map;
-- [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — content/technology/balance alpha;
+- [`docs/stage21h_npc_missions_reputation_discovery.md`](docs/stage21h_npc_missions_reputation_discovery.md) — accepted Stage-21H NPC/mission/reputation/discovery implementation and acceptance map;
+- [`docs/stage21i_living_world_final_gate_completion_record.md`](docs/stage21i_living_world_final_gate_completion_record.md) — Stage-21I final UI/migration/corpus/performance/soak closeout evidence;
+- [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — next content/technology/balance alpha plan;
 - [`docs/content_production_plan_stage21_23.md`](docs/content_production_plan_stage21_23.md) — faction/ship/character/mission/media production;
 - [`docs/stage23_release_candidate_roadmap.md`](docs/stage23_release_candidate_roadmap.md) — polish, packaging and RC gate.
 
@@ -304,8 +316,8 @@ Stage 17 COMPLETE
 → Stage 19 warfare COMPLETE
 → Stage 20 world generation COMPLETE
 → Stage 20.5 runtime + visual integration COMPLETE
-→ Stage 21 living world ACTIVE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G COMPLETE; 21H NEXT; 21H–21I otherwise open
-→ Stage 22 content/technology/balance alpha PLANNED
+→ Stage 21 living world COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
+→ Stage 22 content/technology/balance alpha OPEN/NEXT
 → Stage 23 polish/release candidate PLANNED
 ```
 
