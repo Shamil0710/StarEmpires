@@ -63,17 +63,15 @@ public final class Stage22ContentGovernanceLoader {
             "faction.frontier_union",
             "faction.industrial_combine",
             "faction.free_ports",
-            "faction.research_consortium");
+            "faction.research_consortium",
+            "faction.alpha",
+            "faction.beta");
 
     private Stage22ContentGovernanceLoader() {
         throw new AssertionError("No instances");
     }
 
-    /**
-     * Loads the built-in Stage-22.0 governance baseline and applies production-entry validation.
-     *
-     * @return immutable validated governance catalog
-     */
+    /** Loads the built-in Stage-22.0 governance baseline and applies production-entry validation. */
     public static Stage22ContentGovernanceCatalog loadDefault() {
         ClassLoader classLoader = Stage22ContentGovernanceLoader.class.getClassLoader();
         try (InputStream stream = classLoader.getResourceAsStream(DEFAULT_RESOURCE)) {
@@ -89,12 +87,7 @@ public final class Stage22ContentGovernanceLoader {
         }
     }
 
-    /**
-     * Parses one standalone governance document.
-     *
-     * @param json non-empty JSON governance document
-     * @return immutable validated catalog
-     */
+    /** Parses one standalone governance document. */
     public static Stage22ContentGovernanceCatalog parse(String json) {
         Objects.requireNonNull(json, "json");
         if (json.isBlank()) {
@@ -227,10 +220,14 @@ public final class Stage22ContentGovernanceLoader {
         requireNoCoreBinding(catalog, "faction.frontier_union");
         requireNoCoreBinding(catalog, "faction.free_ports");
         requireNoCoreBinding(catalog, "faction.research_consortium");
+        requireNoCoreBinding(catalog, "faction.alpha");
+        requireNoCoreBinding(catalog, "faction.beta");
 
         requireIdentity(catalog, "faction.neutral", IdentityClass.MINOR_AUTHORED);
         requireIdentity(catalog, "faction.miners", IdentityClass.MINOR_AUTHORED);
         requireIdentity(catalog, "faction.trade_league", IdentityClass.TRANSNATIONAL_NETWORK);
+        requireIdentity(catalog, "faction.alpha", IdentityClass.WORLD_GENERATED);
+        requireIdentity(catalog, "faction.beta", IdentityClass.WORLD_GENERATED);
 
         for (SourceDefinition source : catalog.getSources()) {
             if (source.resourcePath().contains("stage18-")) {
@@ -304,7 +301,7 @@ public final class Stage22ContentGovernanceLoader {
         FactionIdentityDefinition identity = Objects.requireNonNull(
                 catalog.findFactionIdentity(stableId), "Missing compatibility identity " + stableId);
         if (identity.canonicalPackageKey() != null) {
-            throw new IllegalStateException("Post-core-like legacy identity gained a core package binding: " + stableId);
+            throw new IllegalStateException("Non-core compatibility identity gained a core package binding: " + stableId);
         }
     }
 
@@ -313,7 +310,7 @@ public final class Stage22ContentGovernanceLoader {
             String stableId,
             IdentityClass expectedClass) {
         FactionIdentityDefinition identity = Objects.requireNonNull(
-                catalog.findFactionIdentity(stableId), "Missing authored compatibility identity " + stableId);
+                catalog.findFactionIdentity(stableId), "Missing compatibility identity " + stableId);
         if (identity.identityClass() != expectedClass || identity.disposition() != IdentityDisposition.PRESERVE) {
             throw new IllegalStateException("Invalid compatibility classification: " + stableId);
         }
