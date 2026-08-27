@@ -37,12 +37,15 @@ class Stage21IFinalLivingWorldUiProjectorAcceptanceTest {
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED + 41L).runtime();
         var world = stage20.captureState().worldState();
         var evaluator = new FleetReadinessEvaluator(ShipEngineeringCatalogLoader.loadDefault());
+        FleetOperationalAvailability acceptanceObservation = new FleetOperationalAvailability(1_000_000, 7_500);
         FleetForceRegistry bootstrapForces = FleetForceRegistry.reconstruct(world, evaluator, Map.of());
         var selected = bootstrapForces.entries().stream()
                 .filter(entry -> entry.factionId() >= 0)
                 .filter(entry -> entry.locationKind() == FleetLocationKind.IN_SYSTEM)
+                .filter(entry -> evaluator.evaluate(entry.entityState(), acceptanceObservation).supplyAccessBps() == 7_500)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("generated world must contain an in-system military FleetId"));
+                .orElseThrow(() -> new AssertionError(
+                        "generated world must contain an in-system FleetId with resolvable Stage-21D engineering authority"));
         String viewer = world.factionIdentities().stream()
                 .filter(identity -> identity.runtimeFactionId() == selected.factionId())
                 .map(identity -> identity.stableFactionId())
@@ -50,8 +53,7 @@ class Stage21IFinalLivingWorldUiProjectorAcceptanceTest {
                 .orElseThrow();
 
         Map<com.spacesim.world.FleetId, FleetOperationalAvailability> observed = Map.of(
-                selected.fleetId(),
-                new FleetOperationalAvailability(1_000_000, 7_500));
+                selected.fleetId(), acceptanceObservation);
         FleetForceRegistry observedForces = FleetForceRegistry.reconstruct(world, evaluator, observed);
         FleetCommandState commands = new FleetCommandGroupService(world.topology()).form(
                 FleetCommandState.empty(),
