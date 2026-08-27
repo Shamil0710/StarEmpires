@@ -90,7 +90,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
                 last);
     }
 
-    /** Lifts an accepted Stage-20.5 checkpoint into current Stage-21 authorities. */
+    /**
+     * Lifts an accepted Stage-20.5 checkpoint into current Stage-21 authorities.
+     *
+     * @param stage20 accepted Stage-20.5 checkpoint
+     * @return final Stage-21I checkpoint with deterministic initial later-stage sidecars
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage20GeneratedWorldRuntimePersistentState stage20) {
         Objects.requireNonNull(stage20, "stage20");
@@ -124,7 +129,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
         return finishFromStage21B(stage21B, tick, "stage20.5.v2");
     }
 
-    /** Preserves Stage-21A state and adds only later-stage empty sidecars. */
+    /**
+     * Preserves Stage-21A state and adds only later-stage empty sidecars.
+     *
+     * @param stage21A accepted Stage-21A checkpoint
+     * @return final Stage-21I checkpoint preserving Stage-21A authority
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage21AGeneratedWorldRuntimePersistentState stage21A) {
         Objects.requireNonNull(stage21A, "stage21A");
@@ -140,7 +150,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
         return finishFromStage21B(stage21B, tick, "stage21a.v1");
     }
 
-    /** Preserves Stage-21B state and adds only later-stage empty sidecars. */
+    /**
+     * Preserves Stage-21B state and adds only later-stage empty sidecars.
+     *
+     * @param stage21B accepted Stage-21B checkpoint
+     * @return final Stage-21I checkpoint preserving Stage-21B authority
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage21BGeneratedWorldRuntimePersistentState stage21B) {
         Objects.requireNonNull(stage21B, "stage21B");
@@ -148,7 +163,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
         return finishFromStage21B(stage21B, tick, "stage21b.v5");
     }
 
-    /** Preserves Stage-21C state and adds only later-stage empty sidecars. */
+    /**
+     * Preserves Stage-21C state and adds only later-stage empty sidecars.
+     *
+     * @param stage21C accepted Stage-21C checkpoint
+     * @return final Stage-21I checkpoint preserving Stage-21C authority
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage21CGeneratedWorldRuntimePersistentState stage21C) {
         Objects.requireNonNull(stage21C, "stage21C");
@@ -156,7 +176,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
         return finishFromStage21C(stage21C, tick, "stage21c.v6");
     }
 
-    /** Preserves Stage-21D state and adds only later-stage empty sidecars. */
+    /**
+     * Preserves Stage-21D state and adds only later-stage empty sidecars.
+     *
+     * @param stage21D accepted Stage-21D checkpoint
+     * @return final Stage-21I checkpoint preserving Stage-21D authority
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage21DGeneratedWorldRuntimePersistentState stage21D) {
         Objects.requireNonNull(stage21D, "stage21D");
@@ -165,7 +190,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
         return finishFromStage21D(stage21D, tick, "stage21d.v7");
     }
 
-    /** Preserves Stage-21E state and adds only later-stage empty sidecars. */
+    /**
+     * Preserves Stage-21E state and adds only later-stage empty sidecars.
+     *
+     * @param stage21E accepted Stage-21E checkpoint
+     * @return final Stage-21I checkpoint preserving Stage-21E authority
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage21EGeneratedWorldRuntimePersistentState stage21E) {
         Objects.requireNonNull(stage21E, "stage21E");
@@ -174,7 +204,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
         return finishFromStage21E(stage21E, tick, "stage21e.v8");
     }
 
-    /** Preserves Stage-21F state and adds only later-stage empty sidecars. */
+    /**
+     * Preserves Stage-21F state and adds only later-stage empty sidecars.
+     *
+     * @param stage21F accepted Stage-21F checkpoint
+     * @return final Stage-21I checkpoint preserving Stage-21F authority
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage21FGeneratedWorldRuntimePersistentState stage21F) {
         Objects.requireNonNull(stage21F, "stage21F");
@@ -183,7 +218,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
         return finishFromStage21F(stage21F, tick, "stage21f.v9");
     }
 
-    /** Preserves Stage-21G state and adds only the Stage-21H RPG sidecar. */
+    /**
+     * Preserves Stage-21G state and adds only the Stage-21H RPG sidecar.
+     *
+     * @param stage21G accepted Stage-21G checkpoint
+     * @return final Stage-21I checkpoint preserving Stage-21G authority
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage21GGeneratedWorldRuntimePersistentState stage21G) {
         Objects.requireNonNull(stage21G, "stage21G");
@@ -194,7 +234,12 @@ public final class Stage21IGeneratedWorldRuntimeMigration {
         return Stage21IGeneratedWorldRuntimePersistentState.migrated(stage21H, "stage21g.v10", tick);
     }
 
-    /** Preserves the complete Stage-21H authority chain and only adopts the final envelope. */
+    /**
+     * Preserves the complete Stage-21H authority chain and only adopts the final envelope.
+     *
+     * @param stage21H accepted Stage-21H checkpoint
+     * @return final Stage-21I checkpoint preserving the complete Stage-21H authority chain
+     */
     public static Stage21IGeneratedWorldRuntimePersistentState migrate(
             Stage21HGeneratedWorldRuntimePersistentState stage21H) {
         Objects.requireNonNull(stage21H, "stage21H");
