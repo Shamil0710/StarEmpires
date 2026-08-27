@@ -146,7 +146,7 @@ class Stage21IGeneratedWorldRuntimePersistenceAcceptanceTest {
     @Test
     void nativeDecoderFailsClosedOnTruncationTrailingBytesAndCorruptMagic() {
         var stage20 = Stage20PlayableGeneratedWorldFactory.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED + 22L).runtime().captureState();
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime().captureState();
         var migrated = Stage21IGeneratedWorldRuntimePersistenceCodec.decodeOrMigrate(
                 Stage20GeneratedWorldRuntimePersistenceCodec.encode(stage20));
         byte[] nativeBytes = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(
