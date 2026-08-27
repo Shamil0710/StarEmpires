@@ -36,7 +36,13 @@ public record Stage21IGeneratedWorldRuntimePersistentState(
      * @param migrationTick authoritative world tick at which the migration/adoption occurred
      */
     public record MigrationProvenance(String sourceFormat, boolean migrated, long migrationTick) {
-        /** Validates immutable migration metadata. */
+        /**
+         * Validates immutable migration metadata.
+         *
+         * @param sourceFormat stable source-format token
+         * @param migrated whether this lineage entered Stage-21I through backward migration
+         * @param migrationTick authoritative world tick at which the migration/adoption occurred
+         */
         public MigrationProvenance {
             sourceFormat = requireText(sourceFormat, "sourceFormat");
             if (migrationTick < 0L) {
@@ -45,7 +51,14 @@ public record Stage21IGeneratedWorldRuntimePersistentState(
         }
     }
 
-    /** Validates final-envelope identity and authoritative clock bounds. */
+    /**
+     * Validates final-envelope identity and authoritative clock bounds.
+     *
+     * @param schemaVersion exact Stage-21I checkpoint schema
+     * @param runtimeVersion exact Stage-21I runtime contract identifier
+     * @param stage21HRuntime complete accepted Stage-21H checkpoint
+     * @param migrationProvenance deterministic source-format provenance for this checkpoint lineage
+     */
     public Stage21IGeneratedWorldRuntimePersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported Stage-21I checkpoint schema: " + schemaVersion);
@@ -97,7 +110,12 @@ public record Stage21IGeneratedWorldRuntimePersistentState(
                 new MigrationProvenance(sourceFormat, true, migrationTick));
     }
 
-    /** Returns the authoritative active-system clock embedded in the ordinary Stage-20 world. */
+    /**
+     * Returns the authoritative active-system clock embedded in the ordinary Stage-20 world.
+     *
+     * @param stage21H complete accepted Stage-21H checkpoint
+     * @return authoritative active-system simulation tick
+     */
     public static long authoritativeWorldTick(Stage21HGeneratedWorldRuntimePersistentState stage21H) {
         var stage20 = stage21H.stage21GRuntime().stage21FRuntime().stage21ERuntime()
                 .stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime();
