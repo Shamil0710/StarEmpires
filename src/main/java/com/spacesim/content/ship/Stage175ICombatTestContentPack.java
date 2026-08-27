@@ -39,6 +39,8 @@ public final class Stage175ICombatTestContentPack {
     public static final double STAGE19_MAX_PROJECTILE_MASS_KG = 2_000d;
     /** Explicit provisional FTL module used only by Stage-21 strategic-mobility variants. */
     public static final String STAGE21_STRATEGIC_FTL_MODULE_ID = "module.test_stage21_strategic_ftl_v1";
+    /** Local coolant transfer capacity leaves physical recovery margin above idle FTL waste heat. */
+    public static final double STAGE21_STRATEGIC_FTL_COOLANT_TRANSFER_W = 500_000_000d;
 
     private static final String STRATEGIC_SUFFIX = ".stage21_strategic_v1";
     private static final String DATALINK_MOUNT_ID = "utility_datalink";
@@ -242,7 +244,7 @@ public final class Stage175ICombatTestContentPack {
                 0d,
                 25_000_000d,
                 100_000_000_000d,
-                25_000_000d,
+                STAGE21_STRATEGIC_FTL_COOLANT_TRANSFER_W,
                 0d,
                 4,
                 4,
