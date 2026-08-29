@@ -152,12 +152,22 @@ public final class Stage22ContentInventory {
         return fingerprint;
     }
 
-    /** @return all definition occurrences for one ID */
+    /**
+     * Returns all definition occurrences for one stable ID.
+     *
+     * @param id stable content ID
+     * @return all definition occurrences for the ID
+     */
     public List<DefinitionRecord> definitions(String id) {
         return definitionsById.getOrDefault(id, List.of());
     }
 
-    /** @return every governed reference targeting one ID */
+    /**
+     * Returns every governed reference targeting one stable ID.
+     *
+     * @param id stable target content ID
+     * @return every governed reference targeting the ID
+     */
     public List<ReferenceRecord> referencesTo(String id) {
         return referencesByTargetId.getOrDefault(id, List.of());
     }
@@ -320,6 +330,7 @@ public final class Stage22ContentInventory {
             SourceMaturity maturity,
             ContentDisposition disposition,
             String jsonPath) {
+        /** Validates one governed definition occurrence. */
         public DefinitionRecord {
             id = Stage22ContentGovernanceCatalog.requireContentId(id, "Inventory definition ID");
             source = Stage22ContentGovernanceCatalog.requireNonBlank(source, "Inventory definition source");
@@ -335,6 +346,7 @@ public final class Stage22ContentInventory {
             String targetId,
             String source,
             String jsonPath) {
+        /** Validates one reverse-reference occurrence. */
         public ReferenceRecord {
             if (ownerDefinitionId != null) {
                 ownerDefinitionId = Stage22ContentGovernanceCatalog.requireContentId(
@@ -348,6 +360,7 @@ public final class Stage22ContentInventory {
 
     /** Raw-byte source digest contributing to the Stage-22 inventory fingerprint. */
     public record SourceDigest(String source, String sha256, int byteLength) {
+        /** Validates one source digest record. */
         public SourceDigest {
             source = Stage22ContentGovernanceCatalog.requireNonBlank(source, "Digest source");
             sha256 = Stage22ContentGovernanceCatalog.requireNonBlank(sha256, "Digest SHA-256");

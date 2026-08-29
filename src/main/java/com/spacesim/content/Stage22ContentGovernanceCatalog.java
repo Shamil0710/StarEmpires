@@ -118,17 +118,32 @@ public final class Stage22ContentGovernanceCatalog {
         return fingerprint;
     }
 
-    /** @return governed source or {@code null} */
+    /**
+     * Finds one governed source by classpath resource path.
+     *
+     * @param resourcePath classpath resource path
+     * @return governed source or {@code null}
+     */
     public SourceDefinition findSource(String resourcePath) {
         return sourcesByPath.get(resourcePath);
     }
 
-    /** @return explicit hardcoded definition or {@code null} */
+    /**
+     * Finds one explicitly governed procedural definition.
+     *
+     * @param id stable content ID
+     * @return explicit hardcoded definition or {@code null}
+     */
     public HardcodedDefinition findHardcodedDefinition(String id) {
         return hardcodedById.get(id);
     }
 
-    /** @return explicit faction disposition or {@code null} */
+    /**
+     * Finds one governed faction identity disposition.
+     *
+     * @param stableFactionId stable runtime/save faction ID
+     * @return explicit faction disposition or {@code null}
+     */
     public FactionIdentityDefinition findFactionIdentity(String stableFactionId) {
         return identitiesById.get(stableFactionId);
     }
@@ -287,56 +302,87 @@ public final class Stage22ContentGovernanceCatalog {
 
     /** Stage-22 governance class for one currently addressable faction identity. */
     public enum IdentityClass {
+        /** Authored sovereign faction intended as a major production identity. */
         MAJOR_AUTHORED,
+        /** Authored sovereign or local faction intentionally kept below major-faction scope. */
         MINOR_AUTHORED,
+        /** Authored network whose authority is not modeled as ordinary sovereign territory. */
         TRANSNATIONAL_NETWORK,
+        /** Stable identity allocated by generated-world bootstrap/runtime. */
         WORLD_GENERATED,
+        /** Identity restricted to a bounded authored or acceptance scenario. */
         SCENARIO_ONLY,
+        /** Identity reserved for deterministic test fixtures and never production sovereignty. */
         TEST_FIXTURE,
+        /** Compatibility identity retained to preserve existing runtime/save contracts. */
         LEGACY_COMPATIBILITY
     }
 
     /** Stable-ID migration/disposition decision. */
     public enum IdentityDisposition {
+        /** Preserve the stable ID and its current runtime/save behavior. */
         PRESERVE,
+        /** Resolve the stable ID as a compatibility alias without rewriting stored authority. */
         ALIAS,
+        /** Migrate the stable ID through an explicit versioned compatibility path. */
         MIGRATE,
+        /** Retire an identity only after proving it is confined to test-only state. */
         RETIRE_TEST_ONLY
     }
 
     /** Binding families that later production manifests must support. */
     public enum BindingKind {
+        /** Ship exterior/base-hull visual binding. */
         SHIP_VISUAL,
+        /** Character portrait/full-body visual binding. */
         CHARACTER_VISUAL,
+        /** Named or generated NPC content binding. */
         NPC,
+        /** Mission/template content binding. */
         MISSION,
+        /** Localized copy binding. */
         LOCALIZATION,
+        /** Runtime visual-effects binding. */
         VFX,
+        /** Runtime audio binding. */
         AUDIO,
+        /** User-interface icon binding. */
         UI_ICON
     }
 
     /** Production status vocabulary for visual/audio assets. */
     public enum AssetStatus {
+        /** Exploratory visual/audio concept not approved for implementation. */
         CONCEPT,
+        /** Asset whose engineering/readability constraints are approved. */
         ENGINEERING_APPROVED,
+        /** Production-ready asset approved for shipped content. */
         PRODUCTION,
+        /** Asset retained only for compatibility/reference and not new authoring. */
         DEPRECATED
     }
 
     /** Maturity vocabulary for authored content definitions. */
     public enum ContentMaturity {
+        /** Initial authoring seed that may change materially. */
         SEED,
+        /** Candidate definition undergoing validation and iteration. */
         CANDIDATE,
+        /** Definition validated against required gameplay/authoring contracts. */
         VALIDATED,
+        /** Definition frozen for the current production scope/version. */
         FROZEN
     }
 
     /** Product-scope cut priority used by Stage-22 authoring. */
     public enum CutPriority {
+        /** Scope required to preserve the core playable product identity. */
         CRITICAL,
+        /** Scope required for the accepted alpha floor. */
         MUST,
+        /** Valuable scope retained only after critical and must work is secure. */
         SHOULD,
+        /** Explicitly deferred scope that may be cut without violating the alpha gate. */
         DEFERRED
     }
 
@@ -355,6 +401,7 @@ public final class Stage22ContentGovernanceCatalog {
             SourceMaturity maturity,
             ContentDisposition defaultDisposition,
             String semanticReason) {
+        /** Validates and normalizes source-governance components. */
         public SourceDefinition {
             resourcePath = requireNonBlank(resourcePath, "Source resource path");
             if (!resourcePath.startsWith("data/content/") || !resourcePath.endsWith(".json")) {
@@ -393,6 +440,7 @@ public final class Stage22ContentGovernanceCatalog {
             ContentDisposition disposition,
             List<String> references,
             String semanticReason) {
+        /** Validates and normalizes the procedural-definition governance record. */
         public HardcodedDefinition {
             id = requireContentId(id, "Hardcoded definition ID");
             source = requireNonBlank(source, "Hardcoded definition source");
@@ -436,6 +484,7 @@ public final class Stage22ContentGovernanceCatalog {
             String saveBehavior,
             String collisionBehavior,
             String semanticReason) {
+        /** Validates one stable identity compatibility/disposition record. */
         public FactionIdentityDefinition {
             stableFactionId = requireFactionId(stableFactionId);
             identityClass = Objects.requireNonNull(identityClass, "Identity class not set");
@@ -476,6 +525,7 @@ public final class Stage22ContentGovernanceCatalog {
             List<String> localizationLanguages,
             boolean requireProvenance,
             boolean requireFitFingerprintVisualBinding) {
+        /** Validates and normalizes the authoring-manifest contract vocabulary. */
         public AuthoringManifestContract {
             requiredBindingKinds = immutableDistinctEnumList(requiredBindingKinds, BindingKind.class, "binding kinds");
             requiredAssetStatuses = immutableDistinctEnumList(requiredAssetStatuses, AssetStatus.class, "asset statuses");
@@ -543,6 +593,7 @@ public final class Stage22ContentGovernanceCatalog {
             int storyChainsPerCoreFaction,
             int specialLocationArchetypes,
             int publicPrivateEventTemplates) {
+        /** Validates the non-negative Stage-22 alpha coverage floor. */
         public AlphaFloorDefinition {
             int[] values = {
                     productionCoreFactions, requiredPostCoreFactions, militaryBaseHullsPerCoreFaction,
@@ -578,6 +629,7 @@ public final class Stage22ContentGovernanceCatalog {
      * @param reason why the scope has that priority
      */
     public record CutPriorityDefinition(String scopeId, CutPriority priority, String reason) {
+        /** Validates one cut-priority definition. */
         public CutPriorityDefinition {
             scopeId = requireContentId(scopeId, "Cut scope ID");
             priority = Objects.requireNonNull(priority, "Cut priority not set");

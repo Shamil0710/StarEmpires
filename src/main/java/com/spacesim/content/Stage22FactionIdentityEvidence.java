@@ -45,7 +45,11 @@ public final class Stage22FactionIdentityEvidence {
         this.fingerprint = fingerprint(this.records);
     }
 
-    /** Loads evidence from the same versioned governance resource used by Stage-22.0. */
+    /**
+     * Loads evidence from the same versioned governance resource used by Stage-22.0.
+     *
+     * @return validated immutable faction identity evidence
+     */
     public static Stage22FactionIdentityEvidence loadDefault() {
         ClassLoader loader = Stage22FactionIdentityEvidence.class.getClassLoader();
         try (InputStream stream = loader.getResourceAsStream(Stage22ContentGovernanceLoader.DEFAULT_RESOURCE)) {
@@ -72,7 +76,12 @@ public final class Stage22FactionIdentityEvidence {
         }
     }
 
-    /** Parses evidence from one governance JSON document. */
+    /**
+     * Parses evidence from one governance JSON document.
+     *
+     * @param json governance JSON containing identity evidence
+     * @return validated immutable faction identity evidence
+     */
     public static Stage22FactionIdentityEvidence parse(String json) {
         Objects.requireNonNull(json, "json");
         JsonValue root;
@@ -100,7 +109,12 @@ public final class Stage22FactionIdentityEvidence {
         return records;
     }
 
-    /** @return evidence for one stable faction ID, or {@code null} */
+    /**
+     * Finds evidence for one governed stable faction ID.
+     *
+     * @param stableFactionId stable runtime/save faction ID
+     * @return evidence for the stable faction ID, or {@code null}
+     */
     public EvidenceRecord find(String stableFactionId) {
         return byStableId.get(stableFactionId);
     }
@@ -135,6 +149,7 @@ public final class Stage22FactionIdentityEvidence {
 
     /** One roadmap-required evidence record attached to a governed identity disposition. */
     public record EvidenceRecord(String stableFactionId, String telemetryEvent, String fixture) {
+        /** Validates one identity evidence record. */
         public EvidenceRecord {
             stableFactionId = Stage22ContentGovernanceCatalog.requireFactionId(stableFactionId);
             telemetryEvent = Stage22ContentGovernanceCatalog.requireContentId(

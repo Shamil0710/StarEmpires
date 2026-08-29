@@ -71,7 +71,11 @@ public final class Stage22ContentGovernanceLoader {
         throw new AssertionError("No instances");
     }
 
-    /** Loads the built-in Stage-22.0 governance baseline and applies production-entry validation. */
+    /**
+     * Loads the built-in Stage-22.0 governance baseline and applies production-entry validation.
+     *
+     * @return validated built-in Stage-22.0 governance catalog
+     */
     public static Stage22ContentGovernanceCatalog loadDefault() {
         ClassLoader classLoader = Stage22ContentGovernanceLoader.class.getClassLoader();
         try (InputStream stream = classLoader.getResourceAsStream(DEFAULT_RESOURCE)) {
@@ -87,7 +91,12 @@ public final class Stage22ContentGovernanceLoader {
         }
     }
 
-    /** Parses one standalone governance document. */
+    /**
+     * Parses one standalone governance document.
+     *
+     * @param json governance JSON document
+     * @return validated immutable governance catalog
+     */
     public static Stage22ContentGovernanceCatalog parse(String json) {
         Objects.requireNonNull(json, "json");
         if (json.isBlank()) {
