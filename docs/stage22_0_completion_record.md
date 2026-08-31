@@ -1,9 +1,11 @@
 # Stage 22.0 — content authority, identity governance and inventory completion record
 
-> Status: **CLOSURE CANDIDATE**  
+> Status: **COMPLETE**
 > Implementation head verified: `925d05183a0693a5b38d78671b093383b3bdbc93`  
-> Pull request: #343 (`stage22-0-content-authority-inventory`)  
-> Next stage after merged/post-merge-green closure: **Stage 22.1**
+> Final tested PR head: `adb5b6e50d1f1a1ddbb4b2a93349bce6fa92f330`
+> Pull request: #343 (`stage22-0-content-authority-inventory`) — merged as `aa83bf1f4dad5151c635e5709e2fb8f47f90f4f5`
+> Post-merge `main` verification: **success**
+> Next milestone: **Stage 22.1**
 
 ## 1. Closeout scope
 
@@ -97,17 +99,24 @@ Earlier red gates were corrected without weakening quality controls:
 2. global content-ID syntax validation was separated from local engineering slot/interface/compartment/hardpoint IDs;
 3. Stage-22 public record APIs received complete Javadoc parameter documentation instead of disabling doclint or warning failure.
 
-## 8. Final repository closeout gate
+Final exact-PR-head evidence:
 
-This completion record is intentionally committed before merge so the intended merged state is self-contained. It becomes authoritative only after all of the following are true for the final docs-only PR head:
+- head: `adb5b6e50d1f1a1ddbb4b2a93349bce6fa92f330`;
+- workflow run: `33374714953`;
+- Java 17 verification job: `99433501569`;
+- conclusion: **success**.
 
-1. full exact-head Java-17 `clean verify` succeeds again;
-2. `main` has not drifted from the reviewed PR base, or drift is explicitly reconciled;
-3. no unresolved review thread/review blocks merge;
-4. PR #343 is merged with the exact tested head;
-5. the resulting push-to-`main` Java-17 verification succeeds.
+## 8. Final repository closeout gate — satisfied
 
-Until then this file is a closure candidate, not permission to begin Stage 22.1.
+The final repository gate completed without widening Stage 22.0:
+
+1. full exact-head Java-17 `clean verify` succeeded for the final PR head;
+2. the reviewed base did not drift;
+3. no unresolved review thread or submitted review blocked merge;
+4. PR #343 merged with the exact tested head as `aa83bf1f4dad5151c635e5709e2fb8f47f90f4f5`;
+5. push-to-`main` workflow run `33390051128`, Java-17 job `99481356911`, completed **success**.
+
+This record is therefore authoritative completion evidence for M22.0.
 
 ## 9. Intentional deferrals to Stage 22.1+
 
@@ -126,8 +135,8 @@ Those items remain downstream work and must consume the governance seams establi
 
 The Stage-22 entry authority problem is resolved at the implementation level: existing runtime/save authority is preserved, provisional content is explicitly dispositioned, faction identities have deterministic compatibility rules, generated and technical identities cannot silently become authored sovereign factions, and later authoring has a single governance contract.
 
-After the final docs-head and post-merge CI gates succeed, repository status is:
+Repository status after the final docs-head and post-merge CI gates:
 
 - **Stage 22: ACTIVE**;
 - **Stage 22.0: COMPLETE**;
-- **Stage 22.1: NEXT**.
+- **Stage 22.1: closure candidate in PR #344**.
