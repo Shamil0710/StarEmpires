@@ -9,13 +9,12 @@ import com.spacesim.content.Stage22CoreProductionManifestCatalog.SupportEnduranc
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.DemonstratorFitDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinition;
+import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.world.calibration.Stage20RepresentativeEnduranceProfile;
 import com.spacesim.world.calibration.Stage20RepresentativeEnduranceProfile.EnduranceSample;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -97,8 +96,7 @@ public final class Stage22CoreContentSeamValidator {
 
         for (AuthoringTemplateDefinition template : seam.authoringTemplates()) {
             ProductionManifestDefinition manifest = production.findManifestForFit(template.fitId());
-            if (manifest == null
-                    || !manifest.hullId().equals(template.productionHullId())) {
+            if (manifest == null || !manifest.hullId().equals(template.productionHullId())) {
                 throw new IllegalArgumentException(
                         "Authoring template has no exact component/hull/facility production manifest: " + template.id());
             }
