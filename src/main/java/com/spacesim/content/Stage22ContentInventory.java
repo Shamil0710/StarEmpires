@@ -330,7 +330,15 @@ public final class Stage22ContentInventory {
             SourceMaturity maturity,
             ContentDisposition disposition,
             String jsonPath) {
-        /** Validates one governed definition occurrence. */
+        /**
+         * Validates one governed definition occurrence.
+         *
+         * @param id stable content definition ID
+         * @param source governed source descriptor
+         * @param maturity source maturity classification
+         * @param disposition Stage-22 disposition
+         * @param jsonPath JSON or hardcoded path where the definition occurs
+         */
         public DefinitionRecord {
             id = Stage22ContentGovernanceCatalog.requireContentId(id, "Inventory definition ID");
             source = Stage22ContentGovernanceCatalog.requireNonBlank(source, "Inventory definition source");
@@ -346,7 +354,14 @@ public final class Stage22ContentInventory {
             String targetId,
             String source,
             String jsonPath) {
-        /** Validates one reverse-reference occurrence. */
+        /**
+         * Validates one reverse-reference occurrence.
+         *
+         * @param ownerDefinitionId owning definition ID, or {@code null} for an unowned reference
+         * @param targetId referenced dotted content/faction ID
+         * @param source governed source descriptor
+         * @param jsonPath JSON or hardcoded path where the reference occurs
+         */
         public ReferenceRecord {
             if (ownerDefinitionId != null) {
                 ownerDefinitionId = Stage22ContentGovernanceCatalog.requireContentId(
@@ -360,7 +375,13 @@ public final class Stage22ContentInventory {
 
     /** Raw-byte source digest contributing to the Stage-22 inventory fingerprint. */
     public record SourceDigest(String source, String sha256, int byteLength) {
-        /** Validates one source digest record. */
+        /**
+         * Validates one source digest record.
+         *
+         * @param source governed source descriptor
+         * @param sha256 source SHA-256 digest
+         * @param byteLength source byte length
+         */
         public SourceDigest {
             source = Stage22ContentGovernanceCatalog.requireNonBlank(source, "Digest source");
             sha256 = Stage22ContentGovernanceCatalog.requireNonBlank(sha256, "Digest SHA-256");
