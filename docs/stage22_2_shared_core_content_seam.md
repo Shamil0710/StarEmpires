@@ -56,8 +56,22 @@ ProductionManifestDefinition
   componentIds[]
   shipyardId
   requiredFacilityIds[]
+  contentMaturity
   semanticIntent
 ```
+
+`contentMaturity` deliberately reuses the Stage-22.0 `Stage22ContentGovernanceCatalog.ContentMaturity`
+vocabulary instead of declaring a second lifecycle enum:
+
+- `SEED`;
+- `CANDIDATE`;
+- `VALIDATED`;
+- `FROZEN`.
+
+The shared destroyer exemplar remains `CANDIDATE`: it proves the common authoring path but does not
+promote provisional Stage-17.5 content into final faction production data. Content maturity participates
+in the deterministic production-manifest fingerprint, so a maturity promotion is an attributable
+semantic change.
 
 The built-in shared exemplar uses the already accepted engineering and Stage-18 physical seams:
 
@@ -97,7 +111,9 @@ identity or fitting authority.
 
 The shared destroyer visual binding remains `CONCEPT`. It points at the common visual-authoring rules,
 not an Empire/Union asset. `Stage22CoreContentSeamValidator` still resolves and exposes the exact fit
-fingerprint so later `ENGINEERING_APPROVED`/`PRODUCTION` assets can pin it fail-closed.
+fingerprint so later `ENGINEERING_APPROVED`/`PRODUCTION` assets can pin it fail-closed. Asset lifecycle
+therefore reuses the Stage-22.0 `AssetStatus` vocabulary (`CONCEPT`, `ENGINEERING_APPROVED`,
+`PRODUCTION`, `DEPRECATED`) rather than defining an M22.2-only status owner.
 
 ## 5. Manufacturer / procurement lineage
 
@@ -152,15 +168,16 @@ Any hook with `diagnosticOnly=false` fails closed. Telemetry cannot feed a gamep
 
 ## 9. No faction bias
 
-The common loader explicitly rejects the core package/runtime tokens:
+Both common documents reject the core package/runtime tokens before parsing:
 
 - `core.empire`;
 - `faction.imperial_directorate`;
 - `core.industrial_union`;
 - `faction.industrial_combine`.
 
-The shared resources therefore cannot silently encode Empire or Industrial Union outcomes before their
-own production packages.
+This applies to the role/mission/visual seam **and** the component/hull/facility production manifest,
+so lineage, semantic rationale or physical-authoring metadata cannot silently encode Empire or
+Industrial Union outcomes before their own production packages.
 
 ## 10. Validation evidence
 
@@ -172,9 +189,10 @@ Targeted tests cover:
 - one mission profile per role;
 - complete shared destroyer role → mission → fit → physical production → visual chain;
 - exact module/manufacturing/facility/shipyard references;
+- governed `ContentMaturity.CANDIDATE` on the shared exemplar;
 - all three support endurance floors;
-- faction-specific leakage rejection;
-- unknown fit, gameplay telemetry, duplicate components and unsupported schema fail-closed behavior.
+- faction-specific leakage rejection in both shared JSON documents;
+- unknown fit, unknown content maturity, gameplay telemetry, duplicate components and unsupported schema fail-closed behavior.
 
 ## 11. Authority boundaries and deferrals
 
