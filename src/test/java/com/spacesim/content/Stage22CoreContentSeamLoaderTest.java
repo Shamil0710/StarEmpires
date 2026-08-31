@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -79,6 +80,18 @@ class Stage22CoreContentSeamLoaderTest {
                 IllegalArgumentException.class,
                 () -> Stage22CoreProductionManifestLoader.parse(unknownMaturity));
         assertTrue(maturityFailure.getMessage().contains("Unknown contentMaturity"));
+    }
+
+    @Test
+    void productionMaturityIsPartOfSemanticFingerprint() {
+        String json = read(Stage22CoreProductionManifestLoader.DEFAULT_RESOURCE);
+        var candidate = Stage22CoreProductionManifestLoader.parse(json);
+        var seed = Stage22CoreProductionManifestLoader.parse(json.replace(
+                "\"contentMaturity\":\"CANDIDATE\"",
+                "\"contentMaturity\":\"SEED\""));
+
+        assertNotEquals(candidate.fingerprint(), seed.fingerprint());
+        assertNotEquals(candidate.productionManifests(), seed.productionManifests());
     }
 
     private static String read(String resource) {
