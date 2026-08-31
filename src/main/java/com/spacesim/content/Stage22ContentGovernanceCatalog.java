@@ -401,7 +401,15 @@ public final class Stage22ContentGovernanceCatalog {
             SourceMaturity maturity,
             ContentDisposition defaultDisposition,
             String semanticReason) {
-        /** Validates and normalizes source-governance components. */
+        /**
+         * Validates and normalizes source-governance components.
+         *
+         * @param resourcePath classpath resource path
+         * @param domain concise governance domain name
+         * @param maturity current maturity classification
+         * @param defaultDisposition effective decision for definitions in this source
+         * @param semanticReason reason the disposition is safe/required
+         */
         public SourceDefinition {
             resourcePath = requireNonBlank(resourcePath, "Source resource path");
             if (!resourcePath.startsWith("data/content/") || !resourcePath.endsWith(".json")) {
@@ -440,7 +448,16 @@ public final class Stage22ContentGovernanceCatalog {
             ContentDisposition disposition,
             List<String> references,
             String semanticReason) {
-        /** Validates and normalizes the procedural-definition governance record. */
+        /**
+         * Validates and normalizes the procedural-definition governance record.
+         *
+         * @param id stable content/faction ID
+         * @param source stable source descriptor
+         * @param maturity current maturity classification
+         * @param disposition Stage-22 disposition
+         * @param references stable IDs referenced by the generated definition
+         * @param semanticReason rationale for the decision
+         */
         public HardcodedDefinition {
             id = requireContentId(id, "Hardcoded definition ID");
             source = requireNonBlank(source, "Hardcoded definition source");
@@ -484,7 +501,20 @@ public final class Stage22ContentGovernanceCatalog {
             String saveBehavior,
             String collisionBehavior,
             String semanticReason) {
-        /** Validates one stable identity compatibility/disposition record. */
+        /**
+         * Validates one stable identity compatibility/disposition record.
+         *
+         * @param stableFactionId current stable runtime/save faction ID
+         * @param identityClass governance class
+         * @param disposition stable-ID disposition
+         * @param targetStableFactionId target for ALIAS/MIGRATE, otherwise {@code null}
+         * @param canonicalPackageKey public/core package binding key or {@code null}
+         * @param canonicalDisplayName approved public display identity or {@code null}
+         * @param sourceVersionRange supported source version statement
+         * @param saveBehavior exact save/load behavior
+         * @param collisionBehavior deterministic collision behavior
+         * @param semanticReason rationale for the disposition
+         */
         public FactionIdentityDefinition {
             stableFactionId = requireFactionId(stableFactionId);
             identityClass = Objects.requireNonNull(identityClass, "Identity class not set");
@@ -525,7 +555,17 @@ public final class Stage22ContentGovernanceCatalog {
             List<String> localizationLanguages,
             boolean requireProvenance,
             boolean requireFitFingerprintVisualBinding) {
-        /** Validates and normalizes the authoring-manifest contract vocabulary. */
+        /**
+         * Validates and normalizes the authoring-manifest contract vocabulary.
+         *
+         * @param requiredBindingKinds required runtime binding families
+         * @param requiredAssetStatuses complete asset status vocabulary
+         * @param requiredContentMaturities complete content maturity vocabulary
+         * @param sourceLanguage canonical source-copy language
+         * @param localizationLanguages required localization path languages
+         * @param requireProvenance whether shipped assets require provenance/license metadata
+         * @param requireFitFingerprintVisualBinding whether fit-changing visuals require fit fingerprint binding
+         */
         public AuthoringManifestContract {
             requiredBindingKinds = immutableDistinctEnumList(requiredBindingKinds, BindingKind.class, "binding kinds");
             requiredAssetStatuses = immutableDistinctEnumList(requiredAssetStatuses, AssetStatus.class, "asset statuses");
@@ -593,7 +633,25 @@ public final class Stage22ContentGovernanceCatalog {
             int storyChainsPerCoreFaction,
             int specialLocationArchetypes,
             int publicPrivateEventTemplates) {
-        /** Validates the non-negative Stage-22 alpha coverage floor. */
+        /**
+         * Validates the non-negative Stage-22 alpha coverage floor.
+         *
+         * @param productionCoreFactions production-complete sovereign core factions
+         * @param requiredPostCoreFactions production-complete post-core factions required now
+         * @param militaryBaseHullsPerCoreFaction military base-hull floor per core faction
+         * @param civilianSupportBaseHullsPerCoreFaction faction civilian/support base-hull floor
+         * @param sharedCivilianHulls shared/licensed civilian hull floor
+         * @param stationExteriorRoles combined functional station exterior-role floor
+         * @param signatureStationsPerCoreFaction signature station variants per core faction
+         * @param recurringNamedNpcsPerCoreFaction recurring named NPC floor per core faction
+         * @param sharedRecurringContacts shared/minor/independent contact floor
+         * @param generatedNpcRoleArchetypes generated NPC role-archetype floor
+         * @param factionMissionTemplatesPerCoreFaction faction-facing mission template floor
+         * @param gameWideMissionTemplates final game-wide parametric mission template floor
+         * @param storyChainsPerCoreFaction authored short faction-chain floor
+         * @param specialLocationArchetypes special-location archetype floor
+         * @param publicPrivateEventTemplates public/private event template planning floor
+         */
         public AlphaFloorDefinition {
             int[] values = {
                     productionCoreFactions, requiredPostCoreFactions, militaryBaseHullsPerCoreFaction,
@@ -629,7 +687,13 @@ public final class Stage22ContentGovernanceCatalog {
      * @param reason why the scope has that priority
      */
     public record CutPriorityDefinition(String scopeId, CutPriority priority, String reason) {
-        /** Validates one cut-priority definition. */
+        /**
+         * Validates one cut-priority definition.
+         *
+         * @param scopeId stable scope key
+         * @param priority priority class
+         * @param reason why the scope has that priority
+         */
         public CutPriorityDefinition {
             scopeId = requireContentId(scopeId, "Cut scope ID");
             priority = Objects.requireNonNull(priority, "Cut priority not set");
