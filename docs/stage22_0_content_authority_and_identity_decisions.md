@@ -1,6 +1,6 @@
 # Stage 22.0 — content authority and faction identity decision record
 
-> Status: **ACTIVE DECISION RECORD — not a Stage-22.0 completion claim.**  
+> Status: **CLOSURE CANDIDATE — implementation gate passed; final docs-head CI and merge remain.**  
 > Scope: inventory/disposition/migration decisions required before Stage-22 bulk authoring.  
 > Runtime authority remains the accepted Stage 0–21 systems; this document does not introduce a new faction or content registry.
 
@@ -131,7 +131,17 @@ The governance resource also locks:
 - quantified alpha floors;
 - product cut priorities.
 
-## 8. Hard prohibitions carried forward
+## 8. Explicit non-state principal quarantine
+
+The repository-wide faction literal audit found three `faction.*` technical principals that must remain outside mutable faction authority:
+
+- `faction.acceptance.actor` — deterministic Stage-19 acceptance principal;
+- `faction.acceptance.opponent` — deterministic Stage-19 acceptance principal;
+- `faction.playable-generated-world.observer` — Stage-20 discovery-knowledge observer principal.
+
+They are explicitly quarantined by `Stage22RepositoryFactionReferenceAuditTest`. The audit fails both when an ungoverned production faction literal appears and when a quarantined technical principal is accidentally promoted into governed mutable faction identity.
+
+## 9. Hard prohibitions carried forward
 
 Stage 22.0 does not permit:
 
@@ -141,19 +151,28 @@ Stage 22.0 does not permit:
 - faction-name combat/production/sensor modifiers;
 - silent promotion of Stage-17.5/19 provisional content;
 - promotion of `faction.alpha`/`faction.beta` into authored sovereign factions;
+- promotion of technical principals into mutable world factions;
 - early production-complete post-core faction packages;
 - Stage-22.1 systemic profile implementation before the 22.0 exit gate.
 
-## 9. Exit evidence required before this decision record can support 22.0 completion
+## 10. Closure evidence
 
-The following still gate the later completion record:
+The Stage-22.0 implementation head `925d05183a0693a5b38d78671b093383b3bdbc93` satisfies the implementation-side exit gates:
 
 - repository-wide production faction literal audit is green;
 - current Stage-20 generated policy IDs are covered by governance tests;
 - governance/inventory/evidence fingerprints are deterministic;
 - supported save round-trip keeps stable IDs and runtime slots;
-- exact PR head passes the repository Java-17 verification gate;
-- final diff/base/review audit is clean;
-- only then may roadmap status move to `22.0 COMPLETE / 22.1 NEXT`.
+- all governed source resources have deterministic source digests and provisional dispositions are explicit;
+- exact PR implementation head passed the repository Java-17 `clean verify` workflow (`run 33373129115`, job `99428520824`);
+- implementation diff/base/review audit found no unresolved review threads, no submitted reviews and no base drift at that gate.
 
-No statement in this file marks Stage 22.0 complete before those checks exist.
+The remaining closeout sequence is procedural and intentionally does not widen Stage 22.0:
+
+1. synchronize roadmap/status/completion evidence on the same PR branch;
+2. require a new full exact-head CI pass for that docs-only head;
+3. repeat base/head/review audit;
+4. merge PR #343;
+5. require the push-to-`main` Java-17 verification to succeed.
+
+Only the merged, post-merge-green state is the authoritative repository claim that `22.0 COMPLETE / 22.1 NEXT`.
