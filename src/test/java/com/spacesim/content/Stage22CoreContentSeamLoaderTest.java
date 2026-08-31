@@ -61,6 +61,26 @@ class Stage22CoreContentSeamLoaderTest {
         assertThrows(IllegalArgumentException.class, () -> Stage22CoreProductionManifestLoader.parse(badSchema));
     }
 
+    @Test
+    void productionManifestRejectsFactionBiasAndUnknownMaturity() {
+        String json = read(Stage22CoreProductionManifestLoader.DEFAULT_RESOURCE);
+        String biased = json.replace(
+                "Faction-neutral physical authoring exemplar",
+                "core.industrial_union physical authoring exemplar");
+        IllegalArgumentException biasFailure = assertThrows(
+                IllegalArgumentException.class,
+                () -> Stage22CoreProductionManifestLoader.parse(biased));
+        assertTrue(biasFailure.getMessage().contains("faction-specific package token"));
+
+        String unknownMaturity = json.replace(
+                "\"contentMaturity\":\"CANDIDATE\"",
+                "\"contentMaturity\":\"UNREVIEWED\"");
+        IllegalArgumentException maturityFailure = assertThrows(
+                IllegalArgumentException.class,
+                () -> Stage22CoreProductionManifestLoader.parse(unknownMaturity));
+        assertTrue(maturityFailure.getMessage().contains("Unknown contentMaturity"));
+    }
+
     private static String read(String resource) {
         ClassLoader classLoader = Stage22CoreContentSeamLoaderTest.class.getClassLoader();
         try (InputStream stream = classLoader.getResourceAsStream(resource)) {
