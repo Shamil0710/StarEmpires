@@ -73,13 +73,28 @@ public final class Stage22CoreProductionManifestCatalog {
     /** @return lowercase SHA-256 semantic fingerprint */
     public String fingerprint() { return fingerprint; }
 
-    /** @return production manifest by manifest ID, or {@code null} */
+    /**
+     * Finds one production manifest by stable manifest ID.
+     *
+     * @param id stable production-manifest ID
+     * @return production manifest, or {@code null}
+     */
     public ProductionManifestDefinition findManifest(String id) { return manifestsById.get(id); }
 
-    /** @return unique production manifest by exact engineering fit ID, or {@code null} */
+    /**
+     * Finds the unique production manifest for one exact engineering fit.
+     *
+     * @param fitId exact engineering fit ID
+     * @return production manifest, or {@code null}
+     */
     public ProductionManifestDefinition findManifestForFit(String fitId) { return manifestsByFitId.get(fitId); }
 
-    /** @return support endurance requirement by common role ID, or {@code null} */
+    /**
+     * Finds one support-endurance requirement by common role ID.
+     *
+     * @param roleId common support role ID
+     * @return support endurance requirement, or {@code null}
+     */
     public SupportEnduranceRequirement findEnduranceRequirement(String roleId) { return enduranceByRoleId.get(roleId); }
 
     private String computeFingerprint() {
@@ -176,7 +191,18 @@ public final class Stage22CoreProductionManifestCatalog {
             List<String> requiredFacilityIds,
             ContentMaturity contentMaturity,
             String semanticIntent) {
-        /** Validates one immutable reference manifest. */
+        /**
+         * Validates one immutable reference manifest.
+         *
+         * @param id stable manifest ID
+         * @param fitId exact engineering fit ID
+         * @param hullId exact physical hull ID
+         * @param componentIds exact installed component/module IDs
+         * @param shipyardId Stage-18 shipyard ID
+         * @param requiredFacilityIds Stage-18 required facility IDs
+         * @param contentMaturity governed Stage-22 content maturity
+         * @param semanticIntent non-authoritative authoring rationale
+         */
         public ProductionManifestDefinition {
             id = requireContentId(id, "production manifest id");
             fitId = requireContentId(fitId, "production fitId");
@@ -202,7 +228,14 @@ public final class Stage22CoreProductionManifestCatalog {
             String referenceId,
             double minimumMissionEnduranceS,
             String semanticReason) {
-        /** Validates one support-role endurance requirement. */
+        /**
+         * Validates one support-role endurance requirement.
+         *
+         * @param roleId common support role ID
+         * @param referenceId Stage-20 representative endurance reference ID
+         * @param minimumMissionEnduranceS required mission-stores endurance in seconds
+         * @param semanticReason authoring rationale for the selected reference/floor
+         */
         public SupportEnduranceRequirement {
             roleId = requireContentId(roleId, "support roleId");
             referenceId = requireText(referenceId, "support endurance referenceId");
