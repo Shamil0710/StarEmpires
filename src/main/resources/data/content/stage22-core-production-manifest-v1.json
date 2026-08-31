@@ -18,6 +18,7 @@
         "facility.fabrication.heavy",
         "facility.fabrication.assembly"
       ],
+      "contentMaturity":"CANDIDATE",
       "semanticIntent":"Faction-neutral physical authoring exemplar proving exact fit components, hull, shipyard and installed support facilities can be validated before faction package bulk authoring."
     }
   ],
@@ -38,7 +39,7 @@
       "roleId":"role.support.fleet_logistics_repair_salvage",
       "referenceId":"MINING_SHIP",
       "minimumMissionEnduranceS":2592000.0,
-      "semanticReason":"The accepted industrial mining-hull endurance is used only as a conservative forty-five-day industrial-support analogue; dedicated repair/salvage physical fits remain downstream authoring."
+      "semanticReason":"The accepted industrial mining-hull endurance is used only as a conservative thirty-day industrial-support analogue; dedicated repair/salvage physical fits remain downstream authoring."
     }
   ]
 }
