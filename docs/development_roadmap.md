@@ -410,7 +410,7 @@ Must honor:
 - hubs, forks, cycles, alternate paths, gateways, remote/frontier pockets and bounded chokepoints;
 - machine-readable anti-linearity, route-redundancy, articulation/bridge and gateway-concentration diagnostics;
 - spatially correlated resource geography derived from Stage-18 physical host/environment conditions plus local deterministic variance;
-- regional comparative advantage instead of uniform sector bonuses;
+- regional comparative advantage instead of uniform self-sufficiency or `sector = production bonus` shortcuts;
 - essential economic viability through physically reachable supply chains without requiring every system/sector to produce everything;
 - strategic scarcity/dependency strong enough to create trade, stockpiling, infrastructure, diplomacy, security, expansion and warfare incentives;
 - faction-start placement after topology/resource generation, with asymmetric but recoverable starts and anti-accidental-monopoly checks;
