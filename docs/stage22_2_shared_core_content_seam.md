@@ -1,9 +1,10 @@
 # Stage 22.2 — shared core content seam
 
-> Status: **CLOSURE CANDIDATE**  
+> Status: **COMPLETE**  
 > Scope: faction-neutral role/mission/production/visual authoring contract before core-faction bulk data.  
-> Pull request: #345 (`stage22-2-shared-core-content-seam`).  
-> Stage 22 remains **ACTIVE**. M22.3 is blocked until M22.2 exact-head and post-merge gates are green.
+> Implementation PR: #346 (`stage22-2-shared-core-content-seam`), superseding draft merge vehicle #345 without changing the tested implementation head.  
+> Closed implementation on main: `ccd38f1d9d34c84b2f562635295a76826cdbbd11`.  
+> Stage 22 remains **ACTIVE**. M22.3 — Empire production package is **OPEN/NEXT** and was not implemented during this closure.
 
 ## 1. Decision
 
@@ -205,18 +206,24 @@ M22.2 owns no mutable gameplay state and introduces no alternate state owner. It
 - promote provisional Stage-17.5/20 calibration into final faction balance;
 - change save schemas, because all new M22.2 data is immutable catalog/validation metadata.
 
-M22.3 remains blocked until M22.2 closes.
+With M22.2 closed, those faction-specific responsibilities remain downstream. **M22.3 is now NEXT, not
+partially implemented by this milestone.**
 
-## 12. Closure gate
+## 12. Closure evidence
 
-M22.2 becomes **COMPLETE** only when all are true:
+All M22.2 closure gates are satisfied:
 
-1. the targeted architecture/acceptance tests pass;
-2. final PR #345 head passes Java-17 `clean verify`, coverage, Javadoc and packaging;
-3. roadmap/status documents identify M22.2 as the current closure candidate and preserve M22.3 as blocked;
-4. no base drift, blocking review or unresolved review thread remains;
-5. PR #345 merges from the exact tested head;
-6. resulting push-to-`main` Java-17 verification succeeds;
-7. final status/completion evidence records that post-merge result.
+1. targeted architecture/acceptance tests passed on the exact implementation head;
+2. final non-draft implementation PR #346 head `3e9cc6cf18fcd282c1e5271bc4d4f8e935347284` passed Java-17 CI run `33419292845`, job `99577451950` — **SUCCESS**, including tests, coverage, Javadoc and packaging;
+3. the final pre-merge audit found no base drift (`behind 0`), submitted blocking review or unresolved review thread;
+4. PR #346 was squash-merged with an exact-head guard, producing main commit `ccd38f1d9d34c84b2f562635295a76826cdbbd11`;
+5. resulting `main` was verified at that exact SHA;
+6. post-merge push CI run `33424642205`, job `99595144057` completed **SUCCESS**, including tests, coverage, Javadoc, desktop packaging and artifact upload;
+7. final completion evidence is recorded in `docs/stage22_2_completion_record.md` and the canonical roadmap is advanced to M22.3 NEXT.
 
-Until then this document remains a closure candidate.
+Draft PR #345 is not a second implementation lineage. It was superseded solely because the connected
+Ready-for-review GraphQL mutation failed on its own schema normalization while GitHub correctly refused
+to merge a draft. PR #346 used the identical implementation branch/head/base and received its own green
+exact-head CI before merge.
+
+M22.2 is therefore **COMPLETE**. Stage 22 remains active at M22.3.
