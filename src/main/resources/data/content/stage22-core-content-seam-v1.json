@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "stage22.core_content_seam.v1",
+  "roles": [
+    {"id":"role.military.corvette","domain":"MILITARY","enduranceReferenceId":"TORPEDO_CORVETTE","semanticIntent":"Low-burden local escort, interception and short-range security combatant."},
+    {"id":"role.military.frigate","domain":"MILITARY","enduranceReferenceId":"NONE","semanticIntent":"Sustained escort, patrol and reconnaissance combatant; dedicated Stage-22 physical endurance authoring remains downstream."},
+    {"id":"role.military.destroyer","domain":"MILITARY","enduranceReferenceId":"ESCORT_DESTROYER","semanticIntent":"Fleet screen and strike-defense combatant with explicit physical fit and production validation."},
+    {"id":"role.military.cruiser","domain":"MILITARY","enduranceReferenceId":"CRUISER","semanticIntent":"Independent multi-role command combatant able to sustain missions away from immediate support."},
+    {"id":"role.military.battleship","domain":"MILITARY","enduranceReferenceId":"BATTLESHIP","semanticIntent":"Capital line and firepower asset whose burden is expressed through physical production and support."},
+    {"id":"role.military.carrier","domain":"MILITARY","enduranceReferenceId":"CARRIER_AVIATION_GROUP","semanticIntent":"Aviation and small-craft projection family with support burden separate from direct line combat."},
+    {"id":"role.support.freight","domain":"SUPPORT","enduranceReferenceId":"BULK_FREIGHTER_LOADED","semanticIntent":"General and bulk physical cargo movement for industrial and deployed-fleet supply chains."},
+    {"id":"role.support.tanker_replenishment","domain":"SUPPORT","enduranceReferenceId":"FLEET_TANKER_LOADED","semanticIntent":"Reaction-mass, stores and replenishment support for sustained deployed operations."},
+    {"id":"role.support.fleet_logistics_repair_salvage","domain":"SUPPORT","enduranceReferenceId":"MINING_SHIP","semanticIntent":"Industrial fleet support family covering logistics, repair and salvage authoring; later packages may split legal fits without changing the role contract."}
+  ],
+  "missionProfiles": [
+    {"id":"mission_profile.military.corvette_local_security","roleId":"role.military.corvette","authorityInputs":["FLEET","OPERATION"],"objective":"Protect local traffic, intercept limited threats and maintain short-range security coverage."},
+    {"id":"mission_profile.military.frigate_sustained_patrol","roleId":"role.military.frigate","authorityInputs":["DISCOVERY","FLEET","OPERATION"],"objective":"Maintain sustained escort and patrol presence while operating on actor-bounded knowledge."},
+    {"id":"mission_profile.military.destroyer_fleet_screen","roleId":"role.military.destroyer","authorityInputs":["FLEET","OPERATION"],"objective":"Screen a fleet, defeat strike threats and preserve the protected force rather than maximize raw damage."},
+    {"id":"mission_profile.military.cruiser_independent_command","roleId":"role.military.cruiser","authorityInputs":["DISCOVERY","FLEET","OPERATION"],"objective":"Conduct independent multi-role operations with command, sensing and combat responsibilities."},
+    {"id":"mission_profile.military.battleship_line_firepower","roleId":"role.military.battleship","authorityInputs":["FLEET","OPERATION"],"objective":"Provide capital line firepower where infrastructure and support can sustain the commitment."},
+    {"id":"mission_profile.military.carrier_aviation_projection","roleId":"role.military.carrier","authorityInputs":["FLEET","OPERATION"],"objective":"Project small-craft capability while preserving carrier and replenishment dependencies."},
+    {"id":"mission_profile.support.freight_throughput","roleId":"role.support.freight","authorityInputs":["ECONOMY","FREIGHT"],"objective":"Move finite physical cargo between lawful supply and demand endpoints."},
+    {"id":"mission_profile.support.tanker_replenishment","roleId":"role.support.tanker_replenishment","authorityInputs":["FLEET","FREIGHT"],"objective":"Sustain deployed fleet endurance through finite replenishment rather than hidden resupply."},
+    {"id":"mission_profile.support.fleet_logistics_repair_salvage","roleId":"role.support.fleet_logistics_repair_salvage","authorityInputs":["FLEET","FREIGHT","INDUSTRY"],"objective":"Support repair, recovery and salvage using finite industry/freight authorities."}
+  ],
+  "lineages": [
+    {"id":"lineage.shared.escort_authoring_reference","designAuthorityRef":"organization.shared.design_reference","manufacturerRef":"organization.shared.manufacturing_reference","procurementPolicyRef":"policy.shared.procurement.authoring_reference","licenseMode":"SHARED_STANDARD"}
+  ],
+  "visualBindings": [
+    {"id":"visual_binding.shared.escort_destroyer_schema_v1","fitId":"fit.escort_destroyer_schema_v1","status":"CONCEPT","expectedFitFingerprint":null,"assetRef":"docs/factions/faction_gameplay_visual_balance_bible.md#ship-authoring","provenanceRef":"docs/factions/faction_gameplay_visual_balance_bible.md"}
+  ],
+  "localizationRules": [
+    {"id":"localization_rule.shared.ship_roles","sourceLanguage":"ru","languages":["ru","en"],"idKeyPrefix":"localization.shared.ship","namingRule":"Stable IDs remain language-neutral; Russian is source copy and English is a localization projection. Role and class names never alter simulation identity."}
+  ],
+  "telemetryHooks": [
+    {"id":"telemetry.shared.engineering_fit","authorityRef":"authority.ship_engineering","metrics":["installed_module_ids","operational_mass_kg","power_margin_w","thermal_margin_w"],"diagnosticOnly":true},
+    {"id":"telemetry.shared.shipyard_path","authorityRef":"authority.stage18_shipyard","metrics":["build_input_mass_kg","required_facility_ids","service_mass_margin_kg"],"diagnosticOnly":true},
+    {"id":"telemetry.shared.endurance","authorityRef":"authority.stage20_endurance","metrics":["mission_stores_endurance_s","sustained_burn_s"],"diagnosticOnly":true}
+  ],
+  "authoringTemplates": [
+    {"id":"authoring_template.shared.destroyer_end_to_end","roleId":"role.military.destroyer","missionProfileId":"mission_profile.military.destroyer_fleet_screen","fitId":"fit.escort_destroyer_schema_v1","productionHullId":"hull.escort_destroyer_v1","lineageId":"lineage.shared.escort_authoring_reference","visualBindingId":"visual_binding.shared.escort_destroyer_schema_v1","localizationRuleId":"localization_rule.shared.ship_roles","telemetryHookIds":["telemetry.shared.engineering_fit","telemetry.shared.shipyard_path","telemetry.shared.endurance"]}
+  ]
+}

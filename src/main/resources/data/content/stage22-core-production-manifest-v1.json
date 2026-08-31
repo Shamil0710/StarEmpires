@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "stage22.core_production_manifest.v1",
+  "productionManifests": [
+    {
+      "id":"production_manifest.shared.escort_destroyer_schema_v1",
+      "fitId":"fit.escort_destroyer_schema_v1",
+      "hullId":"hull.escort_destroyer_v1",
+      "componentIds":[
+        "module.reactor_5gw_v1",
+        "module.main_drive_escort_v1",
+        "module.sensor_array_escort_v1",
+        "module.radiator_escort_v1",
+        "module.railgun_large_v1"
+      ],
+      "shipyardId":"yard.orbital_escort_v1",
+      "requiredFacilityIds":[
+        "facility.fabrication.heavy",
+        "facility.fabrication.assembly"
+      ],
+      "contentMaturity":"CANDIDATE",
+      "semanticIntent":"Faction-neutral physical authoring exemplar proving exact fit components, hull, shipyard and installed support facilities can be validated before faction package bulk authoring."
+    }
+  ],
+  "supportEnduranceRequirements": [
+    {
+      "roleId":"role.support.freight",
+      "referenceId":"BULK_FREIGHTER_LOADED",
+      "minimumMissionEnduranceS":2592000.0,
+      "semanticReason":"Thirty-day stores floor is below the accepted bulk-freighter calibration and is a planning gate, not a hidden performance bonus."
+    },
+    {
+      "roleId":"role.support.tanker_replenishment",
+      "referenceId":"FLEET_TANKER_LOADED",
+      "minimumMissionEnduranceS":3888000.0,
+      "semanticReason":"Forty-five-day stores floor remains below the accepted tanker calibration so replenishment endurance is explicit before faction-specific tuning."
+    },
+    {
+      "roleId":"role.support.fleet_logistics_repair_salvage",
+      "referenceId":"MINING_SHIP",
+      "minimumMissionEnduranceS":2592000.0,
+      "semanticReason":"The accepted industrial mining-hull endurance is used only as a conservative thirty-day industrial-support analogue; dedicated repair/salvage physical fits remain downstream authoring."
+    }
+  ]
+}

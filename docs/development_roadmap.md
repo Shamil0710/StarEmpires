@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-08-31 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 ACTIVE — M22.0 complete, M22.1 closure candidate.**
+> **Последняя синхронизация: 2026-08-31 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 ACTIVE — M22.0–M22.1 complete, M22.2 closure candidate.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 ## 1. Главный инвариант
@@ -68,7 +68,7 @@ Canonical faction contracts:
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **COMPLETE** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance | 22 | **ACTIVE — M22.1** |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance | 22 | **ACTIVE — M22.2** |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
 Manual merge gate remains mandatory while `main` is unprotected:
@@ -565,8 +565,7 @@ Core-faction note: the same Stage-21 machinery expresses meaningfully different 
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
-**ACTIVE. Stage 22.0 is complete; Stage 22.1 is a closure candidate in PR #344; Stage 22.2 is next
-only after exact-head merge and post-merge verification.**
+**ACTIVE. M22.0 and M22.1 are complete; M22.2 is the current closure candidate in PR #345. M22.3 remains blocked until the exact tested M22.2 head is merged and post-merge `main` verification is green.**
 
 Expands the accepted physical/manufacturable language:
 
@@ -587,12 +586,14 @@ Stage 22 explicitly owns the content review of the Stage-17.5/19 provisional Com
 
 Stage 22 production-complete major-faction scope is intentionally limited to:
 
-1. **Империя** — `22.1` gold slice;
-2. **Индустриальный Союз** — `22.2` contrast slice.
+1. **Империя** — M22.3 gold-slice production package;
+2. **Индустриальный Союз** — M22.4 contrast production package.
 
-Stage 22 must implement their differentiation through common mechanics and then perform pairwise fleet,
-industry, logistics, economy, NPC/content and long-run balance. It must **not** require production-complete
-Директорат / Лигу Свободных Систем / Пограничную Конфедерацию / Консорциум / Кочевой Флот.
+M22.2 is the shared faction-neutral role/mission/production/visual authoring seam required before either
+bulk package. Stage 22 must implement core-pair differentiation through common mechanics and then
+perform pairwise fleet, industry, logistics, economy, NPC/content and long-run balance. It must **not**
+require production-complete Директорат / Лигу Свободных Систем / Пограничную Конфедерацию /
+Консорциум / Кочевой Флот.
 
 Stage 22.0 also owns explicit migration/disposition of legacy generated-world faction IDs so existing
 runtime identities are not silently reinterpreted as final lore identities.
@@ -600,6 +601,10 @@ runtime identities are not silently reinterpreted as final lore identities.
 No isolated `Mk II = +25% all stats` parallel system.
 
 Detailed plan: `docs/stage22_content_balance_plan.md`.
+
+Faction execution roadmap: `docs/factions/faction_implementation_roadmap.md`.  
+M22.1 completion evidence: `docs/stage22_1_completion_record.md`.  
+Current M22.2 decision/closure evidence: `docs/stage22_2_shared_core_content_seam.md`.
 
 Cross-media production plan for faction packages, ships, stations, NPCs, missions, locations,
 characters, UI art, VFX, audio, localization, manifests, alpha floors and cut rules:
@@ -669,7 +674,7 @@ Stage 17 COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
 → Stage 21 RPG / Living World COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
-→ Stage 22 Content / Balance Alpha ACTIVE — M22.0 COMPLETE; M22.1 closure candidate; M22.2 next
+→ Stage 22 Content / Balance Alpha ACTIVE — M22.0 COMPLETE; M22.1 COMPLETE; M22.2 closure candidate; M22.3 next
 → Stage 23 RC / final presentation replacement and polish for the core pair PLANNED
 → Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
@@ -678,11 +683,10 @@ Detailed faction/content execution, ID migration and post-core package sequencin
 `docs/factions/faction_implementation_roadmap.md`; evidence gates are defined in
 `docs/factions/faction_balance_validation_framework.md`. These documents refine the sequence without changing the live stage status in this roadmap.
 
-**Immediate next implementation priority is M22.2 after M22.1 closes.** Stage 22 owns production
-content review/re-authoring of provisional Stage-17.5/19 definitions, the shared role/fit/production/
-visual manifest seam, Imperial gold-slice content, Industrial Union contrast content and pairwise
-balance. The accepted M22.0 identity governance and M22.1 profile boundary must remain upstream of
-that work; no later slice may create a parallel faction or gameplay authority.
+**Immediate implementation priority is M22.2.** It closes the shared role/mission/fit/production/
+visual/lineage/localization/telemetry authoring seam before either core-faction bulk package. The
+accepted M22.0 identity governance and M22.1 profile boundary remain upstream; M22.3 Empire content
+must not begin until M22.2 exact-head merge and post-merge verification are complete.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
 file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.

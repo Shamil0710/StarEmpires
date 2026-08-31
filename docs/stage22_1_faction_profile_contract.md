@@ -1,9 +1,11 @@
 # Stage 22.1 — versioned faction systemic-profile contract
 
-> Status: **CLOSURE CANDIDATE**
+> Status: **COMPLETE**
 > Scope: M22.1 profile schema, authority bindings, deterministic validation and bounded persistence.
 > Pull request: #344 (`stage22-1-faction-profile-contract`).
-> Stage 22 remains **ACTIVE**; M22.2+ are outside this slice.
+> Merge commit: `bfbd8a5ee55329c332d6bbd85c5039a515974cf5`.
+> Post-merge CI: run `33405380066`, Java 17 verification **SUCCESS**.
+> Stage 22 remains **ACTIVE**; M22.2 is the current milestone.
 
 ## 1. Decision
 
@@ -72,8 +74,8 @@ for candidate scoring and selection. Faction names never grant an outcome or hid
 - a compatibility alias without an explicit `ALIAS`/`MIGRATE` governance target;
 - a role with an unknown fit, no Stage-18 physical hull path or mismatched ship visual.
 
-The built-in baseline additionally locks exactly two core packages, 16 policy bindings, four visual
-references and empty M22.2 manifests. This prevents accidental early production-content promotion.
+The M22.1 built-in baseline locks exactly two core packages, 16 policy bindings, four visual references
+and empty M22.2 manifests. M22.2 may now populate those manifests only through its common validated seam.
 
 ## 5. Persistence decision
 
@@ -107,7 +109,7 @@ evidence may still converge on the same rational action in later scenarios.
 ## 7. M22.2 boundary and deferrals
 
 M22.1 defines the common manifest reference and validates a complete role chain if one is present.
-It intentionally authors no production role bindings yet. M22.2 owns:
+M22.2 owns:
 
 - shared role and mission taxonomy;
 - role → legal fit → physical production path → visual binding;
@@ -117,13 +119,13 @@ It intentionally authors no production role bindings yet. M22.2 owns:
 Empire production breadth, Industrial Union production breadth, shared civilian breadth, pairwise
 balance/soak and every post-core package remain M22.3+ work. Stage 22 is not complete after M22.1.
 
-## 8. Closure gate
+## 8. Closure evidence
 
-M22.1 becomes complete only when all of the following are true:
+All M22.1 external gates are satisfied:
 
-1. the final PR head passes Java-17 `clean verify`, including tests, coverage, Javadoc and packaging;
-2. no base drift or unresolved blocking review remains;
-3. PR #344 merges with the exact tested head;
-4. the resulting push-to-`main` Java-17 verification succeeds.
+1. exact PR head `b5eae85a25ec0e8e3d13af44f39b199d58d3ebd5` passed Java-17 verification in run `33394873060`;
+2. final base/review audit found no base drift, submitted blocking reviews or unresolved review threads;
+3. PR #344 merged from that tested head as `bfbd8a5ee55329c332d6bbd85c5039a515974cf5`;
+4. push-to-`main` run `33405380066`, job `99531560484`, completed **SUCCESS**, including the full test/coverage/Javadoc/package step.
 
-Until those external gates succeed, this document is a closure candidate and M22.2 must not start.
+M22.1 is therefore closed. M22.2 is the first unfinished Stage-22 milestone.
