@@ -222,7 +222,14 @@ public final class Stage22CoreContentSeamValidator {
             String productionFingerprint,
             Map<String, String> visualFitFingerprints,
             Map<String, Double> supportEnduranceMarginS) {
-        /** Freezes validation evidence. */
+        /**
+         * Freezes validation evidence.
+         *
+         * @param seamFingerprint common seam semantic fingerprint
+         * @param productionFingerprint production manifest semantic fingerprint
+         * @param visualFitFingerprints resolved visual-binding fit fingerprints
+         * @param supportEnduranceMarginS support-role endurance margins in seconds
+         */
         public ValidationReport {
             seamFingerprint = requireFingerprint(seamFingerprint, "seamFingerprint");
             productionFingerprint = requireFingerprint(productionFingerprint, "productionFingerprint");
