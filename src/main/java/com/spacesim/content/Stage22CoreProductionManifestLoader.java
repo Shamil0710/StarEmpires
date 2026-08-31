@@ -2,6 +2,7 @@ package com.spacesim.content;
 
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
+import com.spacesim.content.Stage22ContentGovernanceCatalog.ContentMaturity;
 import com.spacesim.content.Stage22CoreProductionManifestCatalog.ProductionManifestDefinition;
 import com.spacesim.content.Stage22CoreProductionManifestCatalog.SupportEnduranceRequirement;
 
@@ -18,6 +19,12 @@ public final class Stage22CoreProductionManifestLoader {
     public static final int CURRENT_SCHEMA_VERSION = 1;
     /** Built-in faction-neutral resource. */
     public static final String DEFAULT_RESOURCE = "data/content/stage22-core-production-manifest-v1.json";
+
+    private static final List<String> FORBIDDEN_COMMON_TOKENS = List.of(
+            "core.empire",
+            "faction.imperial_directorate",
+            "core.industrial_union",
+            "faction.industrial_combine");
 
     private Stage22CoreProductionManifestLoader() {
         throw new AssertionError("utility class");
@@ -52,6 +59,7 @@ public final class Stage22CoreProductionManifestLoader {
         if (json.isBlank()) {
             throw new IllegalArgumentException("Stage-22.2 production manifest JSON must not be blank");
         }
+        rejectFactionBias(json);
         final JsonValue root;
         try {
             root = new JsonReader().parse(json);
@@ -75,6 +83,7 @@ public final class Stage22CoreProductionManifestLoader {
                     stringArray(node, "componentIds"),
                     requireText(node, "shipyardId"),
                     stringArray(node, "requiredFacilityIds"),
+                    enumValue(ContentMaturity.class, node, "contentMaturity"),
                     requireText(node, "semanticIntent")));
         }
         if (manifests.isEmpty()) {
@@ -100,6 +109,16 @@ public final class Stage22CoreProductionManifestLoader {
                 requireText(root, "catalogVersion"),
                 manifests,
                 endurance);
+    }
+
+    private static void rejectFactionBias(String json) {
+        String lower = json.toLowerCase(java.util.Locale.ROOT);
+        for (String token : FORBIDDEN_COMMON_TOKENS) {
+            if (lower.contains(token)) {
+                throw new IllegalArgumentException(
+                        "Common Stage-22.2 production manifest contains faction-specific package token: " + token);
+            }
+        }
     }
 
     private static JsonValue requireArray(JsonValue node, String field) {
@@ -141,6 +160,15 @@ public final class Stage22CoreProductionManifestLoader {
             throw new IllegalArgumentException(field + " must be a non-blank string");
         }
         return value.asString().strip();
+    }
+
+    private static <E extends Enum<E>> E enumValue(Class<E> type, JsonValue node, String field) {
+        String value = requireText(node, field);
+        try {
+            return Enum.valueOf(type, value);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Unknown " + field + ": " + value, exception);
+        }
     }
 
     private static List<String> stringArray(JsonValue node, String field) {
