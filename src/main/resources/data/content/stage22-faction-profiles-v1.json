@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "stage22.faction_profiles.v1",
+  "doctrineProfiles": [
+    {
+      "id": "doctrine.core.empire.v1",
+      "institutionalDoctrine": {
+        "tradeOpenness": 45,
+        "securityPosture": 80,
+        "expansionPreference": 65,
+        "sovereigntySensitivity": 85,
+        "treatyLegalism": 80,
+        "interventionism": 70,
+        "economicResiliencePriority": 75
+      },
+      "strategicGoalPreferences": {
+        "secure-route": 9000,
+        "escort": 8500,
+        "claim": 6500,
+        "deter": 8500,
+        "coerce": 4500,
+        "raid": 2500,
+        "blockade": 3500,
+        "invade": 3000,
+        "stockpile": 5000,
+        "explore": 5500,
+        "recover": 9000,
+        "obtain-access": 8000,
+        "defend": 9500
+      }
+    },
+    {
+      "id": "doctrine.core.industrial_union.v1",
+      "institutionalDoctrine": {
+        "tradeOpenness": 60,
+        "securityPosture": 55,
+        "expansionPreference": 70,
+        "sovereigntySensitivity": 50,
+        "treatyLegalism": 70,
+        "interventionism": 35,
+        "economicResiliencePriority": 90
+      },
+      "strategicGoalPreferences": {
+        "secure-route": 9500,
+        "escort": 9000,
+        "claim": 7000,
+        "deter": 7000,
+        "coerce": 5000,
+        "raid": 4000,
+        "blockade": 5000,
+        "invade": 3500,
+        "stockpile": 9500,
+        "explore": 6000,
+        "recover": 8500,
+        "obtain-access": 9500,
+        "defend": 5000
+      }
+    }
+  ],
+  "policyBindings": [
+    {"id":"policy.core.empire.industry.v1","kind":"INDUSTRIAL","authoritySeam":"STAGE18_INDUSTRY","dependsOn":[],"semanticIntent":"Prefer sovereign capacity, strategic reserves and audited production dependencies."},
+    {"id":"policy.core.empire.procurement.v1","kind":"PROCUREMENT","authoritySeam":"FACTION_POLICY_COMMAND","dependsOn":["policy.core.empire.industry.v1"],"semanticIntent":"Fund readiness and resilience through the common treasury and order path."},
+    {"id":"policy.core.empire.logistics.v1","kind":"LOGISTICS","authoritySeam":"STAGE20_FREIGHT","dependsOn":["policy.core.empire.industry.v1"],"semanticIntent":"Protect high-value corridors and preserve physical reserve movement."},
+    {"id":"policy.core.empire.fleet.v1","kind":"FLEET","authoritySeam":"STAGE21_FLEET_COMMAND","dependsOn":["policy.core.empire.logistics.v1"],"semanticIntent":"Weight deterrence, layered defense and recoverable force commitments."},
+    {"id":"policy.core.empire.diplomacy.v1","kind":"DIPLOMACY","authoritySeam":"FACTION_DIPLOMACY","dependsOn":[],"semanticIntent":"Value formal obligations, sovereignty and credible enforcement."},
+    {"id":"policy.core.empire.territory.v1","kind":"TERRITORY","authoritySeam":"TERRITORIAL_CONTROL","dependsOn":["policy.core.empire.diplomacy.v1"],"semanticIntent":"Prefer defensible lawful control over ungrounded map ownership."},
+    {"id":"policy.core.empire.knowledge.v1","kind":"KNOWLEDGE","authoritySeam":"DISCOVERY_KNOWLEDGE","dependsOn":[],"semanticIntent":"Act only on actor-bounded intelligence with explicit provenance."},
+    {"id":"policy.core.empire.recovery.v1","kind":"RECOVERY","authoritySeam":"SETTLEMENT_RECOVERY","dependsOn":["policy.core.empire.fleet.v1","policy.core.empire.logistics.v1"],"semanticIntent":"Restore strategic positions through finite repair, replacement and supply work."},
+    {"id":"policy.core.industrial_union.industry.v1","kind":"INDUSTRIAL","authoritySeam":"STAGE18_INDUSTRY","dependsOn":[],"semanticIntent":"Prefer throughput, redundancy and physically supplied industrial specialization."},
+    {"id":"policy.core.industrial_union.procurement.v1","kind":"PROCUREMENT","authoritySeam":"FACTION_POLICY_COMMAND","dependsOn":["policy.core.industrial_union.industry.v1"],"semanticIntent":"Route expenditure toward production continuity and contractual access."},
+    {"id":"policy.core.industrial_union.logistics.v1","kind":"LOGISTICS","authoritySeam":"STAGE20_FREIGHT","dependsOn":["policy.core.industrial_union.industry.v1"],"semanticIntent":"Prioritize supply corridors, freight capacity and stockpile continuity."},
+    {"id":"policy.core.industrial_union.fleet.v1","kind":"FLEET","authoritySeam":"STAGE21_FLEET_COMMAND","dependsOn":["policy.core.industrial_union.logistics.v1"],"semanticIntent":"Protect production networks with maintainable common fleet orders."},
+    {"id":"policy.core.industrial_union.diplomacy.v1","kind":"DIPLOMACY","authoritySeam":"FACTION_DIPLOMACY","dependsOn":[],"semanticIntent":"Prefer negotiated access, durable contracts and proportional escalation."},
+    {"id":"policy.core.industrial_union.territory.v1","kind":"TERRITORY","authoritySeam":"TERRITORIAL_CONTROL","dependsOn":["policy.core.industrial_union.diplomacy.v1"],"semanticIntent":"Expand only where claims and supplied infrastructure can sustain control."},
+    {"id":"policy.core.industrial_union.knowledge.v1","kind":"KNOWLEDGE","authoritySeam":"DISCOVERY_KNOWLEDGE","dependsOn":[],"semanticIntent":"Price risk from observed routes, deficits and market-access evidence."},
+    {"id":"policy.core.industrial_union.recovery.v1","kind":"RECOVERY","authoritySeam":"SETTLEMENT_RECOVERY","dependsOn":["policy.core.industrial_union.fleet.v1","policy.core.industrial_union.logistics.v1"],"semanticIntent":"Restore lost capacity through finite industrial replacement chains."}
+  ],
+  "manifestReferences": [
+    {"id":"manifest.core.empire.v1","packageKey":"core.empire","scope":"CORE","maturity":"SEED","roleBindings":[]},
+    {"id":"manifest.core.industrial_union.v1","packageKey":"core.industrial_union","scope":"CORE","maturity":"SEED","roleBindings":[]}
+  ],
+  "visualProfiles": [
+    {"id":"visual.core.empire.ship.v1","kind":"SHIP","packageKey":"core.empire","status":"CONCEPT","authorityDocument":"docs/factions/empire_visual_bible.md"},
+    {"id":"visual.core.empire.character.v1","kind":"CHARACTER","packageKey":"core.empire","status":"CONCEPT","authorityDocument":"docs/factions/empire_visual_bible.md"},
+    {"id":"visual.core.industrial_union.ship.v1","kind":"SHIP","packageKey":"core.industrial_union","status":"CONCEPT","authorityDocument":"docs/factions/industrial_union_visual_bible.md"},
+    {"id":"visual.core.industrial_union.character.v1","kind":"CHARACTER","packageKey":"core.industrial_union","status":"CONCEPT","authorityDocument":"docs/factions/industrial_union_visual_bible.md"}
+  ],
+  "localizations": [
+    {"id":"localization.core.empire.v1","namespace":"localization.core.empire","sourceLanguage":"ru","languages":["ru","en"]},
+    {"id":"localization.core.industrial_union.v1","namespace":"localization.core.industrial_union","sourceLanguage":"ru","languages":["ru","en"]}
+  ],
+  "systemicProfiles": [
+    {
+      "profileId":"profile.core.empire.v1",
+      "stableFactionId":"faction.imperial_directorate",
+      "packageKey":"core.empire",
+      "profileVersion":1,
+      "identityClass":"LEGACY_COMPATIBILITY",
+      "doctrineProfileRef":"doctrine.core.empire.v1",
+      "industrialPolicyRef":"policy.core.empire.industry.v1",
+      "procurementPolicyRef":"policy.core.empire.procurement.v1",
+      "logisticsPolicyRef":"policy.core.empire.logistics.v1",
+      "fleetDoctrineRef":"policy.core.empire.fleet.v1",
+      "diplomacyPolicyRef":"policy.core.empire.diplomacy.v1",
+      "territoryPolicyRef":"policy.core.empire.territory.v1",
+      "knowledgePolicyRef":"policy.core.empire.knowledge.v1",
+      "recoveryPolicyRef":"policy.core.empire.recovery.v1",
+      "authoredContentManifestRef":"manifest.core.empire.v1",
+      "shipVisualProfileRef":"visual.core.empire.ship.v1",
+      "characterVisualProfileRef":"visual.core.empire.character.v1",
+      "localizationRef":"localization.core.empire.v1",
+      "compatibilityAliases":[]
+    },
+    {
+      "profileId":"profile.core.industrial_union.v1",
+      "stableFactionId":"faction.industrial_combine",
+      "packageKey":"core.industrial_union",
+      "profileVersion":1,
+      "identityClass":"LEGACY_COMPATIBILITY",
+      "doctrineProfileRef":"doctrine.core.industrial_union.v1",
+      "industrialPolicyRef":"policy.core.industrial_union.industry.v1",
+      "procurementPolicyRef":"policy.core.industrial_union.procurement.v1",
+      "logisticsPolicyRef":"policy.core.industrial_union.logistics.v1",
+      "fleetDoctrineRef":"policy.core.industrial_union.fleet.v1",
+      "diplomacyPolicyRef":"policy.core.industrial_union.diplomacy.v1",
+      "territoryPolicyRef":"policy.core.industrial_union.territory.v1",
+      "knowledgePolicyRef":"policy.core.industrial_union.knowledge.v1",
+      "recoveryPolicyRef":"policy.core.industrial_union.recovery.v1",
+      "authoredContentManifestRef":"manifest.core.industrial_union.v1",
+      "shipVisualProfileRef":"visual.core.industrial_union.ship.v1",
+      "characterVisualProfileRef":"visual.core.industrial_union.character.v1",
+      "localizationRef":"localization.core.industrial_union.v1",
+      "compatibilityAliases":[]
+    }
+  ]
+}

@@ -180,6 +180,9 @@ Faction work в нём ограничено следующим:
 
 # 7. Stage 22 milestone M22.0 — authority inventory и migration
 
+> **COMPLETE.** Machine-readable governance, repository inventory, stable-ID disposition and
+> persistence/migration evidence merged in PR #343; post-merge Java-17 verification is green.
+
 ## M22.0.1. Полная инвентаризация identities
 
 Построить machine-readable report всех мест, где faction ID появляется:
@@ -260,6 +263,11 @@ fixture
 
 # 8. Stage 22 milestone M22.1 — faction profile contract
 
+> **CLOSURE CANDIDATE in PR #344.** The versioned core-pair schema, existing-authority bindings,
+> deterministic fingerprint, bounded persistence sidecar and targeted acceptance coverage are
+> implemented. Decision record: `docs/stage22_1_faction_profile_contract.md`. M22.2 remains blocked
+> until exact-head and post-merge CI complete.
+
 ## M22.1.1. Conceptual data shape
 
 Рекомендуемая логическая запись (название не является обязательным API):
@@ -327,6 +335,8 @@ Validator должен ловить:
 ---
 
 # 9. Stage 22 milestone M22.2 — shared core content seam
+
+> **NEXT after M22.1 closure.** No role/fit/production/visual production manifest is promoted early.
 
 До faction-specific bulk authoring подготовить общие контракты:
 

@@ -1,6 +1,6 @@
 # Star Empires — Stage 22 Content Width / Technology / Balance / Long-run Stability
 
-> Статус: **PLANNED**  
+> Статус: **ACTIVE — M22.0 COMPLETE; M22.1 closure candidate; M22.2 NEXT after green merge**
 > Основание: production Stage 17.5 + Stage 18 industrial foundation + Stages 19–21 world/war/RPG layers  
 > Назначение: расширить мир, корабли, модули, технологии и faction differentiation, не создавая вторую систему правил и не ломая Stage-18 resource/industry ontology.  
 > **Production-complete sovereign faction scope Stage 22: Империя + Индустриальный Союз.**
@@ -16,6 +16,7 @@ Canonical faction scope and horizon:
 - `docs/factions/post_core_faction_horizon.md`;
 - `docs/factions/faction_balance_validation_framework.md`;
 - `docs/factions/faction_implementation_roadmap.md`;
+- `docs/stage22_1_faction_profile_contract.md`;
 - `docs/characters/character_master_prompt.md`.
 
 Директорат, Лига Свободных Систем, Пограничная Конфедерация, Консорциум и Кочевой Флот являются
