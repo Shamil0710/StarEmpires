@@ -1,5 +1,7 @@
 package com.spacesim.content;
 
+import com.spacesim.content.Stage22ContentGovernanceCatalog.ContentMaturity;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -88,6 +90,7 @@ public final class Stage22CoreProductionManifestCatalog {
                     .append(manifest.hullId()).append('|').append(manifest.shipyardId()).append('|')
                     .append(String.join(",", manifest.componentIds())).append('|')
                     .append(String.join(",", manifest.requiredFacilityIds())).append('|')
+                    .append(manifest.contentMaturity()).append('|')
                     .append(manifest.semanticIntent()).append('\n');
         }
         for (SupportEnduranceRequirement endurance : supportEnduranceRequirements) {
@@ -161,6 +164,7 @@ public final class Stage22CoreProductionManifestCatalog {
      * @param componentIds exact installed module/component IDs required by the fit
      * @param shipyardId Stage-18 shipyard able to build/service the hull
      * @param requiredFacilityIds Stage-18 facility definitions required by that shipyard
+     * @param contentMaturity shared Stage-22.0 governed authoring maturity
      * @param semanticIntent authoring rationale; never a gameplay modifier
      */
     public record ProductionManifestDefinition(
@@ -170,6 +174,7 @@ public final class Stage22CoreProductionManifestCatalog {
             List<String> componentIds,
             String shipyardId,
             List<String> requiredFacilityIds,
+            ContentMaturity contentMaturity,
             String semanticIntent) {
         /** Validates one immutable reference manifest. */
         public ProductionManifestDefinition {
@@ -179,6 +184,7 @@ public final class Stage22CoreProductionManifestCatalog {
             componentIds = distinctContentIds(componentIds, "componentIds");
             shipyardId = requireContentId(shipyardId, "shipyardId");
             requiredFacilityIds = distinctContentIds(requiredFacilityIds, "requiredFacilityIds");
+            contentMaturity = Objects.requireNonNull(contentMaturity, "contentMaturity not set");
             semanticIntent = requireText(semanticIntent, "production semanticIntent");
         }
     }
