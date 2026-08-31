@@ -272,7 +272,7 @@ public final class Stage22FactionProfileLoader {
                     profile.characterVisualProfileRef(), VisualKind.CHARACTER, profile.packageKey(), catalog, visualUses);
             LocalizationDefinition localization = requireReference(
                     catalog.findLocalization(profile.localizationRef()), "localization", profile.localizationRef());
-            if (!localization.namespace().equals("faction." + profile.packageKey())
+            if (!localization.namespace().equals("localization." + profile.packageKey())
                     || !localization.languages().containsAll(governance.getAuthoringContract().localizationLanguages())
                     || !localization.sourceLanguage().equals(governance.getAuthoringContract().sourceLanguage())) {
                 throw new IllegalArgumentException("Profile localization contract mismatch: " + profile.profileId());

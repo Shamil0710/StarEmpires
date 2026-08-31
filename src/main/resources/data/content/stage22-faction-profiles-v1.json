@@ -86,8 +86,8 @@
     {"id":"visual.core.industrial_union.character.v1","kind":"CHARACTER","packageKey":"core.industrial_union","status":"CONCEPT","authorityDocument":"docs/factions/industrial_union_visual_bible.md"}
   ],
   "localizations": [
-    {"id":"localization.core.empire.v1","namespace":"faction.core.empire","sourceLanguage":"ru","languages":["ru","en"]},
-    {"id":"localization.core.industrial_union.v1","namespace":"faction.core.industrial_union","sourceLanguage":"ru","languages":["ru","en"]}
+    {"id":"localization.core.empire.v1","namespace":"localization.core.empire","sourceLanguage":"ru","languages":["ru","en"]},
+    {"id":"localization.core.industrial_union.v1","namespace":"localization.core.industrial_union","sourceLanguage":"ru","languages":["ru","en"]}
   ],
   "systemicProfiles": [
     {

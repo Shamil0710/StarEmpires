@@ -42,6 +42,8 @@ class Stage22FactionProfileLoaderTest {
                 manifest.scope() == PackageScope.CORE
                         && manifest.maturity() == ContentMaturity.SEED
                         && manifest.roleBindings().isEmpty()));
+        assertTrue(first.localizations().stream().allMatch(localization ->
+                localization.namespace().startsWith("localization.core.")));
 
         var empire = first.findProfileForFaction("faction.imperial_directorate");
         var union = first.findProfileForFaction("faction.industrial_combine");
