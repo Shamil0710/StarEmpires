@@ -149,7 +149,13 @@ public final class Stage22FactionIdentityEvidence {
 
     /** One roadmap-required evidence record attached to a governed identity disposition. */
     public record EvidenceRecord(String stableFactionId, String telemetryEvent, String fixture) {
-        /** Validates one identity evidence record. */
+        /**
+         * Validates one identity evidence record.
+         *
+         * @param stableFactionId stable runtime/save faction ID
+         * @param telemetryEvent deterministic telemetry event ID
+         * @param fixture acceptance-fixture evidence descriptor
+         */
         public EvidenceRecord {
             stableFactionId = Stage22ContentGovernanceCatalog.requireFactionId(stableFactionId);
             telemetryEvent = Stage22ContentGovernanceCatalog.requireContentId(
