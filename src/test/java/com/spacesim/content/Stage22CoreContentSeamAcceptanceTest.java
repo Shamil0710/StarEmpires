@@ -1,5 +1,6 @@
 package com.spacesim.content;
 
+import com.spacesim.content.Stage22ContentGovernanceCatalog.ContentMaturity;
 import com.spacesim.content.Stage22CoreContentSeamCatalog.RoleDomain;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ class Stage22CoreContentSeamAcceptanceTest {
         var manifest = production.findManifestForFit(template.fitId());
         assertNotNull(manifest);
         assertEquals(template.productionHullId(), manifest.hullId());
+        assertEquals(ContentMaturity.CANDIDATE, manifest.contentMaturity());
         var visual = seam.findVisualBinding(template.visualBindingId());
         assertNotNull(visual);
         assertEquals(template.fitId(), visual.fitId());
@@ -91,9 +93,11 @@ class Stage22CoreContentSeamAcceptanceTest {
     @Test
     void commonContentIdsAndMetadataRemainFactionNeutral() {
         Stage22CoreContentSeamCatalog seam = Stage22CoreContentSeamLoader.loadDefault();
+        Stage22CoreProductionManifestCatalog production = Stage22CoreProductionManifestLoader.loadDefault();
         String canonical = seam.roles() + "|" + seam.missionProfiles() + "|" + seam.lineages()
                 + "|" + seam.visualBindings() + "|" + seam.localizationRules()
-                + "|" + seam.telemetryHooks() + "|" + seam.authoringTemplates();
+                + "|" + seam.telemetryHooks() + "|" + seam.authoringTemplates()
+                + "|" + production.productionManifests() + "|" + production.supportEnduranceRequirements();
         String lower = canonical.toLowerCase(java.util.Locale.ROOT);
 
         assertFalse(lower.contains("core.empire"));
