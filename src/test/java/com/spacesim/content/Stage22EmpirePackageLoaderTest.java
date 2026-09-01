@@ -2,6 +2,8 @@ package com.spacesim.content;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -25,6 +27,22 @@ class Stage22EmpirePackageLoaderTest {
         assertEquals(first.fingerprint(), second.fingerprint());
         assertNotNull(first.findShipForRole("role.military.battleship"));
         assertNotNull(first.findMission("mission.empire.formal_market_access"));
+    }
+
+    @Test
+    void preservesAuthoredStoryChainMissionOrder() {
+        Stage22EmpirePackageCatalog empire = Stage22EmpirePackageLoader.loadDefault();
+
+        assertEquals(List.of(
+                        "mission.empire.formal_market_access",
+                        "mission.empire.reserve_delivery",
+                        "mission.empire.convoy_guard"),
+                empire.findChain("story_chain.empire.reserve_and_oath").missionTemplateIds());
+        assertEquals(List.of(
+                        "mission.empire.frontier_recon",
+                        "mission.empire.route_defense",
+                        "mission.empire.yard_repair_inputs"),
+                empire.findChain("story_chain.empire.broken_citadel").missionTemplateIds());
     }
 
     @Test
