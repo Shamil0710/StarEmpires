@@ -41,7 +41,11 @@ public final class Stage22EmpireCharacterLineup {
         throw new AssertionError("utility class");
     }
 
-    /** Loads and strictly validates the built-in Empire character overlay lineup. */
+    /**
+     * Loads and strictly validates the built-in Empire character overlay lineup.
+     *
+     * @return immutable validated built-in lineup
+     */
     public static Catalog loadDefault() {
         try (InputStream stream = Stage22EmpireCharacterLineup.class.getClassLoader()
                 .getResourceAsStream(DEFAULT_RESOURCE)) {
@@ -54,7 +58,12 @@ public final class Stage22EmpireCharacterLineup {
         }
     }
 
-    /** Parses one complete immutable character overlay document. */
+    /**
+     * Parses one complete immutable character overlay document.
+     *
+     * @param json complete lineup JSON document
+     * @return immutable validated lineup
+     */
     public static Catalog parse(String json) {
         Objects.requireNonNull(json, "json");
         if (json.isBlank()) {
@@ -102,7 +111,15 @@ public final class Stage22EmpireCharacterLineup {
             String factionVisualRef,
             List<OverlayDefinition> overlays,
             String fingerprint) {
-        /** Validates and canonicalizes one character lineup. */
+        /**
+         * Validates and canonicalizes one character lineup.
+         *
+         * @param schemaVersion supported lineup schema version
+         * @param catalogVersion stable lineup catalog version
+         * @param masterPromptRef canonical shared Character Master Prompt document
+         * @param factionVisualRef canonical Empire visual bible document
+         * @param overlays authored Empire character overlays
+         */
         public Catalog(
                 int schemaVersion,
                 String catalogVersion,
@@ -118,6 +135,7 @@ public final class Stage22EmpireCharacterLineup {
                     "");
         }
 
+        /** Validates canonical record state and computes the deterministic fingerprint. */
         public Catalog {
             if (schemaVersion != 1) {
                 throw new IllegalArgumentException("Empire character lineup schema must be 1");
@@ -145,7 +163,12 @@ public final class Stage22EmpireCharacterLineup {
                     schemaVersion, catalogVersion, masterPromptRef, factionVisualRef, overlays);
         }
 
-        /** Finds one overlay by stable ID. */
+        /**
+         * Finds one overlay by stable ID.
+         *
+         * @param id stable character overlay ID
+         * @return matching overlay, or {@code null} when absent
+         */
         public OverlayDefinition findOverlay(String id) {
             for (OverlayDefinition overlay : overlays) {
                 if (overlay.id().equals(id)) {
@@ -164,6 +187,7 @@ public final class Stage22EmpireCharacterLineup {
             String statusReadability,
             String practicalGear,
             String condition) {
+        /** Validates and normalizes one Empire character overlay. */
         public OverlayDefinition {
             id = requireContentId(id, "overlay id");
             if (!id.startsWith("character_overlay.empire.")) {
