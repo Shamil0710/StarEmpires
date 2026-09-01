@@ -292,7 +292,17 @@ public final class Stage22EmpirePackageValidator {
             String shipyardFingerprint,
             String stationFingerprint,
             Map<String, FamilyMetrics> familyMetrics) {
-        /** Validates and freezes the per-role diagnostic metrics map. */
+        /**
+         * Validates and freezes the per-role diagnostic metrics map.
+         *
+         * @param packageFingerprint deterministic Empire package semantic fingerprint
+         * @param productionFingerprint deterministic production-manifest fingerprint
+         * @param engineeringFingerprint deterministic engineering-catalog fingerprint
+         * @param manufacturingFingerprint deterministic manufacturing-catalog fingerprint
+         * @param shipyardFingerprint deterministic shipyard-catalog fingerprint
+         * @param stationFingerprint deterministic station-infrastructure fingerprint
+         * @param familyMetrics immutable per-role engineering burden and margin diagnostics
+         */
         public ValidationReport {
             familyMetrics = Map.copyOf(familyMetrics);
         }
