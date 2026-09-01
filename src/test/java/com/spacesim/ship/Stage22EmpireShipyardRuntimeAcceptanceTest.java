@@ -13,6 +13,7 @@ import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipyardEconomyBridge.PhysicalInputBinding;
+import com.spacesim.ship.ShipyardEngineeringService.MaintenanceState;
 import com.spacesim.ship.ShipyardEngineeringService.ShipyardCapability;
 import com.spacesim.ship.ShipyardEngineeringService.WorkPlan;
 import org.junit.jupiter.api.Test;
@@ -94,20 +95,70 @@ class Stage22EmpireShipyardRuntimeAcceptanceTest {
         assertEquals(fixture.refit(), completion.fit());
     }
 
+    @Test
+    void everyFamilyPlansDeterministicBuildRefitRepairAndMaintenanceThroughSharedRuntime() {
+        var empire = Stage22EmpirePackageLoader.loadDefault();
+        assertEquals(9, empire.shipFamilies().size());
+        long assetSequence = 22_310_000L;
+        for (var family : empire.shipFamilies()) {
+            Fixture fixture = fixture(family.roleId());
+            WorkPlan build = fixture.service().planBuild(fixture.primary(), fixture.yard());
+            WorkPlan repeatedBuild = fixture.service().planBuild(fixture.primary(), fixture.yard());
+            assertTrue(build.feasibility().feasible(), family.familyId());
+            assertEquals(build.requirements(), repeatedBuild.requirements(), family.familyId());
+            assertFalse(build.requirements().inputs().isEmpty(), family.familyId());
+
+            EntityId asset = new EntityId(++assetSequence);
+            WorkPlan refit = fixture.service().planRefit(
+                    asset,
+                    fixture.primary(),
+                    fixture.refit(),
+                    ConsumableState.empty(),
+                    pristineDamage(fixture.engineering(), fixture.primary()),
+                    fixture.yard());
+            assertTrue(refit.feasibility().feasible(), family.familyId());
+            assertFalse(refit.affectedMounts().isEmpty(), family.familyId());
+
+            WorkPlan repair = fixture.service().planRepair(
+                    asset,
+                    fixture.primary(),
+                    ConsumableState.empty(),
+                    damagedSnapshot(fixture.engineering(), fixture.primary()),
+                    fixture.yard());
+            assertTrue(repair.feasibility().feasible(), family.familyId());
+            assertFalse(repair.requirements().inputs().isEmpty(), family.familyId());
+            assertTrue(repair.requirements().totalWorkSeconds() > 0d, family.familyId());
+
+            MaintenanceState due = fixture.service().advanceMaintenance(
+                    fixture.primary(), MaintenanceState.initial(), 1_000_000d);
+            WorkPlan maintenance = fixture.service().planMaintenance(
+                    asset, fixture.primary(), ConsumableState.empty(), due, fixture.yard());
+            assertTrue(maintenance.feasibility().feasible(), family.familyId());
+            assertFalse(maintenance.affectedMounts().isEmpty(), family.familyId());
+            assertTrue(maintenance.requirements().totalWorkSeconds() > 0d, family.familyId());
+        }
+    }
+
     private static Fixture fixture() {
+        return fixture("role.military.corvette");
+    }
+
+    private static Fixture fixture(String roleId) {
         ShipEngineeringCatalog engineering = Stage22EmpireEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog industrial = Stage22EmpireShipyardIndustrialCatalogLoader.loadDefault();
         ShipyardEngineeringService service = new ShipyardEngineeringService(engineering, industrial);
-        var family = Stage22EmpirePackageLoader.loadDefault().findShipForRole("role.military.corvette");
+        var family = Stage22EmpirePackageLoader.loadDefault().findShipForRole(roleId);
         InstalledFit primary = InstalledFit.fromDemonstrator(engineering.findDemonstratorFit(family.primaryFitId()));
         InstalledFit refit = InstalledFit.fromDemonstrator(engineering.findDemonstratorFit(family.refitFitId()));
-        return new Fixture(engineering, service, primary, refit, capability(engineering, industrial, primary));
+        return new Fixture(engineering, service, primary, refit,
+                capability(engineering, industrial, primary, refit));
     }
 
     private static ShipyardCapability capability(
             ShipEngineeringCatalog engineering,
             ShipyardIndustrialCatalog industrial,
-            InstalledFit fit) {
+            InstalledFit fit,
+            InstalledFit refit) {
         var hull = engineering.findHull(fit.hullId());
         TreeSet<String> fabrication = new TreeSet<>();
         TreeSet<String> tooling = new TreeSet<>();
@@ -128,9 +179,6 @@ class Stage22EmpireShipyardRuntimeAcceptanceTest {
 
         Set<String> moduleIds = new TreeSet<>();
         moduleIds.addAll(fit.installedModules().stream().map(InstalledModuleDefinition::moduleId).toList());
-        var packageCatalog = Stage22EmpirePackageLoader.loadDefault();
-        var refit = engineering.findDemonstratorFit(
-                packageCatalog.findShipForRole("role.military.corvette").refitFitId());
         moduleIds.addAll(refit.installedModules().stream().map(InstalledModuleDefinition::moduleId).toList());
         for (String moduleId : moduleIds) {
             var module = engineering.findModule(moduleId);
@@ -163,6 +211,17 @@ class Stage22EmpireShipyardRuntimeAcceptanceTest {
         Map<String, Double> compartments = new TreeMap<>();
         engineering.findHull(fit.hullId()).compartments().forEach(compartment -> compartments.put(compartment.id(), 1d));
         return new ShipDamageRuntime.Snapshot(compartments, DamageState.pristine());
+    }
+
+    private static ShipDamageRuntime.Snapshot damagedSnapshot(
+            ShipEngineeringCatalog engineering,
+            InstalledFit fit) {
+        var hull = engineering.findHull(fit.hullId());
+        Map<String, Double> compartments = new TreeMap<>();
+        hull.compartments().forEach(compartment -> compartments.put(compartment.id(), 1d));
+        compartments.put(hull.compartments().get(0).id(), 0.5d);
+        String damagedMount = fit.installedModules().get(0).mountId();
+        return new ShipDamageRuntime.Snapshot(compartments, new DamageState(Map.of(damagedMount, 0.5d)));
     }
 
     private record Fixture(
