@@ -275,6 +275,21 @@ public final class Stage22EmpirePackageCatalog {
         return List.copyOf(result);
     }
 
+    private static List<String> orderedContentIds(List<String> values, String label, boolean requireNonEmpty) {
+        List<String> result = new ArrayList<>();
+        for (String value : Objects.requireNonNull(values, label)) {
+            String checked = contentId(value, label + " entry");
+            if (result.contains(checked)) {
+                throw new IllegalArgumentException("Duplicate " + label + ": " + checked);
+            }
+            result.add(checked);
+        }
+        if (requireNonEmpty && result.isEmpty()) {
+            throw new IllegalArgumentException(label + " must not be empty");
+        }
+        return List.copyOf(result);
+    }
+
     private static <T> List<T> sorted(List<T> values, Function<T, String> key, String label) {
         List<T> result = new ArrayList<>(Objects.requireNonNull(values, label));
         result.replaceAll(value -> Objects.requireNonNull(value, label + " entry"));
@@ -430,7 +445,7 @@ public final class Stage22EmpirePackageCatalog {
          */
         public StoryChainDefinition {
             id = contentId(id, "chain id");
-            missionTemplateIds = contentIds(missionTemplateIds, "missionTemplateIds", true);
+            missionTemplateIds = orderedContentIds(missionTemplateIds, "missionTemplateIds", true);
             if (missionTemplateIds.size() < 2) {
                 throw new IllegalArgumentException("Empire story chain requires at least two mission steps: " + id);
             }
