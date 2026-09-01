@@ -264,6 +264,7 @@ public final class Stage22EmpirePackageValidator {
             String shipyardFingerprint,
             String stationFingerprint,
             Map<String, FamilyMetrics> familyMetrics) {
+        /** Validates and freezes the per-role diagnostic metrics map. */
         public ValidationReport {
             familyMetrics = Map.copyOf(familyMetrics);
         }
