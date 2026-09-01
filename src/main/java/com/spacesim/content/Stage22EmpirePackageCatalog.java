@@ -306,7 +306,19 @@ public final class Stage22EmpirePackageCatalog {
             String lineageId,
             String fleetUse,
             String counterplay) {
-        /** Validates one authored Empire ship-family binding. */
+        /**
+         * Validates one authored Empire ship-family binding.
+         *
+         * @param familyId stable Empire ship-family content ID
+         * @param roleId common Stage-22 role ID
+         * @param primaryFitId exact primary engineering fit ID
+         * @param refitFitId exact alternate/refit engineering fit ID
+         * @param productionManifestId production manifest binding for the primary fit
+         * @param visualBindingId exact-fit visual binding ID
+         * @param lineageId manufacturer/design/procurement lineage ID
+         * @param fleetUse authored fleet-composition use and support semantics
+         * @param counterplay intended physical/economic counterplay
+         */
         public ShipFamilyDefinition {
             familyId = contentId(familyId, "ship familyId");
             roleId = contentId(roleId, "ship roleId");
@@ -329,7 +341,14 @@ public final class Stage22EmpirePackageCatalog {
             String stage18ArchetypeId,
             List<String> requiredFacilityIds,
             String visualBrief) {
-        /** Validates one Empire signature station variant. */
+        /**
+         * Validates one Empire signature station variant.
+         *
+         * @param id stable Empire station-variant ID
+         * @param stage18ArchetypeId existing Stage-18 station archetype authority binding
+         * @param requiredFacilityIds facilities that must be installed by the bound archetype
+         * @param visualBrief faction visual requirements layered over the common station role
+         */
         public StationVariantDefinition {
             id = contentId(id, "station id");
             stage18ArchetypeId = contentId(stage18ArchetypeId, "stage18ArchetypeId");
@@ -346,7 +365,16 @@ public final class Stage22EmpirePackageCatalog {
             String characterOverlayId,
             String publicVoice,
             String privateVoice) {
-        /** Validates one recurring Empire NPC binding. */
+        /**
+         * Validates one recurring Empire NPC binding.
+         *
+         * @param id stable recurring NPC ID retained from accepted Stage-21H content
+         * @param nameKey localization/content name key
+         * @param role existing Stage-21H NPC role authority binding
+         * @param characterOverlayId Empire character-overlay presentation binding
+         * @param publicVoice authored public-facing voice brief
+         * @param privateVoice authored private/relationship voice brief
+         */
         public RecurringNpcDefinition {
             id = contentId(id, "NPC id");
             nameKey = contentId(nameKey, "NPC nameKey");
@@ -365,7 +393,16 @@ public final class Stage22EmpirePackageCatalog {
             ObjectiveAuthority authority,
             ObjectiveKind objectiveKind,
             String semanticIntent) {
-        /** Validates one Empire faction-facing mission template. */
+        /**
+         * Validates one Empire faction-facing mission template.
+         *
+         * @param id stable authored mission-template ID
+         * @param issuerNpcId stable recurring NPC issuer ID
+         * @param runtimeTemplate existing Stage-21H runtime mission template
+         * @param authority existing Stage-21H objective truth authority
+         * @param objectiveKind existing Stage-21H objective kind
+         * @param semanticIntent authored faction-facing mission intent
+         */
         public MissionTemplateDefinition {
             id = contentId(id, "mission id");
             issuerNpcId = contentId(issuerNpcId, "issuerNpcId");
@@ -384,7 +421,13 @@ public final class Stage22EmpirePackageCatalog {
 
     /** One deterministic short authored Empire chain made exclusively from package mission templates. */
     public record StoryChainDefinition(String id, List<String> missionTemplateIds, String semanticIntent) {
-        /** Validates one deterministic Empire story-chain definition. */
+        /**
+         * Validates one deterministic Empire story-chain definition.
+         *
+         * @param id stable story-chain content ID
+         * @param missionTemplateIds ordered package mission-template IDs used by the chain
+         * @param semanticIntent authored narrative/causal intent for the chain
+         */
         public StoryChainDefinition {
             id = contentId(id, "chain id");
             missionTemplateIds = contentIds(missionTemplateIds, "missionTemplateIds", true);
@@ -397,7 +440,14 @@ public final class Stage22EmpirePackageCatalog {
 
     /** Machine-readable visual/character authoring invariant retained beside package content. */
     public record VisualRuleDefinition(String id, String medium, String authorityDocument, String requirement) {
-        /** Validates one package-level visual authoring rule. */
+        /**
+         * Validates one package-level visual authoring rule.
+         *
+         * @param id stable visual-rule content ID
+         * @param medium presentation medium governed by the rule
+         * @param authorityDocument canonical repository visual authority document
+         * @param requirement machine-readable human-authored visual requirement
+         */
         public VisualRuleDefinition {
             id = contentId(id, "visual rule id");
             medium = text(medium, "visual medium");
