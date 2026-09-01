@@ -188,7 +188,14 @@ public final class Stage22EmpireIndustrialProgram {
             String commodityId,
             Set<String> affectedFunctions,
             String semanticReason) {
-        /** Validates one industrial bottleneck definition. */
+        /**
+         * Validates one industrial bottleneck definition.
+         *
+         * @param id stable bottleneck content ID
+         * @param commodityId finite Stage-18 commodity whose shortage drives the bottleneck
+         * @param affectedFunctions authored functions exposed to the commodity dependency
+         * @param semanticReason causal explanation for the dependency
+         */
         public BottleneckDefinition {
             id = requireText(id, "bottleneck id");
             commodityId = requireText(commodityId, "bottleneck commodityId");
@@ -207,7 +214,15 @@ public final class Stage22EmpireIndustrialProgram {
             int targetCoverageDays,
             String procurementPolicyRef,
             String semanticIntent) {
-        /** Validates one reserve-policy definition. */
+        /**
+         * Validates one reserve-policy definition.
+         *
+         * @param id stable reserve-policy content ID
+         * @param commodityId finite Stage-18 commodity held by ordinary inventory authorities
+         * @param targetCoverageDays desired planning coverage in days
+         * @param procurementPolicyRef existing common procurement policy binding
+         * @param semanticIntent causal reserve-planning intent
+         */
         public ReservePolicyDefinition {
             id = requireText(id, "reserve id");
             commodityId = requireText(commodityId, "reserve commodityId");
