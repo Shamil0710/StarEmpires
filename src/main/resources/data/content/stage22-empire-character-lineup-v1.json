@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "stage22.empire_character_lineup.v1",
+  "masterPromptRef": "docs/characters/character_master_prompt.md",
+  "factionVisualRef": "docs/factions/empire_visual_bible.md",
+  "overlays": [
+    {
+      "id": "character_overlay.empire.industrial_engineer",
+      "roleKey": "industrial_worker_technician",
+      "roleBrief": "Shipyard technician or industrial engineer working around maintainable machinery, tolerances, tools and service records.",
+      "statusReadability": "Work responsibility reads through standardized worn utility clothing, tool access, repair markings and equipment quality rather than ornament.",
+      "practicalGear": "Tool belt, sealed diagnostic slate, service gloves, reinforced knees and one restrained burgundy service identifier.",
+      "condition": "Normal working wear: regulated repairs, faded fabric and minor stains; never chaotic rags."
+    },
+    {
+      "id": "character_overlay.empire.fleet_enlisted_specialist",
+      "roleKey": "fleet_enlisted_specialist",
+      "roleBrief": "Enlisted naval specialist responsible for a practical shipboard system or watch station.",
+      "statusReadability": "Rank remains subordinate and functional: dark regulated work uniform, role patch, minimal personal accessories and durable pressure-layer details.",
+      "practicalGear": "Compact headset, service identifier, gloves and one role-specific diagnostic or maintenance tool.",
+      "condition": "Clean enough for watchstanding, visibly lived-in and repeatedly maintained."
+    },
+    {
+      "id": "character_overlay.empire.line_officer",
+      "roleKey": "line_officer",
+      "roleBrief": "Junior or mid-grade naval line officer responsible for watchkeeping, crew and formal orders.",
+      "statusReadability": "Sharper dark-navy cut, clean protective elements, restrained collar or chest identifiers and little loose equipment.",
+      "practicalGear": "Command communicator, sealed duty tablet and compact emergency pressure equipment.",
+      "condition": "Disciplined daily service wear with small realistic creases and maintenance marks."
+    },
+    {
+      "id": "character_overlay.empire.senior_officer",
+      "roleKey": "senior_officer",
+      "roleBrief": "Senior fleet officer responsible for readiness, trained crews and preservation of strategic assets.",
+      "statusReadability": "Higher-quality ivory-grey command layer over a dark pressure under-suit, strict symmetry, sparse brass authority marks and no decorative excess.",
+      "practicalGear": "Command communicator and formal-but-functional sealed duty tablet.",
+      "condition": "Well maintained and controlled; age and service are visible in face and small garment wear rather than grime."
+    },
+    {
+      "id": "character_overlay.empire.civil_administrator",
+      "roleKey": "civil_administrator",
+      "roleBrief": "Civil administrator handling law, access, obligations, records and institutional continuity.",
+      "statusReadability": "Authority reads through precise tailoring, document tools, cleanliness and restrained insignia rather than military armor or historical costume.",
+      "practicalGear": "Secure administrative slate, identity seal and compact communications unit.",
+      "condition": "Professional daily wear with subtle use and no glamorous presentation."
+    },
+    {
+      "id": "character_overlay.empire.service_noble",
+      "roleKey": "noble_high_official",
+      "roleBrief": "High official or service noble whose legitimacy is expressed as state responsibility, not fantasy aristocratic spectacle.",
+      "statusReadability": "Best material quality, controlled ivory and dark-navy layering, rare old-brass authority marks and strict cut; ornament remains sparse.",
+      "practicalGear": "Secure state communicator and one formal service insignia with a practical fastening system.",
+      "condition": "Carefully maintained, human and lived-in, never glossy or ceremonial-costume heavy."
+    },
+    {
+      "id": "character_overlay.empire.field_worn_variant",
+      "roleKey": "field_damaged_tired_variant",
+      "roleBrief": "Damaged or exhausted field-service variant of an otherwise valid Imperial role after prolonged operations.",
+      "statusReadability": "Faction and rank remain legible through surviving cut, repairs, insignia placement and disciplined equipment even when dirty or damaged.",
+      "practicalGear": "Patched pressure layer, emergency repair tape, used gloves and one still-functional role tool.",
+      "condition": "Tired, scorched or stained with controlled field repairs; never post-apocalyptic rags and never a different art style."
+    },
+    {
+      "id": "character_overlay.empire.logistics_specialist",
+      "roleKey": "logistics_specialist",
+      "roleBrief": "Logistics specialist responsible for cargo, reserves, routing and delivery accountability.",
+      "statusReadability": "Practical regulated utility cut with cargo-control markings, high-use pockets and restrained faction identifiers.",
+      "practicalGear": "Cargo manifest slate, route communicator and standardized handling gloves.",
+      "condition": "Repeatedly used but orderly service clothing; visible seam repairs and minor stains."
+    },
+    {
+      "id": "character_overlay.empire.recon_officer",
+      "roleKey": "recon_officer",
+      "roleBrief": "Reconnaissance and intelligence officer who communicates evidence, provenance and uncertainty.",
+      "statusReadability": "Officer discipline remains visible but equipment prioritizes sensors, secure data handling and field practicality over ceremony.",
+      "practicalGear": "Secure sensor/data slate, compact optics or diagnostic instrument and subdued comms gear.",
+      "condition": "Controlled field wear with no cinematic spy styling."
+    }
+  ]
+}
