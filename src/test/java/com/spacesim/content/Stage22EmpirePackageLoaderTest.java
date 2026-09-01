@@ -34,6 +34,8 @@ class Stage22EmpirePackageLoaderTest {
                 source.replace("faction.imperial_directorate", "faction.empire")));
         assertThrows(IllegalArgumentException.class, () -> Stage22EmpirePackageLoader.parse(
                 source.replace("\"authority\":\"DIPLOMACY\"", "\"authority\":\"EMPIRE_ONLY\"")));
+        assertThrows(IllegalArgumentException.class, () -> Stage22EmpirePackageLoader.parse(
+                source.replace("\"authority\":\"DIPLOMACY\"", "\"authority\":\"FLEET\"")));
     }
 
     @Test
@@ -44,7 +46,7 @@ class Stage22EmpirePackageLoaderTest {
                         "mission.empire.missing\",\"mission.empire.reserve_delivery")));
 
         String withoutOneMission = source.replace(
-                "    {\"id\":\"mission.empire.readiness_muster\",\"issuerNpcId\":\"npc.empire.arkady_serebryakov\",\"authority\":\"FLEET\",\"objectiveKind\":\"FLEET_PRESENT_IN_SYSTEM\",\"semanticIntent\":\"Assemble a named persistent fleet at the designated staging system through ordinary movement orders.\"}\n",
+                "    {\"id\":\"mission.empire.readiness_muster\",\"issuerNpcId\":\"npc.imperial.mikhail-orlov\",\"authority\":\"FLEET\",\"objectiveKind\":\"FLEET_PRESENT_IN_SYSTEM\",\"semanticIntent\":\"Assemble a named persistent fleet at the designated staging system through ordinary movement orders.\"}\n",
                 "");
         assertThrows(IllegalArgumentException.class, () -> Stage22EmpirePackageLoader.parse(withoutOneMission));
     }

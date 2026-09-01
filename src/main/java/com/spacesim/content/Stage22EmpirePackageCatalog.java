@@ -353,7 +353,29 @@ public final class Stage22EmpirePackageCatalog {
             issuerNpcId = contentId(issuerNpcId, "issuerNpcId");
             authority = Objects.requireNonNull(authority, "mission authority");
             objectiveKind = Objects.requireNonNull(objectiveKind, "mission objectiveKind");
+            if (authority != expectedAuthority(objectiveKind)) {
+                throw new IllegalArgumentException(
+                        "Empire mission objective authority mismatch: " + id + " -> "
+                                + authority + "/" + objectiveKind);
+            }
             semanticIntent = text(semanticIntent, "mission semanticIntent");
+        }
+
+        private static ObjectiveAuthority expectedAuthority(ObjectiveKind kind) {
+            return switch (kind) {
+                case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> ObjectiveAuthority.FREIGHT;
+                case FLEET_PRESENT_IN_SYSTEM,
+                        FLEET_ABSENT,
+                        ESCORT_FLEETS_PRESENT_IN_SYSTEM,
+                        FLEET_REACTION_MASS_KG_AT_LEAST -> ObjectiveAuthority.FLEET;
+                case DISCOVERY_AT_LEAST -> ObjectiveAuthority.DISCOVERY;
+                case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST -> ObjectiveAuthority.INDUSTRY;
+                case CONSTRUCTION_DELIVERED_UNITS_AT_LEAST,
+                        CONSTRUCTION_COMPLETED -> ObjectiveAuthority.CONSTRUCTION;
+                case MARKET_ACCESS_ALLOWED -> ObjectiveAuthority.DIPLOMACY;
+                case OPERATION_STATUS -> ObjectiveAuthority.OPERATION;
+                case FACTION_TREASURY_AT_LEAST -> ObjectiveAuthority.ECONOMY;
+            };
         }
     }
 

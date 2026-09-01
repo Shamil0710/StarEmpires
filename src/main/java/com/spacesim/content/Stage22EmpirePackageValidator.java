@@ -13,6 +13,9 @@ import com.spacesim.content.ship.ShipyardIndustrialCatalogLoader;
 import com.spacesim.content.ship.Stage22AuthoredShipyardIndustrialBridge;
 import com.spacesim.content.ship.Stage22EmpireEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22EmpireShipyardIndustrialCatalogLoader;
+import com.spacesim.world.Stage21HImperialGoldSlice;
+import com.spacesim.world.Stage21HNpcMissionState.NpcState;
+import com.spacesim.world.StarSystemId;
 
 import java.net.URL;
 import java.util.LinkedHashMap;
@@ -66,6 +69,7 @@ public final class Stage22EmpirePackageValidator {
 
         validateRoleCoverage(empire, common);
         validateStations(empire, stations);
+        validateNpcContinuity(empire);
         validateMissionIssuers(empire);
 
         var yard = require(combinedShipyards.findYard(Stage22EmpireProductionCatalogs.YARD_ID), "Empire yard");
@@ -155,6 +159,23 @@ public final class Stage22EmpirePackageValidator {
     private static void validateMissionIssuers(Stage22EmpirePackageCatalog empire) {
         for (Stage22EmpirePackageCatalog.MissionTemplateDefinition mission : empire.missions()) {
             require(empire.findNpc(mission.issuerNpcId()), "mission issuer " + mission.issuerNpcId());
+        }
+    }
+
+    private static void validateNpcContinuity(Stage22EmpirePackageCatalog empire) {
+        var acceptedContacts = Stage21HImperialGoldSlice.recurringImperialContacts(new StarSystemId(1L));
+        Map<String, NpcState> acceptedById = acceptedContacts.stream()
+                .collect(Collectors.toUnmodifiableMap(value -> value.npcId(), value -> value));
+        if (acceptedById.size() != empire.recurringNpcs().size()) {
+            throw new IllegalArgumentException("Empire package must promote the exact Stage-21H recurring roster");
+        }
+        for (Stage22EmpirePackageCatalog.RecurringNpcDefinition npc : empire.recurringNpcs()) {
+            var accepted = require(acceptedById.get(npc.id()), "Stage-21H recurring NPC " + npc.id());
+            if (!accepted.factionContentId().equals(empire.stableFactionId())
+                    || !accepted.nameKey().equals(npc.nameKey())
+                    || accepted.role() != npc.role()) {
+                throw new IllegalArgumentException("Empire package drifts from Stage-21H NPC identity: " + npc.id());
+            }
         }
     }
 

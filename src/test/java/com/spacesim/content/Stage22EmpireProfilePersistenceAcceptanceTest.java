@@ -4,9 +4,11 @@ import com.spacesim.LargeDemoGalaxyFactory;
 import com.spacesim.persistence.Stage22FactionProfileBindingCodec;
 import com.spacesim.persistence.Stage22FactionProfileBindingState;
 import com.spacesim.world.FactionIdentityResolver;
+import com.spacesim.world.Stage21HImperialGoldSlice;
+import com.spacesim.world.StarSystemId;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -76,5 +78,22 @@ class Stage22EmpireProfilePersistenceAcceptanceTest {
             assertNotNull(lineup.findOverlay(npc.characterOverlayId()), npc.id());
         }
         assertEquals(9, lineup.overlays().size());
+    }
+
+    @Test
+    void productionNpcDefinitionsPromoteStage21HStableIdentitiesWithoutAParallelRoster() {
+        Stage22EmpirePackageCatalog empire = Stage22EmpirePackageLoader.loadDefault();
+        Map<String, Stage22EmpirePackageCatalog.RecurringNpcDefinition> productionById =
+                empire.recurringNpcs().stream().collect(Collectors.toMap(value -> value.id(), value -> value));
+
+        var accepted = Stage21HImperialGoldSlice.recurringImperialContacts(new StarSystemId(1L));
+        assertEquals(accepted.size(), productionById.size());
+        accepted.forEach(contact -> {
+            var production = productionById.get(contact.npcId());
+            assertNotNull(production, contact.npcId());
+            assertEquals(contact.nameKey(), production.nameKey());
+            assertEquals(contact.role(), production.role());
+            assertEquals(empire.stableFactionId(), contact.factionContentId());
+        });
     }
 }
