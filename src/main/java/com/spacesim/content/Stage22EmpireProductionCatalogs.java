@@ -46,7 +46,7 @@ public final class Stage22EmpireProductionCatalogs {
                     fit.hullId(),
                     fit.installedModules().stream().map(value -> value.moduleId()).toList(),
                     YARD_ID,
-                    yard.requiredSupportFacilityDefinitionIds(),
+                    yard.requiredSupportFacilityDefinitionIds().stream().sorted().toList(),
                     ContentMaturity.VALIDATED,
                     "M22.3 Empire primary fit uses ordinary Stage-17.5 engineering and Stage-18 manufacturing/shipyard paths."));
         }
