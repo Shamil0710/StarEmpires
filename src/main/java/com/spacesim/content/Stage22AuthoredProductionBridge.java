@@ -1,13 +1,16 @@
 package com.spacesim.content;
 
 import com.spacesim.content.Stage18ManufacturingCatalog.ProductBindingDefinition;
+import com.spacesim.content.Stage18ManufacturingCatalog.ProductProfileDefinition;
 import com.spacesim.content.Stage18ShipyardCatalog.HullPhysicalProfile;
 import com.spacesim.content.Stage18ShipyardCatalog.ModuleServiceProfile;
 import com.spacesim.content.Stage18ShipyardCatalog.YardDefinition;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Common Stage-22 composition seam for later authored content that must remain inside Stage-18
@@ -32,21 +35,48 @@ public final class Stage22AuthoredProductionBridge {
     public static Stage18ManufacturingCatalog withProductBindings(
             Stage18ManufacturingCatalog base,
             List<ProductBindingDefinition> additions) {
+        return withManufacturingContent(base, List.of(), additions);
+    }
+
+    /**
+     * Adds reusable Stage-22 manufacturing profiles and product bindings to the accepted Stage-18
+     * grammar without replacing component recipes or production runtime semantics.
+     *
+     * @param base accepted Stage-18 manufacturing catalog
+     * @param profiles reusable later-stage product profiles
+     * @param bindings later-stage product-to-profile bindings
+     * @return combined immutable Stage-18 manufacturing catalog
+     */
+    public static Stage18ManufacturingCatalog withManufacturingContent(
+            Stage18ManufacturingCatalog base,
+            List<ProductProfileDefinition> profiles,
+            List<ProductBindingDefinition> bindings) {
         Stage18ManufacturingCatalog checked = Objects.requireNonNull(base, "base");
-        List<ProductBindingDefinition> combined = new ArrayList<>(checked.getProductBindings());
-        for (ProductBindingDefinition addition : Objects.requireNonNull(additions, "additions")) {
-            ProductBindingDefinition value = Objects.requireNonNull(addition, "product binding");
-            if (checked.findProductProfile(value.profileId()) == null) {
-                throw new IllegalArgumentException(
-                        "Stage-22 product binding references unknown Stage-18 profile: " + value.profileId());
+        List<ProductProfileDefinition> profileAdditions = nonNullCopy(profiles, "profiles");
+        List<ProductBindingDefinition> bindingAdditions = nonNullCopy(bindings, "bindings");
+        List<ProductProfileDefinition> combinedProfiles = new ArrayList<>(checked.getProductProfiles());
+        combinedProfiles.addAll(profileAdditions);
+
+        Set<String> knownProfiles = new HashSet<>();
+        combinedProfiles.forEach(value -> {
+            if (!knownProfiles.add(value.id())) {
+                throw new IllegalArgumentException("Duplicate Stage-22 manufacturing profile: " + value.id());
             }
-            combined.add(value);
+        });
+        for (ProductBindingDefinition value : bindingAdditions) {
+            if (!knownProfiles.contains(value.profileId())) {
+                throw new IllegalArgumentException(
+                        "Stage-22 product binding references unknown Stage-18/22 profile: " + value.profileId());
+            }
         }
+
+        List<ProductBindingDefinition> combinedBindings = new ArrayList<>(checked.getProductBindings());
+        combinedBindings.addAll(bindingAdditions);
         return new Stage18ManufacturingCatalog(
                 checked.getSchemaVersion(),
                 checked.getComponentRecipes(),
-                checked.getProductProfiles(),
-                combined);
+                combinedProfiles,
+                combinedBindings);
     }
 
     /**
