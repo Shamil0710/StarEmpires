@@ -15,7 +15,6 @@ import com.spacesim.content.ship.Stage22EmpireEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22EmpireShipyardIndustrialCatalogLoader;
 
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -192,13 +191,16 @@ public final class Stage22EmpirePackageValidator {
         if (!expected.equals(visual.expectedFitFingerprint())) {
             throw new IllegalArgumentException("Stale Empire visual fingerprint: " + visual.id());
         }
+        if (visual.status() != Stage22ContentGovernanceCatalog.AssetStatus.PRODUCTION) {
+            throw new IllegalArgumentException("Empire M22.3 exact-fit visual is not production-approved: " + visual.id());
+        }
         URL asset = Stage22EmpirePackageValidator.class.getClassLoader().getResource(visual.assetRef());
         if (asset == null) {
-            throw new IllegalArgumentException("Missing Empire silhouette resource: " + visual.assetRef());
+            throw new IllegalArgumentException("Missing Empire production visual resource: " + visual.assetRef());
         }
         String lower = visual.assetRef().toLowerCase(java.util.Locale.ROOT);
-        if (!lower.endsWith("_silhouette.svg")) {
-            throw new IllegalArgumentException("Empire Stage-22 visual must bind a silhouette asset: " + visual.id());
+        if (!lower.contains("/production/") || !lower.endsWith("_base.png")) {
+            throw new IllegalArgumentException("Empire production visual must bind a production base PNG: " + visual.id());
         }
     }
 
