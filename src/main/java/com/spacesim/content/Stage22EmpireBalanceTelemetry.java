@@ -17,7 +17,11 @@ public final class Stage22EmpireBalanceTelemetry {
         throw new AssertionError("utility class");
     }
 
-    /** Derives deterministic package-level diagnostics from the cross-authority validation report. */
+    /**
+     * Derives deterministic package-level diagnostics from the cross-authority validation report.
+     *
+     * @return immutable current Empire balance diagnostics
+     */
     public static Report deriveCurrent() {
         Stage22EmpirePackageValidator.ValidationReport validation = Stage22EmpirePackageValidator.validateDefault();
         Map<String, FamilyMetrics> metrics = validation.familyMetrics();
@@ -103,7 +107,21 @@ public final class Stage22EmpireBalanceTelemetry {
             int familyCount,
             int productionYardCount,
             int repairCoveredFamilyCount) {
-        /** Creates a report where every validated family has repair coverage. */
+        /**
+         * Creates a report where every validated family optionally has repair coverage.
+         *
+         * @param packageFingerprint exact package semantic fingerprint
+         * @param totalPrimaryFittedMassKg total dry fitted mass across one primary fit per role
+         * @param capitalMassShare share of total mass in cruiser/battleship/carrier primaries
+         * @param supportMassShare share of total mass in freight/tanker/fleet-support primaries
+         * @param projectionBundleMassKg carrier+tanker+fleet-support dry fitted mass
+         * @param carrierMassKg carrier dry fitted mass alone
+         * @param battleshipToCorvetteMassRatio physical hierarchy indicator
+         * @param averageStaffedCrewBurden average authored staffed crew burden
+         * @param familyCount exact role-family coverage
+         * @param productionYardCount authored Empire construction/service yards
+         * @param allFamiliesRepairCovered whether every family has validated repair coverage
+         */
         public Report(
                 String packageFingerprint,
                 double totalPrimaryFittedMassKg,
