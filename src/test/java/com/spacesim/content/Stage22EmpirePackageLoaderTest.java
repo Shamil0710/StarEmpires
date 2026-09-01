@@ -36,6 +36,9 @@ class Stage22EmpirePackageLoaderTest {
                 source.replace("\"authority\":\"DIPLOMACY\"", "\"authority\":\"EMPIRE_ONLY\"")));
         assertThrows(IllegalArgumentException.class, () -> Stage22EmpirePackageLoader.parse(
                 source.replace("\"authority\":\"DIPLOMACY\"", "\"authority\":\"FLEET\"")));
+        assertThrows(IllegalArgumentException.class, () -> Stage22EmpirePackageLoader.parse(
+                source.replace("\"runtimeTemplate\":\"IMPERIAL_ACCESS_NEGOTIATION\"",
+                        "\"runtimeTemplate\":\"CONVOY_ESCORT\"")));
     }
 
     @Test
@@ -46,7 +49,7 @@ class Stage22EmpirePackageLoaderTest {
                         "mission.empire.missing\",\"mission.empire.reserve_delivery")));
 
         String withoutOneMission = source.replace(
-                "    {\"id\":\"mission.empire.readiness_muster\",\"issuerNpcId\":\"npc.imperial.mikhail-orlov\",\"authority\":\"FLEET\",\"objectiveKind\":\"FLEET_PRESENT_IN_SYSTEM\",\"semanticIntent\":\"Assemble a named persistent fleet at the designated staging system through ordinary movement orders.\"}\n",
+                "    {\"id\":\"mission.empire.readiness_muster\",\"issuerNpcId\":\"npc.imperial.mikhail-orlov\",\"runtimeTemplate\":\"CONVOY_ESCORT\",\"authority\":\"FLEET\",\"objectiveKind\":\"ESCORT_FLEETS_PRESENT_IN_SYSTEM\",\"semanticIntent\":\"Assemble a named readiness group and its escort at the designated staging system through ordinary fleet movement.\"}\n",
                 "");
         assertThrows(IllegalArgumentException.class, () -> Stage22EmpirePackageLoader.parse(withoutOneMission));
     }

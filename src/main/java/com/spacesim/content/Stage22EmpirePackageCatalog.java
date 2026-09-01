@@ -1,5 +1,7 @@
 package com.spacesim.content;
 
+import com.spacesim.world.Stage21HNpcMissionState;
+import com.spacesim.world.Stage21HNpcMissionState.MissionTemplate;
 import com.spacesim.world.Stage21HNpcMissionState.NpcRole;
 import com.spacesim.world.Stage21HNpcMissionState.ObjectiveAuthority;
 import com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind;
@@ -104,6 +106,7 @@ public final class Stage22EmpirePackageCatalog {
         if (this.visualRules.isEmpty()) {
             throw new IllegalArgumentException("Empire package requires visual rules");
         }
+        validateMissionBindings();
         validateChainMissions();
         this.fingerprint = computeFingerprint();
     }
@@ -178,6 +181,19 @@ public final class Stage22EmpirePackageCatalog {
         }
     }
 
+    private void validateMissionBindings() {
+        for (MissionTemplateDefinition mission : missions) {
+            RecurringNpcDefinition issuer = npcById.get(mission.issuerNpcId());
+            if (issuer == null) {
+                throw new IllegalArgumentException("Empire mission references unknown issuer: " + mission.id());
+            }
+            if (!Stage21HNpcMissionState.canIssue(issuer.role(), mission.runtimeTemplate())) {
+                throw new IllegalArgumentException(
+                        "Empire mission issuer cannot issue runtime template: " + mission.id());
+            }
+        }
+    }
+
     private String computeFingerprint() {
         StringBuilder out = new StringBuilder(16_384);
         out.append("schema|").append(schemaVersion).append('|').append(catalogVersion).append('|')
@@ -200,7 +216,8 @@ public final class Stage22EmpirePackageCatalog {
         }
         for (MissionTemplateDefinition value : missions) {
             out.append("mission|").append(value.id()).append('|').append(value.issuerNpcId()).append('|')
-                    .append(value.authority()).append('|').append(value.objectiveKind()).append('|')
+                    .append(value.runtimeTemplate()).append('|').append(value.authority()).append('|')
+                    .append(value.objectiveKind()).append('|')
                     .append(value.semanticIntent()).append('\n');
         }
         for (StoryChainDefinition value : storyChains) {
@@ -344,6 +361,7 @@ public final class Stage22EmpirePackageCatalog {
     public record MissionTemplateDefinition(
             String id,
             String issuerNpcId,
+            MissionTemplate runtimeTemplate,
             ObjectiveAuthority authority,
             ObjectiveKind objectiveKind,
             String semanticIntent) {
@@ -351,31 +369,16 @@ public final class Stage22EmpirePackageCatalog {
         public MissionTemplateDefinition {
             id = contentId(id, "mission id");
             issuerNpcId = contentId(issuerNpcId, "issuerNpcId");
+            runtimeTemplate = Objects.requireNonNull(runtimeTemplate, "mission runtimeTemplate");
             authority = Objects.requireNonNull(authority, "mission authority");
             objectiveKind = Objects.requireNonNull(objectiveKind, "mission objectiveKind");
-            if (authority != expectedAuthority(objectiveKind)) {
+            if (authority != Stage21HNpcMissionState.expectedAuthority(objectiveKind)) {
                 throw new IllegalArgumentException(
                         "Empire mission objective authority mismatch: " + id + " -> "
                                 + authority + "/" + objectiveKind);
             }
+            Stage21HNpcMissionState.validateTemplateObjective(runtimeTemplate, objectiveKind);
             semanticIntent = text(semanticIntent, "mission semanticIntent");
-        }
-
-        private static ObjectiveAuthority expectedAuthority(ObjectiveKind kind) {
-            return switch (kind) {
-                case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> ObjectiveAuthority.FREIGHT;
-                case FLEET_PRESENT_IN_SYSTEM,
-                        FLEET_ABSENT,
-                        ESCORT_FLEETS_PRESENT_IN_SYSTEM,
-                        FLEET_REACTION_MASS_KG_AT_LEAST -> ObjectiveAuthority.FLEET;
-                case DISCOVERY_AT_LEAST -> ObjectiveAuthority.DISCOVERY;
-                case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST -> ObjectiveAuthority.INDUSTRY;
-                case CONSTRUCTION_DELIVERED_UNITS_AT_LEAST,
-                        CONSTRUCTION_COMPLETED -> ObjectiveAuthority.CONSTRUCTION;
-                case MARKET_ACCESS_ALLOWED -> ObjectiveAuthority.DIPLOMACY;
-                case OPERATION_STATUS -> ObjectiveAuthority.OPERATION;
-                case FACTION_TREASURY_AT_LEAST -> ObjectiveAuthority.ECONOMY;
-            };
         }
     }
 

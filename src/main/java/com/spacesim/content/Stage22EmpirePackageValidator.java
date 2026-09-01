@@ -14,6 +14,7 @@ import com.spacesim.content.ship.Stage22AuthoredShipyardIndustrialBridge;
 import com.spacesim.content.ship.Stage22EmpireEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22EmpireShipyardIndustrialCatalogLoader;
 import com.spacesim.world.Stage21HImperialGoldSlice;
+import com.spacesim.world.Stage21HNpcMissionState;
 import com.spacesim.world.Stage21HNpcMissionState.NpcState;
 import com.spacesim.world.StarSystemId;
 
@@ -158,7 +159,11 @@ public final class Stage22EmpirePackageValidator {
 
     private static void validateMissionIssuers(Stage22EmpirePackageCatalog empire) {
         for (Stage22EmpirePackageCatalog.MissionTemplateDefinition mission : empire.missions()) {
-            require(empire.findNpc(mission.issuerNpcId()), "mission issuer " + mission.issuerNpcId());
+            var issuer = require(empire.findNpc(mission.issuerNpcId()), "mission issuer " + mission.issuerNpcId());
+            if (!Stage21HNpcMissionState.canIssue(issuer.role(), mission.runtimeTemplate())) {
+                throw new IllegalArgumentException(
+                        "Empire mission issuer/runtime template mismatch: " + mission.id());
+            }
         }
     }
 

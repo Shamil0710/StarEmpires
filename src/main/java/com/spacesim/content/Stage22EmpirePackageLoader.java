@@ -8,6 +8,7 @@ import com.spacesim.content.Stage22EmpirePackageCatalog.ShipFamilyDefinition;
 import com.spacesim.content.Stage22EmpirePackageCatalog.StationVariantDefinition;
 import com.spacesim.content.Stage22EmpirePackageCatalog.StoryChainDefinition;
 import com.spacesim.content.Stage22EmpirePackageCatalog.VisualRuleDefinition;
+import com.spacesim.world.Stage21HNpcMissionState.MissionTemplate;
 import com.spacesim.world.Stage21HNpcMissionState.NpcRole;
 import com.spacesim.world.Stage21HNpcMissionState.ObjectiveAuthority;
 import com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind;
@@ -132,6 +133,7 @@ public final class Stage22EmpirePackageLoader {
             result.add(new MissionTemplateDefinition(
                     string(node, "id"),
                     string(node, "issuerNpcId"),
+                    enumValue(node, "runtimeTemplate", MissionTemplate.class),
                     enumValue(node, "authority", ObjectiveAuthority.class),
                     enumValue(node, "objectiveKind", ObjectiveKind.class),
                     string(node, "semanticIntent")));

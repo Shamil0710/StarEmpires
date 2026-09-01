@@ -18,7 +18,6 @@ import com.spacesim.world.Stage21HNpcMissionState.MissionTemplate;
 import com.spacesim.world.Stage21HNpcMissionState.MissionWakeup;
 import com.spacesim.world.Stage21HNpcMissionState.NpcAvailability;
 import com.spacesim.world.Stage21HNpcMissionState.NpcKnowledgeFact;
-import com.spacesim.world.Stage21HNpcMissionState.NpcRole;
 import com.spacesim.world.Stage21HNpcMissionState.NpcState;
 import com.spacesim.world.Stage21HNpcMissionState.ReputationEvent;
 import com.spacesim.world.Stage21HNpcMissionState.ReputationEventKind;
@@ -234,7 +233,7 @@ public final class Stage21HNpcMissionService {
             throw new IllegalStateException("Unavailable NPC cannot issue mission: " + issuer.npcId());
         }
         MissionTemplate checkedTemplate = Objects.requireNonNull(template, "Mission template not set");
-        if (!canIssue(issuer.role(), checkedTemplate)) {
+        if (!Stage21HNpcMissionState.canIssue(issuer.role(), checkedTemplate)) {
             throw new IllegalStateException("NPC role lacks authority for mission template: " + checkedTemplate);
         }
         if (deadlineTick <= tick || rewardMilliCredits <= 0L) {
@@ -838,32 +837,6 @@ public final class Stage21HNpcMissionService {
         if (tick < state.simulationTick()) {
             throw new IllegalArgumentException("Stage-21H mutation cannot move backward in time");
         }
-    }
-
-    private static boolean canIssue(NpcRole role, MissionTemplate template) {
-        return switch (role) {
-            case OFFICIAL -> template == MissionTemplate.ORDINARY_MARKET_PROCUREMENT
-                    || template == MissionTemplate.CONSTRUCTION_REPAIR_INPUT_DELIVERY
-                    || template == MissionTemplate.IMPERIAL_ACCESS_NEGOTIATION;
-            case MILITARY -> template == MissionTemplate.CONVOY_ESCORT
-                    || template == MissionTemplate.STRANDED_FLEET_RESCUE_REFUEL
-                    || template == MissionTemplate.SYSTEM_OBJECT_RECONNAISSANCE
-                    || template == MissionTemplate.INTERCEPTION_DEFENSE;
-            case TRADE_LOGISTICS -> template == MissionTemplate.EMERGENCY_SUPPLY_DELIVERY
-                    || template == MissionTemplate.ORDINARY_MARKET_PROCUREMENT
-                    || template == MissionTemplate.CONVOY_ESCORT;
-            case INDUSTRY_YARD -> template == MissionTemplate.EMERGENCY_SUPPLY_DELIVERY
-                    || template == MissionTemplate.ORDINARY_MARKET_PROCUREMENT
-                    || template == MissionTemplate.CONSTRUCTION_REPAIR_INPUT_DELIVERY;
-            case EXPLORATION_INTELLIGENCE -> template == MissionTemplate.SYSTEM_OBJECT_RECONNAISSANCE
-                    || template == MissionTemplate.DERELICT_INVESTIGATION_RECOVERY
-                    || template == MissionTemplate.INTERCEPTION_DEFENSE
-                    || template == MissionTemplate.IMPERIAL_ACCESS_NEGOTIATION;
-            case INDEPENDENT_FRONTIER -> template == MissionTemplate.EMERGENCY_SUPPLY_DELIVERY
-                    || template == MissionTemplate.ORDINARY_MARKET_PROCUREMENT
-                    || template == MissionTemplate.STRANDED_FLEET_RESCUE_REFUEL
-                    || template == MissionTemplate.DERELICT_INVESTIGATION_RECOVERY;
-        };
     }
 
     private static int discoveryMagnitude(Stage20DiscoveryKnowledgeState.DiscoveryState state) {

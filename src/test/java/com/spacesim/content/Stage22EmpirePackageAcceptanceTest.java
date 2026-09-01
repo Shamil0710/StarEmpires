@@ -2,6 +2,7 @@ package com.spacesim.content;
 
 import com.spacesim.content.Stage18ManufacturingProductRegistry.Provenance;
 import com.spacesim.content.ship.Stage22EmpireEngineeringCatalogLoader;
+import com.spacesim.world.Stage21HNpcMissionState;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -109,5 +110,17 @@ class Stage22EmpirePackageAcceptanceTest {
                     fit.installedModules().stream().map(value -> value.moduleId()).collect(Collectors.toSet()),
                     Set.copyOf(manifest.componentIds()));
         }
+    }
+
+    @Test
+    void authoredMissionVariantsRemainInstantiableByStage21HLifecycleAuthority() {
+        var empire = Stage22EmpirePackageLoader.loadDefault();
+        assertEquals(10, empire.missions().size());
+        assertEquals(9, empire.missions().stream().map(value -> value.runtimeTemplate()).distinct().count());
+        empire.missions().forEach(mission -> {
+            var issuer = empire.findNpc(mission.issuerNpcId());
+            assertNotNull(issuer, mission.id());
+            assertTrue(Stage21HNpcMissionState.canIssue(issuer.role(), mission.runtimeTemplate()), mission.id());
+        });
     }
 }
