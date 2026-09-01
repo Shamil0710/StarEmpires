@@ -135,7 +135,16 @@ public final class Stage22EmpireCharacterLineup {
                     "");
         }
 
-        /** Validates canonical record state and computes the deterministic fingerprint. */
+        /**
+         * Validates canonical record state and computes the deterministic fingerprint.
+         *
+         * @param schemaVersion supported lineup schema version
+         * @param catalogVersion stable lineup catalog version
+         * @param masterPromptRef canonical shared Character Master Prompt document
+         * @param factionVisualRef canonical Empire visual bible document
+         * @param overlays canonical authored Empire character overlays
+         * @param fingerprint deterministic fingerprint output, recomputed during validation
+         */
         public Catalog {
             if (schemaVersion != 1) {
                 throw new IllegalArgumentException("Empire character lineup schema must be 1");
@@ -187,7 +196,16 @@ public final class Stage22EmpireCharacterLineup {
             String statusReadability,
             String practicalGear,
             String condition) {
-        /** Validates and normalizes one Empire character overlay. */
+        /**
+         * Validates and normalizes one Empire character overlay.
+         *
+         * @param id stable Empire character-overlay content ID
+         * @param roleKey local role key used by the lineup gate
+         * @param roleBrief practical profession and responsibility brief
+         * @param statusReadability visible hierarchy/status readability requirements
+         * @param practicalGear role-appropriate functional equipment requirements
+         * @param condition wear, fatigue or field-condition presentation requirements
+         */
         public OverlayDefinition {
             id = requireContentId(id, "overlay id");
             if (!id.startsWith("character_overlay.empire.")) {
