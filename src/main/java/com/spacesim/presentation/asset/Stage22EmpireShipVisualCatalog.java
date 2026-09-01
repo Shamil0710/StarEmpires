@@ -225,7 +225,13 @@ public final class Stage22EmpireShipVisualCatalog {
                     "");
         }
 
-        /** Validates the exact M22.3 family floor and computes the presentation fingerprint. */
+        /**
+         * Validates the exact M22.3 family floor and computes the presentation fingerprint.
+         *
+         * @param engineeringFingerprint semantic fingerprint of the engineering source used for geometry
+         * @param families exact canonical nine-family production visual definitions
+         * @param fingerprint deterministic presentation fingerprint output, recomputed during validation
+         */
         public Catalog {
             if (families.size() != Stage22EmpirePackageCatalog.REQUIRED_SHIP_FAMILIES) {
                 throw new IllegalArgumentException("Empire production visual catalog must contain exactly nine families");
@@ -270,7 +276,18 @@ public final class Stage22EmpireShipVisualCatalog {
             ShipVisualAssetSet assets,
             ShipSpriteSpec sprite,
             String provenanceRef) {
-        /** Validates one production family visual binding. */
+        /**
+         * Validates one production family visual binding.
+         *
+         * @param familyId stable Imperial family ID
+         * @param roleId common Stage-22 role ID
+         * @param primaryFitId exact primary engineering fit
+         * @param refitFitId exact refit engineering fit
+         * @param markerSilhouettePath grayscale marker/silhouette resource
+         * @param assets five-layer production visual asset set
+         * @param sprite engineering-derived presentation geometry and anchors
+         * @param provenanceRef canonical faction visual authority
+         */
         public FamilyVisual {
             familyId = requireText(familyId, "familyId");
             roleId = requireText(roleId, "roleId");
