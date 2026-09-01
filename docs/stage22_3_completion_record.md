@@ -1,9 +1,12 @@
 # Stage 22 M22.3 — Empire production package completion record
 
-> Status: **CLOSURE CANDIDATE — implementation complete; final status requires exact-head CI and merge of PR #348.**  
+> Status: **COMPLETE**  
 > Package: `core.empire`  
 > Stable runtime/save identity: `faction.imperial_directorate`  
-> Working PR: #348 — `Stage 22.3: Empire production package`
+> Exact implementation head: `d414c0f5332ed8619fea6691f4d8d988fb24aaf1`  
+> Implementation PR: #349 — `Stage 22.3: Empire production package`  
+> Merged implementation on `main`: `53cd7dcc2e0bbc7a9dbd08599c05b016f7c1d41b`  
+> Post-merge CI: run `33544564428`, job `99978759651` — **SUCCESS**
 
 ## 1. Scope and authority boundary
 
@@ -36,7 +39,7 @@ The validated Empire package contains:
 - **3 manufacturer/design/procurement lineages**;
 - **6 recurring NPCs** promoted without changing accepted Stage-21H identity/role semantics;
 - **10 faction-facing mission templates** whose objective truth stays in Stage-21H;
-- **2 short authored story chains** built only from package mission templates;
+- **2 short authored story chains** built only from package mission templates and preserving authored mission order;
 - a practical Empire character lineup covering the seven mandatory M22.3 functions plus logistics/recon support overlays;
 - a nine-family production ship visual catalog with base, emissive and damage layers plus shared idle/thrust engine VFX.
 
@@ -157,7 +160,7 @@ No save/load path regenerates ships, cargo, treasury, knowledge, repair or missi
 
 Final paired multi-seed outcome tuning, B18–B20 cross-faction review and Stage-22 freeze remain later milestone responsibilities.
 
-## 9. Principal automated evidence
+## 9. Principal automated evidence and merge verification
 
 Targeted M22.3 coverage includes:
 
@@ -171,9 +174,20 @@ Targeted M22.3 coverage includes:
 - `Stage22EmpireProfilePersistenceAcceptanceTest`;
 - `Stage22EmpireShipVisualCatalogTest`;
 - `Stage22EmpireCharacterLineupTest`;
+- `Stage21HNpcMissionStateTest` story-chain ordering regression;
 - upstream Stage-22 governance/profile/shared-seam suites retained in the full repository verify.
 
-The stage is not declared merged/complete by this record alone. Exact PR-head CI, PR readiness, merge and post-merge `main` verification are the final closure steps required by `docs/development_roadmap.md` and the project development controller.
+Closure evidence:
+
+- exact implementation head: `d414c0f5332ed8619fea6691f4d8d988fb24aaf1`;
+- exact-head PR CI run `33532730211` (#5679), Java 17 verification: **SUCCESS**;
+- full verify evidence on the accepted implementation tree: **1896 tests, 0 failures, 0 errors, 1 skipped**, Javadoc and JaCoCo gates green, desktop package built;
+- branch/base audit before merge: implementation branch `behind 0`; no submitted review and no unresolved review thread;
+- draft PR #348 was superseded only as merge vehicle because the connected GitHub Ready-for-review GraphQL mutation failed on a connector schema incompatibility; replacement PR #349 reused the identical branch, exact head and unchanged base;
+- guarded merge of PR #349 produced `main` commit `53cd7dcc2e0bbc7a9dbd08599c05b016f7c1d41b`, whose tree SHA is the same tested implementation tree;
+- post-merge push CI run `33544564428` (#5681), job `99978759651`: **SUCCESS**, including tests, coverage, Javadoc, desktop packaging and artifact upload.
+
+All M22.3 roadmap exit gates are therefore satisfied on merged and post-merge-verified evidence.
 
 ## 10. Intentionally deferred beyond M22.3
 
@@ -188,3 +202,7 @@ M22.3 does **not** implement:
 - Stage-23 polish/release-candidate work.
 
 These are explicit later-stage boundaries, not missing Empire-package authorities.
+
+## 11. Next
+
+**M22.4 — Industrial Union production package is OPEN/NEXT.** Its implementation is intentionally not part of this M22.3 closeout.
