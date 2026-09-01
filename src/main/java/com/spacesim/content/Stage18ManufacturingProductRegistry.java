@@ -19,12 +19,13 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Stage-18D registry of already-existing Stage-17.5 manufactured module and ammunition identities.
+ * Stage-18D registry of manufactured module and ammunition identities.
  *
  * <p>The registry does not redefine combat content. It projects physical unit mass and storage
- * handling for manufacturing recipes while preserving whether an identity is an ordinary
- * production-schema demonstrator or explicitly provisional Stage-17.5I acceptance content.
- * Stage 22 remains responsible for final content promotion/re-authoring.</p>
+ * handling for manufacturing recipes while preserving content provenance. Stage-22 authored
+ * engineering catalogs may be composed into this same registry through
+ * {@link #withEngineeringCatalog(ShipEngineeringCatalog, Provenance)} rather than creating a
+ * faction-specific manufacturing authority.</p>
  */
 public final class Stage18ManufacturingProductRegistry {
     /** Storage class used by finished ship modules in the Stage-18D baseline. */
@@ -86,11 +87,34 @@ public final class Stage18ManufacturingProductRegistry {
     /**
      * Finds a manufactured product by its existing content ID.
      *
-     * @param contentId Stage-17.5 module or ammunition content ID
+     * @param contentId Stage-17.5/22 module or ammunition content ID
      * @return product definition, or {@code null} when the ID is unknown
      */
     public ProductDefinition findProduct(String contentId) {
         return productsById.get(contentId);
+    }
+
+    /**
+     * Composes modules from one validated later-stage engineering catalog into the ordinary Stage-18
+     * manufacturing registry.
+     *
+     * <p>This is a content-registration seam only. It does not create inventory, change a recipe,
+     * grant faction output, or replace the Stage-18 manufacturing runtime. Duplicate content IDs fail
+     * closed in the ordinary registry constructor.</p>
+     *
+     * @param engineering validated engineering catalog containing authored modules
+     * @param provenance explicit lifecycle provenance for those authored definitions
+     * @return new deterministic registry containing the existing and added products
+     */
+    public Stage18ManufacturingProductRegistry withEngineeringCatalog(
+            ShipEngineeringCatalog engineering,
+            Provenance provenance) {
+        List<ProductDefinition> combined = new ArrayList<>(products);
+        addModules(
+                combined,
+                Objects.requireNonNull(engineering, "engineering"),
+                Objects.requireNonNull(provenance, "provenance"));
+        return new Stage18ManufacturingProductRegistry(combined);
     }
 
     private static void addModules(
@@ -125,7 +149,7 @@ public final class Stage18ManufacturingProductRegistry {
         }
     }
 
-    /** Kind of existing Stage-17.5 identity manufactured by Stage 18D. */
+    /** Kind of identity manufactured by Stage 18D. */
     public enum ProductKind {
         /** Installed or inventory ship module. */
         MODULE,
@@ -138,13 +162,15 @@ public final class Stage18ManufacturingProductRegistry {
         /** Production-schema engineering/ammunition demonstrator, still subject to later content review. */
         STAGE17_5_PRODUCTION_SCHEMA_DEMONSTRATOR,
         /** Stage-17.5I acceptance vocabulary that is explicitly content-provisional until Stage 22. */
-        STAGE17_5I_CONTENT_PROVISIONAL
+        STAGE17_5I_CONTENT_PROVISIONAL,
+        /** Reviewed Stage-22 authored production content composed through the common Stage-18 authority. */
+        STAGE22_AUTHORED
     }
 
     /**
-     * One existing finished-product identity projected into industrial manufacturing.
+     * One finished-product identity projected into industrial manufacturing.
      *
-     * @param contentId existing Stage-17.5 content ID
+     * @param contentId existing engineering/ammunition content ID
      * @param kind module or physical ammunition
      * @param unitMassKg authoritative physical mass of one manufactured unit
      * @param storageClassId Stage-18 storage class used for finished inventory
@@ -159,7 +185,7 @@ public final class Stage18ManufacturingProductRegistry {
         /**
          * Validates one immutable manufacturing product projection.
          *
-         * @param contentId existing Stage-17.5 content ID
+         * @param contentId existing content ID
          * @param kind module or ammunition
          * @param unitMassKg authoritative physical mass of one manufactured unit
          * @param storageClassId Stage-18 storage class used for finished inventory

@@ -688,6 +688,32 @@ public record Stage21HNpcMissionState(
                 CURRENT_VERSION, simulationTick, 1L, List.of(), List.of(), List.of(), List.of());
     }
 
+    /**
+     * Returns the ordinary authority that owns truth for one objective predicate.
+     *
+     * <p>This read-only vocabulary seam lets downstream authored catalogs bind to the accepted
+     * Stage-21H lifecycle without copying its authority matrix.</p>
+     *
+     * @param kind objective predicate family
+     * @return ordinary authority responsible for that predicate
+     */
+    public static ObjectiveAuthority expectedAuthority(ObjectiveKind kind) {
+        return switch (Objects.requireNonNull(kind, "Objective kind not set")) {
+            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> ObjectiveAuthority.FREIGHT;
+            case FLEET_PRESENT_IN_SYSTEM,
+                    FLEET_ABSENT,
+                    ESCORT_FLEETS_PRESENT_IN_SYSTEM,
+                    FLEET_REACTION_MASS_KG_AT_LEAST -> ObjectiveAuthority.FLEET;
+            case DISCOVERY_AT_LEAST -> ObjectiveAuthority.DISCOVERY;
+            case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST -> ObjectiveAuthority.INDUSTRY;
+            case CONSTRUCTION_DELIVERED_UNITS_AT_LEAST,
+                    CONSTRUCTION_COMPLETED -> ObjectiveAuthority.CONSTRUCTION;
+            case MARKET_ACCESS_ALLOWED -> ObjectiveAuthority.DIPLOMACY;
+            case OPERATION_STATUS -> ObjectiveAuthority.OPERATION;
+            case FACTION_TREASURY_AT_LEAST -> ObjectiveAuthority.ECONOMY;
+        };
+    }
+
     private static void validateObjectiveShape(
             ObjectiveAuthority authority,
             ObjectiveKind kind,
@@ -695,40 +721,40 @@ public record Stage21HNpcMissionState(
             long systemId,
             long threshold,
             String requiredState) {
-        boolean valid = switch (kind) {
-            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> authority == ObjectiveAuthority.FREIGHT
-                    && systemId == 0L && threshold > 0L && requiredState.isEmpty();
-            case FLEET_PRESENT_IN_SYSTEM -> authority == ObjectiveAuthority.FLEET
-                    && systemId > 0L && threshold == 0L && requiredState.isEmpty();
-            case FLEET_ABSENT -> authority == ObjectiveAuthority.FLEET
-                    && systemId == 0L && threshold == 0L && requiredState.isEmpty();
-            case ESCORT_FLEETS_PRESENT_IN_SYSTEM -> authority == ObjectiveAuthority.FLEET
-                    && systemId > 0L && threshold == 0L && isPositiveLong(subjectId)
+        boolean validParameters = switch (kind) {
+            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST ->
+                    systemId == 0L && threshold > 0L && requiredState.isEmpty();
+            case FLEET_PRESENT_IN_SYSTEM -> systemId > 0L && threshold == 0L && requiredState.isEmpty();
+            case FLEET_ABSENT -> systemId == 0L && threshold == 0L && requiredState.isEmpty();
+            case ESCORT_FLEETS_PRESENT_IN_SYSTEM -> systemId > 0L && threshold == 0L && isPositiveLong(subjectId)
                     && isPositiveLong(requiredState) && !subjectId.equals(requiredState);
-            case FLEET_REACTION_MASS_KG_AT_LEAST -> authority == ObjectiveAuthority.FLEET
-                    && systemId == 0L && threshold > 0L && requiredState.isEmpty();
-            case DISCOVERY_AT_LEAST -> authority == ObjectiveAuthority.DISCOVERY
-                    && systemId > 0L && threshold == 0L && !requiredState.isEmpty();
-            case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST -> authority == ObjectiveAuthority.INDUSTRY
-                    && systemId > 0L && threshold > 0L && requiredState.split(":", -1).length == 2
+            case FLEET_REACTION_MASS_KG_AT_LEAST ->
+                    systemId == 0L && threshold > 0L && requiredState.isEmpty();
+            case DISCOVERY_AT_LEAST -> systemId > 0L && threshold == 0L && !requiredState.isEmpty();
+            case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST ->
+                    systemId > 0L && threshold > 0L && requiredState.split(":", -1).length == 2
                     && subjectId.split("\\|", -1).length == 2;
-            case CONSTRUCTION_DELIVERED_UNITS_AT_LEAST -> authority == ObjectiveAuthority.CONSTRUCTION
-                    && systemId == 0L && threshold > 0L && requiredState.isEmpty();
-            case CONSTRUCTION_COMPLETED -> authority == ObjectiveAuthority.CONSTRUCTION
-                    && systemId == 0L && threshold == 0L && requiredState.isEmpty();
-            case MARKET_ACCESS_ALLOWED -> authority == ObjectiveAuthority.DIPLOMACY
-                    && systemId == 0L && threshold == 0L && !requiredState.isEmpty();
-            case OPERATION_STATUS -> authority == ObjectiveAuthority.OPERATION
-                    && systemId == 0L && threshold == 0L && !requiredState.isEmpty();
-            case FACTION_TREASURY_AT_LEAST -> authority == ObjectiveAuthority.ECONOMY
-                    && systemId == 0L && requiredState.isEmpty();
+            case CONSTRUCTION_DELIVERED_UNITS_AT_LEAST ->
+                    systemId == 0L && threshold > 0L && requiredState.isEmpty();
+            case CONSTRUCTION_COMPLETED -> systemId == 0L && threshold == 0L && requiredState.isEmpty();
+            case MARKET_ACCESS_ALLOWED, OPERATION_STATUS ->
+                    systemId == 0L && threshold == 0L && !requiredState.isEmpty();
+            case FACTION_TREASURY_AT_LEAST -> systemId == 0L && requiredState.isEmpty();
         };
-        if (!valid) {
+        if (authority != expectedAuthority(kind) || !validParameters) {
             throw new IllegalArgumentException("Objective kind is incompatible with its authority/parameters: " + kind);
         }
     }
 
-    private static void validateTemplateObjective(MissionTemplate template, ObjectiveKind kind) {
+    /**
+     * Requires one authored template/predicate pairing to be instantiable by the Stage-21H lifecycle.
+     *
+     * @param template accepted runtime mission family
+     * @param kind ordinary-authority objective predicate
+     */
+    public static void validateTemplateObjective(MissionTemplate template, ObjectiveKind kind) {
+        Objects.requireNonNull(template, "Mission template not set");
+        Objects.requireNonNull(kind, "Objective kind not set");
         boolean valid = switch (template) {
             case EMERGENCY_SUPPLY_DELIVERY, ORDINARY_MARKET_PROCUREMENT ->
                     kind == ObjectiveKind.FREIGHT_ORDER_DELIVERED_KG_AT_LEAST;
@@ -747,6 +773,44 @@ public record Stage21HNpcMissionState(
             throw new IllegalArgumentException(
                     "Mission template cannot use the supplied ordinary-authority predicate: " + template + "/" + kind);
         }
+    }
+
+    /**
+     * Reports whether an NPC role may issue one accepted runtime mission family.
+     *
+     * <p>This read-only vocabulary seam is the same rule used by the live mission service, so
+     * downstream authored catalogs cannot drift into a second issuer-authority matrix.</p>
+     *
+     * @param role persistent NPC role
+     * @param template accepted runtime mission family
+     * @return {@code true} when the Stage-21H lifecycle permits the pairing
+     */
+    public static boolean canIssue(NpcRole role, MissionTemplate template) {
+        NpcRole checkedRole = Objects.requireNonNull(role, "NPC role not set");
+        MissionTemplate checkedTemplate = Objects.requireNonNull(template, "Mission template not set");
+        return switch (checkedRole) {
+            case OFFICIAL -> checkedTemplate == MissionTemplate.ORDINARY_MARKET_PROCUREMENT
+                    || checkedTemplate == MissionTemplate.CONSTRUCTION_REPAIR_INPUT_DELIVERY
+                    || checkedTemplate == MissionTemplate.IMPERIAL_ACCESS_NEGOTIATION;
+            case MILITARY -> checkedTemplate == MissionTemplate.CONVOY_ESCORT
+                    || checkedTemplate == MissionTemplate.STRANDED_FLEET_RESCUE_REFUEL
+                    || checkedTemplate == MissionTemplate.SYSTEM_OBJECT_RECONNAISSANCE
+                    || checkedTemplate == MissionTemplate.INTERCEPTION_DEFENSE;
+            case TRADE_LOGISTICS -> checkedTemplate == MissionTemplate.EMERGENCY_SUPPLY_DELIVERY
+                    || checkedTemplate == MissionTemplate.ORDINARY_MARKET_PROCUREMENT
+                    || checkedTemplate == MissionTemplate.CONVOY_ESCORT;
+            case INDUSTRY_YARD -> checkedTemplate == MissionTemplate.EMERGENCY_SUPPLY_DELIVERY
+                    || checkedTemplate == MissionTemplate.ORDINARY_MARKET_PROCUREMENT
+                    || checkedTemplate == MissionTemplate.CONSTRUCTION_REPAIR_INPUT_DELIVERY;
+            case EXPLORATION_INTELLIGENCE -> checkedTemplate == MissionTemplate.SYSTEM_OBJECT_RECONNAISSANCE
+                    || checkedTemplate == MissionTemplate.DERELICT_INVESTIGATION_RECOVERY
+                    || checkedTemplate == MissionTemplate.INTERCEPTION_DEFENSE
+                    || checkedTemplate == MissionTemplate.IMPERIAL_ACCESS_NEGOTIATION;
+            case INDEPENDENT_FRONTIER -> checkedTemplate == MissionTemplate.EMERGENCY_SUPPLY_DELIVERY
+                    || checkedTemplate == MissionTemplate.ORDINARY_MARKET_PROCUREMENT
+                    || checkedTemplate == MissionTemplate.STRANDED_FLEET_RESCUE_REFUEL
+                    || checkedTemplate == MissionTemplate.DERELICT_INVESTIGATION_RECOVERY;
+        };
     }
 
     private static boolean supportsOpportunity(MissionTemplate template, String claimCode) {

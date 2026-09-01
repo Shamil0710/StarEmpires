@@ -23,6 +23,35 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class Stage21HNpcMissionStateTest {
 
     @Test
+    void objectiveKindsExposeTheirExistingOrdinaryAuthorityWithoutASecondMatrix() {
+        assertEquals(ObjectiveAuthority.FREIGHT,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.FREIGHT_ORDER_DELIVERED_KG_AT_LEAST));
+        assertEquals(ObjectiveAuthority.FLEET,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.FLEET_PRESENT_IN_SYSTEM));
+        assertEquals(ObjectiveAuthority.FLEET,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.FLEET_ABSENT));
+        assertEquals(ObjectiveAuthority.FLEET,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.ESCORT_FLEETS_PRESENT_IN_SYSTEM));
+        assertEquals(ObjectiveAuthority.FLEET,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.FLEET_REACTION_MASS_KG_AT_LEAST));
+        assertEquals(ObjectiveAuthority.DISCOVERY,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.DISCOVERY_AT_LEAST));
+        assertEquals(ObjectiveAuthority.INDUSTRY,
+                Stage21HNpcMissionState.expectedAuthority(
+                        ObjectiveKind.DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST));
+        assertEquals(ObjectiveAuthority.CONSTRUCTION,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.CONSTRUCTION_DELIVERED_UNITS_AT_LEAST));
+        assertEquals(ObjectiveAuthority.CONSTRUCTION,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.CONSTRUCTION_COMPLETED));
+        assertEquals(ObjectiveAuthority.DIPLOMACY,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.MARKET_ACCESS_ALLOWED));
+        assertEquals(ObjectiveAuthority.OPERATION,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.OPERATION_STATUS));
+        assertEquals(ObjectiveAuthority.ECONOMY,
+                Stage21HNpcMissionState.expectedAuthority(ObjectiveKind.FACTION_TREASURY_AT_LEAST));
+    }
+
+    @Test
     void canonicalStateRetainsBoundedNpcMissionAndAuthoredChainIdentity() {
         NpcState npc = npc();
         MissionContract first = mission("mission.stage21h.1", MissionStatus.COMPLETED, 0L, "freight.delivery-satisfied");
