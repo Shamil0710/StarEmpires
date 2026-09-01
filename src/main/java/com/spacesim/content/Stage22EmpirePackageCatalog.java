@@ -108,22 +108,63 @@ public final class Stage22EmpirePackageCatalog {
         this.fingerprint = computeFingerprint();
     }
 
+    /** @return package schema version */
     public int schemaVersion() { return schemaVersion; }
+    /** @return stable package catalog version */
     public String catalogVersion() { return catalogVersion; }
+    /** @return canonical public package key */
     public String packageKey() { return packageKey; }
+    /** @return authoritative runtime/save faction ID */
     public String stableFactionId() { return stableFactionId; }
+    /** @return immutable authored ship families */
     public List<ShipFamilyDefinition> shipFamilies() { return shipFamilies; }
+    /** @return immutable signature station variants */
     public List<StationVariantDefinition> stations() { return stations; }
+    /** @return immutable recurring NPC definitions */
     public List<RecurringNpcDefinition> recurringNpcs() { return recurringNpcs; }
+    /** @return immutable faction-facing mission templates */
     public List<MissionTemplateDefinition> missions() { return missions; }
+    /** @return immutable short authored story chains */
     public List<StoryChainDefinition> storyChains() { return storyChains; }
+    /** @return immutable visual authoring rules */
     public List<VisualRuleDefinition> visualRules() { return visualRules; }
+    /** @return deterministic package semantic fingerprint */
     public String fingerprint() { return fingerprint; }
 
+    /**
+     * Finds the ship family bound to one common role.
+     *
+     * @param roleId common Stage-22 role ID
+     * @return matching ship family, or {@code null} when absent
+     */
     public ShipFamilyDefinition findShipForRole(String roleId) { return shipByRoleId.get(roleId); }
+    /**
+     * Finds one signature station variant.
+     *
+     * @param id stable station-variant ID
+     * @return matching station variant, or {@code null} when absent
+     */
     public StationVariantDefinition findStation(String id) { return stationById.get(id); }
+    /**
+     * Finds one recurring NPC.
+     *
+     * @param id stable NPC ID
+     * @return matching NPC, or {@code null} when absent
+     */
     public RecurringNpcDefinition findNpc(String id) { return npcById.get(id); }
+    /**
+     * Finds one faction-facing mission template.
+     *
+     * @param id stable mission-template ID
+     * @return matching mission template, or {@code null} when absent
+     */
     public MissionTemplateDefinition findMission(String id) { return missionById.get(id); }
+    /**
+     * Finds one short authored story chain.
+     *
+     * @param id stable story-chain ID
+     * @return matching story chain, or {@code null} when absent
+     */
     public StoryChainDefinition findChain(String id) { return chainById.get(id); }
 
     private void validateChainMissions() {
@@ -248,6 +289,7 @@ public final class Stage22EmpirePackageCatalog {
             String lineageId,
             String fleetUse,
             String counterplay) {
+        /** Validates one authored Empire ship-family binding. */
         public ShipFamilyDefinition {
             familyId = contentId(familyId, "ship familyId");
             roleId = contentId(roleId, "ship roleId");
@@ -270,6 +312,7 @@ public final class Stage22EmpirePackageCatalog {
             String stage18ArchetypeId,
             List<String> requiredFacilityIds,
             String visualBrief) {
+        /** Validates one Empire signature station variant. */
         public StationVariantDefinition {
             id = contentId(id, "station id");
             stage18ArchetypeId = contentId(stage18ArchetypeId, "stage18ArchetypeId");
@@ -286,6 +329,7 @@ public final class Stage22EmpirePackageCatalog {
             String characterOverlayId,
             String publicVoice,
             String privateVoice) {
+        /** Validates one recurring Empire NPC binding. */
         public RecurringNpcDefinition {
             id = contentId(id, "NPC id");
             nameKey = contentId(nameKey, "NPC nameKey");
@@ -303,6 +347,7 @@ public final class Stage22EmpirePackageCatalog {
             ObjectiveAuthority authority,
             ObjectiveKind objectiveKind,
             String semanticIntent) {
+        /** Validates one Empire faction-facing mission template. */
         public MissionTemplateDefinition {
             id = contentId(id, "mission id");
             issuerNpcId = contentId(issuerNpcId, "issuerNpcId");
@@ -314,6 +359,7 @@ public final class Stage22EmpirePackageCatalog {
 
     /** One deterministic short authored Empire chain made exclusively from package mission templates. */
     public record StoryChainDefinition(String id, List<String> missionTemplateIds, String semanticIntent) {
+        /** Validates one deterministic Empire story-chain definition. */
         public StoryChainDefinition {
             id = contentId(id, "chain id");
             missionTemplateIds = contentIds(missionTemplateIds, "missionTemplateIds", true);
@@ -326,6 +372,7 @@ public final class Stage22EmpirePackageCatalog {
 
     /** Machine-readable visual/character authoring invariant retained beside package content. */
     public record VisualRuleDefinition(String id, String medium, String authorityDocument, String requirement) {
+        /** Validates one package-level visual authoring rule. */
         public VisualRuleDefinition {
             id = contentId(id, "visual rule id");
             medium = text(medium, "visual medium");
