@@ -52,6 +52,8 @@ public final class Stage22EmpireIndustrialProgram {
     /**
      * Strategic inputs whose shortage must be visible to ordinary manufacturing/repair flows.
      * Values are planning evidence only, never free inventory grants.
+     *
+     * @return immutable strategic bottleneck definitions
      */
     public static List<BottleneckDefinition> bottlenecks() {
         return List.of(
@@ -75,6 +77,8 @@ public final class Stage22EmpireIndustrialProgram {
     /**
      * Reserve targets consumed as planning intent by existing procurement/freight authorities.
      * They do not materialize stock.
+     *
+     * @return immutable reserve-policy authoring definitions
      */
     public static List<ReservePolicyDefinition> reservePolicies() {
         return List.of(
@@ -104,6 +108,8 @@ public final class Stage22EmpireIndustrialProgram {
      * <p>The path conserves five percent of output mass worth of structural alloy by using additional
      * light alloy already present in the profile, at 25% more process energy and 35% more work.
      * This is deliberately worse than the standard route and therefore cannot be a free upgrade.</p>
+     *
+     * @return validated alternate cargo/tank manufacturing profile
      */
     public static ProductProfileDefinition cargoStructuralSubstitution() {
         ProductProfileDefinition base = Stage22CommonManufacturingProfiles.definitions().stream()
@@ -120,7 +126,11 @@ public final class Stage22EmpireIndustrialProgram {
                 1.35d);
     }
 
-    /** Validates all definitions against accepted Stage-18 ontology and the current Empire package. */
+    /**
+     * Validates all definitions against accepted Stage-18 ontology and the current Empire package.
+     *
+     * @return immutable validation evidence for the authored industrial program
+     */
     public static ValidationReport validateDefault() {
         Stage18ResourceOntologyCatalog ontology = Stage18ResourceOntologyLoader.loadDefault();
         Stage22EmpirePackageCatalog empire = Stage22EmpirePackageLoader.loadDefault();
@@ -178,6 +188,7 @@ public final class Stage22EmpireIndustrialProgram {
             String commodityId,
             Set<String> affectedFunctions,
             String semanticReason) {
+        /** Validates one industrial bottleneck definition. */
         public BottleneckDefinition {
             id = requireText(id, "bottleneck id");
             commodityId = requireText(commodityId, "bottleneck commodityId");
@@ -196,6 +207,7 @@ public final class Stage22EmpireIndustrialProgram {
             int targetCoverageDays,
             String procurementPolicyRef,
             String semanticIntent) {
+        /** Validates one reserve-policy definition. */
         public ReservePolicyDefinition {
             id = requireText(id, "reserve id");
             commodityId = requireText(commodityId, "reserve commodityId");
