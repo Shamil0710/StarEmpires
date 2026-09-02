@@ -4,6 +4,8 @@ import com.spacesim.content.Stage18ManufacturingProductRegistry.Provenance;
 import com.spacesim.content.ship.Stage22IndustrialUnionEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22IndustrialUnionShipyardIndustrialCatalogLoader;
 import com.spacesim.world.Stage21HNpcMissionState;
+import com.spacesim.world.Stage21HNpcMissionState.MissionTemplate;
+import com.spacesim.world.Stage21HNpcMissionState.NpcRole;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -39,6 +41,7 @@ class Stage22IndustrialUnionPackageAcceptanceTest {
         assertEquals(10, physical.getModuleProfiles().size());
         assertEquals(9, manifests.productionManifests().size());
         assertEquals(18, visuals.size());
+        assertEquals(7, union.recurringNpcs().size());
         assertEquals(7, characters.overlays().size());
         assertEquals(64, union.fingerprint().length());
         assertEquals(64, engineering.getFingerprint().length());
@@ -52,6 +55,18 @@ class Stage22IndustrialUnionPackageAcceptanceTest {
                 .map(Stage22IndustrialUnionPackageCatalog.ShipFamilyDefinition::roleId)
                 .collect(Collectors.toCollection(TreeSet::new));
         assertEquals(commonRoles, unionRoles);
+
+        Set<NpcRole> recurringRoles = union.recurringNpcs().stream()
+                .map(Stage22IndustrialUnionPackageCatalog.RecurringNpcDefinition::role)
+                .collect(Collectors.toSet());
+        assertEquals(Set.of(
+                NpcRole.OFFICIAL,
+                NpcRole.MILITARY,
+                NpcRole.TRADE_LOGISTICS,
+                NpcRole.INDUSTRY_YARD,
+                NpcRole.EXPLORATION_INTELLIGENCE,
+                NpcRole.INDEPENDENT_FRONTIER), recurringRoles);
+        assertNotNull(union.findNpc("npc.industrial_union.plant_director"));
 
         var registry = Stage18ManufacturingProductRegistry.loadDefault()
                 .withEngineeringCatalog(engineering, Provenance.STAGE22_AUTHORED);
@@ -95,13 +110,46 @@ class Stage22IndustrialUnionPackageAcceptanceTest {
     }
 
     @Test
-    void missionsRemainInsideStage21HLifecycleAuthority() {
+    void missionsRemainInsideStage21HLifecycleAndMeetM224CategoryFloor() {
         var union = Stage22IndustrialUnionPackageLoader.loadDefault();
-        assertEquals(10, union.missions().size());
+        assertEquals(11, union.missions().size());
         union.missions().forEach(mission -> {
             var issuer = union.findNpc(mission.issuerNpcId());
             assertNotNull(issuer, mission.id());
             assertTrue(Stage21HNpcMissionState.canIssue(issuer.role(), mission.runtimeTemplate()), mission.id());
+            Stage21HNpcMissionState.validateTemplateObjective(mission.runtimeTemplate(), mission.objectiveKind());
+            assertEquals(Stage21HNpcMissionState.expectedAuthority(mission.objectiveKind()), mission.authority(), mission.id());
         });
+
+        long combatSecurity = countTemplates(union, Set.of(
+                MissionTemplate.CONVOY_ESCORT,
+                MissionTemplate.STRANDED_FLEET_RESCUE_REFUEL,
+                MissionTemplate.INTERCEPTION_DEFENSE));
+        long economyProduction = countTemplates(union, Set.of(
+                MissionTemplate.EMERGENCY_SUPPLY_DELIVERY,
+                MissionTemplate.ORDINARY_MARKET_PROCUREMENT,
+                MissionTemplate.CONSTRUCTION_REPAIR_INPUT_DELIVERY));
+        long diplomacyPolitics = countTemplates(union, Set.of(MissionTemplate.IMPERIAL_ACCESS_NEGOTIATION));
+        long explorationAnomaly = countTemplates(union, Set.of(
+                MissionTemplate.SYSTEM_OBJECT_RECONNAISSANCE,
+                MissionTemplate.DERELICT_INVESTIGATION_RECOVERY));
+
+        assertTrue(combatSecurity >= 2L);
+        assertTrue(economyProduction >= 2L);
+        assertTrue(diplomacyPolitics >= 2L);
+        assertTrue(explorationAnomaly >= 2L);
+        assertEquals(2, union.storyChains().size());
+        union.storyChains().forEach(chain -> {
+            assertTrue(chain.missionTemplateIds().size() >= 2, chain.id());
+            assertTrue(chain.missionTemplateIds().size() <= 4, chain.id());
+        });
+    }
+
+    private static long countTemplates(
+            Stage22IndustrialUnionPackageCatalog union,
+            Set<MissionTemplate> templates) {
+        return union.missions().stream()
+                .filter(mission -> templates.contains(mission.runtimeTemplate()))
+                .count();
     }
 }
