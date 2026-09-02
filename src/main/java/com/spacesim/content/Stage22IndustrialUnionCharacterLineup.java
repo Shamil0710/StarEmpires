@@ -141,7 +141,16 @@ public final class Stage22IndustrialUnionCharacterLineup {
                     "");
         }
 
-        /** Validates canonical lineup state and computes the semantic fingerprint. */
+        /**
+         * Validates canonical lineup state and computes the semantic fingerprint.
+         *
+         * @param schemaVersion supported schema version
+         * @param catalogVersion stable catalog version
+         * @param masterPromptRef canonical Character Master Prompt document
+         * @param factionVisualRef canonical Industrial Union visual bible
+         * @param overlays authored function overlays
+         * @param fingerprint derived semantic fingerprint, recomputed during validation
+         */
         public Catalog {
             if (schemaVersion != 1) {
                 throw new IllegalArgumentException("Industrial Union character lineup schema must be 1");
@@ -201,7 +210,16 @@ public final class Stage22IndustrialUnionCharacterLineup {
             String statusReadability,
             String practicalGear,
             String condition) {
-        /** Validates and normalizes one character overlay. */
+        /**
+         * Validates and normalizes one character overlay.
+         *
+         * @param id stable overlay content ID
+         * @param roleKey required functional role key
+         * @param roleBrief profession/responsibility brief
+         * @param statusReadability qualification/responsibility readability rule
+         * @param practicalGear functional equipment rule
+         * @param condition wear/fatigue condition rule
+         */
         public OverlayDefinition {
             id = requireContentId(id, "overlay id");
             if (!id.startsWith("character_overlay.industrial_union.")) {

@@ -171,7 +171,13 @@ public final class Stage22IndustrialUnionCommonalityNetwork {
             Map<String, Double> sharedAssemblyAvailability,
             double bulkLogisticsAvailability,
             double yardFacilityAvailability) {
-        /** Validates exact dependency coverage and canonicalizes the shared-assembly map. */
+        /**
+         * Validates exact dependency coverage and canonicalizes the shared-assembly map.
+         *
+         * @param sharedAssemblyAvailability exact four common assembly availability fractions
+         * @param bulkLogisticsAvailability aggregate availability from ordinary freight/logistics authority
+         * @param yardFacilityAvailability aggregate availability from ordinary Stage-18 facility authority
+         */
         public Availability {
             Map<String, Double> checked = new TreeMap<>(Objects.requireNonNull(
                     sharedAssemblyAvailability, "sharedAssemblyAvailability"));
