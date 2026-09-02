@@ -42,7 +42,7 @@ class Stage22IndustrialUnionPackageAcceptanceTest {
         assertEquals(9, manifests.productionManifests().size());
         assertEquals(18, visuals.size());
         assertEquals(7, union.recurringNpcs().size());
-        assertEquals(7, characters.overlays().size());
+        assertEquals(8, characters.overlays().size());
         assertEquals(64, union.fingerprint().length());
         assertEquals(64, engineering.getFingerprint().length());
         assertEquals(64, physical.getFingerprint().length());
@@ -67,6 +67,8 @@ class Stage22IndustrialUnionPackageAcceptanceTest {
                 NpcRole.EXPLORATION_INTELLIGENCE,
                 NpcRole.INDEPENDENT_FRONTIER), recurringRoles);
         assertNotNull(union.findNpc("npc.industrial_union.plant_director"));
+        union.recurringNpcs().forEach(npc ->
+                assertNotNull(characters.findOverlay(npc.characterOverlayId()), npc.id()));
 
         var registry = Stage18ManufacturingProductRegistry.loadDefault()
                 .withEngineeringCatalog(engineering, Provenance.STAGE22_AUTHORED);
