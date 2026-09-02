@@ -1,9 +1,12 @@
 # Stage 22 M22.4 — Industrial Union production package completion record
 
-> Status: **CLOSURE CANDIDATE — implementation content complete; final status requires exact-head CI, merge of PR #351 and post-merge `main` verification.**  
+> Status: **COMPLETE**
 > Package: `core.industrial_union`  
 > Stable runtime/save identity: `faction.industrial_combine`  
-> Working PR: #351 — `Stage 22.4: Industrial Union production package`
+> Exact implementation head: `8c345e7426c099a208ddcc09360e51f9dc874837`
+> Implementation PR: #351 — `Stage 22.4: Industrial Union production package`
+> Merged implementation on `main`: `490d38729cba03798398f36c3ac46a98e5748495`
+> Post-merge CI: run `33679361738`, job `100411915339` — **SUCCESS**
 
 ## 1. Scope and authority boundary
 
@@ -235,7 +238,7 @@ The M22.4 diff introduces no process execution, network access, dynamic code loa
 
 Final paired multi-seed outcomes and cross-faction review remain M22.6 responsibilities.
 
-## 11. Principal automated evidence and closure sequence
+## 11. Principal automated evidence and merge verification
 
 Targeted M22.4 coverage includes:
 
@@ -248,22 +251,25 @@ Targeted M22.4 coverage includes:
 - `Stage22IndustrialUnionSoloSmokeAcceptanceTest`;
 - full repository Stage-17.5/18/21/22 regression verification through CI.
 
-Implementation-review state at creation of this record:
+Closure evidence:
 
-- implementation PR: #351;
-- base: `main` at `6dbc0bbc1551d4b9359d726a03498b1c812d5a5b`;
-- review submissions: none;
-- unresolved review threads: none;
-- `main` has not advanced from the PR base;
-- implementation code candidate immediately before this record: `e2061cc858bbb9be88aec19063a6445a1467fb2f`;
-- exact-head CI for the final documentation-bearing implementation tree is still required before merge.
+- exact implementation head: `8c345e7426c099a208ddcc09360e51f9dc874837`;
+- exact-head PR CI run `33677910318` (#5734), job `100407114331`: **SUCCESS**;
+- full verify on the accepted implementation tree: **1927 tests, 0 failures, 0 errors, 1 skipped**,
+  with JaCoCo, strict Javadoc and desktop packaging green;
+- the previous closure-candidate head exposed 15 pre-existing compact-record Javadoc warnings; the final
+  head adds the missing parameter documentation without changing runtime behavior;
+- pre-merge audit found no submitted review, no unresolved review thread, no base drift and a mergeable
+  exact head;
+- guarded merge of PR #351 produced `main` commit
+  `490d38729cba03798398f36c3ac46a98e5748495`;
+- the merge commit and tested implementation head share exact tree SHA
+  `43abe66931093ec4d2343393296eaf7d02ede65c`;
+- post-merge `main` CI run `33679361738` (#5735), job `100411915339`: **SUCCESS**, again with
+  **1927 tests, 0 failures, 0 errors, 1 skipped**, coverage, Javadoc, desktop packaging and successful
+  artifact publication.
 
-M22.4 becomes **COMPLETE** only after the following sequence succeeds:
-
-1. final PR head passes full Java-17 CI (`clean verify`, tests, coverage, Javadoc and desktop packaging);
-2. PR #351 is re-audited at that exact head and merged without head drift;
-3. resulting `main` commit passes post-merge CI;
-4. a docs-only closeout records the exact implementation head, merge commit and post-merge CI and advances the canonical roadmap.
+All M22.4 roadmap exit gates are therefore satisfied on merged and post-merge-verified evidence.
 
 ## 12. Intentionally deferred beyond M22.4
 
@@ -280,4 +286,4 @@ These are explicit later-stage boundaries, not missing Industrial Union authorit
 
 ## 13. Next
 
-**M22.4 remains the only active milestone until the closure sequence above is complete. M22.5 is blocked.**
+**M22.5 — shared civilian/minor ecosystem is OPEN/NEXT.**
