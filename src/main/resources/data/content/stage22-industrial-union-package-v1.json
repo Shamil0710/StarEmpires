@@ -113,7 +113,7 @@
     },
     {
       "id": "station_variant.industrial_union.bulk_hub",
-      "stage18ArchetypeId": "station.infrastructure.naval_ordnance_depot",
+      "stage18ArchetypeId": "station.infrastructure.industrial_station",
       "requiredFacilityIds": ["facility.fabrication.assembly", "facility.processing.bulk_refinery"],
       "visualBrief": "Dense standardized transfer spine with container, tanker and common-parts handling geometry; logistics reads as the hero function."
     },
