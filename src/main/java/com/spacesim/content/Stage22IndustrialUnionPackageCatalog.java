@@ -91,18 +91,43 @@ public final class Stage22IndustrialUnionPackageCatalog {
         this.fingerprint = computeFingerprint();
     }
 
+    /** @return supported package schema version */
     public int schemaVersion() { return schemaVersion; }
+    /** @return stable package catalog version */
     public String catalogVersion() { return catalogVersion; }
+    /** @return canonical package key */
     public String packageKey() { return packageKey; }
+    /** @return accepted runtime/save faction identity */
     public String stableFactionId() { return stableFactionId; }
+    /** @return exact nine shared-role ship families */
     public List<ShipFamilyDefinition> shipFamilies() { return shipFamilies; }
+    /** @return authored Union station variants */
     public List<StationVariantDefinition> stations() { return stations; }
+    /** @return authored recurring NPC definitions */
     public List<RecurringNpcDefinition> recurringNpcs() { return recurringNpcs; }
+    /** @return authored faction-facing mission templates */
     public List<MissionTemplateDefinition> missions() { return missions; }
+    /** @return authored short mission chains */
     public List<StoryChainDefinition> storyChains() { return storyChains; }
+    /** @return visual authoring requirements */
     public List<VisualRuleDefinition> visualRules() { return visualRules; }
+    /** @return deterministic package semantic fingerprint */
     public String fingerprint() { return fingerprint; }
+
+    /**
+     * Finds one recurring Union NPC.
+     *
+     * @param id stable NPC content ID
+     * @return matching NPC or {@code null}
+     */
     public RecurringNpcDefinition findNpc(String id) { return npcById.get(id); }
+
+    /**
+     * Finds one Union mission template.
+     *
+     * @param id stable mission content ID
+     * @return matching mission or {@code null}
+     */
     public MissionTemplateDefinition findMission(String id) { return missionById.get(id); }
 
     private String computeFingerprint() {
@@ -123,10 +148,24 @@ public final class Stage22IndustrialUnionPackageCatalog {
         }
     }
 
+    /** One required Union ship family bound to common role, exact fits, production and visual seams. */
     public record ShipFamilyDefinition(
             String familyId, String roleId, String primaryFitId, String refitFitId,
             String productionManifestId, String visualBindingId, String lineageId,
             String fleetUse, String counterplay) {
+        /**
+         * Validates one authored Union ship-family binding.
+         *
+         * @param familyId stable Union family content ID
+         * @param roleId common M22.2 role ID
+         * @param primaryFitId exact primary engineering fit ID
+         * @param refitFitId exact alternate/refit engineering fit ID
+         * @param productionManifestId primary-fit production manifest ID
+         * @param visualBindingId exact-fit visual binding ID
+         * @param lineageId manufacturer/design/procurement lineage ID
+         * @param fleetUse authored fleet-composition use
+         * @param counterplay intended physical/economic counterplay
+         */
         public ShipFamilyDefinition {
             familyId = unionId(familyId, "ship_family.industrial_union.", "familyId");
             roleId = requireId(roleId, "roleId");
@@ -141,7 +180,16 @@ public final class Stage22IndustrialUnionPackageCatalog {
         }
     }
 
+    /** One Union-specific station presentation/content variant over a Stage-18 station archetype. */
     public record StationVariantDefinition(String id, String stage18ArchetypeId, List<String> requiredFacilityIds, String visualBrief) {
+        /**
+         * Validates one station variant.
+         *
+         * @param id stable Union station-variant ID
+         * @param stage18ArchetypeId existing Stage-18 station archetype ID
+         * @param requiredFacilityIds physical facility definitions required by the variant
+         * @param visualBrief faction visual-authoring brief
+         */
         public StationVariantDefinition {
             id = unionId(id, "station_variant.industrial_union.", "station id");
             stage18ArchetypeId = requireId(stage18ArchetypeId, "stage18ArchetypeId");
@@ -150,7 +198,18 @@ public final class Stage22IndustrialUnionPackageCatalog {
         }
     }
 
+    /** One recurring Stage-21H NPC identity used by the Union authored package. */
     public record RecurringNpcDefinition(String id, String nameKey, NpcRole role, String characterOverlayId, String publicVoice, String privateVoice) {
+        /**
+         * Validates one recurring NPC binding.
+         *
+         * @param id stable Union NPC ID
+         * @param nameKey localization key
+         * @param role accepted Stage-21H NPC role
+         * @param characterOverlayId faction character-overlay ID
+         * @param publicVoice public-facing voice brief
+         * @param privateVoice private motivation/voice brief
+         */
         public RecurringNpcDefinition {
             id = unionId(id, "npc.industrial_union.", "npc id");
             nameKey = requireId(nameKey, "nameKey");
@@ -161,9 +220,20 @@ public final class Stage22IndustrialUnionPackageCatalog {
         }
     }
 
+    /** One Union faction-facing mission bound to the accepted Stage-21H objective authorities. */
     public record MissionTemplateDefinition(
             String id, String issuerNpcId, MissionTemplate runtimeTemplate,
             ObjectiveAuthority authority, ObjectiveKind objectiveKind, String semanticIntent) {
+        /**
+         * Validates one mission binding.
+         *
+         * @param id stable Union mission ID
+         * @param issuerNpcId recurring issuer NPC ID
+         * @param runtimeTemplate accepted Stage-21H mission template
+         * @param authority existing objective truth authority
+         * @param objectiveKind accepted objective kind
+         * @param semanticIntent faction-specific authored intent
+         */
         public MissionTemplateDefinition {
             id = unionId(id, "mission.industrial_union.", "mission id");
             issuerNpcId = unionId(issuerNpcId, "npc.industrial_union.", "issuerNpcId");
@@ -174,7 +244,15 @@ public final class Stage22IndustrialUnionPackageCatalog {
         }
     }
 
+    /** One short ordered Union story chain composed only from ordinary package missions. */
     public record StoryChainDefinition(String id, List<String> missionTemplateIds, String semanticIntent) {
+        /**
+         * Validates one story chain.
+         *
+         * @param id stable Union story-chain ID
+         * @param missionTemplateIds ordered mission-template IDs
+         * @param semanticIntent authored causal chain intent
+         */
         public StoryChainDefinition {
             id = unionId(id, "story_chain.industrial_union.", "story chain id");
             missionTemplateIds = nonEmptyIds(missionTemplateIds, "missionTemplateIds");
@@ -182,7 +260,16 @@ public final class Stage22IndustrialUnionPackageCatalog {
         }
     }
 
+    /** One machine-readable Union visual-authoring rule. */
     public record VisualRuleDefinition(String id, String medium, String authorityDocument, String requirement) {
+        /**
+         * Validates one visual rule.
+         *
+         * @param id stable visual-rule ID
+         * @param medium affected presentation medium
+         * @param authorityDocument canonical repository visual authority
+         * @param requirement authored visual requirement
+         */
         public VisualRuleDefinition {
             id = unionId(id, "visual_rule.industrial_union.", "visual rule id");
             medium = requireText(medium, "medium");

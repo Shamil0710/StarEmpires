@@ -10,8 +10,16 @@ import java.nio.charset.StandardCharsets;
 
 /** Loads Union physical shipyard/build/repair content through the accepted Stage-18G authority. */
 public final class Stage22IndustrialUnionShipyardCatalogLoader {
+    /** Built-in Industrial Union Stage-18G physical shipyard resource. */
     public static final String DEFAULT_RESOURCE="data/content/stage22-industrial-union-stage18-shipyards-v1.json";
     private Stage22IndustrialUnionShipyardCatalogLoader(){throw new AssertionError("utility class");}
+
+    /**
+     * Loads and validates the Union physical shipyard package against accepted ontology,
+     * facilities, engineering and Stage-17.5G industrial requirements.
+     *
+     * @return immutable Stage-18G shipyard catalog
+     */
     public static Stage18ShipyardCatalog loadDefault(){
         ShipEngineeringCatalog engineering=Stage22IndustrialUnionEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog industrial=Stage22IndustrialUnionShipyardIndustrialCatalogLoader.loadDefault();

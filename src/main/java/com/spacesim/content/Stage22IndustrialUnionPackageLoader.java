@@ -22,10 +22,16 @@ import java.util.Objects;
 
 /** Strict data loader for the M22.4 Industrial Union authored package. */
 public final class Stage22IndustrialUnionPackageLoader {
+    /** Built-in Industrial Union authored package resource. */
     public static final String DEFAULT_RESOURCE = "data/content/stage22-industrial-union-package-v1.json";
     private static final int MAX_ITEMS = 128;
     private Stage22IndustrialUnionPackageLoader() { throw new AssertionError("utility class"); }
 
+    /**
+     * Loads the built-in M22.4 Industrial Union package.
+     *
+     * @return immutable validated Industrial Union package
+     */
     public static Stage22IndustrialUnionPackageCatalog loadDefault() {
         try (InputStream stream = Stage22IndustrialUnionPackageLoader.class.getClassLoader().getResourceAsStream(DEFAULT_RESOURCE)) {
             if (stream == null) throw new IllegalStateException("Missing Industrial Union package resource: " + DEFAULT_RESOURCE);
@@ -35,6 +41,12 @@ public final class Stage22IndustrialUnionPackageLoader {
         }
     }
 
+    /**
+     * Parses and strictly validates one complete Union package document.
+     *
+     * @param json complete package JSON document
+     * @return immutable validated package
+     */
     public static Stage22IndustrialUnionPackageCatalog parse(String json) {
         Objects.requireNonNull(json, "json");
         if (json.isBlank()) throw new IllegalArgumentException("Industrial Union package JSON must not be blank");

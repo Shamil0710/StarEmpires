@@ -14,9 +14,15 @@ import java.util.Objects;
 
 /** Exact-fit M22.4 Union production-manifest and visual-binding projection over common authorities. */
 public final class Stage22IndustrialUnionProductionCatalogs {
+    /** Reviewed Stage-18 physical series-yard identity used by the M22.4 package. */
     public static final String YARD_ID=Stage22IndustrialUnionIndustrialProgram.YARD_ID;
     private Stage22IndustrialUnionProductionCatalogs(){throw new AssertionError("utility class");}
 
+    /**
+     * Builds one exact primary-fit production manifest for every required Union ship family.
+     *
+     * @return deterministic nine-manifest catalog using the shared M22.2 format
+     */
     public static Stage22CoreProductionManifestCatalog loadManifests(){
         Stage22IndustrialUnionPackageCatalog union=Stage22IndustrialUnionPackageLoader.loadDefault();
         ShipEngineeringCatalog engineering=Stage22IndustrialUnionEngineeringCatalogLoader.loadDefault();
@@ -33,6 +39,11 @@ public final class Stage22IndustrialUnionProductionCatalogs {
         return new Stage22CoreProductionManifestCatalog(1,"stage22.industrial_union_production_manifests.v1",manifests,List.of());
     }
 
+    /**
+     * Builds exact-fit production visual bindings for every primary and refit definition.
+     *
+     * @return deterministic visual bindings for all eighteen legal Union fits
+     */
     public static List<VisualBindingDefinition> loadVisualBindings(){
         Stage22IndustrialUnionPackageCatalog union=Stage22IndustrialUnionPackageLoader.loadDefault();
         ShipEngineeringCatalog engineering=Stage22IndustrialUnionEngineeringCatalogLoader.loadDefault();
