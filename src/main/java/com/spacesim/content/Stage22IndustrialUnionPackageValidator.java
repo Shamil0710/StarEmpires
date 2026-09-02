@@ -309,7 +309,7 @@ public final class Stage22IndustrialUnionPackageValidator {
             throw new IllegalArgumentException(
                     "Industrial Union primary fit has negative continuous thermal margin: " + fit.id());
         }
-        int staffedCrew = hull.crewBaseline() + moduleCrew;
+        int staffedCrew = Math.max(hull.crewBaseline(), moduleCrew);
         if (staffedCrew > hull.lifeSupportCapacity()) {
             throw new IllegalArgumentException(
                     "Industrial Union primary fit exceeds authored life-support capacity: " + fit.id());
