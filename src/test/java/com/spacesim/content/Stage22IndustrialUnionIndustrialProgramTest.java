@@ -42,6 +42,8 @@ class Stage22IndustrialUnionIndustrialProgramTest {
         assertTrue(steady.steadySeries());
         assertTrue(steady.workMultiplier() < cold.workMultiplier());
         assertTrue(steady.energyMultiplier() < cold.energyMultiplier());
+        assertTrue(steady.workMultiplier() >= 0.90d);
+        assertTrue((1d / steady.workMultiplier()) - 1d <= 0.15d + 1e-12d);
     }
 
     @Test
@@ -141,13 +143,19 @@ class Stage22IndustrialUnionIndustrialProgramTest {
     }
 
     @Test
-    void defaultProgramCoversNineFamiliesAndExistingProfileAuthority() {
+    void defaultProgramCoversNineFamiliesAndStaysInsideFormalBenefitCaps() {
         var report = Stage22IndustrialUnionIndustrialProgram.validateDefault();
         assertEquals(3, report.seriesCount());
         assertEquals(9, report.coveredFamilyCount());
         assertEquals(12L, report.sharedCoreAssemblyReferences());
         assertTrue(report.retoolWorkSeconds() > 0L);
         assertTrue(report.retoolEnergyJ() > 0L);
+        assertTrue(report.maximumBuildTimeReduction() <= 0.10d + 1e-12d);
+        assertTrue(report.maximumThroughputImprovement() <= 0.15d + 1e-12d);
+        Stage22IndustrialUnionIndustrialProgram.seriesDefinitions().forEach(series -> {
+            assertTrue(series.steadyWorkMultiplier() >= 0.90d, series.id());
+            assertTrue((1d / series.steadyWorkMultiplier()) - 1d <= 0.15d + 1e-12d, series.id());
+        });
     }
 
     private static YardSeriesState payAndCompleteRetool(YardSeriesState state, String familyId) {
