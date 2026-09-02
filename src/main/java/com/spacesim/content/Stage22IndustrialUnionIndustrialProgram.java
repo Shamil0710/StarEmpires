@@ -27,6 +27,8 @@ public final class Stage22IndustrialUnionIndustrialProgram {
 
     private static final long BASE_RETOOL_WORK_SECONDS = 259_200L;
     private static final long BASE_RETOOL_ENERGY_J = 2_400_000_000_000L;
+    private static final double MIN_STEADY_WORK_MULTIPLIER = 0.90d;
+    private static final double MAX_STEADY_THROUGHPUT_IMPROVEMENT = 0.15d;
 
     private Stage22IndustrialUnionIndustrialProgram() {
         throw new AssertionError("utility class");
@@ -47,7 +49,7 @@ public final class Stage22IndustrialUnionIndustrialProgram {
                                 "module.industrial_union_sensor_block_v1",
                                 "module.industrial_union_radiator_panel_v1"),
                         3,
-                        0.88d,
+                        0.92d,
                         0.94d),
                 new AssemblySeriesDefinition(
                         "assembly_series.industrial_union.capital",
@@ -61,7 +63,7 @@ public final class Stage22IndustrialUnionIndustrialProgram {
                                 "module.industrial_union_sensor_block_v1",
                                 "module.industrial_union_radiator_panel_v1"),
                         4,
-                        0.86d,
+                        0.91d,
                         0.93d),
                 new AssemblySeriesDefinition(
                         "assembly_series.industrial_union.logistics",
@@ -75,7 +77,7 @@ public final class Stage22IndustrialUnionIndustrialProgram {
                                 "module.industrial_union_sensor_block_v1",
                                 "module.industrial_union_radiator_panel_v1"),
                         3,
-                        0.84d,
+                        0.90d,
                         0.92d));
     }
 
@@ -220,7 +222,8 @@ public final class Stage22IndustrialUnionIndustrialProgram {
     }
 
     /**
-     * Validates authored series coverage against the accepted M22.1 profile/policy contract.
+     * Validates authored series coverage against the accepted M22.1 profile/policy contract and the
+     * formal M22.4 production-time/throughput benefit caps.
      *
      * @return immutable diagnostic validation report
      */
@@ -243,8 +246,23 @@ public final class Stage22IndustrialUnionIndustrialProgram {
                         || id.equals("module.industrial_union_sensor_block_v1")
                         || id.equals("module.industrial_union_radiator_panel_v1"))
                 .count();
-        return new ValidationReport(seriesDefinitions().size(), familyToSeries.size(), sharedCoreUseCount,
-                BASE_RETOOL_WORK_SECONDS, BASE_RETOOL_ENERGY_J);
+        double minimumWorkMultiplier = seriesDefinitions().stream()
+                .mapToDouble(AssemblySeriesDefinition::steadyWorkMultiplier)
+                .min()
+                .orElseThrow();
+        double maximumThroughputImprovement = (1d / minimumWorkMultiplier) - 1d;
+        if (minimumWorkMultiplier < MIN_STEADY_WORK_MULTIPLIER
+                || maximumThroughputImprovement > MAX_STEADY_THROUGHPUT_IMPROVEMENT + 1e-12d) {
+            throw new IllegalStateException("Industrial Union serial-production benefit exceeds M22.4 balance caps");
+        }
+        return new ValidationReport(
+                seriesDefinitions().size(),
+                familyToSeries.size(),
+                sharedCoreUseCount,
+                BASE_RETOOL_WORK_SECONDS,
+                BASE_RETOOL_ENERGY_J,
+                1d - minimumWorkMultiplier,
+                maximumThroughputImprovement);
     }
 
     private static AssemblySeriesDefinition requireSeriesForFamily(String shipFamilyId) {
@@ -298,6 +316,11 @@ public final class Stage22IndustrialUnionIndustrialProgram {
             if (!finiteDiscount(steadyWorkMultiplier) || !finiteDiscount(steadyEnergyMultiplier)) {
                 throw new IllegalArgumentException("Steady-series multipliers must be finite in (0,1]");
             }
+            double throughputImprovement = (1d / steadyWorkMultiplier) - 1d;
+            if (steadyWorkMultiplier < MIN_STEADY_WORK_MULTIPLIER
+                    || throughputImprovement > MAX_STEADY_THROUGHPUT_IMPROVEMENT + 1e-12d) {
+                throw new IllegalArgumentException("Steady-series work multiplier exceeds M22.4 production caps");
+            }
         }
     }
 
@@ -321,7 +344,9 @@ public final class Stage22IndustrialUnionIndustrialProgram {
             int coveredFamilyCount,
             long sharedCoreAssemblyReferences,
             long retoolWorkSeconds,
-            long retoolEnergyJ) { }
+            long retoolEnergyJ,
+            double maximumBuildTimeReduction,
+            double maximumThroughputImprovement) { }
 
     private static boolean finiteDiscount(double value) {
         return Double.isFinite(value) && value > 0d && value <= 1d;
