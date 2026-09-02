@@ -227,7 +227,7 @@ public final class Stage22IndustrialUnionCommonalityNetwork {
     private record DependencyValue(String id, double availability) { }
 
     private static double availability(Double value, String label) {
-        return availability(Objects.requireNonNull(value, label), label);
+        return availability(Objects.requireNonNull(value, label).doubleValue(), label);
     }
 
     private static double availability(double value, String label) {
