@@ -1,13 +1,20 @@
 package com.spacesim.content.ship;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import com.spacesim.content.Stage22AuthoredResourceFragments;
+
+import java.util.List;
 
 /** Loads the M22.4 Industrial Union engineering catalog through the common Stage-17.5 schema. */
 public final class Stage22IndustrialUnionEngineeringCatalogLoader {
-    /** Built-in Industrial Union engineering resource. */
-    public static final String DEFAULT_RESOURCE = "data/content/stage22-industrial-union-engineering-v1.json";
+    private static final List<String> DEFAULT_RESOURCES = List.of(
+            "data/content/stage22-industrial-union-engineering-v1.part00",
+            "data/content/stage22-industrial-union-engineering-v1.part01",
+            "data/content/stage22-industrial-union-engineering-v1.part02",
+            "data/content/stage22-industrial-union-engineering-v1.part03",
+            "data/content/stage22-industrial-union-engineering-v1.part04",
+            "data/content/stage22-industrial-union-engineering-v1.part05",
+            "data/content/stage22-industrial-union-engineering-v1.part06");
+
     private Stage22IndustrialUnionEngineeringCatalogLoader(){throw new AssertionError("utility class");}
 
     /**
@@ -16,9 +23,9 @@ public final class Stage22IndustrialUnionEngineeringCatalogLoader {
      * @return common immutable Stage-17.5 engineering catalog
      */
     public static ShipEngineeringCatalog loadDefault(){
-        try(InputStream stream=Stage22IndustrialUnionEngineeringCatalogLoader.class.getClassLoader().getResourceAsStream(DEFAULT_RESOURCE)){
-            if(stream==null)throw new IllegalStateException("Missing Industrial Union engineering resource: "+DEFAULT_RESOURCE);
-            return ShipEngineeringCatalogLoader.parse(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
-        }catch(IOException exception){throw new IllegalStateException("Cannot read Industrial Union engineering resource",exception);}
+        return ShipEngineeringCatalogLoader.parse(Stage22AuthoredResourceFragments.read(
+                Stage22IndustrialUnionEngineeringCatalogLoader.class,
+                DEFAULT_RESOURCES,
+                "Industrial Union engineering"));
     }
 }
