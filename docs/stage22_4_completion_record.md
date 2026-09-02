@@ -138,8 +138,16 @@ Industrial Union production ship art is governed by the canonical `docs/factions
 
 Production evidence includes:
 
-- nine separate production base PNGs, one per required family;
+- nine separate, role-authored production base PNGs, one per required family;
+- normalized `768x512` true-alpha canvases with forward/right facing and transparent corners;
+- material, panel, service and wear detail ranging from 29,114 to 65,642 colors and from 140,666 to
+  356,864 bytes per production PNG;
+- visual proportions checked against each authored hull's physical length/width envelope;
+- a contact-sheet and reproducible prompt/normalization audit in
+  `docs/stage22_4_industrial_union_sprite_audit.md`;
 - strict production resource existence checks;
+- automated placeholder/detail, uniqueness, alpha, centering and physical-aspect regression checks in
+  `Stage22IndustrialUnionProductionSpriteTest`;
 - exact-fit bindings for all 18 primary/refit engineering fits;
 - computed engineering fit fingerprints, so stale visual bindings fail closed;
 - repeated common visual language across propulsion/service/sensor sections;
@@ -236,6 +244,7 @@ Targeted M22.4 coverage includes:
 - `Stage22IndustrialUnionCommonalityNetworkTest`;
 - `Stage22IndustrialUnionPackageAcceptanceTest`;
 - `Stage22IndustrialUnionPackageValidatorTest`;
+- `Stage22IndustrialUnionProductionSpriteTest`;
 - `Stage22IndustrialUnionSoloSmokeAcceptanceTest`;
 - full repository Stage-17.5/18/21/22 regression verification through CI.
 
