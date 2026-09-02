@@ -1,1 +1,328 @@
-{"schemaVersion":1,"catalogVersion":"stage22.industrial_union_package.v1","packageKey":"core.industrial_union","stableFactionId":"faction.industrial_combine","shipFamilies":[{"familyId":"ship_family.industrial_union.corvette","roleId":"role.military.corvette","primaryFitId":"fit.industrial_union.corvette.line_v1","refitFitId":"fit.industrial_union.corvette.adaptation_refit_v1","productionManifestId":"production_manifest.industrial_union.corvette_v1","visualBindingId":"visual_binding.industrial_union.corvette_v1","lineageId":"lineage.industrial_union.series_yards","fleetUse":"Standardized corvette series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."},{"familyId":"ship_family.industrial_union.frigate","roleId":"role.military.frigate","primaryFitId":"fit.industrial_union.frigate.line_v1","refitFitId":"fit.industrial_union.frigate.adaptation_refit_v1","productionManifestId":"production_manifest.industrial_union.frigate_v1","visualBindingId":"visual_binding.industrial_union.frigate_v1","lineageId":"lineage.industrial_union.series_yards","fleetUse":"Standardized frigate series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."},{"familyId":"ship_family.industrial_union.destroyer","roleId":"role.military.destroyer","primaryFitId":"fit.industrial_union.destroyer.line_v1","refitFitId":"fit.industrial_union.destroyer.adaptation_refit_v1","productionManifestId":"production_manifest.industrial_union.destroyer_v1","visualBindingId":"visual_binding.industrial_union.destroyer_v1","lineageId":"lineage.industrial_union.series_yards","fleetUse":"Standardized destroyer series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."},{"familyId":"ship_family.industrial_union.cruiser","roleId":"role.military.cruiser","primaryFitId":"fit.industrial_union.cruiser.line_v1","refitFitId":"fit.industrial_union.cruiser.adaptation_refit_v1","productionManifestId":"production_manifest.industrial_union.cruiser_v1","visualBindingId":"visual_binding.industrial_union.cruiser_v1","lineageId":"lineage.industrial_union.capital_works","fleetUse":"Standardized cruiser series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."},{"familyId":"ship_family.industrial_union.battleship","roleId":"role.military.battleship","primaryFitId":"fit.industrial_union.battleship.line_v1","refitFitId":"fit.industrial_union.battleship.adaptation_refit_v1","productionManifestId":"production_manifest.industrial_union.battleship_v1","visualBindingId":"visual_binding.industrial_union.battleship_v1","lineageId":"lineage.industrial_union.capital_works","fleetUse":"Standardized battleship series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."},{"familyId":"ship_family.industrial_union.carrier","roleId":"role.military.carrier","primaryFitId":"fit.industrial_union.carrier.series_v1","refitFitId":"fit.industrial_union.carrier.logistics_refit_v1","productionManifestId":"production_manifest.industrial_union.carrier_v1","visualBindingId":"visual_binding.industrial_union.carrier_v1","lineageId":"lineage.industrial_union.capital_works","fleetUse":"Standardized carrier series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."},{"familyId":"ship_family.industrial_union.freight","roleId":"role.support.freight","primaryFitId":"fit.industrial_union.freight.bulk_v1","refitFitId":"fit.industrial_union.freight.escort_refit_v1","productionManifestId":"production_manifest.industrial_union.freight_v1","visualBindingId":"visual_binding.industrial_union.freight_v1","lineageId":"lineage.industrial_union.logistics_combine","fleetUse":"Standardized freight series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."},{"familyId":"ship_family.industrial_union.tanker","roleId":"role.support.tanker_replenishment","primaryFitId":"fit.industrial_union.tanker.bulk_v1","refitFitId":"fit.industrial_union.tanker.escort_refit_v1","productionManifestId":"production_manifest.industrial_union.tanker_v1","visualBindingId":"visual_binding.industrial_union.tanker_v1","lineageId":"lineage.industrial_union.logistics_combine","fleetUse":"Standardized tanker series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."},{"familyId":"ship_family.industrial_union.fleet_support","roleId":"role.support.fleet_logistics_repair_salvage","primaryFitId":"fit.industrial_union.fleet_support.repair_v1","refitFitId":"fit.industrial_union.fleet_support.salvage_refit_v1","productionManifestId":"production_manifest.industrial_union.fleet_support_v1","visualBindingId":"visual_binding.industrial_union.fleet_support_v1","lineageId":"lineage.industrial_union.logistics_combine","fleetUse":"Standardized fleet support series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.","counterplay":"Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."}],"stations":[{"id":"station_variant.industrial_union.series_yard","stage18ArchetypeId":"station.infrastructure.industrial_station","requiredFacilityIds":["facility.fabrication.heavy","facility.fabrication.assembly"],"visualBrief":"Long sectional assembly halls, repeated berths, common handling interfaces, mill steel structure and ochre service markings."},{"id":"station_variant.industrial_union.bulk_hub","stage18ArchetypeId":"station.infrastructure.naval_ordnance_depot","requiredFacilityIds":["facility.fabrication.assembly","facility.processing.bulk_refinery"],"visualBrief":"Dense standardized transfer spine with container, tanker and common-parts handling geometry; logistics reads as the hero function."},{"id":"station_variant.industrial_union.precision_works","stage18ArchetypeId":"station.infrastructure.high_tech_hub","requiredFacilityIds":["facility.fabrication.electrical","facility.fabrication.precision"],"visualBrief":"Modular clean precision blocks linked to common production interfaces, without ceremonial central citadel."}],"recurringNpcs":[{"id":"npc.industrial_union.anna-korovina","nameKey":"npc.industrial_union.anna-korovina.name","role":"OFFICIAL","characterOverlayId":"character_overlay.industrial_union.technical_administrator","publicVoice":"Qualification, capacity and contract language with explicit responsibilities.","privateVoice":"Values measurable competence and continuity over prestige."},{"id":"npc.industrial_union.sergei-volkov","nameKey":"npc.industrial_union.sergei-volkov.name","role":"MILITARY","characterOverlayId":"character_overlay.industrial_union.fleet_officer","publicVoice":"Concise readiness, escort and production-network defense orders.","privateVoice":"Treats fleet strength as inseparable from replaceable ships and intact flows."},{"id":"npc.industrial_union.vera-danilova","nameKey":"npc.industrial_union.vera-danilova.name","role":"TRADE_LOGISTICS","characterOverlayId":"character_overlay.industrial_union.logistics_coordinator","publicVoice":"Bulk tonnage, slots, route windows and reserve coverage.","privateVoice":"Distrusts plans that ignore freight concentration and tanker exposure."},{"id":"npc.industrial_union.ilya-mironov","nameKey":"npc.industrial_union.ilya-mironov.name","role":"INDUSTRY_YARD","characterOverlayId":"character_overlay.industrial_union.production_engineer","publicVoice":"Line rates, tooling, changeovers, tolerances and common parts.","privateVoice":"Proud of serial reliability and wary of bespoke emergency redesigns."},{"id":"npc.industrial_union.elena-savin","nameKey":"npc.industrial_union.elena-savin.name","role":"EXPLORATION_INTELLIGENCE","characterOverlayId":"character_overlay.industrial_union.maintenance_specialist","publicVoice":"Evidence-qualified route and infrastructure observations.","privateVoice":"Focuses on failure propagation through shared hubs and common assemblies."},{"id":"npc.industrial_union.nikolai-ustin","nameKey":"npc.industrial_union.nikolai-ustin.name","role":"INDEPENDENT_FRONTIER","characterOverlayId":"character_overlay.industrial_union.field_repair","publicVoice":"Practical repair, access and delivery language.","privateVoice":"Knows standardized fleets recover quickly only while common spares actually arrive."}],"missions":[{"id":"mission.industrial_union.route_stockpile","issuerNpcId":"npc.industrial_union.vera-danilova","runtimeTemplate":"EMERGENCY_SUPPLY_DELIVERY","authority":"FREIGHT","objectiveKind":"FREIGHT_ORDER_DELIVERED_KG_AT_LEAST","semanticIntent":"Move finite common assemblies into a series-yard buffer through ordinary freight."},{"id":"mission.industrial_union.bulk_procurement","issuerNpcId":"npc.industrial_union.vera-danilova","runtimeTemplate":"ORDINARY_MARKET_PROCUREMENT","authority":"FREIGHT","objectiveKind":"FREIGHT_ORDER_DELIVERED_KG_AT_LEAST","semanticIntent":"Procure finite bulk inputs for an active production series."},{"id":"mission.industrial_union.corridor_escort","issuerNpcId":"npc.industrial_union.sergei-volkov","runtimeTemplate":"CONVOY_ESCORT","authority":"FLEET","objectiveKind":"ESCORT_FLEETS_PRESENT_IN_SYSTEM","semanticIntent":"Protect real bulk traffic feeding concentrated industrial hubs."},{"id":"mission.industrial_union.tanker_recovery","issuerNpcId":"npc.industrial_union.nikolai-ustin","runtimeTemplate":"STRANDED_FLEET_RESCUE_REFUEL","authority":"FLEET","objectiveKind":"FLEET_REACTION_MASS_KG_AT_LEAST","semanticIntent":"Restore a named logistics group with finite reaction mass."},{"id":"mission.industrial_union.hub_recon","issuerNpcId":"npc.industrial_union.elena-savin","runtimeTemplate":"SYSTEM_OBJECT_RECONNAISSANCE","authority":"DISCOVERY","objectiveKind":"DISCOVERY_AT_LEAST","semanticIntent":"Obtain actor-bounded evidence around a threatened production corridor."},{"id":"mission.industrial_union.salvage_feed","issuerNpcId":"npc.industrial_union.elena-savin","runtimeTemplate":"DERELICT_INVESTIGATION_RECOVERY","authority":"INDUSTRY","objectiveKind":"DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST","semanticIntent":"Recover finite salvage into ordinary industrial reuse."},{"id":"mission.industrial_union.route_defense","issuerNpcId":"npc.industrial_union.sergei-volkov","runtimeTemplate":"INTERCEPTION_DEFENSE","authority":"OPERATION","objectiveKind":"OPERATION_STATUS","semanticIntent":"Defend a concentrated supply corridor through an existing operation."},{"id":"mission.industrial_union.line_repair_inputs","issuerNpcId":"npc.industrial_union.ilya-mironov","runtimeTemplate":"CONSTRUCTION_REPAIR_INPUT_DELIVERY","authority":"CONSTRUCTION","objectiveKind":"CONSTRUCTION_DELIVERED_UNITS_AT_LEAST","semanticIntent":"Deliver finite repair inputs to restore production infrastructure."},{"id":"mission.industrial_union.access_contract","issuerNpcId":"npc.industrial_union.anna-korovina","runtimeTemplate":"IMPERIAL_ACCESS_NEGOTIATION","authority":"DIPLOMACY","objectiveKind":"MARKET_ACCESS_ALLOWED","semanticIntent":"Resolve contracted market access through existing diplomacy authority."},{"id":"mission.industrial_union.series_muster","issuerNpcId":"npc.industrial_union.sergei-volkov","runtimeTemplate":"CONVOY_ESCORT","authority":"FLEET","objectiveKind":"ESCORT_FLEETS_PRESENT_IN_SYSTEM","semanticIntent":"Assemble a maintainable standardized group and its logistics escort."}],"storyChains":[{"id":"story_chain.industrial_union.flow_and_series","missionTemplateIds":["mission.industrial_union.access_contract","mission.industrial_union.bulk_procurement","mission.industrial_union.corridor_escort"],"semanticIntent":"Contracted access becomes physical bulk flow that must survive real route risk before series production can continue."},{"id":"story_chain.industrial_union.disrupted_line","missionTemplateIds":["mission.industrial_union.hub_recon","mission.industrial_union.route_defense","mission.industrial_union.line_repair_inputs"],"semanticIntent":"Observed disruption becomes a real defensive operation followed by finite industrial repair rather than scripted recovery."}],"visualRules":[{"id":"visual_rule.industrial_union.sectional_silhouette","medium":"ship","authorityDocument":"docs/factions/industrial_union_visual_bible.md","requirement":"Without color, every family must read through repeated sections, common engine banks and replaceable production modules rather than an Imperial central citadel."},{"id":"visual_rule.industrial_union.commonality","medium":"ship_and_station","authorityDocument":"docs/factions/industrial_union_visual_bible.md","requirement":"Propulsion, service doors, sensor blocks, PD housings and handling interfaces visibly repeat across classes and industrial infrastructure."},{"id":"visual_rule.industrial_union.palette","medium":"ship","authorityDocument":"docs/factions/industrial_union_visual_bible.md","requirement":"Foundry graphite, mill steel, machine slate and assembly grey dominate; oxide ochre and safety amber mark service/handling functions with limited instrument teal and signal red."},{"id":"visual_rule.industrial_union.character_master","medium":"character","authorityDocument":"docs/characters/character_master_prompt.md","requirement":"Every character composes the canonical hand-painted Character Master style with the Industrial Union faction overlay, role brief and individual brief."},{"id":"visual_rule.industrial_union.qualification_hierarchy","medium":"character","authorityDocument":"docs/factions/industrial_union_visual_bible.md","requirement":"Status is legible through qualification, responsibility, equipment precision and material quality, never aristocratic costume or retro-Soviet cliché."}]}
+{
+  "schemaVersion": 1,
+  "catalogVersion": "stage22.industrial_union_package.v1",
+  "packageKey": "core.industrial_union",
+  "stableFactionId": "faction.industrial_combine",
+  "shipFamilies": [
+    {
+      "familyId": "ship_family.industrial_union.corvette",
+      "roleId": "role.military.corvette",
+      "primaryFitId": "fit.industrial_union.corvette.line_v1",
+      "refitFitId": "fit.industrial_union.corvette.adaptation_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.corvette_v1",
+      "visualBindingId": "visual_binding.industrial_union.corvette_v1",
+      "lineageId": "lineage.industrial_union.series_yards",
+      "fleetUse": "Standardized corvette series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    },
+    {
+      "familyId": "ship_family.industrial_union.frigate",
+      "roleId": "role.military.frigate",
+      "primaryFitId": "fit.industrial_union.frigate.line_v1",
+      "refitFitId": "fit.industrial_union.frigate.adaptation_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.frigate_v1",
+      "visualBindingId": "visual_binding.industrial_union.frigate_v1",
+      "lineageId": "lineage.industrial_union.series_yards",
+      "fleetUse": "Standardized frigate series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    },
+    {
+      "familyId": "ship_family.industrial_union.destroyer",
+      "roleId": "role.military.destroyer",
+      "primaryFitId": "fit.industrial_union.destroyer.line_v1",
+      "refitFitId": "fit.industrial_union.destroyer.adaptation_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.destroyer_v1",
+      "visualBindingId": "visual_binding.industrial_union.destroyer_v1",
+      "lineageId": "lineage.industrial_union.series_yards",
+      "fleetUse": "Standardized destroyer series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    },
+    {
+      "familyId": "ship_family.industrial_union.cruiser",
+      "roleId": "role.military.cruiser",
+      "primaryFitId": "fit.industrial_union.cruiser.line_v1",
+      "refitFitId": "fit.industrial_union.cruiser.adaptation_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.cruiser_v1",
+      "visualBindingId": "visual_binding.industrial_union.cruiser_v1",
+      "lineageId": "lineage.industrial_union.capital_works",
+      "fleetUse": "Standardized cruiser series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    },
+    {
+      "familyId": "ship_family.industrial_union.battleship",
+      "roleId": "role.military.battleship",
+      "primaryFitId": "fit.industrial_union.battleship.line_v1",
+      "refitFitId": "fit.industrial_union.battleship.adaptation_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.battleship_v1",
+      "visualBindingId": "visual_binding.industrial_union.battleship_v1",
+      "lineageId": "lineage.industrial_union.capital_works",
+      "fleetUse": "Standardized battleship series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    },
+    {
+      "familyId": "ship_family.industrial_union.carrier",
+      "roleId": "role.military.carrier",
+      "primaryFitId": "fit.industrial_union.carrier.series_v1",
+      "refitFitId": "fit.industrial_union.carrier.logistics_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.carrier_v1",
+      "visualBindingId": "visual_binding.industrial_union.carrier_v1",
+      "lineageId": "lineage.industrial_union.capital_works",
+      "fleetUse": "Standardized carrier series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    },
+    {
+      "familyId": "ship_family.industrial_union.freight",
+      "roleId": "role.support.freight",
+      "primaryFitId": "fit.industrial_union.freight.bulk_v1",
+      "refitFitId": "fit.industrial_union.freight.escort_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.freight_v1",
+      "visualBindingId": "visual_binding.industrial_union.freight_v1",
+      "lineageId": "lineage.industrial_union.logistics_combine",
+      "fleetUse": "Standardized freight series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    },
+    {
+      "familyId": "ship_family.industrial_union.tanker",
+      "roleId": "role.support.tanker_replenishment",
+      "primaryFitId": "fit.industrial_union.tanker.bulk_v1",
+      "refitFitId": "fit.industrial_union.tanker.escort_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.tanker_v1",
+      "visualBindingId": "visual_binding.industrial_union.tanker_v1",
+      "lineageId": "lineage.industrial_union.logistics_combine",
+      "fleetUse": "Standardized tanker series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    },
+    {
+      "familyId": "ship_family.industrial_union.fleet_support",
+      "roleId": "role.support.fleet_logistics_repair_salvage",
+      "primaryFitId": "fit.industrial_union.fleet_support.repair_v1",
+      "refitFitId": "fit.industrial_union.fleet_support.salvage_refit_v1",
+      "productionManifestId": "production_manifest.industrial_union.fleet_support_v1",
+      "visualBindingId": "visual_binding.industrial_union.fleet_support_v1",
+      "lineageId": "lineage.industrial_union.logistics_combine",
+      "fleetUse": "Standardized fleet support series built around common banks and replaceable sections; sustained effectiveness depends on intact bulk production and logistics flows.",
+      "counterplay": "Disrupt concentrated routes, common component supply or force abrupt series changeovers; replacement tempo falls without applying faction-wide outcome penalties."
+    }
+  ],
+  "stations": [
+    {
+      "id": "station_variant.industrial_union.series_yard",
+      "stage18ArchetypeId": "station.infrastructure.industrial_station",
+      "requiredFacilityIds": ["facility.fabrication.heavy", "facility.fabrication.assembly"],
+      "visualBrief": "Long sectional assembly halls, repeated berths, common handling interfaces, mill steel structure and ochre service markings."
+    },
+    {
+      "id": "station_variant.industrial_union.bulk_hub",
+      "stage18ArchetypeId": "station.infrastructure.naval_ordnance_depot",
+      "requiredFacilityIds": ["facility.fabrication.assembly", "facility.processing.bulk_refinery"],
+      "visualBrief": "Dense standardized transfer spine with container, tanker and common-parts handling geometry; logistics reads as the hero function."
+    },
+    {
+      "id": "station_variant.industrial_union.precision_works",
+      "stage18ArchetypeId": "station.infrastructure.high_tech_hub",
+      "requiredFacilityIds": ["facility.fabrication.electrical", "facility.fabrication.precision"],
+      "visualBrief": "Modular clean precision blocks linked to common production interfaces, without ceremonial central citadel."
+    }
+  ],
+  "recurringNpcs": [
+    {
+      "id": "npc.industrial_union.plant_director",
+      "nameKey": "npc.industrial_union.plant_director.name",
+      "role": "OFFICIAL",
+      "characterOverlayId": "character_overlay.industrial_union.plant_director",
+      "publicVoice": "Speaks as Director of the Union Plant Council and head of state: capacity obligations, charter authority and inter-combine commitments are stated as measurable public responsibilities.",
+      "privateVoice": "Balances regional works councils, fleet demand and civilian continuity; fears that over-centralized emergency allocation will turn commonality into a single political point of failure."
+    },
+    {
+      "id": "npc.industrial_union.anna-korovina",
+      "nameKey": "npc.industrial_union.anna-korovina.name",
+      "role": "OFFICIAL",
+      "characterOverlayId": "character_overlay.industrial_union.technical_administrator",
+      "publicVoice": "As Central Capacity Board administrator, uses qualification, capacity and contract language with explicit industrial responsibilities.",
+      "privateVoice": "Values measurable competence and continuity over prestige and guards reserve capacity against politically attractive overcommitment."
+    },
+    {
+      "id": "npc.industrial_union.sergei-volkov",
+      "nameKey": "npc.industrial_union.sergei-volkov.name",
+      "role": "MILITARY",
+      "characterOverlayId": "character_overlay.industrial_union.fleet_officer",
+      "publicVoice": "As Fleet Production Defense commander, issues concise readiness, escort and production-network defense orders.",
+      "privateVoice": "Treats fleet strength as inseparable from replaceable ships and intact flows, and prefers defensible throughput over prestige deployments."
+    },
+    {
+      "id": "npc.industrial_union.vera-danilova",
+      "nameKey": "npc.industrial_union.vera-danilova.name",
+      "role": "TRADE_LOGISTICS",
+      "characterOverlayId": "character_overlay.industrial_union.logistics_coordinator",
+      "publicVoice": "Bulk tonnage, slots, route windows and reserve coverage.",
+      "privateVoice": "Distrusts plans that ignore freight concentration and tanker exposure."
+    },
+    {
+      "id": "npc.industrial_union.ilya-mironov",
+      "nameKey": "npc.industrial_union.ilya-mironov.name",
+      "role": "INDUSTRY_YARD",
+      "characterOverlayId": "character_overlay.industrial_union.production_engineer",
+      "publicVoice": "As chief series-yard authority, speaks in line rates, tooling, changeovers, tolerances and common parts.",
+      "privateVoice": "Proud of serial reliability and wary of bespoke emergency redesigns that strand tooling and spares."
+    },
+    {
+      "id": "npc.industrial_union.elena-savin",
+      "nameKey": "npc.industrial_union.elena-savin.name",
+      "role": "EXPLORATION_INTELLIGENCE",
+      "characterOverlayId": "character_overlay.industrial_union.maintenance_specialist",
+      "publicVoice": "As infrastructure intelligence and anomaly liaison, reports only evidence-qualified route, site and production-network observations.",
+      "privateVoice": "Focuses on failure propagation through shared hubs and common assemblies and suspects anomalous events are most dangerous when they mimic ordinary correlated failures."
+    },
+    {
+      "id": "npc.industrial_union.nikolai-ustin",
+      "nameKey": "npc.industrial_union.nikolai-ustin.name",
+      "role": "INDEPENDENT_FRONTIER",
+      "characterOverlayId": "character_overlay.industrial_union.field_repair",
+      "publicVoice": "Practical repair, access and delivery language from the frontier maintenance network.",
+      "privateVoice": "Knows standardized fleets recover quickly only while common spares actually arrive and distrusts central plans that omit the last route segment."
+    }
+  ],
+  "missions": [
+    {
+      "id": "mission.industrial_union.route_stockpile",
+      "issuerNpcId": "npc.industrial_union.vera-danilova",
+      "runtimeTemplate": "EMERGENCY_SUPPLY_DELIVERY",
+      "authority": "FREIGHT",
+      "objectiveKind": "FREIGHT_ORDER_DELIVERED_KG_AT_LEAST",
+      "semanticIntent": "Move finite common assemblies into a series-yard buffer through ordinary freight."
+    },
+    {
+      "id": "mission.industrial_union.bulk_procurement",
+      "issuerNpcId": "npc.industrial_union.vera-danilova",
+      "runtimeTemplate": "ORDINARY_MARKET_PROCUREMENT",
+      "authority": "FREIGHT",
+      "objectiveKind": "FREIGHT_ORDER_DELIVERED_KG_AT_LEAST",
+      "semanticIntent": "Procure finite bulk inputs for an active production series."
+    },
+    {
+      "id": "mission.industrial_union.corridor_escort",
+      "issuerNpcId": "npc.industrial_union.sergei-volkov",
+      "runtimeTemplate": "CONVOY_ESCORT",
+      "authority": "FLEET",
+      "objectiveKind": "ESCORT_FLEETS_PRESENT_IN_SYSTEM",
+      "semanticIntent": "Protect real bulk traffic feeding concentrated industrial hubs."
+    },
+    {
+      "id": "mission.industrial_union.tanker_recovery",
+      "issuerNpcId": "npc.industrial_union.nikolai-ustin",
+      "runtimeTemplate": "STRANDED_FLEET_RESCUE_REFUEL",
+      "authority": "FLEET",
+      "objectiveKind": "FLEET_REACTION_MASS_KG_AT_LEAST",
+      "semanticIntent": "Restore a named logistics group with finite reaction mass."
+    },
+    {
+      "id": "mission.industrial_union.hub_recon",
+      "issuerNpcId": "npc.industrial_union.elena-savin",
+      "runtimeTemplate": "SYSTEM_OBJECT_RECONNAISSANCE",
+      "authority": "DISCOVERY",
+      "objectiveKind": "DISCOVERY_AT_LEAST",
+      "semanticIntent": "Obtain actor-bounded evidence around a threatened production corridor."
+    },
+    {
+      "id": "mission.industrial_union.salvage_feed",
+      "issuerNpcId": "npc.industrial_union.elena-savin",
+      "runtimeTemplate": "DERELICT_INVESTIGATION_RECOVERY",
+      "authority": "INDUSTRY",
+      "objectiveKind": "DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST",
+      "semanticIntent": "Recover finite salvage into ordinary industrial reuse."
+    },
+    {
+      "id": "mission.industrial_union.route_defense",
+      "issuerNpcId": "npc.industrial_union.sergei-volkov",
+      "runtimeTemplate": "INTERCEPTION_DEFENSE",
+      "authority": "OPERATION",
+      "objectiveKind": "OPERATION_STATUS",
+      "semanticIntent": "Defend a concentrated supply corridor through an existing operation."
+    },
+    {
+      "id": "mission.industrial_union.line_repair_inputs",
+      "issuerNpcId": "npc.industrial_union.ilya-mironov",
+      "runtimeTemplate": "CONSTRUCTION_REPAIR_INPUT_DELIVERY",
+      "authority": "CONSTRUCTION",
+      "objectiveKind": "CONSTRUCTION_DELIVERED_UNITS_AT_LEAST",
+      "semanticIntent": "Deliver finite repair inputs to restore production infrastructure."
+    },
+    {
+      "id": "mission.industrial_union.access_contract",
+      "issuerNpcId": "npc.industrial_union.anna-korovina",
+      "runtimeTemplate": "IMPERIAL_ACCESS_NEGOTIATION",
+      "authority": "DIPLOMACY",
+      "objectiveKind": "MARKET_ACCESS_ALLOWED",
+      "semanticIntent": "Resolve contracted market access through existing diplomacy authority."
+    },
+    {
+      "id": "mission.industrial_union.capacity_compact",
+      "issuerNpcId": "npc.industrial_union.plant_director",
+      "runtimeTemplate": "IMPERIAL_ACCESS_NEGOTIATION",
+      "authority": "DIPLOMACY",
+      "objectiveKind": "MARKET_ACCESS_ALLOWED",
+      "semanticIntent": "Negotiate reciprocal emergency yard and market access for finite reserve capacity through ordinary diplomacy rather than granting scripted industrial access."
+    },
+    {
+      "id": "mission.industrial_union.series_muster",
+      "issuerNpcId": "npc.industrial_union.sergei-volkov",
+      "runtimeTemplate": "CONVOY_ESCORT",
+      "authority": "FLEET",
+      "objectiveKind": "ESCORT_FLEETS_PRESENT_IN_SYSTEM",
+      "semanticIntent": "Assemble a maintainable standardized group and its logistics escort."
+    }
+  ],
+  "storyChains": [
+    {
+      "id": "story_chain.industrial_union.flow_and_series",
+      "missionTemplateIds": [
+        "mission.industrial_union.capacity_compact",
+        "mission.industrial_union.access_contract",
+        "mission.industrial_union.bulk_procurement",
+        "mission.industrial_union.corridor_escort"
+      ],
+      "semanticIntent": "Political capacity commitment and contracted access become physical bulk flow that must survive real route risk before series production can continue."
+    },
+    {
+      "id": "story_chain.industrial_union.disrupted_line",
+      "missionTemplateIds": [
+        "mission.industrial_union.hub_recon",
+        "mission.industrial_union.route_defense",
+        "mission.industrial_union.line_repair_inputs"
+      ],
+      "semanticIntent": "Observed disruption becomes a real defensive operation followed by finite industrial repair rather than scripted recovery."
+    }
+  ],
+  "visualRules": [
+    {
+      "id": "visual_rule.industrial_union.sectional_silhouette",
+      "medium": "ship",
+      "authorityDocument": "docs/factions/industrial_union_visual_bible.md",
+      "requirement": "Without color, every family must read through repeated sections, common engine banks and replaceable production modules rather than an Imperial central citadel."
+    },
+    {
+      "id": "visual_rule.industrial_union.commonality",
+      "medium": "ship_and_station",
+      "authorityDocument": "docs/factions/industrial_union_visual_bible.md",
+      "requirement": "Propulsion, service doors, sensor blocks, PD housings and handling interfaces visibly repeat across classes and industrial infrastructure."
+    },
+    {
+      "id": "visual_rule.industrial_union.palette",
+      "medium": "ship",
+      "authorityDocument": "docs/factions/industrial_union_visual_bible.md",
+      "requirement": "Foundry graphite, mill steel, machine slate and assembly grey dominate; oxide ochre and safety amber mark service/handling functions with limited instrument teal and signal red."
+    },
+    {
+      "id": "visual_rule.industrial_union.character_master",
+      "medium": "character",
+      "authorityDocument": "docs/characters/character_master_prompt.md",
+      "requirement": "Every character composes the canonical hand-painted Character Master style with the Industrial Union faction overlay, role brief and individual brief."
+    },
+    {
+      "id": "visual_rule.industrial_union.qualification_hierarchy",
+      "medium": "character",
+      "authorityDocument": "docs/factions/industrial_union_visual_bible.md",
+      "requirement": "Status is legible through qualification, responsibility, equipment precision and material quality, never aristocratic costume or retro-Soviet cliché."
+    }
+  ]
+}
