@@ -1,1 +1,72 @@
-{"schemaVersion":1,"catalogVersion":"stage22.industrial_union_character_lineup.v1","masterPromptRef":"docs/characters/character_master_prompt.md","factionVisualRef":"docs/factions/industrial_union_visual_bible.md","overlays":[{"id":"character_overlay.industrial_union.assembly_worker","roleKey":"assembly_worker","roleBrief":"Hands-on serial assembly worker responsible for repeated structural sections and common interfaces.","statusReadability":"Qualification patch, inspected tools and work-zone responsibility, not decorative rank.","practicalGear":"Torque tools, inspection tablet, safety tether and standardized workwear.","condition":"Clean production wear with localized handling marks."},{"id":"character_overlay.industrial_union.maintenance_specialist","roleKey":"maintenance_specialist","roleBrief":"Fleet maintenance specialist trained across common engine, sensor and service assemblies.","statusReadability":"Higher certification shown by calibrated diagnostic equipment and controlled access markings.","practicalGear":"Diagnostic rig, service keys, spare-interface gauges and protective gloves.","condition":"Operational grime limited to service zones; equipment remains maintained."},{"id":"character_overlay.industrial_union.production_engineer","roleKey":"production_engineer","roleBrief":"Production engineer coordinating line balance, tolerances and controlled changeovers.","statusReadability":"Responsibility reads through precision instruments, authorization tabs and cleaner technical layers.","practicalGear":"Line tablet, tolerance gauges, headset and modular tool roll.","condition":"Tired during changeover work but technically composed."},{"id":"character_overlay.industrial_union.fleet_officer","roleKey":"ship_fleet_officer","roleBrief":"Ship or fleet officer responsible for maintainable standardized task groups.","statusReadability":"Command responsibility through functional cut, data access and restrained qualification marks.","practicalGear":"Fleet terminal, comms interface and practical pressure-ready uniform.","condition":"No ceremonial excess; field variant may show fatigue."},{"id":"character_overlay.industrial_union.logistics_coordinator","roleKey":"logistics_coordinator","roleBrief":"Coordinator of bulk freight, tanker windows, stockpile coverage and route capacity.","statusReadability":"Status through route authority credentials and high-grade planning equipment.","practicalGear":"Cargo manifest tablet, comms, route overlays and handling-zone PPE.","condition":"Travel-worn but precise and organized."},{"id":"character_overlay.industrial_union.technical_administrator","roleKey":"plant_director_technical_administrator","roleBrief":"Plant director or technical administrator accountable for throughput, safety and contractual access.","statusReadability":"Highest responsibility shown through material quality, clean fit and senior certification, not luxury ornament.","practicalGear":"Secure terminal, inspection credentials and minimal supervisory gear.","condition":"Controlled fatigue during crisis; no aristocratic signals."},{"id":"character_overlay.industrial_union.field_repair","roleKey":"field_repair_variant","roleBrief":"Field repair specialist restoring damaged standardized sections under constrained supply.","statusReadability":"Competence through improvised-but-standard-compatible equipment and visible qualification markings.","practicalGear":"Portable diagnostic kit, patch panels, tether, spare connectors and protective layers.","condition":"Damaged/tired variant: soot and abrasion localized to work surfaces without post-apocalyptic styling."}]}
+{
+  "schemaVersion": 1,
+  "catalogVersion": "stage22.industrial_union_character_lineup.v1",
+  "masterPromptRef": "docs/characters/character_master_prompt.md",
+  "factionVisualRef": "docs/factions/industrial_union_visual_bible.md",
+  "overlays": [
+    {
+      "id": "character_overlay.industrial_union.assembly_worker",
+      "roleKey": "assembly_worker",
+      "roleBrief": "Hands-on serial assembly worker responsible for repeated structural sections and common interfaces.",
+      "statusReadability": "Qualification patch, inspected tools and work-zone responsibility, not decorative rank.",
+      "practicalGear": "Torque tools, inspection tablet, safety tether and standardized workwear.",
+      "condition": "Clean production wear with localized handling marks."
+    },
+    {
+      "id": "character_overlay.industrial_union.maintenance_specialist",
+      "roleKey": "maintenance_specialist",
+      "roleBrief": "Fleet maintenance specialist trained across common engine, sensor and service assemblies.",
+      "statusReadability": "Higher certification shown by calibrated diagnostic equipment and controlled access markings.",
+      "practicalGear": "Diagnostic rig, service keys, spare-interface gauges and protective gloves.",
+      "condition": "Operational grime limited to service zones; equipment remains maintained."
+    },
+    {
+      "id": "character_overlay.industrial_union.production_engineer",
+      "roleKey": "production_engineer",
+      "roleBrief": "Production engineer coordinating line balance, tolerances and controlled changeovers.",
+      "statusReadability": "Responsibility reads through precision instruments, authorization tabs and cleaner technical layers.",
+      "practicalGear": "Line tablet, tolerance gauges, headset and modular tool roll.",
+      "condition": "Tired during changeover work but technically composed."
+    },
+    {
+      "id": "character_overlay.industrial_union.fleet_officer",
+      "roleKey": "ship_fleet_officer",
+      "roleBrief": "Ship or fleet officer responsible for maintainable standardized task groups.",
+      "statusReadability": "Command responsibility through functional cut, data access and restrained qualification marks.",
+      "practicalGear": "Fleet terminal, comms interface and practical pressure-ready uniform.",
+      "condition": "No ceremonial excess; field variant may show fatigue."
+    },
+    {
+      "id": "character_overlay.industrial_union.logistics_coordinator",
+      "roleKey": "logistics_coordinator",
+      "roleBrief": "Coordinator of bulk freight, tanker windows, stockpile coverage and route capacity.",
+      "statusReadability": "Status through route authority credentials and high-grade planning equipment.",
+      "practicalGear": "Cargo manifest tablet, comms, route overlays and handling-zone PPE.",
+      "condition": "Travel-worn but precise and organized."
+    },
+    {
+      "id": "character_overlay.industrial_union.technical_administrator",
+      "roleKey": "plant_director_technical_administrator",
+      "roleBrief": "Senior technical administrator accountable for capacity allocation, safety and contractual access across multiple production sites.",
+      "statusReadability": "High responsibility shown through material quality, clean fit and senior certification, not luxury ornament.",
+      "practicalGear": "Secure terminal, inspection credentials and minimal supervisory gear.",
+      "condition": "Controlled fatigue during crisis; no aristocratic signals."
+    },
+    {
+      "id": "character_overlay.industrial_union.plant_director",
+      "roleKey": "plant_director_technical_administrator",
+      "roleBrief": "Director of the Union Plant Council and public head of state, responsible for charter commitments, reserve capacity and cross-combine continuity.",
+      "statusReadability": "Top political-industrial responsibility reads through immaculate qualification layers, secure authority credentials and precise practical tailoring; never ceremonial luxury.",
+      "practicalGear": "Secure council terminal, capacity-board credentials, compact comms and inspection-ready pressure-compatible uniform.",
+      "condition": "Maintained and controlled under normal conditions; crisis variant shows fatigue without loss of technical discipline."
+    },
+    {
+      "id": "character_overlay.industrial_union.field_repair",
+      "roleKey": "field_repair_variant",
+      "roleBrief": "Field repair specialist restoring damaged standardized sections under constrained supply.",
+      "statusReadability": "Competence through improvised-but-standard-compatible equipment and visible qualification markings.",
+      "practicalGear": "Portable diagnostic kit, patch panels, tether, spare connectors and protective layers.",
+      "condition": "Damaged/tired variant: soot and abrasion localized to work surfaces without post-apocalyptic styling."
+    }
+  ]
+}
