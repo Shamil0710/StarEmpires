@@ -17,11 +17,17 @@ import java.util.Objects;
  * operating authority.</p>
  */
 public final class Stage22CivilianMiningProductionPath {
+    /** Preserved compatibility-era mining archetype used by supported worlds and saves. */
     public static final String LEGACY_RUNTIME_ARCHETYPE = "ship.basic_miner";
+    /** Reviewed Industrial Union fit licensed as the physical replacement/support path. */
     public static final String LICENSED_FIT_ID = "fit.industrial_union.fleet_support.repair_v1";
+    /** Core production manifest that legally manufactures the licensed fit. */
     public static final String PRODUCTION_MANIFEST_ID = "production_manifest.industrial_union.fleet_support_v1";
+    /** Existing Stage-18 asteroid extraction method used by civilian miners. */
     public static final String EXTRACTION_METHOD_ID = "extraction.asteroid_excavation";
+    /** Core package that authors the licensed physical fit. */
     public static final String SOURCE_PACKAGE_KEY = Stage22IndustrialUnionPackageCatalog.PACKAGE_KEY;
+    /** Preserved minor-faction identity that operates the civilian mining role. */
     public static final String OPERATOR_FACTION_ID = "faction.miners";
 
     private Stage22CivilianMiningProductionPath() {
@@ -122,6 +128,9 @@ public final class Stage22CivilianMiningProductionPath {
             boolean miningIndustrialModulePresent,
             boolean productionPathReady,
             boolean extractionSupportReady) {
+        /**
+         * Normalizes required identifiers for deterministic validation evidence.
+         */
         public ValidationReport {
             legacyRuntimeArchetype = Objects.requireNonNull(legacyRuntimeArchetype, "legacyRuntimeArchetype");
             licensedFitId = Objects.requireNonNull(licensedFitId, "licensedFitId");
