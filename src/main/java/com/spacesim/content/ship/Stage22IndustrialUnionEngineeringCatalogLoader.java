@@ -27,6 +27,7 @@ public final class Stage22IndustrialUnionEngineeringCatalogLoader {
                 Stage22IndustrialUnionEngineeringCatalogLoader.class,
                 DEFAULT_RESOURCES,
                 "Industrial Union engineering"));
-        return Stage22CorePairSensorModeProjection.apply(authored);
+        ShipEngineeringCatalog sensors = Stage22CorePairSensorModeProjection.apply(authored);
+        return Stage22CorePairShieldModeProjection.apply(sensors);
     }
 }
