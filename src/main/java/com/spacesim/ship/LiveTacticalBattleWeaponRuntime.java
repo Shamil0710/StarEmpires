@@ -4,8 +4,6 @@ import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.Vector3d;
 import com.spacesim.content.ship.ShipProtectionCatalog;
-import com.spacesim.content.ship.Stage175ICombatTestContentPack;
-import com.spacesim.content.ship.Stage175ICombatTestProtectionPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponLauncherCatalog;
@@ -53,16 +51,40 @@ public final class LiveTacticalBattleWeaponRuntime {
     private long nextProjectileId = 190_000L;
 
     /**
-     * Creates shared weapon/protection execution over one materialized/control-driven battle.
+     * Creates shared weapon/protection execution over one materialized/control-driven legacy battle.
+     *
+     * <p>The battle-local protection catalog is always reused. The no-argument content path preserves
+     * the accepted Stage-17.5I ammunition/launcher fixtures for existing callers.</p>
      *
      * @param controlRuntime production multi-combatant sensing/AI/engineering/flight runtime
      */
     public LiveTacticalBattleWeaponRuntime(LiveTacticalBattleControlRuntime controlRuntime) {
+        this(
+                controlRuntime,
+                Stage175ICombatTestWeaponPack.loadAmmunition(),
+                Stage175ICombatTestWeaponPack.loadLaunchers());
+    }
+
+    /**
+     * Creates shared weapon/protection execution with explicit battle-package ammunition and launchers.
+     *
+     * <p>This is a content injection seam only: all firing, body motion, collision, shield, material
+     * response and local damage continue through this same Stage-19 runtime. The supplied catalogs are
+     * validated by the ordinary Stage-17.5E loaders before they reach this constructor.</p>
+     *
+     * @param controlRuntime production multi-combatant sensing/AI/engineering/flight runtime
+     * @param ammunitionCatalog physical ammunition content matching the battle engineering catalog
+     * @param launcherCatalog launcher operating profiles matching the battle engineering catalog
+     */
+    public LiveTacticalBattleWeaponRuntime(
+            LiveTacticalBattleControlRuntime controlRuntime,
+            WeaponAmmunitionCatalog ammunitionCatalog,
+            WeaponLauncherCatalog launcherCatalog) {
         this.controlRuntime = Objects.requireNonNull(controlRuntime, "controlRuntime");
         engineeringCatalog = battleState().engineeringCatalog();
-        protectionCatalog = Stage175ICombatTestProtectionPack.load();
-        ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
-        launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
+        protectionCatalog = battleState().protectionCatalog();
+        this.ammunitionCatalog = Objects.requireNonNull(ammunitionCatalog, "ammunitionCatalog");
+        this.launcherCatalog = Objects.requireNonNull(launcherCatalog, "launcherCatalog");
         calculator = new DerivedShipCalculator(engineeringCatalog);
         weaponAdapter = new ShipWeaponEngineeringAdapter();
         shieldAdapter = new ShipShieldEngineeringAdapter();
