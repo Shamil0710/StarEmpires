@@ -270,9 +270,7 @@ public final class Stage22CivilianMinorEcosystemValidator {
             boolean b16BindingReady,
             boolean insuranceHookDeferred,
             boolean miningCompatibilityBridgeReady) {
-        /**
-         * Normalizes immutable collections used by the validation report.
-         */
+        // Normalizes immutable collections used by the validation report.
         public ValidationReport {
             ecosystemFingerprint = Objects.requireNonNull(ecosystemFingerprint, "ecosystemFingerprint");
             unresolvedProductionRoles = List.copyOf(Objects.requireNonNull(unresolvedProductionRoles, "unresolvedProductionRoles"));
