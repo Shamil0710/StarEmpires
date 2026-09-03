@@ -1,6 +1,7 @@
 package com.spacesim.content;
 
 import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.LargeDemoGalaxyFactory;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionIdentityResolver;
 import com.spacesim.world.FactionStrategicState;
@@ -8,6 +9,7 @@ import com.spacesim.world.FleetId;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.Stage22TerritorialTransitionProbe;
 import com.spacesim.world.TerritorialTransitionService;
+import com.spacesim.world.WorldFactionIdentityState;
 import com.spacesim.world.WorldSimulation;
 import com.spacesim.world.WorldState;
 import org.junit.jupiter.api.Test;
@@ -83,6 +85,9 @@ class Stage22CorePairTerritoryMachineEvidenceAcceptanceTest {
     private static Fixture fixture(long seed) {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldState base = DemoGalaxyFactory.create(seed).snapshot();
+        List<WorldFactionIdentityState> worldIdentities = LargeDemoGalaxyFactory
+                .createState(seed, content)
+                .factionIdentities();
         List<FactionStrategicState> strategies = new ArrayList<>();
         for (FactionStrategicState strategy : base.factionStrategies()) {
             List<StarSystemId> controlled = strategy.controlledSystems().stream()
@@ -118,14 +123,14 @@ class Stage22CorePairTerritoryMachineEvidenceAcceptanceTest {
                 base.nextFleetIdValue(),
                 base.fleets(),
                 base.fleetJumps(),
-                base.factionIdentities());
+                worldIdentities);
         WorldSimulation world = WorldSimulation.restore(
                 state,
                 content,
                 DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
                 WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS,
                 WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME);
-        return new Fixture(world, FactionIdentityResolver.createDefault(content, base.factionIdentities()));
+        return new Fixture(world, FactionIdentityResolver.createDefault(content, worldIdentities));
     }
 
     private static void appendStrategyIfMissing(List<FactionStrategicState> strategies, String factionId) {
