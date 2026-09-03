@@ -41,7 +41,7 @@ No M22.5 class owns inventory, credits, territory, diplomacy, construction progr
 
 The contract distinguishes compatibility archetypes from legally licensed Stage-22 core assets while requiring every M22.5 role to have an actual production/support closure.
 
-### Licensed production paths
+### Licensed core production paths
 
 - freight: `fit.industrial_union.freight.bulk_v1` → `production_manifest.industrial_union.freight_v1`;
 - tanker: `fit.empire.tanker.fleet_v1` → `production_manifest.empire.tanker_v1`;
@@ -50,22 +50,27 @@ The contract distinguishes compatibility archetypes from legally licensed Stage-
 
 These are **individual licensed market assets**, not profile inheritance. A minor operator may obtain/use the concrete asset only through ordinary market/access/production conditions; it does not receive the source faction's doctrine, policy state or package identity.
 
-### Mining compatibility-to-production bridge
+### Dedicated civilian mining compatibility-to-production bridge
 
-Mining preserves `ship.basic_miner` for supported runtime/save compatibility, but replacement availability is no longer treated as implicit bootstrap magic.
+Mining preserves `ship.basic_miner` for supported runtime/save compatibility, but replacement availability is no longer treated as implicit bootstrap magic and no longer reuses an unmodified repair fit as if it were a miner.
 
-`Stage22CivilianMiningProductionPath` proves the explicit bridge:
+`Stage22CivilianMiningProductionPath` and `Stage22CivilianMiningEngineeringCatalogLoader` prove the explicit bridge:
 
 - compatibility runtime archetype: `ship.basic_miner`;
-- licensed reviewed physical fit: `fit.industrial_union.fleet_support.repair_v1`;
-- exact production manifest: `production_manifest.industrial_union.fleet_support_v1`;
-- real Stage-18 shipyard hull/module profiles and manufacturing bindings;
-- industrial/mining-capable common module family on the licensed fit;
-- operating extraction authority: `Stage18ExtractionRuntime` with `extraction.asteroid_excavation`.
+- reviewed physical envelope source: `fit.industrial_union.fleet_support.repair_v1`;
+- dedicated non-sovereign mining fit: `fit.civilian.miners.asteroid_excavator_v1`;
+- dedicated mining mission module: `module.civilian.miners.asteroid_excavation_section_v1`;
+- exact civilian production manifest: `production_manifest.civilian.miners.asteroid_excavator_v1`;
+- the accepted Union support hull, reactor, drive, sensor and thermal modules remain unchanged and are composed into the civilian fit;
+- the repair/salvage workshop is replaced by exactly one asteroid-excavation section rather than gaining an implicit mining capability;
+- the new mission module receives an ordinary Stage-18 manufacturing binding and shipyard service profile through `Stage22AuthoredProductionBridge`;
+- the fit retains a real Stage-18 hull service profile and every installed module retains manufacturing and service closure;
+- operating extraction remains `Stage18ExtractionRuntime` with `extraction.asteroid_excavation` and the exact `capability.extraction.asteroid_excavation` capability tag;
+- validation performs a real committed Stage-18 extraction and an explicit negative control proving that the accepted repair workshop is rejected for asteroid mining.
 
-The minor operator remains `faction.miners`; licensing this individual support fit does not grant Industrial Union doctrine/profile identity.
+The minor operator remains `faction.miners`. Reusing reviewed physical components does not grant Industrial Union doctrine/profile identity and the dedicated civilian fit is not added back into the accepted M22.4 Union package.
 
-`Stage22CivilianMinorEcosystemValidator` removes `CivilianRole.MINING` from the compatibility row's unresolved list only after this bridge validates successfully. The resulting validation report requires `unresolvedProductionRoles == []` and `productionClosureReady() == true`.
+`Stage22CivilianMinorEcosystemValidator` removes `CivilianRole.MINING` from the compatibility row's unresolved list only after the dedicated bridge validates successfully. The resulting validation report requires `unresolvedProductionRoles == []` and `productionClosureReady() == true`.
 
 ## 4. Neutral/minor service providers
 
@@ -119,15 +124,16 @@ No remote faction debuff, scripted market modifier or duplicate diplomacy author
 - `faction.trade_league`;
 - `faction.miners`.
 
-The test also requires every one of these identities to have no core `canonicalPackageKey` and no major-package fallback.
+The test also requires every one of these identities to have no core `canonicalPackageKey` and no major-package fallback. Their identity class and canonical localized display names remain governed by the accepted M22.0 content-governance catalog rather than a new M22.5 identity registry.
 
 ## 9. Validation and acceptance gate
 
 `Stage22CivilianMinorEcosystemValidator.validateDefault()` requires:
 
 - all five civilian roles to be explicitly represented;
-- all five roles to have a legal production/support closure, including the mining compatibility bridge;
-- every licensed fit to match a real core ship family and its exact production manifest;
+- all five roles to have a legal production/support closure, including the dedicated mining compatibility bridge;
+- every licensed core fit to match a real core ship family and its exact production manifest;
+- the civilian mining fit to preserve a reviewed physical hull/module envelope while adding only the explicit mining mission section and exact civilian manifest;
 - every service provider to resolve to a real constructible station with matching owner;
 - authority class references to resolve;
 - B08 and B16 to bind one valid mission from each core faction;
@@ -137,7 +143,7 @@ The test also requires every one of these identities to have no core `canonicalP
 
 Representative automated evidence:
 
-- `Stage22CivilianMinorEcosystemValidatorTest` — five roles, five production closures, three providers, three preserved minors, zero unresolved production roles and no major-package fallback;
+- `Stage22CivilianMinorEcosystemValidatorTest` — five roles, five production closures, three providers, three preserved minors, zero unresolved production roles, exact dedicated mining fit/module/manifest, real extraction and no major-package fallback;
 - `Stage22CivilianMinorMigrationAcceptanceTest` — deterministic binary round-trip plus stable minor IDs/runtime slots;
 - `Stage22CivilianMinorScenarioAcceptanceTest` — real B08 physical interdiction and real B16 treaty/access/tariff shock.
 
