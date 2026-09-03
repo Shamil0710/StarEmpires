@@ -24,7 +24,11 @@ public final class Stage22CivilianMinorEcosystemValidator {
         throw new AssertionError("utility class");
     }
 
-    /** Runs the canonical M22.5 diagnostic validation. */
+    /**
+     * Runs the canonical M22.5 diagnostic validation.
+     *
+     * @return immutable evidence describing civilian/minor production, services and scenario closure
+     */
     public static ValidationReport validateDefault() {
         Stage22CivilianMinorEcosystemCatalog ecosystem = Stage22CivilianMinorEcosystemCatalog.loadDefault();
         ContentCatalog legacy = ContentCatalogLoader.loadDefault();
@@ -266,6 +270,9 @@ public final class Stage22CivilianMinorEcosystemValidator {
             boolean b16BindingReady,
             boolean insuranceHookDeferred,
             boolean miningCompatibilityBridgeReady) {
+        /**
+         * Normalizes immutable collections used by the validation report.
+         */
         public ValidationReport {
             ecosystemFingerprint = Objects.requireNonNull(ecosystemFingerprint, "ecosystemFingerprint");
             unresolvedProductionRoles = List.copyOf(Objects.requireNonNull(unresolvedProductionRoles, "unresolvedProductionRoles"));
