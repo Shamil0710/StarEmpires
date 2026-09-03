@@ -270,7 +270,20 @@ public final class Stage22CivilianMinorEcosystemValidator {
             boolean b16BindingReady,
             boolean insuranceHookDeferred,
             boolean miningCompatibilityBridgeReady) {
-        // Normalizes immutable collections used by the validation report.
+        /**
+         * Validates and normalizes the canonical M22.5 ecosystem evidence.
+         *
+         * @param ecosystemFingerprint deterministic ecosystem fingerprint
+         * @param civilianRoleCount number of governed civilian roles
+         * @param licensedProductionPathCount number of legal production paths, including dedicated mining closure
+         * @param serviceProviderCount number of governed neutral/minor service providers
+         * @param preservedMinorActorCount number of preserved minor actor identities
+         * @param unresolvedProductionRoles civilian roles still lacking legal production closure
+         * @param b08BindingReady whether convoy/interdiction scenario binding is complete
+         * @param b16BindingReady whether market/treaty shock scenario binding is complete
+         * @param insuranceHookDeferred whether insurance remains explicitly deferred
+         * @param miningCompatibilityBridgeReady whether the dedicated mining compatibility bridge is complete
+         */
         public ValidationReport {
             ecosystemFingerprint = Objects.requireNonNull(ecosystemFingerprint, "ecosystemFingerprint");
             unresolvedProductionRoles = List.copyOf(Objects.requireNonNull(unresolvedProductionRoles, "unresolvedProductionRoles"));
