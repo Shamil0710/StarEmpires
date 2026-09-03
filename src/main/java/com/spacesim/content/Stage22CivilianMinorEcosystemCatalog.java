@@ -24,10 +24,15 @@ import java.util.Objects;
 public final class Stage22CivilianMinorEcosystemCatalog {
     /** Shared civilian roles required by the M22.5 alpha slice. */
     public enum CivilianRole {
+        /** Inter-system freight and cargo transport. */
         FREIGHT,
+        /** Fuel, propellant and replenishment support. */
         TANKER,
+        /** Civilian resource extraction. */
         MINING,
+        /** Wreck recovery and salvage support. */
         SALVAGE,
+        /** Background neutral traffic using ordinary logistics authority. */
         NEUTRAL_TRAFFIC
     }
 
@@ -41,8 +46,11 @@ public final class Stage22CivilianMinorEcosystemCatalog {
 
     /** Optional ecosystem integrations that must not create a parallel economy. */
     public enum HookKind {
+        /** Existing inter-system trade integration. */
         TRADE,
+        /** Existing mission/contract integration. */
         CONTRACT,
+        /** Reserved insurance integration that remains explicitly deferred in M22.5. */
         INSURANCE
     }
 
@@ -71,6 +79,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String operatingAuthority,
             String supportAuthority,
             boolean legalProductionPath) {
+        /** Validates and normalizes one civilian availability contract. */
         public CivilianAvailability {
             role = Objects.requireNonNull(role, "civilian role");
             pathKind = Objects.requireNonNull(pathKind, "asset path kind");
@@ -106,6 +115,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String spawnPolicy,
             boolean preserveStableId,
             boolean majorPackageFallbackAllowed) {
+        /** Validates stable identity preservation and rejects major-package fallback. */
         public MinorActorPolicy {
             stableFactionId = requireFactionId(stableFactionId);
             provenance = requireText(provenance, "provenance");
@@ -138,6 +148,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String accessAuthority,
             String tariffAuthority,
             String logisticsAuthority) {
+        /** Validates the provider identity and canonical authority references. */
         public ServiceProviderPolicy {
             providerRef = requireText(providerRef, "providerRef");
             ownerFactionId = requireFactionId(ownerFactionId);
@@ -152,8 +163,14 @@ public final class Stage22CivilianMinorEcosystemCatalog {
     /**
      * One integration hook. Deferred hooks are deliberately non-authoritative placeholders for later
      * content and may not name a mutable authority that does not exist yet.
+     *
+     * @param kind integration category
+     * @param authorityRef existing authority class, or {@code null} only for deferred hooks
+     * @param deferred whether implementation remains intentionally deferred
+     * @param semanticIntent bounded purpose of the integration
      */
     public record EcosystemHook(HookKind kind, String authorityRef, boolean deferred, String semanticIntent) {
+        /** Validates that deferred hooks do not invent authorities and active hooks resolve a reference. */
         public EcosystemHook {
             kind = Objects.requireNonNull(kind, "hook kind");
             semanticIntent = requireText(semanticIntent, "semanticIntent");
@@ -169,12 +186,18 @@ public final class Stage22CivilianMinorEcosystemCatalog {
 
     /**
      * One M22.5 balance-scenario binding to already-existing authorities and core-pair mission content.
+     *
+     * @param scenarioId canonical balance-scenario identifier
+     * @param primaryAuthority existing runtime authority exercised by the scenario
+     * @param requiredCoreMissionIds exactly two core-pair mission identifiers
+     * @param semanticIntent expected scenario consequence without introducing a parallel authority
      */
     public record ScenarioBinding(
             String scenarioId,
             String primaryAuthority,
             List<String> requiredCoreMissionIds,
             String semanticIntent) {
+        /** Validates deterministic two-faction scenario binding metadata. */
         public ScenarioBinding {
             scenarioId = requireText(scenarioId, "scenarioId");
             primaryAuthority = requireText(primaryAuthority, "primaryAuthority");
@@ -254,7 +277,11 @@ public final class Stage22CivilianMinorEcosystemCatalog {
         this.fingerprint = computeFingerprint();
     }
 
-    /** Builds the canonical in-progress M22.5 contract. */
+    /**
+     * Builds the canonical in-progress M22.5 contract.
+     *
+     * @return immutable governed civilian/minor ecosystem catalog
+     */
     public static Stage22CivilianMinorEcosystemCatalog loadDefault() {
         Stage22ContentGovernanceCatalog governance = Stage22ContentGovernanceLoader.loadDefault();
         Stage22CivilianMinorEcosystemCatalog catalog = new Stage22CivilianMinorEcosystemCatalog(
@@ -389,14 +416,46 @@ public final class Stage22CivilianMinorEcosystemCatalog {
         return catalog;
     }
 
+    /** @return immutable civilian availability rows ordered by role */
     public List<CivilianAvailability> civilianAvailability() { return civilianAvailability; }
+
+    /** @return immutable preserved minor-actor policies ordered by stable faction ID */
     public List<MinorActorPolicy> minorActors() { return minorActors; }
+
+    /** @return immutable neutral/minor service-provider policies */
     public List<ServiceProviderPolicy> serviceProviders() { return serviceProviders; }
+
+    /** @return immutable ecosystem integration hooks */
     public List<EcosystemHook> hooks() { return hooks; }
+
+    /** @return immutable B08/B16 scenario bindings */
     public List<ScenarioBinding> scenarioBindings() { return scenarioBindings; }
+
+    /** @return deterministic SHA-256 fingerprint of the complete M22.5 catalog */
     public String fingerprint() { return fingerprint; }
+
+    /**
+     * Resolves the availability contract for one civilian role.
+     *
+     * @param role civilian role to resolve
+     * @return matching availability row, or {@code null} when absent
+     */
     public CivilianAvailability availability(CivilianRole role) { return availabilityByRole.get(role); }
+
+    /**
+     * Resolves one preserved minor actor by stable faction ID.
+     *
+     * @param stableFactionId stable faction identity
+     * @return matching actor policy, or {@code null} when absent
+     */
     public MinorActorPolicy minorActor(String stableFactionId) { return minorById.get(stableFactionId); }
+
+    /**
+     * Resolves one representative balance scenario.
+     *
+     * @param scenarioId canonical scenario identifier
+     * @return matching scenario binding, or {@code null} when absent
+     */
     public ScenarioBinding scenario(String scenarioId) { return scenariosById.get(scenarioId); }
 
     /** @return deterministic list of roles whose physical production path is not closed yet */
