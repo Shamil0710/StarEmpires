@@ -15,50 +15,79 @@ import java.util.Objects;
 /**
  * Immutable Stage-22.5 governed contract for shared civilian traffic and preserved minor actors.
  *
- * <p>This class owns no mutable economy, diplomacy, ownership, logistics, extraction or fleet state.
- * It only binds Stage-22 civilian/minor content to authorities implemented by earlier stages and
- * validates that compatibility identities cannot silently inherit a major-faction package.</p>
+ * <p>This class owns no mutable economy, diplomacy, ownership, logistics, extraction, production or
+ * fleet state. It binds M22.5 content to existing authorities, allows individual reviewed core support
+ * assets to be exposed through ordinary licensed-market access without granting the operator a core
+ * faction doctrine/profile, and keeps incomplete legacy production paths explicit rather than faking
+ * closure.</p>
  */
 public final class Stage22CivilianMinorEcosystemCatalog {
     /** Shared civilian roles required by the M22.5 alpha slice. */
     public enum CivilianRole {
-        /** Inter-system bulk freight. */
         FREIGHT,
-        /** Fuel/consumables replenishment traffic. */
         TANKER,
-        /** Resource extraction traffic. */
         MINING,
-        /** Wreck recovery and salvage traffic. */
         SALVAGE,
-        /** Low-value neutral/local traffic. */
         NEUTRAL_TRAFFIC
     }
 
+    /** Provenance of one civilian asset path. */
+    public enum AssetPathKind {
+        /** Existing compatibility-era runtime archetype retained for supported saves/worlds. */
+        LEGACY_RUNTIME_ARCHETYPE,
+        /** One concrete reviewed core asset exposed individually through ordinary market licensing. */
+        LICENSED_CORE_FIT
+    }
+
+    /** Optional ecosystem integrations that must not create a parallel economy. */
+    public enum HookKind {
+        TRADE,
+        CONTRACT,
+        INSURANCE
+    }
+
     /**
-     * One legal civilian availability path.
+     * One legal or explicitly-unfinished civilian availability path.
      *
      * @param role shared civilian role
-     * @param contentRef existing archetype/role reference
+     * @param pathKind provenance of the asset path
+     * @param assetRef concrete legacy archetype or production fit ID
+     * @param sourcePackageKey core package key for licensed fits, otherwise {@code null}
+     * @param productionManifestId exact core production manifest for licensed fits, otherwise {@code null}
      * @param defaultOperatorFactionId preserved default operator identity
-     * @param productionAuthority authoritative construction/manufacturing seam
+     * @param productionAuthority immutable composition/production seam
      * @param operatingAuthority authoritative runtime seam
      * @param supportAuthority supporting logistics/extraction seam
+     * @param legalProductionPath whether this row currently closes a real production path
      */
     public record CivilianAvailability(
             CivilianRole role,
-            String contentRef,
+            AssetPathKind pathKind,
+            String assetRef,
+            String sourcePackageKey,
+            String productionManifestId,
             String defaultOperatorFactionId,
             String productionAuthority,
             String operatingAuthority,
-            String supportAuthority) {
-        /** Validates one immutable availability row. */
+            String supportAuthority,
+            boolean legalProductionPath) {
         public CivilianAvailability {
             role = Objects.requireNonNull(role, "civilian role");
-            contentRef = requireText(contentRef, "contentRef");
+            pathKind = Objects.requireNonNull(pathKind, "asset path kind");
+            assetRef = requireText(assetRef, "assetRef");
             defaultOperatorFactionId = requireFactionId(defaultOperatorFactionId);
             productionAuthority = requireText(productionAuthority, "productionAuthority");
             operatingAuthority = requireText(operatingAuthority, "operatingAuthority");
             supportAuthority = requireText(supportAuthority, "supportAuthority");
+            if (pathKind == AssetPathKind.LICENSED_CORE_FIT) {
+                sourcePackageKey = requireText(sourcePackageKey, "sourcePackageKey");
+                productionManifestId = requireText(productionManifestId, "productionManifestId");
+                if (!legalProductionPath) {
+                    throw new IllegalArgumentException("Licensed core asset must bind a legal production path");
+                }
+            } else if (sourcePackageKey != null || productionManifestId != null) {
+                throw new IllegalArgumentException("Legacy archetype cannot masquerade as a core production manifest");
+            }
         }
     }
 
@@ -77,7 +106,6 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String spawnPolicy,
             boolean preserveStableId,
             boolean majorPackageFallbackAllowed) {
-        /** Validates one minor-actor policy. */
         public MinorActorPolicy {
             stableFactionId = requireFactionId(stableFactionId);
             provenance = requireText(provenance, "provenance");
@@ -94,7 +122,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
     /**
      * One neutral/minor service provider bound to canonical authority seams.
      *
-     * @param providerRef existing station/service reference
+     * @param providerRef existing station archetype reference
      * @param ownerFactionId stable owner identity
      * @param serviceKind concise provider purpose
      * @param ownershipAuthority canonical territorial/ownership authority
@@ -110,7 +138,6 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String accessAuthority,
             String tariffAuthority,
             String logisticsAuthority) {
-        /** Validates one service-provider binding. */
         public ServiceProviderPolicy {
             providerRef = requireText(providerRef, "providerRef");
             ownerFactionId = requireFactionId(ownerFactionId);
@@ -122,19 +149,63 @@ public final class Stage22CivilianMinorEcosystemCatalog {
         }
     }
 
+    /**
+     * One integration hook. Deferred hooks are deliberately non-authoritative placeholders for later
+     * content and may not name a mutable authority that does not exist yet.
+     */
+    public record EcosystemHook(HookKind kind, String authorityRef, boolean deferred, String semanticIntent) {
+        public EcosystemHook {
+            kind = Objects.requireNonNull(kind, "hook kind");
+            semanticIntent = requireText(semanticIntent, "semanticIntent");
+            if (deferred) {
+                if (authorityRef != null) {
+                    throw new IllegalArgumentException("Deferred hook must not invent an authority reference");
+                }
+            } else {
+                authorityRef = requireText(authorityRef, "authorityRef");
+            }
+        }
+    }
+
+    /**
+     * One M22.5 balance-scenario binding to already-existing authorities and core-pair mission content.
+     */
+    public record ScenarioBinding(
+            String scenarioId,
+            String primaryAuthority,
+            List<String> requiredCoreMissionIds,
+            String semanticIntent) {
+        public ScenarioBinding {
+            scenarioId = requireText(scenarioId, "scenarioId");
+            primaryAuthority = requireText(primaryAuthority, "primaryAuthority");
+            ArrayList<String> missions = new ArrayList<>(Objects.requireNonNull(requiredCoreMissionIds, "requiredCoreMissionIds"));
+            missions.replaceAll(value -> requireText(value, "requiredCoreMissionId"));
+            if (missions.size() != 2) {
+                throw new IllegalArgumentException("M22.5 core-pair scenario binding requires exactly two mission IDs");
+            }
+            missions.sort(String::compareTo);
+            requiredCoreMissionIds = List.copyOf(missions);
+            semanticIntent = requireText(semanticIntent, "semanticIntent");
+        }
+    }
+
     private final List<CivilianAvailability> civilianAvailability;
     private final List<MinorActorPolicy> minorActors;
     private final List<ServiceProviderPolicy> serviceProviders;
+    private final List<EcosystemHook> hooks;
+    private final List<ScenarioBinding> scenarioBindings;
     private final Map<CivilianRole, CivilianAvailability> availabilityByRole;
     private final Map<String, MinorActorPolicy> minorById;
+    private final Map<String, ScenarioBinding> scenariosById;
     private final String fingerprint;
 
     private Stage22CivilianMinorEcosystemCatalog(
             List<CivilianAvailability> civilianAvailability,
             List<MinorActorPolicy> minorActors,
-            List<ServiceProviderPolicy> serviceProviders) {
-        ArrayList<CivilianAvailability> availabilityCopy = new ArrayList<>(
-                Objects.requireNonNull(civilianAvailability, "civilianAvailability"));
+            List<ServiceProviderPolicy> serviceProviders,
+            List<EcosystemHook> hooks,
+            List<ScenarioBinding> scenarioBindings) {
+        ArrayList<CivilianAvailability> availabilityCopy = new ArrayList<>(Objects.requireNonNull(civilianAvailability, "civilianAvailability"));
         availabilityCopy.sort(Comparator.comparing(value -> value.role().name()));
         this.civilianAvailability = List.copyOf(availabilityCopy);
 
@@ -142,10 +213,17 @@ public final class Stage22CivilianMinorEcosystemCatalog {
         actorCopy.sort(Comparator.comparing(MinorActorPolicy::stableFactionId));
         this.minorActors = List.copyOf(actorCopy);
 
-        ArrayList<ServiceProviderPolicy> providerCopy = new ArrayList<>(
-                Objects.requireNonNull(serviceProviders, "serviceProviders"));
+        ArrayList<ServiceProviderPolicy> providerCopy = new ArrayList<>(Objects.requireNonNull(serviceProviders, "serviceProviders"));
         providerCopy.sort(Comparator.comparing(ServiceProviderPolicy::providerRef));
         this.serviceProviders = List.copyOf(providerCopy);
+
+        ArrayList<EcosystemHook> hookCopy = new ArrayList<>(Objects.requireNonNull(hooks, "hooks"));
+        hookCopy.sort(Comparator.comparing(value -> value.kind().name()));
+        this.hooks = List.copyOf(hookCopy);
+
+        ArrayList<ScenarioBinding> scenarioCopy = new ArrayList<>(Objects.requireNonNull(scenarioBindings, "scenarioBindings"));
+        scenarioCopy.sort(Comparator.comparing(ScenarioBinding::scenarioId));
+        this.scenarioBindings = List.copyOf(scenarioCopy);
 
         EnumMap<CivilianRole, CivilianAvailability> byRole = new EnumMap<>(CivilianRole.class);
         for (CivilianAvailability value : this.civilianAvailability) {
@@ -165,53 +243,77 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             }
         }
         this.minorById = Map.copyOf(actors);
+
+        LinkedHashMap<String, ScenarioBinding> scenarios = new LinkedHashMap<>();
+        for (ScenarioBinding scenario : this.scenarioBindings) {
+            if (scenarios.putIfAbsent(scenario.scenarioId(), scenario) != null) {
+                throw new IllegalArgumentException("Duplicate scenario binding: " + scenario.scenarioId());
+            }
+        }
+        this.scenariosById = Map.copyOf(scenarios);
         this.fingerprint = computeFingerprint();
     }
 
-    /**
-     * Builds and validates the canonical Stage-22.5 package against Stage-22.0 identity governance.
-     *
-     * @return immutable canonical package
-     */
+    /** Builds the canonical in-progress M22.5 contract. */
     public static Stage22CivilianMinorEcosystemCatalog loadDefault() {
         Stage22ContentGovernanceCatalog governance = Stage22ContentGovernanceLoader.loadDefault();
         Stage22CivilianMinorEcosystemCatalog catalog = new Stage22CivilianMinorEcosystemCatalog(
                 List.of(
                         new CivilianAvailability(
                                 CivilianRole.FREIGHT,
-                                "bulk_freighter",
+                                AssetPathKind.LICENSED_CORE_FIT,
+                                "fit.industrial_union.freight.bulk_v1",
+                                Stage22IndustrialUnionPackageCatalog.PACKAGE_KEY,
+                                "production_manifest.industrial_union.freight_v1",
                                 "faction.trade_league",
                                 "com.spacesim.content.Stage22AuthoredProductionBridge",
                                 "com.spacesim.trade.InterSystemTradeService",
-                                "com.spacesim.economy.Stage18LogisticsRuntime"),
+                                "com.spacesim.economy.Stage18LogisticsRuntime",
+                                true),
                         new CivilianAvailability(
                                 CivilianRole.TANKER,
-                                "role.support.tanker_replenishment",
+                                AssetPathKind.LICENSED_CORE_FIT,
+                                "fit.empire.tanker.fleet_v1",
+                                Stage22EmpirePackageCatalog.PACKAGE_KEY,
+                                "production_manifest.empire.tanker_v1",
                                 "faction.neutral",
                                 "com.spacesim.content.Stage22AuthoredProductionBridge",
                                 "com.spacesim.trade.InterSystemTradeService",
-                                "com.spacesim.economy.Stage18LogisticsRuntime"),
+                                "com.spacesim.economy.Stage18LogisticsRuntime",
+                                true),
                         new CivilianAvailability(
                                 CivilianRole.MINING,
-                                "miner",
+                                AssetPathKind.LEGACY_RUNTIME_ARCHETYPE,
+                                "ship.basic_miner",
+                                null,
+                                null,
                                 "faction.miners",
-                                "com.spacesim.content.Stage22AuthoredProductionBridge",
+                                "data/content/catalog-v1.json",
                                 "com.spacesim.economy.Stage18ExtractionRuntime",
-                                "extraction.asteroid_excavation"),
+                                "extraction.asteroid_excavation",
+                                false),
                         new CivilianAvailability(
                                 CivilianRole.SALVAGE,
-                                "salvage_tug",
+                                AssetPathKind.LICENSED_CORE_FIT,
+                                "fit.industrial_union.fleet_support.salvage_refit_v1",
+                                Stage22IndustrialUnionPackageCatalog.PACKAGE_KEY,
+                                "production_manifest.industrial_union.fleet_support_v1",
                                 "faction.miners",
                                 "com.spacesim.content.Stage22AuthoredProductionBridge",
                                 "com.spacesim.economy.Stage18SalvageRuntime",
-                                "extraction.salvage_recovery"),
+                                "extraction.salvage_recovery",
+                                true),
                         new CivilianAvailability(
                                 CivilianRole.NEUTRAL_TRAFFIC,
-                                "cargo_lugger",
+                                AssetPathKind.LICENSED_CORE_FIT,
+                                "fit.empire.freight.bulk_v1",
+                                Stage22EmpirePackageCatalog.PACKAGE_KEY,
+                                "production_manifest.empire.freight_v1",
                                 "faction.neutral",
                                 "com.spacesim.content.Stage22AuthoredProductionBridge",
-                                "com.spacesim.trade.InterSystemTradeService",
-                                "com.spacesim.world.generation.Stage21EGeneratedWorldTrafficRuntime")),
+                                "com.spacesim.world.generation.Stage21EGeneratedWorldTrafficRuntime",
+                                "com.spacesim.economy.Stage18LogisticsRuntime",
+                                true)),
                 List.of(
                         new MinorActorPolicy(
                                 "faction.neutral",
@@ -233,55 +335,85 @@ public final class Stage22CivilianMinorEcosystemCatalog {
                                 false)),
                 List.of(
                         new ServiceProviderPolicy(
-                                "hub-neutral-alpha",
+                                "station.colony",
                                 "faction.neutral",
-                                "neutral market and service hub",
+                                "neutral market and logistics hub",
                                 "com.spacesim.world.FactionTerritoryService",
                                 "com.spacesim.world.DiplomaticMarketAccessResolver",
                                 "com.spacesim.world.CustomsTariffResolver",
                                 "com.spacesim.economy.Stage18LogisticsRuntime"),
                         new ServiceProviderPolicy(
-                                "exchange-trade-lane",
+                                "station.agrodome",
                                 "faction.trade_league",
-                                "civilian trade exchange",
+                                "civilian trade and provisioning node",
                                 "com.spacesim.world.FactionTerritoryService",
                                 "com.spacesim.world.DiplomaticMarketAccessResolver",
                                 "com.spacesim.world.CustomsTariffResolver",
                                 "com.spacesim.economy.Stage18LogisticsRuntime"),
                         new ServiceProviderPolicy(
-                                "refinery-belt-3",
+                                "station.mining_base",
                                 "faction.miners",
-                                "extraction and refining support hub",
+                                "extraction support and ore market node",
                                 "com.spacesim.world.FactionTerritoryService",
                                 "com.spacesim.world.DiplomaticMarketAccessResolver",
                                 "com.spacesim.world.CustomsTariffResolver",
-                                "com.spacesim.economy.Stage18LogisticsRuntime")));
+                                "com.spacesim.economy.Stage18LogisticsRuntime")),
+                List.of(
+                        new EcosystemHook(
+                                HookKind.TRADE,
+                                "com.spacesim.trade.InterSystemTradeService",
+                                false,
+                                "Use ordinary finite freight and market flow; no civilian shadow ledger."),
+                        new EcosystemHook(
+                                HookKind.CONTRACT,
+                                "com.spacesim.world.Stage21HNpcMissionService",
+                                false,
+                                "Use existing mission/contract objective authorities for civilian work requests."),
+                        new EcosystemHook(
+                                HookKind.INSURANCE,
+                                null,
+                                true,
+                                "Reserve provenance/risk metadata only; M22.5 does not create an insurance treasury, debt model or post-core League mechanic.")),
+                List.of(
+                        new ScenarioBinding(
+                                "B08",
+                                "com.spacesim.world.Stage21EOperationTrafficPolicy",
+                                List.of("mission.empire.convoy_guard", "mission.industrial_union.corridor_escort"),
+                                "Convoy escort/interdiction must protect or threaten real civilian/logistics traffic through existing fleet/operation authority."),
+                        new ScenarioBinding(
+                                "B16",
+                                "com.spacesim.world.DiplomaticMarketAccessResolver",
+                                List.of("mission.empire.formal_market_access", "mission.industrial_union.access_contract"),
+                                "Treaty/market-access shock must change legal access through existing diplomacy state rather than a scripted faction modifier.")));
         catalog.validateGovernance(governance);
         return catalog;
     }
 
-    /** @return deterministic civilian availability rows */
     public List<CivilianAvailability> civilianAvailability() { return civilianAvailability; }
-
-    /** @return deterministic preserved minor actor policies */
     public List<MinorActorPolicy> minorActors() { return minorActors; }
-
-    /** @return deterministic neutral/minor provider policies */
     public List<ServiceProviderPolicy> serviceProviders() { return serviceProviders; }
-
-    /** @return deterministic SHA-256 fingerprint of the package */
+    public List<EcosystemHook> hooks() { return hooks; }
+    public List<ScenarioBinding> scenarioBindings() { return scenarioBindings; }
     public String fingerprint() { return fingerprint; }
-
-    /** @return availability for a required role */
     public CivilianAvailability availability(CivilianRole role) { return availabilityByRole.get(role); }
-
-    /** @return minor policy for a stable ID, or {@code null} */
     public MinorActorPolicy minorActor(String stableFactionId) { return minorById.get(stableFactionId); }
+    public ScenarioBinding scenario(String scenarioId) { return scenariosById.get(scenarioId); }
+
+    /** @return deterministic list of roles whose physical production path is not closed yet */
+    public List<CivilianRole> unresolvedProductionRoles() {
+        ArrayList<CivilianRole> unresolved = new ArrayList<>();
+        for (CivilianAvailability value : civilianAvailability) {
+            if (!value.legalProductionPath()) {
+                unresolved.add(value.role());
+            }
+        }
+        unresolved.sort(Comparator.comparing(Enum::name));
+        return List.copyOf(unresolved);
+    }
 
     private void validateGovernance(Stage22ContentGovernanceCatalog governance) {
         for (MinorActorPolicy actor : minorActors) {
-            Stage22ContentGovernanceCatalog.FactionIdentityDefinition identity =
-                    governance.findFactionIdentity(actor.stableFactionId());
+            Stage22ContentGovernanceCatalog.FactionIdentityDefinition identity = governance.findFactionIdentity(actor.stableFactionId());
             if (identity == null) {
                 throw new IllegalStateException("M22.5 minor actor lacks Stage-22 governance: " + actor.stableFactionId());
             }
@@ -296,6 +428,11 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             if (!minorById.containsKey(value.defaultOperatorFactionId())) {
                 throw new IllegalStateException("Civilian role uses an ungoverned M22.5 operator: " + value.role());
             }
+            if (value.sourcePackageKey() != null
+                    && !Stage22EmpirePackageCatalog.PACKAGE_KEY.equals(value.sourcePackageKey())
+                    && !Stage22IndustrialUnionPackageCatalog.PACKAGE_KEY.equals(value.sourcePackageKey())) {
+                throw new IllegalStateException("Licensed civilian path references a non-core package: " + value.sourcePackageKey());
+            }
         }
         for (ServiceProviderPolicy provider : serviceProviders) {
             if (!minorById.containsKey(provider.ownerFactionId())) {
@@ -305,11 +442,13 @@ public final class Stage22CivilianMinorEcosystemCatalog {
     }
 
     private String computeFingerprint() {
-        StringBuilder canonical = new StringBuilder(4096);
+        StringBuilder canonical = new StringBuilder(8192);
         for (CivilianAvailability value : civilianAvailability) {
-            canonical.append("availability|").append(value.role()).append('|').append(value.contentRef()).append('|')
-                    .append(value.defaultOperatorFactionId()).append('|').append(value.productionAuthority()).append('|')
-                    .append(value.operatingAuthority()).append('|').append(value.supportAuthority()).append('\n');
+            canonical.append("availability|").append(value.role()).append('|').append(value.pathKind()).append('|')
+                    .append(value.assetRef()).append('|').append(nullToEmpty(value.sourcePackageKey())).append('|')
+                    .append(nullToEmpty(value.productionManifestId())).append('|').append(value.defaultOperatorFactionId()).append('|')
+                    .append(value.productionAuthority()).append('|').append(value.operatingAuthority()).append('|')
+                    .append(value.supportAuthority()).append('|').append(value.legalProductionPath()).append('\n');
         }
         for (MinorActorPolicy actor : minorActors) {
             canonical.append("minor|").append(actor.stableFactionId()).append('|').append(actor.provenance()).append('|')
@@ -322,6 +461,14 @@ public final class Stage22CivilianMinorEcosystemCatalog {
                     .append(provider.accessAuthority()).append('|').append(provider.tariffAuthority()).append('|')
                     .append(provider.logisticsAuthority()).append('\n');
         }
+        for (EcosystemHook hook : hooks) {
+            canonical.append("hook|").append(hook.kind()).append('|').append(nullToEmpty(hook.authorityRef())).append('|')
+                    .append(hook.deferred()).append('|').append(hook.semanticIntent()).append('\n');
+        }
+        for (ScenarioBinding scenario : scenarioBindings) {
+            canonical.append("scenario|").append(scenario.scenarioId()).append('|').append(scenario.primaryAuthority()).append('|')
+                    .append(String.join(",", scenario.requiredCoreMissionIds())).append('|').append(scenario.semanticIntent()).append('\n');
+        }
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(canonical.toString().getBytes(StandardCharsets.UTF_8)));
@@ -329,6 +476,8 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             throw new IllegalStateException("JVM does not provide mandatory SHA-256", exception);
         }
     }
+
+    private static String nullToEmpty(String value) { return value == null ? "" : value; }
 
     private static String requireText(String value, String label) {
         String checked = Objects.requireNonNull(value, label + " not set").strip();
