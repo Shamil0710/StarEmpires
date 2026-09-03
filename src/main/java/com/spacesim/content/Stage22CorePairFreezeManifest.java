@@ -163,7 +163,36 @@ public final class Stage22CorePairFreezeManifest {
             int unionProductionStateVersion,
             List<String> scenarioVersions,
             String freezeFingerprint) {
-        /** Freezes scenario-version ordering. */
+        /**
+         * Freezes scenario-version ordering.
+         *
+         * @param schemaVersion freeze schema version
+         * @param manifestVersion freeze semantic version
+         * @param scenarioSuiteVersion canonical scenario suite version
+         * @param empireFactionId stable Empire save/runtime ID
+         * @param unionFactionId stable Industrial Union save/runtime ID
+         * @param empirePackageFingerprint Empire package fingerprint
+         * @param unionPackageFingerprint Industrial Union package fingerprint
+         * @param empireProductionFingerprint Empire production-manifest fingerprint
+         * @param unionProductionFingerprint Industrial Union production-manifest fingerprint
+         * @param empireEngineeringFingerprint Empire engineering fingerprint
+         * @param unionEngineeringFingerprint Industrial Union engineering fingerprint
+         * @param empireManufacturingFingerprint Empire manufacturing fingerprint
+         * @param unionManufacturingFingerprint Industrial Union manufacturing fingerprint
+         * @param empireShipyardFingerprint Empire physical shipyard fingerprint
+         * @param unionShipyardFingerprint Industrial Union physical shipyard fingerprint
+         * @param empireStationFingerprint shared Stage-18 station-infrastructure fingerprint observed by Empire validation
+         * @param unionStationFingerprint shared Stage-18 station-infrastructure fingerprint observed by Union validation
+         * @param empireProfileFingerprint Empire promoted profile-catalog fingerprint
+         * @param coreProfileCatalogFingerprint shared Stage-22 profile-catalog fingerprint containing Union profile
+         * @param empireCharacterFingerprint Empire character-lineup fingerprint
+         * @param unionCharacterFingerprint Industrial Union character-lineup fingerprint
+         * @param empireProfileSchemaVersion Empire profile schema version
+         * @param coreProfileSchemaVersion shared profile schema version
+         * @param unionProductionStateVersion Industrial Union production sidecar save version
+         * @param scenarioVersions exact B00-B20 scenario version IDs
+         * @param freezeFingerprint aggregate semantic freeze fingerprint
+         */
         public Snapshot {
             scenarioVersions = List.copyOf(scenarioVersions);
         }
