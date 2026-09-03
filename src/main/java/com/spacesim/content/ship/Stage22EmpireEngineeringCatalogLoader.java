@@ -24,10 +24,8 @@ public final class Stage22EmpireEngineeringCatalogLoader {
             if (stream == null) {
                 throw new IllegalStateException("Missing Empire engineering resource: " + DEFAULT_RESOURCE);
             }
-            ShipEngineeringCatalog authored = ShipEngineeringCatalogLoader.parse(
+            return ShipEngineeringCatalogLoader.parse(
                     new String(stream.readAllBytes(), StandardCharsets.UTF_8));
-            ShipEngineeringCatalog sensors = Stage22CorePairSensorModeProjection.apply(authored);
-            return Stage22CorePairShieldModeProjection.apply(sensors);
         } catch (IOException exception) {
             throw new IllegalStateException("Cannot read Empire engineering resource", exception);
         }
