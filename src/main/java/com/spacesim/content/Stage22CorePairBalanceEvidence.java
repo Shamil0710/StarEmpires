@@ -3,7 +3,6 @@ package com.spacesim.content;
 import com.spacesim.content.Stage22EmpirePackageValidator.FamilyMetrics;
 import com.spacesim.content.Stage22IndustrialUnionProductionState.YardSeriesState;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,7 +185,7 @@ public final class Stage22CorePairBalanceEvidence {
         LinkedHashMap<String, Double> isolatedAssemblies =
                 new LinkedHashMap<>(healthy.sharedAssemblyAvailability());
         isolatedAssemblies.put("module.industrial_union_sensor_block_v1", 0.75d);
-        Stage22IndustrialUnionCommonalityNetwork.Observation isolated =
+        Stage22IndustrialUnionCommonalityNetwork.Report isolated =
                 Stage22IndustrialUnionCommonalityNetwork.observe(
                         yard,
                         "ship_family.industrial_union.freight",
@@ -195,7 +194,7 @@ public final class Stage22CorePairBalanceEvidence {
         LinkedHashMap<String, Double> correlatedAssemblies = new LinkedHashMap<>();
         Stage22IndustrialUnionCommonalityNetwork.SHARED_ASSEMBLY_IDS.stream().sorted()
                 .forEach(id -> correlatedAssemblies.put(id, 0.75d));
-        Stage22IndustrialUnionCommonalityNetwork.Observation correlated =
+        Stage22IndustrialUnionCommonalityNetwork.Report correlated =
                 Stage22IndustrialUnionCommonalityNetwork.observe(
                         yard,
                         "ship_family.industrial_union.freight",
