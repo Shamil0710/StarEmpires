@@ -64,7 +64,12 @@ public final class Stage22CorePairExperimentProtocol {
      * @param permutation slot/topology assignment for this run
      */
     public record RunCoordinate(long seed, Permutation permutation) {
-        /** Validates one run coordinate. */
+        /**
+         * Validates one run coordinate.
+         *
+         * @param seed common authoritative seed shared by both permutations
+         * @param permutation slot/topology assignment for this run
+         */
         public RunCoordinate {
             if (seed < 0L) {
                 throw new IllegalArgumentException("seed must be non-negative");
