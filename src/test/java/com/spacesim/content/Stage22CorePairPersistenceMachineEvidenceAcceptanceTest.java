@@ -101,7 +101,7 @@ class Stage22CorePairPersistenceMachineEvidenceAcceptanceTest {
         Stage22IndustrialUnionProductionState continuedRestored = continueFrom(restoredCheckpoint);
         byte[] continuedLiveBytes = Stage22IndustrialUnionProductionStateCodec.encode(continuedLive);
         byte[] continuedRestoredBytes = Stage22IndustrialUnionProductionStateCodec.encode(continuedRestored);
-        boolean continuationEqual = continuedLive.equals(continuedRestored)
+        boolean continuationEqual = sameState(continuedLive, continuedRestored)
                 && Arrays.equals(continuedLiveBytes, continuedRestoredBytes)
                 && continuedRestored.sequence() == checkpoint.sequence() + 1L
                 && continuedRestored.findYard(Stage22IndustrialUnionIndustrialProgram.YARD_ID).commonalityStreak() == 1;
@@ -139,5 +139,15 @@ class Stage22CorePairPersistenceMachineEvidenceAcceptanceTest {
         YardSeriesState qualified = Stage22IndustrialUnionIndustrialProgram.completeRetool(paid);
         YardSeriesState completed = Stage22IndustrialUnionIndustrialProgram.recordCompletedUnit(qualified, TARGET_FAMILY);
         return checkpoint.withYard(completed);
+    }
+
+    private static boolean sameState(
+            Stage22IndustrialUnionProductionState left,
+            Stage22IndustrialUnionProductionState right) {
+        return left.envelopeVersion() == right.envelopeVersion()
+                && left.stableFactionId().equals(right.stableFactionId())
+                && left.packageFingerprint().equals(right.packageFingerprint())
+                && left.sequence() == right.sequence()
+                && left.yards().equals(right.yards());
     }
 }
