@@ -90,7 +90,13 @@ public final class Stage22CorePairWeaponRuntimeCatalogLoader {
             ShipEngineeringCatalog engineering,
             WeaponLauncherCatalog launchers,
             WeaponAmmunitionCatalog ammunition) {
-        /** Validates immutable bridge content. */
+        /**
+         * Validates immutable bridge content.
+         *
+         * @param engineering accepted Stage-22 engineering catalog
+         * @param launchers common Stage-17.5E launcher profiles
+         * @param ammunition common Stage-17.5E physical ammunition catalog
+         */
         public RuntimeContent {
             Objects.requireNonNull(engineering, "engineering");
             Objects.requireNonNull(launchers, "launchers");
