@@ -7,7 +7,6 @@ import com.spacesim.content.Stage22CivilianMinorEcosystemCatalog.EcosystemHook;
 import com.spacesim.content.Stage22CivilianMinorEcosystemCatalog.HookKind;
 import com.spacesim.content.Stage22CivilianMinorEcosystemCatalog.ScenarioBinding;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -116,31 +115,45 @@ public final class Stage22CivilianMinorEcosystemValidator {
         if (roleId == null) {
             throw new IllegalStateException("Role has no legal core-license mapping: " + availability.role());
         }
-        Stage22EmpirePackageCatalog.ShipFamilyDefinition empireFamily = null;
-        Stage22IndustrialUnionPackageCatalog.ShipFamilyDefinition unionFamily = null;
         if (Stage22EmpirePackageCatalog.PACKAGE_KEY.equals(availability.sourcePackageKey())) {
-            empireFamily = empire.findShipForRole(roleId);
-            if (empireFamily == null) {
+            Stage22EmpirePackageCatalog.ShipFamilyDefinition family = empire.findShipForRole(roleId);
+            if (family == null) {
                 throw new IllegalStateException("Empire lacks licensed role: " + roleId);
             }
             requireFamilyBinding(
                     availability,
-                    empireFamily.primaryFitId(),
-                    empireFamily.refitFitId(),
-                    empireFamily.productionManifestId());
+                    family.primaryFitId(),
+                    family.refitFitId(),
+                    family.productionManifestId());
         } else if (Stage22IndustrialUnionPackageCatalog.PACKAGE_KEY.equals(availability.sourcePackageKey())) {
-            unionFamily = union.findShipForRole(roleId);
-            if (unionFamily == null) {
+            Stage22IndustrialUnionPackageCatalog.ShipFamilyDefinition family = findUnionShipForRole(union, roleId);
+            if (family == null) {
                 throw new IllegalStateException("Industrial Union lacks licensed role: " + roleId);
             }
             requireFamilyBinding(
                     availability,
-                    unionFamily.primaryFitId(),
-                    unionFamily.refitFitId(),
-                    unionFamily.productionManifestId());
+                    family.primaryFitId(),
+                    family.refitFitId(),
+                    family.productionManifestId());
         } else {
             throw new IllegalStateException("Unknown licensed core package: " + availability.sourcePackageKey());
         }
+    }
+
+    private static Stage22IndustrialUnionPackageCatalog.ShipFamilyDefinition findUnionShipForRole(
+            Stage22IndustrialUnionPackageCatalog union,
+            String roleId) {
+        Stage22IndustrialUnionPackageCatalog.ShipFamilyDefinition found = null;
+        for (Stage22IndustrialUnionPackageCatalog.ShipFamilyDefinition family : union.shipFamilies()) {
+            if (!family.roleId().equals(roleId)) {
+                continue;
+            }
+            if (found != null) {
+                throw new IllegalStateException("Industrial Union has duplicate shared role: " + roleId);
+            }
+            found = family;
+        }
+        return found;
     }
 
     private static void requireFamilyBinding(
