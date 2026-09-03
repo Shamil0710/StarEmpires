@@ -79,7 +79,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String operatingAuthority,
             String supportAuthority,
             boolean legalProductionPath) {
-        /** Validates and normalizes one civilian availability contract. */
+        // Validates and normalizes one civilian availability contract.
         public CivilianAvailability {
             role = Objects.requireNonNull(role, "civilian role");
             pathKind = Objects.requireNonNull(pathKind, "asset path kind");
@@ -115,7 +115,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String spawnPolicy,
             boolean preserveStableId,
             boolean majorPackageFallbackAllowed) {
-        /** Validates stable identity preservation and rejects major-package fallback. */
+        // Validates stable identity preservation and rejects major-package fallback.
         public MinorActorPolicy {
             stableFactionId = requireFactionId(stableFactionId);
             provenance = requireText(provenance, "provenance");
@@ -148,7 +148,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String accessAuthority,
             String tariffAuthority,
             String logisticsAuthority) {
-        /** Validates the provider identity and canonical authority references. */
+        // Validates the provider identity and canonical authority references.
         public ServiceProviderPolicy {
             providerRef = requireText(providerRef, "providerRef");
             ownerFactionId = requireFactionId(ownerFactionId);
@@ -170,7 +170,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
      * @param semanticIntent bounded purpose of the integration
      */
     public record EcosystemHook(HookKind kind, String authorityRef, boolean deferred, String semanticIntent) {
-        /** Validates that deferred hooks do not invent authorities and active hooks resolve a reference. */
+        // Validates that deferred hooks do not invent authorities and active hooks resolve a reference.
         public EcosystemHook {
             kind = Objects.requireNonNull(kind, "hook kind");
             semanticIntent = requireText(semanticIntent, "semanticIntent");
@@ -197,7 +197,7 @@ public final class Stage22CivilianMinorEcosystemCatalog {
             String primaryAuthority,
             List<String> requiredCoreMissionIds,
             String semanticIntent) {
-        /** Validates deterministic two-faction scenario binding metadata. */
+        // Validates deterministic two-faction scenario binding metadata.
         public ScenarioBinding {
             scenarioId = requireText(scenarioId, "scenarioId");
             primaryAuthority = requireText(primaryAuthority, "primaryAuthority");
