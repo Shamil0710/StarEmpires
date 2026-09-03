@@ -234,13 +234,6 @@ class Stage22CorePairIndustrialMachineEvidenceAcceptanceTest {
                 Stage18FacilityCatalogLoader.loadDefault(),
                 ontology);
         String stationId = "station.m22_6." + key + "." + seed;
-        Stage18StationStorage storage = new Stage18StationStorage(
-                ontology,
-                Stage18ManufacturingProductRegistry.loadDefault(),
-                stationId,
-                storageCapacities(),
-                Map.of(),
-                Map.of());
         var order = runtime.createOrder(
                 "construction.order.m22_6." + key + "." + seed,
                 "facility.instance.m22_6." + key + "." + seed,
@@ -249,7 +242,13 @@ class Stage22CorePairIndustrialMachineEvidenceAcceptanceTest {
                 "location.orbital_station");
         double installedMass = order.installedMassKg();
         double requiredWork = order.requiredWorkSeconds();
-        order.requiredMassByCommodityKg().forEach(storage::addCommodity);
+        Stage18StationStorage storage = new Stage18StationStorage(
+                ontology,
+                Stage18ManufacturingProductRegistry.loadDefault(),
+                stationId,
+                storageCapacities(),
+                order.requiredMassByCommodityKg(),
+                Map.of());
         for (Map.Entry<String, Double> required : order.requiredMassByCommodityKg().entrySet()) {
             order = runtime.deliver(order, storage, required.getKey(), required.getValue()).order();
         }
