@@ -241,7 +241,7 @@ public final class Stage22CivilianMiningProductionPath {
             boolean productionPathReady,
             boolean runtimeExtractionReady,
             boolean repairFitRejectedForMining) {
-        /** Normalizes required identifiers for deterministic validation evidence. */
+        // Normalizes required identifiers for deterministic validation evidence.
         public ValidationReport {
             legacyRuntimeArchetype = Objects.requireNonNull(legacyRuntimeArchetype, "legacyRuntimeArchetype");
             licensedFitId = Objects.requireNonNull(licensedFitId, "licensedFitId");
