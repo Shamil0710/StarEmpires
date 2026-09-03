@@ -26,7 +26,8 @@ public final class Stage22EmpireEngineeringCatalogLoader {
             }
             ShipEngineeringCatalog authored = ShipEngineeringCatalogLoader.parse(
                     new String(stream.readAllBytes(), StandardCharsets.UTF_8));
-            return Stage22CorePairSensorModeProjection.apply(authored);
+            ShipEngineeringCatalog sensors = Stage22CorePairSensorModeProjection.apply(authored);
+            return Stage22CorePairShieldModeProjection.apply(sensors);
         } catch (IOException exception) {
             throw new IllegalStateException("Cannot read Empire engineering resource", exception);
         }
