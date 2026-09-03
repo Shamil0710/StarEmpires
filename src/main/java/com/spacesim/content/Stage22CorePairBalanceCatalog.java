@@ -115,7 +115,16 @@ public final class Stage22CorePairBalanceCatalog {
             String primaryLayer,
             Requirement requirement,
             String authorityEvidence) {
-        /** Validates one canonical scenario definition. */
+        /**
+         * Validates one canonical scenario definition.
+         *
+         * @param id canonical B00-B20 identifier
+         * @param version immutable scenario version ID used by freeze evidence
+         * @param title canonical scenario title
+         * @param primaryLayer principal validation layer(s)
+         * @param requirement M22.6 closure requirement
+         * @param authorityEvidence existing common authority expected to produce evidence
+         */
         public ScenarioDefinition {
             id = requireText(id, "id");
             if (!id.matches("B(?:0[0-9]|1[0-9]|20)")) {
