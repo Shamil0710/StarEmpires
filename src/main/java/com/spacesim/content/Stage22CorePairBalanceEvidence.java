@@ -277,6 +277,17 @@ public final class Stage22CorePairBalanceEvidence {
      * Canonical pairwise balance card required by the validation framework.
      *
      * <p>Text describes hypotheses/counterplay and never acts as gameplay authority.</p>
+     *
+     * @param pair stable pair identifier
+     * @param contestedResourceOrObjective finite resource or objective under contest
+     * @param advantageA first side's observable advantage hypothesis
+     * @param costA first side's observable cost/counterplay hypothesis
+     * @param advantageB second side's observable advantage hypothesis
+     * @param costB second side's observable cost/counterplay hypothesis
+     * @param requiredScenarios canonical scenarios required to validate the pair
+     * @param prohibitedShortcut forbidden balance shortcut or hidden modifier
+     * @param evidenceLinks existing authorities expected to provide evidence
+     * @param openRisks unresolved evidence risks before freeze sign-off
      */
     public record PairwiseBalanceCard(
             String pair,
@@ -289,7 +300,20 @@ public final class Stage22CorePairBalanceEvidence {
             String prohibitedShortcut,
             List<String> evidenceLinks,
             List<String> openRisks) {
-        /** Freezes mutable caller lists. */
+        /**
+         * Freezes mutable caller lists.
+         *
+         * @param pair stable pair identifier
+         * @param contestedResourceOrObjective finite resource or objective under contest
+         * @param advantageA first side's observable advantage hypothesis
+         * @param costA first side's observable cost/counterplay hypothesis
+         * @param advantageB second side's observable advantage hypothesis
+         * @param costB second side's observable cost/counterplay hypothesis
+         * @param requiredScenarios canonical scenarios required to validate the pair
+         * @param prohibitedShortcut forbidden balance shortcut or hidden modifier
+         * @param evidenceLinks existing authorities expected to provide evidence
+         * @param openRisks unresolved evidence risks before freeze sign-off
+         */
         public PairwiseBalanceCard {
             requiredScenarios = List.copyOf(requiredScenarios);
             evidenceLinks = List.copyOf(evidenceLinks);
