@@ -241,7 +241,20 @@ public final class Stage22CivilianMiningProductionPath {
             boolean productionPathReady,
             boolean runtimeExtractionReady,
             boolean repairFitRejectedForMining) {
-        // Normalizes required identifiers for deterministic validation evidence.
+        /**
+         * Validates and normalizes the canonical mining-path evidence.
+         *
+         * @param legacyRuntimeArchetype preserved compatibility-era mining archetype
+         * @param licensedFitId dedicated civilian mining fit used for new production
+         * @param hullId reviewed physical hull used by the mining fit
+         * @param miningModuleId dedicated asteroid-excavation mission module
+         * @param productionManifestId exact civilian mining production manifest
+         * @param extractionMethodId Stage-18 extraction method exercised by the fit
+         * @param extractionCapabilityTag exact Stage-18 capability required by the method
+         * @param productionPathReady whether manufacturing and shipyard closure resolves
+         * @param runtimeExtractionReady whether real Stage-18 extraction commits successfully
+         * @param repairFitRejectedForMining whether the accepted repair fit remains incapable of mining
+         */
         public ValidationReport {
             legacyRuntimeArchetype = Objects.requireNonNull(legacyRuntimeArchetype, "legacyRuntimeArchetype");
             licensedFitId = Objects.requireNonNull(licensedFitId, "licensedFitId");
