@@ -7,6 +7,7 @@ import com.spacesim.content.Stage22CivilianMinorEcosystemCatalog.EcosystemHook;
 import com.spacesim.content.Stage22CivilianMinorEcosystemCatalog.HookKind;
 import com.spacesim.content.Stage22CivilianMinorEcosystemCatalog.ScenarioBinding;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -16,7 +17,7 @@ import java.util.Objects;
  * <p>No method mutates world, economy, diplomacy, production or fleet state. The validator proves that
  * concrete content references resolve, licensed support assets bind real core production manifests,
  * service providers are real constructible legacy archetypes, B08/B16 have core-pair mission bindings,
- * and any unfinished production path remains explicit in the report.</p>
+ * and compatibility-only runtime archetypes have an explicit legal replacement/support bridge.</p>
  */
 public final class Stage22CivilianMinorEcosystemValidator {
     private Stage22CivilianMinorEcosystemValidator() {
@@ -30,6 +31,8 @@ public final class Stage22CivilianMinorEcosystemValidator {
         Stage22ContentGovernanceCatalog governance = Stage22ContentGovernanceLoader.loadDefault();
         Stage22EmpirePackageCatalog empire = Stage22EmpirePackageLoader.loadDefault();
         Stage22IndustrialUnionPackageCatalog union = Stage22IndustrialUnionPackageLoader.loadDefault();
+        Stage22CivilianMiningProductionPath.ValidationReport miningPath =
+                Stage22CivilianMiningProductionPath.validateDefault();
 
         int licensedPaths = 0;
         for (CivilianAvailability availability : ecosystem.civilianAvailability()) {
@@ -44,11 +47,19 @@ public final class Stage22CivilianMinorEcosystemValidator {
                 if (legacy.findShipArchetype(availability.assetRef()) == null) {
                     throw new IllegalStateException("Unknown legacy civilian ship archetype: " + availability.assetRef());
                 }
+                if (availability.role() == CivilianRole.MINING
+                        && !availability.assetRef().equals(miningPath.legacyRuntimeArchetype())) {
+                    throw new IllegalStateException("M22.5 mining compatibility archetype and production bridge disagree");
+                }
             } else {
                 licensedPaths++;
                 validateLicensedCoreAsset(availability, empire, union);
             }
         }
+        if (!miningPath.ready()) {
+            throw new IllegalStateException("M22.5 mining compatibility-to-production bridge is incomplete");
+        }
+        licensedPaths++;
 
         for (Stage22CivilianMinorEcosystemCatalog.ServiceProviderPolicy provider : ecosystem.serviceProviders()) {
             ContentCatalog.StationArchetypeDefinition station = legacy.findStationArchetype(provider.providerRef());
@@ -95,16 +106,22 @@ public final class Stage22CivilianMinorEcosystemValidator {
         boolean b08Ready = validateScenario(ecosystem.scenario("B08"), empire, union, "CONVOY_ESCORT", null);
         boolean b16Ready = validateScenario(ecosystem.scenario("B16"), empire, union, null, "MARKET_ACCESS_ALLOWED");
 
+        ArrayList<CivilianRole> unresolvedProductionRoles = new ArrayList<>(ecosystem.unresolvedProductionRoles());
+        if (miningPath.ready()) {
+            unresolvedProductionRoles.remove(CivilianRole.MINING);
+        }
+
         return new ValidationReport(
                 ecosystem.fingerprint(),
                 ecosystem.civilianAvailability().size(),
                 licensedPaths,
                 ecosystem.serviceProviders().size(),
                 ecosystem.minorActors().size(),
-                ecosystem.unresolvedProductionRoles(),
+                unresolvedProductionRoles,
                 b08Ready,
                 b16Ready,
-                insuranceDeferred);
+                insuranceDeferred,
+                miningPath.ready());
     }
 
     private static void validateLicensedCoreAsset(
@@ -113,7 +130,7 @@ public final class Stage22CivilianMinorEcosystemValidator {
             Stage22IndustrialUnionPackageCatalog union) {
         String roleId = roleId(availability.role());
         if (roleId == null) {
-            throw new IllegalStateException("Role has no legal core-license mapping: " + availability.role());
+            throw new IllegalStateException("Role has no direct core-license mapping: " + availability.role());
         }
         if (Stage22EmpirePackageCatalog.PACKAGE_KEY.equals(availability.sourcePackageKey())) {
             Stage22EmpirePackageCatalog.ShipFamilyDefinition family = empire.findShipForRole(roleId);
@@ -247,15 +264,16 @@ public final class Stage22CivilianMinorEcosystemValidator {
             List<CivilianRole> unresolvedProductionRoles,
             boolean b08BindingReady,
             boolean b16BindingReady,
-            boolean insuranceHookDeferred) {
+            boolean insuranceHookDeferred,
+            boolean miningCompatibilityBridgeReady) {
         public ValidationReport {
             ecosystemFingerprint = Objects.requireNonNull(ecosystemFingerprint, "ecosystemFingerprint");
             unresolvedProductionRoles = List.copyOf(Objects.requireNonNull(unresolvedProductionRoles, "unresolvedProductionRoles"));
         }
 
-        /** @return true only when every required M22.5 civilian role has a legal production path */
+        /** @return true only when every required M22.5 civilian role has a legal production/support path */
         public boolean productionClosureReady() {
-            return unresolvedProductionRoles.isEmpty();
+            return unresolvedProductionRoles.isEmpty() && miningCompatibilityBridgeReady;
         }
     }
 }
