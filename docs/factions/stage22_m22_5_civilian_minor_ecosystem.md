@@ -1,6 +1,6 @@
 # Star Empires — Stage 22 / M22.5 shared civilian and minor ecosystem
 
-> **Status:** IMPLEMENTATION IN PROGRESS — authority/content binding landed on feature branch; mining production closure remains a blocker.  
+> **Status:** IMPLEMENTATION CANDIDATE — functional closure is present on the feature branch; acceptance remains gated by green exact-head CI, merge and green `main`.  
 > **Scope authority:** `docs/factions/faction_implementation_roadmap.md`, M22.5.  
 > **Balance authority:** `docs/factions/faction_balance_validation_framework.md`, especially B08/B16.  
 > **Content/identity authority:** `data/content/stage22-content-governance-v1.json`.
@@ -39,9 +39,9 @@ No M22.5 class owns inventory, credits, territory, diplomacy, construction progr
 
 ## 3. Civilian asset availability
 
-The current contract distinguishes compatibility archetypes from legally licensed Stage-22 core assets.
+The contract distinguishes compatibility archetypes from legally licensed Stage-22 core assets while requiring every M22.5 role to have an actual production/support closure.
 
-### Production-closed licensed paths
+### Licensed production paths
 
 - freight: `fit.industrial_union.freight.bulk_v1` → `production_manifest.industrial_union.freight_v1`;
 - tanker: `fit.empire.tanker.fleet_v1` → `production_manifest.empire.tanker_v1`;
@@ -50,13 +50,22 @@ The current contract distinguishes compatibility archetypes from legally license
 
 These are **individual licensed market assets**, not profile inheritance. A minor operator may obtain/use the concrete asset only through ordinary market/access/production conditions; it does not receive the source faction's doctrine, policy state or package identity.
 
-### Explicit unresolved path
+### Mining compatibility-to-production bridge
 
-- mining traffic currently resolves the compatibility archetype `ship.basic_miner` and Stage-18 extraction method `extraction.asteroid_excavation`;
-- that legacy archetype does not itself prove a Stage-18/Stage-22 ship production manifest;
-- therefore `CivilianRole.MINING` remains the only explicit `unresolvedProductionRole` and blocks M22.5 completion.
+Mining preserves `ship.basic_miner` for supported runtime/save compatibility, but replacement availability is no longer treated as implicit bootstrap magic.
 
-The blocker must be closed by an authored shared/licensed mining fit with a real manufacturing/shipyard path. It must not be hidden by treating bootstrap availability as construction authority.
+`Stage22CivilianMiningProductionPath` proves the explicit bridge:
+
+- compatibility runtime archetype: `ship.basic_miner`;
+- licensed reviewed physical fit: `fit.industrial_union.fleet_support.repair_v1`;
+- exact production manifest: `production_manifest.industrial_union.fleet_support_v1`;
+- real Stage-18 shipyard hull/module profiles and manufacturing bindings;
+- industrial/mining-capable common module family on the licensed fit;
+- operating extraction authority: `Stage18ExtractionRuntime` with `extraction.asteroid_excavation`.
+
+The minor operator remains `faction.miners`; licensing this individual support fit does not grant Industrial Union doctrine/profile identity.
+
+`Stage22CivilianMinorEcosystemValidator` removes `CivilianRole.MINING` from the compatibility row's unresolved list only after this bridge validates successfully. The resulting validation report requires `unresolvedProductionRoles == []` and `productionClosureReady() == true`.
 
 ## 4. Neutral/minor service providers
 
@@ -78,23 +87,29 @@ M22.5 does not create an insurance treasury, debt ledger, premium balance, priva
 
 ## 6. B08 — Convoy escort/interdiction
 
-The M22.5 binding resolves both core factions into existing convoy mission content:
+The content binding resolves both core factions into existing convoy mission content:
 
 - Empire: `mission.empire.convoy_guard` (`CONVOY_ESCORT`);
 - Industrial Union: `mission.industrial_union.corridor_escort` (`CONVOY_ESCORT`).
 
 Primary operation/traffic seam: `Stage21EOperationTrafficPolicy`.
 
-The acceptance meaning remains the canonical B08 contract: support fleet and objective play must protect or threaten real logistics/civilian traffic. No scripted convoy-success modifier is introduced by M22.5.
+`Stage22CivilianMinorScenarioAcceptanceTest` provides behavioral rather than metadata-only evidence. It creates an ordinary operational combat fleet and an active interception operation, verifies that `Stage21EOperationTrafficPolicy` denies the exact civilian traffic edge through `DENIED_BY_PHYSICAL_INTERDICTION`, and then moves the same fleet through ordinary `beginFleetTransfer`. Once the physical interdiction fleet leaves the edge anchor, the same edge becomes available again.
+
+The traffic query is also asserted read-only. No scripted convoy-success modifier or Stage-22 mutable warfare state is introduced.
 
 ## 7. B16 — Treaty/market access shock
 
-The M22.5 binding resolves both core factions into existing market-access mission content:
+The content binding resolves both core factions into existing market-access mission content:
 
 - Empire: `mission.empire.formal_market_access` (`MARKET_ACCESS_ALLOWED`);
 - Industrial Union: `mission.industrial_union.access_contract` (`MARKET_ACCESS_ALLOWED`).
 
-Primary legal seam: `DiplomaticMarketAccessResolver`, whose existing precedence remains authoritative (embargo, treaty right, relation fallback). M22.5 introduces no remote faction debuff for access loss.
+Primary legal seams are `DiplomaticMarketAccessResolver`, `CustomsTariffResolver` and the existing persisted treaty command boundary.
+
+`Stage22CivilianMinorScenarioAcceptanceTest` starts from an actually denied relation-threshold state with a 750-basis-point standard tariff, offers and accepts a real mutual `MARKET_ACCESS` + `CUSTOMS_TARIFF_EXEMPTION` treaty, and verifies that legal access opens and tariff falls to zero through the existing resolvers. A real treaty breach then restores the original access denial and standard tariff shock.
+
+No remote faction debuff, scripted market modifier or duplicate diplomacy authority is introduced.
 
 ## 8. Save migration / stable identity evidence
 
@@ -106,22 +121,31 @@ Primary legal seam: `DiplomaticMarketAccessResolver`, whose existing precedence 
 
 The test also requires every one of these identities to have no core `canonicalPackageKey` and no major-package fallback.
 
-## 9. Current validation gate
+## 9. Validation and acceptance gate
 
-`Stage22CivilianMinorEcosystemValidator.validateDefault()` currently requires:
+`Stage22CivilianMinorEcosystemValidator.validateDefault()` requires:
 
 - all five civilian roles to be explicitly represented;
+- all five roles to have a legal production/support closure, including the mining compatibility bridge;
 - every licensed fit to match a real core ship family and its exact production manifest;
 - every service provider to resolve to a real constructible station with matching owner;
 - authority class references to resolve;
 - B08 and B16 to bind one valid mission from each core faction;
 - insurance to remain deferred/non-authoritative;
 - minor IDs to remain governed and package-free;
-- unresolved production roles to remain visible.
+- deterministic ecosystem fingerprinting.
 
-### M22.5 completion remains blocked until
+Representative automated evidence:
 
-1. `CivilianRole.MINING` receives a legal production/support path;
-2. targeted and full CI are green on the final exact branch SHA;
-3. B08/B16 acceptance evidence remains green after the mining path is added;
-4. roadmap status is updated only after the implementation is merged into `main` and main CI is green.
+- `Stage22CivilianMinorEcosystemValidatorTest` — five roles, five production closures, three providers, three preserved minors, zero unresolved production roles and no major-package fallback;
+- `Stage22CivilianMinorMigrationAcceptanceTest` — deterministic binary round-trip plus stable minor IDs/runtime slots;
+- `Stage22CivilianMinorScenarioAcceptanceTest` — real B08 physical interdiction and real B16 treaty/access/tariff shock.
+
+### M22.5 completion process
+
+Functional closure is present on the feature branch, but milestone status is not advanced by this document alone. The required release sequence remains:
+
+1. green full CI on the exact final implementation branch SHA;
+2. inspect exact diff and merge that tested implementation SHA into `main`;
+3. verify resulting `main` and available post-merge CI;
+4. only then record M22.5 `COMPLETE`, create canonical completion evidence and advance Stage 22 to M22.6.
