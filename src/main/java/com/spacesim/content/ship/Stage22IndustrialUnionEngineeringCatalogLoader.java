@@ -23,9 +23,10 @@ public final class Stage22IndustrialUnionEngineeringCatalogLoader {
      * @return common immutable Stage-17.5 engineering catalog
      */
     public static ShipEngineeringCatalog loadDefault(){
-        return ShipEngineeringCatalogLoader.parse(Stage22AuthoredResourceFragments.read(
+        ShipEngineeringCatalog authored = ShipEngineeringCatalogLoader.parse(Stage22AuthoredResourceFragments.read(
                 Stage22IndustrialUnionEngineeringCatalogLoader.class,
                 DEFAULT_RESOURCES,
                 "Industrial Union engineering"));
+        return Stage22CorePairSensorModeProjection.apply(authored);
     }
 }
