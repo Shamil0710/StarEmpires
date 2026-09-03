@@ -1,29 +1,44 @@
 package com.spacesim.content;
 
-import com.spacesim.content.Stage22CivilianMinorEcosystemCatalog.CivilianRole;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage22CivilianMinorEcosystemValidatorTest {
     @Test
-    void defaultEcosystemResolvesRealProvidersLicensedAssetsAndCorePairScenarioBindings() {
+    void defaultEcosystemResolvesProvidersProductionPathsAndCorePairScenarioBindings() {
         var report = Stage22CivilianMinorEcosystemValidator.validateDefault();
 
         assertEquals(64, report.ecosystemFingerprint().length());
         assertEquals(5, report.civilianRoleCount());
-        assertEquals(4, report.licensedProductionPathCount());
+        assertEquals(5, report.licensedProductionPathCount());
         assertEquals(3, report.serviceProviderCount());
         assertEquals(3, report.preservedMinorActorCount());
-        assertEquals(List.of(CivilianRole.MINING), report.unresolvedProductionRoles());
-        assertFalse(report.productionClosureReady());
+        assertEquals(List.of(), report.unresolvedProductionRoles());
+        assertTrue(report.productionClosureReady());
+        assertTrue(report.miningCompatibilityBridgeReady());
         assertTrue(report.b08BindingReady());
         assertTrue(report.b16BindingReady());
         assertTrue(report.insuranceHookDeferred());
+    }
+
+    @Test
+    void miningCompatibilityArchetypeHasExactLicensedPhysicalReplacementAndExtractionSupport() {
+        var mining = Stage22CivilianMiningProductionPath.validateDefault();
+
+        assertEquals("ship.basic_miner", mining.legacyRuntimeArchetype());
+        assertEquals("fit.industrial_union.fleet_support.repair_v1", mining.licensedFitId());
+        assertEquals("production_manifest.industrial_union.fleet_support_v1", mining.productionManifestId());
+        assertEquals("extraction.asteroid_excavation", mining.extractionMethodId());
+        assertTrue(mining.miningIndustrialModulePresent());
+        assertTrue(mining.productionPathReady());
+        assertTrue(mining.extractionSupportReady());
+        assertTrue(mining.ready());
     }
 
     @Test
@@ -34,7 +49,7 @@ class Stage22CivilianMinorEcosystemValidatorTest {
         ecosystem.minorActors().forEach(actor -> {
             assertTrue(actor.preserveStableId(), actor.stableFactionId());
             assertFalse(actor.majorPackageFallbackAllowed(), actor.stableFactionId());
-            assertEquals(null, governance.canonicalPackageKey(actor.stableFactionId()), actor.stableFactionId());
+            assertNull(governance.canonicalPackageKey(actor.stableFactionId()), actor.stableFactionId());
         });
     }
 }
