@@ -32,12 +32,14 @@ class Stage22CivilianMinorEcosystemValidatorTest {
         var mining = Stage22CivilianMiningProductionPath.validateDefault();
 
         assertEquals("ship.basic_miner", mining.legacyRuntimeArchetype());
-        assertEquals("fit.industrial_union.fleet_support.repair_v1", mining.licensedFitId());
-        assertEquals("production_manifest.industrial_union.fleet_support_v1", mining.productionManifestId());
+        assertEquals("fit.civilian.miners.asteroid_excavator_v1", mining.licensedFitId());
+        assertEquals("module.civilian.miners.asteroid_excavation_section_v1", mining.miningModuleId());
+        assertEquals("production_manifest.civilian.miners.asteroid_excavator_v1", mining.productionManifestId());
         assertEquals("extraction.asteroid_excavation", mining.extractionMethodId());
-        assertTrue(mining.miningIndustrialModulePresent());
+        assertEquals("capability.extraction.asteroid_excavation", mining.extractionCapabilityTag());
         assertTrue(mining.productionPathReady());
-        assertTrue(mining.extractionSupportReady());
+        assertTrue(mining.runtimeExtractionReady());
+        assertTrue(mining.repairFitRejectedForMining());
         assertTrue(mining.ready());
     }
 
