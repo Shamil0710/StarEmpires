@@ -1,12 +1,14 @@
 package com.spacesim.content.weapon;
 
 import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22EmpireEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22IndustrialUnionEngineeringCatalogLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Objects;
 
 /**
@@ -49,6 +51,55 @@ public final class Stage22CorePairWeaponRuntimeCatalogLoader {
                 Stage22IndustrialUnionEngineeringCatalogLoader.loadDefault(),
                 UNION_LAUNCHER_RESOURCE,
                 UNION_AMMUNITION_RESOURCE);
+    }
+
+    /**
+     * Loads the exact two-faction weapon content used by M22.6 paired Stage-19 scenarios.
+     *
+     * @return one immutable engineering/launcher/ammunition universe containing both core packages
+     */
+    public static RuntimeContent loadCombined() {
+        RuntimeContent empire = loadEmpire();
+        RuntimeContent union = loadIndustrialUnion();
+        ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        if (empire.launchers().getSchemaVersion() != union.launchers().getSchemaVersion()
+                || empire.launchers().getMigrationVersion() != union.launchers().getMigrationVersion()
+                || empire.ammunition().getSchemaVersion() != union.ammunition().getSchemaVersion()
+                || empire.ammunition().getMigrationVersion() != union.ammunition().getMigrationVersion()) {
+            throw new IllegalStateException("Core weapon packages disagree on schema/migration versions");
+        }
+
+        ArrayList<WeaponLauncherCatalog.LauncherProfile> launchers = new ArrayList<>();
+        launchers.addAll(empire.launchers().getProfiles());
+        launchers.addAll(union.launchers().getProfiles());
+        WeaponLauncherCatalog combinedLaunchers = new WeaponLauncherCatalog(
+                empire.launchers().getSchemaVersion(),
+                empire.launchers().getMigrationVersion(),
+                launchers);
+
+        ArrayList<WeaponAmmunitionCatalog.KineticAmmunitionDefinition> kinetic = new ArrayList<>();
+        kinetic.addAll(empire.ammunition().getKineticAmmunition());
+        kinetic.addAll(union.ammunition().getKineticAmmunition());
+        ArrayList<WeaponAmmunitionCatalog.GuidedAmmunitionDefinition> guided = new ArrayList<>();
+        guided.addAll(empire.ammunition().getGuidedAmmunition());
+        guided.addAll(union.ammunition().getGuidedAmmunition());
+        WeaponAmmunitionCatalog combinedAmmunition = new WeaponAmmunitionCatalog(
+                empire.ammunition().getSchemaVersion(),
+                empire.ammunition().getMigrationVersion(),
+                kinetic,
+                guided);
+
+        for (WeaponLauncherCatalog.LauncherProfile profile : combinedLaunchers.getProfiles()) {
+            if (engineering.findModule(profile.moduleId()) == null) {
+                throw new IllegalStateException("Combined launcher references absent core module: " + profile.moduleId());
+            }
+        }
+        combinedAmmunition.getKineticAmmunition().forEach(ammo -> {
+            if (engineering.findMaterial(ammo.materialId()) == null) {
+                throw new IllegalStateException("Combined ammunition references absent core material: " + ammo.id());
+            }
+        });
+        return new RuntimeContent(engineering, combinedLaunchers, combinedAmmunition);
     }
 
     private static RuntimeContent load(
