@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "profiles": [
+    {
+      "moduleId": "module.industrial_union_weapon_cassette_v1",
+      "family": "KINETIC",
+      "ammunitionInterfaceId": "kinetic_feed",
+      "ammunitionAmountPerShot": 1.0,
+      "cycleTimeSeconds": 4.0,
+      "supportChannelCount": 1,
+      "pointingJitterRad": 0.00002,
+      "maxProjectileMassKg": 200.0,
+      "maxProjectileLengthM": 2.2,
+      "maxProjectileDiameterM": 0.10
+    }
+  ]
+}
