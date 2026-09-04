@@ -19,7 +19,6 @@ import com.spacesim.economy.Stage18FacilityRuntime.FacilityCapabilitySnapshot;
 import com.spacesim.economy.Stage18ManufacturingRuntime;
 import com.spacesim.economy.Stage18RefiningRuntime;
 import com.spacesim.economy.Stage18StationProductionBridge;
-import com.spacesim.persistence.EntityState;
 import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.persistence.Stage20FreightPersistentState.AssignmentKind;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
@@ -230,7 +229,7 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
                 String processMarker = ":" + recipe.id() + ":" + order.commodityId() + ":";
                 if (recipe.inputs().size() != 1
                         || !recipe.inputs().get(0).commodityId().equals(order.commodityId())
-                        || !order.sourceProvenance().contains(processMarker)) continue;
+                        || !order.sourceProvenanceId().contains(processMarker)) continue;
                 var input = ontology.findCommodity(order.commodityId());
                 var output = ontology.findCommodity(recipe.outputCommodityId());
                 if (input == null || output == null
