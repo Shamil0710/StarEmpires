@@ -140,6 +140,16 @@ public final class LiveTacticalBattleWeaponRuntime {
         return controlRuntime;
     }
 
+    /** @return immutable physical ammunition content shared by every layer of this battle */
+    public WeaponAmmunitionCatalog ammunitionCatalog() {
+        return ammunitionCatalog;
+    }
+
+    /** @return immutable launcher content shared by every layer of this battle */
+    public WeaponLauncherCatalog launcherCatalog() {
+        return launcherCatalog;
+    }
+
     /** @return immutable current physical projectile-body set in deterministic creation order */
     public List<ProjectileBody> projectiles() {
         return List.copyOf(projectiles);

@@ -139,3 +139,27 @@ Freeze discovery schema 2 also includes the **runtime-completed** engineering ca
 launchers and their schema/migration versions. Raw package fingerprints alone omitted the executable
 sensor/shield mode projection and the launcher/ammunition catalogs. These additional values remain
 discovery evidence until the full balance and human-review gates are satisfied.
+
+### Committed encounter and treaty boundaries
+
+The exact Stage-19 encounter resolver now accepts an explicit engineering/protection/ammunition/
+launcher universe while its default constructor retains legacy compatibility. Ordnance, defense,
+decoy and deception layers take weapon catalogs from their shared weapon authority. Previously those
+layers independently reloaded the old Stage-17.5I weapon pack, so a core kinetic module failed the
+guided-mount preflight even though the direct kinetic duel worked.
+
+`Stage22CorePairEncounterContinuationProbe` exercises three bounded encounters through the complete
+Stage-19 stack. It compares uninterrupted and saved/reloaded encounter-boundary continuation in both
+permutations, verifies that detached resolution does not mutate input world-owned components, and
+rejects any fit substitution or replenishment of spent rounds/reaction mass. The existing
+`Stage21EGeneratedWorldStage19Authority` already accepts a resolver; generated-world handoff/commit
+acceptance with actual core ships is still needed before claiming the campaign integration closed.
+
+`Stage22CorePairTreatyProbe` uses the actual `faction.imperial_directorate` and
+`faction.industrial_combine` identities. It mirrors market-owner/visitor roles and verifies binary
+saves while offered, active and breached. An offer grants nothing; acceptance produces mutual access
+and a 0-bps exemption; breach restores denial and the declared 750-bps rate. This is authority and
+continuation evidence, not a physical trade-volume recovery curve.
+
+The [100-pair tactical archive](../evidence/stage22/m22_6/tactical-42ebd4cc/README.md) retains
+the clean-source `42ebd4cc` diagnostic runs and raw vectors. It is not a signed-off balance report.
