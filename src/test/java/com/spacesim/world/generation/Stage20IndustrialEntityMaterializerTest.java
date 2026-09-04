@@ -14,6 +14,13 @@ import com.spacesim.world.generation.Stage20OperationalIndustrialSpecializationP
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Set;
+import com.spacesim.content.*;
+import com.spacesim.economy.Stage18FacilityConstructionRuntime;
+import com.spacesim.economy.Stage18FacilityRuntime;
+import com.spacesim.economy.Stage18StationStorage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -93,6 +100,56 @@ class Stage20IndustrialEntityMaterializerTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> Stage20IndustrialEntityMaterializer.restore(empty));
+    }
+
+    @Test
+    void completedPaidFacilitySurvivesGeneratedRestoreWhileMissingCompletionFailsClosed() {
+        CadenceFixture fixture = fixture();
+        var initial = savedState(fixture, Stage18IndustrialState.empty(0L));
+        var registry = Stage20IndustrialEntityMaterializer.materializeBootstrap(initial, fixture.specialization());
+        var captured = registry.captureIndustrialState(initial.industrialState());
+        var target = registry.stations().stream()
+                .filter(station -> station.stationNode().locationTag().equals("location.orbital_station"))
+                .findFirst().orElseThrow();
+        var construction = new Stage18FacilityConstructionRuntime(Stage18FacilityConstructionCatalogLoader.loadDefault(),
+                Stage18FacilityCatalogLoader.loadDefault(), Stage18ResourceOntologyLoader.loadDefault());
+        var order = construction.createOrder("m22.6.completed_support", "m22.6.support_instance",
+                "facility.fabrication.precision", target.stationId(), target.stationNode().locationTag());
+        // The fixture declares and pays a finite construction kit; restore receives no kit or grants.
+        Map<String, Double> capacity = new java.util.TreeMap<>();
+        order.requiredMassByCommodityKg().forEach((id, mass) -> capacity.merge(
+                Stage18ResourceOntologyLoader.loadDefault().findCommodity(id).storageClassId(), mass, Double::sum));
+        var kit = new Stage18StationStorage(Stage18ResourceOntologyLoader.loadDefault(),
+                Stage18ManufacturingProductRegistry.loadDefault(), target.stationId(), capacity,
+                order.requiredMassByCommodityKg(), Map.of());
+        for (var input : order.requiredMassByCommodityKg().entrySet()) {
+            order = construction.deliver(order, kit, input.getKey(), input.getValue()).order();
+        }
+        var constructors = new Stage18FacilityConstructionRuntime.ConstructionCapability("fixture.funded_constructors",
+                Set.of("capability.fabrication.heavy", "capability.fabrication.assembly",
+                        "capability.fabrication.electrical", "capability.fabrication.precision"), 1d);
+        var completed = construction.advanceWork(order, constructors.openInterval(order.requiredWorkSeconds() + 1d));
+        assertEquals(Stage18FacilityConstructionRuntime.WorkStatus.COMPLETED, completed.status());
+        var facilities = new ArrayList<>(captured.facilities());
+        facilities.add(new Stage18IndustrialState.FacilityInstallationSnapshot(target.stationId(),
+                new Stage18FacilityRuntime.InstalledFacilityState(order.facilityInstanceId(), order.facilityDefinitionId(),
+                        1d, 0d, 0d, 0d, 0d, order.locationTag(), true)));
+        var constructions = new ArrayList<>(captured.constructionOrders());
+        constructions.add(completed.order());
+        var extended = new Stage18IndustrialState(captured.schemaVersion(), captured.contentFingerprint(),
+                captured.simulationTick(), captured.sources(), captured.stationStorages(), facilities,
+                captured.yards(), constructions, captured.processOrders());
+        var restored = Stage20IndustrialEntityMaterializer.restore(replaceIndustry(initial, extended));
+        assertEquals(extended, restored.captureIndustrialState(extended));
+        assertTrue(restored.station(target.stationId()).stationNode().installedFacilities().contains(completed.installedFacility()));
+        var added = restored.station(target.stationId()).facilityCapabilities().stream()
+                .filter(row -> row.facilityInstanceId().equals("m22.6.support_instance")).findFirst().orElseThrow();
+        assertEquals(0d, added.effectiveEngineeringWorkRate(), "load must not grant power or staff to the new facility");
+        var unproven = new Stage18IndustrialState(captured.schemaVersion(), captured.contentFingerprint(),
+                captured.simulationTick(), captured.sources(), captured.stationStorages(), facilities,
+                captured.yards(), captured.constructionOrders(), captured.processOrders());
+        assertThrows(IllegalArgumentException.class, () ->
+                Stage20IndustrialEntityMaterializer.restore(replaceIndustry(initial, unproven)));
     }
 
     private static Stage20GeneratedCampaignPersistentState savedState(

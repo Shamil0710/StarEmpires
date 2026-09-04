@@ -187,7 +187,10 @@ public final class Stage20IndustrialEntityMaterializer {
                     .getOrDefault(storage.stationId(), List.of()).stream()
                     .map(YardInstallationSnapshot::state)
                     .toList();
-            stations.add(restoreStation(authority, storage, facilityStates, yardStates));
+            stations.add(restoreStation(authority, storage, facilityStates, yardStates,
+                    authority.ownerId(), industrial.constructionOrders().stream()
+                            .filter(order -> order.stationId().equals(storage.stationId()))
+                            .toList()));
         }
         if (!unsupportedAssignments.isEmpty()) {
             throw new IllegalStateException("unexpected unsupported industrial assignments");
@@ -264,6 +267,16 @@ public final class Stage20IndustrialEntityMaterializer {
             List<InstalledFacilityState> facilities,
             List<InstalledYardState> yards,
             String owner) {
+        return restoreStation(canonical, storageSnapshot, facilities, yards, owner, List.of());
+    }
+
+    private static MaterializedIndustrialStation restoreStation(
+            CanonicalStation canonical,
+            StationStorageSnapshot storageSnapshot,
+            List<InstalledFacilityState> facilities,
+            List<InstalledYardState> yards,
+            String owner,
+            List<com.spacesim.economy.Stage18FacilityConstructionRuntime.ConstructionOrderSnapshot> constructionOrders) {
         Objects.requireNonNull(canonical, "canonical");
         if (!canonical.stationId().equals(storageSnapshot.stationId())) {
             throw new IllegalArgumentException("storage station differs from canonical station");
@@ -280,6 +293,14 @@ public final class Stage20IndustrialEntityMaterializer {
                 archetype,
                 Stage18ResourceOntologyLoader.loadDefault(),
                 Stage18ManufacturingProductRegistry.loadDefault());
+        for (var order : constructionOrders) {
+            if (order.status() == com.spacesim.economy.Stage18FacilityConstructionRuntime.OrderStatus.COMPLETE) {
+                node = node.withCompletedConstruction(order,
+                        new com.spacesim.economy.Stage18FacilityConstructionRuntime(
+                                com.spacesim.content.Stage18FacilityConstructionCatalogLoader.loadDefault(),
+                                Stage18FacilityCatalogLoader.loadDefault(), Stage18ResourceOntologyLoader.loadDefault()));
+            }
+        }
         if (!storageSnapshot.capacityByStorageClassKg().equals(archetype.storageCapacityByClassKg())) {
             throw new IllegalArgumentException("saved storage capacity differs from generated archetype");
         }
@@ -294,11 +315,15 @@ public final class Stage20IndustrialEntityMaterializer {
                 throw new IllegalArgumentException("duplicate installed facility state");
             }
         });
-        Set<String> structuralIds = node.installedFacilities().stream()
-                .map(Stage18StationIndustrialNode.InstalledFacilityReference::facilityInstanceId)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        if (!structuralIds.containsAll(stateById.keySet())) {
-            throw new IllegalArgumentException("facility state is absent from generated station archetype");
+        Map<String, String> structuralDefinitions = node.installedFacilities().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        Stage18StationIndustrialNode.InstalledFacilityReference::facilityInstanceId,
+                        Stage18StationIndustrialNode.InstalledFacilityReference::facilityDefinitionId));
+        for (var installed : stateById.values()) {
+            if (!installed.definitionId().equals(structuralDefinitions.get(installed.facilityInstanceId()))
+                    || !installed.locationTag().equals(node.locationTag())) {
+                throw new IllegalArgumentException("facility state differs from station archetype/completed construction");
+            }
         }
         Stage18FacilityRuntime facilityRuntime = new Stage18FacilityRuntime(
                 Stage18FacilityCatalogLoader.loadDefault());

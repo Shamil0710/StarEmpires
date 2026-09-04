@@ -92,3 +92,28 @@ This foundation is not M22.6 completion. Before freeze sign-off the branch still
 - full exact-head CI, guarded merge, post-merge `main` CI and docs-only roadmap closeout.
 
 No Stage 23 implementation may start before those gates are complete.
+
+## 6. Runtime integration evidence — 2026-09-04
+
+The current continuation adds these probes; neither the scenario suite nor M22.6 is signed off:
+
+| Evidence | Executed authority and scope | Remaining boundary |
+| --- | --- | --- |
+| `Stage22CorePairFreightProbe` / B05 | 100 paired load-sensitivity seeds; finite Stage-18 stock loading; exact Stage-20 lost-lot provenance; surviving alternate-route delivery; byte-stable freight save and continuation; no reused destroyed ID | Two declared routes, not a stochastic generated-campaign balance batch. Stage-21D alternate-route planning does not rewrite an in-flight Stage-20 order. No automatic loss-to-salvage/replacement bridge is claimed. |
+| `Stage22CorePairRecoveryProbe` / B03, B14 | Both exact destroyer fits at 25/50/75% damage; paid missing-yard-support construction; physical Stage-21G repair through the Stage-18 yard; material/work rejection; facility persistence and repair continuation | Full recovery still needs replacement and rolling-attrition curves. Starting construction kits and repair stock are explicit scenario resources. |
+
+The repair probe exposed two integration defects that catalog-only tests did not exercise:
+
+1. Neither industrial-station archetype includes the precision fabrication facility required by the
+   authored core yards. Stage-18H completion now projects a validated, fully paid construction order
+   into the existing station roster. The generated industrial restorer replays persisted completed
+   orders before validating installed facility identities. Power/labor allocations remain separate;
+   restoring a newly installed facility does not activate it for free. Existing save schema is retained.
+2. The Stage-21G component-repair path could encounter an invalid runtime shield contract after
+   consuming repair inputs. It now validates restored emitter capability before settlement. The raw
+   authoring catalogs remain distinct from the existing M22.6 runtime-completed core catalog; the
+   incompatible-catalog regression checks unchanged stock, yard work and engineering state.
+
+`target/stage22-evidence/` retains source SHA, dirty-tree flag, content fingerprint, raw observations
+and limitations. CI archives these small reports on the exact tested checkout, including the PR
+merge-checkout SHA where applicable. A dirty local discovery run is not freeze evidence.

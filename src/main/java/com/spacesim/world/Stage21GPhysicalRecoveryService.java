@@ -275,6 +275,9 @@ public final class Stage21GPhysicalRecoveryService {
             Stage18ShipyardRuntime.YardWorkBudget budget) {
         EngineeringComponent checkedShip = Objects.requireNonNull(ship, "ship");
         ShipInstanceRuntimeState before = Objects.requireNonNull(checkedShip.instanceState, "ship.instanceState");
+        // A missing runtime shield contract must fail before Stage-18 stock/work is committed.
+        // Repairs may restore disabled emitters, so preflight the undamaged capability as well.
+        repairedShields(checkedShip, DamageState.pristine());
         RepairResult result = repair(
                 operation,
                 assetId,
@@ -426,11 +429,24 @@ public final class Stage21GPhysicalRecoveryService {
             throw new IllegalArgumentException("repair completion belongs to another physical asset");
         }
         ShipInstanceRuntimeState before = Objects.requireNonNull(ship.instanceState, "ship.instanceState");
+        TreeMap<String, ShieldFieldRuntime.State> shields = repairedShields(
+                ship, checkedCompletion.damage().moduleDamage());
+        ship.setInstanceState(new ShipInstanceRuntimeState(
+                checkedCompletion.damage(),
+                shields,
+                before.maintenance(),
+                before.weaponLoadout(),
+                before.weaponMountRuntime()));
+    }
+
+    private TreeMap<String, ShieldFieldRuntime.State> repairedShields(
+            EngineeringComponent ship, DamageState repairedDamage) {
+        ShipInstanceRuntimeState before = Objects.requireNonNull(ship.instanceState, "ship.instanceState");
         RuntimeState operating = Objects.requireNonNull(ship.runtimeState, "ship.runtimeState");
         var derived = engineeringRuntime.derive(
                 Objects.requireNonNull(ship.fit, "ship.fit"),
                 operating,
-                checkedCompletion.damage().moduleDamage());
+                repairedDamage);
         TreeMap<String, ShieldFieldRuntime.State> shields = new TreeMap<>();
         for (ShipShieldEngineeringAdapter.FittedShield fitted : shieldAdapter.derive(derived)) {
             ShieldFieldRuntime.State existing = before.shieldStatesByMount().get(fitted.mountId());
@@ -440,12 +456,7 @@ public final class Stage21GPhysicalRecoveryService {
             shields.put(fitted.mountId(), shieldRuntime.withEmitterIntegrity(
                     fitted.definition(), existing, fitted.emitterIntegrity()));
         }
-        ship.setInstanceState(new ShipInstanceRuntimeState(
-                checkedCompletion.damage(),
-                shields,
-                before.maintenance(),
-                before.weaponLoadout(),
-                before.weaponMountRuntime()));
+        return shields;
     }
 
     private EngineeringComponent materializeNewEngineering(InstalledFit fit) {
