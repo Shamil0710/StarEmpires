@@ -33,7 +33,6 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** M22.6 B01 generated-world commit evidence for the exact Empire/Industrial Union core fits. */
@@ -123,10 +122,9 @@ class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
             EntityState before = fleetId.equals(attacker.fleetId()) ? attackerBefore : targetBefore;
             EntityState after = EntityStateMapper.capture(entity);
             anyPhysicalEffect |= !after.equals(before);
-            String expectedFit = fleetId.equals(attacker.fleetId())
-                    ? Stage22CorePairTacticalFactory.EMPIRE_DESTROYER_FIT
-                    : Stage22CorePairTacticalFactory.UNION_DESTROYER_FIT;
-            assertEquals(expectedFit, entity.getComponent(EngineeringComponent.class).fit.fitId(),
+            assertEquals(
+                    fleetId.equals(attacker.fleetId()) ? empire.fit : union.fit,
+                    entity.getComponent(EngineeringComponent.class).fit,
                     "generated-world tactical commit must preserve the exact installed core fit");
         }
 
