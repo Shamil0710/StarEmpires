@@ -12,6 +12,9 @@ import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderStat
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage20SourceOutpostMaterializer.MaterializedExtractionOutpost;
+import com.spacesim.ship.ShipDamageRuntime;
+import com.spacesim.ship.ShipEngineeringState.DamageState;
+import com.spacesim.ship.ShipInstanceRuntimeState;
 import com.spacesim.ship.Stage19ExactTacticalEncounterResolver;
 import com.spacesim.ship.Stage22CorePairTacticalFactory;
 import com.spacesim.world.FleetId;
@@ -39,6 +42,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,38 +58,59 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * military FleetId is physically active. The escort/interdictor exchange is committed by the exact
  * Stage-19 generated-world authority. No combat result is copied into a Stage-22 logistics counter:
  * the same traffic policy simply observes whether the real interdictor FleetId still exists.</p>
+ *
+ * <p>Two real physical branches are required. The pristine control demonstrates that an unresolved
+ * surviving interdictor continues to block traffic. The catastrophic-loss branch starts from a
+ * heavily damaged but explicitly still-alive exact M22.6 fit, mirroring the already accepted
+ * Stage-21E physical-loss protocol; only Stage 19 is allowed to apply the final destructive effect.
+ * This is a physical initial condition, not a synthetic combat-result flag or manual fleet removal.</p>
  */
 class Stage22CorePairEscortInterdictionIntegrationAcceptanceTest {
     private static final long OPERATION_ID = 22_608L;
     private static final long TACTICAL_TICKS = 1_200L;
     private static final double HANDLING_SECONDS = 3_600d;
+    private static final double CRITICAL_INTEGRITY = 1.0e-6d;
+    private static final double PRISTINE_SEPARATION_M = 1_430d;
+    private static final double CRITICAL_SEPARATION_M = 600d;
 
     @Test
     void exactStage19OutcomeCausallyGatesTheSamePhysicalFreightOrder() {
-        ScenarioResult defaultFirst = run(Permutation.DEFAULT);
-        ScenarioResult defaultSecond = run(Permutation.DEFAULT);
-        ScenarioResult mirroredFirst = run(Permutation.MIRRORED);
-        ScenarioResult mirroredSecond = run(Permutation.MIRRORED);
+        ScenarioResult pristineFirst = run(Permutation.DEFAULT, InterdictorCondition.PRISTINE);
+        ScenarioResult pristineSecond = run(Permutation.DEFAULT, InterdictorCondition.PRISTINE);
+        ScenarioResult criticalDefaultFirst = run(Permutation.DEFAULT, InterdictorCondition.CRITICAL_BUT_ALIVE);
+        ScenarioResult criticalDefaultSecond = run(Permutation.DEFAULT, InterdictorCondition.CRITICAL_BUT_ALIVE);
+        ScenarioResult criticalMirroredFirst = run(Permutation.MIRRORED, InterdictorCondition.CRITICAL_BUT_ALIVE);
+        ScenarioResult criticalMirroredSecond = run(Permutation.MIRRORED, InterdictorCondition.CRITICAL_BUT_ALIVE);
 
-        assertArrayEquals(defaultFirst.checkpoint(), defaultSecond.checkpoint(),
-                "default escort/interdiction replay must be byte deterministic");
-        assertArrayEquals(mirroredFirst.checkpoint(), mirroredSecond.checkpoint(),
-                "mirrored escort/interdiction replay must be byte deterministic");
-        assertEquals(defaultFirst.interdictorAlive(), defaultSecond.interdictorAlive());
-        assertEquals(mirroredFirst.interdictorAlive(), mirroredSecond.interdictorAlive());
-        assertEquals(defaultFirst.routeAdmitted(), !defaultFirst.interdictorAlive(),
-                "freight admission must be derived from the physical interdictor outcome");
-        assertEquals(mirroredFirst.routeAdmitted(), !mirroredFirst.interdictorAlive(),
-                "mirrored freight admission must be derived from the physical interdictor outcome");
-        assertTrue(!defaultFirst.interdictorAlive() || !mirroredFirst.interdictorAlive(),
-                "paired B08 evidence must include a real destroyed-interdictor/unblocked route branch");
-        assertEquals(defaultFirst.orderIdBefore(), defaultFirst.orderIdAfter(),
-                "combat must gate the same persistent freight order rather than replacing it");
-        assertEquals(mirroredFirst.orderIdBefore(), mirroredFirst.orderIdAfter(),
-                "mirrored combat must gate the same persistent freight order rather than replacing it");
+        assertArrayEquals(pristineFirst.checkpoint(), pristineSecond.checkpoint(),
+                "pristine B08 control must replay byte deterministically");
+        assertArrayEquals(criticalDefaultFirst.checkpoint(), criticalDefaultSecond.checkpoint(),
+                "default catastrophic-loss B08 branch must replay byte deterministically");
+        assertArrayEquals(criticalMirroredFirst.checkpoint(), criticalMirroredSecond.checkpoint(),
+                "mirrored catastrophic-loss B08 branch must replay byte deterministically");
+
+        assertTrue(pristineFirst.interdictorAlive(),
+                "pristine control must preserve a real physical denied-route branch");
+        assertFalse(pristineFirst.routeAdmitted(),
+                "same freight hop must remain denied while the real interdictor survives");
+        assertFalse(criticalDefaultFirst.interdictorAlive(),
+                "Stage 19 must destroy the critically damaged default interdictor itself");
+        assertTrue(criticalDefaultFirst.routeAdmitted(),
+                "destroying the default interdictor must admit the same physical freight hop");
+        assertFalse(criticalMirroredFirst.interdictorAlive(),
+                "Stage 19 must destroy the critically damaged mirrored interdictor itself");
+        assertTrue(criticalMirroredFirst.routeAdmitted(),
+                "destroying the mirrored interdictor must admit the same physical freight hop");
+
+        for (ScenarioResult result : List.of(pristineFirst, criticalDefaultFirst, criticalMirroredFirst)) {
+            assertEquals(result.routeAdmitted(), !result.interdictorAlive(),
+                    "freight admission must be derived only from physical interdictor survival");
+            assertEquals(result.orderIdBefore(), result.orderIdAfter(),
+                    "combat must gate the same persistent freight order rather than replacing it");
+        }
     }
 
-    private static ScenarioResult run(Permutation permutation) {
+    private static ScenarioResult run(Permutation permutation, InterdictorCondition condition) {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
         FreighterState source = assignedSourceFreighter(runtime);
@@ -112,7 +137,7 @@ class Stage22CorePairEscortInterdictionIntegrationAcceptanceTest {
                 "the real interdictor must deny the same freight edge before tactical resolution");
         assertTrue(runtime.world().findFleetJump(outbound.fleetId()).isEmpty());
 
-        var core = Stage22CorePairTacticalFactory.createDestroyerDuel(permutation);
+        Stage22CorePairTacticalFactory.Duel core = Stage22CorePairTacticalFactory.createDestroyerDuel(permutation);
         EngineeringComponent empire = engineeringFor(core, Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID);
         EngineeringComponent union = engineeringFor(core, Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
         EngineeringComponent escortEngineering = permutation == Permutation.DEFAULT ? empire : union;
@@ -124,12 +149,19 @@ class Stage22CorePairEscortInterdictionIntegrationAcceptanceTest {
         Entity interdictorEntity = entity(runtime, interdictorPlacement);
         escortEntity.add(copy(escortEngineering));
         interdictorEntity.add(copy(interdictorEngineering));
+        EngineeringComponent installedInterdictor = interdictorEntity.getComponent(EngineeringComponent.class);
+        if (condition == InterdictorCondition.CRITICAL_BUT_ALIVE) {
+            applyCriticalButSurvivingPhysicalState(core, installedInterdictor);
+        }
 
         LocalPhysicalKinematics anchor = runtime.arrival().materialization(from)
                 .physicalState(escortPlacement.localEntityId()).orElseThrow();
+        LocalPhysicalKinematics targetPhysical = condition == InterdictorCondition.CRITICAL_BUT_ALIVE
+                ? LocalPhysicalKinematics.stationary(anchor.position().translated(0d, CRITICAL_SEPARATION_M))
+                : new LocalPhysicalKinematics(
+                        anchor.position().translated(PRISTINE_SEPARATION_M, 0d), 0d, 0d);
         runtime.arrival().materialization(from).updatePhysicalState(
-                interdictorPlacement.localEntityId(),
-                new LocalPhysicalKinematics(anchor.position().translated(1_430d, 0d), 0d, 0d));
+                interdictorPlacement.localEntityId(), targetPhysical);
 
         EntityState escortState = EntityStateMapper.capture(escortEntity);
         EntityState interdictorState = EntityStateMapper.capture(interdictorEntity);
@@ -176,6 +208,40 @@ class Stage22CorePairEscortInterdictionIntegrationAcceptanceTest {
         assertFalse(orderAfter.orderId().isBlank());
         return new ScenarioResult(checkpoint, interdictorAlive, escortAlive, routeAdmitted,
                 orderBefore.orderId(), orderAfter.orderId());
+    }
+
+    private static void applyCriticalButSurvivingPhysicalState(
+            Stage22CorePairTacticalFactory.Duel core,
+            EngineeringComponent engineering) {
+        var hull = core.content().engineering().findHull(engineering.fit.hullId());
+        var layout = core.protection().findHullDamageLayout(hull.id());
+        if (layout == null) {
+            throw new AssertionError("exact M22.6 interdictor hull lacks physical protection layout");
+        }
+
+        TreeMap<String, Double> compartmentIntegrity = new TreeMap<>();
+        hull.compartments().forEach(compartment -> compartmentIntegrity.put(compartment.id(), 0d));
+        String liveCompartment = hull.compartments().stream()
+                .filter(compartment -> compartment.id().equals("engineering"))
+                .findFirst()
+                .orElseGet(() -> hull.compartments().stream().findFirst().orElseThrow())
+                .id();
+        compartmentIntegrity.put(liveCompartment, CRITICAL_INTEGRITY);
+
+        TreeMap<String, Double> moduleIntegrity = new TreeMap<>();
+        engineering.fit.installedModules().forEach(installed -> moduleIntegrity.put(installed.mountId(), 0d));
+        ShipDamageRuntime.Snapshot damage = new ShipDamageRuntime.Snapshot(
+                compartmentIntegrity, new DamageState(moduleIntegrity));
+        assertFalse(ShipDamageRuntime.isFullyDestroyed(hull, engineering.fit, layout, damage),
+                "critical B08 interdictor must still be a live physical ship before Stage 19");
+
+        ShipInstanceRuntimeState previous = engineering.instanceState;
+        engineering.setInstanceState(new ShipInstanceRuntimeState(
+                damage,
+                Map.of(),
+                previous.maintenance(),
+                previous.weaponLoadout(),
+                previous.weaponMountRuntime()));
     }
 
     private static EngineeringComponent engineeringFor(
@@ -336,6 +402,11 @@ class Stage22CorePairEscortInterdictionIntegrationAcceptanceTest {
             }
         }
         throw new AssertionError("generated topology has no B08 military route");
+    }
+
+    private enum InterdictorCondition {
+        PRISTINE,
+        CRITICAL_BUT_ALIVE
     }
 
     private record MilitaryFleet(FleetId fleetId, int factionId) { }
