@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * Shared Stage-19I physical weapon/body/protection execution over one multi-combatant runtime.
@@ -47,6 +48,9 @@ public final class LiveTacticalBattleWeaponRuntime {
     private final List<ProjectileBody> projectiles = new ArrayList<>();
     private final TreeMap<Long, Long> shotsBySourceEntityId = new TreeMap<>();
     private final TreeMap<Long, Long> impactsByTargetEntityId = new TreeMap<>();
+    // A surface response is charged once while a residual remains inside that hull. Leaving the
+    // footprint releases the contact so a later physical re-entry can collide normally.
+    private final TreeMap<Long, TreeSet<Long>> surfaceContactsByProjectileId = new TreeMap<>();
 
     private long nextProjectileId = 190_000L;
 
@@ -195,6 +199,7 @@ public final class LiveTacticalBattleWeaponRuntime {
         PositionSnapshot targetPosition = new PositionSnapshot(targetXM, targetYM);
         KineticProtectionRuntime.Result result = resolveImpact(target, checkedBody, targetPosition);
         recordImpact(targetEntityId);
+        rememberResidualContact(result, targetEntityId);
         return result;
     }
 
@@ -232,7 +237,21 @@ public final class LiveTacticalBattleWeaponRuntime {
                 controlRuntime.fingerprint(),
                 sources,
                 targets,
-                List.copyOf(projectiles));
+                List.copyOf(projectiles),
+                surfaceContactSnapshot());
+    }
+
+    private Map<Long, List<Long>> surfaceContactSnapshot() {
+        Map<Long, List<Long>> result = new TreeMap<>();
+        surfaceContactsByProjectileId.forEach((id, targets) -> result.put(id, List.copyOf(targets)));
+        return result;
+    }
+
+    private void rememberResidualContact(KineticProtectionRuntime.Result result, long targetId) {
+        if (result.postProtectionProjectile() != null) {
+            surfaceContactsByProjectileId.computeIfAbsent(
+                    result.postProtectionProjectile().projectileId(), ignored -> new TreeSet<>()).add(targetId);
+        }
     }
 
     private void advanceLauncherCycles() {
@@ -349,6 +368,7 @@ public final class LiveTacticalBattleWeaponRuntime {
                     impactBody,
                     impact.targetPositionAtImpact);
             recordImpact(impact.target.spec().entityId());
+            rememberResidualContact(result, impact.target.spec().entityId());
 
             if (result.postProtectionProjectile() != null) {
                 double remainingSeconds = LiveTacticalBattleControlRuntime.TICK_SECONDS * (1d - impact.fraction);
@@ -358,6 +378,9 @@ public final class LiveTacticalBattleWeaponRuntime {
         }
         projectiles.clear();
         projectiles.addAll(survivors);
+        var survivingIds = survivors.stream().map(ProjectileBody::projectileId)
+                .collect(java.util.stream.Collectors.toSet());
+        surfaceContactsByProjectileId.keySet().retainAll(survivingIds);
     }
 
     private ImpactCandidate firstImpact(
@@ -380,6 +403,14 @@ public final class LiveTacticalBattleWeaponRuntime {
                             "target start position");
             double halfLength = target.hull().boundingDimensionsM().lengthM() * 0.5d;
             double halfWidth = target.hull().boundingDimensionsM().widthM() * 0.5d;
+            TreeSet<Long> contacts = surfaceContactsByProjectileId.get(body.projectileId());
+            if (contacts != null && contacts.contains(target.spec().entityId())) {
+                boolean stillInside = Math.abs(body.xM() - start.xM) <= halfLength + EPSILON
+                        && Math.abs(body.yM() - start.yM) <= halfWidth + EPSILON;
+                if (stillInside) continue;
+                contacts.remove(target.spec().entityId());
+                if (contacts.isEmpty()) surfaceContactsByProjectileId.remove(body.projectileId());
+            }
             var fraction = TacticalCollisionGeometry.firstSegmentAabbHitFraction(
                     body.xM() - start.xM,
                     body.yM() - start.yM,
@@ -730,13 +761,15 @@ public final class LiveTacticalBattleWeaponRuntime {
      * @param sources canonical stable-entity weapon projections
      * @param targets canonical stable-entity protection projections
      * @param projectiles current independent physical projectile bodies
+     * @param surfaceContactsByProjectileId hull surfaces already resolved for residuals still traversing them
      */
     public record BattleWeaponFingerprint(
             long tick,
             LiveTacticalBattleControlRuntime.BattleControlFingerprint controlFingerprint,
             List<SourceWeaponFingerprint> sources,
             List<TargetProtectionFingerprint> targets,
-            List<ProjectileBody> projectiles) {
+            List<ProjectileBody> projectiles,
+            Map<Long, List<Long>> surfaceContactsByProjectileId) {
         /**
          * Validates and freezes the whole-battle weapon projection.
          *
@@ -745,6 +778,7 @@ public final class LiveTacticalBattleWeaponRuntime {
          * @param sources canonical stable-entity weapon projections
          * @param targets canonical stable-entity protection projections
          * @param projectiles current independent physical projectile bodies
+         * @param surfaceContactsByProjectileId hull surfaces already resolved for residuals still traversing them
          */
         public BattleWeaponFingerprint {
             if (tick < 0L) {
@@ -754,6 +788,10 @@ public final class LiveTacticalBattleWeaponRuntime {
             sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
             targets = List.copyOf(Objects.requireNonNull(targets, "targets"));
             projectiles = List.copyOf(Objects.requireNonNull(projectiles, "projectiles"));
+            var contacts = new TreeMap<Long, List<Long>>();
+            Objects.requireNonNull(surfaceContactsByProjectileId, "surfaceContactsByProjectileId")
+                    .forEach((id, targetsForBody) -> contacts.put(id, List.copyOf(targetsForBody)));
+            surfaceContactsByProjectileId = Collections.unmodifiableMap(contacts);
         }
     }
 }

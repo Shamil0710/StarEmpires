@@ -5,6 +5,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.Collections;
+
+import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader;
 
 /**
  * Deterministic M22.6 freeze-manifest projection over the accepted core pair.
@@ -14,9 +19,9 @@ import java.util.List;
  */
 public final class Stage22CorePairFreezeManifest {
     /** Freeze schema version. */
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     /** Semantic freeze-manifest version. */
-    public static final String MANIFEST_VERSION = "stage22.core_pair_freeze_manifest.v1";
+    public static final String MANIFEST_VERSION = "stage22.core_pair_freeze_manifest.v2";
 
     private Stage22CorePairFreezeManifest() {
         throw new AssertionError("utility class");
@@ -40,6 +45,17 @@ public final class Stage22CorePairFreezeManifest {
         List<String> scenarioVersions = Stage22CorePairBalanceCatalog.scenarios().stream()
                 .map(Stage22CorePairBalanceCatalog.ScenarioDefinition::version)
                 .toList();
+        var runtime = Stage22CorePairWeaponRuntimeCatalogLoader.loadCombined();
+        Map<String, String> runtimePins = Map.of(
+                "engineering", runtime.engineering().getFingerprint(),
+                "ammunition", runtime.ammunition().getFingerprint(),
+                "launchers", runtime.launchers().getFingerprint(),
+                "engineering.schemaMigration", runtime.engineering().getSchemaVersion() + ":"
+                        + runtime.engineering().getMigrationVersion(),
+                "ammunition.schemaMigration", runtime.ammunition().getSchemaVersion() + ":"
+                        + runtime.ammunition().getMigrationVersion(),
+                "launchers.schemaMigration", runtime.launchers().getSchemaVersion() + ":"
+                        + runtime.launchers().getMigrationVersion());
 
         Snapshot provisional = new Snapshot(
                 SCHEMA_VERSION,
@@ -67,6 +83,7 @@ public final class Stage22CorePairFreezeManifest {
                 coreProfiles.schemaVersion(),
                 Stage22IndustrialUnionProductionState.CURRENT_VERSION,
                 scenarioVersions,
+                runtimePins,
                 "");
         return provisional.withFingerprint(computeFingerprint(provisional));
     }
@@ -97,7 +114,8 @@ public final class Stage22CorePairFreezeManifest {
                 Integer.toString(value.empireProfileSchemaVersion()),
                 Integer.toString(value.coreProfileSchemaVersion()),
                 Integer.toString(value.unionProductionStateVersion()),
-                String.join(",", value.scenarioVersions()));
+                String.join(",", value.scenarioVersions()),
+                value.runtimeContentFingerprints().toString());
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(canonical.getBytes(StandardCharsets.UTF_8)));
@@ -134,6 +152,7 @@ public final class Stage22CorePairFreezeManifest {
      * @param coreProfileSchemaVersion shared profile schema version
      * @param unionProductionStateVersion Industrial Union production sidecar save version
      * @param scenarioVersions exact B00-B20 scenario version IDs
+     * @param runtimeContentFingerprints combined runtime engineering, weapon and schema/migration pins
      * @param freezeFingerprint aggregate semantic freeze fingerprint
      */
     public record Snapshot(
@@ -162,6 +181,7 @@ public final class Stage22CorePairFreezeManifest {
             int coreProfileSchemaVersion,
             int unionProductionStateVersion,
             List<String> scenarioVersions,
+            Map<String, String> runtimeContentFingerprints,
             String freezeFingerprint) {
         /**
          * Freezes scenario-version ordering.
@@ -191,10 +211,12 @@ public final class Stage22CorePairFreezeManifest {
          * @param coreProfileSchemaVersion shared profile schema version
          * @param unionProductionStateVersion Industrial Union production sidecar save version
          * @param scenarioVersions exact B00-B20 scenario version IDs
+         * @param runtimeContentFingerprints combined runtime engineering, weapon and schema/migration pins
          * @param freezeFingerprint aggregate semantic freeze fingerprint
          */
         public Snapshot {
             scenarioVersions = List.copyOf(scenarioVersions);
+            runtimeContentFingerprints = Collections.unmodifiableMap(new TreeMap<>(runtimeContentFingerprints));
         }
 
         private Snapshot withFingerprint(String fingerprint) {
@@ -210,7 +232,7 @@ public final class Stage22CorePairFreezeManifest {
                     empireProfileFingerprint, coreProfileCatalogFingerprint,
                     empireCharacterFingerprint, unionCharacterFingerprint,
                     empireProfileSchemaVersion, coreProfileSchemaVersion, unionProductionStateVersion,
-                    scenarioVersions, fingerprint);
+                    scenarioVersions, runtimeContentFingerprints, fingerprint);
         }
     }
 }

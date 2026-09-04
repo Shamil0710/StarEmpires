@@ -117,3 +117,25 @@ The repair probe exposed two integration defects that catalog-only tests did not
 `target/stage22-evidence/` retains source SHA, dirty-tree flag, content fingerprint, raw observations
 and limitations. CI archives these small reports on the exact tested checkout, including the PR
 merge-checkout SHA where applicable. A dirty local discovery run is not freeze evidence.
+
+### Tactical controls and a causal collision defect
+
+`Stage22CorePairTacticalProbe` runs both exact destroyer fits with the common Stage-19 control,
+sensor, flight, launcher, protection and compartment-damage authorities. Thirty paired initial
+geometries cover normal engagement, either faction's destroyed sensor and a four-round magazine.
+Reports retain raw starting mass/crew/power/ammunition/reaction-mass burdens and timed state vectors.
+The common tactical policy is explicitly identified; equal role is not equal economic burden.
+An engineering-state save at the scenario start must reproduce the complete sampled continuation.
+This does not claim that an in-flight battle has a save/restore contract.
+
+The first physical traces exposed repeated armor/shield settlement while a penetrating residual
+was still traversing the same hull. A focused reproducer observed two impacts for one crossing.
+The shared Stage-19 weapon runtime now remembers resolved surface contacts until the residual
+leaves that hull, preserves the physical residual, and permits a later re-entry. The contact state
+is included in deterministic runtime fingerprints. Both native and externally resolved residuals
+are covered; no faction modifier or projectile deletion hides the repeated-impact defect.
+
+Freeze discovery schema 2 also includes the **runtime-completed** engineering catalog, ammunition,
+launchers and their schema/migration versions. Raw package fingerprints alone omitted the executable
+sensor/shield mode projection and the launcher/ammunition catalogs. These additional values remain
+discovery evidence until the full balance and human-review gates are satisfied.

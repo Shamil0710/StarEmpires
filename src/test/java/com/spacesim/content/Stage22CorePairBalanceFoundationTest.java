@@ -78,6 +78,10 @@ class Stage22CorePairBalanceFoundationTest {
         assertEquals(Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID, first.empireFactionId());
         assertEquals(Stage22CorePairBalanceEvidence.UNION_FACTION_ID, first.unionFactionId());
         assertNotEquals(first.empirePackageFingerprint(), first.unionPackageFingerprint());
+        var runtime = com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader.loadCombined();
+        assertEquals(runtime.engineering().getFingerprint(), first.runtimeContentFingerprints().get("engineering"));
+        assertEquals(runtime.ammunition().getFingerprint(), first.runtimeContentFingerprints().get("ammunition"));
+        assertEquals(runtime.launchers().getFingerprint(), first.runtimeContentFingerprints().get("launchers"));
 
         System.out.println("M22_6_DISCOVERY_FREEZE|aggregate|" + first.freezeFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|empire.package|" + first.empirePackageFingerprint());
@@ -90,6 +94,8 @@ class Stage22CorePairBalanceFoundationTest {
         System.out.println("M22_6_DISCOVERY_FREEZE|core.profile|" + first.coreProfileCatalogFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|empire.character|" + first.empireCharacterFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|union.character|" + first.unionCharacterFingerprint());
+        first.runtimeContentFingerprints().forEach((key, value) ->
+                System.out.println("M22_6_DISCOVERY_FREEZE|runtime." + key + "|" + value));
     }
 
     private static void assertPaired(
