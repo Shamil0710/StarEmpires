@@ -337,8 +337,29 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
     }
 
     private static void awaitJump(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, FleetId fleetId) {
-        for (int i = 0; i < 800 && runtime.world().findFleetJump(fleetId).isPresent(); i++) runtime.advanceFrame(0.25f);
-        assertTrue(runtime.world().findFleetJump(fleetId).isEmpty());
+        int phaseTransitions = 0;
+        while (true) {
+            var initial = runtime.world().findFleetJump(fleetId);
+            if (initial.isEmpty()) return;
+            var phase = initial.orElseThrow();
+            long phaseStartedTick = phase.phaseStartedTick();
+            long phaseDeadlineTick = phase.phaseEndsTick() + 1L;
+            while (true) {
+                var current = runtime.world().findFleetJump(fleetId);
+                if (current.isEmpty()) return;
+                var state = current.orElseThrow();
+                if (state.phase() != phase.phase() || state.phaseStartedTick() != phaseStartedTick) break;
+                long worldTick = runtime.world().getAuthoritativeWorldTick();
+                if (worldTick > phaseDeadlineTick) {
+                    throw new AssertionError("ordinary FTL phase exceeded its authoritative phaseEndsTick: " + state);
+                }
+                runtime.advanceFrame(0.25f);
+            }
+            phaseTransitions++;
+            if (phaseTransitions > 8) {
+                throw new AssertionError("ordinary FTL jump exceeded bounded canonical phase transitions");
+            }
+        }
     }
 
     private static void awaitCooldown(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, FleetId fleetId) {
