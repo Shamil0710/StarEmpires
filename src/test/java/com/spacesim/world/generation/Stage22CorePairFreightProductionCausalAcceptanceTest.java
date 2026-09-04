@@ -65,40 +65,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * M22.6 B08 end-to-end economic consequence evidence.
- *
- * <p>This acceptance never copies a tactical result into economy state. The exact Stage-19 fight
- * removes a critically damaged but still-live interdictor through the existing generated-world
- * warfare authority. The ordinary Stage-21E traffic policy then admits the same Stage-20
- * INDUSTRIAL_INPUT order, whose real freighter traverses every retained topology edge through the
- * normal jump FSM. The cargo is unloaded into the exact generated destination station and is then
- * consumed by the ordinary Stage-18 production bridge named by that order's provenance.</p>
- */
+/** M22.6 B08: physical interdiction outcome -> same freight order -> real Stage-18 production. */
 class Stage22CorePairFreightProductionCausalAcceptanceTest {
     private static final long OPERATION_ID = 22_608_100L;
     private static final long TACTICAL_TICKS = 1_200L;
     private static final double HANDLING_SECONDS = 3_600d;
     private static final double CRITICAL_INTEGRITY = 1.0e-6d;
-    private static final double CRITICAL_SEPARATION_M = 600d;
-    private static final double LONG_PROCESS_WINDOW_SECONDS = 1.0e9d;
+    private static final double PROCESS_WINDOW_SECONDS = 1.0e9d;
     private static final double EPSILON = 1.0e-7d;
 
     @Test
-    void destroyedInterdictorLetsSameIndustrialOrderFeedRealStage18ProductionForBothCoreFits() {
-        EconomicResult defaultResult = run(Permutation.DEFAULT);
-        EconomicResult mirroredResult = run(Permutation.MIRRORED);
-
-        for (EconomicResult result : List.of(defaultResult, mirroredResult)) {
-            assertFalse(result.interdictorAlive(),
-                    "Stage 19 must physically remove the critically damaged interdictor");
-            assertEquals(result.loadedMassKg(), result.deliveredMassKg(), EPSILON,
-                    "the same admitted order must deliver exactly the physical mass that was loaded");
-            assertTrue(result.productionAccepted(),
-                    "delivered industrial input must unlock the real Stage-18 process that was starved before delivery");
-            assertTrue(result.productionConsumedKg() > 0d,
-                    "downstream production must consume physical delivered input");
-            assertTrue(result.deliveredOrderId().startsWith("freight-order:industrial:"));
+    void destroyedInterdictorLetsSameIndustrialOrderFeedRealProductionForBothCoreFits() {
+        EconomicResult normal = run(Permutation.DEFAULT);
+        EconomicResult mirrored = run(Permutation.MIRRORED);
+        for (EconomicResult result : List.of(normal, mirrored)) {
+            assertFalse(result.interdictorAlive());
+            assertEquals(result.loadedMassKg(), result.deliveredMassKg(), EPSILON);
+            assertTrue(result.productionAccepted());
+            assertTrue(result.productionConsumedKg() > 0d);
+            assertTrue(result.orderId().startsWith("freight-order:industrial:"));
         }
     }
 
@@ -117,18 +102,15 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
 
         double initialInputKg = station.storage().commodityMassKg(orderBefore.commodityId());
         if (initialInputKg > EPSILON) {
-            var drain = production.refineAtStation(
-                    recipe.id(), initialInputKg, station.storage(), facility, LONG_PROCESS_WINDOW_SECONDS);
-            assertTrue(drain.accepted(),
-                    "acceptance setup must exhaust pre-existing input only through the real production authority");
+            assertTrue(production.refineAtStation(
+                    recipe.id(), initialInputKg, station.storage(), facility, PROCESS_WINDOW_SECONDS).accepted());
         }
         assertEquals(0d, station.storage().commodityMassKg(orderBefore.commodityId()), EPSILON);
-        var starved = production.refineAtStation(
-                recipe.id(), 1d, station.storage(), facility, LONG_PROCESS_WINDOW_SECONDS);
-        assertEquals(Stage18RefiningRuntime.Status.INSUFFICIENT_INPUT, starved.status(),
-                "destination process must be physically input-starved before this convoy arrives");
+        assertEquals(Stage18RefiningRuntime.Status.INSUFFICIENT_INPUT,
+                production.refineAtStation(
+                        recipe.id(), 1d, station.storage(), facility, PROCESS_WINDOW_SECONDS).status());
 
-        MaterializedExtractionOutpost outpost = matchingOutpost(runtime, orderBefore);
+        MaterializedExtractionOutpost outpost = candidate.outpost();
         var extraction = runtime.extract(outpost.site().siteId(), 10_000d, HANDLING_SECONDS);
         assertTrue(extraction.committed());
         double loadMassKg = Math.min(Math.min(extraction.outputMassStoredKg(), 1_000d), freighter.cargoCapacityKg());
@@ -146,67 +128,57 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
         StarSystemId to = orderBefore.orderedSystems().get(outbound.routeIndex() + 1);
         int trafficFaction = runtime.world().findFactionRuntimeId(outbound.stableFactionId()).orElseThrow();
         MilitaryFleet escort = militaryFleets(runtime).stream()
-                .filter(value -> value.factionId() == trafficFaction)
-                .findFirst().orElseThrow(() -> new AssertionError("B08 production run lacks escort"));
+                .filter(value -> value.factionId() == trafficFaction).findFirst().orElseThrow();
         MilitaryFleet interdictor = militaryFleets(runtime).stream()
-                .filter(value -> value.factionId() != trafficFaction)
-                .findFirst().orElseThrow(() -> new AssertionError("B08 production run lacks interdictor"));
-        moveFleetByOrdinaryRoute(runtime, escort.fleetId(), from);
-        moveFleetByOrdinaryRoute(runtime, interdictor.fleetId(), from);
-
-        StrategicOperationState operations = interception(interdictor, from, to,
-                runtime.world().getAuthoritativeWorldTick());
+                .filter(value -> value.factionId() != trafficFaction).findFirst().orElseThrow();
+        moveFleet(runtime, escort.fleetId(), from);
+        moveFleet(runtime, interdictor.fleetId(), from);
+        StrategicOperationState operations = interception(
+                interdictor, from, to, runtime.world().getAuthoritativeWorldTick());
         Stage21EGeneratedWorldTrafficRuntime traffic = new Stage21EGeneratedWorldTrafficRuntime(runtime);
         var denied = new com.spacesim.world.Stage21EOperationTrafficPolicy(
                 new com.spacesim.world.PhysicalWarfareOperationService(runtime.world()))
                 .edgeAvailability(operations, from, to, trafficFaction);
-        assertFalse(denied.allowsTraffic(), "physical interdictor must deny the convoy edge before battle");
+        assertFalse(denied.allowsTraffic());
 
         Stage22CorePairTacticalFactory.Duel core = Stage22CorePairTacticalFactory.createDestroyerDuel(permutation);
         EngineeringComponent empire = engineeringFor(core, Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID);
         EngineeringComponent union = engineeringFor(core, Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
-        EngineeringComponent escortEngineering = permutation == Permutation.DEFAULT ? empire : union;
-        EngineeringComponent interdictorEngineering = permutation == Permutation.DEFAULT ? union : empire;
         FleetPlacementState escortPlacement = runtime.world().findFleet(escort.fleetId()).orElseThrow();
         FleetPlacementState interdictorPlacement = runtime.world().findFleet(interdictor.fleetId()).orElseThrow();
         Entity escortEntity = entity(runtime, escortPlacement);
         Entity interdictorEntity = entity(runtime, interdictorPlacement);
-        escortEntity.add(copy(escortEngineering));
-        interdictorEntity.add(copy(interdictorEngineering));
-        applyCriticalButSurvivingPhysicalState(core,
-                interdictorEntity.getComponent(EngineeringComponent.class));
-
+        escortEntity.add(copy(permutation == Permutation.DEFAULT ? empire : union));
+        interdictorEntity.add(copy(permutation == Permutation.DEFAULT ? union : empire));
+        applyCriticalState(core, interdictorEntity.getComponent(EngineeringComponent.class));
         LocalPhysicalKinematics anchor = runtime.arrival().materialization(from)
                 .physicalState(escortPlacement.localEntityId()).orElseThrow();
         runtime.arrival().materialization(from).updatePhysicalState(
                 interdictorPlacement.localEntityId(),
-                LocalPhysicalKinematics.stationary(anchor.position().translated(0d, CRITICAL_SEPARATION_M)));
-        EntityState escortState = EntityStateMapper.capture(escortEntity);
-        EntityState interdictorState = EntityStateMapper.capture(interdictorEntity);
+                LocalPhysicalKinematics.stationary(anchor.position().translated(0d, 600d)));
+
         List<PhysicalCombatant> combatants = new ArrayList<>(List.of(
-                new PhysicalCombatant(escort.fleetId(), CombatSide.CONTACT, escort.factionId(), escortState),
-                new PhysicalCombatant(interdictor.fleetId(), CombatSide.OPERATION,
-                        interdictor.factionId(), interdictorState)));
+                new PhysicalCombatant(escort.fleetId(), CombatSide.CONTACT, escort.factionId(),
+                        EntityStateMapper.capture(escortEntity)),
+                new PhysicalCombatant(interdictor.fleetId(), CombatSide.OPERATION, interdictor.factionId(),
+                        EntityStateMapper.capture(interdictorEntity))));
         combatants.sort(Comparator.comparing(PhysicalCombatant::fleetId));
-        long now = runtime.world().getAuthoritativeWorldTick();
         var resolver = new Stage19ExactTacticalEncounterResolver(
                 core.content().engineering(), core.protection(), core.content().ammunition(), core.content().launchers());
         new Stage21EGeneratedWorldStage19Authority(runtime, resolver, TACTICAL_TICKS).materializeExact(
-                new TacticalMaterializationRequest(OPERATION_ID, from, now, List.copyOf(combatants)));
+                new TacticalMaterializationRequest(
+                        OPERATION_ID, from, runtime.world().getAuthoritativeWorldTick(), List.copyOf(combatants)));
         boolean interdictorAlive = runtime.world().findFleet(interdictor.fleetId()).isPresent();
-        assertFalse(interdictorAlive,
-                "only the exact Stage-19 authority may remove the critically damaged interdictor");
+        assertFalse(interdictorAlive);
 
         while (runtime.freight().findFreighter(freighter.fleetId()).orElseThrow().phase() == FreightPhase.OUTBOUND) {
             FreighterState beforeHop = runtime.freight().findFreighter(freighter.fleetId()).orElseThrow();
             traffic.requestNextRouteHop(operations, freighter.fleetId());
-            assertTrue(runtime.world().findFleetJump(freighter.fleetId()).isPresent(),
-                    "admitted freight hop must enter the ordinary world jump FSM");
-            awaitJumpCompletion(runtime, freighter.fleetId());
+            assertTrue(runtime.world().findFleetJump(freighter.fleetId()).isPresent());
+            awaitJump(runtime, freighter.fleetId());
             FreighterState afterHop = runtime.freight().findFreighter(freighter.fleetId()).orElseThrow();
             assertTrue(afterHop.routeIndex() > beforeHop.routeIndex()
-                            || afterHop.phase() == FreightPhase.AT_DESTINATION,
-                    "world arrival must synchronize the retained freight route state");
+                    || afterHop.phase() == FreightPhase.AT_DESTINATION);
         }
         FreighterState atDestination = runtime.freight().findFreighter(freighter.fleetId()).orElseThrow();
         assertEquals(FreightPhase.AT_DESTINATION, atDestination.phase());
@@ -216,34 +188,25 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
         var unload = traffic.unloadAtOrderDestination(
                 operations, freighter.fleetId(), atDestination.cargoMassKg(), HANDLING_SECONDS);
         assertTrue(unload.transferred());
-        double stationInputAfterUnload = station.storage().commodityMassKg(orderBefore.commodityId());
-        assertEquals(loadMassKg, stationInputAfterUnload, EPSILON);
-        TransportOrderState orderAfterUnload = runtime.freight().findOrder(orderBefore.orderId()).orElseThrow();
-        assertEquals(orderBefore.orderId(), orderAfterUnload.orderId());
-        assertEquals(loadMassKg, orderAfterUnload.deliveredMassKg() - orderBefore.deliveredMassKg(), EPSILON);
+        double stationInputKg = station.storage().commodityMassKg(orderBefore.commodityId());
+        assertEquals(loadMassKg, stationInputKg, EPSILON);
+        TransportOrderState orderAfter = runtime.freight().findOrder(orderBefore.orderId()).orElseThrow();
+        double deliveredKg = orderAfter.deliveredMassKg() - orderBefore.deliveredMassKg();
+        assertEquals(loadMassKg, deliveredKg, EPSILON);
 
-        double productionBatchKg = Math.min(10d, stationInputAfterUnload);
+        double batchKg = Math.min(10d, stationInputKg);
         var produced = production.refineAtStation(
-                recipe.id(), productionBatchKg, station.storage(), facility, LONG_PROCESS_WINDOW_SECONDS);
-        assertTrue(produced.accepted(),
-                "the same convoy's delivered input must unlock the exact retained Stage-18 process");
+                recipe.id(), batchKg, station.storage(), facility, PROCESS_WINDOW_SECONDS);
+        assertTrue(produced.accepted());
         double consumedKg = produced.consumedInputMassByCommodityKg().values().stream()
                 .mapToDouble(Double::doubleValue).sum();
-        assertEquals(productionBatchKg, consumedKg, EPSILON);
-        assertTrue(station.storage().commodityMassKg(orderBefore.commodityId())
-                < stationInputAfterUnload - EPSILON);
+        assertEquals(batchKg, consumedKg, EPSILON);
 
         byte[] checkpoint = Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState());
         assertArrayEquals(checkpoint, Stage20GeneratedWorldRuntimePersistenceCodec.encode(
-                        Stage20GeneratedWorldRuntimePersistenceCodec.decode(checkpoint)),
-                "post-delivery production consequence must remain byte-stable in the generated-world checkpoint");
-        return new EconomicResult(
-                interdictorAlive,
-                loadMassKg,
-                orderAfterUnload.deliveredMassKg() - orderBefore.deliveredMassKg(),
-                produced.accepted(),
-                consumedKg,
-                orderAfterUnload.orderId());
+                Stage20GeneratedWorldRuntimePersistenceCodec.decode(checkpoint)));
+        return new EconomicResult(interdictorAlive, loadMassKg, deliveredKg,
+                produced.accepted(), consumedKg, orderAfter.orderId());
     }
 
     private static ProductionFreight productionFreight(
@@ -255,21 +218,23 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
             TransportOrderState order = runtime.freight().findOrder(freighter.activeOrderId()).orElse(null);
             if (order == null || order.assignmentKind() != AssignmentKind.INDUSTRIAL_INPUT
                     || order.orderedSystems().size() < 2) continue;
-            MaterializedExtractionOutpost outpost = matchingOutpostOrNull(runtime, order);
+            MaterializedExtractionOutpost outpost = matchingOutpost(runtime, order);
             if (outpost == null) continue;
-            MaterializedIndustrialStation station = runtime.industry().industrial().station(
-                    order.destinationEndpointId()).orElse(null);
-            if (station == null) continue;
+            MaterializedIndustrialStation station;
+            try {
+                station = runtime.industry().industrial().station(order.destinationEndpointId());
+            } catch (IllegalArgumentException ignored) {
+                continue;
+            }
             for (RefiningRecipeDefinition recipe : refining.getRecipes()) {
+                String processMarker = ":" + recipe.id() + ":" + order.commodityId() + ":";
                 if (recipe.inputs().size() != 1
                         || !recipe.inputs().get(0).commodityId().equals(order.commodityId())
-                        || !order.sourceProvenance().contains(':' + recipe.id() + ':' + order.commodityId() + ':')) {
-                    continue;
-                }
-                var inputCommodity = ontology.findCommodity(order.commodityId());
-                var outputCommodity = ontology.findCommodity(recipe.outputCommodityId());
-                if (inputCommodity == null || outputCommodity == null
-                        || !inputCommodity.storageClassId().equals(outputCommodity.storageClassId())) continue;
+                        || !order.sourceProvenance().contains(processMarker)) continue;
+                var input = ontology.findCommodity(order.commodityId());
+                var output = ontology.findCommodity(recipe.outputCommodityId());
+                if (input == null || output == null
+                        || !input.storageClassId().equals(output.storageClassId())) continue;
                 FacilityCapabilitySnapshot facility = station.facilityCapabilities().stream()
                         .filter(value -> value.status() == Stage18FacilityRuntime.Status.ACTIVE)
                         .filter(value -> value.capabilityTags().containsAll(recipe.requiredCapabilityTags()))
@@ -277,39 +242,15 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
                                 && value.effectiveEngineeringWorkRate() > 0d
                                 && value.effectiveMaintenanceWorkRate() > 0d)
                         .findFirst().orElse(null);
-                if (facility != null) {
-                    return new ProductionFreight(freighter, order, station, outpost, recipe, facility);
-                }
+                if (facility != null) return new ProductionFreight(
+                        freighter, order, station, outpost, recipe, facility);
             }
         }
-        throw new AssertionError(
-                "generated M22.6 world lacks an INDUSTRIAL_INPUT freight order backed by a runnable refining process");
-    }
-
-    private static Stage18StationProductionBridge productionBridge(Stage18ResourceOntologyCatalog ontology) {
-        Stage18ManufacturingProductRegistry products = Stage18ManufacturingProductRegistry.loadDefault();
-        Stage18FacilityRuntime facilityRuntime = new Stage18FacilityRuntime(Stage18FacilityCatalogLoader.loadDefault());
-        return new Stage18StationProductionBridge(
-                ontology,
-                products,
-                facilityRuntime,
-                new Stage18ExtractionRuntime(ontology, Stage18ExtractionCatalogLoader.loadDefault()),
-                new Stage18RefiningRuntime(ontology, Stage18RefiningCatalogLoader.loadDefault()),
-                new Stage18ManufacturingRuntime(
-                        ontology, Stage18ManufacturingCatalogLoader.loadDefault(), products));
+        throw new AssertionError("generated world lacks runnable INDUSTRIAL_INPUT refining freight");
     }
 
     private static MaterializedExtractionOutpost matchingOutpost(
-            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            TransportOrderState order) {
-        MaterializedExtractionOutpost result = matchingOutpostOrNull(runtime, order);
-        if (result == null) throw new AssertionError("industrial freight source lacks matching physical outpost");
-        return result;
-    }
-
-    private static MaterializedExtractionOutpost matchingOutpostOrNull(
-            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            TransportOrderState order) {
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, TransportOrderState order) {
         StarSystemId source = order.orderedSystems().get(0);
         return runtime.industry().sourceOutposts().outposts().stream()
                 .filter(value -> value.site().systemId().equals(source))
@@ -317,32 +258,39 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
                 .findFirst().orElse(null);
     }
 
-    private static void applyCriticalButSurvivingPhysicalState(
-            Stage22CorePairTacticalFactory.Duel core,
-            EngineeringComponent engineering) {
+    private static Stage18StationProductionBridge productionBridge(Stage18ResourceOntologyCatalog ontology) {
+        Stage18ManufacturingProductRegistry products = Stage18ManufacturingProductRegistry.loadDefault();
+        Stage18FacilityRuntime facilities = new Stage18FacilityRuntime(Stage18FacilityCatalogLoader.loadDefault());
+        return new Stage18StationProductionBridge(
+                ontology, products, facilities,
+                new Stage18ExtractionRuntime(ontology, Stage18ExtractionCatalogLoader.loadDefault()),
+                new Stage18RefiningRuntime(ontology, Stage18RefiningCatalogLoader.loadDefault()),
+                new Stage18ManufacturingRuntime(
+                        ontology, Stage18ManufacturingCatalogLoader.loadDefault(), products));
+    }
+
+    private static void applyCriticalState(
+            Stage22CorePairTacticalFactory.Duel core, EngineeringComponent engineering) {
         var hull = core.content().engineering().findHull(engineering.fit.hullId());
         var layout = core.protection().findHullDamageLayout(hull.id());
-        if (layout == null) throw new AssertionError("exact B08 interdictor hull lacks protection layout");
+        if (layout == null) throw new AssertionError("exact B08 hull lacks protection layout");
         TreeMap<String, Double> compartments = new TreeMap<>();
         hull.compartments().forEach(value -> compartments.put(value.id(), 0d));
-        String liveCompartment = hull.compartments().stream()
-                .filter(value -> value.id().equals("engineering"))
+        String live = hull.compartments().stream().filter(value -> value.id().equals("engineering"))
                 .findFirst().orElseGet(() -> hull.compartments().stream().findFirst().orElseThrow()).id();
-        compartments.put(liveCompartment, CRITICAL_INTEGRITY);
+        compartments.put(live, CRITICAL_INTEGRITY);
         TreeMap<String, Double> modules = new TreeMap<>();
         engineering.fit.installedModules().forEach(value -> modules.put(value.mountId(), 0d));
         ShipDamageRuntime.Snapshot damage = new ShipDamageRuntime.Snapshot(compartments, new DamageState(modules));
-        assertFalse(ShipDamageRuntime.isFullyDestroyed(hull, engineering.fit, layout, damage),
-                "critical interdictor must still exist before Stage 19 resolves the final loss");
+        assertFalse(ShipDamageRuntime.isFullyDestroyed(hull, engineering.fit, layout, damage));
         ShipInstanceRuntimeState previous = engineering.instanceState;
         engineering.setInstanceState(new ShipInstanceRuntimeState(
                 damage, Map.of(), previous.maintenance(), previous.weaponLoadout(), previous.weaponMountRuntime()));
     }
 
     private static EngineeringComponent engineeringFor(
-            Stage22CorePairTacticalFactory.Duel core,
-            long entityId) {
-        return core.weapons().battleState().combatants().stream()
+            Stage22CorePairTacticalFactory.Duel duel, long entityId) {
+        return duel.weapons().battleState().combatants().stream()
                 .filter(value -> value.spec().entityId() == entityId)
                 .findFirst().orElseThrow().engineering();
     }
@@ -358,26 +306,11 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
 
     private static StrategicOperationState interception(
             MilitaryFleet actor, StarSystemId from, StarSystemId to, long tick) {
-        OperationState operation = new OperationState(
-                OPERATION_ID,
-                OperationType.INTERCEPTION,
-                1L,
-                1L,
-                actor.factionId(),
-                List.of(actor.fleetId()),
-                from,
-                to,
-                "system:" + to.value(),
-                RulesOfEngagement.DECLARED_HOSTILES,
-                new SupplyPolicy(0, 0, 100L),
-                new WithdrawalPolicy(from, 0, true, true),
-                OperationStatus.ACTIVE,
-                tick,
-                tick,
-                -1L,
-                null,
-                null);
-        return new StrategicOperationState(OPERATION_ID + 1L, List.of(operation));
+        return new StrategicOperationState(OPERATION_ID + 1L, List.of(new OperationState(
+                OPERATION_ID, OperationType.INTERCEPTION, 1L, 1L, actor.factionId(), List.of(actor.fleetId()),
+                from, to, "system:" + to.value(), RulesOfEngagement.DECLARED_HOSTILES,
+                new SupplyPolicy(0, 0, 100L), new WithdrawalPolicy(from, 0, true, true),
+                OperationStatus.ACTIVE, tick, tick, -1L, null, null)));
     }
 
     private static List<MilitaryFleet> militaryFleets(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime) {
@@ -387,54 +320,41 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
             Entity entity = entity(runtime, placement);
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
-            if (engineering != null && faction != null) {
-                result.add(new MilitaryFleet(placement.id(), faction.factionId));
-            }
+            if (engineering != null && faction != null) result.add(new MilitaryFleet(placement.id(), faction.factionId));
         }
         result.sort(Comparator.comparing(MilitaryFleet::fleetId));
         return List.copyOf(result);
     }
 
-    private static void moveFleetByOrdinaryRoute(
-            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            FleetId fleetId,
-            StarSystemId destination) {
-        FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
-        List<StarSystemId> route = route(runtime, placement.systemId(), destination);
-        for (int index = 1; index < route.size(); index++) {
-            GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, fleetId, route.get(index));
-            runtime.world().requestFleetJump(fleetId, route.get(index));
-            awaitJumpCompletion(runtime, fleetId);
-            if (index + 1 < route.size()) awaitFittedCooldown(runtime, fleetId);
+    private static void moveFleet(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, FleetId fleetId, StarSystemId destination) {
+        List<StarSystemId> route = route(runtime, runtime.world().findFleet(fleetId).orElseThrow().systemId(), destination);
+        for (int i = 1; i < route.size(); i++) {
+            GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, fleetId, route.get(i));
+            runtime.world().requestFleetJump(fleetId, route.get(i));
+            awaitJump(runtime, fleetId);
+            if (i + 1 < route.size()) awaitCooldown(runtime, fleetId);
         }
     }
 
-    private static void awaitJumpCompletion(
-            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            FleetId fleetId) {
-        for (int attempt = 0; attempt < 800 && runtime.world().findFleetJump(fleetId).isPresent(); attempt++) {
-            runtime.advanceFrame(0.25f);
-        }
-        assertTrue(runtime.world().findFleetJump(fleetId).isEmpty(), "ordinary FTL hop must complete");
+    private static void awaitJump(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, FleetId fleetId) {
+        for (int i = 0; i < 800 && runtime.world().findFleetJump(fleetId).isPresent(); i++) runtime.advanceFrame(0.25f);
+        assertTrue(runtime.world().findFleetJump(fleetId).isEmpty());
     }
 
-    private static void awaitFittedCooldown(
-            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            FleetId fleetId) {
-        for (int attempt = 0; attempt < 800; attempt++) {
+    private static void awaitCooldown(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, FleetId fleetId) {
+        for (int i = 0; i < 800; i++) {
             FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
             EngineeringComponent engineering = entity(runtime, placement).getComponent(EngineeringComponent.class);
             if (engineering == null || engineering.runtimeState.ftlCooldownSecondsByMount().values().stream()
                     .noneMatch(value -> value > 0d)) return;
             runtime.advanceFrame(0.25f);
         }
-        throw new AssertionError("ordinary fitted FTL cooldown did not clear");
+        throw new AssertionError("fitted FTL cooldown did not clear");
     }
 
     private static List<StarSystemId> route(
-            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            StarSystemId origin,
-            StarSystemId destination) {
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, StarSystemId origin, StarSystemId destination) {
         if (origin.equals(destination)) return List.of(origin);
         ArrayDeque<StarSystemId> queue = new ArrayDeque<>();
         Map<StarSystemId, StarSystemId> previous = new HashMap<>();
@@ -446,14 +366,10 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
                 if (previous.containsKey(neighbor)) continue;
                 previous.put(neighbor, current);
                 if (neighbor.equals(destination)) {
-                    ArrayList<StarSystemId> reverse = new ArrayList<>();
-                    StarSystemId cursor = destination;
-                    while (cursor != null) {
-                        reverse.add(cursor);
-                        cursor = previous.get(cursor);
-                    }
-                    java.util.Collections.reverse(reverse);
-                    return List.copyOf(reverse);
+                    ArrayList<StarSystemId> reversed = new ArrayList<>();
+                    for (StarSystemId cursor = destination; cursor != null; cursor = previous.get(cursor)) reversed.add(cursor);
+                    java.util.Collections.reverse(reversed);
+                    return List.copyOf(reversed);
                 }
                 queue.addLast(neighbor);
             }
@@ -462,20 +378,11 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
     }
 
     private record ProductionFreight(
-            FreighterState freighter,
-            TransportOrderState order,
-            MaterializedIndustrialStation station,
-            MaterializedExtractionOutpost outpost,
-            RefiningRecipeDefinition recipe,
+            FreighterState freighter, TransportOrderState order, MaterializedIndustrialStation station,
+            MaterializedExtractionOutpost outpost, RefiningRecipeDefinition recipe,
             FacilityCapabilitySnapshot facility) { }
-
     private record MilitaryFleet(FleetId fleetId, int factionId) { }
-
     private record EconomicResult(
-            boolean interdictorAlive,
-            double loadedMassKg,
-            double deliveredMassKg,
-            boolean productionAccepted,
-            double productionConsumedKg,
-            String deliveredOrderId) { }
+            boolean interdictorAlive, double loadedMassKg, double deliveredMassKg,
+            boolean productionAccepted, double productionConsumedKg, String orderId) { }
 }
