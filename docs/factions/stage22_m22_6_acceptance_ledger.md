@@ -17,7 +17,7 @@ remaining work; it does not redefine or waive their gates.
 | B05 route / hub loss | PARTIAL | 100 paired freight load controls, irrecoverable lost lots, alternative-route delivery and byte continuation; campaign response remains. |
 | B06 distributed raids | MISSING | Matched operational scenarios with real patrol coverage, supplies and causal traces. |
 | B07 equal-burden patrol | PARTIAL | Exact-fit common-policy tactical controls and explicit raw physical burdens; fleet/economic normalization remains. |
-| B08 escort / interdiction | MISSING | Objective-driven supported convoy scenario through ordinary fleet/logistics/warfare authorities. |
+| B08 escort / interdiction | PARTIAL | Mirrored B08 seam regression now keeps the accepted Stage-19I tactical patrol and Stage-20 physical freight halves under one paired evidence coordinate: finite ammunition/actor-bounded targeting remain valid while cargo loss, provenance, surviving delivery, persistence and no-replacement invariants remain physical. The test deliberately records `production_causal_bridge_present=0`; an ordinary gameplay authority must still make the tactical escort/interdiction outcome gate the fate of that same freight order before B08 can be IMPLEMENTED. |
 | B09 prepared defense | MISSING | Sustained preparation, reserves, support and defense outcome vectors. |
 | B10 offensive projection | MISSING | Actual transport/support burden, travel, overextension and bounded actor knowledge. |
 | B11 degraded command / sensors | PARTIAL | Both factions' sensor-loss controls exclude unseen targets and firing; command-network degradation remains. |
