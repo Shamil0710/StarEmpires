@@ -168,3 +168,20 @@ Full verification for `42ebd4cc` logged `BUILD SUCCESS`, 1,965 tests (zero failu
 skip), successful Javadoc/coverage/package and evidence upload. The workflow nevertheless ended
 `cancelled` at the job's 15-minute boundary, so it is **not** a green merge gate. The job allowance is
 now 20 minutes to include setup and cleanup; the Maven command, tests and coverage gates are unchanged.
+
+### Physical replacement
+
+`Stage22CorePairReplacementProbe` starts from a declared post-war loss obligation, opens the request
+through `SettlementRecoveryService`, and builds each exact destroyer through the ordinary Stage-18
+yard and Stage-21G commissioning authority. Empty stock and insufficient work cannot create a fleet.
+Successful commissioning consumes the complete hull-material and finished-module bill, allocates a
+fresh FleetId and leaves ammunition, reaction mass, electrical stores and shield reserves empty.
+Replaying from binary world/recovery/storage saves yields the same fleet and resource state; a
+second completion attempt cannot duplicate it. The source manufacturing and loss-producing battle
+remain explicit separate boundaries of this post-war fixture.
+
+The probe also reproduced three pre-settlement validation gaps: incompatible shield content,
+nonexistent berth system and negative operation tick could consume the build bill before failure.
+Stage-21G now validates those inputs and prepares the detached engineering component before settling
+the yard bill or allocating an ordinary entity/FleetId. Rejections preserve storage, work budget,
+world allocator state and recovery obligation.

@@ -333,6 +333,12 @@ public final class Stage21GPhysicalRecoveryService {
         if (!Float.isFinite(x) || !Float.isFinite(y)) {
             throw new IllegalArgumentException("Replacement berth coordinates must be finite");
         }
+        if (currentTick < 0L) {
+            throw new IllegalArgumentException("Replacement tick must be non-negative");
+        }
+        if (checkedWorld.findSession(checkedSystem).isEmpty()) {
+            throw new IllegalArgumentException("Replacement berth system does not exist: " + checkedSystem);
+        }
         ReplacementDemand demand = checkedRecovery.snapshot().requireReplacementDemand(demandId);
         if (demand.status() != ReplacementStatus.DEMANDED) {
             throw new IllegalStateException("Replacement demand has already left the planning queue");
@@ -350,6 +356,9 @@ public final class Stage21GPhysicalRecoveryService {
                         "Replacement owner lacks runtime faction identity: " + demand.factionContentId()));
 
         WorkPlan plan = engineering.planBuild(targetFit, Objects.requireNonNull(yard, "yard").plannerCapability());
+        // Resolve every authored runtime capability while the ship is still detached. In particular,
+        // an incompatible shield contract must not consume materials/work or allocate ordinary IDs.
+        EngineeringComponent completedEngineering = materializeNewEngineering(targetFit);
         Stage18ShipyardRuntime.SettlementResult settlement = shipyards.settleBuild(
                 plan, Objects.requireNonNull(station, "station"), yard,
                 Objects.requireNonNull(budget, "budget"));
@@ -367,7 +376,7 @@ public final class Stage21GPhysicalRecoveryService {
         try {
             BuildCompletion completion = engineering.completeBuild(
                     assetId, plan, settlement.compatibilitySettlement());
-            asset.add(materializeNewEngineering(completion.fit()));
+            asset.add(completedEngineering);
             FleetId fleetId = checkedWorld.findFleetByLocal(checkedSystem, assetId)
                     .orElseThrow(() -> new IllegalStateException(
                             "Ordinary replacement fleet registration did not produce a FleetId"));

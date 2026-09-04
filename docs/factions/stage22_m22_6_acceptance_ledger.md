@@ -23,7 +23,7 @@ remaining work; it does not redefine or waive their gates.
 | B11 degraded command / sensors | PARTIAL | Both factions' sensor-loss controls exclude unseen targets and firing; command-network degradation remains. |
 | B12 magazine-limited engagement | PARTIAL | Four physical rounds per ship are exhausted without refill; support/replenishment scenario remains. |
 | B13 rolling attrition | PARTIAL | Three committed encounters preserve damage and spent supplies; production/replacement war trajectory remains. |
-| B14 post-war recovery | PARTIAL | Exact destroyer repairs at three damage levels after paid yard-support construction; physical replacement and T50/T80 recovery curves remain. |
+| B14 post-war recovery | PARTIAL | Exact destroyer repair and paid fresh-identity replacement, with binary continuation and invalid-plan rejection; manufacturing/loss integration and T50/T80 recovery curves remain. |
 | B15 territory | PARTIAL | Existing sustained occupation/claim authority probe; actual core physical forces and campaign trajectory remain. |
 | B16 treaty / access shock | PARTIAL | Actual core participants, pending/active/breached binary saves and mirrored access/tariffs; trade-volume consequences remain. |
 | B17 adaptation / retool | PARTIAL | Finite Union retool/commonality controls; integrated actor adaptation and opportunity cost remain. |

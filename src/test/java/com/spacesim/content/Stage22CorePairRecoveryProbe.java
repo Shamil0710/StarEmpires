@@ -29,7 +29,7 @@ final class Stage22CorePairRecoveryProbe {
 
     private Stage22CorePairRecoveryProbe() { }
 
-    static Result run(boolean empire, double damageFraction) {
+    static PreparedYard prepareYard(boolean empire) {
         ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         Stage18ShipyardCatalog yards = empire ? Stage22EmpireShipyardCatalogLoader.loadDefault()
                 : Stage22IndustrialUnionShipyardCatalogLoader.loadDefault();
@@ -103,6 +103,26 @@ final class Stage22CorePairRecoveryProbe {
                 && yard.equals(yardRuntime.projectYard(installedYard, restoredNode,
                         decoded.facilities().stream().map(row -> facilityRuntime.project(row.state())).toList()));
 
+        return new PreparedYard(engineering, yards, industrial, products, yardRuntime, station, yard,
+                constructionMassKg, constructionSeconds, initiallyBlocked, facilityPersistence);
+    }
+
+    record PreparedYard(ShipEngineeringCatalog engineering, Stage18ShipyardCatalog yards,
+            ShipyardIndustrialCatalog industrial, Stage18ManufacturingProductRegistry products,
+            Stage18ShipyardRuntime yardRuntime, Stage18StationIndustrialNode station,
+            Stage18ShipyardRuntime.YardCapabilitySnapshot yard, double constructionMassKg,
+            double constructionSeconds, boolean initiallyBlocked, boolean facilityPersistence) { }
+
+    static Result run(boolean empire, double damageFraction) {
+        var setup = prepareYard(empire);
+        var engineering = setup.engineering();
+        var yards = setup.yards();
+        var industrial = setup.industrial();
+        var products = setup.products();
+        var yardRuntime = setup.yardRuntime();
+        var station = setup.station();
+        var yard = setup.yard();
+        var ontology = Stage18ResourceOntologyLoader.loadDefault();
         String fitId = empire ? "fit.empire.destroyer.screen_v1" : "fit.industrial_union.destroyer.line_v1";
         InstalledFit fit = InstalledFit.fromDemonstrator(engineering.findDemonstratorFit(fitId));
         var hull = engineering.findHull(fit.hullId());
@@ -176,8 +196,8 @@ final class Stage22CorePairRecoveryProbe {
                 .mapToDouble(Double::doubleValue).sum();
         boolean massClosed = Math.abs(consumedKg - repairInputs.values().stream().mapToDouble(Double::doubleValue).sum()) < 1e-6d
                 && supplied.snapshotCommodityMassByIdKg().values().stream().mapToDouble(Double::doubleValue).sum() < 1e-6d;
-        return new Result(constructionMassKg, constructionSeconds, seconds, consumedKg,
-                initiallyBlocked, facilityPersistence, noFreeRepair, finiteTime, continuation, continuity, massClosed,
+        return new Result(setup.constructionMassKg(), setup.constructionSeconds(), seconds, consumedKg,
+                setup.initiallyBlocked(), setup.facilityPersistence(), noFreeRepair, finiteTime, continuation, continuity, massClosed,
                 incompatibleRejected);
     }
 
