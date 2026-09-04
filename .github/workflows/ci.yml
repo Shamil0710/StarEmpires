@@ -12,7 +12,9 @@ jobs:
   verify:
     name: Java 17 verification
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The full suite plus packaging/Javadoc now takes about 15 minutes; allow setup, evidence
+    # upload and cleanup to finish after successful verification without cancelling the check.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository

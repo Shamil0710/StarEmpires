@@ -163,3 +163,8 @@ continuation evidence, not a physical trade-volume recovery curve.
 
 The [100-pair tactical archive](../evidence/stage22/m22_6/tactical-42ebd4cc/README.md) retains
 the clean-source `42ebd4cc` diagnostic runs and raw vectors. It is not a signed-off balance report.
+
+Full verification for `42ebd4cc` logged `BUILD SUCCESS`, 1,965 tests (zero failures/errors, one existing
+skip), successful Javadoc/coverage/package and evidence upload. The workflow nevertheless ended
+`cancelled` at the job's 15-minute boundary, so it is **not** a green merge gate. The job allowance is
+now 20 minutes to include setup and cleanup; the Maven command, tests and coverage gates are unchanged.
