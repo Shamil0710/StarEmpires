@@ -1,5 +1,6 @@
 package com.spacesim.content;
 
+import com.spacesim.ship.Stage22CorePairTacticalFactory;
 import com.spacesim.world.Stage22CorePairPreparedDefenseProbe;
 import com.spacesim.world.StrategicOperationService.SupplyDecision;
 import org.junit.jupiter.api.Test;
@@ -10,31 +11,50 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * M22.6 B09 prepared-defense machine evidence over ordinary Stage-21D/21E authorities.
+ * M22.6 B09 prepared-defense machine evidence over ordinary Stage-19/21 authorities.
  *
- * <p>The test deliberately archives raw readiness and reinforcement/supply outcomes rather than
- * converting doctrine labels into combat bonuses. Exact Stage-22 engineering state is projected by
- * {@code FleetReadinessEvaluator}; the ordinary reinforcement service rejects a reserve before
- * physical arrival; and the ordinary strategic-operation supply review exposes loss of prepared
- * supply as withdrawal pressure.</p>
+ * <p>The test archives raw readiness, reinforcement/supply and equal-policy tactical outcomes rather
+ * than converting doctrine labels into combat bonuses. Exact Stage-22 engineering state is projected
+ * by the ordinary readiness evaluator; reserve admission is physical-location gated; and loss of
+ * prepared supply becomes ordinary withdrawal pressure. The same seeded/mirrored Stage-19 patrol
+ * then checks the authored robustness axis while the existing paid replacement authority checks the
+ * Industrial Union's distinct replacement-throughput contest path.</p>
  *
- * <p>This closes the operational-authority seam only. The longer prepared-system endurance contour
- * and Empire-vs-Union scale/replacement outcome remain separate B09 evidence requirements.</p>
+ * <p>This does not invent a synthetic system-defense simulator. Longer multi-wave campaign endurance
+ * remains part of the wider B09/B13 campaign evidence boundary.</p>
  */
 class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
     @Test
-    void b09RunsEightPairedPreparedDefenseAuthorityCellsWithoutHiddenDefensiveGrants() {
+    void b09RunsEightPairedPreparedDefenseCellsThroughOrdinaryAuthorities() {
+        var empireReplacement = Stage22CorePairReplacementProbe.run(true);
+        var unionReplacement = Stage22CorePairReplacementProbe.run(false);
+        assertTrue(empireReplacement.valid());
+        assertTrue(unionReplacement.valid());
+        assertTrue(unionReplacement.buildSeconds() < empireReplacement.buildSeconds(),
+                "B09 contest path requires the authored Union paid-replacement throughput advantage");
+
         var vector = Stage22CorePairMachineEvidenceBatch.runScenario(
                 "B09",
                 "prepared_defense_operational_authority",
-                "stage21d-stage21e.current",
+                "stage19-stage21.current",
                 Stage22CorePairExperimentProtocol.pairedSchedule(8),
                 (scenario, variant, profile, coordinate) -> {
                     var result = Stage22CorePairPreparedDefenseProbe.run(coordinate.permutation());
                     var empire = result.empire();
                     var union = result.union();
+                    var patrol = Stage22CorePairTacticalProbe.run(
+                            Stage22CorePairTacticalProbe.Variant.PATROL,
+                            coordinate,
+                            false);
+                    var empireProtection = protection(
+                            patrol,
+                            Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID);
+                    var unionProtection = protection(
+                            patrol,
+                            Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
 
                     boolean empireReady = empire.defenderReadinessBps() > 0
                             && empire.reserveReadinessBps() > 0;
@@ -51,6 +71,12 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                     boolean supplyLossVisible = empire.unsupportedDecision()
                             == SupplyDecision.SUBMIT_ORDINARY_WITHDRAW_ORDER
                             && union.unsupportedDecision() == SupplyDecision.SUBMIT_ORDINARY_WITHDRAW_ORDER;
+                    boolean commonTacticalPolicyValid = patrol.valid();
+                    boolean empireRobustnessVisible = empireProtection.meanCompartmentIntegrity()
+                            > unionProtection.meanCompartmentIntegrity()
+                            && empireProtection.totalShieldReserveJ() > unionProtection.totalShieldReserveJ();
+                    boolean unionReplacementContestPath = unionReplacement.buildSeconds()
+                            < empireReplacement.buildSeconds();
 
                     List<String> breaches = new ArrayList<>();
                     if (!empireReady) breaches.add("b09_empire_exact_fit_not_operation_ready");
@@ -58,21 +84,33 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                     if (!arrivalGate) breaches.add("b09_reinforcement_physical_arrival_gate_drift");
                     if (!preparedContinuation) breaches.add("b09_prepared_supply_does_not_continue");
                     if (!supplyLossVisible) breaches.add("b09_supply_loss_hidden_from_operation");
+                    if (!commonTacticalPolicyValid) breaches.add("b09_common_tactical_policy_invalid");
+                    if (!empireRobustnessVisible) breaches.add("b09_empire_prepared_robustness_identity_lost");
+                    if (!unionReplacementContestPath) breaches.add("b09_union_replacement_contest_path_lost");
 
                     return new Stage22CorePairMachineEvidenceBatch.ObservationPayload(
-                            Map.of(
-                                    "empire_defender_readiness_bps", (double) empire.defenderReadinessBps(),
-                                    "empire_reserve_readiness_bps", (double) empire.reserveReadinessBps(),
-                                    "union_defender_readiness_bps", (double) union.defenderReadinessBps(),
-                                    "union_reserve_readiness_bps", (double) union.reserveReadinessBps(),
-                                    "empire_committed_participants", (double) empire.committedParticipantCount(),
-                                    "union_committed_participants", (double) union.committedParticipantCount()),
+                            Map.ofEntries(
+                                    Map.entry("empire_defender_readiness_bps", (double) empire.defenderReadinessBps()),
+                                    Map.entry("empire_reserve_readiness_bps", (double) empire.reserveReadinessBps()),
+                                    Map.entry("union_defender_readiness_bps", (double) union.defenderReadinessBps()),
+                                    Map.entry("union_reserve_readiness_bps", (double) union.reserveReadinessBps()),
+                                    Map.entry("empire_committed_participants", (double) empire.committedParticipantCount()),
+                                    Map.entry("union_committed_participants", (double) union.committedParticipantCount()),
+                                    Map.entry("empire_final_mean_integrity", empireProtection.meanCompartmentIntegrity()),
+                                    Map.entry("union_final_mean_integrity", unionProtection.meanCompartmentIntegrity()),
+                                    Map.entry("empire_final_shield_reserve_j", empireProtection.totalShieldReserveJ()),
+                                    Map.entry("union_final_shield_reserve_j", unionProtection.totalShieldReserveJ()),
+                                    Map.entry("empire_paid_replacement_seconds", empireReplacement.buildSeconds()),
+                                    Map.entry("union_paid_replacement_seconds", unionReplacement.buildSeconds())),
                             Map.of(
                                     "empire_exact_fit_ready", empireReady ? 1d : 0d,
                                     "union_exact_fit_ready", unionReady ? 1d : 0d,
                                     "reinforcement_physical_arrival_gate", arrivalGate ? 1d : 0d,
                                     "prepared_supply_continues", preparedContinuation ? 1d : 0d,
-                                    "supply_loss_visible", supplyLossVisible ? 1d : 0d),
+                                    "supply_loss_visible", supplyLossVisible ? 1d : 0d,
+                                    "common_tactical_policy_valid", commonTacticalPolicyValid ? 1d : 0d,
+                                    "empire_robustness_visible", empireRobustnessVisible ? 1d : 0d,
+                                    "union_replacement_contest_path", unionReplacementContestPath ? 1d : 0d),
                             breaches);
                 });
 
@@ -85,6 +123,9 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("reinforcement_physical_arrival_gate"));
         assertEquals(1d, vector.guardMetricMeans().get("prepared_supply_continues"));
         assertEquals(1d, vector.guardMetricMeans().get("supply_loss_visible"));
+        assertEquals(1d, vector.guardMetricMeans().get("common_tactical_policy_valid"));
+        assertEquals(1d, vector.guardMetricMeans().get("empire_robustness_visible"));
+        assertEquals(1d, vector.guardMetricMeans().get("union_replacement_contest_path"));
         assertEquals(0, vector.hardRuleBreachCount());
 
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
@@ -102,6 +143,15 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B09-prepared-defense-operational-paired-8",
                 archive,
-                "Eight paired/mirrored cells crossing exact Stage-22 engineering payloads into ordinary Stage-21D readiness and Stage-21E reinforcement/supply review. Reserve admission is physical-location gated and loss of prepared supply produces ordinary withdrawal pressure. Prepared-system endurance and Empire-versus-Union scale/replacement outcomes remain open.");
+                "Eight paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Empire retains the authored robustness contour under the same tactical policy; Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
+    }
+
+    private static com.spacesim.ship.LiveTacticalBattleWeaponRuntime.TargetProtectionFingerprint protection(
+            Stage22CorePairTacticalProbe.Evidence evidence,
+            long entityId) {
+        return evidence.last().protection().stream()
+                .filter(value -> value.entityId() == entityId)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Missing tactical protection fingerprint " + entityId));
     }
 }
