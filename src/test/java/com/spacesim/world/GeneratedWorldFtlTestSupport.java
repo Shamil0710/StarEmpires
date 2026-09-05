@@ -91,20 +91,23 @@ public final class GeneratedWorldFtlTestSupport {
             // Keep the system that owns the next physical boundary authoritative before batching time.
             checked.world().activateSystem(authoritySystem);
             long worldTick = checked.world().getAuthoritativeWorldTick();
-            if (worldTick > state.phaseEndsTick()) {
+            if (worldTick >= state.phaseEndsTick()) {
                 throw new AssertionError(
-                        "ordinary generated-world jump passed its authoritative phase boundary: " + state);
+                        "ordinary generated-world jump reached or passed an unprocessed phase boundary: " + state);
             }
 
             var active = checked.world().findSession(checked.world().getActiveSystemId()).orElseThrow();
-            long remainingTicks = state.phaseEndsTick() - worldTick;
-            while (remainingTicks > 0L) {
-                int strategicTicks = (int) Math.min((long) Integer.MAX_VALUE, remainingTicks);
+            // Leave the final fixed tick to WorldSimulation. Advancing the active session all the way
+            // to phaseEndsTick and then calling advanceFrame would invoke the transition callback at
+            // phaseEndsTick + 1, making the boundary-owning system appear ahead of authoritative time.
+            long remainingStrategicTicks = state.phaseEndsTick() - worldTick - 1L;
+            while (remainingStrategicTicks > 0L) {
+                int strategicTicks = (int) Math.min((long) Integer.MAX_VALUE, remainingStrategicTicks);
                 active.advanceStrategicSteps(strategicTicks);
-                remainingTicks -= strategicTicks;
+                remainingStrategicTicks -= strategicTicks;
             }
 
-            // One ordinary local tick lets WorldSimulation own the exact FSM boundary and live hooks.
+            // The exact boundary tick is always executed through the ordinary local simulation path.
             checked.advanceFrame(active.getClock().getFixedStepSeconds());
         }
     }
