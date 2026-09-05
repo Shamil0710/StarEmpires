@@ -4,7 +4,6 @@ import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.Stage22CorePairExperimentProtocol;
 import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpFailure;
-import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.Stage22CorePairTacticalFactory;
 import org.junit.jupiter.api.Test;
@@ -12,17 +11,13 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** M22.6 integration proof that exact core fits use the ordinary production FTL resolver. */
+/** M22.6 integration proof that exact core fits resolve through the ordinary production FTL authority. */
 class ProductionFittedJumpResolverStage22CorePairAcceptanceTest {
-    private static final int MAX_RECOVERY_STEPS = 10_000;
-    private static final double RECOVERY_STEP_SECONDS = 0.25d;
-
     @Test
-    void empireAndUnionExactFitsPlanAndCommitThroughOrdinaryProductionResolver() {
+    void exactCoreDestroyersResolveNormallyButCannotJumpWithoutAnAuthoredFtlModule() {
         var duel = Stage22CorePairTacticalFactory.createDestroyerDuel(
                 Stage22CorePairExperimentProtocol.Permutation.DEFAULT);
         var resolver = new ProductionFittedJumpResolver();
@@ -35,19 +30,12 @@ class ProductionFittedJumpResolverStage22CorePairAcceptanceTest {
                     .findFirst()
                     .orElseThrow()
                     .engineering();
-            EngineeringComponent component = copy(source);
-            JumpPlan plan = awaitAllowed(resolver, component);
 
-            var before = component.runtimeState;
-            var committed = resolver.commit(component, plan);
-            assertNotEquals(before, committed,
-                    "ordinary FTL commit must change exact core physical operating state");
-            component.setRuntimeState(committed);
-            assertTrue(component.runtimeState.ftlCooldownSecondsByMount().values().stream()
-                            .anyMatch(value -> value > 0d),
-                    "ordinary FTL commit must leave the fitted exact-core drive in cooldown");
-            assertEquals(JumpFailure.COOLDOWN_ACTIVE, resolver.plan(component).failure(),
-                    "the next ordinary jump must observe the same fitted cooldown authority");
+            var plan = resolver.plan(copy(source));
+            assertFalse(plan.allowed(),
+                    "M22.6 must not invent strategic lift for a core destroyer that carries no FTL module");
+            assertEquals(JumpFailure.NO_FTL_MODULE, plan.failure(),
+                    "ordinary production resolver must recognize the exact core catalog and expose its physical no-FTL boundary");
         }
     }
 
@@ -65,25 +53,6 @@ class ProductionFittedJumpResolverStage22CorePairAcceptanceTest {
         var core = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         var ambiguous = new ProductionFittedJumpResolver(List.of(core, core));
         assertThrows(IllegalArgumentException.class, () -> ambiguous.plan(copy(source)));
-    }
-
-    private static JumpPlan awaitAllowed(
-            ProductionFittedJumpResolver resolver,
-            EngineeringComponent component) {
-        for (int attempt = 0; attempt < MAX_RECOVERY_STEPS; attempt++) {
-            JumpPlan plan = resolver.plan(component);
-            if (plan.allowed()) {
-                return plan;
-            }
-            if (plan.failure() != JumpFailure.COOLDOWN_ACTIVE
-                    && plan.failure() != JumpFailure.THERMAL_LIMIT
-                    && plan.failure() != JumpFailure.CHARGE_POWER_UNAVAILABLE
-                    && plan.failure() != JumpFailure.STORED_ENERGY_UNAVAILABLE) {
-                throw new AssertionError("exact core fit has permanent ordinary FTL failure: " + plan.failure());
-            }
-            component.setRuntimeState(resolver.advanceIdle(component, RECOVERY_STEP_SECONDS));
-        }
-        throw new AssertionError("exact core fit did not recover to ordinary FTL spool boundary");
     }
 
     private static EngineeringComponent copy(EngineeringComponent source) {
