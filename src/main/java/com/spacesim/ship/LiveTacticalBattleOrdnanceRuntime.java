@@ -3,7 +3,6 @@ package com.spacesim.ship;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
-import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponLauncherCatalog;
 import com.spacesim.ship.GuidanceRuntime.TrackSource;
@@ -56,8 +55,8 @@ public final class LiveTacticalBattleOrdnanceRuntime {
     public LiveTacticalBattleOrdnanceRuntime(LiveTacticalBattleWeaponRuntime weaponRuntime) {
         this.weaponRuntime = Objects.requireNonNull(weaponRuntime, "weaponRuntime");
         engineeringCatalog = battleState().engineeringCatalog();
-        ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
-        launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
+        ammunitionCatalog = weaponRuntime.ammunitionCatalog();
+        launcherCatalog = weaponRuntime.launcherCatalog();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         guidedAdapter = new ShipGuidedWeaponEngineeringAdapter();
         guidanceRuntime = new GuidanceRuntime();

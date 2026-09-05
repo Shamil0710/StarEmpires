@@ -3,7 +3,6 @@ package com.spacesim.ship;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
-import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedEngagementRole;
 import com.spacesim.content.weapon.WeaponLauncherCatalog;
@@ -59,8 +58,8 @@ public final class LiveTacticalBattleDeceptionRuntime {
         beamRuntime = new LiveTacticalBattleBeamRuntime(ordnanceRuntime.weaponRuntime());
         orderingAudit = new Stage19GuidedImpactOrderingAudit();
         engineeringCatalog = battleState().engineeringCatalog();
-        ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
-        launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
+        ammunitionCatalog = ordnanceRuntime.weaponRuntime().ammunitionCatalog();
+        launcherCatalog = ordnanceRuntime.weaponRuntime().launcherCatalog();
         calculator = new DerivedShipCalculator(engineeringCatalog);
         guidedAdapter = new ShipGuidedWeaponEngineeringAdapter();
         for (CombatantRuntime combatant : battleState().combatants()) {

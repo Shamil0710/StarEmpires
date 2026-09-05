@@ -20,6 +20,47 @@ class GlobalEventManagerTest {
     private static final long RANDOM_SEED = 7_431L;
 
     @Test
+    void unreadPresentationRetentionKeepsNewestArticlesWithoutChangingEconomicEvents() {
+        GlobalEventManager manager = managerWithoutAutomaticSpawn();
+        EconomyEvent event = createEvent(10f);
+        manager.activateEvent(event);
+        for (int index = 0; index < GlobalEventManager.MAX_PENDING_NEWS; index++) {
+            manager.publishNews(new NewsArticle("article-" + index, "causal detail", null, index));
+        }
+        assertThrows(NullPointerException.class, () -> manager.publishNews(null));
+        assertSame(event, manager.getActiveEvents().get(0));
+        assertEquals(1L, manager.getEventRevision());
+        assertEquals(0d, manager.getSimulationTimeSeconds());
+        List<NewsArticle> retained = manager.consumePendingNews();
+        assertEquals(GlobalEventManager.MAX_PENDING_NEWS, retained.size());
+        assertEquals("article-0", retained.get(0).headline);
+        assertEquals("article-99999", retained.get(retained.size() - 1).headline);
+        assertTrue(manager.consumePendingNews().isEmpty());
+        manager.update(10f);
+        assertTrue(manager.getActiveEvents().isEmpty());
+        assertEquals(2L, manager.getEventRevision());
+    }
+
+    @Test
+    void automaticNewsRetentionDoesNotAffectEventScheduleOrRandomState() {
+        var unreadRandom = new com.spacesim.simulation.StatefulRandom(RANDOM_SEED);
+        var consumedRandom = new com.spacesim.simulation.StatefulRandom(RANDOM_SEED);
+        var unread = new GlobalEventManager(unreadRandom, 1d);
+        var consumed = new GlobalEventManager(consumedRandom, 1d);
+        long published = 0L;
+        for (int interval = 0; interval < 110; interval++) {
+            unread.update(1_000f);
+            consumed.update(1_000f);
+            published += consumed.consumePendingNews().size();
+        }
+        assertTrue(published > GlobalEventManager.MAX_PENDING_NEWS);
+        assertEquals(GlobalEventManager.MAX_PENDING_NEWS, unread.snapshotState().pendingNews().size());
+        assertEquals(consumedRandom.getState(), unreadRandom.getState());
+        unread.consumePendingNews();
+        assertEquals(consumed.snapshotState(), unread.snapshotState());
+    }
+
+    @Test
     void activationAndExpirationChangeRevisionOnlyWhenActiveSetChanges() {
         GlobalEventManager manager = managerWithoutAutomaticSpawn();
         EconomyEvent event = createEvent(1f);

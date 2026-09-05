@@ -1,0 +1,64 @@
+{
+  "buildCommitSha": "42ebd4ccf2a7cffd204c4b0999759ab48e69d07f",
+  "status": "DIAGNOSTIC_CONTROLS_NOT_BALANCE_SIGNOFF",
+  "runner": "Stage22CorePairTacticalProbe",
+  "seedPairs": 100,
+  "variants": [
+    {
+      "id": "EMPIRE_SENSOR_LOSS",
+      "file": "tactical-empire_sensor_loss.json.gz",
+      "sha256": "4826ae55b055d84b272b7c73a8f9e086f2b1df88f781faa5726a05315f81388a",
+      "rawSha256": "19251c91f69bd109d97eda03dd58825372309542076f9acee9ac7fc9efde850c",
+      "runCount": 200,
+      "contentFingerprint": "4fdd3ab100b27754164c4634a7345d7f2592dcaf12fc71969d1070dc8b5abd20",
+      "maxMirroredHullIntegrityDifference": 9.463751338145698e-09,
+      "unauthorizedTargetTicks": 0,
+      "meanFinalIntegrity": [
+        0.9207285971308711,
+        1.0
+      ]
+    },
+    {
+      "id": "LIMITED_MAGAZINES",
+      "file": "tactical-limited_magazines.json.gz",
+      "sha256": "90037ca82b5441a3d13c298e83660493abbb711467d03f4db9ab7489fea5a569",
+      "rawSha256": "04b413c177329bd4a22159323409f55831b8065421cfbd464e510edfdc76c24a",
+      "runCount": 200,
+      "contentFingerprint": "4fdd3ab100b27754164c4634a7345d7f2592dcaf12fc71969d1070dc8b5abd20",
+      "maxMirroredHullIntegrityDifference": 7.685962977177496e-12,
+      "unauthorizedTargetTicks": 0,
+      "meanFinalIntegrity": [
+        0.9611475186735737,
+        0.9501646246831498
+      ]
+    },
+    {
+      "id": "PATROL",
+      "file": "tactical-patrol.json.gz",
+      "sha256": "de7a3ff73df93316f40b05725da6dd9a5686f1687c4347d04e0642a078acb05e",
+      "rawSha256": "26b352fe4cda4b8f63ff217497a9a102b09b90589742f2650e639b51f107a129",
+      "runCount": 200,
+      "contentFingerprint": "4fdd3ab100b27754164c4634a7345d7f2592dcaf12fc71969d1070dc8b5abd20",
+      "maxMirroredHullIntegrityDifference": 0.015049813782286314,
+      "unauthorizedTargetTicks": 0,
+      "meanFinalIntegrity": [
+        0.9295414731489254,
+        0.9102358080518902
+      ]
+    },
+    {
+      "id": "UNION_SENSOR_LOSS",
+      "file": "tactical-union_sensor_loss.json.gz",
+      "sha256": "9db1833f941727ccc0381c420f1a5c47dbb00ababb4a3d5a08401852e175c309",
+      "rawSha256": "db9cfc7539ec148dc64eea887c3d6db3490512c001e20e65c59ef233139aceab",
+      "runCount": 200,
+      "contentFingerprint": "4fdd3ab100b27754164c4634a7345d7f2592dcaf12fc71969d1070dc8b5abd20",
+      "maxMirroredHullIntegrityDifference": 0.002401861702502339,
+      "unauthorizedTargetTicks": 0,
+      "meanFinalIntegrity": [
+        1.0,
+        0.8981944006207793
+      ]
+    }
+  ]
+}

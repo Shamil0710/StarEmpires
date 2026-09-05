@@ -1,5 +1,9 @@
 package com.spacesim.ship;
 
+import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.ShipProtectionCatalog;
+import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
+import com.spacesim.content.weapon.WeaponLauncherCatalog;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.ImportedCombatantState;
 import com.spacesim.ship.LiveTacticalBattleScenario.Side;
@@ -28,6 +32,42 @@ public final class Stage19ExactTacticalEncounterResolver {
     /** Provisional Stage-19 encounter horizon: 120 exact simulation seconds. */
     public static final long DEFAULT_MAXIMUM_TICKS = Math.round(120d / LiveTacticalBattleControlRuntime.TICK_SECONDS);
 
+    private final ShipEngineeringCatalog engineeringCatalog;
+    private final ShipProtectionCatalog protectionCatalog;
+    private final WeaponAmmunitionCatalog ammunitionCatalog;
+    private final WeaponLauncherCatalog launcherCatalog;
+
+    /** Creates the existing Stage-19/21 legacy-content resolver. */
+    public Stage19ExactTacticalEncounterResolver() {
+        engineeringCatalog = null;
+        protectionCatalog = null;
+        ammunitionCatalog = null;
+        launcherCatalog = null;
+    }
+
+    /**
+     * Creates the same exact-local encounter authority with an explicit accepted content universe.
+     *
+     * <p>The caller supplies physical catalogs only. No doctrine statistics are substituted, and the
+     * complete existing sensing/control/weapon/protection stack still executes the encounter. The
+     * no-argument constructor retains the Stage-19/21 compatibility boundary.</p>
+     *
+     * @param engineeringCatalog authoritative installed-fit and material content
+     * @param protectionCatalog hull protection/layout content for those exact fits
+     * @param ammunitionCatalog physical ammunition referenced by imported loadouts
+     * @param launcherCatalog operating profiles for installed weapon modules
+     */
+    public Stage19ExactTacticalEncounterResolver(
+            ShipEngineeringCatalog engineeringCatalog,
+            ShipProtectionCatalog protectionCatalog,
+            WeaponAmmunitionCatalog ammunitionCatalog,
+            WeaponLauncherCatalog launcherCatalog) {
+        this.engineeringCatalog = Objects.requireNonNull(engineeringCatalog, "engineeringCatalog");
+        this.protectionCatalog = Objects.requireNonNull(protectionCatalog, "protectionCatalog");
+        this.ammunitionCatalog = Objects.requireNonNull(ammunitionCatalog, "ammunitionCatalog");
+        this.launcherCatalog = Objects.requireNonNull(launcherCatalog, "launcherCatalog");
+    }
+
     /**
      * Resolves one bounded exact-local encounter through the complete current Stage-19 runtime stack.
      *
@@ -40,9 +80,13 @@ public final class Stage19ExactTacticalEncounterResolver {
         if (maximumTicks <= 0L) {
             throw new IllegalArgumentException("maximumTicks must be positive");
         }
-        LiveTacticalBattleRuntimeState battle = LiveTacticalBattleRuntimeState.importExact(imported);
+        LiveTacticalBattleRuntimeState battle = engineeringCatalog == null
+                ? LiveTacticalBattleRuntimeState.importExact(imported)
+                : LiveTacticalBattleRuntimeState.importExact(imported, engineeringCatalog, protectionCatalog);
         LiveTacticalBattleControlRuntime control = new LiveTacticalBattleControlRuntime(battle);
-        LiveTacticalBattleWeaponRuntime weapon = new LiveTacticalBattleWeaponRuntime(control);
+        LiveTacticalBattleWeaponRuntime weapon = engineeringCatalog == null
+                ? new LiveTacticalBattleWeaponRuntime(control)
+                : new LiveTacticalBattleWeaponRuntime(control, ammunitionCatalog, launcherCatalog);
         LiveTacticalBattleOrdnanceRuntime ordnance = new LiveTacticalBattleOrdnanceRuntime(weapon);
         LiveTacticalBattleDeceptionRuntime runtime = new LiveTacticalBattleDeceptionRuntime(ordnance);
 

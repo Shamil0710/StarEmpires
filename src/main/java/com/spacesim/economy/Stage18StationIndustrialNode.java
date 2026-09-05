@@ -115,6 +115,42 @@ public final class Stage18StationIndustrialNode {
         return installedFacilities;
     }
 
+    /**
+     * Projects a paid, completed Stage-18H construction order into this station's facility roster.
+     *
+     * <p>The existing order remains the persistence authority for the addition. Reapplying that
+     * order after load is idempotent. Storage, handling capacity and resource allocation are unchanged;
+     * a separate installed-facility state must still supply power, heat rejection and labor before
+     * the new facility can support production or a yard.</p>
+     *
+     * @param order completed construction order belonging to this station and location
+     * @param construction authoritative facility-construction runtime
+     * @return station view with the additional stable facility reference and the same storage object
+     */
+    public Stage18StationIndustrialNode withCompletedConstruction(
+            Stage18FacilityConstructionRuntime.ConstructionOrderSnapshot order,
+            Stage18FacilityConstructionRuntime construction) {
+        Objects.requireNonNull(order, "order");
+        Objects.requireNonNull(construction, "construction");
+        if (!stationId.equals(order.stationId()) || !locationTag.equals(order.locationTag())) {
+            throw new IllegalArgumentException("Completed facility construction belongs to another station/location");
+        }
+        InstalledFacilityReference addition = construction.completedFacility(order);
+        for (InstalledFacilityReference existing : installedFacilities) {
+            if (existing.facilityInstanceId().equals(addition.facilityInstanceId())) {
+                if (!existing.equals(addition)) {
+                    throw new IllegalArgumentException("Constructed facility identity conflicts with station roster");
+                }
+                return this;
+            }
+        }
+        List<InstalledFacilityReference> references = new ArrayList<>(installedFacilities);
+        references.add(addition);
+        references.sort(java.util.Comparator.comparing(InstalledFacilityReference::facilityInstanceId));
+        return new Stage18StationIndustrialNode(
+                stationId, archetypeId, locationTag, references, storage, handlingCapability);
+    }
+
     /** @return canonical physical Stage-18F station storage */
     public Stage18StationStorage storage() {
         return storage;

@@ -1,7 +1,6 @@
 package com.spacesim.ship;
 
 import com.spacesim.components.EngineeringComponent;
-import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog.GuidedEngagementRole;
 import com.spacesim.content.weapon.WeaponLauncherCatalog;
@@ -52,8 +51,8 @@ public final class LiveTacticalBattleDecoyRuntime {
      */
     public LiveTacticalBattleDecoyRuntime(LiveTacticalBattleOrdnanceRuntime ordnanceRuntime) {
         this.ordnanceRuntime = Objects.requireNonNull(ordnanceRuntime, "ordnanceRuntime");
-        ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
-        launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
+        ammunitionCatalog = ordnanceRuntime.weaponRuntime().ammunitionCatalog();
+        launcherCatalog = ordnanceRuntime.weaponRuntime().launcherCatalog();
         calculator = new DerivedShipCalculator(battleState().engineeringCatalog());
         guidedAdapter = new ShipGuidedWeaponEngineeringAdapter();
         ammunitionRuntime = new AmmunitionRuntime();

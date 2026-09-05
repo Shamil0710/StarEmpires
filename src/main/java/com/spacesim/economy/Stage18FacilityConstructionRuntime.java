@@ -444,6 +444,27 @@ public final class Stage18FacilityConstructionRuntime {
     }
 
     /**
+     * Resolves a fully settled order to its installed-facility reference, including after save/load.
+     *
+     * @param order completed order whose physical bill must match the current construction catalog
+     * @return stable installed-facility reference without consuming or granting any resources
+     */
+    public InstalledFacilityReference completedFacility(ConstructionOrderSnapshot order) {
+        ConstructionOrderSnapshot checked = Objects.requireNonNull(order, "order");
+        ConstructionOrderSnapshot expected = createOrder(checked.orderId(), checked.facilityInstanceId(),
+                checked.facilityDefinitionId(), checked.stationId(), checked.locationTag());
+        if (!expected.requiredMassByCommodityKg().equals(checked.requiredMassByCommodityKg())
+                || expected.requiredWorkSeconds() != checked.requiredWorkSeconds()) {
+            throw new IllegalArgumentException("Completed facility order differs from the authoritative construction bill");
+        }
+        if (checked.status() != OrderStatus.COMPLETE || !checked.materialsFulfilled()
+                || checked.remainingWorkSeconds() > EPSILON) {
+            throw new IllegalArgumentException("Facility installation requires fully paid materials and work");
+        }
+        return new InstalledFacilityReference(checked.facilityInstanceId(), checked.facilityDefinitionId());
+    }
+
+    /**
      * Cancels an order before engineering work begins and atomically returns delivered kilograms.
      *
      * <p>Once any construction work has been applied, cancellation must use an explicit physical

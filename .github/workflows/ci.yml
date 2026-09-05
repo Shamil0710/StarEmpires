@@ -12,7 +12,10 @@ jobs:
   verify:
     name: Java 17 verification
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The green pre-B07/B08 baseline takes about 14 minutes. M22.6 now also runs mirrored
+    # generated-world freight/combat/production and multidimensional burden acceptance, so keep
+    # the verification command and gates unchanged while allowing the deterministic suite to finish.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -27,6 +30,15 @@ jobs:
 
       - name: Test, check coverage, build Javadoc and package desktop JAR
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
+
+      - name: Retain core-pair raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage22-evidence-${{ github.sha }}
+          path: target/stage22-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
 
       # Artifact publication is deliberately restricted to main. Pull requests still execute the
       # exact same mandatory Maven verification gate, but routine branch/PR runs no longer retain a

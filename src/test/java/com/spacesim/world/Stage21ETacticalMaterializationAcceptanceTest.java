@@ -4,6 +4,8 @@ import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityState;
 import com.spacesim.world.FactionActorObservationSnapshot.ObservationChannel;
 import com.spacesim.world.Stage21ETacticalMaterializationService.TacticalMaterializationRequest;
+import com.spacesim.world.Stage21ETacticalMaterializationService.PhysicalCombatant;
+import com.spacesim.world.Stage21ETacticalMaterializationService.CombatSide;
 import com.spacesim.world.StrategicOperationState.ContactState;
 import com.spacesim.world.StrategicOperationState.OperationState;
 import com.spacesim.world.StrategicOperationState.OperationStatus;
@@ -14,6 +16,7 @@ import com.spacesim.world.StrategicOperationState.WithdrawalPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +24,30 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 final class Stage21ETacticalMaterializationAcceptanceTest {
+    @Test
+    void requestOwnsAnImmutableSnapshotOfTheValidatedCombatantList() {
+        var rows = new ArrayList<>(List.of(
+                new PhysicalCombatant(new FleetId(10), CombatSide.OPERATION, 1,
+                        physicalEntity(1010, 1, "hull.attacker")),
+                new PhysicalCombatant(new FleetId(20), CombatSide.CONTACT, 2,
+                        physicalEntity(1020, 2, "hull.target"))));
+        var request = new TacticalMaterializationRequest(1, new StarSystemId(2), 50, rows);
+        var expected = List.copyOf(rows);
+        rows.clear();
+        assertEquals(expected, request.combatants());
+        assertThrows(UnsupportedOperationException.class, () -> request.combatants().clear());
+    }
+
+    @Test
+    void sameFleetCannotBeImportedTwiceEvenOnOppositeSides() {
+        var state = physicalEntity(1010, 1, "hull.attacker");
+        var rows = List.of(
+                new PhysicalCombatant(new FleetId(10), CombatSide.OPERATION, 1, state),
+                new PhysicalCombatant(new FleetId(10), CombatSide.CONTACT, 1, state));
+        assertThrows(IllegalArgumentException.class,
+                () -> new TacticalMaterializationRequest(1, new StarSystemId(2), 50, rows));
+    }
+
     @Test
     void exactOrdinaryEntityPayloadsAreHandedToStage19AuthorityAfterPhysicalMeeting() {
         FleetId attackerId = new FleetId(10L);

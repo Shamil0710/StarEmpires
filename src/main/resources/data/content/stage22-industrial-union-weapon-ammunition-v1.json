@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "kineticAmmunition": [
+    {
+      "id": "ammo.industrial_union_dart_140kg_v1",
+      "materialId": "material.industrial_union_mill_steel_v1",
+      "shape": "DART",
+      "lengthM": 1.75,
+      "diameterM": 0.073,
+      "massKg": 140.0
+    }
+  ],
+  "guidedAmmunition": []
+}

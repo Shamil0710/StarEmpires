@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "kineticAmmunition": [
+    {
+      "id": "ammo.empire_axial_dart_150kg_v1",
+      "materialId": "material.empire_service_alloy_v1",
+      "shape": "DART",
+      "lengthM": 1.8,
+      "diameterM": 0.075,
+      "massKg": 150.0
+    }
+  ],
+  "guidedAmmunition": []
+}
