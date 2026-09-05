@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * M22.6 B13 rolling-attrition evidence over the committed Stage-19 authority.
@@ -32,8 +31,8 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
                 "core_pair.current",
                 Stage22CorePairExperimentProtocol.pairedSchedule(8),
                 (scenario, variant, profile, coordinate) -> {
-                    var direct = Stage22CorePairEncounterContinuationProbe.run(coordinate.permutation(), false);
-                    var reloaded = Stage22CorePairEncounterContinuationProbe.run(coordinate.permutation(), true);
+                    var direct = Stage22CorePairEncounterContinuationProbe.run(coordinate, false);
+                    var reloaded = Stage22CorePairEncounterContinuationProbe.run(coordinate, true);
                     boolean continuationStable = direct.equals(reloaded);
                     boolean threeCommitted = direct.size() == 3;
 
@@ -112,7 +111,7 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B13-rolling-attrition-paired-8",
                 archive,
-                "Three committed exact-core Stage-19 encounters with save/restore continuation and finite stores. Production, paid replacement cadence, backlog and long-war campaign trajectory remain open.");
+                "Three committed exact-core Stage-19 encounters with seeded mirrored contact geometry, save/restore continuation and finite stores. Production, paid replacement cadence, backlog and long-war campaign trajectory remain open.");
     }
 
     private static Stage19ExactTacticalEncounterResolver.CombatantResult combatant(
