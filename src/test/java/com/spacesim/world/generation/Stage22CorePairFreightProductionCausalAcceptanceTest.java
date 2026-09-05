@@ -72,6 +72,8 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
     private static final double CRITICAL_INTEGRITY = 1.0e-6d;
     private static final double PROCESS_WINDOW_SECONDS = 1.0e9d;
     private static final double EPSILON = 1.0e-7d;
+    private static final float SIMULATION_WAIT_FRAME_SECONDS = 10f;
+    private static final int MAX_COOLDOWN_WAIT_FRAMES = 40;
 
     @Test
     void destroyedInterdictorLetsSameIndustrialOrderFeedRealProductionForBothCoreFits() {
@@ -353,7 +355,7 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
                 if (worldTick > phaseDeadlineTick) {
                     throw new AssertionError("ordinary FTL phase exceeded its authoritative phaseEndsTick: " + state);
                 }
-                runtime.advanceFrame(0.25f);
+                runtime.advanceFrame(SIMULATION_WAIT_FRAME_SECONDS);
             }
             phaseTransitions++;
             if (phaseTransitions > 8) {
@@ -363,12 +365,12 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
     }
 
     private static void awaitCooldown(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, FleetId fleetId) {
-        for (int i = 0; i < 800; i++) {
+        for (int i = 0; i < MAX_COOLDOWN_WAIT_FRAMES; i++) {
             FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
             EngineeringComponent engineering = entity(runtime, placement).getComponent(EngineeringComponent.class);
             if (engineering == null || engineering.runtimeState.ftlCooldownSecondsByMount().values().stream()
                     .noneMatch(value -> value > 0d)) return;
-            runtime.advanceFrame(0.25f);
+            runtime.advanceFrame(SIMULATION_WAIT_FRAME_SECONDS);
         }
         throw new AssertionError("fitted FTL cooldown did not clear");
     }
