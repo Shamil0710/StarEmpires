@@ -13,16 +13,19 @@ class Stage22CorePairCommittedAuthorityAcceptanceTest {
     void exactCoreFitsContinueAcrossCommittedEncountersWithoutRestoringSpentResources() {
         var rows = new ArrayList<Object>();
         for (var permutation : Stage22CorePairExperimentProtocol.Permutation.values()) {
-            var direct = Stage22CorePairEncounterContinuationProbe.run(permutation, false);
-            var reloaded = Stage22CorePairEncounterContinuationProbe.run(permutation, true);
+            var coordinate = new Stage22CorePairExperimentProtocol.RunCoordinate(
+                    Stage22CorePairExperimentProtocol.FIRST_SEED,
+                    permutation);
+            var direct = Stage22CorePairEncounterContinuationProbe.run(coordinate, false);
+            var reloaded = Stage22CorePairEncounterContinuationProbe.run(coordinate, true);
             assertEquals(direct, reloaded);
             assertEquals(3, direct.size());
             assertTrue(direct.get(2).combatants().stream()
                     .allMatch(actor -> actor.runtimeState().consumables().ammunitionCount() < 120L));
-            rows.add(Map.of("permutation", permutation, "encounters", direct));
+            rows.add(Map.of("coordinate", coordinate, "encounters", direct));
         }
         Stage22CorePairEvidenceArchive.write("B01-committed-core-encounters", rows,
-                "Full Stage-19 stack with exact core catalogs; three bounded exchanges and engine-state saves at committed boundaries. Detached result validation is tested; a generated-world campaign and in-flight body persistence are separate boundaries.");
+                "Full Stage-19 stack with exact core catalogs; three bounded seeded/mirrored exchanges and engine-state saves at committed boundaries. Detached result validation is tested; a generated-world campaign and in-flight body persistence are separate boundaries.");
     }
 
     @Test
