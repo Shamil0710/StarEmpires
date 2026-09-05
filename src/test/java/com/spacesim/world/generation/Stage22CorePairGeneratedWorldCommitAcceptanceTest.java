@@ -39,6 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
     private static final long OPERATION_ID = 22_601L;
     private static final long TACTICAL_TICKS = 240L;
+    private static final float SIMULATION_WAIT_FRAME_SECONDS = 10f;
+    private static final int MAX_COOLDOWN_WAIT_FRAMES = 40;
 
     @Test
     void exactCoreFitsCommitThroughStage21eAuthorityAndRoundTripDeterministically() {
@@ -171,26 +173,48 @@ class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
         for (int index = 1; index < route.size(); index++) {
             GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, fleetId, route.get(index));
             runtime.world().requestFleetJump(fleetId, route.get(index));
-            for (int attempt = 0; attempt < 400 && runtime.world().findFleetJump(fleetId).isPresent(); attempt++) {
-                runtime.advanceFrame(0.25f);
-            }
-            assertTrue(runtime.world().findFleetJump(fleetId).isEmpty(),
-                    "ordinary target movement must finish every topology hop");
+            awaitJump(runtime, fleetId);
             if (index + 1 < route.size()) awaitFittedCooldown(runtime, fleetId);
+        }
+    }
+
+    private static void awaitJump(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, FleetId fleetId) {
+        int phaseTransitions = 0;
+        while (true) {
+            var initial = runtime.world().findFleetJump(fleetId);
+            if (initial.isEmpty()) return;
+            var phase = initial.orElseThrow();
+            long phaseStartedTick = phase.phaseStartedTick();
+            long phaseDeadlineTick = phase.phaseEndsTick() + 1L;
+            while (true) {
+                var current = runtime.world().findFleetJump(fleetId);
+                if (current.isEmpty()) return;
+                var state = current.orElseThrow();
+                if (state.phase() != phase.phase() || state.phaseStartedTick() != phaseStartedTick) break;
+                long worldTick = runtime.world().getAuthoritativeWorldTick();
+                if (worldTick > phaseDeadlineTick) {
+                    throw new AssertionError("ordinary FTL phase exceeded its authoritative phaseEndsTick: " + state);
+                }
+                runtime.advanceFrame(SIMULATION_WAIT_FRAME_SECONDS);
+            }
+            phaseTransitions++;
+            if (phaseTransitions > 8) {
+                throw new AssertionError("ordinary FTL jump exceeded bounded canonical phase transitions");
+            }
         }
     }
 
     private static void awaitFittedCooldown(
             Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
             FleetId fleetId) {
-        for (int attempt = 0; attempt < 400; attempt++) {
+        for (int attempt = 0; attempt < MAX_COOLDOWN_WAIT_FRAMES; attempt++) {
             FleetPlacementState placement = runtime.world().findFleet(fleetId).orElseThrow();
             Entity entity = runtime.world().findSession(placement.systemId()).orElseThrow()
                     .getEntityRegistry().require(placement.localEntityId());
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             if (engineering == null || engineering.runtimeState.ftlCooldownSecondsByMount().values().stream()
                     .noneMatch(value -> value > 0d)) return;
-            runtime.advanceFrame(0.25f);
+            runtime.advanceFrame(SIMULATION_WAIT_FRAME_SECONDS);
         }
         throw new AssertionError("ordinary fitted FTL cooldown did not clear through simulation time");
     }
