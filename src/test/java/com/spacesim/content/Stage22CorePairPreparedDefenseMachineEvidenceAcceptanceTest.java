@@ -1,6 +1,7 @@
 package com.spacesim.content;
 
 import com.spacesim.ship.Stage22CorePairTacticalFactory;
+import com.spacesim.world.FleetReadinessState;
 import com.spacesim.world.Stage22CorePairPreparedDefenseProbe;
 import com.spacesim.world.StrategicOperationService.SupplyDecision;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * remains part of the wider B09/B13 campaign evidence boundary.</p>
  */
 class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
+    private static final int PREPARED_MISSION_FLOOR_BPS = 1_000;
+
     @Test
     void b09RunsEightPairedPreparedDefenseCellsThroughOrdinaryAuthorities() {
         var empireReplacement = Stage22CorePairReplacementProbe.run(true);
@@ -45,6 +48,8 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                     var result = Stage22CorePairPreparedDefenseProbe.run(coordinate.permutation());
                     var empire = result.empire();
                     var union = result.union();
+                    var empireReadiness = empire.defenderReadiness();
+                    var unionReadiness = union.defenderReadiness();
                     var patrol = Stage22CorePairTacticalProbe.run(
                             Stage22CorePairTacticalProbe.Variant.PATROL,
                             coordinate,
@@ -56,10 +61,10 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                             patrol,
                             Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
 
-                    boolean empireReady = empire.defenderReadinessBps() > 0
-                            && empire.reserveReadinessBps() > 0;
-                    boolean unionReady = union.defenderReadinessBps() > 0
-                            && union.reserveReadinessBps() > 0;
+                    boolean empireReady = empire.defenderReadiness().missionCapable(PREPARED_MISSION_FLOOR_BPS)
+                            && empire.reserveReadiness().missionCapable(PREPARED_MISSION_FLOOR_BPS);
+                    boolean unionReady = union.defenderReadiness().missionCapable(PREPARED_MISSION_FLOOR_BPS)
+                            && union.reserveReadiness().missionCapable(PREPARED_MISSION_FLOOR_BPS);
                     boolean arrivalGate = empire.rejectedBeforePhysicalArrival()
                             && union.rejectedBeforePhysicalArrival()
                             && empire.attachedAfterPhysicalArrival()
@@ -90,10 +95,18 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
 
                     return new Stage22CorePairMachineEvidenceBatch.ObservationPayload(
                             Map.ofEntries(
-                                    Map.entry("empire_defender_readiness_bps", (double) empire.defenderReadinessBps()),
-                                    Map.entry("empire_reserve_readiness_bps", (double) empire.reserveReadinessBps()),
-                                    Map.entry("union_defender_readiness_bps", (double) union.defenderReadinessBps()),
-                                    Map.entry("union_reserve_readiness_bps", (double) union.reserveReadinessBps()),
+                                    Map.entry("empire_defender_readiness_bps", (double) empireReadiness.overallBps()),
+                                    Map.entry("empire_ammunition_readiness_bps", (double) empireReadiness.ammunitionBps()),
+                                    Map.entry("empire_propellant_readiness_bps", (double) empireReadiness.propellantBps()),
+                                    Map.entry("empire_structural_readiness_bps", (double) empireReadiness.structuralBps()),
+                                    Map.entry("empire_sensor_readiness_bps", (double) empireReadiness.sensorsBps()),
+                                    Map.entry("empire_maintenance_readiness_bps", (double) empireReadiness.maintenanceBps()),
+                                    Map.entry("union_defender_readiness_bps", (double) unionReadiness.overallBps()),
+                                    Map.entry("union_ammunition_readiness_bps", (double) unionReadiness.ammunitionBps()),
+                                    Map.entry("union_propellant_readiness_bps", (double) unionReadiness.propellantBps()),
+                                    Map.entry("union_structural_readiness_bps", (double) unionReadiness.structuralBps()),
+                                    Map.entry("union_sensor_readiness_bps", (double) unionReadiness.sensorsBps()),
+                                    Map.entry("union_maintenance_readiness_bps", (double) unionReadiness.maintenanceBps()),
                                     Map.entry("empire_committed_participants", (double) empire.committedParticipantCount()),
                                     Map.entry("union_committed_participants", (double) union.committedParticipantCount()),
                                     Map.entry("empire_final_mean_integrity", empireProtection.meanCompartmentIntegrity()),
@@ -116,6 +129,8 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
 
         assertEquals(8, vector.pairedSeedCount());
         assertEquals(16, vector.runCount());
+        assertTrue(vector.metricMeans().get("empire_defender_readiness_bps") >= PREPARED_MISSION_FLOOR_BPS);
+        assertTrue(vector.metricMeans().get("union_defender_readiness_bps") >= PREPARED_MISSION_FLOOR_BPS);
         assertEquals(2d, vector.metricMeans().get("empire_committed_participants"));
         assertEquals(2d, vector.metricMeans().get("union_committed_participants"));
         assertEquals(1d, vector.guardMetricMeans().get("empire_exact_fit_ready"));
@@ -143,7 +158,7 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B09-prepared-defense-operational-paired-8",
                 archive,
-                "Eight paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Empire retains the authored robustness contour under the same tactical policy; Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
+                "Eight paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Prepared starting magazines are finite and authored before operation admission at the declared ten-percent readiness floor; no in-operation refill is granted. Empire retains the authored robustness contour under the same tactical policy; Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
     }
 
     private static com.spacesim.ship.LiveTacticalBattleWeaponRuntime.TargetProtectionFingerprint protection(
