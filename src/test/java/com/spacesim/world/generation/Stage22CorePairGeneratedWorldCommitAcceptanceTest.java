@@ -34,6 +34,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** M22.6 B01 generated-world commit evidence for the exact Empire/Industrial Union core fits. */
 class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
@@ -44,11 +45,11 @@ class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
 
     @Test
     void exactCoreFitsCommitThroughStage21eAuthorityAndRoundTripDeterministically() {
-        ScenarioResult first = runScenario();
-        ScenarioResult second = runScenario();
+        ScenarioResult first = runScenario(false);
+        ScenarioResult second = runScenario(true);
 
         assertArrayEquals(first.checkpoint(), second.checkpoint(),
-                "same generated world, exact core fits and bounded Stage-19 horizon must replay byte-identically");
+                "restored live world must continue the next exact core encounter byte-identically");
         assertEquals(first.remainingCoreFleetIds(), second.remainingCoreFleetIds());
         assertTrue(first.anyPhysicalEffect(), "core encounter must commit spent stores, damage or destruction");
         assertEquals(first.nextFleetIdBefore(), first.nextFleetIdAfter(),
@@ -57,7 +58,7 @@ class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
                 "post-encounter core FleetIds must be a subset of the original ordinary FleetIds");
     }
 
-    private static ScenarioResult runScenario() {
+    private static ScenarioResult runScenario(boolean restoreBetweenEncounters) {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
         List<MilitaryFleet> military = militaryFleets(runtime);
@@ -108,9 +109,31 @@ class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
         var resolver = new Stage19ExactTacticalEncounterResolver(
                 core.content().engineering(), core.protection(), core.content().ammunition(), core.content().launchers());
         var authority = new Stage21EGeneratedWorldStage19Authority(runtime, resolver, TACTICAL_TICKS);
+        assertInvalidHandoffsAreAtomic(runtime, authority, attacker.systemId(), now, combatants);
         long encounterId = authority.materializeExact(
                 new TacticalMaterializationRequest(OPERATION_ID, attacker.systemId(), now, List.copyOf(combatants)));
         assertEquals(now + 1L, encounterId);
+
+        // Codec symmetry alone does not prove that a saved world can run again. Reconstruct the
+        // complete generated runtime, then execute the next encounter against its ordinary entities.
+        byte[] firstEncounter = Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState());
+        if (restoreBetweenEncounters) {
+            runtime = Stage20GeneratedWorldRuntimeBridge.restore(
+                    Stage20GeneratedWorldRuntimePersistenceCodec.decode(firstEncounter));
+            assertArrayEquals(firstEncounter,
+                    Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState()));
+        }
+        List<PhysicalCombatant> continuation = new ArrayList<>();
+        for (PhysicalCombatant previous : combatants) {
+            FleetPlacementState placement = runtime.world().findFleet(previous.fleetId()).orElseThrow();
+            Entity current = runtime.world().findSession(placement.systemId()).orElseThrow()
+                    .getEntityRegistry().require(placement.localEntityId());
+            continuation.add(new PhysicalCombatant(previous.fleetId(), previous.side(), previous.factionId(),
+                    EntityStateMapper.capture(current)));
+        }
+        new Stage21EGeneratedWorldStage19Authority(runtime, resolver, TACTICAL_TICKS).materializeExact(
+                new TacticalMaterializationRequest(OPERATION_ID + 1L, attacker.systemId(), now,
+                        List.copyOf(continuation)));
 
         Set<FleetId> remaining = new HashSet<>();
         for (FleetId fleetId : coreFleetIds) {
@@ -145,6 +168,27 @@ class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
 
     private static EngineeringComponent copy(EngineeringComponent source) {
         return new EngineeringComponent(source.fit, source.runtimeState, source.instanceState);
+    }
+
+    private static void assertInvalidHandoffsAreAtomic(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
+            Stage21EGeneratedWorldStage19Authority authority,
+            StarSystemId system, long tick, List<PhysicalCombatant> combatants) {
+        byte[] before = Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState());
+        for (long invalidTick : new long[] { tick - 1L, tick + 1L, Long.MAX_VALUE }) {
+            assertThrows(IllegalStateException.class, () -> authority.materializeExact(
+                    new TacticalMaterializationRequest(OPERATION_ID, system, invalidTick, combatants)));
+            assertArrayEquals(before, Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState()),
+                    "stale/future handoff must leave stores, entities, allocator and exact kinematics untouched");
+        }
+        var inconsistent = new ArrayList<>(combatants);
+        var first = inconsistent.get(0);
+        inconsistent.set(0, new PhysicalCombatant(first.fleetId(), first.side(),
+                first.factionId() + 1, first.entityState()));
+        assertThrows(IllegalStateException.class, () -> authority.materializeExact(
+                new TacticalMaterializationRequest(OPERATION_ID, system, tick, inconsistent)));
+        assertArrayEquals(before, Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState()),
+                "forged faction metadata must not reach detached combat or commit");
     }
 
     private static List<MilitaryFleet> militaryFleets(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime) {

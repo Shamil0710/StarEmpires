@@ -13,6 +13,7 @@ import com.spacesim.content.Stage18RefiningCatalogLoader;
 import com.spacesim.content.Stage18ResourceOntologyCatalog;
 import com.spacesim.content.Stage18ResourceOntologyLoader;
 import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
+import com.spacesim.content.Stage22CorePairEvidenceArchive;
 import com.spacesim.economy.Stage18ExtractionRuntime;
 import com.spacesim.economy.Stage18FacilityRuntime;
 import com.spacesim.economy.Stage18FacilityRuntime.FacilityCapabilitySnapshot;
@@ -43,6 +44,7 @@ import com.spacesim.world.Stage21ETacticalMaterializationService.PhysicalCombata
 import com.spacesim.world.Stage21ETacticalMaterializationService.TacticalMaterializationRequest;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StrategicOperationState;
+import com.spacesim.world.StrategicOperationStateCodec;
 import com.spacesim.world.StrategicOperationState.OperationState;
 import com.spacesim.world.StrategicOperationState.OperationStatus;
 import com.spacesim.world.StrategicOperationState.OperationType;
@@ -62,6 +64,7 @@ import java.util.TreeMap;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** M22.6 B08: physical interdiction outcome -> same freight order -> real Stage-18 production. */
@@ -74,22 +77,35 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
     private static final double EPSILON = 1.0e-7d;
 
     @Test
-    void destroyedInterdictorLetsSameIndustrialOrderFeedRealProductionForBothCoreFits() {
+    void physicalInterdictorOutcomeControlsSameIndustrialInputAndSavedProductionContinuation() {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime seedRuntime = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
         byte[] baseline = Stage20GeneratedWorldRuntimePersistenceCodec.encode(seedRuntime.captureState());
 
-        EconomicResult normal = run(restored(baseline), Permutation.DEFAULT);
-        EconomicResult mirrored = run(restored(baseline), Permutation.MIRRORED);
-        for (EconomicResult result : List.of(normal, mirrored)) {
-            assertFalse(result.interdictorAlive());
-            assertEquals(result.loadedMassKg(), result.deliveredMassKg(), EPSILON);
-            assertTrue(result.productionAccepted());
-            assertTrue(result.productionConsumedKg() > 0d);
-            assertTrue(result.orderId().startsWith("freight-order:industrial:"));
+        var vectors = new ArrayList<Map<String, Object>>();
+        for (Permutation permutation : Permutation.values()) {
+            EconomicResult admitted = run(restored(baseline), permutation, true);
+            EconomicResult blocked = run(restored(baseline), permutation, false);
+            assertFalse(admitted.interdictorAlive());
+            assertEquals(admitted.loadedMassKg(), admitted.deliveredMassKg(), EPSILON);
+            assertTrue(admitted.productionAccepted());
+            assertTrue(admitted.productionConsumedKg() > 0d);
+            assertTrue(admitted.orderId().startsWith("freight-order:industrial:"));
+            assertTrue(blocked.interdictorAlive());
+            assertFalse(blocked.productionAccepted());
+            assertEquals(0d, blocked.deliveredMassKg(), EPSILON);
+            assertEquals(0d, blocked.productionConsumedKg(), EPSILON);
+            assertEquals(admitted.loadedMassKg(), blocked.loadedMassKg(), EPSILON);
+            assertEquals(admitted.orderId(), blocked.orderId(),
+                    "physical counterfactuals must keep the same industrial order and starting cargo");
+            vectors.add(vector(permutation, admitted));
+            vectors.add(vector(permutation, blocked));
         }
-        assertEquals(normal.orderId(), mirrored.orderId(),
-                "paired B08 permutations must exercise the same generated-world freight authority");
+        Stage22CorePairEvidenceArchive.write("B08-generated-freight-production-counterfactuals", vectors,
+                "Deterministic authority controls on one generated seed, with legacy owners and exact core fits. "
+                        + "Critical/pristine interdictor conditions are declared inputs, not balanced matchups. "
+                        + "World and operation sidecar use their existing separate codecs. "
+                        + "Deployment occurs before core fit installation; no B10 or core-profile campaign pass.");
     }
 
     private static Stage20GeneratedWorldRuntimeBridge.LiveRuntime restored(byte[] baseline) {
@@ -99,7 +115,8 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
 
     private static EconomicResult run(
             Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            Permutation permutation) {
+            Permutation permutation,
+            boolean criticalInterdictor) {
         Stage18ResourceOntologyCatalog ontology = Stage18ResourceOntologyLoader.loadDefault();
         Stage18RefiningCatalog refining = Stage18RefiningCatalogLoader.loadDefault();
         ProductionFreight candidate = productionFreight(runtime, ontology, refining);
@@ -159,12 +176,16 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
         Entity interdictorEntity = entity(runtime, interdictorPlacement);
         escortEntity.add(copy(permutation == Permutation.DEFAULT ? empire : union));
         interdictorEntity.add(copy(permutation == Permutation.DEFAULT ? union : empire));
-        applyCriticalState(core, interdictorEntity.getComponent(EngineeringComponent.class));
+        if (criticalInterdictor) {
+            applyCriticalState(core, interdictorEntity.getComponent(EngineeringComponent.class));
+        }
         LocalPhysicalKinematics anchor = runtime.arrival().materialization(from)
                 .physicalState(escortPlacement.localEntityId()).orElseThrow();
         runtime.arrival().materialization(from).updatePhysicalState(
                 interdictorPlacement.localEntityId(),
-                LocalPhysicalKinematics.stationary(anchor.position().translated(0d, 600d)));
+                LocalPhysicalKinematics.stationary(criticalInterdictor
+                        ? anchor.position().translated(0d, 600d)
+                        : anchor.position().translated(1_430d, 0d)));
 
         List<PhysicalCombatant> combatants = new ArrayList<>(List.of(
                 new PhysicalCombatant(escort.fleetId(), CombatSide.CONTACT, escort.factionId(),
@@ -178,7 +199,31 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
                 new TacticalMaterializationRequest(
                         OPERATION_ID, from, runtime.world().getAuthoritativeWorldTick(), List.copyOf(combatants)));
         boolean interdictorAlive = runtime.world().findFleet(interdictor.fleetId()).isPresent();
-        assertFalse(interdictorAlive);
+        assertEquals(!criticalInterdictor, interdictorAlive,
+                "the physical control must exercise the declared live/removed blockade branch");
+        if (interdictorAlive) {
+            byte[] checkpoint = Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState());
+            byte[] operationCheckpoint = StrategicOperationStateCodec.encode(operations);
+            var resumed = restored(checkpoint);
+            var resumedOperations = StrategicOperationStateCodec.decode(operationCheckpoint);
+            for (var checked : List.of(runtime, resumed)) {
+                var checkedTraffic = new Stage21EGeneratedWorldTrafficRuntime(checked);
+                assertThrows(IllegalStateException.class,
+                        () -> checkedTraffic.requestNextRouteHop(resumedOperations, freighter.fleetId()));
+                assertTrue(checked.world().findFleetJump(freighter.fleetId()).isEmpty());
+                var held = checked.freight().findFreighter(freighter.fleetId()).orElseThrow();
+                assertEquals(loadMassKg, held.cargoMassKg(), EPSILON);
+                assertEquals(orderBefore.orderId(), held.activeOrderId());
+                var checkedStation = checked.industry().industrial().station(station.stationId());
+                assertEquals(Stage18RefiningRuntime.Status.INSUFFICIENT_INPUT,
+                        production.refineAtStation(recipe.id(), 1d, checkedStation.storage(),
+                                facility, PROCESS_WINDOW_SECONDS).status());
+                assertArrayEquals(checkpoint,
+                        Stage20GeneratedWorldRuntimePersistenceCodec.encode(checked.captureState()),
+                        "denied delivery and production must preserve the complete state before and after load");
+            }
+            return new EconomicResult(true, loadMassKg, 0d, false, 0d, orderBefore.orderId());
+        }
 
         while (runtime.freight().findFreighter(freighter.fleetId()).orElseThrow().phase() == FreightPhase.OUTBOUND) {
             FreighterState beforeHop = runtime.freight().findFreighter(freighter.fleetId()).orElseThrow();
@@ -194,28 +239,48 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
         assertEquals(orderBefore.destinationEndpointId(), station.stationId());
         assertEquals(0d, station.storage().commodityMassKg(orderBefore.commodityId()), EPSILON);
 
-        var unload = traffic.unloadAtOrderDestination(
-                operations, freighter.fleetId(), atDestination.cargoMassKg(), HANDLING_SECONDS);
-        assertTrue(unload.transferred());
-        double stationInputKg = station.storage().commodityMassKg(orderBefore.commodityId());
-        assertEquals(loadMassKg, stationInputKg, EPSILON);
-        TransportOrderState orderAfter = runtime.freight().findOrder(orderBefore.orderId()).orElseThrow();
-        double deliveredKg = orderAfter.deliveredMassKg() - orderBefore.deliveredMassKg();
-        assertEquals(loadMassKg, deliveredKg, EPSILON);
+        byte[] deliveredCheckpoint = Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState());
+        var resumed = restored(deliveredCheckpoint);
+        var resumedOperations = StrategicOperationStateCodec.decode(StrategicOperationStateCodec.encode(operations));
+        EconomicResult uninterrupted = finishProduction(runtime, operations, candidate, loadMassKg, production);
+        EconomicResult continued = finishProduction(resumed, resumedOperations, candidate, loadMassKg, production);
+        assertEquals(uninterrupted, continued);
+        assertArrayEquals(Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState()),
+                Stage20GeneratedWorldRuntimePersistenceCodec.encode(resumed.captureState()),
+                "actual unloading and refining after world reconstruction must match uninterrupted production");
+        return uninterrupted;
+    }
 
-        double batchKg = Math.min(10d, stationInputKg);
-        var produced = production.refineAtStation(
-                recipe.id(), batchKg, station.storage(), facility, PROCESS_WINDOW_SECONDS);
+    private static EconomicResult finishProduction(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, StrategicOperationState operations,
+            ProductionFreight candidate, double loadMassKg, Stage18StationProductionBridge production) {
+        var station = runtime.industry().industrial().station(candidate.station().stationId());
+        assertTrue(station.facilityCapabilities().contains(candidate.facility()),
+                "restored production must have the same physical facility capability");
+        var traffic = new Stage21EGeneratedWorldTrafficRuntime(runtime);
+        var unload = traffic.unloadAtOrderDestination(
+                operations, candidate.freighter().fleetId(), loadMassKg, HANDLING_SECONDS);
+        assertTrue(unload.transferred());
+        assertEquals(loadMassKg, station.storage().commodityMassKg(candidate.order().commodityId()), EPSILON);
+        var orderAfter = runtime.freight().findOrder(candidate.order().orderId()).orElseThrow();
+        double deliveredKg = orderAfter.deliveredMassKg() - candidate.order().deliveredMassKg();
+        assertEquals(loadMassKg, deliveredKg, EPSILON);
+        double batchKg = Math.min(10d, loadMassKg);
+        var produced = production.refineAtStation(candidate.recipe().id(), batchKg, station.storage(),
+                candidate.facility(), PROCESS_WINDOW_SECONDS);
         assertTrue(produced.accepted());
         double consumedKg = produced.consumedInputMassByCommodityKg().values().stream()
                 .mapToDouble(Double::doubleValue).sum();
         assertEquals(batchKg, consumedKg, EPSILON);
+        return new EconomicResult(false, loadMassKg, deliveredKg, produced.accepted(), consumedKg, orderAfter.orderId());
+    }
 
-        byte[] checkpoint = Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState());
-        assertArrayEquals(checkpoint, Stage20GeneratedWorldRuntimePersistenceCodec.encode(
-                Stage20GeneratedWorldRuntimePersistenceCodec.decode(checkpoint)));
-        return new EconomicResult(interdictorAlive, loadMassKg, deliveredKg,
-                produced.accepted(), consumedKg, orderAfter.orderId());
+    private static Map<String, Object> vector(Permutation permutation, EconomicResult result) {
+        return Map.of("seed", Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED,
+                "permutation", permutation, "orderId", result.orderId(),
+                "interdictorAlive", result.interdictorAlive(), "loadedMassKg", result.loadedMassKg(),
+                "deliveredMassKg", result.deliveredMassKg(), "productionAccepted", result.productionAccepted(),
+                "productionConsumedKg", result.productionConsumedKg());
     }
 
     private static ProductionFreight productionFreight(

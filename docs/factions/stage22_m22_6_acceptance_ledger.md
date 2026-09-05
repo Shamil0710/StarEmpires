@@ -10,14 +10,14 @@ remaining work; it does not redefine or waive their gates.
 | --- | --- | --- |
 | Versioned B00–B20 contract, paired schedule | IMPLEMENTED | Canonical scenario catalog; 30/100 paired coordinates; machine batch rejects human B18–B20. |
 | B00 content integrity / legality | IMPLEMENTED | Cross-package validator/catalog acceptance with nine-role floor and stable identities. |
-| B01 persistence and replay | PARTIAL | Core sidecars, paid facility completion, physical ship start and committed encounter continuation; generated-world core encounter commit remains. |
+| B01 persistence and replay | PARTIAL | Core sidecars, paid facilities, two generated-world core-fit encounters with an intervening full runtime restore, atomic invalid-handoff rejection and long-route news overflow regression. Complete operational suite continuation remains. See `stage22_m22_6_runtime_reliability.md`. |
 | B02 cold start | PARTIAL | Existing physical production probes; complete matched campaign starts and actor-knowledge fingerprints remain. |
 | B03 expansion / construction | PARTIAL | Finite construction and built facility/yard support now persist; comparable expansion trajectories remain. |
 | B04 shortages | PARTIAL | Existing finite-input bottleneck probes; matched campaign response and recovery remain. |
 | B05 route / hub loss | PARTIAL | 100 paired freight load controls, irrecoverable lost lots, alternative-route delivery and byte continuation; campaign response remains. |
 | B06 distributed raids | MISSING | Matched operational scenarios with real patrol coverage, supplies and causal traces. |
 | B07 equal-burden patrol | PARTIAL | Exact-fit common-policy tactical controls and explicit raw physical burdens; fleet/economic normalization remains. |
-| B08 escort / interdiction | PARTIAL | Mirrored B08 seam regression now keeps the accepted Stage-19I tactical patrol and Stage-20 physical freight halves under one paired evidence coordinate: finite ammunition/actor-bounded targeting remain valid while cargo loss, provenance, surviving delivery, persistence and no-replacement invariants remain physical. The test deliberately records `production_causal_bridge_present=0`; an ordinary gameplay authority must still make the tactical escort/interdiction outcome gate the fate of that same freight order before B08 can be IMPLEMENTED. |
+| B08 escort / interdiction | PARTIAL | Generated-world counterfactuals now connect actual Stage-19 interdictor survival/destruction to Stage-21E admission of the same Stage-20 industrial order and real Stage-18 refining. Both fit permutations cover blocked production and physical delivery, with binary reconstruction and byte-identical continued unloading/refining. Raw counterfactual vectors are archived by CI. Actual core-profile decisions, complete campaign scheduling and operational balance batches remain; the older isolated seam probe still correctly reports its own bridge as absent. |
 | B09 prepared defense | MISSING | Sustained preparation, reserves, support and defense outcome vectors. |
 | B10 offensive projection | MISSING | Actual transport/support burden, travel, overextension and bounded actor knowledge. |
 | B11 degraded command / sensors | PARTIAL | Both factions' sensor-loss controls exclude unseen targets and firing; command-network degradation remains. |

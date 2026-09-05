@@ -87,6 +87,10 @@ public final class Stage21EGeneratedWorldStage19Authority implements TacticalMat
         TacticalMaterializationRequest checked = Objects.requireNonNull(request, "request");
         StarSystemId systemId = checked.systemId();
         var world = runtime.world();
+        if (checked.materializedAtTick() != world.getAuthoritativeWorldTick()) {
+            throw new IllegalStateException("tactical handoff tick differs from the authoritative world tick");
+        }
+        long encounterId = Math.addExact(checked.materializedAtTick(), 1L);
         var session = world.findSession(systemId)
                 .orElseThrow(() -> new IllegalStateException("tactical system has no ordinary local session"));
 
@@ -106,6 +110,10 @@ public final class Stage21EGeneratedWorldStage19Authority implements TacticalMat
             if (!actual.equals(row.entityState())) {
                 throw new IllegalStateException(
                         "tactical handoff payload is stale for ordinary fleet: " + row.fleetId());
+            }
+            if (actual.faction() == null || actual.faction().factionId() != row.factionId()) {
+                throw new IllegalStateException(
+                        "tactical handoff faction differs from ordinary fleet allegiance: " + row.fleetId());
             }
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             if (engineering == null) {
@@ -141,7 +149,7 @@ public final class Stage21EGeneratedWorldStage19Authority implements TacticalMat
         validateCommitBoundary(systemId, bound, result);
         commitSurvivors(systemId, anchor, bound, result);
         commitDestructions(systemId, bound, result);
-        return Math.addExact(checked.materializedAtTick(), 1L);
+        return encounterId;
     }
 
     boolean fleetExists(FleetId fleetId) {

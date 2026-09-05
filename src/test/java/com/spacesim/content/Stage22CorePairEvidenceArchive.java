@@ -9,10 +9,10 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /** Retains raw probe vectors and honest source provenance for review; never assigns a balance pass. */
-final class Stage22CorePairEvidenceArchive {
+public final class Stage22CorePairEvidenceArchive {
     private Stage22CorePairEvidenceArchive() { }
 
-    static void write(String id, Object evidence, String limitation) {
+    public static void write(String id, Object evidence, String limitation) {
         if (!id.matches("[A-Za-z0-9_.-]+")) throw new IllegalArgumentException("Invalid evidence ID");
         Map<String, Object> row = new TreeMap<>();
         row.put("evidenceId", id);
