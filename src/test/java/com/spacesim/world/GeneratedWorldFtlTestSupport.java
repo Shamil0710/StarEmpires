@@ -9,6 +9,7 @@ import com.spacesim.ship.ShipEngineeringRuntime.JumpFailure;
 public final class GeneratedWorldFtlTestSupport {
     private static final int MAX_FITTED_RECOVERY_STEPS = 10_000;
     private static final float FITTED_RECOVERY_STEP_SECONDS = 0.25f;
+    private static final int MAX_ORDINARY_JUMP_PHASES = 8;
 
     private GeneratedWorldFtlTestSupport() {
         throw new AssertionError("No instances");
@@ -53,6 +54,59 @@ public final class GeneratedWorldFtlTestSupport {
                 .position();
         checked.arrival().materialization(origin).updatePhysicalState(
                 placement.localEntityId(), LocalPhysicalKinematics.stationary(outgoing));
+    }
+
+    /**
+     * Advances an already-requested generated-world jump through the ordinary production FSM while
+     * batching only elapsed strategic time between authoritative phase boundaries.
+     *
+     * <p>This is deliberately not a force-complete seam: every phase is still entered and completed
+     * by {@link WorldSimulation}/{@link FleetJumpService}, exact departure/arrival authority still
+     * runs, fitted engineering consequences still commit at the normal boundary, and the live
+     * runtime still synchronizes freight arrivals after each transition. The helper merely avoids
+     * executing millions of unrelated local ECS ticks when an acceptance test needs a real
+     * astronomical transit whose local-system behavior is covered elsewhere.</p>
+     *
+     * @param runtime generated runtime owning the ordinary jump FSM
+     * @param fleetId fleet with an active jump request
+     */
+    public static void advanceOrdinaryJumpToCompletion(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
+            FleetId fleetId) {
+        Stage20GeneratedWorldRuntimeBridge.LiveRuntime checked = java.util.Objects.requireNonNull(
+                runtime, "runtime");
+        FleetId checkedFleetId = java.util.Objects.requireNonNull(fleetId, "fleetId");
+        int phases = 0;
+        while (checked.world().findFleetJump(checkedFleetId).isPresent()) {
+            if (++phases > MAX_ORDINARY_JUMP_PHASES) {
+                throw new AssertionError(
+                        "ordinary generated-world jump exceeded bounded phase count: " + checkedFleetId);
+            }
+            FleetJumpState state = checked.world().findFleetJump(checkedFleetId).orElseThrow();
+            StarSystemId authoritySystem = switch (state.phase()) {
+                case MOVING_TO_JUMP, JUMP_PENDING -> state.originSystemId();
+                case IN_TRANSIT, ARRIVING -> state.destinationSystemId();
+            };
+
+            // Keep the system that owns the next physical boundary authoritative before batching time.
+            checked.world().activateSystem(authoritySystem);
+            long worldTick = checked.world().getAuthoritativeWorldTick();
+            if (worldTick > state.phaseEndsTick()) {
+                throw new AssertionError(
+                        "ordinary generated-world jump passed its authoritative phase boundary: " + state);
+            }
+
+            var active = checked.world().findSession(checked.world().getActiveSystemId()).orElseThrow();
+            long remainingTicks = state.phaseEndsTick() - worldTick;
+            while (remainingTicks > 0L) {
+                int strategicTicks = (int) Math.min((long) Integer.MAX_VALUE, remainingTicks);
+                active.advanceStrategicSteps(strategicTicks);
+                remainingTicks -= strategicTicks;
+            }
+
+            // One ordinary local tick lets WorldSimulation own the exact FSM boundary and live hooks.
+            checked.advanceFrame(active.getClock().getFixedStepSeconds());
+        }
     }
 
     private static void awaitFittedJumpBoundary(
