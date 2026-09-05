@@ -4,9 +4,14 @@ import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.EntityIdComponent;
 import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
+import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityState;
 import com.spacesim.persistence.EntityStateMapper;
+import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
+import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
+import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.Stage22CorePairTacticalFactory;
 import com.spacesim.world.StrategicOperationService.SupplyDecision;
 import com.spacesim.world.StrategicOperationState.OperationState;
@@ -16,6 +21,7 @@ import com.spacesim.world.StrategicOperationState.RulesOfEngagement;
 import com.spacesim.world.StrategicOperationState.SupplyPolicy;
 import com.spacesim.world.StrategicOperationState.WithdrawalPolicy;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -26,6 +32,12 @@ import java.util.List;
  * persistent engineering payload; reinforcement admission is rejected until the reserve is physically
  * located in the objective system; and loss of observed supply access is handled by the ordinary
  * operation withdrawal decision. No faction-specific readiness or reinforcement modifier exists here.</p>
+ *
+ * <p>The common tactical duel intentionally carries only 120 rounds. Prepared defense is a distinct
+ * starting condition, so before any operation begins this probe increases only the existing ammunition
+ * loads to the declared ten-percent mission-readiness floor. The amount-per-round and physical mass per
+ * round are taken from the exact existing load, and the authored interface capacity remains the upper
+ * bound. No in-operation refill, resource grant or faction-specific stock rule is introduced.</p>
  */
 public final class Stage22CorePairPreparedDefenseProbe {
     private static final StarSystemId STAGING_SYSTEM = new StarSystemId(22_609L);
@@ -56,10 +68,77 @@ public final class Stage22CorePairPreparedDefenseProbe {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Missing Industrial Union core combatant"))
                 .engineering();
-        FleetReadinessEvaluator evaluator = new FleetReadinessEvaluator(duel.content().engineering());
+        ShipEngineeringCatalog engineering = duel.content().engineering();
+        FleetReadinessEvaluator evaluator = new FleetReadinessEvaluator(engineering);
         return new Result(
-                evaluateFaction(empire, evaluator, 1, 22_609_101L),
-                evaluateFaction(union, evaluator, 2, 22_609_201L));
+                evaluateFaction(preparedDefenseLoadout(empire, engineering), evaluator, 1, 22_609_101L),
+                evaluateFaction(preparedDefenseLoadout(union, engineering), evaluator, 2, 22_609_201L));
+    }
+
+    private static EngineeringComponent preparedDefenseLoadout(
+            EngineeringComponent source,
+            ShipEngineeringCatalog catalog) {
+        ConsumableState current = source.runtimeState.consumables();
+        ArrayList<ConsumableLoad> loads = new ArrayList<>(current.interfaceLoads().size());
+        for (ConsumableLoad load : current.interfaceLoads()) {
+            if (load.kind() != InterfaceKind.AMMUNITION) {
+                loads.add(load);
+                continue;
+            }
+            if (load.itemCount() <= 0L || !(load.amount() > 0d) || !(load.massKg() > 0d)) {
+                throw new AssertionError("Prepared core ammunition seed must be itemized and physical: " + load);
+            }
+            var installed = source.fit.installedModules().stream()
+                    .filter(value -> value.mountId().equals(load.mountId()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Prepared ammunition mount is not installed: " + load.mountId()));
+            var module = catalog.findModule(installed.moduleId());
+            if (module == null) {
+                throw new AssertionError("Prepared ammunition module is absent from exact core catalog: "
+                        + installed.moduleId());
+            }
+            var physicalInterface = module.interfaces().stream()
+                    .filter(value -> value.kind() == InterfaceKind.AMMUNITION
+                            && value.id().equals(load.interfaceId()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Prepared ammunition interface is absent: " + load));
+
+            double amountPerRound = load.amount() / load.itemCount();
+            double massPerRoundKg = load.massKg() / load.itemCount();
+            double minimumAmount = physicalInterface.capacity()
+                    * MINIMUM_MISSION_READINESS_BPS / FleetReadinessState.FULL;
+            long preparedRounds = Math.max(
+                    load.itemCount(),
+                    (long) Math.ceil(minimumAmount / amountPerRound));
+            double preparedAmount = preparedRounds * amountPerRound;
+            if (preparedAmount > physicalInterface.capacity() + 1e-9d) {
+                throw new AssertionError("Prepared ammunition exceeds authored interface capacity: " + load.mountId());
+            }
+            loads.add(new ConsumableLoad(
+                    load.mountId(),
+                    load.interfaceId(),
+                    load.kind(),
+                    preparedAmount,
+                    preparedRounds * massPerRoundKg,
+                    preparedRounds));
+        }
+
+        ConsumableState prepared = new ConsumableState(
+                current.cargoMassKg(),
+                current.storesMassKg(),
+                current.missionPayloadMassKg(),
+                current.missionIntegrationVolumeM3(),
+                loads);
+        RuntimeState runtime = source.runtimeState;
+        RuntimeState preparedRuntime = new RuntimeState(
+                prepared,
+                runtime.sharedBusEnergyJ(),
+                runtime.shipHeatStoredJ(),
+                runtime.localHeatJByMount(),
+                runtime.thrustLimitNByMount(),
+                runtime.coolantBusCapacityW(),
+                runtime.ftlCooldownSecondsByMount());
+        return new EngineeringComponent(source.fit, preparedRuntime, source.instanceState);
     }
 
     private static FactionResult evaluateFaction(
@@ -132,8 +211,8 @@ public final class Stage22CorePairPreparedDefenseProbe {
                 .decision();
 
         return new FactionResult(
-                defenderReadiness.overallBps(),
-                reserveReadiness.overallBps(),
+                defenderReadiness,
+                reserveReadiness,
                 rejectedBeforePhysicalArrival,
                 attachedAfterPhysicalArrival,
                 reinforced.requireOperation(1L).participantFleetIds().size(),
@@ -170,8 +249,8 @@ public final class Stage22CorePairPreparedDefenseProbe {
 
     /** One faction's ordinary operational-authority observations. */
     public record FactionResult(
-            int defenderReadinessBps,
-            int reserveReadinessBps,
+            FleetReadinessState defenderReadiness,
+            FleetReadinessState reserveReadiness,
             boolean rejectedBeforePhysicalArrival,
             boolean attachedAfterPhysicalArrival,
             int committedParticipantCount,
