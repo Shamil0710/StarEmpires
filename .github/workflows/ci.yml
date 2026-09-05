@@ -12,9 +12,10 @@ jobs:
   verify:
     name: Java 17 verification
     runs-on: ubuntu-latest
-    # The full suite plus packaging/Javadoc now takes about 15 minutes; allow setup, evidence
-    # upload and cleanup to finish after successful verification without cancelling the check.
-    timeout-minutes: 20
+    # The green pre-B07/B08 baseline takes about 14 minutes. M22.6 now also runs mirrored
+    # generated-world freight/combat/production and multidimensional burden acceptance, so keep
+    # the verification command and gates unchanged while allowing the deterministic suite to finish.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
