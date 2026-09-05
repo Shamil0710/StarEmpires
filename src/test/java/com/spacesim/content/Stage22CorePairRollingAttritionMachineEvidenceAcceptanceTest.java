@@ -1,5 +1,6 @@
 package com.spacesim.content;
 
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.ship.Stage19ExactTacticalEncounterResolver;
 import com.spacesim.ship.Stage22CorePairTacticalFactory;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,20 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
                 "core_pair.current",
                 Stage22CorePairExperimentProtocol.pairedSchedule(8),
                 (scenario, variant, profile, coordinate) -> {
+                    var baseline = Stage22CorePairTacticalFactory.createDestroyerDuel(coordinate.permutation());
+                    var initialEmpire = baseline.weapons().battleState().combatants().stream()
+                            .filter(actor -> actor.spec().entityId() == Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID)
+                            .findFirst()
+                            .orElseThrow(() -> new AssertionError("Missing initial Empire core combatant"));
+                    var initialUnion = baseline.weapons().battleState().combatants().stream()
+                            .filter(actor -> actor.spec().entityId() == Stage22CorePairTacticalFactory.UNION_ENTITY_ID)
+                            .findFirst()
+                            .orElseThrow(() -> new AssertionError("Missing initial Union core combatant"));
+                    long empireInitialRounds = initialEmpire.engineering().runtimeState.consumables().ammunitionCount();
+                    long unionInitialRounds = initialUnion.engineering().runtimeState.consumables().ammunitionCount();
+                    double empireInitialIntegrity = meanCompartmentIntegrity(initialEmpire.engineering());
+                    double unionInitialIntegrity = meanCompartmentIntegrity(initialUnion.engineering());
+
                     var direct = Stage22CorePairEncounterContinuationProbe.run(coordinate, false);
                     var reloaded = Stage22CorePairEncounterContinuationProbe.run(coordinate, true);
                     boolean continuationStable = direct.equals(reloaded);
@@ -54,10 +69,13 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
                             && unionLastRounds <= unionFirstRounds;
                     boolean physicalDamagePersists = empireLastIntegrity <= empireFirstIntegrity + 1e-12d
                             && unionLastIntegrity <= unionFirstIntegrity + 1e-12d;
-                    boolean materialAttritionObserved = empireLastRounds < empireFirstRounds
-                            || unionLastRounds < unionFirstRounds
-                            || empireLastIntegrity < empireFirstIntegrity - 1e-12d
-                            || unionLastIntegrity < unionFirstIntegrity - 1e-12d;
+                    // Rolling attrition is measured over the complete declared three-contact chain. The
+                    // previous version compared encounter-one exit to encounter-three exit and therefore
+                    // discarded all material expenditure/damage from the first committed contact.
+                    boolean materialAttritionObserved = empireLastRounds < empireInitialRounds
+                            || unionLastRounds < unionInitialRounds
+                            || empireLastIntegrity < empireInitialIntegrity - 1e-12d
+                            || unionLastIntegrity < unionInitialIntegrity - 1e-12d;
 
                     List<String> breaches = new ArrayList<>();
                     if (!continuationStable) breaches.add("b13_save_continuation_drift");
@@ -67,16 +85,20 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
                     if (!materialAttritionObserved) breaches.add("b13_no_material_attrition_observed");
 
                     return new Stage22CorePairMachineEvidenceBatch.ObservationPayload(
-                            Map.of(
-                                    "encounter_count", (double) direct.size(),
-                                    "empire_first_rounds", (double) empireFirstRounds,
-                                    "empire_last_rounds", (double) empireLastRounds,
-                                    "union_first_rounds", (double) unionFirstRounds,
-                                    "union_last_rounds", (double) unionLastRounds,
-                                    "empire_first_mean_integrity", empireFirstIntegrity,
-                                    "empire_last_mean_integrity", empireLastIntegrity,
-                                    "union_first_mean_integrity", unionFirstIntegrity,
-                                    "union_last_mean_integrity", unionLastIntegrity),
+                            Map.ofEntries(
+                                    Map.entry("encounter_count", (double) direct.size()),
+                                    Map.entry("empire_initial_rounds", (double) empireInitialRounds),
+                                    Map.entry("empire_first_rounds", (double) empireFirstRounds),
+                                    Map.entry("empire_last_rounds", (double) empireLastRounds),
+                                    Map.entry("union_initial_rounds", (double) unionInitialRounds),
+                                    Map.entry("union_first_rounds", (double) unionFirstRounds),
+                                    Map.entry("union_last_rounds", (double) unionLastRounds),
+                                    Map.entry("empire_initial_mean_integrity", empireInitialIntegrity),
+                                    Map.entry("empire_first_mean_integrity", empireFirstIntegrity),
+                                    Map.entry("empire_last_mean_integrity", empireLastIntegrity),
+                                    Map.entry("union_initial_mean_integrity", unionInitialIntegrity),
+                                    Map.entry("union_first_mean_integrity", unionFirstIntegrity),
+                                    Map.entry("union_last_mean_integrity", unionLastIntegrity)),
                             Map.of(
                                     "save_continuation_stable", continuationStable ? 1d : 0d,
                                     "three_committed_encounters", threeCommitted ? 1d : 0d,
@@ -111,7 +133,7 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B13-rolling-attrition-paired-8",
                 archive,
-                "Three committed exact-core Stage-19 encounters with seeded mirrored contact geometry, save/restore continuation and finite stores. Production, paid replacement cadence, backlog and long-war campaign trajectory remain open.");
+                "Three committed exact-core Stage-19 encounters with seeded mirrored contact geometry, save/restore continuation and finite stores. Material attrition is measured from the declared pre-contact baseline through the final committed exit. Production, paid replacement cadence, backlog and long-war campaign trajectory remain open.");
     }
 
     private static Stage19ExactTacticalEncounterResolver.CombatantResult combatant(
@@ -127,6 +149,14 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
         var values = actor.instanceState().damage().compartmentIntegrityById().values();
         if (values.isEmpty()) {
             throw new AssertionError("Core combatant has no compartment integrity state");
+        }
+        return values.stream().mapToDouble(Double::doubleValue).average().orElseThrow();
+    }
+
+    private static double meanCompartmentIntegrity(EngineeringComponent component) {
+        var values = component.instanceState.damage().compartmentIntegrityById().values();
+        if (values.isEmpty()) {
+            throw new AssertionError("Initial core combatant has no compartment integrity state");
         }
         return values.stream().mapToDouble(Double::doubleValue).average().orElseThrow();
     }
