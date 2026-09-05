@@ -72,9 +72,6 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
     private static final double CRITICAL_INTEGRITY = 1.0e-6d;
     private static final double PROCESS_WINDOW_SECONDS = 1.0e9d;
     private static final double EPSILON = 1.0e-7d;
-    /** Maximal useful batching below SimulationLoop's 2,048 fixed-tick per-frame guard. */
-    private static final float SIMULATION_WAIT_FRAME_SECONDS = 100f;
-    private static final int MAX_WAIT_FRAMES_PER_JUMP = 10_000;
 
     @Test
     void destroyedInterdictorLetsSameIndustrialOrderFeedRealProductionForBothCoreFits() {
@@ -387,18 +384,7 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
     private static void awaitJump(
             Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
             FleetId fleetId) {
-        int frames = 0;
-        while (runtime.world().findFleetJump(fleetId).isPresent()) {
-            if (++frames > MAX_WAIT_FRAMES_PER_JUMP) {
-                throw new AssertionError("ordinary B08 FTL jump exceeded bounded wait frames: " + fleetId);
-            }
-            var state = runtime.world().findFleetJump(fleetId).orElseThrow();
-            long worldTick = runtime.world().getAuthoritativeWorldTick();
-            if (worldTick > state.phaseEndsTick() + 1L) {
-                throw new AssertionError("ordinary FTL phase exceeded its authoritative phaseEndsTick: " + state);
-            }
-            runtime.advanceFrame(SIMULATION_WAIT_FRAME_SECONDS);
-        }
+        GeneratedWorldFtlTestSupport.advanceOrdinaryJumpToCompletion(runtime, fleetId);
     }
 
     private static List<StarSystemId> route(
