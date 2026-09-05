@@ -3,6 +3,7 @@ package com.spacesim.content;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.EntityIdComponent;
+import com.spacesim.content.Stage22CorePairExperimentProtocol.RunCoordinate;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.ImportedCombatantState;
@@ -11,25 +12,41 @@ import com.spacesim.ship.Stage22CorePairTacticalFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SplittableRandom;
 
 /** Persists exact core ships between committed encounters, including damage and finite stores. */
 final class Stage22CorePairEncounterContinuationProbe {
+    private static final double CONTACT_CENTER_X_M = 1_000d;
+    private static final double CONTACT_CENTER_Y_M = 700d;
+
     private Stage22CorePairEncounterContinuationProbe() { }
 
     static List<Stage19ExactTacticalEncounterResolver.Result> run(
-            Stage22CorePairExperimentProtocol.Permutation permutation, boolean reloadBetweenEncounters) {
-        var fixture = Stage22CorePairTacticalFactory.createDestroyerDuel(permutation);
+            RunCoordinate coordinate, boolean reloadBetweenEncounters) {
+        var fixture = Stage22CorePairTacticalFactory.createDestroyerDuel(coordinate.permutation());
         var resolver = new Stage19ExactTacticalEncounterResolver(fixture.content().engineering(),
                 fixture.protection(), fixture.content().ammunition(), fixture.content().launchers());
+        var random = new SplittableRandom(coordinate.seed());
+        double separationM = 900d + random.nextDouble() * 900d;
+        double lateralM = random.nextDouble(-180d, 180d);
+        double velocityMps = random.nextDouble(0d, 12d);
+        int orientation = coordinate.permutation() == Stage22CorePairExperimentProtocol.Permutation.DEFAULT ? 1 : -1;
         List<ImportedCombatantState> inputs = fixture.weapons().battleState().combatants().stream()
-                .map(actor -> new ImportedCombatantState(actor.spec().entityId(), actor.spec().side(), actor.engineering(),
-                        actor.transform().position.x, actor.transform().position.y,
-                        actor.transform().velocity.x, actor.transform().velocity.y)).toList();
+                .map(actor -> {
+                    boolean empire = actor.spec().entityId() == Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID;
+                    int direction = (empire ? 1 : -1) * orientation;
+                    return new ImportedCombatantState(actor.spec().entityId(), actor.spec().side(), actor.engineering(),
+                            CONTACT_CENTER_X_M - direction * separationM / 2d,
+                            CONTACT_CENTER_Y_M - direction * lateralM / 2d,
+                            direction * velocityMps,
+                            0d);
+                }).toList();
         // B13 models three distinct operational contacts. Strategic transit between contacts is outside
-        // this boundary probe, so every contact reuses the same mirrored encounter geometry while the
-        // exact engineering state (damage, ammunition, reaction mass, shields and maintenance) carries
-        // forward. Reusing retreat kinematics from the previous local battle can make later contacts
-        // never re-enter sensing/weapon range and therefore would not exercise rolling attrition.
+        // this boundary probe, so every contact reuses the same seeded/mirrored encounter geometry while
+        // the exact engineering state (damage, ammunition, reaction mass, shields and maintenance) carries
+        // forward. This is the already-accepted B07/B11/B12 paired contact geometry; unlike the factory's
+        // neutral zero-velocity authoring geometry it deterministically enters the common Stage-19 sensing
+        // and weapon envelope, so rolling attrition actually exercises finite stores and physical damage.
         List<ImportedCombatantState> engagementGeometry = inputs;
         boolean rejectedByLegacyContent = false;
         try {
@@ -41,7 +58,7 @@ final class Stage22CorePairEncounterContinuationProbe {
         var results = new ArrayList<Stage19ExactTacticalEncounterResolver.Result>();
         for (int encounter = 0; encounter < 3; encounter++) {
             var before = inputs.stream().map(actor -> state(actor.entityId(), actor.engineering())).toList();
-            var result = resolver.resolve(inputs, 600L);
+            var result = resolver.resolve(inputs, Stage22CorePairTacticalProbe.TICKS);
             if (!before.equals(inputs.stream().map(actor -> state(actor.entityId(), actor.engineering())).toList())) {
                 throw new AssertionError("Resolver mutated world-owned input ships");
             }
@@ -81,10 +98,10 @@ final class Stage22CorePairEncounterContinuationProbe {
     }
 
     public static void main(String[] args) {
-        for (var permutation : Stage22CorePairExperimentProtocol.Permutation.values()) {
-            var direct = run(permutation, false);
-            if (!direct.equals(run(permutation, true))) throw new AssertionError("Committed-encounter save continuation diverged");
-            System.out.println(permutation + "|encounters=" + direct.size() + "|remainingRounds="
+        for (var coordinate : Stage22CorePairExperimentProtocol.pairedSchedule(1)) {
+            var direct = run(coordinate, false);
+            if (!direct.equals(run(coordinate, true))) throw new AssertionError("Committed-encounter save continuation diverged");
+            System.out.println(coordinate + "|encounters=" + direct.size() + "|remainingRounds="
                     + direct.get(direct.size() - 1).combatants().stream()
                             .map(actor -> actor.runtimeState().consumables().ammunitionCount()).toList());
         }
