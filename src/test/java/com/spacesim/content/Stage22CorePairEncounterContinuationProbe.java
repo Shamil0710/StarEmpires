@@ -25,6 +25,12 @@ final class Stage22CorePairEncounterContinuationProbe {
                 .map(actor -> new ImportedCombatantState(actor.spec().entityId(), actor.spec().side(), actor.engineering(),
                         actor.transform().position.x, actor.transform().position.y,
                         actor.transform().velocity.x, actor.transform().velocity.y)).toList();
+        // B13 models three distinct operational contacts. Strategic transit between contacts is outside
+        // this boundary probe, so every contact reuses the same mirrored encounter geometry while the
+        // exact engineering state (damage, ammunition, reaction mass, shields and maintenance) carries
+        // forward. Reusing retreat kinematics from the previous local battle can make later contacts
+        // never re-enter sensing/weapon range and therefore would not exercise rolling attrition.
+        List<ImportedCombatantState> engagementGeometry = inputs;
         boolean rejectedByLegacyContent = false;
         try {
             new Stage19ExactTacticalEncounterResolver().resolve(inputs, 1L);
@@ -58,8 +64,12 @@ final class Stage22CorePairEncounterContinuationProbe {
                     if (!saved.equals(EntityStateMapper.capture(restored))) throw new AssertionError("Encounter-exit save drift");
                     component = restored.getComponent(EngineeringComponent.class);
                 }
+                var geometry = engagementGeometry.stream()
+                        .filter(row -> row.entityId() == actor.entityId())
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError("Missing encounter geometry for " + actor.entityId()));
                 return new ImportedCombatantState(actor.entityId(), actor.side(), component,
-                        actor.xM(), actor.yM(), actor.velocityXMps(), actor.velocityYMps());
+                        geometry.xM(), geometry.yM(), geometry.velocityXMps(), geometry.velocityYMps());
             }).toList();
             if (result.termination() == Stage19ExactTacticalEncounterResolver.Termination.PHYSICAL_DESTRUCTION) break;
         }
