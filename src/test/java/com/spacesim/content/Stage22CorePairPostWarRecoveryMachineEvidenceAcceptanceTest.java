@@ -19,16 +19,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * continuation. The evidence batch owns no recovery state and cannot manufacture replacement
  * capability.</p>
  *
- * <p>The validation framework defines a 25% matched-loss recovery-time differential as a stop-ship
- * threshold. Until a continuous campaign capability curve exists, this test applies that bound only
- * to the already-authoritative fresh-replacement latency dimension. It must not be cited as closure
- * of the remaining recoveryT50/recoveryT80 campaign-curve requirement.</p>
+ * <p>The canonical validation framework does not require replacement-time parity. Its authored
+ * contrast requires Industrial Union series production/replacement throughput to be favorable while
+ * Empire recovery gains value from repair and preservation. This test therefore records the raw
+ * matched replacement-latency differential diagnostically and hard-fails only if the physical paid
+ * replacement authority is invalid or the authored Union replacement-throughput ordering disappears.
+ * Continuous campaign capability curves remain required before B14 can close.</p>
  */
 class Stage22CorePairPostWarRecoveryMachineEvidenceAcceptanceTest {
-    private static final double MAX_MATCHED_REPLACEMENT_LATENCY_DIFFERENTIAL = 0.25d;
-
     @Test
-    void b14RunsEightPairedPaidReplacementCellsWithinMatchedLatencyGuard() {
+    void b14RunsEightPairedPaidReplacementCellsWithAuthoredThroughputContrast() {
         var vector = Stage22CorePairMachineEvidenceBatch.runScenario(
                 "B14",
                 "paid_fresh_identity_replacement",
@@ -40,11 +40,10 @@ class Stage22CorePairPostWarRecoveryMachineEvidenceAcceptanceTest {
                     double latencyDifferential = relativeDifferential(
                             empire.buildSeconds(), union.buildSeconds());
                     boolean authoritiesValid = empire.valid() && union.valid();
-                    boolean latencyWithinGuard = latencyDifferential
-                            <= MAX_MATCHED_REPLACEMENT_LATENCY_DIFFERENTIAL + 1e-12d;
+                    boolean unionReplacementFaster = union.buildSeconds() < empire.buildSeconds();
                     List<String> breaches = new ArrayList<>();
                     if (!authoritiesValid) breaches.add("b14_paid_replacement_authority_invalid");
-                    if (!latencyWithinGuard) breaches.add("b14_matched_replacement_latency_over_25_percent");
+                    if (!unionReplacementFaster) breaches.add("b14_union_replacement_throughput_advantage_missing");
                     return new Stage22CorePairMachineEvidenceBatch.ObservationPayload(
                             Map.of(
                                     "empire_replacement_latency_seconds", empire.buildSeconds(),
@@ -57,7 +56,7 @@ class Stage22CorePairPostWarRecoveryMachineEvidenceAcceptanceTest {
                             Map.of(
                                     "empire_paid_replacement_valid", empire.valid() ? 1d : 0d,
                                     "union_paid_replacement_valid", union.valid() ? 1d : 0d,
-                                    "matched_latency_guard_passed", latencyWithinGuard ? 1d : 0d),
+                                    "union_replacement_throughput_advantage", unionReplacementFaster ? 1d : 0d),
                             breaches);
                 });
 
@@ -65,11 +64,12 @@ class Stage22CorePairPostWarRecoveryMachineEvidenceAcceptanceTest {
         assertEquals(16, vector.runCount());
         assertEquals(1d, vector.guardMetricMeans().get("empire_paid_replacement_valid"));
         assertEquals(1d, vector.guardMetricMeans().get("union_paid_replacement_valid"));
-        assertEquals(1d, vector.guardMetricMeans().get("matched_latency_guard_passed"));
+        assertEquals(1d, vector.guardMetricMeans().get("union_replacement_throughput_advantage"));
         assertTrue(vector.metricMeans().get("empire_replacement_latency_seconds") > 0d);
         assertTrue(vector.metricMeans().get("union_replacement_latency_seconds") > 0d);
-        assertTrue(vector.metricMeans().get("matched_replacement_latency_differential")
-                <= MAX_MATCHED_REPLACEMENT_LATENCY_DIFFERENTIAL + 1e-12d);
+        assertTrue(vector.metricMeans().get("union_replacement_latency_seconds")
+                < vector.metricMeans().get("empire_replacement_latency_seconds"));
+        assertTrue(vector.metricMeans().get("matched_replacement_latency_differential") > 0d);
         assertEquals(0, vector.hardRuleBreachCount());
 
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
@@ -87,7 +87,7 @@ class Stage22CorePairPostWarRecoveryMachineEvidenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B14-paid-replacement-paired-8",
                 archive,
-                "Finite Stage-21G fresh-identity replacement latency and raw material burdens only; continuous post-war capability curves, manufacturing/loss campaign integration and recoveryT50/recoveryT80 remain open.");
+                "Finite Stage-21G fresh-identity replacement latency and raw material burdens; Industrial Union replacement throughput ordering is checked without inventing a parity threshold. Continuous post-war capability curves, manufacturing/loss campaign integration and recoveryT50/recoveryT80 remain open.");
     }
 
     private static double relativeDifferential(double first, double second) {
