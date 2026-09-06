@@ -242,8 +242,7 @@ class Stage22CorePairOffensiveProjectionGeneratedWorldAcceptanceTest {
 
     private static String exactFitId(ShipEngineeringCatalog catalog, InstalledFit fit) {
         return catalog.getDemonstratorFits().stream()
-                .filter(definition -> definition.hullId().equals(fit.hullId()))
-                .filter(definition -> definition.installedModules().equals(fit.installedModules()))
+                .filter(definition -> InstalledFit.fromDemonstrator(definition).equals(fit))
                 .map(DemonstratorFitDefinition::id)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Generated B10 fleet lost exact strategic fit identity"));
