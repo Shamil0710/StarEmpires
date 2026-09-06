@@ -128,7 +128,7 @@ class Stage22CorePairOffensiveProjectionGeneratedWorldAcceptanceTest {
                 assertEquals(target, arrivedPlacement.systemId());
                 EngineeringComponent arrivedEngineering = entity(runtime, arrivedPlacement)
                         .getComponent(EngineeringComponent.class);
-                assertEquals(fitIds.get(shipIndex()), exactFitId(catalog, arrivedEngineering.fit),
+                assertEquals(fitIds.get(shipIndex), exactFitId(catalog, arrivedEngineering.fit),
                         "ordinary FTL movement must preserve the exact strategic fit assignment");
                 arrived++;
             }
