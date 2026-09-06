@@ -6,10 +6,11 @@ import java.util.ArrayList;
  * Composes the two accepted Stage-22 core engineering packages into one immutable runtime universe.
  *
  * <p>The original M22.3/M22.4 package loaders remain unchanged so their accepted visual/content
- * fingerprints stay stable. M22.6 then applies explicit versioned radar/shield runtime completion and
- * the common strategic-mobility projection to the combined universe. No normalization or faction-name
- * capability is added: every package-specific material, hull and base-fit burden remains authored,
- * while strategic variants pay for FTL by displacing an existing defensive utility module.</p>
+ * fingerprints stay stable. M22.6 then applies explicit versioned radar/shield runtime completion,
+ * a common paid command-network projection and the common strategic-mobility projection to the
+ * combined universe. No normalization or faction-name capability is added: every package-specific
+ * material, hull and base-fit burden remains authored, while command-network and strategic variants
+ * pay for their capability by displacing an existing defensive utility module.</p>
  */
 public final class Stage22CorePairEngineeringCatalogLoader {
     private Stage22CorePairEngineeringCatalogLoader() {
@@ -20,7 +21,7 @@ public final class Stage22CorePairEngineeringCatalogLoader {
      * Loads, runtime-completes and combines Empire and Industrial Union engineering content.
      *
      * @return one immutable common Stage-17.5 schema catalog containing both core packages and the
-     *         versioned common strategic-mobility variants
+     *         versioned common command-network and strategic-mobility variants
      */
     public static ShipEngineeringCatalog loadDefault() {
         ShipEngineeringCatalog empire = runtimeComplete(Stage22EmpireEngineeringCatalogLoader.loadDefault());
@@ -38,7 +39,8 @@ public final class Stage22CorePairEngineeringCatalogLoader {
                 concat(empire.getHulls(), union.getHulls()),
                 concat(empire.getModules(), union.getModules()),
                 concat(empire.getDemonstratorFits(), union.getDemonstratorFits()));
-        return Stage22CorePairStrategicMobilityProjection.apply(combined);
+        ShipEngineeringCatalog network = Stage22CorePairCommandNetworkProjection.apply(combined);
+        return Stage22CorePairStrategicMobilityProjection.apply(network);
     }
 
     private static ShipEngineeringCatalog runtimeComplete(ShipEngineeringCatalog source) {

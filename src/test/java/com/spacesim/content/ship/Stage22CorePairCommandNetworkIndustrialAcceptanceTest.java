@@ -18,47 +18,49 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class Stage22CorePairStrategicMobilityIndustrialAcceptanceTest {
+class Stage22CorePairCommandNetworkIndustrialAcceptanceTest {
     @Test
-    void strategicFtlIsARealStage18ProductWithFiniteAuthoredConstructionBurden() {
+    void coreDatalinkIsARealStage18ProductWithFiniteCommonPhysics() {
         ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
-        ModuleDefinition ftl = engineering.findModule(Stage22CorePairStrategicMobilityProjection.FTL_MODULE_ID);
+        ModuleDefinition datalink = engineering.findModule(Stage22CorePairCommandNetworkProjection.DATALINK_MODULE_ID);
 
-        assertNotNull(ftl);
-        assertEquals(ModuleFamily.FTL_JUMP, ftl.family());
-        assertTrue(ftl.massKg() > 0d && Double.isFinite(ftl.massKg()));
-        assertTrue(ftl.constructionInputs().size() >= 3);
-        assertTrue(ftl.constructionInputs().stream()
+        assertNotNull(datalink);
+        assertEquals(ModuleFamily.COMMUNICATION_DATALINK, datalink.family());
+        assertTrue(datalink.massKg() > 0d && Double.isFinite(datalink.massKg()));
+        assertTrue(datalink.continuousPowerDemandW() > 0d);
+        assertEquals(64d, datalink.capabilityParameters().get("support_channels"));
+        assertTrue(datalink.constructionInputs().size() >= 3);
+        assertTrue(datalink.constructionInputs().stream()
                 .allMatch(input -> input.amount() > 0d && Double.isFinite(input.amount())));
 
         Stage18ManufacturingProductRegistry manufacturing = Stage18ManufacturingProductRegistry.loadDefault()
                 .withEngineeringCatalog(engineering, Provenance.STAGE22_AUTHORED);
-        Stage18ManufacturingProductRegistry.ProductDefinition product = manufacturing.findProduct(ftl.id());
+        Stage18ManufacturingProductRegistry.ProductDefinition product = manufacturing.findProduct(datalink.id());
 
         assertNotNull(product);
         assertEquals(ProductKind.MODULE, product.kind());
-        assertEquals(ftl.massKg(), product.unitMassKg());
+        assertEquals(datalink.massKg(), product.unitMassKg());
         assertEquals(Provenance.STAGE22_AUTHORED, product.provenance());
     }
 
     @Test
-    void eachFactionPaysOrdinaryShipyardWorkForTheCommonFtlModule() {
+    void eachFactionPaysOrdinaryShipyardWorkForTheSamePhysicalDatalink() {
         ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog empireBase = Stage22EmpireShipyardIndustrialCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog unionBase = Stage22IndustrialUnionShipyardIndustrialCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog empire = Stage22CorePairShipyardIndustrialCatalogLoader.loadEmpireDefault();
         ShipyardIndustrialCatalog union = Stage22CorePairShipyardIndustrialCatalogLoader.loadIndustrialUnionDefault();
-        String ftlId = Stage22CorePairStrategicMobilityProjection.FTL_MODULE_ID;
+        String datalinkId = Stage22CorePairCommandNetworkProjection.DATALINK_MODULE_ID;
 
-        assertNull(empireBase.findModuleProfile(ftlId));
-        assertNull(unionBase.findModuleProfile(ftlId));
-        assertTrue(empire.getModuleProfiles().size() > empireBase.getModuleProfiles().size(),
-                "M22.6 composition may contain multiple paid common module projections");
-        assertTrue(union.getModuleProfiles().size() > unionBase.getModuleProfiles().size(),
-                "M22.6 composition may contain multiple paid common module projections");
+        assertNull(empireBase.findModuleProfile(datalinkId));
+        assertNull(unionBase.findModuleProfile(datalinkId));
+        assertEquals(empireBase.getModuleProfiles().size() + 2, empire.getModuleProfiles().size(),
+                "M22.6 must expose exactly the paid FTL and command-network common profiles");
+        assertEquals(unionBase.getModuleProfiles().size() + 2, union.getModuleProfiles().size(),
+                "M22.6 must expose exactly the paid FTL and command-network common profiles");
 
-        ModuleIndustrialProfile empireProfile = empire.findModuleProfile(ftlId);
-        ModuleIndustrialProfile unionProfile = union.findModuleProfile(ftlId);
+        ModuleIndustrialProfile empireProfile = empire.findModuleProfile(datalinkId);
+        ModuleIndustrialProfile unionProfile = union.findModuleProfile(datalinkId);
         assertPaidProfile(empireProfile);
         assertPaidProfile(unionProfile);
         assertNotEquals(empireProfile.fabricationCapabilities(), unionProfile.fabricationCapabilities());
@@ -67,29 +69,31 @@ class Stage22CorePairStrategicMobilityIndustrialAcceptanceTest {
         assertNotEquals(empireProfile.installationWorkSeconds(), unionProfile.installationWorkSeconds());
 
         assertThrows(IllegalArgumentException.class,
-                () -> Stage22CorePairStrategicMobilityIndustrialProjection.applyEmpire(empire, engineering));
+                () -> Stage22CorePairCommandNetworkIndustrialProjection.applyEmpire(empire, engineering));
         assertThrows(IllegalArgumentException.class,
-                () -> Stage22CorePairStrategicMobilityIndustrialProjection.applyIndustrialUnion(union, engineering));
+                () -> Stage22CorePairCommandNetworkIndustrialProjection.applyIndustrialUnion(union, engineering));
     }
 
     @Test
-    void allStrategicVariantsCarryThePaidFtlWhileBaseCombatFitsRemainSeparate() {
+    void commandVariantsPayWithDefenseSlotWhileAcceptedBaseFitsRemainShielded() {
         ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
-        String ftlId = Stage22CorePairStrategicMobilityProjection.FTL_MODULE_ID;
-        List<String> strategicFits = List.of(
-                Stage22CorePairStrategicMobilityProjection.EMPIRE_DESTROYER_STRATEGIC_FIT,
-                Stage22CorePairStrategicMobilityProjection.EMPIRE_TANKER_STRATEGIC_FIT,
-                Stage22CorePairStrategicMobilityProjection.EMPIRE_SUPPORT_STRATEGIC_FIT,
-                Stage22CorePairStrategicMobilityProjection.UNION_DESTROYER_STRATEGIC_FIT,
-                Stage22CorePairStrategicMobilityProjection.UNION_TANKER_STRATEGIC_FIT,
-                Stage22CorePairStrategicMobilityProjection.UNION_SUPPORT_STRATEGIC_FIT);
+        String datalinkId = Stage22CorePairCommandNetworkProjection.DATALINK_MODULE_ID;
+        List<String> commandFits = List.of(
+                Stage22CorePairCommandNetworkProjection.EMPIRE_DESTROYER_COMMAND_FIT,
+                Stage22CorePairCommandNetworkProjection.UNION_DESTROYER_COMMAND_FIT);
 
-        for (String fitId : strategicFits) {
+        for (String fitId : commandFits) {
             DemonstratorFitDefinition fit = engineering.findDemonstratorFit(fitId);
             assertNotNull(fit, fitId);
             assertEquals(1L, fit.installedModules().stream()
-                    .filter(module -> ftlId.equals(module.moduleId()))
+                    .filter(module -> "utility_defense".equals(module.mountId()))
+                    .filter(module -> datalinkId.equals(module.moduleId()))
                     .count(), fitId);
+            assertTrue(fit.installedModules().stream()
+                    .filter(module -> "utility_defense".equals(module.mountId()))
+                    .map(module -> engineering.findModule(module.moduleId()))
+                    .noneMatch(module -> module != null && module.family() == ModuleFamily.SHIELD_FIELD),
+                    fitId + " must physically trade the defensive slot for network capability");
         }
 
         for (String baseFitId : List.of(
@@ -97,7 +101,12 @@ class Stage22CorePairStrategicMobilityIndustrialAcceptanceTest {
                 "fit.industrial_union.destroyer.line_v1")) {
             DemonstratorFitDefinition fit = engineering.findDemonstratorFit(baseFitId);
             assertNotNull(fit, baseFitId);
-            assertTrue(fit.installedModules().stream().noneMatch(module -> ftlId.equals(module.moduleId())), baseFitId);
+            assertTrue(fit.installedModules().stream().noneMatch(module -> datalinkId.equals(module.moduleId())), baseFitId);
+            assertTrue(fit.installedModules().stream()
+                    .filter(module -> "utility_defense".equals(module.mountId()))
+                    .map(module -> engineering.findModule(module.moduleId()))
+                    .anyMatch(module -> module != null && module.family() == ModuleFamily.SHIELD_FIELD),
+                    baseFitId + " accepted combat fit must retain its authored defense module");
         }
     }
 
