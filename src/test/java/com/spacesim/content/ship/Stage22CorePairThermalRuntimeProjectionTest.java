@@ -53,7 +53,7 @@ class Stage22CorePairThermalRuntimeProjectionTest {
             var state = runtime.initialize(fit, fullReactionMass(catalog, definition), DamageState.pristine());
             var plan = runtime.planJump(fit, state, DamageState.pristine());
             assertTrue(plan.allowed(), "strategic destroyer must plan through the ordinary fitted FTL authority");
-            state = runtime.commitJump(fit, state, DamageState.pristine(), plan);
+            state = runtime.commitJump(state, plan);
 
             for (int second = 0; second < 60; second++) {
                 state = runtime.advance(
