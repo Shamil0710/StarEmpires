@@ -14,7 +14,11 @@ public final class Stage22CorePairShipyardIndustrialCatalogLoader {
         throw new AssertionError("utility class");
     }
 
-    /** Loads the Empire's accepted industrial requirements plus paid common M22.6 module profiles. */
+    /**
+     * Loads the Empire's accepted industrial requirements plus paid common M22.6 module profiles.
+     *
+     * @return completed Empire shipyard industrial catalog for M22.6
+     */
     public static ShipyardIndustrialCatalog loadEmpireDefault() {
         ShipyardIndustrialCatalog base = Stage22EmpireShipyardIndustrialCatalogLoader.loadDefault();
         ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
@@ -23,7 +27,11 @@ public final class Stage22CorePairShipyardIndustrialCatalogLoader {
         return Stage22CorePairCommandNetworkIndustrialProjection.applyEmpire(strategic, engineering);
     }
 
-    /** Loads the Industrial Union's accepted industrial requirements plus paid common M22.6 module profiles. */
+    /**
+     * Loads the Industrial Union's accepted industrial requirements plus paid common M22.6 module profiles.
+     *
+     * @return completed Industrial Union shipyard industrial catalog for M22.6
+     */
     public static ShipyardIndustrialCatalog loadIndustrialUnionDefault() {
         ShipyardIndustrialCatalog base = Stage22IndustrialUnionShipyardIndustrialCatalogLoader.loadDefault();
         ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
