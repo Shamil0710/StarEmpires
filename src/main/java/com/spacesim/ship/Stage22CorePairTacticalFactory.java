@@ -5,6 +5,7 @@ import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
+import com.spacesim.content.ship.Stage22CorePairCommandNetworkProjection;
 import com.spacesim.content.ship.ShipProtectionCatalog;
 import com.spacesim.content.ship.Stage22CorePairProtectionCatalogLoader;
 import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader;
@@ -35,6 +36,10 @@ public final class Stage22CorePairTacticalFactory {
     public static final long EMPIRE_ENTITY_ID = 226_101L;
     /** Stable Industrial Union combatant identity used by deterministic M22.6 paired runs. */
     public static final long UNION_ENTITY_ID = 226_201L;
+    /** Stable Empire command-network wingman identity. */
+    public static final long EMPIRE_COMMAND_WINGMAN_ID = 226_102L;
+    /** Stable Industrial Union command-network wingman identity. */
+    public static final long UNION_COMMAND_WINGMAN_ID = 226_202L;
     /** Empire equal-role destroyer fit. */
     public static final String EMPIRE_DESTROYER_FIT = "fit.empire.destroyer.screen_v1";
     /** Industrial Union equal-role destroyer fit. */
@@ -49,6 +54,7 @@ public final class Stage22CorePairTacticalFactory {
     private static final double LEFT_X_M = 250d;
     private static final double RIGHT_X_M = 1_650d;
     private static final double CENTER_Y_M = 700d;
+    private static final double WINGMAN_Y_OFFSET_M = 180d;
 
     private Stage22CorePairTacticalFactory() {
         throw new AssertionError("utility class");
@@ -74,7 +80,9 @@ public final class Stage22CorePairTacticalFactory {
                 EMPIRE_DESTROYER_FIT,
                 EMPIRE_AMMUNITION_ID,
                 EMPIRE_ROUND_MASS_KG,
-                mirrored ? RIGHT_X_M : LEFT_X_M);
+                mirrored ? RIGHT_X_M : LEFT_X_M,
+                CENTER_Y_M,
+                true);
         ImportedCombatantState union = importedCombatant(
                 content.engineering(),
                 protection,
@@ -83,7 +91,9 @@ public final class Stage22CorePairTacticalFactory {
                 UNION_DESTROYER_FIT,
                 UNION_AMMUNITION_ID,
                 UNION_ROUND_MASS_KG,
-                mirrored ? LEFT_X_M : RIGHT_X_M);
+                mirrored ? LEFT_X_M : RIGHT_X_M,
+                CENTER_Y_M,
+                true);
 
         LiveTacticalBattleRuntimeState battle = LiveTacticalBattleRuntimeState.importExact(
                 List.of(empire, union),
@@ -97,6 +107,89 @@ public final class Stage22CorePairTacticalFactory {
         return new Duel(checked, content, protection, weapons);
     }
 
+    /**
+     * Creates a four-ship exact-content command-network skirmish for B11 degradation evidence.
+     *
+     * <p>Each side receives two ordinary command-network destroyer variants. The variant physically
+     * replaces the authored {@code utility_defense} shield with the common fleet datalink, so this
+     * scenario contains no synthetic command aura and no free defensive fallback. The seed only
+     * chooses a small deterministic vertical geometry offset; it does not modify gameplay randomness
+     * or faction capability. Mirroring swaps the complete side/topology assignment while preserving
+     * faction identities.</p>
+     *
+     * @param permutation default or mirrored side/topology assignment
+     * @param seed paired experiment seed used only for deterministic starting geometry
+     * @return fresh ordinary Stage-19 control runtime over exact Stage-22 command variants
+     */
+    public static CommandNetworkSkirmish createCommandNetworkSkirmish(Permutation permutation, long seed) {
+        Permutation checked = Objects.requireNonNull(permutation, "permutation");
+        if (seed < 0L) {
+            throw new IllegalArgumentException("seed must be non-negative");
+        }
+        RuntimeContent content = Stage22CorePairWeaponRuntimeCatalogLoader.loadCombined();
+        ShipProtectionCatalog protection = Stage22CorePairProtectionCatalogLoader.project(content.engineering());
+        boolean mirrored = checked == Permutation.MIRRORED;
+        double seedOffsetM = (Math.floorMod(seed, 17L) - 8L) * 4d;
+        double primaryY = CENTER_Y_M + seedOffsetM;
+        double wingmanY = primaryY + WINGMAN_Y_OFFSET_M;
+
+        ImportedCombatantState empirePrimary = importedCombatant(
+                content.engineering(),
+                protection,
+                EMPIRE_ENTITY_ID,
+                mirrored ? Side.BETA : Side.ALPHA,
+                Stage22CorePairCommandNetworkProjection.EMPIRE_DESTROYER_COMMAND_FIT,
+                EMPIRE_AMMUNITION_ID,
+                EMPIRE_ROUND_MASS_KG,
+                mirrored ? RIGHT_X_M : LEFT_X_M,
+                primaryY,
+                false);
+        ImportedCombatantState empireWingman = importedCombatant(
+                content.engineering(),
+                protection,
+                EMPIRE_COMMAND_WINGMAN_ID,
+                mirrored ? Side.BETA : Side.ALPHA,
+                Stage22CorePairCommandNetworkProjection.EMPIRE_DESTROYER_COMMAND_FIT,
+                EMPIRE_AMMUNITION_ID,
+                EMPIRE_ROUND_MASS_KG,
+                mirrored ? RIGHT_X_M - 100d : LEFT_X_M + 100d,
+                wingmanY,
+                false);
+        ImportedCombatantState unionPrimary = importedCombatant(
+                content.engineering(),
+                protection,
+                UNION_ENTITY_ID,
+                mirrored ? Side.ALPHA : Side.BETA,
+                Stage22CorePairCommandNetworkProjection.UNION_DESTROYER_COMMAND_FIT,
+                UNION_AMMUNITION_ID,
+                UNION_ROUND_MASS_KG,
+                mirrored ? LEFT_X_M : RIGHT_X_M,
+                primaryY,
+                false);
+        ImportedCombatantState unionWingman = importedCombatant(
+                content.engineering(),
+                protection,
+                UNION_COMMAND_WINGMAN_ID,
+                mirrored ? Side.ALPHA : Side.BETA,
+                Stage22CorePairCommandNetworkProjection.UNION_DESTROYER_COMMAND_FIT,
+                UNION_AMMUNITION_ID,
+                UNION_ROUND_MASS_KG,
+                mirrored ? LEFT_X_M + 100d : RIGHT_X_M - 100d,
+                wingmanY,
+                false);
+
+        LiveTacticalBattleRuntimeState battle = LiveTacticalBattleRuntimeState.importExact(
+                List.of(empirePrimary, empireWingman, unionPrimary, unionWingman),
+                content.engineering(),
+                protection);
+        return new CommandNetworkSkirmish(
+                checked,
+                seed,
+                content,
+                protection,
+                new LiveTacticalBattleControlRuntime(battle));
+    }
+
     private static ImportedCombatantState importedCombatant(
             ShipEngineeringCatalog engineering,
             ShipProtectionCatalog protection,
@@ -105,7 +198,9 @@ public final class Stage22CorePairTacticalFactory {
             String fitId,
             String ammunitionId,
             double roundMassKg,
-            double xM) {
+            double xM,
+            double yM,
+            boolean requireShield) {
         ShipEngineeringCatalog.DemonstratorFitDefinition definition = engineering.findDemonstratorFit(fitId);
         if (definition == null) {
             throw new IllegalStateException("Missing M22.6 tactical fit: " + fitId);
@@ -151,7 +246,7 @@ public final class Stage22CorePairTacticalFactory {
         for (ShipShieldEngineeringAdapter.FittedShield shield : new ShipShieldEngineeringAdapter().derive(derived)) {
             shields.put(shield.mountId(), shield.chargedState(shieldRuntime));
         }
-        if (shields.isEmpty()) {
+        if (requireShield && shields.isEmpty()) {
             throw new IllegalStateException("M22.6 equal-role destroyer must expose its authored shield: " + fitId);
         }
         ShipInstanceRuntimeState instance = new ShipInstanceRuntimeState(
@@ -162,7 +257,7 @@ public final class Stage22CorePairTacticalFactory {
                         "weapon_primary", "kinetic_feed", ammunitionId))),
                 WeaponMountRuntime.RuntimeState.empty());
         EngineeringComponent component = new EngineeringComponent(fit, operating, instance);
-        return new ImportedCombatantState(entityId, side, component, xM, CENTER_Y_M, 0d, 0d);
+        return new ImportedCombatantState(entityId, side, component, xM, yM, 0d, 0d);
     }
 
     /**
@@ -191,6 +286,33 @@ public final class Stage22CorePairTacticalFactory {
             Objects.requireNonNull(content, "content");
             Objects.requireNonNull(protection, "protection");
             Objects.requireNonNull(weapons, "weapons");
+        }
+    }
+
+    /**
+     * Fresh B11 exact-command-network initial state.
+     *
+     * @param permutation mirrored assignment used to create the scenario
+     * @param seed paired experiment seed used only for deterministic starting geometry
+     * @param content combined Stage-22 engineering/weapon content
+     * @param protection projected common protection content
+     * @param control ordinary Stage-19 actor-bounded control runtime
+     */
+    public record CommandNetworkSkirmish(
+            Permutation permutation,
+            long seed,
+            RuntimeContent content,
+            ShipProtectionCatalog protection,
+            LiveTacticalBattleControlRuntime control) {
+        /** Validates immutable command-network skirmish references. */
+        public CommandNetworkSkirmish {
+            Objects.requireNonNull(permutation, "permutation");
+            if (seed < 0L) {
+                throw new IllegalArgumentException("seed must be non-negative");
+            }
+            Objects.requireNonNull(content, "content");
+            Objects.requireNonNull(protection, "protection");
+            Objects.requireNonNull(control, "control");
         }
     }
 }
