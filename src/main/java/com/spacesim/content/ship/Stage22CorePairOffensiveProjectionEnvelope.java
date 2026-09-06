@@ -216,8 +216,11 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
 
     /** Actor-facing assessment without authoritative hidden route/support fields. */
     public enum RouteAssessment {
+        /** The actor knows the complete operation and finite support covers the declared demand. */
         KNOWN_SUPPORTED,
+        /** The actor knows the complete operation and declared demand exceeds finite support. */
         KNOWN_OVEREXTENDED,
+        /** The actor lacks authoritative route or support-demand information beyond its known operation. */
         UNKNOWN_BEYOND_KNOWN_OPERATION
     }
 
