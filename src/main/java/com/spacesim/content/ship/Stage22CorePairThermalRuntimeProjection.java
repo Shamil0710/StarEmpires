@@ -2,6 +2,7 @@ package com.spacesim.content.ship;
 
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
+import com.spacesim.ship.ShipEngineeringRuntime;
 
 import java.util.ArrayList;
 import java.util.Map;
