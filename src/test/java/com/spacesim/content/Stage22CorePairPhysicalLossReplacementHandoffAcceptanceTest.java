@@ -6,6 +6,7 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.content.Stage18ManufacturingProductRegistry.Provenance;
 import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.ShipEngineeringCatalog.CompartmentDefinition;
 import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.economy.Stage18ShipConsumableService;
 import com.spacesim.economy.Stage18StationStorage;
@@ -15,6 +16,7 @@ import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
 import com.spacesim.persistence.WorldStateCodec;
 import com.spacesim.ship.ShieldFieldRuntime.State;
 import com.spacesim.ship.ShipDamageRuntime;
+import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipInstanceRuntimeState;
 import com.spacesim.ship.ShipyardEngineeringService;
@@ -52,6 +54,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,18 +70,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * M22.6 B13/B14 production handoff from an actual generated-world combat loss to paid replacement.
  *
- * <p>The target begins as a declared heavily attrited survivor: exact core fit and finite stores are
- * retained, structural integrity is low and its already-collapsed shield remains unavailable for the
- * contact. Stage-19 still has to inflict the catastrophic loss. Only disappearance of the ordinary
- * FleetId from the generated world may then become a Stage-21E consequence, Stage-21G loss record and
- * replacement demand. The replacement is built from finite Stage-18 hull/module stock and work.</p>
+ * <p>The target begins as a declared heavily attrited survivor from the separately-covered rolling
+ * attrition chain: exact core fit and finite stores are retained, prior combat has already destroyed
+ * its fitted subsystem mounts and all structure except one tiny centerline compartment, and its
+ * already-collapsed shield remains unavailable for the contact. The target is explicitly proven not
+ * to be catastrophically destroyed before tactical materialization. Stage-19 must still inflict the
+ * final physical loss. Only disappearance of the ordinary FleetId from the generated world may then
+ * become a Stage-21E consequence, Stage-21G loss record and replacement demand. The replacement is
+ * built from finite Stage-18 hull/module stock and work.</p>
  */
 class Stage22CorePairPhysicalLossReplacementHandoffAcceptanceTest {
     private static final long OPERATION_ID = 22_613_001L;
     private static final long TACTICAL_TICKS = 1_200L;
     private static final int CREW_AVAILABLE = 100_000;
     private static final double CONTACT_SEPARATION_M = 850d;
-    private static final double ATTRITED_STRUCTURE = 0.03d;
+    private static final double ATTRITED_STRUCTURE = 1.0e-6d;
     private static final double SHIELD_RESTART_SECONDS = 10_000d;
 
     @Test
@@ -104,7 +110,7 @@ class Stage22CorePairPhysicalLossReplacementHandoffAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B13-B14-physical-loss-paid-replacement-handoff",
                 archive,
-                "Generated-world exact Stage-19 combat causes the FleetId loss; Stage-21E consequence reconciliation derives that loss from before/after physical registries; Stage-21G records it and accepts a replacement demand; existing Stage-18/17.5 yard authority consumes finite hull/module stock and work to commission a fresh FleetId. Mirroring makes both exact core destroyer packages traverse the same loss-to-replacement seam. The declared low-integrity/collapsed-shield target represents prior rolling attrition and is not synthetic combat damage.");
+                "Generated-world exact Stage-19 combat causes the FleetId loss; Stage-21E consequence reconciliation derives that loss from before/after physical registries; Stage-21G records it and accepts a replacement demand; existing Stage-18/17.5 yard authority consumes finite hull/module stock and work to commission a fresh FleetId. Mirroring makes both exact core destroyer packages traverse the same loss-to-replacement seam. The declared nearly-terminal structure, destroyed subsystem mounts and collapsed shield represent prior rolling attrition; a positive centerline compartment proves the target is still a physical survivor before Stage-19 inflicts the final loss.");
     }
 
     private static ScenarioResult run(Permutation permutation) {
@@ -136,8 +142,18 @@ class Stage22CorePairPhysicalLossReplacementHandoffAcceptanceTest {
         Entity attackerEntity = entity(runtime, attackerPlacement);
         Entity targetEntity = entity(runtime, targetPlacement);
         attackerEntity.add(copy(attackerCore));
-        targetEntity.add(attrited(targetCore));
-        InstalledFit lostFit = targetEntity.getComponent(EngineeringComponent.class).fit;
+        targetEntity.add(attrited(targetCore, core.content().engineering()));
+        EngineeringComponent attritedTarget = targetEntity.getComponent(EngineeringComponent.class);
+        var targetHull = core.content().engineering().findHull(attritedTarget.fit.hullId());
+        var targetLayout = core.protection().findHullDamageLayout(attritedTarget.fit.hullId());
+        assertFalse(
+                ShipDamageRuntime.isFullyDestroyed(
+                        targetHull,
+                        attritedTarget.fit,
+                        targetLayout,
+                        attritedTarget.instanceState.damage()),
+                "B13 target must enter Stage-19 as a physical survivor rather than a pre-declared loss");
+        InstalledFit lostFit = attritedTarget.fit;
 
         LocalPhysicalKinematics attackerPhysical = runtime.arrival().materialization(system)
                 .physicalState(attackerPlacement.localEntityId()).orElseThrow();
@@ -310,13 +326,30 @@ class Stage22CorePairPhysicalLossReplacementHandoffAcceptanceTest {
         return new EngineeringComponent(source.fit, source.runtimeState, source.instanceState);
     }
 
-    private static EngineeringComponent attrited(EngineeringComponent source) {
+    private static EngineeringComponent attrited(
+            EngineeringComponent source,
+            ShipEngineeringCatalog catalog) {
+        var hull = catalog.findHull(source.fit.hullId());
+        if (hull == null) {
+            throw new AssertionError("B13 attrition fixture lacks fitted hull: " + source.fit.hullId());
+        }
+        String residualCompartment = hull.compartments().stream()
+                .min(Comparator
+                        .comparingDouble((CompartmentDefinition value) -> Math.abs(value.centerM().yM()))
+                        .thenComparing(CompartmentDefinition::id))
+                .orElseThrow(() -> new AssertionError("B13 attrition fixture hull has no compartments"))
+                .id();
+
         Map<String, Double> compartments = new TreeMap<>();
-        source.instanceState.damage().compartmentIntegrityById().keySet()
-                .forEach(id -> compartments.put(id, ATTRITED_STRUCTURE));
+        hull.compartments().forEach(compartment -> compartments.put(
+                compartment.id(),
+                compartment.id().equals(residualCompartment) ? ATTRITED_STRUCTURE : 0d));
+        Map<String, Double> modules = new TreeMap<>();
+        source.fit.installedModules().forEach(row -> modules.put(row.mountId(), 0d));
         ShipDamageRuntime.Snapshot damage = new ShipDamageRuntime.Snapshot(
                 compartments,
-                source.instanceState.damage().moduleDamage());
+                new DamageState(modules));
+
         Map<String, State> shields = new TreeMap<>();
         source.instanceState.shieldStatesByMount().forEach((mount, state) -> shields.put(
                 mount,
