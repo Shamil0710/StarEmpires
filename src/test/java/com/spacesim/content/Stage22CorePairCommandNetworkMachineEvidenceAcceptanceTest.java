@@ -29,12 +29,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>No hidden hostile transform is exposed to the planner, no command bonus is synthesized and the
  * refit pays a literal utility-slot cost: the command variants have no shield at the displaced
- * {@code utility_defense} mount. The canonical 30-seed mirrored tuning schedule is intentionally
- * cheap here because every cell advances only the first sensing/control tick.</p>
+ * {@code utility_defense} mount. The canonical 30-seed mirrored tuning schedule advances a bounded
+ * one-second ordinary control window so relayed observations can accumulate the same track quality
+ * required by production AI fire authorization; no track quality or fire state is injected.</p>
  */
 class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
     private static final String SENSOR_MOUNT = "utility_sensor";
     private static final String NETWORK_MOUNT = "utility_defense";
+    private static final int CONTROL_WINDOW_TICKS = 20;
 
     @Test
     void b11RunsThirtyPairedExactCommandNetworkDegradationCells() {
@@ -77,7 +79,7 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B11-command-network-degradation-paired-30",
                 archive,
-                "Thirty paired/mirrored exact Stage-22 command-network cells. Primaries with failed local radar can use only a current allied measurement relayed through two physical fitted datalink endpoints. Breaking either endpoint on a fresh run removes all hostile tracks, target selection and fire authorization. Command variants physically displace the authored utility shield; no faction-name command modifier or hidden hostile state is introduced.");
+                "Thirty paired/mirrored exact Stage-22 command-network cells. Primaries with failed local radar can use only current allied measurements relayed through two physical fitted datalink endpoints during a bounded one-second ordinary control window. Breaking either endpoint on a fresh run removes all hostile tracks, target selection and fire authorization. Command variants physically displace the authored utility shield; no faction-name command modifier or hidden hostile state is introduced.");
     }
 
     private static Stage22CorePairMachineEvidenceBatch.ObservationPayload observe(RunCoordinate coordinate) {
@@ -173,7 +175,9 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
                 battle, Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID)
                 && paidNetworkTradeoff(battle, Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
 
-        control.advanceOneTick();
+        for (int tick = 0; tick < CONTROL_WINDOW_TICKS; tick++) {
+            control.advanceOneTick();
+        }
         var empireControl = control.controlState(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID);
         var unionControl = control.controlState(Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
         int empireContacts = battle.visibleContacts(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID).size();
