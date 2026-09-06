@@ -1,6 +1,7 @@
 package com.spacesim.content;
 
 import com.spacesim.content.Stage22CorePairExperimentProtocol.RunCoordinate;
+import com.spacesim.content.ship.ShipEngineeringCatalog.DemonstratorFitDefinition;
 import com.spacesim.content.ship.Stage22CorePairCommandNetworkProjection;
 import com.spacesim.ship.LiveTacticalBattleControlRuntime;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState;
@@ -143,8 +144,10 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
         LiveTacticalBattleRuntimeState battle = control.battleState();
         LiveTacticalInitialReadinessService initial = new LiveTacticalInitialReadinessService();
 
-        initial.setModuleIntegrity(battle.requireCombatant(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID), SENSOR_MOUNT, 0d);
-        initial.setModuleIntegrity(battle.requireCombatant(Stage22CorePairTacticalFactory.UNION_ENTITY_ID), SENSOR_MOUNT, 0d);
+        initial.setModuleIntegrity(
+                battle.requireCombatant(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID), SENSOR_MOUNT, 0d);
+        initial.setModuleIntegrity(
+                battle.requireCombatant(Stage22CorePairTacticalFactory.UNION_ENTITY_ID), SENSOR_MOUNT, 0d);
         if (breakMode == BreakMode.RECEIVER) {
             initial.setModuleIntegrity(
                     battle.requireCombatant(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID), NETWORK_MOUNT, 0d);
@@ -157,14 +160,17 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
                     battle.requireCombatant(Stage22CorePairTacticalFactory.UNION_COMMAND_WINGMAN_ID), NETWORK_MOUNT, 0d);
         }
 
-        boolean exactCommandFits = battle.requireCombatant(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID)
-                .engineering().fit.fitId().equals(Stage22CorePairCommandNetworkProjection.EMPIRE_DESTROYER_COMMAND_FIT)
-                && battle.requireCombatant(Stage22CorePairTacticalFactory.UNION_ENTITY_ID)
-                .engineering().fit.fitId().equals(Stage22CorePairCommandNetworkProjection.UNION_DESTROYER_COMMAND_FIT);
-        boolean paidShieldTradeoff = battle.requireCombatant(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID)
-                .engineering().instanceState.shieldStatesByMount().isEmpty()
-                && battle.requireCombatant(Stage22CorePairTacticalFactory.UNION_ENTITY_ID)
-                .engineering().instanceState.shieldStatesByMount().isEmpty();
+        boolean exactCommandFits = matchesFit(
+                skirmish,
+                Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID,
+                Stage22CorePairCommandNetworkProjection.EMPIRE_DESTROYER_COMMAND_FIT)
+                && matchesFit(
+                skirmish,
+                Stage22CorePairTacticalFactory.UNION_ENTITY_ID,
+                Stage22CorePairCommandNetworkProjection.UNION_DESTROYER_COMMAND_FIT);
+        boolean paidShieldTradeoff = paidNetworkTradeoff(
+                battle, Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID)
+                && paidNetworkTradeoff(battle, Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
 
         control.advanceOneTick();
         var empireControl = control.controlState(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID);
@@ -189,6 +195,27 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
                 empireControl.fireAuthorized(),
                 unionControl.fireAuthorized(),
                 control.fingerprint());
+    }
+
+    private static boolean matchesFit(
+            Stage22CorePairTacticalFactory.CommandNetworkSkirmish skirmish,
+            long entityId,
+            String expectedFitId) {
+        DemonstratorFitDefinition expected = skirmish.content().engineering().findDemonstratorFit(expectedFitId);
+        if (expected == null) {
+            return false;
+        }
+        var actual = skirmish.control().battleState().requireCombatant(entityId).engineering().fit;
+        return actual.hullId().equals(expected.hullId())
+                && actual.installedModules().equals(expected.installedModules());
+    }
+
+    private static boolean paidNetworkTradeoff(LiveTacticalBattleRuntimeState battle, long entityId) {
+        var engineering = battle.requireCombatant(entityId).engineering();
+        boolean datalinkOwnsPaidMount = engineering.fit.installedModules().stream()
+                .anyMatch(value -> value.mountId().equals(NETWORK_MOUNT)
+                        && value.moduleId().equals(Stage22CorePairCommandNetworkProjection.DATALINK_MODULE_ID));
+        return datalinkOwnsPaidMount && engineering.instanceState.shieldStatesByMount().isEmpty();
     }
 
     private enum BreakMode {
