@@ -78,6 +78,7 @@ public final class LiveTacticalBattleControlRuntime {
     private final ShipObservationEngineeringService observationService;
     private final ShipSensorRuntime sensorRuntime;
     private final ShipSensorEngineeringAdapter sensorAdapter;
+    private final ShipDatalinkEngineeringAdapter datalinkAdapter;
     private final ObservedTacticalIntentPlanner tacticalPlanner;
     private final TacticalSurvivalPlanner survivalPlanner;
     private final TacticalFormationPlanner formationPlanner;
@@ -138,6 +139,7 @@ public final class LiveTacticalBattleControlRuntime {
         observationService = new ShipObservationEngineeringService(engineeringCatalog);
         sensorRuntime = new ShipSensorRuntime();
         sensorAdapter = new ShipSensorEngineeringAdapter();
+        datalinkAdapter = new ShipDatalinkEngineeringAdapter();
         tacticalPlanner = new ObservedTacticalIntentPlanner();
         survivalPlanner = new TacticalSurvivalPlanner();
         formationPlanner = new TacticalFormationPlanner();
@@ -281,58 +283,123 @@ public final class LiveTacticalBattleControlRuntime {
 
     private void scanAllObservers() {
         for (CombatantRuntime observer : battleState.combatants()) {
-            scanObserver(observer);
+            collectObserverMeasurements(observer);
+        }
+        shareAlliedMeasurements();
+        for (CombatantRuntime observer : battleState.combatants()) {
+            refreshVisibleContacts(observer);
         }
     }
 
-    private void scanObserver(CombatantRuntime observer) {
+    private void collectObserverMeasurements(CombatantRuntime observer) {
         DerivedShipState observerDerived = derive(observer);
         FittedSensor radar = sensorAdapter.derive(observerDerived).sensors().stream()
                 .filter(value -> value.definition().mode() == Mode.ACTIVE_RADAR)
                 .findFirst()
                 .orElse(null);
-        TreeMap<Long, List<SensorMeasurement>> history = measurementsByObserver.get(observer.spec().entityId());
-
-        if (radar != null) {
-            var budget = grantService.beginInterval(observer.engineering(), SENSOR_INTERVAL_SECONDS);
-            for (CombatantRuntime target : battleState.combatants()) {
-                if (target.spec().side() == observer.spec().side()) {
-                    continue;
-                }
-                DerivedShipState targetDerived = derive(target);
-                var targetSignature = sensorAdapter.derive(targetDerived).staticSignature();
-                var observation = observationService.observe(
-                        observer.engineering(),
-                        radar,
-                        SensorRuntimeState.nominal(),
-                        SENSOR_INTERVAL_SECONDS,
-                        observer.spec().entityId(),
-                        target.spec().entityId(),
-                        new Position2d(observer.transform().position.x, observer.transform().position.y),
-                        new Position2d(target.transform().position.x, target.transform().position.y),
-                        targetSignature,
-                        ElectronicWarfareState.empty(),
-                        elapsedSeconds(),
-                        budget);
-                observation.measurement().ifPresent(measurement -> appendMeasurement(
-                        history,
-                        target.spec().entityId(),
-                        measurement));
-            }
+        if (radar == null) {
+            return;
         }
 
-        DatalinkState localLink = DatalinkState.local();
+        TreeMap<Long, List<SensorMeasurement>> history = measurementsByObserver.get(observer.spec().entityId());
+        var budget = grantService.beginInterval(observer.engineering(), SENSOR_INTERVAL_SECONDS);
+        for (CombatantRuntime target : battleState.combatants()) {
+            if (target.spec().side() == observer.spec().side()) {
+                continue;
+            }
+            DerivedShipState targetDerived = derive(target);
+            var targetSignature = sensorAdapter.derive(targetDerived).staticSignature();
+            var observation = observationService.observe(
+                    observer.engineering(),
+                    radar,
+                    SensorRuntimeState.nominal(),
+                    SENSOR_INTERVAL_SECONDS,
+                    observer.spec().entityId(),
+                    target.spec().entityId(),
+                    new Position2d(observer.transform().position.x, observer.transform().position.y),
+                    new Position2d(target.transform().position.x, target.transform().position.y),
+                    targetSignature,
+                    ElectronicWarfareState.empty(),
+                    elapsedSeconds(),
+                    budget);
+            observation.measurement().ifPresent(measurement -> appendMeasurement(
+                    history,
+                    target.spec().entityId(),
+                    measurement));
+        }
+    }
+
+    /**
+     * Relays current allied measurements through fitted, damage-aware datalink capacity only.
+     *
+     * <p>Stage-17.5I content currently authors {@code support_channels} but no separate network range,
+     * latency or transport-noise surface. This coordinator therefore does not invent those values. It
+     * only allows one current-cycle fallback measurement for a target that the receiver did not sense
+     * locally, and only while both endpoints retain physical datalink channels. Original measurement
+     * provenance is preserved and received measurements are never re-broadcast, so the relay cannot
+     * create truth-state, multi-hop omniscience or faction-name bonuses.</p>
+     */
+    private void shareAlliedMeasurements() {
+        double nowSeconds = elapsedSeconds();
+        TreeMap<Long, Integer> remainingChannels = new TreeMap<>();
+        for (CombatantRuntime combatant : battleState.combatants()) {
+            remainingChannels.put(
+                    combatant.spec().entityId(),
+                    datalinkAdapter.totalSupportChannels(derive(combatant)));
+        }
+
+        for (CombatantRuntime receiver : battleState.combatants()) {
+            long receiverId = receiver.spec().entityId();
+            if (remainingChannels.getOrDefault(receiverId, 0) <= 0) {
+                continue;
+            }
+            TreeMap<Long, List<SensorMeasurement>> receiverHistory = measurementsByObserver.get(receiverId);
+            for (CombatantRuntime sender : battleState.combatants()) {
+                long senderId = sender.spec().entityId();
+                if (senderId == receiverId || sender.spec().side() != receiver.spec().side()) {
+                    continue;
+                }
+                if (remainingChannels.getOrDefault(senderId, 0) <= 0
+                        || remainingChannels.getOrDefault(receiverId, 0) <= 0) {
+                    continue;
+                }
+
+                TreeMap<Long, List<SensorMeasurement>> senderHistory = measurementsByObserver.get(senderId);
+                for (Map.Entry<Long, List<SensorMeasurement>> entry : senderHistory.entrySet()) {
+                    if (remainingChannels.getOrDefault(senderId, 0) <= 0
+                            || remainingChannels.getOrDefault(receiverId, 0) <= 0) {
+                        break;
+                    }
+                    long targetId = entry.getKey();
+                    if (hasCurrentMeasurement(receiverHistory.getOrDefault(targetId, List.of()), nowSeconds)) {
+                        continue;
+                    }
+                    SensorMeasurement measurement = currentLocalMeasurement(senderId, entry.getValue(), nowSeconds);
+                    if (measurement == null) {
+                        continue;
+                    }
+                    appendMeasurement(receiverHistory, targetId, measurement);
+                    remainingChannels.put(senderId, remainingChannels.get(senderId) - 1);
+                    remainingChannels.put(receiverId, remainingChannels.get(receiverId) - 1);
+                }
+            }
+        }
+    }
+
+    private void refreshVisibleContacts(CombatantRuntime observer) {
+        TreeMap<Long, List<SensorMeasurement>> history = measurementsByObserver.get(observer.spec().entityId());
+        DatalinkState fusionLink = DatalinkState.local();
         TrackQualityPolicy qualityPolicy = TrackQualityPolicy.defaultPolicy();
         double nowSeconds = elapsedSeconds();
         List<ObservedContact> contacts = new ArrayList<>();
         for (Map.Entry<Long, List<SensorMeasurement>> entry : history.entrySet()) {
-            if (!hasDeliveredFreshMeasurement(entry.getKey(), entry.getValue(), localLink, nowSeconds)) {
+            if (!hasDeliveredFreshMeasurement(entry.getKey(), entry.getValue(), fusionLink, nowSeconds)) {
                 continue;
             }
             TrackState track = sensorRuntime.fuse(
                     entry.getKey(),
                     entry.getValue(),
-                    localLink,
+                    fusionLink,
                     qualityPolicy,
                     nowSeconds);
             contacts.add(new ObservedContact(track, ContactDisposition.HOSTILE));
@@ -524,6 +591,27 @@ public final class LiveTacticalBattleControlRuntime {
             values.remove(0);
         }
         history.put(targetId, List.copyOf(values));
+    }
+
+    private static SensorMeasurement currentLocalMeasurement(
+            long observerId,
+            List<SensorMeasurement> measurements,
+            double nowSeconds) {
+        SensorMeasurement result = null;
+        for (SensorMeasurement measurement : measurements) {
+            if (measurement != null
+                    && measurement.observerId() == observerId
+                    && Math.abs(measurement.timestampSeconds() - nowSeconds) <= EPSILON) {
+                result = measurement;
+            }
+        }
+        return result;
+    }
+
+    private static boolean hasCurrentMeasurement(List<SensorMeasurement> measurements, double nowSeconds) {
+        return measurements.stream()
+                .filter(Objects::nonNull)
+                .anyMatch(value -> Math.abs(value.timestampSeconds() - nowSeconds) <= EPSILON);
     }
 
     private static boolean hasDeliveredFreshMeasurement(
