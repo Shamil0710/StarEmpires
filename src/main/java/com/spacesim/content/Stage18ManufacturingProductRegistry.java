@@ -23,9 +23,8 @@ import java.util.Objects;
  *
  * <p>The registry does not redefine combat content. It projects physical unit mass and storage
  * handling for manufacturing recipes while preserving content provenance. Stage-22 authored
- * engineering catalogs may be composed into this same registry through
- * {@link #withEngineeringCatalog(ShipEngineeringCatalog, Provenance)} rather than creating a
- * faction-specific manufacturing authority.</p>
+ * engineering and ammunition catalogs may be composed into this same registry through the explicit
+ * composition methods rather than creating faction-specific manufacturing authorities.</p>
  */
 public final class Stage18ManufacturingProductRegistry {
     /** Storage class used by finished ship modules in the Stage-18D baseline. */
@@ -117,6 +116,30 @@ public final class Stage18ManufacturingProductRegistry {
         return new Stage18ManufacturingProductRegistry(combined);
     }
 
+    /**
+     * Composes physical ammunition from one validated later-stage weapon catalog into the ordinary
+     * Stage-18 manufacturing registry.
+     *
+     * <p>The ammunition catalog remains the combat authority for dimensions/material/body mass. This
+     * method only projects those existing bodies into the Stage-18 finished-product vocabulary so the
+     * ordinary manufacturing, storage, logistics and Stage-19F servicing path can consume the same
+     * identity and physical unit mass. No ammunition is created by registration.</p>
+     *
+     * @param ammunition validated physical ammunition catalog
+     * @param provenance explicit lifecycle provenance for the authored definitions
+     * @return new deterministic registry containing the existing and added ammunition products
+     */
+    public Stage18ManufacturingProductRegistry withAmmunitionCatalog(
+            WeaponAmmunitionCatalog ammunition,
+            Provenance provenance) {
+        List<ProductDefinition> combined = new ArrayList<>(products);
+        addAmmunition(
+                combined,
+                Objects.requireNonNull(ammunition, "ammunition"),
+                Objects.requireNonNull(provenance, "provenance"));
+        return new Stage18ManufacturingProductRegistry(combined);
+    }
+
     private static void addModules(
             List<ProductDefinition> products,
             ShipEngineeringCatalog catalog,
@@ -186,7 +209,7 @@ public final class Stage18ManufacturingProductRegistry {
          * Validates one immutable manufacturing product projection.
          *
          * @param contentId existing content ID
-         * @param kind module or ammunition
+         * @param kind module or physical ammunition
          * @param unitMassKg authoritative physical mass of one manufactured unit
          * @param storageClassId Stage-18 storage class used for finished inventory
          * @param provenance content-lifecycle provenance
