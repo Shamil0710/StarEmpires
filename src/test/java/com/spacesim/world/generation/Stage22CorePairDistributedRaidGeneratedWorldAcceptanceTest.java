@@ -3,7 +3,6 @@ package com.spacesim.world.generation;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FactionComponent;
-import com.spacesim.content.Stage22CorePairBalanceEvidence;
 import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
 import com.spacesim.persistence.EntityState;
 import com.spacesim.persistence.EntityStateMapper;
@@ -45,33 +44,34 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * M22.6 B06 generated-world integration for distributed low-intensity raids.
  *
  * <p>The generated campaign already commissions three ordinary physical military FleetIds per
- * faction. This acceptance uses those exact persistent fleets rather than inventing a raid-force
- * registry: each attacker/defender pair moves through the ordinary generated-world FTL path into a
- * distinct objective system, receives the accepted exact Stage-22 engineering fit at the same
- * Stage-21E tactical-admission seam used by B01/B08, and remains owned by ordinary world/persistence
- * authorities.</p>
+ * generated faction. This acceptance keeps those generated faction identities authoritative rather
+ * than pretending that the Stage-20 representative {@code faction.alpha}/{@code faction.beta}
+ * placement contract has already migrated to Stage-22 core identities. The two deterministic
+ * generated faction slots are used only as mirrored fixture carriers for the exact Empire and
+ * Industrial Union engineering packages.</p>
  *
- * <p>Three simultaneous raid lanes are reviewed by the ordinary Stage-21E supply/readiness service.
- * Two lanes retain observed physical supply access and are allowed to commit an exact Stage-19
- * encounter against a real opposing patrol FleetId. The third lane loses supply access, submits the
- * ordinary withdrawal decision and is proven physically unchanged while the other lanes fight. No
- * raid damage scalar, abstract patrol score, hidden income penalty or faction-specific combat bonus is
- * introduced.</p>
+ * <p>Each attacker/defender pair moves through the ordinary generated-world FTL path into a distinct
+ * objective system. Exact Stage-22 engineering fits are installed only after physical arrival at the
+ * same Stage-21E tactical-admission seam already exercised by B01/B08. Three simultaneous RAID rows
+ * are then reviewed by the ordinary Stage-21E supply/readiness service: two retain observed physical
+ * supply access and may commit exact Stage-19 encounters; the third loses supply access, must submit
+ * the ordinary withdrawal decision and is proven physically unchanged while the supported lanes
+ * fight.</p>
  *
- * <p>Initial inter-system staging still uses the generated campaign's provisional Stage-21 military
- * engineering because the production world FTL catalog has not yet been promoted to the Stage-22
- * core-fit universe; B10 owns exact-core projection travel. Exact core fits are installed only after
- * ordinary physical arrival, matching the existing B01/B08 tactical materialization boundary.</p>
+ * <p>No raid damage scalar, abstract patrol score, hidden income penalty, generated-faction identity
+ * rewrite or faction-specific combat bonus is introduced. Exact-core inter-system projection remains
+ * owned by B10; this test intentionally preserves the existing provisional generated-world FTL
+ * engineering until arrival instead of manufacturing a second travel authority.</p>
  */
 class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
     private static final long OPERATION_BASE = 22_606_000L;
@@ -93,45 +93,44 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
         assertEquals(defaultFirst.summary(), defaultSecond.summary());
 
         for (ScenarioResult result : List.of(defaultFirst, mirrored)) {
+            assertEquals(2, result.summary().generatedFactionSlots());
             assertEquals(3, result.summary().distinctObjectiveSystems());
             assertEquals(2, result.summary().continuingRaids());
             assertEquals(1, result.summary().withdrawingRaids());
             assertEquals(2, result.summary().committedEncounters());
-            assertTrue(result.summary().physicallyActiveRaidAnchors() >= 3,
-                    "all three raid intents must have real local FleetId/target anchors before supply review");
+            assertEquals(3, result.summary().physicallyActiveRaidAnchors());
             assertTrue(result.summary().physicalEffectCount() > 0,
-                    "supported B06 lanes must commit at least one real ammunition/damage/destruction consequence");
+                    "supported B06 lanes must commit real ammunition/damage/destruction consequences");
             assertTrue(result.summary().withheldLaneUnchanged(),
                     "supply-denied lane must not receive hidden tactical or economic consequences");
-            assertTrue(result.summary().survivingCommittedFleetCount() >= 0);
+            assertTrue(result.summary().survivingCommittedFleetCount() >= 0
+                            && result.summary().survivingCommittedFleetCount() <= 4,
+                    "two committed lanes can retain at most their four original physical FleetIds");
         }
     }
 
     private static ScenarioResult run(Permutation permutation) {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
-        int empireFactionId = runtime.world().findFactionRuntimeId(
-                Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID).orElseThrow();
-        int unionFactionId = runtime.world().findFactionRuntimeId(
-                Stage22CorePairBalanceEvidence.UNION_FACTION_ID).orElseThrow();
+        List<FactionFleetGroup> generatedGroups = generatedMilitaryGroups(runtime);
+        assertEquals(2, generatedGroups.size(),
+                "current representative generated-world contract must expose two deterministic faction slots");
+        for (FactionFleetGroup group : generatedGroups) {
+            assertEquals(GeneratedFactionMilitaryBootstrap.SHIPS_PER_FACTION, group.fleets().size(),
+                    "each generated faction must retain the ordinary three-ship military bootstrap");
+        }
 
-        List<MilitaryFleet> empire = militaryFleets(runtime, empireFactionId);
-        List<MilitaryFleet> union = militaryFleets(runtime, unionFactionId);
-        assertEquals(GeneratedFactionMilitaryBootstrap.SHIPS_PER_FACTION, empire.size());
-        assertEquals(GeneratedFactionMilitaryBootstrap.SHIPS_PER_FACTION, union.size());
-
+        FactionFleetGroup empireSlot = generatedGroups.get(0);
+        FactionFleetGroup unionSlot = generatedGroups.get(1);
         boolean empireAttacks = permutation == Permutation.DEFAULT;
-        List<MilitaryFleet> attackers = empireAttacks ? empire : union;
-        List<MilitaryFleet> defenders = empireAttacks ? union : empire;
-        int attackerFactionId = empireAttacks ? empireFactionId : unionFactionId;
+        FactionFleetGroup attackerGroup = empireAttacks ? empireSlot : unionSlot;
+        FactionFleetGroup defenderGroup = empireAttacks ? unionSlot : empireSlot;
 
         var core = Stage22CorePairTacticalFactory.createDestroyerDuel(permutation);
         EngineeringComponent empireEngineering = engineeringFor(
                 core, Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID);
         EngineeringComponent unionEngineering = engineeringFor(
                 core, Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
-        EngineeringComponent attackerEngineering = empireAttacks ? empireEngineering : unionEngineering;
-        EngineeringComponent defenderEngineering = empireAttacks ? unionEngineering : empireEngineering;
 
         List<StarSystemId> objectives = runtime.world().getTopology().systems().stream()
                 .map(value -> value.id())
@@ -144,22 +143,39 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
         ArrayList<Lane> lanes = new ArrayList<>();
         PhysicalWarfareOperationService physicalOperations = new PhysicalWarfareOperationService(runtime.world());
         for (int laneIndex = 0; laneIndex < 3; laneIndex++) {
-            MilitaryFleet attacker = attackers.get(laneIndex);
-            MilitaryFleet defender = defenders.get(laneIndex);
+            MilitaryFleet empireFleet = empireSlot.fleets().get(laneIndex);
+            MilitaryFleet unionFleet = unionSlot.fleets().get(laneIndex);
+            MilitaryFleet attacker = attackerGroup.fleets().get(laneIndex);
+            MilitaryFleet defender = defenderGroup.fleets().get(laneIndex);
             StarSystemId objective = objectives.get(laneIndex);
-            moveFleetByOrdinaryRoute(runtime, attacker.fleetId(), objective);
-            moveFleetByOrdinaryRoute(runtime, defender.fleetId(), objective);
+
+            moveFleetByOrdinaryRoute(runtime, empireFleet.fleetId(), objective);
+            moveFleetByOrdinaryRoute(runtime, unionFleet.fleetId(), objective);
+
+            FleetPlacementState empirePlacement = runtime.world().findFleet(empireFleet.fleetId()).orElseThrow();
+            FleetPlacementState unionPlacement = runtime.world().findFleet(unionFleet.fleetId()).orElseThrow();
+            assertEquals(objective, empirePlacement.systemId());
+            assertEquals(objective, unionPlacement.systemId());
+
+            Entity empireEntity = entity(runtime, empirePlacement);
+            Entity unionEntity = entity(runtime, unionPlacement);
+            int empireGeneratedFaction = empireEntity.getComponent(FactionComponent.class).factionId;
+            int unionGeneratedFaction = unionEntity.getComponent(FactionComponent.class).factionId;
+            empireEntity.add(copy(empireEngineering));
+            unionEntity.add(copy(unionEngineering));
+            assertEquals(empireGeneratedFaction, empireEntity.getComponent(FactionComponent.class).factionId,
+                    "installing an exact core fit must not rewrite generated-world faction identity");
+            assertEquals(unionGeneratedFaction, unionEntity.getComponent(FactionComponent.class).factionId,
+                    "installing an exact core fit must not rewrite generated-world faction identity");
 
             FleetPlacementState attackerPlacement = runtime.world().findFleet(attacker.fleetId()).orElseThrow();
             FleetPlacementState defenderPlacement = runtime.world().findFleet(defender.fleetId()).orElseThrow();
-            assertEquals(objective, attackerPlacement.systemId());
-            assertEquals(objective, defenderPlacement.systemId());
-
             Entity attackerEntity = entity(runtime, attackerPlacement);
             Entity defenderEntity = entity(runtime, defenderPlacement);
-            attackerEntity.add(copy(attackerEngineering));
-            defenderEntity.add(copy(defenderEngineering));
-            assertEquals(attackerFactionId, attackerEntity.getComponent(FactionComponent.class).factionId);
+            assertEquals(attackerGroup.runtimeFactionId(),
+                    attackerEntity.getComponent(FactionComponent.class).factionId);
+            assertEquals(defenderGroup.runtimeFactionId(),
+                    defenderEntity.getComponent(FactionComponent.class).factionId);
 
             LocalPhysicalKinematics attackerPhysical = runtime.arrival().materialization(objective)
                     .physicalState(attackerPlacement.localEntityId()).orElseThrow();
@@ -172,9 +188,8 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
 
             PhysicalWarfareOperation physicalRaid = PhysicalWarfareOperation.raid(
                     attacker.fleetId(), objective, defenderPlacement.localEntityId());
-            if (!physicalOperations.isPhysicallyActive(physicalRaid)) {
-                throw new AssertionError("B06 raid lacks a real local physical anchor: lane=" + laneIndex);
-            }
+            assertTrue(physicalOperations.isPhysicallyActive(physicalRaid),
+                    "B06 raid requires a real local combat FleetId and a real local target entity");
             lanes.add(new Lane(
                     laneIndex,
                     attacker.fleetId(),
@@ -200,7 +215,7 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
         ArrayList<OperationState> operationRows = new ArrayList<>();
         long now = runtime.world().getAuthoritativeWorldTick();
         for (Lane lane : lanes) {
-            operationRows.add(operation(lane, attackerFactionId, now));
+            operationRows.add(operation(lane, attackerGroup.runtimeFactionId(), now));
         }
         StrategicOperationState operations = new StrategicOperationState(4L, operationRows);
         StrategicOperationService strategic = new StrategicOperationService();
@@ -217,7 +232,9 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
                     operations, lane.index() + 1L, forces, now).decision();
             decisions.put(lane.index(), decision);
             if (decision == SupplyDecision.CONTINUE) {
-                physicalEffectCount += commitEncounter(runtime, core, lane) ? 1 : 0;
+                if (commitEncounter(runtime, core, lane)) {
+                    physicalEffectCount++;
+                }
                 committedEncounters++;
             }
         }
@@ -257,7 +274,8 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
         return new ScenarioResult(
                 checkpoint,
                 new Summary(
-                        objectives.stream().distinct().count() == 3 ? 3 : (int) objectives.stream().distinct().count(),
+                        generatedGroups.size(),
+                        (int) objectives.stream().distinct().count(),
                         (int) continuingRaids,
                         (int) withdrawingRaids,
                         committedEncounters,
@@ -336,38 +354,41 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
         if (attackerAlive) {
             FleetPlacementState placement = runtime.world().findFleet(lane.attackerFleetId()).orElseThrow();
             Entity current = entity(runtime, placement);
-            long after = current.getComponent(EngineeringComponent.class)
+            long roundsAfter = current.getComponent(EngineeringComponent.class)
                     .runtimeState.consumables().ammunitionCount();
-            assertTrue(after <= attackerRoundsBefore,
+            assertTrue(roundsAfter <= attackerRoundsBefore,
                     "Stage-19 raid contact cannot refill attacker ammunition");
             physicalEffect |= !attackerBefore.equals(EntityStateMapper.capture(current));
         }
         if (defenderAlive) {
             FleetPlacementState placement = runtime.world().findFleet(lane.defenderFleetId()).orElseThrow();
             Entity current = entity(runtime, placement);
-            long after = current.getComponent(EngineeringComponent.class)
+            long roundsAfter = current.getComponent(EngineeringComponent.class)
                     .runtimeState.consumables().ammunitionCount();
-            assertTrue(after <= defenderRoundsBefore,
+            assertTrue(roundsAfter <= defenderRoundsBefore,
                     "Stage-19 raid contact cannot refill patrol ammunition");
             physicalEffect |= !defenderBefore.equals(EntityStateMapper.capture(current));
         }
         return physicalEffect;
     }
 
-    private static List<MilitaryFleet> militaryFleets(
-            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            int factionId) {
-        ArrayList<MilitaryFleet> result = new ArrayList<>();
+    private static List<FactionFleetGroup> generatedMilitaryGroups(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime) {
+        TreeMap<Integer, ArrayList<MilitaryFleet>> byFaction = new TreeMap<>();
         for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) continue;
             Entity entity = entity(runtime, placement);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
-            if (faction != null && faction.factionId == factionId && engineering != null) {
-                result.add(new MilitaryFleet(placement.id(), placement.systemId()));
-            }
+            if (faction == null || engineering == null) continue;
+            byFaction.computeIfAbsent(faction.factionId, ignored -> new ArrayList<>())
+                    .add(new MilitaryFleet(placement.id()));
         }
-        result.sort(Comparator.comparing(MilitaryFleet::fleetId));
+        ArrayList<FactionFleetGroup> result = new ArrayList<>();
+        for (Map.Entry<Integer, ArrayList<MilitaryFleet>> entry : byFaction.entrySet()) {
+            entry.getValue().sort(Comparator.comparing(MilitaryFleet::fleetId));
+            result.add(new FactionFleetGroup(entry.getKey(), List.copyOf(entry.getValue())));
+        }
         return List.copyOf(result);
     }
 
@@ -479,7 +500,13 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
         throw new AssertionError("generated topology has no B06 military route");
     }
 
-    private record MilitaryFleet(FleetId fleetId, StarSystemId initialSystemId) { }
+    private record MilitaryFleet(FleetId fleetId) { }
+
+    private record FactionFleetGroup(int runtimeFactionId, List<MilitaryFleet> fleets) {
+        private FactionFleetGroup {
+            fleets = List.copyOf(fleets);
+        }
+    }
 
     private record Lane(
             int index,
@@ -491,6 +518,7 @@ class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
             EntityState defenderBefore) { }
 
     private record Summary(
+            int generatedFactionSlots,
             int distinctObjectiveSystems,
             int continuingRaids,
             int withdrawingRaids,
