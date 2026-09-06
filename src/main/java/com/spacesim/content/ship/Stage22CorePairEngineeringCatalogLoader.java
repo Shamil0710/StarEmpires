@@ -6,11 +6,11 @@ import java.util.ArrayList;
  * Composes the two accepted Stage-22 core engineering packages into one immutable runtime universe.
  *
  * <p>The original M22.3/M22.4 package loaders remain unchanged so their accepted visual/content
- * fingerprints stay stable. M22.6 then applies explicit versioned radar/shield runtime completion,
- * a common paid command-network projection and the common strategic-mobility projection to the
- * combined universe. No normalization or faction-name capability is added: every package-specific
- * material, hull and base-fit burden remains authored, while command-network and strategic variants
- * pay for their capability by displacing an existing defensive utility module.</p>
+ * fingerprints stay stable. M22.6 then applies explicit versioned radar/shield/thermal runtime
+ * completion, a common paid command-network projection and the common strategic-mobility projection
+ * to the combined universe. No normalization or faction-name capability is added: every
+ * package-specific material, hull and base-fit burden remains authored, while command-network and
+ * strategic variants pay for their capability by displacing an existing defensive utility module.</p>
  */
 public final class Stage22CorePairEngineeringCatalogLoader {
     private Stage22CorePairEngineeringCatalogLoader() {
@@ -45,7 +45,8 @@ public final class Stage22CorePairEngineeringCatalogLoader {
 
     private static ShipEngineeringCatalog runtimeComplete(ShipEngineeringCatalog source) {
         ShipEngineeringCatalog sensors = Stage22CorePairSensorModeProjection.apply(source);
-        return Stage22CorePairShieldModeProjection.apply(sensors);
+        ShipEngineeringCatalog shields = Stage22CorePairShieldModeProjection.apply(sensors);
+        return Stage22CorePairThermalRuntimeProjection.apply(shields);
     }
 
     private static <T> java.util.List<T> concat(java.util.List<T> first, java.util.List<T> second) {
