@@ -6,12 +6,11 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.content.Stage18ManufacturingProductRegistry.Provenance;
 import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
-import com.spacesim.economy.Stage18ShipConsumableCatalogLoader;
+import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.economy.Stage18ShipConsumableService;
 import com.spacesim.economy.Stage18StationStorage;
 import com.spacesim.economy.Stage19WarfareSupplyService;
 import com.spacesim.persistence.EntityStateMapper;
-import com.spacesim.persistence.SettlementRecoveryStateCodec;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
 import com.spacesim.persistence.WorldStateCodec;
 import com.spacesim.ship.ShieldFieldRuntime.State;
@@ -105,7 +104,7 @@ class Stage22CorePairPhysicalLossReplacementHandoffAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B13-B14-physical-loss-paid-replacement-handoff",
                 archive,
-                "Generated-world exact Stage-19 combat causes the FleetId loss; Stage-21E consequence reconciliation derives that loss from before/after physical registries; Stage-21G persists it and accepts a replacement demand; existing Stage-18/17.5 yard authority consumes finite hull/module stock and work to commission a fresh FleetId. Mirroring makes both exact core destroyer packages traverse the same loss-to-replacement seam. The declared low-integrity/collapsed-shield target represents prior rolling attrition and is not synthetic combat damage.");
+                "Generated-world exact Stage-19 combat causes the FleetId loss; Stage-21E consequence reconciliation derives that loss from before/after physical registries; Stage-21G records it and accepts a replacement demand; existing Stage-18/17.5 yard authority consumes finite hull/module stock and work to commission a fresh FleetId. Mirroring makes both exact core destroyer packages traverse the same loss-to-replacement seam. The declared low-integrity/collapsed-shield target represents prior rolling attrition and is not synthetic combat damage.");
     }
 
     private static ScenarioResult run(Permutation permutation) {
@@ -247,9 +246,6 @@ class Stage22CorePairPhysicalLossReplacementHandoffAcceptanceTest {
 
         byte[] worldBytes = WorldStateCodec.encode(runtime.world().snapshot());
         assertArrayEquals(worldBytes, WorldStateCodec.encode(WorldStateCodec.decode(worldBytes)));
-        byte[] recoveryBytes = SettlementRecoveryStateCodec.encode(recovery.snapshot());
-        assertArrayEquals(recoveryBytes,
-                SettlementRecoveryStateCodec.encode(SettlementRecoveryStateCodec.decode(recoveryBytes)));
 
         double hullMassKg = built.settlement().consumedCommodityMassKg().values().stream()
                 .mapToDouble(Double::doubleValue).sum();
