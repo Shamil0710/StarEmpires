@@ -132,7 +132,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                                     Map.entry("empire_replacement_module_input_kg", empireReplacement.moduleInputMassKg()),
                                     Map.entry("union_replacement_module_input_kg", unionReplacement.moduleInputMassKg()),
                                     Map.entry("union_retool_work_seconds", (double) pair.unionDisruption().retoolWorkSeconds()),
-                                    Map.entry("union_retool_energy_j", pair.unionDisruption().retoolEnergyJ())),
+                                    Map.entry("union_retool_energy_j", (double) pair.unionDisruption().retoolEnergyJ())),
                             Map.of(
                                     "authorization_envelope", authorization ? 1d : 0d,
                                     "common_actor_bounded_policy", commonPolicy ? 1d : 0d,
