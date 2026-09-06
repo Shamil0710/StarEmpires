@@ -304,7 +304,15 @@ public final class Stage22CorePairTacticalFactory {
             RuntimeContent content,
             ShipProtectionCatalog protection,
             LiveTacticalBattleControlRuntime control) {
-        /** Validates immutable command-network skirmish references. */
+        /**
+         * Validates immutable command-network skirmish references.
+         *
+         * @param permutation mirrored assignment used to create the scenario
+         * @param seed paired experiment seed used only for deterministic starting geometry
+         * @param content combined Stage-22 engineering/weapon content
+         * @param protection projected common protection content
+         * @param control ordinary Stage-19 actor-bounded control runtime
+         */
         public CommandNetworkSkirmish {
             Objects.requireNonNull(permutation, "permutation");
             if (seed < 0L) {
