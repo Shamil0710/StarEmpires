@@ -6,24 +6,25 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinitio
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleDefinition;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
  * M22.6 operational envelope for the paired Stage-22 strategic destroyer+tanker+support packages.
  *
- * <p>This authority deliberately derives projection burden from the ordinary engineering catalog:
- * fitted hull mass, the shared paid FTL module, destroyer reaction-mass interfaces and tanker/support
- * stores. It does not grant faction-name range or tempo modifiers. The same translation physics is
- * therefore applied to both factions while authored hull/support choices remain visible in the
- * resulting burden.</p>
+ * <p>This authority derives projection burden from the ordinary engineering catalog: fitted hull
+ * mass, each ship's own reaction-mass load, the tanker's transferable reaction mass, repair stores
+ * and the shared paid FTL module. It grants no faction-name range or tempo modifier. Translation
+ * physics are therefore common while authored hull/support choices remain visible in the raw
+ * burden.</p>
  *
- * <p>The actor view is intentionally narrower than the simulation result. Unknown route legs never
- * leak the authoritative route length through the actor-facing assessment.</p>
+ * <p>Route travel and combat sustainment are deliberately separate axes. FTL travel does not
+ * silently consume tactical propellant; overextension instead occurs when the declared combat
+ * refill demand exceeds the finite tanker stock. The actor projection contains only the route and
+ * support demand actually known to that actor.</p>
  */
 public final class Stage22CorePairOffensiveProjectionEnvelope {
-    /** Version pinned by the M22.6 acceptance surface. */
-    public static final String VERSION = "stage22.core_pair_offensive_projection_envelope.v1";
+    /** Version pinned by the M22.6 acceptance surface after wet-mass/runtime reconciliation. */
+    public static final String VERSION = "stage22.core_pair_offensive_projection_envelope.v2";
 
     private static final String PROPELLANT_FEED = "propellant_feed";
     private static final String REPLENISHMENT_TRANSFER = "replenishment_transfer";
@@ -40,8 +41,10 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
      * @param destroyerFitId strategic destroyer fit
      * @param tankerFitId strategic tanker fit
      * @param supportFitId strategic repair/support fit
-     * @param actualRouteEdges authoritative route length in translation edges
-     * @param actorKnownRouteEdges route prefix actually known to the observing actor
+     * @param actualRouteEdges authoritative FTL route length
+     * @param actorKnownRouteEdges route prefix known to the observing actor
+     * @param requiredCombatRefills authoritative full destroyer-refill demand at the objective
+     * @param actorKnownCombatRefills refill demand known to the observing actor
      * @return deterministic authoritative and actor-bounded projection result
      */
     public static ProjectionResult evaluate(
@@ -50,11 +53,19 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
             String tankerFitId,
             String supportFitId,
             int actualRouteEdges,
-            int actorKnownRouteEdges) {
+            int actorKnownRouteEdges,
+            int requiredCombatRefills,
+            int actorKnownCombatRefills) {
         ShipEngineeringCatalog checked = Objects.requireNonNull(catalog, "catalog");
         if (actualRouteEdges < 1) throw new IllegalArgumentException("actualRouteEdges must be positive");
         if (actorKnownRouteEdges < 0 || actorKnownRouteEdges > actualRouteEdges) {
             throw new IllegalArgumentException("actorKnownRouteEdges must be within the authoritative route");
+        }
+        if (requiredCombatRefills < 0) {
+            throw new IllegalArgumentException("requiredCombatRefills must be non-negative");
+        }
+        if (actorKnownCombatRefills < 0 || actorKnownCombatRefills > requiredCombatRefills) {
+            throw new IllegalArgumentException("actorKnownCombatRefills must be within authoritative demand");
         }
 
         FitBurden destroyer = burden(checked, destroyerFitId);
@@ -65,18 +76,23 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
         requireSharedFtl(tanker, ftl.id());
         requireSharedFtl(support, ftl.id());
 
-        double destroyerReactionMassKg = requireInterfaceCapacity(checked, destroyer.fit(), PROPELLANT_FEED);
-        double tankerReactionMassKg = requireInterfaceCapacity(checked, tanker.fit(), REPLENISHMENT_TRANSFER);
-        double repairStores = requireInterfaceCapacity(checked, support.fit(), REPAIR_STORES);
-        int supportedCombatEdges = (int) Math.floor(tankerReactionMassKg / destroyerReactionMassKg);
-        if (supportedCombatEdges < 1) {
-            throw new IllegalStateException("Strategic tanker cannot replenish one destroyer reaction-mass load");
+        double destroyerPropellantKg = requireInterfaceCapacity(checked, destroyer.fit(), PROPELLANT_FEED);
+        double tankerPropellantKg = requireInterfaceCapacity(checked, tanker.fit(), PROPELLANT_FEED);
+        double supportPropellantKg = requireInterfaceCapacity(checked, support.fit(), PROPELLANT_FEED);
+        double tankerReplenishmentKg = requireInterfaceCapacity(checked, tanker.fit(), REPLENISHMENT_TRANSFER);
+        double repairStoresAmount = requireInterfaceCapacity(checked, support.fit(), REPAIR_STORES);
+        int supportableCombatRefills = (int) Math.floor(tankerReplenishmentKg / destroyerPropellantKg);
+        if (supportableCombatRefills < 1) {
+            throw new IllegalStateException("Strategic tanker cannot replenish one destroyer propellant load");
         }
 
         double translatedMassLimitKg = requirePositive(ftl, "translated_mass_max_kg");
-        assertTranslatable(destroyer, translatedMassLimitKg, 0d);
-        assertTranslatable(tanker, translatedMassLimitKg, tankerReactionMassKg);
-        assertTranslatable(support, translatedMassLimitKg, 0d);
+        double destroyerTranslatedMassKg = translatableMass(
+                destroyer, translatedMassLimitKg, destroyerPropellantKg);
+        double tankerTranslatedMassKg = translatableMass(
+                tanker, translatedMassLimitKg, tankerPropellantKg + tankerReplenishmentKg);
+        double supportTranslatedMassKg = translatableMass(
+                support, translatedMassLimitKg, supportPropellantKg);
 
         double spoolSeconds = requirePositive(ftl, "spool_time_s");
         double transitSeconds = requirePositive(ftl, "edge_transit_time_s");
@@ -86,14 +102,15 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
         double travelSeconds = secondsPerEdge * actualRouteEdges;
         double fleetJumpEnergyJ = jumpEnergyJ * actualRouteEdges * 3d;
         double fleetDryMassKg = destroyer.dryMassKg() + tanker.dryMassKg() + support.dryMassKg();
-        double deployedMassKg = fleetDryMassKg + tankerReactionMassKg;
-        double remainingReactionMassKg = Math.max(
-                0d, tankerReactionMassKg - destroyerReactionMassKg * actualRouteEdges);
-        boolean overextended = actualRouteEdges > supportedCombatEdges;
+        double fleetOwnPropellantKg = destroyerPropellantKg + tankerPropellantKg + supportPropellantKg;
+        double deployedMassKg = destroyerTranslatedMassKg + tankerTranslatedMassKg + supportTranslatedMassKg;
+        double remainingReplenishmentKg = Math.max(
+                0d, tankerReplenishmentKg - destroyerPropellantKg * requiredCombatRefills);
+        boolean overextended = requiredCombatRefills > supportableCombatRefills;
 
         RouteAssessment assessment;
-        if (actorKnownRouteEdges < actualRouteEdges) {
-            assessment = RouteAssessment.UNKNOWN_BEYOND_KNOWN_ROUTE;
+        if (actorKnownRouteEdges < actualRouteEdges || actorKnownCombatRefills < requiredCombatRefills) {
+            assessment = RouteAssessment.UNKNOWN_BEYOND_KNOWN_OPERATION;
         } else if (overextended) {
             assessment = RouteAssessment.KNOWN_OVEREXTENDED;
         } else {
@@ -101,23 +118,31 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
         }
         ActorProjection actorProjection = new ActorProjection(
                 actorKnownRouteEdges,
-                supportedCombatEdges,
-                Math.max(0, supportedCombatEdges - actorKnownRouteEdges),
+                actorKnownCombatRefills,
+                supportableCombatRefills,
+                Math.max(0, supportableCombatRefills - actorKnownCombatRefills),
                 assessment);
 
         return new ProjectionResult(
                 actualRouteEdges,
-                supportedCombatEdges,
+                requiredCombatRefills,
+                supportableCombatRefills,
                 overextended,
                 secondsPerEdge,
                 travelSeconds,
                 fleetJumpEnergyJ,
                 fleetDryMassKg,
+                fleetOwnPropellantKg,
+                tankerReplenishmentKg,
                 deployedMassKg,
-                destroyerReactionMassKg,
-                tankerReactionMassKg,
-                remainingReactionMassKg,
-                repairStores,
+                destroyerTranslatedMassKg,
+                tankerTranslatedMassKg,
+                supportTranslatedMassKg,
+                destroyerPropellantKg,
+                tankerPropellantKg,
+                supportPropellantKg,
+                remainingReplenishmentKg,
+                repairStoresAmount,
                 actorProjection);
     }
 
@@ -128,8 +153,7 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
         if (hull == null) throw new IllegalStateException("Missing hull for fit: " + fitId);
         double dryMassKg = hull.bareHullMassKg();
         for (InstalledModuleDefinition assignment : fit.installedModules()) {
-            ModuleDefinition module = requireModule(catalog, assignment.moduleId());
-            dryMassKg += module.massKg();
+            dryMassKg += requireModule(catalog, assignment.moduleId()).massKg();
         }
         if (!Double.isFinite(dryMassKg) || dryMassKg <= 0d || dryMassKg > hull.maxOperationalMassKg()) {
             throw new IllegalStateException("Invalid fitted operational mass: " + fitId);
@@ -142,15 +166,19 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
                 .filter(assignment -> ftlId.equals(assignment.moduleId()))
                 .count();
         if (count != 1L) {
-            throw new IllegalArgumentException("Projection fit must carry exactly one shared FTL module: " + burden.fit().id());
+            throw new IllegalArgumentException(
+                    "Projection fit must carry exactly one shared FTL module: " + burden.fit().id());
         }
     }
 
-    private static void assertTranslatable(FitBurden burden, double translatedMassLimitKg, double consumableLoadKg) {
-        double translatedMassKg = burden.dryMassKg() + consumableLoadKg;
+    private static double translatableMass(
+            FitBurden burden, double translatedMassLimitKg, double reactionMassLoadKg) {
+        double translatedMassKg = burden.dryMassKg() + reactionMassLoadKg;
         if (!Double.isFinite(translatedMassKg) || translatedMassKg > translatedMassLimitKg) {
-            throw new IllegalStateException("Strategic fit exceeds FTL translated-mass envelope: " + burden.fit().id());
+            throw new IllegalStateException(
+                    "Strategic fit exceeds FTL translated-mass envelope: " + burden.fit().id());
         }
+        return translatedMassKg;
     }
 
     private static double requireInterfaceCapacity(
@@ -166,7 +194,8 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
             }
         }
         if (matches != 1 || !Double.isFinite(capacity) || capacity <= 0d) {
-            throw new IllegalStateException("Expected one finite positive " + interfaceId + " interface on " + fit.id());
+            throw new IllegalStateException(
+                    "Expected one finite positive " + interfaceId + " interface on " + fit.id());
         }
         return capacity;
     }
@@ -185,34 +214,42 @@ public final class Stage22CorePairOffensiveProjectionEnvelope {
         return value;
     }
 
-    /** Actor-facing route assessment without authoritative hidden-route fields. */
+    /** Actor-facing assessment without authoritative hidden route/support fields. */
     public enum RouteAssessment {
         KNOWN_SUPPORTED,
         KNOWN_OVEREXTENDED,
-        UNKNOWN_BEYOND_KNOWN_ROUTE
+        UNKNOWN_BEYOND_KNOWN_OPERATION
     }
 
-    /** Information available to one actor; authoritative route length is intentionally absent. */
+    /** Information available to one actor; authoritative route and demand totals are intentionally absent. */
     public record ActorProjection(
             int knownRouteEdges,
-            int supportableCombatEdges,
-            int knownSupportMarginEdges,
+            int knownCombatRefills,
+            int supportableCombatRefills,
+            int knownSupportMarginRefills,
             RouteAssessment assessment) { }
 
     /** Authoritative deterministic projection outcome used by the M22.6 acceptance harness. */
     public record ProjectionResult(
             int actualRouteEdges,
-            int supportableCombatEdges,
+            int requiredCombatRefills,
+            int supportableCombatRefills,
             boolean overextended,
             double secondsPerEdge,
             double travelSeconds,
             double fleetJumpEnergyJ,
             double fleetDryMassKg,
+            double fleetOwnPropellantKg,
+            double tankerReplenishmentKg,
             double deployedMassKg,
-            double destroyerReactionMassPerSupportedEdgeKg,
-            double tankerReactionMassKg,
-            double remainingReactionMassKg,
-            double repairStores,
+            double destroyerTranslatedMassKg,
+            double tankerTranslatedMassKg,
+            double supportTranslatedMassKg,
+            double destroyerPropellantKg,
+            double tankerPropellantKg,
+            double supportPropellantKg,
+            double remainingReplenishmentKg,
+            double repairStoresAmount,
             ActorProjection actorProjection) { }
 
     private record FitBurden(DemonstratorFitDefinition fit, double dryMassKg) { }
