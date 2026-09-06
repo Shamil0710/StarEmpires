@@ -6,6 +6,7 @@ import com.spacesim.content.ship.Stage22CorePairCommandNetworkProjection;
 import com.spacesim.ship.LiveTacticalBattleControlRuntime;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState;
 import com.spacesim.ship.LiveTacticalInitialReadinessService;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.Stage22CorePairTacticalFactory;
 import org.junit.jupiter.api.Test;
 
@@ -205,9 +206,8 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
         if (expected == null) {
             return false;
         }
-        var actual = skirmish.control().battleState().requireCombatant(entityId).engineering().fit;
-        return actual.hullId().equals(expected.hullId())
-                && actual.installedModules().equals(expected.installedModules());
+        InstalledFit actual = skirmish.control().battleState().requireCombatant(entityId).engineering().fit;
+        return actual.equals(InstalledFit.fromDemonstrator(expected));
     }
 
     private static boolean paidNetworkTradeoff(LiveTacticalBattleRuntimeState battle, long entityId) {
