@@ -81,6 +81,7 @@ class LiveTacticalResourceConstraintAcceptanceTest {
         var constrained = battle.requireCombatant(POWER_STARVED_E);
         initial.setModuleIntegrity(constrained, "core_reactor", 0.16d);
         initial.setSharedBusEnergyJ(constrained, 0d);
+        initial.setModuleIntegrity(constrained, "utility_datalink", 0d);
         LiveTacticalBattleControlRuntime runtime = new LiveTacticalBattleControlRuntime(battle);
 
         for (int index = 0; index < 8; index++) {
@@ -108,6 +109,7 @@ class LiveTacticalResourceConstraintAcceptanceTest {
         var stressed = battle.requireCombatant(THERMAL_STRESSED_E);
         double sensorThermalCapacityJ = moduleAtMount(stressed, "utility_sensor").localThermalCapacityJ();
         initial.setLocalHeatJ(stressed, "utility_sensor", sensorThermalCapacityJ);
+        initial.setModuleIntegrity(stressed, "utility_datalink", 0d);
         LiveTacticalBattleControlRuntime runtime = new LiveTacticalBattleControlRuntime(battle);
 
         runtime.advanceOneTick();
