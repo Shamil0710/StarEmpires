@@ -21,14 +21,26 @@ public final class Stage22CorePairCommandNetworkIndustrialProjection {
         throw new AssertionError("utility class");
     }
 
-    /** Adds paid Empire manufacturing/integration requirements for the common datalink. */
+    /**
+     * Adds paid Empire manufacturing/integration requirements for the common datalink.
+     *
+     * @param source accepted Empire shipyard industrial catalog
+     * @param engineering completed paired Stage-22 engineering catalog containing the datalink
+     * @return a new catalog with the Empire datalink industrial profile appended
+     */
     public static ShipyardIndustrialCatalog applyEmpire(
             ShipyardIndustrialCatalog source,
             ShipEngineeringCatalog engineering) {
         return apply(source, engineering, empireProfile());
     }
 
-    /** Adds paid Industrial Union manufacturing/integration requirements for the common datalink. */
+    /**
+     * Adds paid Industrial Union manufacturing/integration requirements for the common datalink.
+     *
+     * @param source accepted Industrial Union shipyard industrial catalog
+     * @param engineering completed paired Stage-22 engineering catalog containing the datalink
+     * @return a new catalog with the Industrial Union datalink industrial profile appended
+     */
     public static ShipyardIndustrialCatalog applyIndustrialUnion(
             ShipyardIndustrialCatalog source,
             ShipEngineeringCatalog engineering) {
