@@ -54,7 +54,7 @@ public final class Stage22CorePairDistributedRaidProbe {
     }
 
     private static EngineeringComponent engineering(
-            Stage22CorePairTacticalFactory.DestroyerDuel duel,
+            Stage22CorePairTacticalFactory.Duel duel,
             long entityId) {
         return duel.weapons().battleState().combatants().stream()
                 .filter(actor -> actor.spec().entityId() == entityId)
