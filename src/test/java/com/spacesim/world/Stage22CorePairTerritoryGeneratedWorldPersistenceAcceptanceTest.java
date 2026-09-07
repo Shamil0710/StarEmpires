@@ -102,6 +102,9 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         long sourceEntityId = empirePackage
                 ? Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID
                 : Stage22CorePairTacticalFactory.UNION_ENTITY_ID;
+        String exactFitId = empirePackage
+                ? Stage22CorePairTacticalFactory.EMPIRE_DESTROYER_FIT
+                : Stage22CorePairTacticalFactory.UNION_DESTROYER_FIT;
         EngineeringComponent exact = duel.weapons().battleState().combatants().stream()
                 .filter(value -> value.spec().entityId() == sourceEntityId)
                 .findFirst()
@@ -110,6 +113,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         Entity physical = entity(runtime, candidate.fleetId());
         physical.add(new EngineeringComponent(exact.fit, exact.runtimeState, exact.instanceState));
         assertEquals(candidate.runtimeFactionId(), physical.getComponent(FactionComponent.class).factionId);
+        assertEquals(duel.content().engineering().findDemonstratorFit(exactFitId).hullId(), exact.fit.hullId());
 
         Map<FleetId, FleetOperationalAvailability> availability = Map.of(
                 candidate.fleetId(), new FleetOperationalAvailability(CREW_AVAILABLE, SUPPLY_ACCESS_BPS));
@@ -171,8 +175,8 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         assertEquals(TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS / 2L,
                 midpoint.occupation().securedTicks());
         assertFalse(midpoint.claimCreated());
-        assertFalse(runtime.world().findFactionStrategicState(candidate.stableFactionId()).orElseThrow()
-                .claimFor(candidate.targetSystemId()) != null);
+        assertTrue(runtime.world().findFactionStrategicState(candidate.stableFactionId()).orElseThrow()
+                .claimFor(candidate.targetSystemId()) == null);
 
         Stage21FGeneratedWorldRuntimePersistentState checkpoint = Stage21FGeneratedWorldRuntimePersistentState.compose(
                 stage21E(runtime.captureState(), commands, midpoint.operations(), midpointTick),
@@ -247,7 +251,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
 
         return new LaneResult(
                 empirePackage ? "empire" : "industrial_union",
-                exact.fit.fitId(),
+                exactFitId,
                 candidate.stableFactionId(),
                 candidate.fleetId().value(),
                 candidate.originSystemId().value(),
@@ -354,9 +358,11 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
     }
 
     private static void advanceToTick(WorldSimulation world, long targetTick) {
+        float fixedStepSeconds = world.findSession(world.getActiveSystemId()).orElseThrow()
+                .getClock().getFixedStepSeconds();
         int guard = 0;
         while (world.getAuthoritativeWorldTick() < targetTick) {
-            world.advanceFrame(1.0f);
+            world.advanceFrame(fixedStepSeconds);
             if (++guard > 20_000) {
                 throw new AssertionError("B15 generated world did not reach target authoritative tick");
             }
