@@ -28,7 +28,6 @@ import com.spacesim.world.SettlementRecoveryState;
 import com.spacesim.world.SettlementRecoveryStateCodec;
 import com.spacesim.world.Stage21EPhysicalConsequenceService;
 import com.spacesim.world.Stage21GPhysicalRecoveryService;
-import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StrategicOperationState.ContactState;
 import com.spacesim.world.StrategicOperationState.OperationState;
 import com.spacesim.world.StrategicOperationState.OperationStatus;
@@ -55,29 +54,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * M22.6 B01/B13/B14 generated-world persistence for a paid Stage-21G replacement.
  *
- * <p>The test begins with an ordinary generated military FleetId, installs the exact matching core
- * package, records only an actual ordinary destruction through Stage-21E consequence reconciliation,
- * and creates a Stage-21G replacement demand. The existing Stage-18/17.5 yard consumes finite stock
- * and work. {@link Stage21GGeneratedWorldPhysicalRecoveryAuthority} then adds only the missing exact
- * Stage-20 berth sidecar to the fresh ordinary replacement FleetId.</p>
- *
- * <p>The acceptance boundary is deliberately stronger than WorldState persistence: the complete
- * Stage-20.5 generated runtime must capture, encode, decode and restore after commissioning. The
- * restored replacement must retain the same fresh FleetId, exact core fit and hierarchical/double
- * berth. Stage-21G recovery metadata is independently byte-stable and still references that exact
- * commissioned FleetId. Both core factions traverse the same seam.</p>
+ * <p>Generated-world faction identity and Stage-22 core-package identity are intentionally separate.
+ * The bootstrap owns ordinary fleets under its generated faction directory; the experiment installs
+ * one exact Empire/Union core fit onto that physical fleet. Stage-21G recovery therefore records the
+ * real generated owner while the paired experiment records which exact core package crossed the seam.</p>
  */
 class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
     private static final long OPERATION_ID = 22_613_500L;
     private static final int CREW_AVAILABLE = 100_000;
 
     @Test
-    void b13PaidReplacementRemainsCapturableByFullGeneratedWorldRuntimeForBothCoreFactions() {
+    void b13PaidReplacementRemainsCapturableByFullGeneratedWorldRuntimeForBothCorePackages() {
         ScenarioResult empire = run(true);
         ScenarioResult union = run(false);
 
-        assertEquals(Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID, empire.factionId());
-        assertEquals(Stage22CorePairBalanceEvidence.UNION_FACTION_ID, union.factionId());
+        assertEquals(Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID, empire.corePackageId());
+        assertEquals(Stage22CorePairBalanceEvidence.UNION_FACTION_ID, union.corePackageId());
         for (ScenarioResult result : List.of(empire, union)) {
             assertTrue(result.fullRuntimeByteStable());
             assertTrue(result.recoveryByteStable());
@@ -85,19 +77,20 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
             assertTrue(result.exactFitRestored());
             assertTrue(result.finiteStockConsumed());
             assertNotEquals(result.lostFleetId(), result.replacementFleetId());
+            assertFalse(result.physicalOwnerId().isBlank());
         }
 
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
-        archive.put("empire", empire);
-        archive.put("union", union);
+        archive.put("empireCorePackage", empire);
+        archive.put("unionCorePackage", union);
         Stage22CorePairEvidenceArchive.write(
                 "B13-B14-generated-world-paid-replacement-full-checkpoint",
                 archive,
-                "A real ordinary FleetId loss becomes a Stage-21E consequence and Stage-21G replacement demand. Existing finite Stage-18 yard stock/work commissions a fresh FleetId, and the generated-world recovery adapter registers only its exact Stage-20 stationary berth. Full Stage-20.5 capture/restore and Stage-21G recovery-state bytes are deterministic for both exact core packages. This closes the missing commissioned-replacement physical-sidecar/persistence seam; multi-loss sustained backlog cadence and the continuous same-shock B14 repair/replacement curve remain open.");
+                "A real ordinary generated FleetId loss becomes a Stage-21E consequence and Stage-21G replacement demand under the bootstrap's actual stable faction owner. The paired coordinate installs either exact core package on that physical asset; it does not rewrite generated faction identity. Existing finite Stage-18 yard stock/work commissions a fresh FleetId, the generated-world recovery adapter registers only its exact Stage-20 stationary berth, and full Stage-20.5 capture/restore plus Stage-21G recovery bytes remain deterministic. Sustained long-war cadence and the continuous same-shock B14 recovery curve remain open.");
     }
 
-    private static ScenarioResult run(boolean empire) {
-        String targetFaction = empire
+    private static ScenarioResult run(boolean empireCorePackage) {
+        String corePackageId = empireCorePackage
                 ? Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID
                 : Stage22CorePairBalanceEvidence.UNION_FACTION_ID;
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime = Stage20PlayableGeneratedWorldFactory.create(
@@ -106,20 +99,18 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
                 ContentCatalogLoader.loadDefault(), runtime.world().snapshot().factionIdentities());
 
         List<MilitaryFleet> military = militaryFleets(runtime, identities);
-        MilitaryFleet target = military.stream()
-                .filter(row -> row.stableFactionId().equals(targetFaction))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("generated world lacks target core faction military fleet"));
+        if (military.size() < 2) throw new AssertionError("generated world lacks two ordinary military fleets");
+        MilitaryFleet target = military.get(0);
         MilitaryFleet survivor = military.stream()
-                .filter(row -> !row.stableFactionId().equals(targetFaction))
+                .filter(row -> row.runtimeFactionId() != target.runtimeFactionId())
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("generated world lacks opposing military fleet"));
+                .orElseThrow(() -> new AssertionError("generated world lacks opposing ordinary military faction"));
 
         var duel = Stage22CorePairTacticalFactory.createDestroyerDuel(Permutation.DEFAULT);
         EngineeringComponent empireCore = engineering(duel, Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID);
         EngineeringComponent unionCore = engineering(duel, Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
-        EngineeringComponent targetCore = empire ? empireCore : unionCore;
-        EngineeringComponent survivorCore = empire ? unionCore : empireCore;
+        EngineeringComponent targetCore = empireCorePackage ? empireCore : unionCore;
+        EngineeringComponent survivorCore = empireCorePackage ? unionCore : empireCore;
         entity(runtime, target.placement()).add(copy(targetCore));
         entity(runtime, survivor.placement()).add(copy(survivorCore));
         InstalledFit lostFit = targetCore.fit;
@@ -138,8 +129,7 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
                 target.placement().systemId(), targetLocalId, DestructionPolicy.destroyAll());
         runtime.arrival().materialization(target.placement().systemId())
                 .releasePhysicalStateForWorldTransfer(targetLocalId);
-        assertFalse(runtime.world().findFleet(target.fleetId()).isPresent(),
-                "B13 physical loss must remove the ordinary FleetId before recovery planning");
+        assertFalse(runtime.world().findFleet(target.fleetId()).isPresent());
 
         Map<FleetId, FleetOperationalAvailability> afterAvailability = Map.of(
                 survivor.fleetId(), new FleetOperationalAvailability(CREW_AVAILABLE, FleetReadinessState.FULL));
@@ -150,10 +140,10 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
 
         var settlement = new SettlementRecoveryState.Settlement(
                 1L,
-                "proposal.m22_6.generated_replacement." + targetFaction,
+                "proposal.m22_6.generated_replacement." + corePackageId,
                 "war.m22_6.generated_replacement",
                 survivor.stableFactionId(),
-                targetFaction,
+                target.stableFactionId(),
                 tick,
                 tick,
                 SettlementRecoveryState.SettlementStatus.PENDING,
@@ -172,7 +162,7 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
         var demand = recovery.requestReplacement(1L, target.fleetId(), lostFit, tick);
         recovery.finalizeRecoveryPlan(1L, tick);
 
-        Stage22CorePairRecoveryProbe.PreparedYard setup = Stage22CorePairRecoveryProbe.prepareYard(empire);
+        Stage22CorePairRecoveryProbe.PreparedYard setup = Stage22CorePairRecoveryProbe.prepareYard(empireCorePackage);
         Stage18StationStorage stock = replacementStock(setup, lostFit);
         Map<String, Double> startingMaterials = stock.snapshotCommodityMassByIdKg();
         Map<String, Integer> startingModules = stock.snapshotProductCountById();
@@ -243,7 +233,8 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
         assertTrue(finiteStockConsumed);
 
         return new ScenarioResult(
-                targetFaction,
+                corePackageId,
+                target.stableFactionId(),
                 target.fleetId().value(),
                 built.commissionedFleetId().value(),
                 fullRuntimeByteStable,
@@ -329,9 +320,9 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
         ArrayList<MilitaryFleet> result = new ArrayList<>();
         for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) continue;
-            Entity entity = entity(runtime, placement);
-            EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
-            FactionComponent faction = entity.getComponent(FactionComponent.class);
+            Entity fleetEntity = entity(runtime, placement);
+            EngineeringComponent engineering = fleetEntity.getComponent(EngineeringComponent.class);
+            FactionComponent faction = fleetEntity.getComponent(FactionComponent.class);
             if (engineering == null || faction == null) continue;
             String stableFaction = identities.stableId(faction.factionId).orElseThrow();
             result.add(new MilitaryFleet(placement.id(), faction.factionId, stableFaction, placement));
@@ -354,7 +345,8 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
             FleetPlacementState placement) { }
 
     private record ScenarioResult(
-            String factionId,
+            String corePackageId,
+            String physicalOwnerId,
             long lostFleetId,
             long replacementFleetId,
             boolean fullRuntimeByteStable,
