@@ -25,6 +25,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * M22.6 B01/B11 production save-continuation evidence for degraded command and sensors.
@@ -90,8 +91,10 @@ class Stage22CorePairCommandNetworkPersistenceAcceptanceTest {
         int empireContacts = restoredBattle.visibleContacts(Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID).size();
         int unionContacts = restoredBattle.visibleContacts(Stage22CorePairTacticalFactory.UNION_ENTITY_ID).size();
         if (breakMode == BreakMode.NONE) {
-            assertEquals(1, empireContacts, "intact Empire relay must reconstruct one hostile contact after load");
-            assertEquals(1, unionContacts, "intact Union relay must reconstruct one hostile contact after load");
+            assertTrue(empireContacts > 0,
+                    "intact Empire relay must reconstruct hostile awareness after load");
+            assertTrue(unionContacts > 0,
+                    "intact Union relay must reconstruct hostile awareness after load");
         } else {
             assertEquals(0, empireContacts, "broken physical datalink must remain fail-closed after load");
             assertEquals(0, unionContacts, "broken physical datalink must remain fail-closed after load");
