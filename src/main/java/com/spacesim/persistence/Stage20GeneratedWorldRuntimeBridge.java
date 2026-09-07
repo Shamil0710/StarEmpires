@@ -797,7 +797,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
          * Validates one exact endpoint binding.
          *
          * @param systemId exact generated system
-         * @param stationId exact generated station identity
+         * @param stationId exact generated station placement ID
          * @param stationArchetypeId exact Stage-18 station archetype
          * @param position exact generated local physical position
          * @param storage ordinary mutable Stage-18 storage
@@ -807,7 +807,6 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         public RuntimeEndpoint {
             Objects.requireNonNull(systemId, "systemId");
             stationId = requireText(stationId, "stationId");
-            stableFactionId = stableFactionId;
             stationArchetypeId = requireText(stationArchetypeId, "stationArchetypeId");
             Objects.requireNonNull(position, "position");
             Objects.requireNonNull(storage, "storage");
