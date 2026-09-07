@@ -49,7 +49,7 @@ public final class Stage22CorePairEvidenceArchive {
         }
     }
 
-    private static String json(Object value) {
+    static String json(Object value) {
         if (value == null) return "null";
         if (value instanceof String || value instanceof Enum<?>) return quote(value.toString());
         if (value instanceof Boolean || value instanceof Number) return value.toString();
@@ -67,8 +67,13 @@ public final class Stage22CorePairEvidenceArchive {
         if (value.getClass().isRecord()) {
             var fields = new TreeMap<String, Object>();
             for (var component : value.getClass().getRecordComponents()) {
+                var accessor = component.getAccessor();
+                if (!accessor.canAccess(value) && !accessor.trySetAccessible()) {
+                    throw new IllegalArgumentException(
+                            "Cannot access evidence record component: " + component.getName());
+                }
                 try {
-                    fields.put(component.getName(), component.getAccessor().invoke(value));
+                    fields.put(component.getName(), accessor.invoke(value));
                 } catch (ReflectiveOperationException exception) {
                     throw new IllegalArgumentException("Cannot serialize evidence record", exception);
                 }
