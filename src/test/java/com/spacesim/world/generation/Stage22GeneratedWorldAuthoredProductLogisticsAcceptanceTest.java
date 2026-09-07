@@ -105,7 +105,7 @@ class Stage22GeneratedWorldAuthoredProductLogisticsAcceptanceTest {
 
         assertEquals(Status.TRANSFERRED, transfer.status());
         assertEquals(AUTHORED_PRODUCT, transfer.cargoId());
-        assertEquals(1, transfer.productCount());
+        assertEquals(1, transfer.transferredUnitCount());
         assertEquals(0, restoredSource.storage().productCount(AUTHORED_PRODUCT));
         assertEquals(1, restoredDestination.storage().productCount(AUTHORED_PRODUCT));
 
