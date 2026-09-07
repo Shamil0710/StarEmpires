@@ -44,7 +44,7 @@ class Stage22CorePairExpansionTrajectoryPersistenceAcceptanceTest {
                 "B03",
                 "stage18_required_support_expansion_trajectory",
                 "stage18+stage22.current",
-                Stage22CorePairExperimentProtocol.tuningSchedule(),
+                Stage22CorePairExperimentProtocol.pairedSchedule(1),
                 (scenario, variant, profile, coordinate) -> {
                     ExpansionTrajectory empire = run(true, coordinate.seed());
                     ExpansionTrajectory union = run(false, coordinate.seed());
@@ -82,9 +82,9 @@ class Stage22CorePairExpansionTrajectoryPersistenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("union_midwork_save_continuation"));
         assertEquals(1d, vector.guardMetricMeans().get("matched_support_burden"));
         Stage22CorePairEvidenceArchive.write(
-                "B03-stage18-expansion-trajectory-tuning",
+                "B03-stage18-expansion-trajectory",
                 vector,
-                "Canonical 30-seed/default+mirrored B03 batch over the actual missing precision-fabrication dependency. Both core yards begin blocked, pay the same Stage-18 kg/work support burden, survive an ordinary mid-construction industrial checkpoint, and activate only after the required facility completes. IDs vary by coordinate only; no gameplay RNG or faction bonus is introduced.");
+                "Deterministic default+mirrored B03 batch over the actual missing precision-fabrication dependency. Both core yards begin blocked, pay the same Stage-18 kg/work support burden, survive an ordinary mid-construction industrial checkpoint, and activate only after the required facility completes. Exact replay is executed explicitly; coordinate IDs vary only to prove slot independence, while this construction path contains no gameplay RNG.");
     }
 
     private static ExpansionTrajectory run(boolean empire, long seed) {
