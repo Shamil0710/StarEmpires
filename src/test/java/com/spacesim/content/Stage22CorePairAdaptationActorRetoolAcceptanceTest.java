@@ -129,7 +129,7 @@ class Stage22CorePairAdaptationActorRetoolAcceptanceTest {
         assertFalse(screenQualified.retooling());
         assertTrue(screenModifier.workMultiplier() > 0d);
         assertTrue(screenModifier.energyMultiplier() > 0d);
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(IllegalStateException.class,
                 () -> Stage22IndustrialUnionIndustrialProgram.modifierFor(screenQualified, LOGISTICS_FAMILY),
                 "completed adaptation must retain the series-change opportunity cost until a later paid retool back");
 
