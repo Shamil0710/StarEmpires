@@ -41,6 +41,10 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                             Stage22CorePairTacticalProbe.Variant.PATROL,
                             coordinate,
                             false);
+                    var restoredPatrol = Stage22CorePairTacticalProbe.run(
+                            Stage22CorePairTacticalProbe.Variant.PATROL,
+                            coordinate,
+                            true);
                     Map<String, Stage22CorePairTacticalProbe.StartingBurden> burdens = patrol.startingBurden().stream()
                             .collect(Collectors.toMap(
                                     Stage22CorePairTacticalProbe.StartingBurden::factionId,
@@ -70,6 +74,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                     boolean commonPolicy = patrol.valid()
                             && Stage22CorePairTacticalProbe.POLICY.equals(patrol.policyId())
                             && patrol.unauthorizedTargetTicks() == 0L;
+                    boolean saveContinuationStable = patrol.equals(restoredPatrol);
                     boolean bothEngaged = empireProtection.impactsResolved() > 0L
                             && unionProtection.impactsResolved() > 0L
                             && empireWeapons.shotsFired() > 0L
@@ -95,6 +100,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                     List<String> breaches = new ArrayList<>();
                     if (!authorization) breaches.add("b07_authorization_envelope_drift");
                     if (!commonPolicy) breaches.add("b07_common_policy_or_actor_bound_drift");
+                    if (!saveContinuationStable) breaches.add("b07_physical_start_save_continuation_drift");
                     if (!bothEngaged) breaches.add("b07_no_observed_patrol_exchange");
                     if (!ammunitionConserved) breaches.add("b07_ammunition_not_physically_conserved");
                     if (!nonPareto) breaches.add("b07_raw_dimension_pareto_collapse");
@@ -136,6 +142,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                             Map.of(
                                     "authorization_envelope", authorization ? 1d : 0d,
                                     "common_actor_bounded_policy", commonPolicy ? 1d : 0d,
+                                    "physical_start_save_continuation", saveContinuationStable ? 1d : 0d,
                                     "both_sides_observed_exchange", bothEngaged ? 1d : 0d,
                                     "ammunition_conserved", ammunitionConserved ? 1d : 0d,
                                     "two_sided_non_pareto", nonPareto ? 1d : 0d,
@@ -148,6 +155,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
         assertEquals(60, vector.runCount());
         assertEquals(1d, vector.guardMetricMeans().get("authorization_envelope"));
         assertEquals(1d, vector.guardMetricMeans().get("common_actor_bounded_policy"));
+        assertEquals(1d, vector.guardMetricMeans().get("physical_start_save_continuation"));
         assertEquals(1d, vector.guardMetricMeans().get("both_sides_observed_exchange"));
         assertEquals(1d, vector.guardMetricMeans().get("ammunition_conserved"));
         assertEquals(1d, vector.guardMetricMeans().get("two_sided_non_pareto"));
@@ -170,7 +178,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B07-equal-burden-patrol-paired-30",
                 archive,
-                "Thirty paired/mirrored B07 patrol coordinates using the same Stage-19 tactical policy and exact Stage-22 destroyer fits. Raw mass, crew, power, ammunition, reaction mass, acceleration, visibility, exchange, surviving protection and paid replacement/retool burdens remain separate dimensions; no scalar power score or faction-wide combat modifier is introduced.");
+                "Thirty paired/mirrored B07 patrol coordinates using the same Stage-19 tactical policy and exact Stage-22 destroyer fits. Every coordinate is also rerun from an ordinary EntityStateMapper physical-start round trip and must produce the exact same complete sampled evidence. Raw mass, crew, power, ammunition, reaction mass, acceleration, visibility, exchange, surviving protection and paid replacement/retool burdens remain separate dimensions; no scalar power score or faction-wide combat modifier is introduced. This proves scenario-start persistence, not a synthetic mid-flight battle save authority.");
     }
 
     private static boolean fitsAuthorization(Stage22CorePairTacticalProbe.StartingBurden burden) {
