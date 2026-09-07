@@ -44,10 +44,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>The older B15 probe proves the stable core identities are accepted by Stage-21F territorial
  * law, but its package-local force fixture is intentionally synthetic. This complementary acceptance
  * starts from a production generated world and an already materialized ordinary military FleetId.
- * The fleet moves through the ordinary fitted FTL FSM to a non-owned empty neighboring system, then
- * receives one exact Stage-22 core destroyer engineering package. Stage-21D INVADE and Stage-21E
- * operation admission consume a {@link FleetForceRegistry} reconstructed from that exact persistent
- * entity; no hand-authored force entry or readiness vector participates in occupation authority.</p>
+ * The fleet moves through the ordinary fitted FTL FSM to a non-owned neighboring system, then
+ * receives one exact Stage-22 core destroyer engineering package. Any bootstrap resident fleets in
+ * the destination are removed through the ordinary world lifecycle before departure so this focused
+ * occupation lane does not depend on an accidental generated-world emptiness invariant. Stage-21D
+ * INVADE and Stage-21E operation admission consume a {@link FleetForceRegistry} reconstructed from
+ * that exact persistent entity; no hand-authored force entry or readiness vector participates in
+ * occupation authority.</p>
  *
  * <p>The occupation is checkpointed halfway through its sustained-security clock via the production
  * Stage-21F codec. Direct and restored worlds must then reach the same Stage-17 claim, completed
@@ -79,7 +82,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B15-generated-world-core-package-occupation-save-continuation",
                 archive,
-                "Two fresh production generated worlds supply ordinary persistent military FleetIds and ordinary fitted FTL movement. After physical arrival each lane receives one exact Stage-22 core destroyer package, readiness is reconstructed from the persisted entity, and Stage-21D/21E/21F authorities own invasion/occupation/claim progression. A halfway Stage-21F checkpoint resumes to the same Stage-17 claim and byte-identical final checkpoint. Generated world political owners remain world-bootstrap identities; the separate B15 mirrored core-identity probe remains the authority evidence for stable Empire/Industrial Union territorial identity binding.");
+                "Two fresh production generated worlds supply ordinary persistent military FleetIds and ordinary fitted FTL movement. Each lane deterministically selects a non-owned neighboring system and removes any bootstrap resident fleets through the ordinary world lifecycle solely to isolate occupation authority from generated-world population accidents. After physical arrival each lane receives one exact Stage-22 core destroyer package, readiness is reconstructed from the persisted entity, and Stage-21D/21E/21F authorities own invasion/occupation/claim progression. A halfway Stage-21F checkpoint resumes to the same Stage-17 claim and byte-identical final checkpoint. Generated world political owners remain world-bootstrap identities; the separate B15 mirrored core-identity probe remains the authority evidence for stable Empire/Industrial Union territorial identity binding.");
     }
 
     private static LaneResult runLane(boolean empirePackage) {
@@ -88,6 +91,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         FactionIdentityResolver identities = FactionIdentityResolver.createDefault(
                 ContentCatalogLoader.loadDefault(), runtime.world().snapshot().factionIdentities());
         Candidate candidate = candidate(runtime, identities);
+        clearDestinationFleets(runtime, candidate.targetSystemId());
 
         GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, candidate.fleetId(), candidate.targetSystemId());
         runtime.world().requestFleetJump(candidate.fleetId(), candidate.targetSystemId());
@@ -233,13 +237,27 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
             if (stableFactionId == null) continue;
             for (StarSystemId target : runtime.world().getTopology().neighbors(placement.systemId()).stream().sorted().toList()) {
                 if (runtime.world().controllingFaction(target).filter(stableFactionId::equals).isPresent()) continue;
-                boolean occupied = placements.stream().anyMatch(other -> other.locationKind() == FleetLocationKind.IN_SYSTEM
-                        && target.equals(other.systemId()));
-                if (occupied) continue;
                 return new Candidate(placement.id(), faction.factionId, stableFactionId, placement.systemId(), target);
             }
         }
-        throw new AssertionError("generated world lacks an ordinary military FleetId adjacent to a non-owned empty system");
+        throw new AssertionError("generated world lacks an ordinary military FleetId adjacent to a non-owned system");
+    }
+
+    private static void clearDestinationFleets(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
+            StarSystemId targetSystemId) {
+        List<FleetPlacementState> residents = runtime.world().getFleetPlacements().stream()
+                .filter(placement -> placement.locationKind() == FleetLocationKind.IN_SYSTEM)
+                .filter(placement -> targetSystemId.equals(placement.systemId()))
+                .toList();
+        for (FleetPlacementState resident : residents) {
+            assertTrue(runtime.world().removeEntity(targetSystemId, resident.localEntityId()),
+                    "B15 lane setup must remove the selected destination resident through world lifecycle");
+        }
+        assertFalse(runtime.world().getFleetPlacements().stream()
+                .anyMatch(placement -> placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                        && targetSystemId.equals(placement.systemId())),
+                "B15 isolated occupation target must contain no bootstrap resident fleet before departure");
     }
 
     private static Entity entity(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime, FleetId fleetId) {
