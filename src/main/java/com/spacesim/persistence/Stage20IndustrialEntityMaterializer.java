@@ -62,7 +62,8 @@ public final class Stage20IndustrialEntityMaterializer {
     }
 
     /**
-     * Materializes the first live industrial registry from the accepted Stage-20F authority.
+     * Materializes the first live industrial registry from the accepted Stage-20F authority using
+     * the baseline Stage-18 manufactured-product vocabulary.
      *
      * @param saved exact Stage-20K campaign authority
      * @param specialization exact closed Stage-20F operational specialization used to capture it
@@ -71,9 +72,34 @@ public final class Stage20IndustrialEntityMaterializer {
     public static MaterializedIndustrialRegistry materializeBootstrap(
             Stage20GeneratedCampaignPersistentState saved,
             OperationalSpecializationReport specialization) {
+        return materializeBootstrap(
+                saved,
+                specialization,
+                Stage18ManufacturingProductRegistry.loadDefault());
+    }
+
+    /**
+     * Materializes the first live industrial registry with an explicitly composed Stage-18 product
+     * vocabulary.
+     *
+     * <p>The supplied registry is only a content vocabulary. It grants no inventory, capacity,
+     * facility or production output and therefore keeps the generated Stage-20 physical authority
+     * unchanged. Later authored content can extend the ordinary Stage-18 registry without creating
+     * a reverse Stage-20 dependency on that later content package.</p>
+     *
+     * @param saved exact Stage-20K campaign authority
+     * @param specialization exact closed Stage-20F operational specialization used to capture it
+     * @param products explicit manufactured-product vocabulary used by station/storage/yard runtime
+     * @return deterministic live Stage-18 industrial registry
+     */
+    public static MaterializedIndustrialRegistry materializeBootstrap(
+            Stage20GeneratedCampaignPersistentState saved,
+            OperationalSpecializationReport specialization,
+            Stage18ManufacturingProductRegistry products) {
         Stage20GeneratedCampaignPersistentState state = requireBase(saved);
         OperationalSpecializationReport operations = Objects.requireNonNull(
                 specialization, "specialization");
+        Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
         if (operations.rootSeed() != state.generationIdentity().worldSeed()
                 || !operations.resolvedProbeVersion().equals(state.generationIdentity().generatorVersion())
                 || !operations.readyForRuntimeBridge()) {
@@ -138,7 +164,8 @@ public final class Stage20IndustrialEntityMaterializer {
                     stationInventory.assignment().storage(),
                     stationFacilities,
                     stationYards,
-                    true));
+                    true,
+                    productRegistry));
         }
         validateStationCoverage(ownerByStation.keySet(), stations);
         MaterializedIndustrialRegistry registry = registry(state, stations);
@@ -147,14 +174,29 @@ public final class Stage20IndustrialEntityMaterializer {
     }
 
     /**
-     * Restores live industrial entities solely from persisted Stage-18 state and Stage-20K identity.
+     * Restores live industrial entities solely from persisted Stage-18 state and Stage-20K identity
+     * using the baseline Stage-18 manufactured-product vocabulary.
      *
      * @param saved exact saved generated campaign after an initial 20.5C bootstrap
      * @return deterministic restored live industrial registry
      */
     public static MaterializedIndustrialRegistry restore(
             Stage20GeneratedCampaignPersistentState saved) {
+        return restore(saved, Stage18ManufacturingProductRegistry.loadDefault());
+    }
+
+    /**
+     * Restores live industrial entities with an explicitly composed Stage-18 product vocabulary.
+     *
+     * @param saved exact saved generated campaign after an initial 20.5C bootstrap
+     * @param products explicit manufactured-product vocabulary used by station/storage/yard runtime
+     * @return deterministic restored live industrial registry
+     */
+    public static MaterializedIndustrialRegistry restore(
+            Stage20GeneratedCampaignPersistentState saved,
+            Stage18ManufacturingProductRegistry products) {
         Stage20GeneratedCampaignPersistentState state = requireBase(saved);
+        Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
         Stage18IndustrialState industrial = state.industrialState();
         if (industrial.stationStorages().isEmpty() || industrial.facilities().isEmpty()) {
             throw new IllegalArgumentException(
@@ -187,10 +229,16 @@ public final class Stage20IndustrialEntityMaterializer {
                     .getOrDefault(storage.stationId(), List.of()).stream()
                     .map(YardInstallationSnapshot::state)
                     .toList();
-            stations.add(restoreStation(authority, storage, facilityStates, yardStates,
-                    authority.ownerId(), industrial.constructionOrders().stream()
+            stations.add(restoreStation(
+                    authority,
+                    storage,
+                    facilityStates,
+                    yardStates,
+                    authority.ownerId(),
+                    industrial.constructionOrders().stream()
                             .filter(order -> order.stationId().equals(storage.stationId()))
-                            .toList()));
+                            .toList(),
+                    productRegistry));
         }
         if (!unsupportedAssignments.isEmpty()) {
             throw new IllegalStateException("unexpected unsupported industrial assignments");
@@ -229,7 +277,8 @@ public final class Stage20IndustrialEntityMaterializer {
             StationStorageSnapshot storageSnapshot,
             List<FacilityStateAssignment> facilityAssignments,
             List<InstalledYardEvidence> yardEvidence,
-            boolean compareAcceptedYardProjection) {
+            boolean compareAcceptedYardProjection,
+            Stage18ManufacturingProductRegistry products) {
         List<InstalledFacilityState> facilities = facilityAssignments.stream()
                 .map(FacilityStateAssignment::state)
                 .sorted(Comparator.comparing(InstalledFacilityState::facilityInstanceId))
@@ -239,7 +288,13 @@ public final class Stage20IndustrialEntityMaterializer {
                 .sorted(Comparator.comparing(InstalledYardState::yardInstanceId))
                 .toList();
         MaterializedIndustrialStation station = restoreStation(
-                canonical, storageSnapshot, facilities, yards, owner);
+                canonical,
+                storageSnapshot,
+                facilities,
+                yards,
+                owner,
+                List.of(),
+                products);
         if (compareAcceptedYardProjection) {
             Map<String, YardCapabilitySnapshot> accepted = new TreeMap<>();
             yardEvidence.forEach(value -> accepted.put(value.snapshot().yardInstanceId(), value.snapshot()));
@@ -257,27 +312,12 @@ public final class Stage20IndustrialEntityMaterializer {
             CanonicalStation canonical,
             StationStorageSnapshot storageSnapshot,
             List<InstalledFacilityState> facilities,
-            List<InstalledYardState> yards) {
-        return restoreStation(canonical, storageSnapshot, facilities, yards, canonical.ownerId());
-    }
-
-    private static MaterializedIndustrialStation restoreStation(
-            CanonicalStation canonical,
-            StationStorageSnapshot storageSnapshot,
-            List<InstalledFacilityState> facilities,
-            List<InstalledYardState> yards,
-            String owner) {
-        return restoreStation(canonical, storageSnapshot, facilities, yards, owner, List.of());
-    }
-
-    private static MaterializedIndustrialStation restoreStation(
-            CanonicalStation canonical,
-            StationStorageSnapshot storageSnapshot,
-            List<InstalledFacilityState> facilities,
             List<InstalledYardState> yards,
             String owner,
-            List<com.spacesim.economy.Stage18FacilityConstructionRuntime.ConstructionOrderSnapshot> constructionOrders) {
+            List<com.spacesim.economy.Stage18FacilityConstructionRuntime.ConstructionOrderSnapshot> constructionOrders,
+            Stage18ManufacturingProductRegistry products) {
         Objects.requireNonNull(canonical, "canonical");
+        Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
         if (!canonical.stationId().equals(storageSnapshot.stationId())) {
             throw new IllegalArgumentException("storage station differs from canonical station");
         }
@@ -292,7 +332,7 @@ public final class Stage20IndustrialEntityMaterializer {
                 GENERATED_LOCATION_TAG,
                 archetype,
                 Stage18ResourceOntologyLoader.loadDefault(),
-                Stage18ManufacturingProductRegistry.loadDefault());
+                productRegistry);
         for (var order : constructionOrders) {
             if (order.status() == com.spacesim.economy.Stage18FacilityConstructionRuntime.OrderStatus.COMPLETE) {
                 node = node.withCompletedConstruction(order,
@@ -306,7 +346,7 @@ public final class Stage20IndustrialEntityMaterializer {
         }
         Stage18StationStorage storage = Stage18StationStorage.restore(
                 Stage18ResourceOntologyLoader.loadDefault(),
-                Stage18ManufacturingProductRegistry.loadDefault(),
+                productRegistry,
                 storageSnapshot);
 
         TreeMap<String, InstalledFacilityState> stateById = new TreeMap<>();
@@ -334,7 +374,7 @@ public final class Stage20IndustrialEntityMaterializer {
         Stage18ShipyardRuntime shipyardRuntime = new Stage18ShipyardRuntime(
                 Stage18ShipyardCatalogLoader.loadDefault(),
                 Stage18ResourceOntologyLoader.loadDefault(),
-                Stage18ManufacturingProductRegistry.loadDefault());
+                productRegistry);
         ArrayList<YardCapabilitySnapshot> yardCapabilities = new ArrayList<>();
         ArrayList<InstalledYardState> sortedYards = new ArrayList<>(yards);
         sortedYards.sort(Comparator.comparing(InstalledYardState::yardInstanceId));
