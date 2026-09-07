@@ -117,12 +117,13 @@ class Stage22CorePairPreparedDefenseGeneratedWorldPersistenceAcceptanceTest {
                 RulesOfEngagement.IDENTIFIED_HOSTILES,
                 supply,
                 new WithdrawalPolicy(union.homeSystemId(), 0, true, true));
+        final StrategicOperationState admittedOperations = operations;
 
         Stage21EReinforcementService reinforcements = new Stage21EReinforcementService();
         IllegalStateException empireAbsent = assertThrows(
                 IllegalStateException.class,
                 () -> reinforcements.attachArrived(
-                        operations,
+                        admittedOperations,
                         1L,
                         empire.reserveFleetId(),
                         beforeReserveArrival,
@@ -130,7 +131,7 @@ class Stage22CorePairPreparedDefenseGeneratedWorldPersistenceAcceptanceTest {
         IllegalStateException unionAbsent = assertThrows(
                 IllegalStateException.class,
                 () -> reinforcements.attachArrived(
-                        operations,
+                        admittedOperations,
                         2L,
                         union.reserveFleetId(),
                         beforeReserveArrival,
@@ -147,7 +148,7 @@ class Stage22CorePairPreparedDefenseGeneratedWorldPersistenceAcceptanceTest {
                 runtime.world().snapshot(), evaluator, supportedAvailability);
         long reinforcementTick = runtime.world().getAuthoritativeWorldTick();
         operations = reinforcements.attachArrived(
-                operations, 1L, empire.reserveFleetId(), arrived, reinforcementTick);
+                admittedOperations, 1L, empire.reserveFleetId(), arrived, reinforcementTick);
         operations = reinforcements.attachArrived(
                 operations, 2L, union.reserveFleetId(), arrived, reinforcementTick);
         assertEquals(2, operations.requireOperation(1L).participantFleetIds().size());
