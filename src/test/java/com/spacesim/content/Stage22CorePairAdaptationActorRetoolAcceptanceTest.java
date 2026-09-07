@@ -158,7 +158,7 @@ class Stage22CorePairAdaptationActorRetoolAcceptanceTest {
                         Domain.SECURITY,
                         InterestKind.BORDER_SECURITY,
                         "system:stage22-new-enemy-border",
-                        9_000,
+                        8_000,
                         new ObservationEvidence(
                                 ObservationChannel.LOCAL_SENSOR_REPORT,
                                 "sensor-report:stage22-new-enemy-border",
