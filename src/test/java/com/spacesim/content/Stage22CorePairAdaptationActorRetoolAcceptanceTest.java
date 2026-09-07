@@ -135,20 +135,20 @@ class Stage22CorePairAdaptationActorRetoolAcceptanceTest {
 
         Stage22CorePairEvidenceArchive.write(
                 "B17-actor-bounded-adaptation-paid-retool",
-                Map.of(
-                        "factionId", UNION_ID,
-                        "observedThreatTarget", "system:stage22-new-enemy-border",
-                        "selectedGoal", decision.state().activeGoals().get(0).type().name(),
-                        "sourceFamily", LOGISTICS_FAMILY,
-                        "targetFamily", SCREEN_FAMILY,
-                        "retoolWorkSeconds", totalWork,
-                        "retoolEnergyJ", totalEnergy,
-                        "midpointWorkRemainingSeconds", midpoint.retoolWorkRemainingSeconds(),
-                        "midpointEnergyRemainingJ", midpoint.retoolEnergyRemainingJ(),
-                        "oldFamilyBlockedDuringRetool", true,
-                        "targetFamilyBlockedDuringRetool", true,
-                        "intentCheckpointBytes", intentCheckpoint.length,
-                        "productionCheckpointBytes", productionCheckpoint.length),
+                Map.ofEntries(
+                        Map.entry("factionId", UNION_ID),
+                        Map.entry("observedThreatTarget", "system:stage22-new-enemy-border"),
+                        Map.entry("selectedGoal", decision.state().activeGoals().get(0).type().name()),
+                        Map.entry("sourceFamily", LOGISTICS_FAMILY),
+                        Map.entry("targetFamily", SCREEN_FAMILY),
+                        Map.entry("retoolWorkSeconds", totalWork),
+                        Map.entry("retoolEnergyJ", totalEnergy),
+                        Map.entry("midpointWorkRemainingSeconds", midpoint.retoolWorkRemainingSeconds()),
+                        Map.entry("midpointEnergyRemainingJ", midpoint.retoolEnergyRemainingJ()),
+                        Map.entry("oldFamilyBlockedDuringRetool", true),
+                        Map.entry("targetFamilyBlockedDuringRetool", true),
+                        Map.entry("intentCheckpointBytes", intentCheckpoint.length),
+                        Map.entry("productionCheckpointBytes", productionCheckpoint.length)),
                 "Industrial Union adaptation is causally gated by actor-bounded Stage-21A security evidence and a common Stage-21B DEFEND decision. The response changes from the qualified logistics series to the destroyer/screen series only through the existing finite M22.4 retool contract. Positive work/energy debt, blocked old/new production during changeover, midpoint binary persistence and the need for a later paid retool to regain logistics capacity are preserved as raw opportunity-cost dimensions; no faction-specific hidden counter bonus or omniscient enemy lookup is used.");
     }
 
