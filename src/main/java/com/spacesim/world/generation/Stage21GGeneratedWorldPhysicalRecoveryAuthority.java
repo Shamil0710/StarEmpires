@@ -51,8 +51,9 @@ public final class Stage21GGeneratedWorldPhysicalRecoveryAuthority {
      *
      * <p>The supplied berth must be stationary: a just-completed shipyard asset cannot acquire free
      * velocity from this composition layer. The legacy float transform supplied to Stage-21G is only
-     * an exactly representable projection of the authoritative hierarchical/double local offset.
-     * Failed Stage-18 settlement produces no entity and therefore no Stage-20 physical registration.</p>
+     * a finite non-authoritative projection of the hierarchical/double local offset; the exact
+     * {@link LocalPhysicalKinematics} remains the Stage-20 authority. Failed Stage-18 settlement
+     * produces no entity and therefore no Stage-20 physical registration.</p>
      *
      * @param recoveryState existing Stage-21G settlement/replacement coordinator
      * @param demandId persisted replacement demand
@@ -90,8 +91,8 @@ public final class Stage21GGeneratedWorldPhysicalRecoveryAuthority {
             throw new IllegalArgumentException("generated-world replacement system is absent: " + checkedSystem);
         }
         var materialization = runtime.arrival().materialization(checkedSystem);
-        float projectedX = exactFloat(physical.position().offsetXM(), "replacement berth X");
-        float projectedY = exactFloat(physical.position().offsetYM(), "replacement berth Y");
+        float projectedX = legacyFloat(physical.position().offsetXM(), "replacement berth X");
+        float projectedY = legacyFloat(physical.position().offsetYM(), "replacement berth Y");
 
         Stage21GPhysicalRecoveryService.BuildResult built = recovery.buildReplacement(
                 checkedRecovery,
@@ -140,10 +141,10 @@ public final class Stage21GGeneratedWorldPhysicalRecoveryAuthority {
         return built;
     }
 
-    private static float exactFloat(double value, String label) {
+    private static float legacyFloat(double value, String label) {
         float projected = (float) value;
-        if (!Float.isFinite(projected) || Double.compare((double) projected, value) != 0) {
-            throw new IllegalArgumentException(label + " is not exactly representable by the legacy float projection");
+        if (!Float.isFinite(projected)) {
+            throw new IllegalArgumentException(label + " is outside legacy float projection range");
         }
         return projected;
     }
