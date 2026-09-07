@@ -89,9 +89,6 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 ContentCatalogLoader.loadDefault(), runtime.world().snapshot().factionIdentities());
         Candidate candidate = candidate(runtime, identities);
 
-        // Projection into the occupation system remains ordinary Stage-20/21 physical movement. The exact
-        // core package is fitted only after arrival, matching the established Stage-22 generated-world
-        // acceptance pattern and keeping this test focused on B15 occupation rather than B10 projection.
         GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, candidate.fleetId(), candidate.targetSystemId());
         runtime.world().requestFleetJump(candidate.fleetId(), candidate.targetSystemId());
         GeneratedWorldFtlTestSupport.advanceOrdinaryJumpToCompletion(runtime, candidate.fleetId());
@@ -129,29 +126,17 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         long startTick = runtime.world().getAuthoritativeWorldTick();
         FleetCommandState commands = commands(candidate, startTick);
         StrategicOperationState operations = new StrategicOperationService().beginFromActiveOrder(
-                StrategicOperationState.empty(),
-                commands,
-                forces,
-                1L,
-                startTick,
+                StrategicOperationState.empty(), commands, forces, 1L, startTick,
                 RulesOfEngagement.DECLARED_HOSTILES,
-                new SupplyPolicy(
-                        MINIMUM_MISSION_READINESS_BPS,
-                        MINIMUM_SUPPLY_ACCESS_BPS,
+                new SupplyPolicy(MINIMUM_MISSION_READINESS_BPS, MINIMUM_SUPPLY_ACCESS_BPS,
                         TerritorialTransitionService.OCCUPATION_COLLAPSE_GRACE_TICKS),
                 new WithdrawalPolicy(candidate.originSystemId(), 0, true, true));
         assertEquals(StrategicOperationState.OperationType.INVASION, operations.requireOperation(1L).type());
         assertTrue(operations.requireOperation(1L).status().active());
 
         TerritorialTransitionService territory = new TerritorialTransitionService();
-        var initial = territory.advance(
-                TerritorialTransitionState.empty(),
-                runtime.world(),
-                operations,
-                forces,
-                identities,
-                1L,
-                startTick);
+        var initial = territory.advance(TerritorialTransitionState.empty(), runtime.world(), operations, forces,
+                identities, 1L, startTick);
         assertEquals(OccupationStatus.OCCUPYING, initial.occupation().status());
         assertEquals(0L, initial.occupation().securedTicks());
         assertFalse(initial.claimCreated());
@@ -163,14 +148,8 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         advanceToTick(runtime.world(), midpointTick);
         FleetForceRegistry midpointForces = FleetForceRegistry.reconstruct(
                 runtime.world().snapshot(), evaluator, availability);
-        var midpoint = territory.advance(
-                initial.transitions(),
-                runtime.world(),
-                initial.operations(),
-                midpointForces,
-                identities,
-                1L,
-                midpointTick);
+        var midpoint = territory.advance(initial.transitions(), runtime.world(), initial.operations(), midpointForces,
+                identities, 1L, midpointTick);
         assertEquals(OccupationStatus.OCCUPYING, midpoint.occupation().status());
         assertEquals(TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS / 2L,
                 midpoint.occupation().securedTicks());
@@ -179,8 +158,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 .claimFor(candidate.targetSystemId()) == null);
 
         Stage21FGeneratedWorldRuntimePersistentState checkpoint = Stage21FGeneratedWorldRuntimePersistentState.compose(
-                stage21E(runtime.captureState(), commands, midpoint.operations(), midpointTick),
-                midpoint.transitions());
+                stage21E(runtime.captureState(), commands, midpoint.operations(), midpointTick), midpoint.transitions());
         byte[] encoded = Stage21FGeneratedWorldRuntimePersistenceCodec.encode(checkpoint);
         Stage21FGeneratedWorldRuntimePersistentState decoded =
                 Stage21FGeneratedWorldRuntimePersistenceCodec.decode(encoded);
@@ -193,8 +171,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 ContentCatalogLoader.loadDefault(), restored.world().snapshot().factionIdentities());
         FleetForceRegistry restoredMidpointForces = FleetForceRegistry.reconstruct(
                 restored.world().snapshot(), evaluator, availability);
-        assertEquals(
-                midpointForces.find(candidate.fleetId()).orElseThrow().entityState().engineering(),
+        assertEquals(midpointForces.find(candidate.fleetId()).orElseThrow().entityState().engineering(),
                 restoredMidpointForces.find(candidate.fleetId()).orElseThrow().entityState().engineering(),
                 "exact B15 core engineering must survive the Stage-21F checkpoint");
         assertEquals(midpoint.transitions(), decoded.territorialTransitions());
@@ -206,26 +183,13 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 runtime.world().snapshot(), evaluator, availability);
         FleetForceRegistry restoredFinalForces = FleetForceRegistry.reconstruct(
                 restored.world().snapshot(), evaluator, availability);
-        var directFinal = territory.advance(
-                midpoint.transitions(),
-                runtime.world(),
-                midpoint.operations(),
-                directFinalForces,
-                identities,
-                1L,
-                finalTick);
-        var restoredFinal = territory.advance(
-                decoded.territorialTransitions(),
-                restored.world(),
-                decoded.stage21ERuntime().operationState(),
-                restoredFinalForces,
-                restoredIdentities,
-                1L,
-                finalTick);
+        var directFinal = territory.advance(midpoint.transitions(), runtime.world(), midpoint.operations(),
+                directFinalForces, identities, 1L, finalTick);
+        var restoredFinal = territory.advance(decoded.territorialTransitions(), restored.world(),
+                decoded.stage21ERuntime().operationState(), restoredFinalForces, restoredIdentities, 1L, finalTick);
 
         assertEquals(OccupationStatus.SECURED, directFinal.occupation().status());
-        assertEquals(TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS,
-                directFinal.occupation().securedTicks());
+        assertEquals(TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS, directFinal.occupation().securedTicks());
         assertTrue(directFinal.claimCreated());
         assertTrue(restoredFinal.claimCreated());
         assertEquals(directFinal.transitions(), restoredFinal.transitions());
@@ -249,20 +213,10 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         assertArrayEquals(directFinalCheckpoint, restoredFinalCheckpoint,
                 "direct/restored physical occupation must converge to one authoritative Stage-21F checkpoint");
 
-        return new LaneResult(
-                empirePackage ? "empire" : "industrial_union",
-                exactFitId,
-                candidate.stableFactionId(),
-                candidate.fleetId().value(),
-                candidate.originSystemId().value(),
-                candidate.targetSystemId().value(),
-                startTick,
-                midpointTick,
-                finalTick,
-                encoded.length,
-                directFinalCheckpoint.length,
-                directFinal.occupation().securedTicks(),
-                true);
+        return new LaneResult(empirePackage ? "empire" : "industrial_union", exactFitId,
+                candidate.stableFactionId(), candidate.fleetId().value(), candidate.originSystemId().value(),
+                candidate.targetSystemId().value(), startTick, midpointTick, finalTick, encoded.length,
+                directFinalCheckpoint.length, directFinal.occupation().securedTicks(), true);
     }
 
     private static Candidate candidate(
@@ -282,8 +236,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 boolean occupied = placements.stream().anyMatch(other -> other.locationKind() == FleetLocationKind.IN_SYSTEM
                         && target.equals(other.systemId()));
                 if (occupied) continue;
-                return new Candidate(
-                        placement.id(), faction.factionId, stableFactionId, placement.systemId(), target);
+                return new Candidate(placement.id(), faction.factionId, stableFactionId, placement.systemId(), target);
             }
         }
         throw new AssertionError("generated world lacks an ordinary military FleetId adjacent to a non-owned empty system");
@@ -300,25 +253,12 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
 
     private static FleetCommandState commands(Candidate candidate, long tick) {
         CommandGroupState group = new CommandGroupState(
-                1L,
-                candidate.runtimeFactionId(),
-                "M22.6 B15 physical occupation group",
-                List.of(candidate.fleetId()),
-                candidate.originSystemId(),
-                false,
-                true,
-                FleetReadinessState.FULL);
+                1L, candidate.runtimeFactionId(), "M22.6 B15 physical occupation group",
+                List.of(candidate.fleetId()), candidate.originSystemId(), false, true, FleetReadinessState.FULL);
         FleetOrderState order = new FleetOrderState(
-                1L,
-                group.id(),
-                OrderType.INVADE,
-                OrderSource.AI,
-                candidate.targetSystemId(),
-                List.of(candidate.targetSystemId()),
-                0,
-                tick,
-                tick + TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS + 10L,
-                OrderStatus.ACTIVE);
+                1L, group.id(), OrderType.INVADE, OrderSource.AI, candidate.targetSystemId(),
+                List.of(candidate.targetSystemId()), 0, tick,
+                tick + TerritorialTransitionService.REQUIRED_OCCUPATION_TICKS + 10L, OrderStatus.ACTIVE);
         return new FleetCommandState(2L, 2L, List.of(group), List.of(order));
     }
 
@@ -333,25 +273,19 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         Stage21AGeneratedWorldRuntimePersistentState stage21A =
                 new Stage21AGeneratedWorldRuntimePersistentState(
                         Stage21AGeneratedWorldRuntimePersistentState.CURRENT_VERSION,
-                        Stage21AGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION,
-                        stage20,
-                        actors);
+                        Stage21AGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION, stage20, actors);
         List<FactionStrategicIntentState> intents = actors.stream()
                 .map(actor -> FactionStrategicIntentState.initial(actor.factionContentId()))
                 .toList();
         Stage21BGeneratedWorldRuntimePersistentState stage21B =
                 new Stage21BGeneratedWorldRuntimePersistentState(
                         Stage21BGeneratedWorldRuntimePersistentState.CURRENT_VERSION,
-                        Stage21BGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION,
-                        stage21A,
-                        intents);
+                        Stage21BGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION, stage21A, intents);
         Stage21CGeneratedWorldRuntimePersistentState stage21C =
                 new Stage21CGeneratedWorldRuntimePersistentState(
                         Stage21CGeneratedWorldRuntimePersistentState.CURRENT_VERSION,
                         Stage21CGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION,
-                        stage21B,
-                        DiplomaticLifecycleState.empty(tick),
-                        Stage19ConflictState.empty(tick));
+                        stage21B, DiplomaticLifecycleState.empty(tick), Stage19ConflictState.empty(tick));
         Stage21DGeneratedWorldRuntimePersistentState stage21D =
                 Stage21DGeneratedWorldRuntimePersistentState.compose(stage21C, commands);
         return Stage21EGeneratedWorldRuntimePersistentState.compose(stage21D, operations);
@@ -363,9 +297,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         int guard = 0;
         while (world.getAuthoritativeWorldTick() < targetTick) {
             world.advanceFrame(fixedStepSeconds);
-            if (++guard > 20_000) {
-                throw new AssertionError("B15 generated world did not reach target authoritative tick");
-            }
+            if (++guard > 20_000) throw new AssertionError("B15 generated world did not reach target tick");
         }
         assertEquals(targetTick, world.getAuthoritativeWorldTick(),
                 "B15 advance helper must stop on the exact authoritative tick");
@@ -383,8 +315,8 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
             String exactFitId,
             String generatedOwnerStableFactionId,
             long fleetId,
-            int originSystemId,
-            int targetSystemId,
+            long originSystemId,
+            long targetSystemId,
             long startTick,
             long midpointTick,
             long finalTick,
