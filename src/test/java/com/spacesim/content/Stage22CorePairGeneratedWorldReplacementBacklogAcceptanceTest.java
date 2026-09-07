@@ -37,6 +37,7 @@ import com.spacesim.world.StrategicOperationState.OperationType;
 import com.spacesim.world.StrategicOperationState.RulesOfEngagement;
 import com.spacesim.world.StrategicOperationState.SupplyPolicy;
 import com.spacesim.world.StrategicOperationState.WithdrawalPolicy;
+import com.spacesim.world.generation.GeneratedFactionMilitaryBootstrap;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import com.spacesim.world.generation.Stage21GGeneratedWorldPhysicalRecoveryAuthority;
 import org.junit.jupiter.api.Test;
@@ -55,32 +56,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * M22.6 B13 production-versus-preservation evidence from finite replacement capacity.
  *
- * <p>Each core faction begins with the three ordinary military FleetIds already commissioned by the
- * generated-world bootstrap. The exact matching Stage-22 destroyer package is installed on those
- * physical assets. Three separate ordinary destructions are reconciled one at a time through
- * {@link Stage21EPhysicalConsequenceService}; Stage-21G therefore receives three distinct loss rows
- * and three replacement demands rather than an abstract casualty count.</p>
- *
- * <p>The recovery window receives exactly one physical replacement bill of Stage-18 materials and
- * modules. The first demand commissions a fresh ordinary FleetId through the existing yard and the
- * generated-world Stage-20 sidecar adapter. The remaining two attempts see the exhausted station
- * stock, settle nothing, allocate no FleetId and remain persisted {@link ReplacementStatus#DEMANDED}
- * backlog. Full generated-world and recovery-state round trips prove that the backlog is causal
- * persistent state rather than a report-only metric.</p>
+ * <p>The generated military bootstrap owns exactly three ordinary physical patrol ships per generated
+ * faction. This test keeps that real owner identity and installs either exact Stage-22 core package on
+ * the three assets. Three ordinary destructions become three Stage-21E/21G physical loss rows. One
+ * finite Stage-18 replacement bill can commission only one fresh FleetId, leaving two causal persisted
+ * DEMANDED rows rather than an abstract backlog counter.</p>
  */
 class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
     private static final long OPERATION_BASE = 22_613_700L;
     private static final int CREW_AVAILABLE = 100_000;
 
     @Test
-    void b13ThreePhysicalLossesAgainstOneReplacementBillLeaveTwoDemandBacklogForBothCoreFactions() {
+    void b13ThreePhysicalLossesAgainstOneReplacementBillLeaveTwoDemandBacklogForBothCorePackages() {
         ScenarioResult empire = run(true);
         ScenarioResult union = run(false);
 
-        assertEquals(Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID, empire.factionId());
-        assertEquals(Stage22CorePairBalanceEvidence.UNION_FACTION_ID, union.factionId());
+        assertEquals(Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID, empire.corePackageId());
+        assertEquals(Stage22CorePairBalanceEvidence.UNION_FACTION_ID, union.corePackageId());
         for (ScenarioResult result : List.of(empire, union)) {
-            assertEquals(3, result.physicalLosses());
+            assertEquals(GeneratedFactionMilitaryBootstrap.SHIPS_PER_FACTION, result.physicalLosses());
             assertEquals(3, result.replacementDemands());
             assertEquals(1, result.commissioned());
             assertEquals(2, result.backlog());
@@ -88,19 +82,20 @@ class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
             assertTrue(result.failedBuildsAllocatedNothing());
             assertTrue(result.fullRuntimeByteStable());
             assertTrue(result.recoveryByteStable());
+            assertFalse(result.physicalOwnerId().isBlank());
         }
 
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
-        archive.put("empire", empire);
-        archive.put("union", union);
+        archive.put("empireCorePackage", empire);
+        archive.put("unionCorePackage", union);
         Stage22CorePairEvidenceArchive.write(
                 "B13-generated-world-finite-replacement-backlog",
                 archive,
-                "Three distinct ordinary generated-world FleetId losses per core faction are reconciled through Stage-21E and persisted as three Stage-21G replacement demands. A finite Stage-18 yard stock containing exactly one replacement bill commissions one fresh FleetId; two later attempts fail without allocation and remain DEMANDED backlog across deterministic recovery/full-runtime checkpoints. Exact Stage-19 combat causation of an ordinary FleetId loss is covered separately by the B13/B14 physical-loss handoff acceptance; this slice closes the sustained finite-capacity backlog seam, not the remaining full long-war campaign trajectory.");
+                "The accepted generated bootstrap provides three ordinary FleetIds per generated faction. For each paired coordinate those real assets retain their actual stable owner while carrying either exact core package. Three distinct losses become three Stage-21G demands; one finite Stage-18 replacement bill commissions one fresh FleetId, two exhausted-stock attempts allocate nothing and remain DEMANDED, and both recovery/full-runtime checkpoints remain deterministic. This closes the accumulated finite-capacity backlog seam, not the remaining full long-war campaign trajectory.");
     }
 
-    private static ScenarioResult run(boolean empire) {
-        String targetFaction = empire
+    private static ScenarioResult run(boolean empireCorePackage) {
+        String corePackageId = empireCorePackage
                 ? Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID
                 : Stage22CorePairBalanceEvidence.UNION_FACTION_ID;
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime = Stage20PlayableGeneratedWorldFactory.create(
@@ -108,26 +103,28 @@ class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
         FactionIdentityResolver identities = FactionIdentityResolver.createDefault(
                 ContentCatalogLoader.loadDefault(), runtime.world().snapshot().factionIdentities());
         List<MilitaryFleet> military = militaryFleets(runtime, identities);
+        if (military.isEmpty()) throw new AssertionError("B13 generated military bootstrap is empty");
+
+        String physicalOwner = military.get(0).stableFactionId();
         List<MilitaryFleet> targets = military.stream()
-                .filter(row -> row.stableFactionId().equals(targetFaction))
-                .limit(3)
+                .filter(row -> row.stableFactionId().equals(physicalOwner))
                 .toList();
-        if (targets.size() != 3) {
-            throw new AssertionError("B13 requires three generated military FleetIds for " + targetFaction);
+        if (targets.size() != GeneratedFactionMilitaryBootstrap.SHIPS_PER_FACTION) {
+            throw new AssertionError("B13 generated military bootstrap violated ships-per-faction contract");
         }
         MilitaryFleet survivor = military.stream()
-                .filter(row -> !row.stableFactionId().equals(targetFaction))
+                .filter(row -> !row.stableFactionId().equals(physicalOwner))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("B13 requires an opposing surviving military FleetId"));
+                .orElseThrow(() -> new AssertionError("B13 requires a second generated faction"));
 
         var duel = Stage22CorePairTacticalFactory.createDestroyerDuel(Permutation.DEFAULT);
         EngineeringComponent targetCore = engineering(
                 duel,
-                empire ? Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID
+                empireCorePackage ? Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID
                         : Stage22CorePairTacticalFactory.UNION_ENTITY_ID);
         EngineeringComponent survivorCore = engineering(
                 duel,
-                empire ? Stage22CorePairTacticalFactory.UNION_ENTITY_ID
+                empireCorePackage ? Stage22CorePairTacticalFactory.UNION_ENTITY_ID
                         : Stage22CorePairTacticalFactory.EMPIRE_ENTITY_ID);
         targets.forEach(target -> entity(runtime, target.placement()).add(copy(targetCore)));
         entity(runtime, survivor.placement()).add(copy(survivorCore));
@@ -136,10 +133,10 @@ class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
         long tick = runtime.world().getAuthoritativeWorldTick();
         var settlement = new SettlementRecoveryState.Settlement(
                 1L,
-                "proposal.m22_6.backlog." + targetFaction,
+                "proposal.m22_6.backlog." + corePackageId,
                 "war.m22_6.backlog",
                 survivor.stableFactionId(),
-                targetFaction,
+                physicalOwner,
                 tick,
                 tick,
                 SettlementRecoveryState.SettlementStatus.PENDING,
@@ -180,7 +177,7 @@ class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
         assertEquals(3, recovery.snapshot().replacementDemands().size());
         recovery.finalizeRecoveryPlan(1L, tick);
 
-        Stage22CorePairRecoveryProbe.PreparedYard setup = Stage22CorePairRecoveryProbe.prepareYard(empire);
+        Stage22CorePairRecoveryProbe.PreparedYard setup = Stage22CorePairRecoveryProbe.prepareYard(empireCorePackage);
         Stage18StationStorage stock = replacementStock(setup, replacementFit);
         ShipyardEngineeringService planner = new ShipyardEngineeringService(setup.engineering(), setup.industrial());
         var plan = planner.planBuild(replacementFit, setup.yard().plannerCapability());
@@ -266,7 +263,8 @@ class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
         targets.forEach(target -> assertFalse(restoredRuntime.world().findFleet(target.fleetId()).isPresent()));
 
         return new ScenarioResult(
-                targetFaction,
+                corePackageId,
+                physicalOwner,
                 recovery.snapshot().losses().size(),
                 recovery.snapshot().replacementDemands().size(),
                 commissioned,
@@ -367,9 +365,9 @@ class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
         ArrayList<MilitaryFleet> result = new ArrayList<>();
         for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) continue;
-            Entity entity = entity(runtime, placement);
-            EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
-            FactionComponent faction = entity.getComponent(FactionComponent.class);
+            Entity fleetEntity = entity(runtime, placement);
+            EngineeringComponent engineering = fleetEntity.getComponent(EngineeringComponent.class);
+            FactionComponent faction = fleetEntity.getComponent(FactionComponent.class);
             if (engineering == null || faction == null) continue;
             result.add(new MilitaryFleet(
                     placement.id(),
@@ -395,7 +393,8 @@ class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
             FleetPlacementState placement) { }
 
     private record ScenarioResult(
-            String factionId,
+            String corePackageId,
+            String physicalOwnerId,
             int physicalLosses,
             int replacementDemands,
             int commissioned,
