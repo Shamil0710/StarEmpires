@@ -40,7 +40,7 @@ class Stage22CorePairIndustrialMachineEvidenceAcceptanceTest {
                 "B02",
                 "stage18_authored_module_cold_start",
                 "stage18+stage22.current",
-                Stage22CorePairExperimentProtocol.pairedSchedule(1),
+                Stage22CorePairExperimentProtocol.tuningSchedule(),
                 (scenario, variant, profile, coordinate) -> {
                     ManufacturingProbe empire = manufacture(
                             Stage22EmpireEngineeringCatalogLoader.loadDefault(),
@@ -97,6 +97,10 @@ class Stage22CorePairIndustrialMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("union_finite_series_qualification_paid"));
         assertTrue(vector.metricMeans().get("empire_output_mass_kg") > 0d);
         assertTrue(vector.metricMeans().get("union_output_mass_kg") > 0d);
+        Stage22CorePairEvidenceArchive.write(
+                "B02-stage18-industrial-cold-start-tuning",
+                vector,
+                "Canonical 30-seed/default+mirrored B02 industrial cold-start batch. Both authored cargo products are manufactured only through ordinary Stage-18 finite-input manufacturing with mass conservation; Industrial Union series qualification pays finite work and energy on every coordinate. This establishes repeatable L1 industrial viability and paid Union qualification, not the complete L1-L4 physical campaign trajectory.");
     }
 
     @Test
