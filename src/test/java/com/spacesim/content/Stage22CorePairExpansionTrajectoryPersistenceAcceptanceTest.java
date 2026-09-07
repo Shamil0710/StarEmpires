@@ -1,6 +1,7 @@
 package com.spacesim.content;
 
 import com.spacesim.content.Stage18ManufacturingProductRegistry.Provenance;
+import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.economy.Stage18FacilityConstructionRuntime;
 import com.spacesim.economy.Stage18FacilityConstructionRuntime.ConstructionOrderSnapshot;
 import com.spacesim.economy.Stage18FacilityConstructionRuntime.OrderStatus;
