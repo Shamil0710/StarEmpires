@@ -22,11 +22,27 @@ python3 tools/stage22/summarize_evidence.py target/stage22-evidence --minimum-pa
 ```
 
 Use a clean checkout/output directory for each lane. The summarizer rejects dirty-source evidence,
-incomplete or duplicated pairs, non-finite metrics, observed rule breaches and mixed source/content
-identities. It preserves source-file SHA-256, raw run count and paired seed count. Statistics include
-mean, median, nearest-rank p05/p95, DEFAULT-minus-MIRRORED mean and a normal-approximation 95% interval
-for the mean of **independent seed pairs**. The two mirrored runs are not treated as independent samples.
-These diagnostic intervals are not a balance acceptance criterion or a claim about campaign victory.
+incomplete or duplicated pairs, non-finite metrics, observed **hard-rule** breaches and mixed
+source/content identities. Hard rules are causal/integrity contracts that must hold on every run:
+authority ownership, actor-bounded knowledge, physical arrival/admission, conservation, finite stores,
+save/load continuation and other fail-closed invariants. They are not relaxed by the RC profile.
+
+Materially stochastic outcome hypotheses are not hard rules merely because their expected advantage
+is directional. In particular, surviving shield/compartment protection in B07/B09/Gate C keeps every
+individual run, including inversions/outliers, in raw evidence. The canonical balance framework §6.2
+requires DEFAULT and MIRRORED observations to be averaged **per seed pair before aggregation across
+seeds**. M22.6 therefore evaluates the authored Empire survivability/robustness hypothesis on those
+paired physical dimensions while still requiring a strictly positive paired aggregate advantage; it
+does not lower a `1.0` pass fraction, delete an outlier, or convert a stochastic observation into a
+faction-wide modifier. `Stage22CorePairPairedMetrics` mirrors this reduction in Java acceptance tests,
+and `tools/stage22/summarize_evidence.py` independently uses the seed pair as the sampling unit.
+
+The statistics output preserves source-file SHA-256, raw run count and paired seed count. Statistics
+include mean, median, nearest-rank p05/p95, DEFAULT-minus-MIRRORED mean and a normal-approximation 95%
+interval for the mean of **independent seed pairs**. The two mirrored runs are not treated as
+independent samples. These diagnostic intervals are not themselves a balance acceptance criterion or
+a claim about campaign victory. The directional acceptance assertion remains on the declared raw
+physical dimensions; interval/percentile output is review evidence and outlier diagnostics.
 
 Operational vector lanes also replay min/median/max coordinates on one declared raw diagnostic
 metric, including both mirrored assignments, and require exact repeat equality. Patrol traces retain
