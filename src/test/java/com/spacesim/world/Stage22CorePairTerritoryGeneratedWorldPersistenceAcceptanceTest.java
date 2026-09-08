@@ -214,13 +214,17 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 "occupation claim must not bypass Stage-17 stabilization into instant sovereignty");
         assertTrue(restored.world().controllingFaction(candidate.targetSystemId()).isEmpty());
 
+        Stage20GeneratedWorldRuntimePersistentState directStage20 = runtime.captureState();
+        Stage20GeneratedWorldRuntimePersistentState restoredStage20 = restored.captureState();
+        assertStage20EnvelopeEqual(directStage20, restoredStage20);
+
         byte[] directFinalCheckpoint = Stage21FGeneratedWorldRuntimePersistenceCodec.encode(
                 Stage21FGeneratedWorldRuntimePersistentState.compose(
-                        stage21E(runtime.captureState(), commands, directFinal.operations(), finalTick),
+                        stage21E(directStage20, commands, directFinal.operations(), finalTick),
                         directFinal.transitions()));
         byte[] restoredFinalCheckpoint = Stage21FGeneratedWorldRuntimePersistenceCodec.encode(
                 Stage21FGeneratedWorldRuntimePersistentState.compose(
-                        stage21E(restored.captureState(), commands, restoredFinal.operations(), finalTick),
+                        stage21E(restoredStage20, commands, restoredFinal.operations(), finalTick),
                         restoredFinal.transitions()));
         assertArrayEquals(directFinalCheckpoint, restoredFinalCheckpoint,
                 "direct/restored physical occupation must converge to one authoritative Stage-21F checkpoint");
@@ -229,6 +233,66 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 candidate.stableFactionId(), candidate.fleetId().value(), candidate.originSystemId().value(),
                 candidate.targetSystemId().value(), startTick, midpointTick, finalTick, encoded.length,
                 directFinalCheckpoint.length, directFinal.occupation().securedTicks(), true);
+    }
+
+    private static void assertStage20EnvelopeEqual(
+            Stage20GeneratedWorldRuntimePersistentState direct,
+            Stage20GeneratedWorldRuntimePersistentState restored) {
+        assertEquals(direct.schemaVersion(), restored.schemaVersion(), "B15 Stage-20.5 schema diverged");
+        assertEquals(direct.bridgeVersion(), restored.bridgeVersion(), "B15 Stage-20.5 bridge version diverged");
+        assertEquals(direct.campaign(), restored.campaign(), "B15 generated campaign diverged after continuation");
+        assertEquals(direct.activeSystemId(), restored.activeSystemId(), "B15 active system diverged after continuation");
+        assertEquals(direct.freight(), restored.freight(), "B15 freight sidecar diverged after continuation");
+        assertEquals(direct.localFleetPhysicalStates(), restored.localFleetPhysicalStates(),
+                "B15 local physical sidecar diverged after continuation");
+
+        WorldState directWorld = direct.worldState();
+        WorldState restoredWorld = restored.worldState();
+        assertEquals(directWorld.topology(), restoredWorld.topology(), "B15 topology diverged");
+        assertEquals(directWorld.factions(), restoredWorld.factions(), "B15 faction economy diverged");
+        assertEquals(directWorld.factionStrategies(), restoredWorld.factionStrategies(),
+                "B15 territorial strategy diverged");
+        assertEquals(directWorld.nextConstructionProjectIdValue(), restoredWorld.nextConstructionProjectIdValue(),
+                "B15 construction allocator diverged");
+        assertEquals(directWorld.constructionProjects(), restoredWorld.constructionProjects(),
+                "B15 construction projects diverged");
+        assertEquals(directWorld.factionEconomicPressures(), restoredWorld.factionEconomicPressures(),
+                "B15 economic pressure state diverged");
+        assertEquals(directWorld.nextFleetIdValue(), restoredWorld.nextFleetIdValue(),
+                "B15 fleet allocator diverged");
+        assertEquals(directWorld.fleets(), restoredWorld.fleets(), "B15 fleet placements diverged");
+        assertEquals(directWorld.fleetJumps(), restoredWorld.fleetJumps(), "B15 jump state diverged");
+        assertEquals(directWorld.factionIdentities(), restoredWorld.factionIdentities(),
+                "B15 faction identity directory diverged");
+        assertEquals(directWorld.factionDiplomacyStates(), restoredWorld.factionDiplomacyStates(),
+                "B15 diplomacy state diverged");
+        assertEquals(directWorld.systems().size(), restoredWorld.systems().size(),
+                "B15 local system count diverged");
+        for (int index = 0; index < directWorld.systems().size(); index++) {
+            var directSystem = directWorld.systems().get(index);
+            var restoredSystem = restoredWorld.systems().get(index);
+            assertEquals(directSystem.systemId(), restoredSystem.systemId(),
+                    "B15 local system ordering diverged at index " + index);
+            var directGame = directSystem.simulationState();
+            var restoredGame = restoredSystem.simulationState();
+            String label = "B15 local GameState " + directSystem.systemId().value() + ' ';
+            assertEquals(directGame.schemaVersion(), restoredGame.schemaVersion(), label + "schema diverged");
+            assertEquals(directGame.rootSeed(), restoredGame.rootSeed(), label + "root seed diverged");
+            assertEquals(directGame.clock(), restoredGame.clock(), label + "clock diverged");
+            assertEquals(directGame.nextEntityIdValue(), restoredGame.nextEntityIdValue(),
+                    label + "entity allocator diverged");
+            assertEquals(directGame.eventRandomState(), restoredGame.eventRandomState(),
+                    label + "event RNG diverged");
+            assertEquals(directGame.asteroidRandomState(), restoredGame.asteroidRandomState(),
+                    label + "asteroid RNG diverged");
+            assertEquals(directGame.events(), restoredGame.events(), label + "event manager diverged");
+            assertEquals(directGame.asteroidSpawner(), restoredGame.asteroidSpawner(),
+                    label + "asteroid spawner diverged");
+            assertEquals(directGame.priceRecorder(), restoredGame.priceRecorder(),
+                    label + "price recorder diverged");
+            assertEquals(directGame.ledger(), restoredGame.ledger(), label + "ledger diverged");
+            assertEquals(directGame.entities(), restoredGame.entities(), label + "entities diverged");
+        }
     }
 
     private static Candidate candidate(
