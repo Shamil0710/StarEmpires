@@ -55,7 +55,7 @@ class Stage22CorePairTreatyTradeConsequenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B16-core-treaty-physical-trade-consequence",
                 rows,
-                "Both mirrored Empire/Industrial-Union ownership lanes use persistent ordinary market/visitor entities and WorldSimulation.createTradeController. A pending treaty refresh leaves the same purchase at zero physical volume with byte-stable money/inventory, acceptance moves real item units and wallet value with an ordinary ledger trade, breach removes access and produces zero mutation, and a newly accepted agreement restores physical volume. Active and breached/recovered consequences survive ordinary WorldState binary round trips; no composite economic score or synthetic trade-volume counter is used.");
+                "Both mirrored Empire/Industrial-Union ownership lanes use persistent ordinary market/visitor entities and WorldSimulation.createTradeController. A pending treaty refresh leaves the same purchase at zero physical volume with byte-stable money/inventory and no new ledger row, acceptance moves real item units and wallet value with exactly one additional ordinary ledger trade, breach removes access with no mutation and no additional row while preserving prior history, and a newly accepted agreement restores physical volume with exactly one further ledger trade. Active and breached/recovered consequences survive ordinary WorldState binary round trips; no composite economic score or synthetic trade-volume counter is used.");
     }
 
     private static LaneResult runLane(Stage22CorePairExperimentProtocol.Permutation permutation) {
@@ -85,26 +85,29 @@ class Stage22CorePairTreatyTradeConsequenceAcceptanceTest {
         Entity buyer = entity(world, visitorId);
         TradeController pendingController = world.createTradeController(
                 world.findSession(world.getActiveSystemId()).orElseThrow());
+        int pendingLedgerBefore = pendingController.getLedger().getEntries().size();
         PhysicalState pendingBefore = physical(station, buyer);
         assertFalse(pendingController.buyFromStation(
                 station, buyer, Constants.ITEM_FOOD, FIRST_TRADE_AMOUNT));
         PhysicalState pendingAfter = physical(station, buyer);
         assertEquals(pendingBefore, pendingAfter,
                 "pending B16 agreement must not mutate physical trade state");
-        assertEquals(0, pendingController.getLedger().getEntries().size());
+        assertEquals(pendingLedgerBefore, pendingController.getLedger().getEntries().size(),
+                "pending B16 agreement must not append a trade ledger row");
 
         world.applyDiplomaticTreatyCommand(new DiplomaticTreatyCommand.Accept(visitor, offered.treatyId()));
         station = entity(world, stationId);
         buyer = entity(world, visitorId);
         TradeController activeController = world.createTradeController(
                 world.findSession(world.getActiveSystemId()).orElseThrow());
+        int activeLedgerBefore = activeController.getLedger().getEntries().size();
         PhysicalState activeBefore = physical(station, buyer);
         assertTrue(activeController.buyFromStation(
                 station, buyer, Constants.ITEM_FOOD, FIRST_TRADE_AMOUNT));
         PhysicalState activeAfter = physical(station, buyer);
         assertTradeDelta(activeBefore, activeAfter, FIRST_TRADE_AMOUNT);
-        assertEquals(1, activeController.getLedger().getEntries().size(),
-                "tariff-exempt B16 trade should produce exactly one ordinary trade ledger row");
+        assertEquals(activeLedgerBefore + 1, activeController.getLedger().getEntries().size(),
+                "tariff-exempt B16 trade should append exactly one ordinary trade ledger row");
 
         world = Stage22CorePairWorldFixture.roundTrip(world);
         PhysicalState activeRestored = physical(entity(world, stationId), entity(world, visitorId));
@@ -117,13 +120,15 @@ class Stage22CorePairTreatyTradeConsequenceAcceptanceTest {
         buyer = entity(world, visitorId);
         TradeController breachedController = world.createTradeController(
                 world.findSession(world.getActiveSystemId()).orElseThrow());
+        int breachedLedgerBefore = breachedController.getLedger().getEntries().size();
         PhysicalState breachedBefore = physical(station, buyer);
         assertFalse(breachedController.buyFromStation(
                 station, buyer, Constants.ITEM_FOOD, RECOVERY_TRADE_AMOUNT));
         PhysicalState breachedAfter = physical(station, buyer);
         assertEquals(breachedBefore, breachedAfter,
                 "breached B16 access shock must fail closed without money or inventory mutation");
-        assertEquals(0, breachedController.getLedger().getEntries().size());
+        assertEquals(breachedLedgerBefore, breachedController.getLedger().getEntries().size(),
+                "breached B16 access shock must preserve prior ledger history without appending a trade row");
 
         world = Stage22CorePairWorldFixture.roundTrip(world);
         PhysicalState breachedRestored = physical(entity(world, stationId), entity(world, visitorId));
@@ -140,12 +145,14 @@ class Stage22CorePairTreatyTradeConsequenceAcceptanceTest {
         buyer = entity(world, visitorId);
         TradeController recoveryController = world.createTradeController(
                 world.findSession(world.getActiveSystemId()).orElseThrow());
+        int recoveryLedgerBefore = recoveryController.getLedger().getEntries().size();
         PhysicalState recoveryBefore = physical(station, buyer);
         assertTrue(recoveryController.buyFromStation(
                 station, buyer, Constants.ITEM_FOOD, RECOVERY_TRADE_AMOUNT));
         PhysicalState recoveryAfter = physical(station, buyer);
         assertTradeDelta(recoveryBefore, recoveryAfter, RECOVERY_TRADE_AMOUNT);
-        assertEquals(1, recoveryController.getLedger().getEntries().size());
+        assertEquals(recoveryLedgerBefore + 1, recoveryController.getLedger().getEntries().size(),
+                "recovered B16 access must append exactly one additional ordinary trade ledger row");
 
         world = Stage22CorePairWorldFixture.roundTrip(world);
         PhysicalState recoveredRestored = physical(entity(world, stationId), entity(world, visitorId));
