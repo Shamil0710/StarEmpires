@@ -30,8 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * acceptance closes the next causal seam: a pending agreement must not move physical goods or money,
  * an active mutual market-access/customs agreement must admit the ordinary {@link TradeController},
  * breach must stop the same transaction without mutation, and a later accepted agreement must
- * restore real trade. Station and visitor are persistent entities created through the ordinary world
- * lifecycle; no abstract trade score or synthetic volume counter participates.</p>
+ * restore real trade. Station and visitor are persistent entities created economically empty through
+ * the ordinary world lifecycle and receive explicit test-fixture source stock/funds only after
+ * registration; no abstract trade score or synthetic volume counter participates.</p>
  */
 class Stage22CorePairTreatyTradeConsequenceAcceptanceTest {
     private static final int INITIAL_STATION_STOCK = 20;
@@ -73,6 +74,7 @@ class Stage22CorePairTreatyTradeConsequenceAcceptanceTest {
 
         EntityId stationId = world.createEntity(world.getActiveSystemId(), station(ownerRuntimeId));
         EntityId visitorId = world.createEntity(world.getActiveSystemId(), visitor(visitorRuntimeId));
+        seedPhysicalTradeState(entity(world, stationId), entity(world, visitorId));
 
         var offered = world.applyDiplomaticTreatyCommand(new DiplomaticTreatyCommand.Offer(
                 owner,
@@ -180,17 +182,15 @@ class Stage22CorePairTreatyTradeConsequenceAcceptanceTest {
     }
 
     private static Entity station(int factionId) {
-        InventoryComponent inventory = new InventoryComponent();
-        inventory.stock[Constants.ITEM_FOOD] = INITIAL_STATION_STOCK;
         MarketComponent market = new MarketComponent();
         market.configureTradableItem(Constants.ITEM_FOOD, 100, 0f);
         market.sellPrices[Constants.ITEM_FOOD] = 10f;
         market.buyPrices[Constants.ITEM_FOOD] = 9f;
         return new Entity()
                 .add(new IdentityComponent("M22.6 treaty market", IdentityComponent.Kind.STATION))
-                .add(inventory)
+                .add(new InventoryComponent())
                 .add(market)
-                .add(new WalletComponent(Money.fromCredits(1_000d)))
+                .add(new WalletComponent())
                 .add(new FactionComponent(factionId));
     }
 
@@ -198,8 +198,16 @@ class Stage22CorePairTreatyTradeConsequenceAcceptanceTest {
         return new Entity()
                 .add(new IdentityComponent("M22.6 treaty visitor", IdentityComponent.Kind.FLEET))
                 .add(new InventoryComponent())
-                .add(new WalletComponent(Money.fromCredits(100d)))
+                .add(new WalletComponent())
                 .add(new FactionComponent(factionId));
+    }
+
+    private static void seedPhysicalTradeState(Entity station, Entity visitor) {
+        station.getComponent(InventoryComponent.class).stock[Constants.ITEM_FOOD] = INITIAL_STATION_STOCK;
+        assertTrue(station.getComponent(WalletComponent.class).creditFromSource(Money.fromCredits(1_000d)),
+                "B16 fixture station source funding must succeed after lifecycle registration");
+        assertTrue(visitor.getComponent(WalletComponent.class).creditFromSource(Money.fromCredits(100d)),
+                "B16 fixture visitor source funding must succeed after lifecycle registration");
     }
 
     private static Entity entity(WorldSimulation world, EntityId id) {
