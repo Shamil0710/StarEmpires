@@ -3,13 +3,14 @@ package com.spacesim.content;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.Collections;
 
 import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader;
+import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceContract;
 
 /**
  * Deterministic M22.6 freeze-manifest projection over the accepted core pair.
@@ -19,9 +20,9 @@ import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader;
  */
 public final class Stage22CorePairFreezeManifest {
     /** Freeze schema version. */
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     /** Semantic freeze-manifest version. */
-    public static final String MANIFEST_VERSION = "stage22.core_pair_freeze_manifest.v2";
+    public static final String MANIFEST_VERSION = "stage22.core_pair_freeze_manifest.v3";
 
     private Stage22CorePairFreezeManifest() {
         throw new AssertionError("utility class");
@@ -82,6 +83,11 @@ public final class Stage22CorePairFreezeManifest {
                 empireProfiles.schemaVersion(),
                 coreProfiles.schemaVersion(),
                 Stage22IndustrialUnionProductionState.CURRENT_VERSION,
+                Stage20GeneratedWorldRuntimePersistenceContract.CURRENT_BRIDGE_VERSION,
+                Stage20GeneratedWorldRuntimePersistenceContract.CURRENT_CHECKPOINT_SCHEMA_VERSION,
+                Stage20GeneratedWorldRuntimePersistenceContract.CURRENT_FILE_FORMAT_VERSION,
+                Stage20GeneratedWorldRuntimePersistenceContract.MIGRATION_VERSION,
+                Stage20GeneratedWorldRuntimePersistenceContract.SUPPORTED_FILE_FORMAT_VERSIONS,
                 scenarioVersions,
                 runtimePins,
                 "");
@@ -114,6 +120,11 @@ public final class Stage22CorePairFreezeManifest {
                 Integer.toString(value.empireProfileSchemaVersion()),
                 Integer.toString(value.coreProfileSchemaVersion()),
                 Integer.toString(value.unionProductionStateVersion()),
+                value.generatedRuntimeBridgeVersion(),
+                Integer.toString(value.generatedRuntimeCheckpointSchemaVersion()),
+                Integer.toString(value.generatedRuntimeCheckpointFileFormatVersion()),
+                value.generatedRuntimeMigrationVersion(),
+                value.generatedRuntimeSupportedFileFormats().toString(),
                 String.join(",", value.scenarioVersions()),
                 value.runtimeContentFingerprints().toString());
         try {
@@ -141,7 +152,7 @@ public final class Stage22CorePairFreezeManifest {
      * @param empireManufacturingFingerprint Empire manufacturing fingerprint
      * @param unionManufacturingFingerprint Industrial Union manufacturing fingerprint
      * @param empireShipyardFingerprint Empire physical shipyard fingerprint
-     * @param unionShipyardFingerprint Industrial Union physical shipyard fingerprint
+     * @param unionShipyardFingerprint Union physical shipyard fingerprint
      * @param empireStationFingerprint shared Stage-18 station-infrastructure fingerprint observed by Empire validation
      * @param unionStationFingerprint shared Stage-18 station-infrastructure fingerprint observed by Union validation
      * @param empireProfileFingerprint Empire promoted profile-catalog fingerprint
@@ -151,6 +162,11 @@ public final class Stage22CorePairFreezeManifest {
      * @param empireProfileSchemaVersion Empire profile schema version
      * @param coreProfileSchemaVersion shared profile schema version
      * @param unionProductionStateVersion Industrial Union production sidecar save version
+     * @param generatedRuntimeBridgeVersion Stage-20.5 generated-world runtime composition contract
+     * @param generatedRuntimeCheckpointSchemaVersion Stage-20.5 atomic checkpoint value schema
+     * @param generatedRuntimeCheckpointFileFormatVersion Stage-20.5 atomic checkpoint binary format
+     * @param generatedRuntimeMigrationVersion Stage-20.5 migration-table identity
+     * @param generatedRuntimeSupportedFileFormats intentionally readable Stage-20.5 binary formats
      * @param scenarioVersions exact B00-B20 scenario version IDs
      * @param runtimeContentFingerprints combined runtime engineering, weapon and schema/migration pins
      * @param freezeFingerprint aggregate semantic freeze fingerprint
@@ -180,41 +196,17 @@ public final class Stage22CorePairFreezeManifest {
             int empireProfileSchemaVersion,
             int coreProfileSchemaVersion,
             int unionProductionStateVersion,
+            String generatedRuntimeBridgeVersion,
+            int generatedRuntimeCheckpointSchemaVersion,
+            int generatedRuntimeCheckpointFileFormatVersion,
+            String generatedRuntimeMigrationVersion,
+            List<Integer> generatedRuntimeSupportedFileFormats,
             List<String> scenarioVersions,
             Map<String, String> runtimeContentFingerprints,
             String freezeFingerprint) {
-        /**
-         * Freezes scenario-version ordering.
-         *
-         * @param schemaVersion freeze schema version
-         * @param manifestVersion freeze semantic version
-         * @param scenarioSuiteVersion canonical scenario suite version
-         * @param empireFactionId stable Empire save/runtime ID
-         * @param unionFactionId stable Industrial Union save/runtime ID
-         * @param empirePackageFingerprint Empire package fingerprint
-         * @param unionPackageFingerprint Industrial Union package fingerprint
-         * @param empireProductionFingerprint Empire production-manifest fingerprint
-         * @param unionProductionFingerprint Industrial Union production-manifest fingerprint
-         * @param empireEngineeringFingerprint Empire engineering fingerprint
-         * @param unionEngineeringFingerprint Industrial Union engineering fingerprint
-         * @param empireManufacturingFingerprint Empire manufacturing fingerprint
-         * @param unionManufacturingFingerprint Industrial Union manufacturing fingerprint
-         * @param empireShipyardFingerprint Empire physical shipyard fingerprint
-         * @param unionShipyardFingerprint Industrial Union physical shipyard fingerprint
-         * @param empireStationFingerprint shared Stage-18 station-infrastructure fingerprint observed by Empire validation
-         * @param unionStationFingerprint shared Stage-18 station-infrastructure fingerprint observed by Union validation
-         * @param empireProfileFingerprint Empire promoted profile-catalog fingerprint
-         * @param coreProfileCatalogFingerprint shared Stage-22 profile-catalog fingerprint containing Union profile
-         * @param empireCharacterFingerprint Empire character-lineup fingerprint
-         * @param unionCharacterFingerprint Industrial Union character-lineup fingerprint
-         * @param empireProfileSchemaVersion Empire profile schema version
-         * @param coreProfileSchemaVersion shared profile schema version
-         * @param unionProductionStateVersion Industrial Union production sidecar save version
-         * @param scenarioVersions exact B00-B20 scenario version IDs
-         * @param runtimeContentFingerprints combined runtime engineering, weapon and schema/migration pins
-         * @param freezeFingerprint aggregate semantic freeze fingerprint
-         */
+        /** Freezes collection ordering and rejects null mutable views. */
         public Snapshot {
+            generatedRuntimeSupportedFileFormats = List.copyOf(generatedRuntimeSupportedFileFormats);
             scenarioVersions = List.copyOf(scenarioVersions);
             runtimeContentFingerprints = Collections.unmodifiableMap(new TreeMap<>(runtimeContentFingerprints));
         }
@@ -232,6 +224,11 @@ public final class Stage22CorePairFreezeManifest {
                     empireProfileFingerprint, coreProfileCatalogFingerprint,
                     empireCharacterFingerprint, unionCharacterFingerprint,
                     empireProfileSchemaVersion, coreProfileSchemaVersion, unionProductionStateVersion,
+                    generatedRuntimeBridgeVersion,
+                    generatedRuntimeCheckpointSchemaVersion,
+                    generatedRuntimeCheckpointFileFormatVersion,
+                    generatedRuntimeMigrationVersion,
+                    generatedRuntimeSupportedFileFormats,
                     scenarioVersions, runtimeContentFingerprints, fingerprint);
         }
     }
