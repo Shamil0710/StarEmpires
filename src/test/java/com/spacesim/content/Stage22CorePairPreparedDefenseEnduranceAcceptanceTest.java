@@ -85,8 +85,8 @@ class Stage22CorePairPreparedDefenseEnduranceAcceptanceTest {
 
             LinkedHashMap<String, Object> row = new LinkedHashMap<>();
             row.put("permutation", permutation.name());
-            row.put("preparedEmpireMissionReadinessBps", prepared.empire().defenderReadiness().missionReadinessBps());
-            row.put("preparedUnionMissionReadinessBps", prepared.union().defenderReadiness().missionReadinessBps());
+            row.put("preparedEmpireOverallReadinessBps", prepared.empire().defenderReadiness().overallBps());
+            row.put("preparedUnionOverallReadinessBps", prepared.union().defenderReadiness().overallBps());
             row.put("preparedParticipantCountEmpire", prepared.empire().committedParticipantCount());
             row.put("preparedParticipantCountUnion", prepared.union().committedParticipantCount());
             row.put("endurance", direct);
