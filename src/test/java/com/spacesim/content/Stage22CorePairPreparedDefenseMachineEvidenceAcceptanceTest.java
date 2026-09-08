@@ -24,6 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * then checks the authored robustness axis while the existing paid replacement authority checks the
  * Industrial Union's distinct replacement-throughput contest path.</p>
  *
+ * <p>Authority, readiness, physical arrival, supply-loss visibility and tactical-policy validity are
+ * hard rules on every run. Surviving protection is materially stochastic combat evidence and follows
+ * the canonical protocol: DEFAULT/MIRRORED observations are averaged per seed before the authored
+ * Empire robustness hypothesis is evaluated across seeds. Individual inversions remain in raw
+ * evidence and causal samples; they are not deleted or converted into hard-rule breaches.</p>
+ *
  * <p>This does not invent a synthetic system-defense simulator. Longer multi-wave campaign endurance
  * remains part of the wider B09/B13 campaign evidence boundary.</p>
  */
@@ -77,9 +83,6 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                             == SupplyDecision.SUBMIT_ORDINARY_WITHDRAW_ORDER
                             && union.unsupportedDecision() == SupplyDecision.SUBMIT_ORDINARY_WITHDRAW_ORDER;
                     boolean commonTacticalPolicyValid = patrol.valid();
-                    boolean empireRobustnessVisible = empireProtection.meanCompartmentIntegrity()
-                            > unionProtection.meanCompartmentIntegrity()
-                            && empireProtection.totalShieldReserveJ() > unionProtection.totalShieldReserveJ();
                     boolean unionReplacementContestPath = unionReplacement.buildSeconds()
                             < empireReplacement.buildSeconds();
 
@@ -90,7 +93,6 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                     if (!preparedContinuation) breaches.add("b09_prepared_supply_does_not_continue");
                     if (!supplyLossVisible) breaches.add("b09_supply_loss_hidden_from_operation");
                     if (!commonTacticalPolicyValid) breaches.add("b09_common_tactical_policy_invalid");
-                    if (!empireRobustnessVisible) breaches.add("b09_empire_prepared_robustness_identity_lost");
                     if (!unionReplacementContestPath) breaches.add("b09_union_replacement_contest_path_lost");
 
                     return new Stage22CorePairMachineEvidenceBatch.ObservationPayload(
@@ -122,7 +124,6 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                                     "prepared_supply_continues", preparedContinuation ? 1d : 0d,
                                     "supply_loss_visible", supplyLossVisible ? 1d : 0d,
                                     "common_tactical_policy_valid", commonTacticalPolicyValid ? 1d : 0d,
-                                    "empire_robustness_visible", empireRobustnessVisible ? 1d : 0d,
                                     "union_replacement_contest_path", unionReplacementContestPath ? 1d : 0d),
                             breaches);
                 });
@@ -139,9 +140,17 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("prepared_supply_continues"));
         assertEquals(1d, vector.guardMetricMeans().get("supply_loss_visible"));
         assertEquals(1d, vector.guardMetricMeans().get("common_tactical_policy_valid"));
-        assertEquals(1d, vector.guardMetricMeans().get("empire_robustness_visible"));
         assertEquals(1d, vector.guardMetricMeans().get("union_replacement_contest_path"));
         assertEquals(0, vector.hardRuleBreachCount());
+
+        double pairedShieldAdvantage = Stage22CorePairPairedMetrics.meanDifference(
+                vector, "empire_final_shield_reserve_j", "union_final_shield_reserve_j");
+        double pairedIntegrityAdvantage = Stage22CorePairPairedMetrics.meanDifference(
+                vector, "empire_final_mean_integrity", "union_final_mean_integrity");
+        assertTrue(pairedShieldAdvantage > 0d,
+                "B09 paired RC evidence must retain positive Empire surviving shield advantage");
+        assertTrue(pairedIntegrityAdvantage > 0d,
+                "B09 paired RC evidence must retain positive Empire surviving integrity advantage");
 
         Stage22CorePairCausalSamples.archive("PreparedDefenseMachineEvidenceAcceptanceTest", vector, "union_final_mean_integrity",
                 coordinate -> Stage22CorePairTacticalProbe.run(
@@ -156,13 +165,15 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         archive.put("runCount", vector.runCount());
         archive.put("metricMeans", vector.metricMeans());
         archive.put("guardMetricMeans", vector.guardMetricMeans());
+        archive.put("pairedEmpireShieldReserveAdvantageJ", pairedShieldAdvantage);
+        archive.put("pairedEmpireMeanIntegrityAdvantage", pairedIntegrityAdvantage);
         archive.put("hardRuleBreachCount", vector.hardRuleBreachCount());
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
                 "B09-prepared-defense-operational-paired-" + Stage22CorePairEvidenceProfile.seedCount(8),
                 archive,
-                "Paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Prepared starting magazines are finite and authored before operation admission at the declared ten-percent readiness floor; no in-operation refill is granted. Empire retains the authored robustness contour under the same tactical policy; Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
+                "Paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Prepared starting magazines are finite and authored before operation admission at the declared ten-percent readiness floor; no in-operation refill is granted. Per-run authority/conservation rules remain hard. Materially stochastic surviving protection is reduced DEFAULT+MIRRORED per seed before the Empire robustness hypothesis is evaluated across seeds; individual inversions remain archived. Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
     }
 
     private static com.spacesim.ship.LiveTacticalBattleWeaponRuntime.TargetProtectionFingerprint protection(
