@@ -6,6 +6,7 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.content.Stage18ManufacturingProductRegistry;
 import com.spacesim.content.Stage18ResourceOntologyCatalog;
 import com.spacesim.content.Stage18ResourceOntologyLoader;
@@ -164,7 +165,12 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         Stage20GeneratedWorldRuntimePersistentState saved = Objects.requireNonNull(
                 checkpoint, "checkpoint");
         Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
-        WorldSimulation world = WorldSimulation.restore(saved.worldState(), saved.activeSystemId());
+        WorldSimulation world = WorldSimulation.restore(
+                saved.worldState(),
+                ContentCatalogLoader.loadDefault(),
+                saved.activeSystemId(),
+                saved.strategicStepTicks(),
+                saved.remoteUpdateBudgetPerFrame());
         MaterializedGeneratedIndustrialRuntime industry =
                 Stage20GeneratedIndustrialRuntimeBridge.restore(saved.campaign(), productRegistry);
         InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(
@@ -632,6 +638,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     campaign,
                     world.snapshot(),
                     world.getActiveSystemId(),
+                    world.getStrategicStepTicks(),
+                    world.getRemoteUpdateBudgetPerFrame(),
                     freightState,
                     localPhysical);
         }
@@ -783,7 +791,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
      * @param position exact generated local physical position
      * @param storage ordinary mutable Stage-18 storage
      * @param handlingCapability ordinary physical handling interface
-     * @param generatedIndustrial whether Stage-20.5C owns this endpoint runtime
+     * @param generatedIndustrial whether Stage-20.5 owns this endpoint runtime
      */
     public record RuntimeEndpoint(
             StarSystemId systemId,
@@ -802,7 +810,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
          * @param position exact generated local physical position
          * @param storage ordinary mutable Stage-18 storage
          * @param handlingCapability ordinary physical handling interface
-         * @param generatedIndustrial whether Stage-20.5C owns this endpoint runtime
+         * @param generatedIndustrial whether Stage-20.5 owns this endpoint runtime
          */
         public RuntimeEndpoint {
             Objects.requireNonNull(systemId, "systemId");
