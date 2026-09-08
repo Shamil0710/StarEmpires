@@ -43,14 +43,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>The older B15 probe proves the stable core identities are accepted by Stage-21F territorial
  * law, but its package-local force fixture is intentionally synthetic. This complementary acceptance
- * starts from a production generated world and an already materialized ordinary military FleetId.
- * The fleet moves through the ordinary fitted FTL FSM to a non-owned neighboring system, then
- * receives one exact Stage-22 core destroyer engineering package. Any bootstrap resident fleets in
- * the destination are removed through the ordinary world lifecycle before departure so this focused
- * occupation lane does not depend on an accidental generated-world emptiness invariant. Stage-21D
- * INVADE and Stage-21E operation admission consume a {@link FleetForceRegistry} reconstructed from
- * that exact persistent entity; no hand-authored force entry or readiness vector participates in
- * occupation authority.</p>
+ * starts from a production generated world and an already materialized ordinary non-freight military
+ * FleetId. The fleet moves through the ordinary fitted FTL FSM to a non-owned neighboring system,
+ * then receives one exact Stage-22 core destroyer engineering package. Any bootstrap resident fleets
+ * in the destination are removed through their existing ordinary lifecycle authorities before
+ * departure so this focused occupation lane does not depend on an accidental generated-world
+ * emptiness invariant. Freight residents are destroyed only through the composed world/freight
+ * authority so no operational freight sidecar identity can be orphaned. Stage-21D INVADE and
+ * Stage-21E operation admission consume a {@link FleetForceRegistry} reconstructed from that exact
+ * persistent entity; no hand-authored force entry or readiness vector participates in occupation
+ * authority.</p>
  *
  * <p>The exact tactical package intentionally carries a finite 120-round starting magazine rather
  * than a strategic full-load fraction. This persistence slice therefore requires every readiness
@@ -88,7 +90,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "B15-generated-world-core-package-occupation-save-continuation",
                 archive,
-                "Two fresh production generated worlds supply ordinary persistent military FleetIds and ordinary fitted FTL movement. Each lane deterministically selects a non-owned neighboring system and removes any bootstrap resident fleets through the ordinary world lifecycle solely to isolate occupation authority from generated-world population accidents. After physical arrival each lane receives one exact Stage-22 core destroyer package, readiness is reconstructed from the persisted entity, and Stage-21D/21E/21F authorities own invasion/occupation/claim progression. A halfway Stage-21F checkpoint resumes to the same Stage-17 claim and byte-identical final checkpoint. Generated world political owners remain world-bootstrap identities; the separate B15 mirrored core-identity probe remains the authority evidence for stable Empire/Industrial Union territorial identity binding.");
+                "Two fresh production generated worlds supply ordinary persistent non-freight military FleetIds and ordinary fitted FTL movement. Each lane deterministically selects a non-owned neighboring system and removes bootstrap residents through their existing lifecycle authorities solely to isolate occupation authority from generated-world population accidents; any resident freight is removed through the paired world/freight destruction boundary so its sidecar state remains authoritative. After physical arrival each lane receives one exact Stage-22 core destroyer package, readiness is reconstructed from the persisted entity, and Stage-21D/21E/21F authorities own invasion/occupation/claim progression. A halfway Stage-21F checkpoint resumes to the same Stage-17 claim and byte-identical final checkpoint. Generated world political owners remain world-bootstrap identities; the separate B15 mirrored core-identity probe remains the authority evidence for stable Empire/Industrial Union territorial identity binding.");
     }
 
     private static LaneResult runLane(boolean empirePackage) {
@@ -235,6 +237,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
         List<FleetPlacementState> placements = runtime.world().getFleetPlacements();
         for (FleetPlacementState placement : placements) {
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) continue;
+            if (runtime.freight().findFreighter(placement.id()).isPresent()) continue;
             Entity entity = entity(runtime, placement.id());
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
@@ -246,7 +249,7 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 return new Candidate(placement.id(), faction.factionId, stableFactionId, placement.systemId(), target);
             }
         }
-        throw new AssertionError("generated world lacks an ordinary military FleetId adjacent to a non-owned system");
+        throw new AssertionError("generated world lacks an ordinary non-freight military FleetId adjacent to a non-owned system");
     }
 
     private static void clearDestinationFleets(
@@ -257,8 +260,14 @@ class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
                 .filter(placement -> targetSystemId.equals(placement.systemId()))
                 .toList();
         for (FleetPlacementState resident : residents) {
+            if (runtime.freight().findFreighter(resident.id()).isPresent()) {
+                runtime.destroyLocalFreighter(resident.id(), DestructionPolicy.destroyAll());
+                continue;
+            }
             assertTrue(runtime.world().removeEntity(targetSystemId, resident.localEntityId()),
                     "B15 lane setup must remove the selected destination resident through world lifecycle");
+            runtime.arrival().materialization(targetSystemId)
+                    .releasePhysicalStateForWorldTransfer(resident.localEntityId());
         }
         assertFalse(runtime.world().getFleetPlacements().stream()
                 .anyMatch(placement -> placement.locationKind() == FleetLocationKind.IN_SYSTEM
