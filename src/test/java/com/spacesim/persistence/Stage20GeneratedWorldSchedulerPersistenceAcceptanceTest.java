@@ -13,14 +13,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression for exact generated-world continuation with a non-default multi-system scheduler. */
 class Stage20GeneratedWorldSchedulerPersistenceAcceptanceTest {
-    private static final int CURRENT_FILE_FORMAT_VERSION = 4;
-
     @Test
     void generatedWorldSchedulerRoundTripsAndKeepsRemoteContinuationExact() {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime direct = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
         Stage20GeneratedWorldRuntimePersistentState checkpoint = direct.captureState();
 
+        assertEquals(Stage20GeneratedWorldRuntimePersistenceContract.CURRENT_CHECKPOINT_SCHEMA_VERSION,
+                checkpoint.schemaVersion());
+        assertEquals(Stage20GeneratedWorldRuntimePersistenceContract.CURRENT_BRIDGE_VERSION,
+                checkpoint.bridgeVersion());
         assertEquals(direct.world().getStrategicStepTicks(), checkpoint.strategicStepTicks());
         assertEquals(direct.world().getRemoteUpdateBudgetPerFrame(), checkpoint.remoteUpdateBudgetPerFrame());
         assertEquals(checkpoint.worldState().systems().size(), checkpoint.remoteUpdateBudgetPerFrame(),
@@ -29,7 +31,9 @@ class Stage20GeneratedWorldSchedulerPersistenceAcceptanceTest {
                 "regression fixture must differ from the historical restore default");
 
         byte[] encoded = Stage20GeneratedWorldRuntimePersistenceCodec.encode(checkpoint);
-        assertEquals(CURRENT_FILE_FORMAT_VERSION, ByteBuffer.wrap(encoded).getInt(4));
+        assertEquals(Stage20GeneratedWorldRuntimePersistenceContract.CURRENT_FILE_FORMAT_VERSION,
+                ByteBuffer.wrap(encoded).getInt(4),
+                "semantic persistence contract must track the binary codec header");
         Stage20GeneratedWorldRuntimePersistentState decoded =
                 Stage20GeneratedWorldRuntimePersistenceCodec.decode(encoded);
         assertEquals(checkpoint, decoded);
