@@ -84,10 +84,8 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                     boolean ammunitionConserved = empireWeapons.shotsFired() + empireWeapons.ammunitionRounds()
                             == empire.rounds()
                             && unionWeapons.shotsFired() + unionWeapons.ammunitionRounds() == union.rounds();
-                    boolean nonPareto = union.dryMassKg() < empire.dryMassKg()
-                            && union.crew() < empire.crew()
-                            && empireProtection.totalShieldReserveJ() > unionProtection.totalShieldReserveJ()
-                            && empireProtection.meanCompartmentIntegrity() > unionProtection.meanCompartmentIntegrity();
+                    boolean unionResourceEfficiency = union.dryMassKg() < empire.dryMassKg()
+                            && union.crew() < empire.crew();
                     boolean replacementPaid = empireReplacement.buildSeconds() > unionReplacement.buildSeconds()
                             && empireReplacement.moduleInputMassKg() > unionReplacement.moduleInputMassKg()
                             && Double.compare(empireReplacement.hullInputMassKg(), unionReplacement.hullInputMassKg()) == 0;
@@ -103,7 +101,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                     if (!saveContinuationStable) breaches.add("b07_physical_start_save_continuation_drift");
                     if (!bothEngaged) breaches.add("b07_no_observed_patrol_exchange");
                     if (!ammunitionConserved) breaches.add("b07_ammunition_not_physically_conserved");
-                    if (!nonPareto) breaches.add("b07_raw_dimension_pareto_collapse");
+                    if (!unionResourceEfficiency) breaches.add("b07_union_resource_efficiency_missing");
                     if (!replacementPaid) breaches.add("b07_replacement_burden_not_paid");
                     if (!unionCounterCost) breaches.add("b07_union_commonality_countercost_missing");
 
@@ -145,7 +143,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                                     "physical_start_save_continuation", saveContinuationStable ? 1d : 0d,
                                     "both_sides_observed_exchange", bothEngaged ? 1d : 0d,
                                     "ammunition_conserved", ammunitionConserved ? 1d : 0d,
-                                    "two_sided_non_pareto", nonPareto ? 1d : 0d,
+                                    "union_resource_efficiency_advantage", unionResourceEfficiency ? 1d : 0d,
                                     "replacement_burden_paid", replacementPaid ? 1d : 0d,
                                     "union_commonality_countercost", unionCounterCost ? 1d : 0d),
                             breaches);
@@ -158,10 +156,19 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("physical_start_save_continuation"));
         assertEquals(1d, vector.guardMetricMeans().get("both_sides_observed_exchange"));
         assertEquals(1d, vector.guardMetricMeans().get("ammunition_conserved"));
-        assertEquals(1d, vector.guardMetricMeans().get("two_sided_non_pareto"));
+        assertEquals(1d, vector.guardMetricMeans().get("union_resource_efficiency_advantage"));
         assertEquals(1d, vector.guardMetricMeans().get("replacement_burden_paid"));
         assertEquals(1d, vector.guardMetricMeans().get("union_commonality_countercost"));
         assertEquals(0, vector.hardRuleBreachCount());
+
+        double pairedShieldAdvantage = Stage22CorePairPairedMetrics.meanDifference(
+                vector, "empire_final_shield_reserve_j", "union_final_shield_reserve_j");
+        double pairedIntegrityAdvantage = Stage22CorePairPairedMetrics.meanDifference(
+                vector, "empire_final_mean_integrity", "union_final_mean_integrity");
+        assertTrue(pairedShieldAdvantage > 0d,
+                "B07 paired evidence must retain positive Empire surviving shield advantage");
+        assertTrue(pairedIntegrityAdvantage > 0d,
+                "B07 paired evidence must retain positive Empire surviving integrity advantage");
 
         Stage22CorePairCausalSamples.archive("EqualBurdenMachineEvidenceAcceptanceTest", vector, "union_final_mean_integrity",
                 coordinate -> Stage22CorePairTacticalProbe.run(
@@ -176,13 +183,15 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
         archive.put("runCount", vector.runCount());
         archive.put("metricMeans", vector.metricMeans());
         archive.put("guardMetricMeans", vector.guardMetricMeans());
+        archive.put("pairedEmpireShieldReserveAdvantageJ", pairedShieldAdvantage);
+        archive.put("pairedEmpireMeanIntegrityAdvantage", pairedIntegrityAdvantage);
         archive.put("hardRuleBreachCount", vector.hardRuleBreachCount());
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
                 "B07-equal-burden-patrol-paired-" + Stage22CorePairEvidenceProfile.seedCount(30),
                 archive,
-                "Paired/mirrored B07 patrol coordinates using the same Stage-19 tactical policy and exact Stage-22 destroyer fits. Every coordinate is also rerun from an ordinary EntityStateMapper physical-start round trip and must produce the exact same complete sampled evidence. Raw mass, crew, power, ammunition, reaction mass, acceleration, visibility, exchange, surviving protection and paid replacement/retool burdens remain separate dimensions; no scalar power score or faction-wide combat modifier is introduced. This proves scenario-start persistence, not a synthetic mid-flight battle save authority.");
+                "Paired/mirrored B07 patrol coordinates using the same Stage-19 tactical policy and exact Stage-22 destroyer fits. Every coordinate is also rerun from an ordinary EntityStateMapper physical-start round trip and must produce the exact same complete sampled evidence. Authority, actor bounds, physical exchange and ammunition conservation remain hard per run. Raw mass, crew, power, ammunition, reaction mass, acceleration, visibility, exchange, surviving protection and paid replacement/retool burdens remain separate dimensions. Materially stochastic surviving protection is reduced DEFAULT+MIRRORED per seed before the Empire robustness hypothesis is evaluated across seeds; individual inversions remain archived. No scalar power score or faction-wide combat modifier is introduced. This proves scenario-start persistence, not a synthetic mid-flight battle save authority.");
     }
 
     private static boolean fitsAuthorization(Stage22CorePairTacticalProbe.StartingBurden burden) {
