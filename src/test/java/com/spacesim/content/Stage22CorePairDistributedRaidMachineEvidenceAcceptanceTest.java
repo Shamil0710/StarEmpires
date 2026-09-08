@@ -34,7 +34,7 @@ class Stage22CorePairDistributedRaidMachineEvidenceAcceptanceTest {
                 "B06",
                 "distributed_raid_supply_patrol_authority",
                 "stage19-stage21.current",
-                Stage22CorePairExperimentProtocol.tuningSchedule(),
+                Stage22CorePairEvidenceProfile.schedule(30),
                 (scenario, variant, profile, coordinate) -> {
                     var raids = Stage22CorePairDistributedRaidProbe.run(coordinate.permutation());
                     var repeat = Stage22CorePairDistributedRaidProbe.run(coordinate.permutation());
@@ -84,8 +84,8 @@ class Stage22CorePairDistributedRaidMachineEvidenceAcceptanceTest {
                             breaches);
                 });
 
-        assertEquals(Stage22CorePairExperimentProtocol.TUNING_SEED_COUNT, vector.pairedSeedCount());
-        assertEquals(Stage22CorePairExperimentProtocol.TUNING_SEED_COUNT * 2, vector.runCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(30), vector.pairedSeedCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(30) * 2, vector.runCount());
         assertEquals(2d, vector.metricMeans().get("empire_continuing_raids"));
         assertEquals(2d, vector.metricMeans().get("union_continuing_raids"));
         assertEquals(1d, vector.metricMeans().get("empire_withdrawing_raids"));
@@ -100,6 +100,10 @@ class Stage22CorePairDistributedRaidMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("deterministic_repeat"));
         assertEquals(0, vector.hardRuleBreachCount());
 
+        Stage22CorePairCausalSamples.archive("DistributedRaidMachineEvidenceAcceptanceTest", vector, "union_patrol_visible_ticks",
+                coordinate -> Stage22CorePairTacticalProbe.run(
+                        Stage22CorePairTacticalProbe.Variant.PATROL, coordinate, true));
+
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
         archive.put("scenarioId", vector.scenarioId());
         archive.put("scenarioVersion", vector.scenarioVersion());
@@ -113,8 +117,8 @@ class Stage22CorePairDistributedRaidMachineEvidenceAcceptanceTest {
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
-                "B06-distributed-raids-supply-patrol-paired-30",
+                "B06-distributed-raids-supply-patrol-paired-" + Stage22CorePairEvidenceProfile.seedCount(30),
                 archive,
-                "Thirty paired/mirrored B06 cells. Each faction commits three exact Stage-22 physical raid payloads to independent objectives through ordinary Stage-21E supply/readiness authority: two supplied lanes continue, one supply-denied lane submits ordinary withdrawal, and a missing FleetId fails closed. The same coordinate runs the common Stage-19 patrol policy with actor-bounded contacts. No raid damage scalar, income penalty or faction combat bonus is introduced. Multi-system campaign scheduling, repeated encounter consequences and recovery remain open B06/B13/B14 evidence.");
+                "Paired/mirrored B06 cells. Each faction commits three exact Stage-22 physical raid payloads to independent objectives through ordinary Stage-21E supply/readiness authority: two supplied lanes continue, one supply-denied lane submits ordinary withdrawal, and a missing FleetId fails closed. The same coordinate runs the common Stage-19 patrol policy with actor-bounded contacts. No raid damage scalar, income penalty or faction combat bonus is introduced. Multi-system campaign scheduling, repeated encounter consequences and recovery remain open B06/B13/B14 evidence.");
     }
 }

@@ -30,7 +30,7 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
                 "B13",
                 "three_committed_exact_core_encounters",
                 "core_pair.current",
-                Stage22CorePairExperimentProtocol.pairedSchedule(8),
+                Stage22CorePairEvidenceProfile.schedule(8),
                 (scenario, variant, profile, coordinate) -> {
                     var baseline = Stage22CorePairTacticalFactory.createDestroyerDuel(coordinate.permutation());
                     var initialEmpire = baseline.weapons().battleState().combatants().stream()
@@ -108,8 +108,8 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
                             breaches);
                 });
 
-        assertEquals(8, vector.pairedSeedCount());
-        assertEquals(16, vector.runCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(8), vector.pairedSeedCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(8) * 2, vector.runCount());
         assertEquals(3d, vector.metricMeans().get("encounter_count"));
         assertEquals(1d, vector.guardMetricMeans().get("save_continuation_stable"));
         assertEquals(1d, vector.guardMetricMeans().get("three_committed_encounters"));
@@ -117,6 +117,9 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("physical_damage_persists"));
         assertEquals(1d, vector.guardMetricMeans().get("material_attrition_observed"));
         assertEquals(0, vector.hardRuleBreachCount());
+
+        Stage22CorePairCausalSamples.archive("B13-rolling-attrition", vector, "union_last_mean_integrity",
+                coordinate -> Stage22CorePairEncounterContinuationProbe.run(coordinate, true));
 
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
         archive.put("scenarioId", vector.scenarioId());
@@ -131,7 +134,7 @@ class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
-                "B13-rolling-attrition-paired-8",
+                "B13-rolling-attrition-paired-" + Stage22CorePairEvidenceProfile.seedCount(8),
                 archive,
                 "Three committed exact-core Stage-19 encounters with seeded mirrored contact geometry, save/restore continuation and finite stores. Material attrition is measured from the declared pre-contact baseline through the final committed exit. Production, paid replacement cadence, backlog and long-war campaign trajectory remain open.");
     }

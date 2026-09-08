@@ -49,11 +49,11 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
                 "B11",
                 "exact_command_network_sensor_degradation",
                 Stage22CorePairCommandNetworkProjection.VERSION,
-                Stage22CorePairExperimentProtocol.tuningSchedule(),
+                Stage22CorePairEvidenceProfile.schedule(30),
                 (scenario, variant, profile, coordinate) -> observe(coordinate));
 
-        assertEquals(Stage22CorePairExperimentProtocol.TUNING_SEED_COUNT, vector.pairedSeedCount());
-        assertEquals(Stage22CorePairExperimentProtocol.TUNING_SEED_COUNT * 2, vector.runCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(30), vector.pairedSeedCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(30) * 2, vector.runCount());
         assertTrue(vector.metricMeans().get("empire_linked_contacts") > 0d);
         assertTrue(vector.metricMeans().get("union_linked_contacts") > 0d);
         assertEquals(0d, vector.metricMeans().get("empire_receiver_severed_contacts"));
@@ -70,6 +70,11 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("deterministic_repeat"));
         assertEquals(0, vector.hardRuleBreachCount());
 
+        Stage22CorePairCausalSamples.archive("B11-command-network", vector, "union_linked_contacts",
+                coordinate -> Map.of("linked", run(coordinate, BreakMode.NONE),
+                        "receiverSevered", run(coordinate, BreakMode.RECEIVER),
+                        "senderSevered", run(coordinate, BreakMode.SENDER)));
+
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
         archive.put("scenarioId", vector.scenarioId());
         archive.put("scenarioVersion", vector.scenarioVersion());
@@ -83,9 +88,9 @@ class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
-                "B11-command-network-degradation-paired-30",
+                "B11-command-network-degradation-paired-" + Stage22CorePairEvidenceProfile.seedCount(30),
                 archive,
-                "Thirty paired/mirrored exact Stage-22 command-network cells. Primaries with failed local radar acquire actor-bounded hostile awareness and target selection only from current allied measurements relayed through two physical fitted datalink endpoints during a bounded one-second ordinary control window. Because the failed radar is real subsystem damage, the ordinary survival planner retains authority: linked primaries retreat for SUBSYSTEM_DAMAGE and final fire authorization remains false. Breaking either datalink endpoint on a fresh run removes all hostile tracks and target selection. Command variants physically displace the authored utility shield; no faction-name command modifier or hidden hostile state is introduced.");
+                "Paired/mirrored exact Stage-22 command-network cells. Primaries with failed local radar acquire actor-bounded hostile awareness and target selection only from current allied measurements relayed through two physical fitted datalink endpoints during a bounded one-second ordinary control window. Because the failed radar is real subsystem damage, the ordinary survival planner retains authority: linked primaries retreat for SUBSYSTEM_DAMAGE and final fire authorization remains false. Breaking either datalink endpoint on a fresh run removes all hostile tracks and target selection. Command variants physically displace the authored utility shield; no faction-name command modifier or hidden hostile state is introduced.");
     }
 
     private static Stage22CorePairMachineEvidenceBatch.ObservationPayload observe(RunCoordinate coordinate) {

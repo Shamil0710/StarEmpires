@@ -35,7 +35,7 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                 "B07",
                 "equal_burden_patrol_raw_dimensions",
                 Stage22CorePairTacticalProbe.POLICY,
-                Stage22CorePairExperimentProtocol.pairedSchedule(30),
+                Stage22CorePairEvidenceProfile.schedule(30),
                 (scenario, variant, profile, coordinate) -> {
                     var patrol = Stage22CorePairTacticalProbe.run(
                             Stage22CorePairTacticalProbe.Variant.PATROL,
@@ -151,8 +151,8 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
                             breaches);
                 });
 
-        assertEquals(30, vector.pairedSeedCount());
-        assertEquals(60, vector.runCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(30), vector.pairedSeedCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(30) * 2, vector.runCount());
         assertEquals(1d, vector.guardMetricMeans().get("authorization_envelope"));
         assertEquals(1d, vector.guardMetricMeans().get("common_actor_bounded_policy"));
         assertEquals(1d, vector.guardMetricMeans().get("physical_start_save_continuation"));
@@ -162,6 +162,10 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("replacement_burden_paid"));
         assertEquals(1d, vector.guardMetricMeans().get("union_commonality_countercost"));
         assertEquals(0, vector.hardRuleBreachCount());
+
+        Stage22CorePairCausalSamples.archive("EqualBurdenMachineEvidenceAcceptanceTest", vector, "union_final_mean_integrity",
+                coordinate -> Stage22CorePairTacticalProbe.run(
+                        Stage22CorePairTacticalProbe.Variant.PATROL, coordinate, true));
 
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
         archive.put("scenarioId", vector.scenarioId());
@@ -176,9 +180,9 @@ class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
-                "B07-equal-burden-patrol-paired-30",
+                "B07-equal-burden-patrol-paired-" + Stage22CorePairEvidenceProfile.seedCount(30),
                 archive,
-                "Thirty paired/mirrored B07 patrol coordinates using the same Stage-19 tactical policy and exact Stage-22 destroyer fits. Every coordinate is also rerun from an ordinary EntityStateMapper physical-start round trip and must produce the exact same complete sampled evidence. Raw mass, crew, power, ammunition, reaction mass, acceleration, visibility, exchange, surviving protection and paid replacement/retool burdens remain separate dimensions; no scalar power score or faction-wide combat modifier is introduced. This proves scenario-start persistence, not a synthetic mid-flight battle save authority.");
+                "Paired/mirrored B07 patrol coordinates using the same Stage-19 tactical policy and exact Stage-22 destroyer fits. Every coordinate is also rerun from an ordinary EntityStateMapper physical-start round trip and must produce the exact same complete sampled evidence. Raw mass, crew, power, ammunition, reaction mass, acceleration, visibility, exchange, surviving protection and paid replacement/retool burdens remain separate dimensions; no scalar power score or faction-wide combat modifier is introduced. This proves scenario-start persistence, not a synthetic mid-flight battle save authority.");
     }
 
     private static boolean fitsAuthorization(Stage22CorePairTacticalProbe.StartingBurden burden) {

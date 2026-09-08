@@ -37,7 +37,7 @@ class Stage22CorePairCrossScenarioDominanceAcceptanceTest {
                 "B07",
                 "cross_scenario_non_pareto_review",
                 Stage22CorePairTacticalProbe.POLICY,
-                Stage22CorePairExperimentProtocol.pairedSchedule(30),
+                Stage22CorePairEvidenceProfile.schedule(30),
                 (scenario, variant, profile, coordinate) -> {
                     var patrol = Stage22CorePairTacticalProbe.run(
                             Stage22CorePairTacticalProbe.Variant.PATROL,
@@ -127,8 +127,8 @@ class Stage22CorePairCrossScenarioDominanceAcceptanceTest {
                             breaches);
                 });
 
-        assertEquals(30, vector.pairedSeedCount());
-        assertEquals(60, vector.runCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(30), vector.pairedSeedCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(30) * 2, vector.runCount());
         assertEquals(1d, vector.guardMetricMeans().get("ordinary_stage19_exchange"));
         assertEquals(1d, vector.guardMetricMeans().get("union_resource_efficiency_advantage"));
         assertEquals(1d, vector.guardMetricMeans().get("empire_survivability_advantage"));
@@ -137,6 +137,10 @@ class Stage22CorePairCrossScenarioDominanceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("union_adaptation_countercost"));
         assertEquals(1d, vector.guardMetricMeans().get("no_global_pareto_winner"));
         assertEquals(0, vector.hardRuleBreachCount());
+
+        Stage22CorePairCausalSamples.archive("CrossScenarioDominanceAcceptanceTest", vector, "union_final_mean_integrity",
+                coordinate -> Stage22CorePairTacticalProbe.run(
+                        Stage22CorePairTacticalProbe.Variant.PATROL, coordinate, true));
 
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
         archive.put("scenarioId", vector.scenarioId());
@@ -151,8 +155,8 @@ class Stage22CorePairCrossScenarioDominanceAcceptanceTest {
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
-                "gate-c-cross-scenario-non-pareto-paired-30",
+                "gate-c-cross-scenario-non-pareto-paired-" + Stage22CorePairEvidenceProfile.seedCount(30),
                 archive,
-                "Thirty paired/mirrored ordinary B07 Stage-19 patrol coordinates composed with the ordinary paid Stage-21G replacement authority and finite Union retool/commonality exposure. Raw dimensions remain separate: Union retains lower dry-mass/crew and faster/lower-module replacement, Empire retains greater surviving shield/compartment protection, and Union throughput/commonality retains a finite correlated adaptation cost. No composite power score, faction-wide modifier or synthetic outcome authority is introduced; this is the cross-scenario dominance review, not a waiver of still-open campaign scenarios or human B18-B20 gates.");
+                "Paired/mirrored ordinary B07 Stage-19 patrol coordinates composed with the ordinary paid Stage-21G replacement authority and finite Union retool/commonality exposure. Raw dimensions remain separate: Union retains lower dry-mass/crew and faster/lower-module replacement, Empire retains greater surviving shield/compartment protection, and Union throughput/commonality retains a finite correlated adaptation cost. No composite power score, faction-wide modifier or synthetic outcome authority is introduced; this is the cross-scenario dominance review, not a waiver of still-open campaign scenarios or human B18-B20 gates.");
     }
 }

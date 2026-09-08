@@ -43,7 +43,7 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                 "B09",
                 "prepared_defense_operational_authority",
                 "stage19-stage21.current",
-                Stage22CorePairExperimentProtocol.pairedSchedule(8),
+                Stage22CorePairEvidenceProfile.schedule(8),
                 (scenario, variant, profile, coordinate) -> {
                     var result = Stage22CorePairPreparedDefenseProbe.run(coordinate.permutation());
                     var empire = result.empire();
@@ -127,8 +127,8 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
                             breaches);
                 });
 
-        assertEquals(8, vector.pairedSeedCount());
-        assertEquals(16, vector.runCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(8), vector.pairedSeedCount());
+        assertEquals(Stage22CorePairEvidenceProfile.seedCount(8) * 2, vector.runCount());
         assertTrue(vector.metricMeans().get("empire_defender_readiness_bps") >= PREPARED_MISSION_FLOOR_BPS);
         assertTrue(vector.metricMeans().get("union_defender_readiness_bps") >= PREPARED_MISSION_FLOOR_BPS);
         assertEquals(2d, vector.metricMeans().get("empire_committed_participants"));
@@ -143,6 +143,10 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("union_replacement_contest_path"));
         assertEquals(0, vector.hardRuleBreachCount());
 
+        Stage22CorePairCausalSamples.archive("PreparedDefenseMachineEvidenceAcceptanceTest", vector, "union_final_mean_integrity",
+                coordinate -> Stage22CorePairTacticalProbe.run(
+                        Stage22CorePairTacticalProbe.Variant.PATROL, coordinate, true));
+
         LinkedHashMap<String, Object> archive = new LinkedHashMap<>();
         archive.put("scenarioId", vector.scenarioId());
         archive.put("scenarioVersion", vector.scenarioVersion());
@@ -156,9 +160,9 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
-                "B09-prepared-defense-operational-paired-8",
+                "B09-prepared-defense-operational-paired-" + Stage22CorePairEvidenceProfile.seedCount(8),
                 archive,
-                "Eight paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Prepared starting magazines are finite and authored before operation admission at the declared ten-percent readiness floor; no in-operation refill is granted. Empire retains the authored robustness contour under the same tactical policy; Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
+                "Paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Prepared starting magazines are finite and authored before operation admission at the declared ten-percent readiness floor; no in-operation refill is granted. Empire retains the authored robustness contour under the same tactical policy; Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
     }
 
     private static com.spacesim.ship.LiveTacticalBattleWeaponRuntime.TargetProtectionFingerprint protection(

@@ -24,7 +24,7 @@ class Stage22CorePairTacticalSensitivityAcceptanceTest {
     void thirtyPairedGeometriesExposeFiniteMagazinesAndActorBoundedSensorLoss() {
         for (var variant : Stage22CorePairTacticalProbe.Variant.values()) {
             var observations = new ArrayList<Stage22CorePairTacticalProbe.Evidence>();
-            for (var coordinate : Stage22CorePairExperimentProtocol.tuningSchedule()) {
+            for (var coordinate : Stage22CorePairEvidenceProfile.schedule(30)) {
                 var row = Stage22CorePairTacticalProbe.run(variant, coordinate, false);
                 observations.add(row);
                 assertTrue(row.valid(), row.toString());
@@ -36,9 +36,9 @@ class Stage22CorePairTacticalSensitivityAcceptanceTest {
                     assertTrue(row.last().control().stream().noneMatch(control -> control.fireAuthorized()));
                 }
             }
-            assertEquals(60, observations.size());
+            assertEquals(Stage22CorePairEvidenceProfile.seedCount(30) * 2, observations.size());
             Stage22CorePairEvidenceArchive.write("tactical-" + variant.name().toLowerCase(java.util.Locale.ROOT), observations,
-                    "30 paired deterministic geometry controls, common Stage-19 tactical policy and exact Stage-22 destroyers. Equal role does not normalize economic burden. Start-state save/replay is tested; mid-flight battle persistence, faction-specific strategic AI and campaign victory are not established by these controls.");
+                    "Paired deterministic geometry controls, common Stage-19 tactical policy and exact Stage-22 destroyers. Equal role does not normalize economic burden. Start-state save/replay is tested; mid-flight battle persistence, faction-specific strategic AI and campaign victory are not established by these controls.");
         }
     }
 }
