@@ -52,6 +52,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * that exact persistent entity; no hand-authored force entry or readiness vector participates in
  * occupation authority.</p>
  *
+ * <p>The exact tactical package intentionally carries a finite 120-round starting magazine rather
+ * than a strategic full-load fraction. This persistence slice therefore requires every readiness
+ * dimension to remain physically non-zero; it does not invent ammunition or reinterpret the package
+ * as strategically replenished. Stocking policy and paid replenishment are covered by their own
+ * M22.6 causal acceptances.</p>
+ *
  * <p>The occupation is checkpointed halfway through its sustained-security clock via the production
  * Stage-21F codec. Direct and restored worlds must then reach the same Stage-17 claim, completed
  * operation and byte-identical final Stage-21F checkpoint for both exact core packages. The test does
@@ -61,7 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
     private static final int CREW_AVAILABLE = 100_000;
     private static final int SUPPLY_ACCESS_BPS = FleetReadinessState.FULL;
-    private static final int MINIMUM_MISSION_READINESS_BPS = 1_000;
+    private static final int MINIMUM_MISSION_READINESS_BPS = 1;
     private static final int MINIMUM_SUPPLY_ACCESS_BPS = 5_000;
 
     @Test
