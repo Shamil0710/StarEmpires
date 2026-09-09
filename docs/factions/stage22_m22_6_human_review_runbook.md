@@ -2,7 +2,9 @@
 
 > Status: **PROTOCOL ONLY — NO HUMAN GATE RESULT RECORDED**  
 > Scope: execution and evidence format for the mandatory M22.6 B18, B19 and B20 human lanes.  
-> Authority: `faction_balance_validation_framework.md` Gate E and the canonical B18–B20 scenario definitions.
+> Authority: `faction_balance_validation_framework.md` Gate E and the canonical B18–B20 scenario definitions.  
+> Frozen manifest: `stage22.core_pair_freeze_manifest.v3`  
+> Frozen fingerprint: `6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`
 
 This document does **not** lower, redefine or satisfy the canonical thresholds. It exists so a later
 human review is reproducible, blinded where required, tied to an exact release-candidate checkout and
@@ -27,6 +29,12 @@ reviewerAnonymousId
 reviewStartedAtUtc
 reviewCompletedAtUtc
 ```
+
+For the current M22.6 frozen machine candidate, `freezeManifestVersion` must be
+`stage22.core_pair_freeze_manifest.v3` and `freezeFingerprint` must be
+`6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`. `buildSha` must be the exact
+candidate commit that passed the final normal CI and 100-pair RC workflow; it is intentionally not
+hard-coded in this protocol before those workflows finish.
 
 The review is invalid for release sign-off when the tested build SHA or freeze fingerprint differs
 from the final release-candidate SHA/fingerprint. Discovery fingerprints from an earlier branch head
@@ -244,7 +252,8 @@ required nor desirable.
 A human-gate result may be referenced by the M22.6 balance report only when all boxes are true:
 
 - [ ] review packet uses the final candidate `buildSha`;
-- [ ] packet uses the final candidate `freezeFingerprint`;
+- [ ] packet uses `stage22.core_pair_freeze_manifest.v3`;
+- [ ] packet uses frozen fingerprint `6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`;
 - [ ] B18 answers were collected before answer-key disclosure;
 - [ ] B19 samples were genuinely grayscale/blinded and not label-leaking screenshots;
 - [ ] B20 judgments were made on actual reviewed character samples;
@@ -257,5 +266,5 @@ A human-gate result may be referenced by the M22.6 balance report only when all 
 - [ ] B20 shared-style accuracy is at least 90%;
 - [ ] no automated/assistant-generated judgment is counted as human evidence.
 
-Until recorded responses satisfying this checklist exist, B18 remains `MISSING`, B19/B20 remain
-`PARTIAL`, M22.6 remains open and the Stage-22 freeze cannot be signed off.
+Until recorded responses satisfying this checklist exist, B18–B20 remain human blockers, M22.6
+remains open and the Stage-22 freeze cannot be signed off or merged.
