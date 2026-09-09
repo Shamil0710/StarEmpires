@@ -29,7 +29,10 @@ jobs:
           cache: maven
 
       - name: Test, check coverage, build Javadoc and package desktop JAR
-        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+        shell: bash
+        run: |
+          set -o pipefail
+          ./mvnw --batch-mode --no-transfer-progress clean verify 2>&1 | tee maven-verify.log
 
       - name: Retain core-pair raw evidence
         if: always()
@@ -58,15 +61,20 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      # Failed-run diagnostics are useful, but keeping successful Surefire output from every PR is
-      # unnecessary. A short retention window prevents diagnostic reports from filling the free
-      # Actions storage quota again.
-      - name: Upload failed test reports
+      # Keep the exact Maven gate fail-closed while retaining enough post-test diagnostics to
+      # distinguish Surefire, strict Javadoc, JaCoCo and packaging failures. This is observability
+      # only: the original clean verify exit status is preserved by pipefail.
+      - name: Upload failed verification diagnostics
         if: failure()
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports-${{ github.sha }}
-          path: target/surefire-reports/
+          name: verification-diagnostics-${{ github.sha }}
+          path: |
+            maven-verify.log
+            target/surefire-reports/
+            target/site/jacoco/
+            target/site/apidocs/
+            target/jacoco.exec
           if-no-files-found: ignore
           retention-days: 3
