@@ -32,17 +32,34 @@ is directional. In particular, surviving shield/compartment protection in B07/B0
 individual run, including inversions/outliers, in raw evidence. The canonical balance framework §6.2
 requires DEFAULT and MIRRORED observations to be averaged **per seed pair before aggregation across
 seeds**. M22.6 therefore evaluates the authored Empire survivability/robustness hypothesis on those
-paired physical dimensions while still requiring a strictly positive paired aggregate advantage; it
-does not lower a `1.0` pass fraction, delete an outlier, or convert a stochastic observation into a
-faction-wide modifier. `Stage22CorePairPairedMetrics` mirrors this reduction in Java acceptance tests,
-and `tools/stage22/summarize_evidence.py` independently uses the seed pair as the sampling unit.
+paired physical dimensions rather than requiring every individual run to point in the same direction.
+It does not lower a `1.0` hard-rule pass fraction, delete an outlier, or convert a stochastic
+observation into a faction-wide modifier.
+
+For the declared B07/B09/Gate-C Empire survivability dimensions, the acceptance implementation uses
+the same normal-approximation pair-mean arithmetic as the independent evidence summarizer:
+
+```text
+pairedDifference(seed) = mean(DEFAULT, MIRRORED)_Empire
+                       - mean(DEFAULT, MIRRORED)_Union
+sampleSd = sample standard deviation of pairedDifference over seeds
+approx95HalfWidth = 1.96 * sampleSd / sqrt(pairCount)
+approx95LowerBound = mean(pairedDifference) - approx95HalfWidth
+```
+
+The stochastic directional claim passes only when `approx95LowerBound > 0` for both surviving shield
+reserve and mean compartment integrity. The independent sampling unit is the complete seed pair. This
+is deliberately stricter than checking only a positive aggregate mean while preserving every
+individual inversion in the archive. `Stage22CorePairPairedMetrics` implements this acceptance-side
+reduction in Java and has fixed-arithmetic unit coverage; `tools/stage22/summarize_evidence.py`
+independently computes the same pair-mean interval for retained evidence.
 
 The statistics output preserves source-file SHA-256, raw run count and paired seed count. Statistics
-include mean, median, nearest-rank p05/p95, DEFAULT-minus-MIRRORED mean and a normal-approximation 95%
-interval for the mean of **independent seed pairs**. The two mirrored runs are not treated as
-independent samples. These diagnostic intervals are not themselves a balance acceptance criterion or
-a claim about campaign victory. The directional acceptance assertion remains on the declared raw
-physical dimensions; interval/percentile output is review evidence and outlier diagnostics.
+also include mean, median, nearest-rank p05/p95, DEFAULT-minus-MIRRORED mean and the same
+normal-approximation 95% interval for the mean of **independent seed pairs**. The two mirrored runs are
+not treated as independent samples. For metrics that are not explicitly declared directional
+acceptance dimensions, these interval/percentile values remain diagnostics and outlier-review aids;
+they do not invent a campaign-victory criterion or waive scenario-specific contracts.
 
 Operational vector lanes also replay min/median/max coordinates on one declared raw diagnostic
 metric, including both mirrored assignments, and require exact repeat equality. Patrol traces retain
