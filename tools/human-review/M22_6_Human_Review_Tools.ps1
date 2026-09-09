@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('BuildPacket','StartSession','FinishSession','Validate')]
+    [ValidateSet('BuildPacket','StartSession','RunB19','FinishSession','Validate')]
     [string]$Action = 'BuildPacket',
     [Parameter(Mandatory=$true)][string]$RcDir,
     [Parameter(Mandatory=$true)][string]$EvidenceDir,
@@ -25,10 +25,10 @@ $B19Responses = Join-Path $EvidenceDir 'b19_responses.csv'
 function Write-Utf8([string]$Path, [string]$Text) {
     $parent = Split-Path -Parent $Path
     if ($parent -and -not (Test-Path $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-    [System.IO.File]::WriteAllText($Path, $Text, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($Path, $Text, [System.Text.UTF8Encoding]::new($false))
 }
 
-function Get-UtcNow { return [DateTime]::UtcNow.ToString('o') }
+function Get-UtcNow { [DateTime]::UtcNow.ToString('o') }
 
 function Assert-ExactRc {
     if (-not (Test-Path $RcDir)) { throw "RC directory does not exist: $RcDir" }
@@ -36,7 +36,7 @@ function Assert-ExactRc {
     if ($LASTEXITCODE -ne 0 -or $head -ne $RcSha) { throw "Exact RC SHA mismatch. Expected $RcSha, got $head" }
     $dirty = @(& git -C $RcDir status --porcelain 2>$null)
     if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect RC worktree status.' }
-    if ($dirty.Count -gt 0) { throw "Exact RC worktree is dirty. Human packet construction is refused." }
+    if ($dirty.Count -gt 0) { throw 'Exact RC worktree is dirty. Human packet construction is refused.' }
 }
 
 function Read-Identity {
@@ -47,7 +47,7 @@ function Read-Identity {
             if ($i -gt 0) { $map[$line.Substring(0,$i)] = $line.Substring($i+1) }
         }
     }
-    return $map
+    $map
 }
 
 function Save-Identity($map) {
@@ -78,27 +78,27 @@ function Get-Sha256Text([string]$Text) {
     $sha = [Security.Cryptography.SHA256]::Create()
     try {
         $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
-        return -join ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
+        -join ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
     } finally { $sha.Dispose() }
 }
 
 function New-GrayscalePng([string]$Source, [string]$Destination) {
     Add-Type -AssemblyName System.Drawing
-    $src = New-Object System.Drawing.Bitmap($Source)
+    $src = [System.Drawing.Bitmap]::new($Source)
     try {
-        $dst = New-Object System.Drawing.Bitmap($src.Width, $src.Height, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $dst = [System.Drawing.Bitmap]::new($src.Width, $src.Height, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
         try {
             $g = [Drawing.Graphics]::FromImage($dst)
             try {
-                $ia = New-Object Drawing.Imaging.ImageAttributes
+                $ia = [Drawing.Imaging.ImageAttributes]::new()
                 try {
-                    $m = New-Object Drawing.Imaging.ColorMatrix
+                    $m = [Drawing.Imaging.ColorMatrix]::new()
                     $m.Matrix00 = 0.299; $m.Matrix01 = 0.299; $m.Matrix02 = 0.299
                     $m.Matrix10 = 0.587; $m.Matrix11 = 0.587; $m.Matrix12 = 0.587
                     $m.Matrix20 = 0.114; $m.Matrix21 = 0.114; $m.Matrix22 = 0.114
                     $m.Matrix33 = 1.0; $m.Matrix44 = 1.0
                     $ia.SetColorMatrix($m)
-                    $rect = New-Object Drawing.Rectangle(0,0,$src.Width,$src.Height)
+                    $rect = [Drawing.Rectangle]::new(0,0,$src.Width,$src.Height)
                     $g.DrawImage($src,$rect,0,0,$src.Width,$src.Height,[Drawing.GraphicsUnit]::Pixel,$ia)
                 } finally { $ia.Dispose() }
             } finally { $g.Dispose() }
@@ -154,57 +154,52 @@ function Build-Packet {
     $instructions = @"
 M22.6 B19 — blinded grayscale ship review
 
-DO NOT open the folder:
-  facilitator_private_DO_NOT_OPEN_BEFORE_REVIEW
-until the complete B19 response sheet is frozen.
+DO NOT open:
+  packet\facilitator_private_DO_NOT_OPEN_BEFORE_REVIEW
+until menu item 7 has frozen the complete review.
 
-There are exactly 18 production-RC samples: 9 role families x 2 core factions.
-Open PNG files in packet\reviewer\b19_grayscale in filename order.
-For each sample, fill the matching sampleId row in b19_responses.csv.
+There are exactly 18 exact production-RC samples: 9 role families x 2 core factions.
+Use runner menu item 5 to start and item 6 to run/resume the interactive review.
+The runner opens one grayscale image at a time and records UTC automatically.
+No correctness feedback is shown between samples.
 Do not inspect the original colored assets while reviewing.
-Do not reveal correctness between samples.
 
-Allowed faction IDs:
-  core.empire             = Империя
-  core.industrial_union   = Индустриальный Союз
+Faction choices:
+  1 = core.empire (Империя)
+  2 = core.industrial_union (Индустриальный Союз)
 
-Allowed role IDs:
-  battleship
-  carrier
-  corvette
-  cruiser
-  destroyer
-  fleet_support
-  freight
-  frigate
-  tanker
+Role choices:
+  1 battleship
+  2 carrier
+  3 corvette
+  4 cruiser
+  5 destroyer
+  6 fleet_support
+  7 freight
+  8 frigate
+  9 tanker
 
 Thresholds:
   faction accuracy >= 90%
   role accuracy    >= 80%
-
-answeredAtUtc must be recorded for every scored row.
-If a row must be excluded, keep it and provide a non-empty exclusionReason.
 "@
     Write-Utf8 (Join-Path $ReviewerDir 'B19_REVIEW_INSTRUCTIONS.txt') $instructions
 
-    $b18Block = @"
+    Write-Utf8 (Join-Path $ReviewerDir 'B18_BLOCKED.txt') @"
 B18 FORMAL REVIEW STATUS: BLOCKED
 
-The frozen RC contains the B18 protocol, but this tools pass did not find or invent a pre-frozen task packet with hidden answer-key rows containing taskId, scenarioId, seed, permutation, start/end checkpoint refs, primaryDependencyId, acceptedEquivalentAnswers and visibleEvidenceRefs.
+The frozen RC contains the B18 protocol, but no formal pre-frozen blinded task/answer-key packet is available with all required taskId, scenarioId, seed, permutation, checkpoint refs, primaryDependencyId, acceptedEquivalentAnswers and visibleEvidenceRefs.
 
-Launching an arbitrary generated-world seed is NOT formal B18 evidence. The runner intentionally refuses to substitute free play for the canonical blinded task protocol.
+Launching an arbitrary generated-world seed is NOT formal B18 evidence. This runner refuses to invent a task key or substitute free play for the canonical protocol.
 "@
-    Write-Utf8 (Join-Path $ReviewerDir 'B18_BLOCKED.txt') $b18Block
 
-    $b20Block = @"
+    Write-Utf8 (Join-Path $ReviewerDir 'B20_BLOCKED.txt') @"
 B20 FORMAL REVIEW STATUS: BLOCKED
 
-The exact frozen RC has the shared Character Master Prompt and frozen character-lineup fingerprints, but no canonical RC reviewed-character render manifest/sample set is available to this packet builder. A prompt, generated proxy, machine classification or assistant judgment cannot replace actual reviewed RC character samples.
+The exact frozen RC contains the canonical Character Master Prompt and frozen character-lineup fingerprints, but it does not provide a canonical reviewed-character render manifest/sample set to this packet builder. A prompt, generated proxy, machine classification or assistant judgment cannot replace actual reviewed RC character samples.
 
-The runner therefore does not manufacture B20 images or count placeholder judgments.
+This runner therefore refuses to manufacture B20 judgments or images.
 "@
-    Write-Utf8 (Join-Path $ReviewerDir 'B20_BLOCKED.txt') $b20Block
 
     $manifest = [ordered]@{
         buildSha = $RcSha
@@ -213,15 +208,15 @@ The runner therefore does not manufacture B20 images or count placeholder judgme
         scenarioSuiteVersion = $ScenarioSuiteVersion
         reviewPacketVersion = $PacketVersion
         generatedAtUtc = Get-UtcNow
-        b18 = [ordered]@{ status='BLOCKED'; reason='No pre-frozen blinded task/answer-key packet available; no synthetic substitute allowed.' }
+        b18 = [ordered]@{ status='BLOCKED'; reason='No formal pre-frozen blinded task/answer-key packet available; synthetic substitute forbidden.' }
         b19 = [ordered]@{ status='READY'; sampleCount=$sorted.Count; expectedRoleCount=9; expectedFactionCount=2; answerKey='facilitator_private_DO_NOT_OPEN_BEFORE_REVIEW/b19_answer_key.csv' }
         b20 = [ordered]@{ status='BLOCKED'; reason='No canonical reviewed RC character render manifest/sample set available; proxies forbidden.' }
     }
     Write-Utf8 (Join-Path $PacketDir 'packet_manifest.json') (($manifest | ConvertTo-Json -Depth 5) + "`r`n")
     Write-Utf8 (Join-Path $EvidenceDir 'packet_status.txt') "B18=BLOCKED`r`nB19=READY (18 blinded exact-RC grayscale samples)`r`nB20=BLOCKED`r`n"
     Write-Host "[OK] B19 blinded packet created: $B19Dir"
-    Write-Host "[BLOCKED] B18 requires a formal pre-frozen task/answer-key packet."
-    Write-Host "[BLOCKED] B20 requires actual reviewed RC character renders/manifest."
+    Write-Host '[BLOCKED] B18: formal task/answer-key packet absent.'
+    Write-Host '[BLOCKED] B20: actual reviewed RC character render manifest/samples absent.'
 }
 
 function Start-Session {
@@ -229,22 +224,92 @@ function Start-Session {
     if (-not (Test-Path $B19Key)) { throw 'BuildPacket must be run first.' }
     if ([string]::IsNullOrWhiteSpace($ReviewerId)) { throw 'ReviewerId is required for StartSession.' }
     if ($ReviewerId -match '[,\r\n]') { throw 'ReviewerId must not contain comma or line breaks.' }
+
+    if (Test-Path $B19Responses) {
+        $existing = @(Import-Csv $B19Responses)
+        $answered = @($existing | Where-Object { -not [string]::IsNullOrWhiteSpace($_.answeredAtUtc) -or -not [string]::IsNullOrWhiteSpace($_.exclusionReason) })
+        if ($answered.Count -gt 0) { throw 'Existing B19 judgments found. Use RunB19 to resume; do not overwrite recorded human evidence.' }
+    }
+
     $m = Read-Identity
     $m['buildSha']=$RcSha; $m['freezeManifestVersion']=$FreezeManifest; $m['freezeFingerprint']=$FreezeFingerprint
     $m['scenarioSuiteVersion']=$ScenarioSuiteVersion; $m['reviewPacketVersion']=$PacketVersion
     $m['reviewerAnonymousId']=$ReviewerId; $m['reviewStartedAtUtc']=Get-UtcNow; $m['reviewCompletedAtUtc']='FILL_AT_END'
     Save-Identity $m
 
-    $key = @(Import-Csv $B19Key | Sort-Object sampleId)
-    $forms = foreach ($k in $key) {
-        [pscustomobject]@{ reviewerAnonymousId=$ReviewerId; sampleId=$k.sampleId; reportedFactionId=''; reportedRoleId=''; confidenceOptional=''; answeredAtUtc=''; exclusionReason='' }
+    $images = @(Get-ChildItem -Path $B19Dir -Filter 'B19-*.png' -File | Sort-Object Name)
+    if ($images.Count -ne 18) { throw "Expected 18 blinded samples, got $($images.Count)." }
+    $forms = foreach ($img in $images) {
+        [pscustomobject]@{ reviewerAnonymousId=$ReviewerId; sampleId=$img.BaseName; reportedFactionId=''; reportedRoleId=''; confidenceOptional=''; answeredAtUtc=''; exclusionReason='' }
     }
     $forms | Export-Csv -Path $B19Responses -NoTypeInformation -Encoding UTF8
     Write-Host "[OK] Human review session started for reviewer '$ReviewerId'."
-    Write-Host "B19 response form prepared: $B19Responses"
+}
+
+function Save-B19Rows($Rows) { @($Rows) | Export-Csv -Path $B19Responses -NoTypeInformation -Encoding UTF8 }
+
+function Run-B19 {
+    Assert-ExactRc
+    $identity = Read-Identity
+    if (-not $identity.Contains('reviewerAnonymousId') -or [string]$identity['reviewerAnonymousId'] -like 'FILL*') { throw 'StartSession must be run first.' }
+    if (-not (Test-Path $B19Responses)) { throw 'B19 response sheet is missing.' }
+
+    $roles = [ordered]@{'1'='battleship';'2'='carrier';'3'='corvette';'4'='cruiser';'5'='destroyer';'6'='fleet_support';'7'='freight';'8'='frigate';'9'='tanker'}
+    $factions = [ordered]@{'1'='core.empire';'2'='core.industrial_union'}
+    $rows = @(Import-Csv $B19Responses)
+    if ($rows.Count -ne 18) { throw "Expected 18 B19 rows, got $($rows.Count)." }
+
+    for ($i=0; $i -lt $rows.Count; $i++) {
+        $r = $rows[$i]
+        if (-not [string]::IsNullOrWhiteSpace($r.answeredAtUtc) -or -not [string]::IsNullOrWhiteSpace($r.exclusionReason)) { continue }
+        $imagePath = Join-Path $B19Dir ($r.sampleId + '.png')
+        if (-not (Test-Path $imagePath)) { throw "Missing blinded image: $($r.sampleId)" }
+        Start-Process -FilePath $imagePath | Out-Null
+        Write-Host ''
+        Write-Host ('Sample {0}/18: {1}' -f ($i+1),$r.sampleId) -ForegroundColor Cyan
+        Write-Host 'Inspect ONLY the opened grayscale image. Do not open the private answer-key folder.'
+        Write-Host 'Faction: 1 Empire | 2 Industrial Union | X exclude'
+        do { $fc = (Read-Host 'Faction').Trim().ToUpperInvariant() } until ($fc -in @('1','2','X'))
+        if ($fc -eq 'X') {
+            do { $reason = (Read-Host 'Explicit exclusion reason').Trim() } until (-not [string]::IsNullOrWhiteSpace($reason))
+            $r.exclusionReason = $reason
+            $r.answeredAtUtc = Get-UtcNow
+            Save-B19Rows $rows
+            continue
+        }
+        Write-Host 'Role: 1 battleship | 2 carrier | 3 corvette | 4 cruiser | 5 destroyer'
+        Write-Host '      6 fleet_support | 7 freight | 8 frigate | 9 tanker'
+        do { $rc = (Read-Host 'Role').Trim() } until ($roles.Contains($rc))
+        $confidence = (Read-Host 'Confidence 1-5 (optional)').Trim()
+        if ($confidence -and $confidence -notmatch '^[1-5]$') { $confidence = '' }
+        $r.reportedFactionId = $factions[$fc]
+        $r.reportedRoleId = $roles[$rc]
+        $r.confidenceOptional = $confidence
+        $r.answeredAtUtc = Get-UtcNow
+        Save-B19Rows $rows
+    }
+    $remaining = @($rows | Where-Object { [string]::IsNullOrWhiteSpace($_.answeredAtUtc) -and [string]::IsNullOrWhiteSpace($_.exclusionReason) })
+    if ($remaining.Count -eq 0) {
+        Write-Host ''
+        Write-Host '[OK] All 18 B19 samples are frozen. No correctness has been revealed.' -ForegroundColor Green
+        Write-Host 'Use runner menu item 7 to finish the session and calculate the aggregate result.'
+    } else {
+        Write-Host "[INFO] Remaining samples: $($remaining.Count)"
+    }
+}
+
+function Assert-B19Complete {
+    if (-not (Test-Path $B19Responses)) { throw 'B19 responses are missing.' }
+    $rows = @(Import-Csv $B19Responses)
+    if ($rows.Count -ne 18) { throw "Expected 18 B19 rows, got $($rows.Count)." }
+    foreach ($r in $rows) {
+        if (-not [string]::IsNullOrWhiteSpace($r.exclusionReason)) { continue }
+        if ([string]::IsNullOrWhiteSpace($r.reportedFactionId) -or [string]::IsNullOrWhiteSpace($r.reportedRoleId) -or [string]::IsNullOrWhiteSpace($r.answeredAtUtc)) { throw "B19 sample is incomplete: $($r.sampleId)" }
+    }
 }
 
 function Finish-Session {
+    Assert-B19Complete
     $m = Read-Identity
     if (-not $m.Contains('reviewerAnonymousId') -or [string]$m['reviewerAnonymousId'] -like 'FILL*') { throw 'StartSession must be run first.' }
     $m['reviewCompletedAtUtc'] = Get-UtcNow
@@ -254,6 +319,7 @@ function Finish-Session {
 
 function Validate-Evidence {
     Assert-ExactRc
+    Assert-B19Complete
     $m = Read-Identity
     $required = [ordered]@{ buildSha=$RcSha; freezeManifestVersion=$FreezeManifest; freezeFingerprint=$FreezeFingerprint; scenarioSuiteVersion=$ScenarioSuiteVersion; reviewPacketVersion=$PacketVersion }
     foreach ($k in $required.Keys) {
@@ -263,12 +329,10 @@ function Validate-Evidence {
         if (-not $m.Contains($k) -or [string]::IsNullOrWhiteSpace([string]$m[$k]) -or [string]$m[$k] -like 'FILL*') { throw "Identity field not finalized: $k" }
     }
     if (-not (Test-Path $B19Key)) { throw 'B19 answer key is missing.' }
-    if (-not (Test-Path $B19Responses)) { throw 'B19 responses are missing.' }
 
     $keyRows = @(Import-Csv $B19Key)
     $responses = @(Import-Csv $B19Responses)
-    if ($keyRows.Count -ne 18) { throw "Expected 18 B19 key rows, got $($keyRows.Count)." }
-    if ($responses.Count -ne 18) { throw "Expected 18 B19 response rows, got $($responses.Count)." }
+    if ($keyRows.Count -ne 18 -or $responses.Count -ne 18) { throw 'B19 requires exactly 18 key and response rows.' }
     $byId = @{}
     foreach ($r in $responses) {
         if ($byId.ContainsKey($r.sampleId)) { throw "Duplicate B19 sampleId: $($r.sampleId)" }
@@ -280,7 +344,6 @@ function Validate-Evidence {
         if (-not $byId.ContainsKey($k.sampleId)) { throw "Missing B19 response for $($k.sampleId)" }
         $r = $byId[$k.sampleId]
         if (-not [string]::IsNullOrWhiteSpace($r.exclusionReason)) { $excluded++; continue }
-        if ([string]::IsNullOrWhiteSpace($r.reportedFactionId) -or [string]::IsNullOrWhiteSpace($r.reportedRoleId) -or [string]::IsNullOrWhiteSpace($r.answeredAtUtc)) { throw "Incomplete scored B19 response: $($k.sampleId)" }
         $scored++
         if ($r.reportedFactionId -eq $k.expectedFactionId) { $factionCorrect++ }
         if ($r.reportedRoleId -eq $k.expectedRoleId) { $roleCorrect++ }
@@ -322,6 +385,7 @@ function Validate-Evidence {
 switch ($Action) {
     'BuildPacket' { Build-Packet }
     'StartSession' { Start-Session }
+    'RunB19' { Run-B19 }
     'FinishSession' { Finish-Session }
     'Validate' { Validate-Evidence }
 }
