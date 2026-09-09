@@ -128,17 +128,17 @@ class Stage22CorePairCrossScenarioDominanceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("union_adaptation_countercost"));
         assertEquals(0, vector.hardRuleBreachCount());
 
-        double pairedShieldAdvantage = Stage22CorePairPairedMetrics.meanDifference(
+        var pairedShield = Stage22CorePairPairedMetrics.summarizeDifference(
                 vector, "empire_final_shield_reserve_j", "union_final_shield_reserve_j");
-        double pairedIntegrityAdvantage = Stage22CorePairPairedMetrics.meanDifference(
+        var pairedIntegrity = Stage22CorePairPairedMetrics.summarizeDifference(
                 vector, "empire_final_mean_integrity", "union_final_mean_integrity");
-        assertTrue(pairedShieldAdvantage > 0d,
-                "Gate C requires positive paired Empire surviving shield advantage");
-        assertTrue(pairedIntegrityAdvantage > 0d,
-                "Gate C requires positive paired Empire surviving integrity advantage");
+        assertTrue(pairedShield.approximate95PercentLowerBound() > 0d,
+                "Gate C requires positive paired Empire surviving shield advantage at approximate 95% confidence");
+        assertTrue(pairedIntegrity.approximate95PercentLowerBound() > 0d,
+                "Gate C requires positive paired Empire surviving integrity advantage at approximate 95% confidence");
 
-        boolean noGlobalParetoWinner = pairedShieldAdvantage > 0d
-                && pairedIntegrityAdvantage > 0d
+        boolean noGlobalParetoWinner = pairedShield.approximate95PercentLowerBound() > 0d
+                && pairedIntegrity.approximate95PercentLowerBound() > 0d
                 && vector.guardMetricMeans().values().stream().allMatch(value -> Double.compare(value, 1d) == 0);
         assertTrue(noGlobalParetoWinner,
                 "Gate C requires distinct advantages/costs after canonical paired reduction");
@@ -156,8 +156,16 @@ class Stage22CorePairCrossScenarioDominanceAcceptanceTest {
         archive.put("runCount", vector.runCount());
         archive.put("metricMeans", vector.metricMeans());
         archive.put("guardMetricMeans", vector.guardMetricMeans());
-        archive.put("pairedEmpireShieldReserveAdvantageJ", pairedShieldAdvantage);
-        archive.put("pairedEmpireMeanIntegrityAdvantage", pairedIntegrityAdvantage);
+        archive.put("pairedEmpireShieldReserveAdvantageJ", pairedShield.meanDifference());
+        archive.put("pairedEmpireShieldReserveApproximate95PercentHalfWidthJ",
+                pairedShield.approximate95PercentHalfWidth());
+        archive.put("pairedEmpireShieldReserveApproximate95PercentLowerBoundJ",
+                pairedShield.approximate95PercentLowerBound());
+        archive.put("pairedEmpireMeanIntegrityAdvantage", pairedIntegrity.meanDifference());
+        archive.put("pairedEmpireMeanIntegrityApproximate95PercentHalfWidth",
+                pairedIntegrity.approximate95PercentHalfWidth());
+        archive.put("pairedEmpireMeanIntegrityApproximate95PercentLowerBound",
+                pairedIntegrity.approximate95PercentLowerBound());
         archive.put("noGlobalParetoWinnerAfterPairedReduction", noGlobalParetoWinner);
         archive.put("hardRuleBreachCount", vector.hardRuleBreachCount());
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
@@ -165,6 +173,6 @@ class Stage22CorePairCrossScenarioDominanceAcceptanceTest {
         Stage22CorePairEvidenceArchive.write(
                 "gate-c-cross-scenario-non-pareto-paired-" + Stage22CorePairEvidenceProfile.seedCount(30),
                 archive,
-                "Paired/mirrored ordinary B07 Stage-19 patrol coordinates composed with the ordinary paid Stage-21G replacement authority and finite Union retool/commonality exposure. Raw dimensions remain separate: Union retains lower dry-mass/crew and faster/lower-module replacement; Empire surviving shield/compartment protection is evaluated from DEFAULT+MIRRORED seed-pair means before aggregation; and Union throughput/commonality retains a finite correlated adaptation cost. Individual stochastic tactical inversions remain archived rather than becoming hard authority failures. No composite power score, faction-wide modifier or synthetic outcome authority is introduced; this is the cross-scenario dominance review, not a waiver of still-open campaign scenarios or human B18-B20 gates.");
+                "Paired/mirrored ordinary B07 Stage-19 patrol coordinates composed with the ordinary paid Stage-21G replacement authority and finite Union retool/commonality exposure. Raw dimensions remain separate: Union retains lower dry-mass/crew and faster/lower-module replacement; Empire surviving shield/compartment protection is evaluated from DEFAULT+MIRRORED seed-pair means before aggregation and its approximate 95% pair-mean confidence lower bound must remain positive; and Union throughput/commonality retains a finite correlated adaptation cost. Individual stochastic tactical inversions remain archived rather than becoming hard authority failures. No composite power score, faction-wide modifier or synthetic outcome authority is introduced; this is the cross-scenario dominance review, not a waiver of still-open campaign scenarios or human B18-B20 gates.");
     }
 }
