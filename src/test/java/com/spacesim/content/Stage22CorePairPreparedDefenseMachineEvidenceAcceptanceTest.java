@@ -143,14 +143,14 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         assertEquals(1d, vector.guardMetricMeans().get("union_replacement_contest_path"));
         assertEquals(0, vector.hardRuleBreachCount());
 
-        double pairedShieldAdvantage = Stage22CorePairPairedMetrics.meanDifference(
+        var pairedShield = Stage22CorePairPairedMetrics.summarizeDifference(
                 vector, "empire_final_shield_reserve_j", "union_final_shield_reserve_j");
-        double pairedIntegrityAdvantage = Stage22CorePairPairedMetrics.meanDifference(
+        var pairedIntegrity = Stage22CorePairPairedMetrics.summarizeDifference(
                 vector, "empire_final_mean_integrity", "union_final_mean_integrity");
-        assertTrue(pairedShieldAdvantage > 0d,
-                "B09 paired RC evidence must retain positive Empire surviving shield advantage");
-        assertTrue(pairedIntegrityAdvantage > 0d,
-                "B09 paired RC evidence must retain positive Empire surviving integrity advantage");
+        assertTrue(pairedShield.approximate95PercentLowerBound() > 0d,
+                "B09 paired RC evidence must retain positive Empire surviving shield advantage at approximate 95% confidence");
+        assertTrue(pairedIntegrity.approximate95PercentLowerBound() > 0d,
+                "B09 paired RC evidence must retain positive Empire surviving integrity advantage at approximate 95% confidence");
 
         Stage22CorePairCausalSamples.archive("PreparedDefenseMachineEvidenceAcceptanceTest", vector, "union_final_mean_integrity",
                 coordinate -> Stage22CorePairTacticalProbe.run(
@@ -165,15 +165,23 @@ class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
         archive.put("runCount", vector.runCount());
         archive.put("metricMeans", vector.metricMeans());
         archive.put("guardMetricMeans", vector.guardMetricMeans());
-        archive.put("pairedEmpireShieldReserveAdvantageJ", pairedShieldAdvantage);
-        archive.put("pairedEmpireMeanIntegrityAdvantage", pairedIntegrityAdvantage);
+        archive.put("pairedEmpireShieldReserveAdvantageJ", pairedShield.meanDifference());
+        archive.put("pairedEmpireShieldReserveApproximate95PercentHalfWidthJ",
+                pairedShield.approximate95PercentHalfWidth());
+        archive.put("pairedEmpireShieldReserveApproximate95PercentLowerBoundJ",
+                pairedShield.approximate95PercentLowerBound());
+        archive.put("pairedEmpireMeanIntegrityAdvantage", pairedIntegrity.meanDifference());
+        archive.put("pairedEmpireMeanIntegrityApproximate95PercentHalfWidth",
+                pairedIntegrity.approximate95PercentHalfWidth());
+        archive.put("pairedEmpireMeanIntegrityApproximate95PercentLowerBound",
+                pairedIntegrity.approximate95PercentLowerBound());
         archive.put("hardRuleBreachCount", vector.hardRuleBreachCount());
         archive.put("evidenceFingerprint", vector.evidenceFingerprint());
         archive.put("observations", vector.observations());
         Stage22CorePairEvidenceArchive.write(
                 "B09-prepared-defense-operational-paired-" + Stage22CorePairEvidenceProfile.seedCount(8),
                 archive,
-                "Paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Prepared starting magazines are finite and authored before operation admission at the declared ten-percent readiness floor; no in-operation refill is granted. Per-run authority/conservation rules remain hard. Materially stochastic surviving protection is reduced DEFAULT+MIRRORED per seed before the Empire robustness hypothesis is evaluated across seeds; individual inversions remain archived. Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
+                "Paired/mirrored cells crossing exact Stage-22 fits through ordinary readiness, reinforcement, supply and common Stage-19 tactical authorities. Prepared starting magazines are finite and authored before operation admission at the declared ten-percent readiness floor; no in-operation refill is granted. Per-run authority/conservation rules remain hard. Materially stochastic surviving protection is reduced DEFAULT+MIRRORED per seed before the Empire robustness hypothesis is evaluated across seeds; the approximate 95% pair-mean confidence lower bound must remain positive while individual inversions remain archived. Industrial Union retains a separate paid-replacement throughput contest path. No faction-specific defensive modifier is introduced; longer campaign/multi-wave endurance remains coupled to B13.");
     }
 
     private static com.spacesim.ship.LiveTacticalBattleWeaponRuntime.TargetProtectionFingerprint protection(
