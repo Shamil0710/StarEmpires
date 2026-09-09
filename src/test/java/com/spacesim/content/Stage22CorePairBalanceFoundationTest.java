@@ -84,16 +84,42 @@ class Stage22CorePairBalanceFoundationTest {
         assertEquals(runtime.launchers().getFingerprint(), first.runtimeContentFingerprints().get("launchers"));
 
         System.out.println("M22_6_DISCOVERY_FREEZE|aggregate|" + first.freezeFingerprint());
+        System.out.println("M22_6_DISCOVERY_FREEZE|manifest.version|" + first.manifestVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|scenario.suite|" + first.scenarioSuiteVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|empire.faction|" + first.empireFactionId());
+        System.out.println("M22_6_DISCOVERY_FREEZE|union.faction|" + first.unionFactionId());
         System.out.println("M22_6_DISCOVERY_FREEZE|empire.package|" + first.empirePackageFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|union.package|" + first.unionPackageFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|empire.production|" + first.empireProductionFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|union.production|" + first.unionProductionFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|empire.engineering|" + first.empireEngineeringFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|union.engineering|" + first.unionEngineeringFingerprint());
+        System.out.println("M22_6_DISCOVERY_FREEZE|empire.manufacturing|" + first.empireManufacturingFingerprint());
+        System.out.println("M22_6_DISCOVERY_FREEZE|union.manufacturing|" + first.unionManufacturingFingerprint());
+        System.out.println("M22_6_DISCOVERY_FREEZE|empire.shipyard|" + first.empireShipyardFingerprint());
+        System.out.println("M22_6_DISCOVERY_FREEZE|union.shipyard|" + first.unionShipyardFingerprint());
+        System.out.println("M22_6_DISCOVERY_FREEZE|empire.station|" + first.empireStationFingerprint());
+        System.out.println("M22_6_DISCOVERY_FREEZE|union.station|" + first.unionStationFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|empire.profile|" + first.empireProfileFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|core.profile|" + first.coreProfileCatalogFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|empire.character|" + first.empireCharacterFingerprint());
         System.out.println("M22_6_DISCOVERY_FREEZE|union.character|" + first.unionCharacterFingerprint());
+        System.out.println("M22_6_DISCOVERY_FREEZE|empire.profile.schema|" + first.empireProfileSchemaVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|core.profile.schema|" + first.coreProfileSchemaVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|union.production.state.version|"
+                + first.unionProductionStateVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|generated.bridge.version|"
+                + first.generatedRuntimeBridgeVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|generated.checkpoint.schema|"
+                + first.generatedRuntimeCheckpointSchemaVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|generated.checkpoint.file|"
+                + first.generatedRuntimeCheckpointFileFormatVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|generated.migration.version|"
+                + first.generatedRuntimeMigrationVersion());
+        System.out.println("M22_6_DISCOVERY_FREEZE|generated.supported.file.formats|"
+                + first.generatedRuntimeSupportedFileFormats());
+        System.out.println("M22_6_DISCOVERY_FREEZE|scenario.versions|"
+                + String.join(",", first.scenarioVersions()));
         first.runtimeContentFingerprints().forEach((key, value) ->
                 System.out.println("M22_6_DISCOVERY_FREEZE|runtime." + key + "|" + value));
     }
