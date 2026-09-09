@@ -44,15 +44,49 @@ echo [0] Exit
 echo.
 set "CHOICE="
 set /p "CHOICE=Select: "
-if "%CHOICE%"=="1" call :prepare_rc & pause & goto :menu
-if "%CHOICE%"=="2" call :quick_preflight & pause & goto :menu
-if "%CHOICE%"=="3" call :full_verify & pause & goto :menu
-if "%CHOICE%"=="4" call :b18 & goto :menu
-if "%CHOICE%"=="5" call :open_runbook & pause & goto :menu
-if "%CHOICE%"=="6" call :open_evidence & pause & goto :menu
-if "%CHOICE%"=="7" call :show_identity & pause & goto :menu
+if "%CHOICE%"=="1" goto :menu_prepare
+if "%CHOICE%"=="2" goto :menu_preflight
+if "%CHOICE%"=="3" goto :menu_verify
+if "%CHOICE%"=="4" goto :menu_b18
+if "%CHOICE%"=="5" goto :menu_runbook
+if "%CHOICE%"=="6" goto :menu_evidence
+if "%CHOICE%"=="7" goto :menu_identity
 if "%CHOICE%"=="0" exit /b 0
 echo Unknown menu item.
+pause
+goto :menu
+
+:menu_prepare
+call :prepare_rc
+pause
+goto :menu
+
+:menu_preflight
+call :quick_preflight
+pause
+goto :menu
+
+:menu_verify
+call :full_verify
+pause
+goto :menu
+
+:menu_b18
+call :b18
+goto :menu
+
+:menu_runbook
+call :open_runbook
+pause
+goto :menu
+
+:menu_evidence
+call :open_evidence
+pause
+goto :menu
+
+:menu_identity
+call :show_identity
 pause
 goto :menu
 
@@ -168,7 +202,10 @@ exit /b !VERIFY_RC!
 
 :b18
 call :prepare_rc
-if errorlevel 1 pause & exit /b 1
+if errorlevel 1 (
+  pause
+  exit /b 1
+)
 start "" "%RC_DIR%\docs\factions\stage22_m22_6_human_review_runbook.md"
 start "" "%EVIDENCE_DIR%\b18_responses.csv"
 echo.
