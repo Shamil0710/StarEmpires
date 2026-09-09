@@ -10,6 +10,7 @@ set "FREEZE_FINGERPRINT=6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4
 set "REPO_ROOT="
 set "RC_DIR="
 set "EVIDENCE_DIR=%USERPROFILE%\Documents\StarEmpires-M22.6-HumanReview-5fb4c523"
+set "PS_TOOL=%~dp0tools\human-review\M22_6_Human_Review_Tools.ps1"
 
 call :find_repo "%~1"
 if errorlevel 1 goto :fatal
@@ -23,7 +24,7 @@ goto :menu
 :menu
 cls
 echo ============================================================================
-echo StarEmpires M22.6 Human Review Runner
+echo StarEmpires M22.6 Human Review Runner v2
 echo ============================================================================
 echo Frozen SHA : %RC_SHA%
 echo Manifest   : %FREEZE_MANIFEST%
@@ -31,15 +32,20 @@ echo Fingerprint: %FREEZE_FINGERPRINT%
 echo RC worktree: %RC_DIR%
 echo Evidence   : %EVIDENCE_DIR%
 echo.
-echo Machine checks are PREFLIGHT ONLY. They do NOT satisfy human B18/B19/B20.
+echo B18: BLOCKED until a formal pre-frozen blinded task packet exists.
+echo B19: READY through exact-RC blinded grayscale packet generation.
+echo B20: BLOCKED until actual reviewed RC character renders/manifest exist.
+echo Machine checks do NOT satisfy human B18/B19/B20.
 echo.
 echo [1] Prepare / verify exact frozen RC worktree
 echo [2] Run quick M22.6 machine preflight
 echo [3] Run full clean verify
-echo [4] B18: open instructions and launch generated-world client
-echo [5] Open canonical B18-B20 human-review runbook
-echo [6] Open evidence folder and response CSV files
-echo [7] Show exact RC identity/status
+echo [4] Build / refresh blinded human-review packet
+echo [5] Start B19 human review session
+echo [6] Open B19 reviewer packet and response sheet
+echo [7] Finish B19 session and calculate result
+echo [8] Open B18/B20 blockers and canonical runbook
+echo [9] Open evidence folder and exact identity
 echo [0] Exit
 echo.
 set "CHOICE="
@@ -47,10 +53,12 @@ set /p "CHOICE=Select: "
 if "%CHOICE%"=="1" goto :menu_prepare
 if "%CHOICE%"=="2" goto :menu_preflight
 if "%CHOICE%"=="3" goto :menu_verify
-if "%CHOICE%"=="4" goto :menu_b18
-if "%CHOICE%"=="5" goto :menu_runbook
-if "%CHOICE%"=="6" goto :menu_evidence
-if "%CHOICE%"=="7" goto :menu_identity
+if "%CHOICE%"=="4" goto :menu_build_packet
+if "%CHOICE%"=="5" goto :menu_start_b19
+if "%CHOICE%"=="6" goto :menu_open_b19
+if "%CHOICE%"=="7" goto :menu_finish_b19
+if "%CHOICE%"=="8" goto :menu_blockers
+if "%CHOICE%"=="9" goto :menu_evidence
 if "%CHOICE%"=="0" exit /b 0
 echo Unknown menu item.
 pause
@@ -71,22 +79,33 @@ call :full_verify
 pause
 goto :menu
 
-:menu_b18
-call :b18
+:menu_build_packet
+call :build_packet
+pause
 goto :menu
 
-:menu_runbook
-call :open_runbook
+:menu_start_b19
+call :start_b19
+pause
+goto :menu
+
+:menu_open_b19
+call :open_b19
+pause
+goto :menu
+
+:menu_finish_b19
+call :finish_b19
+pause
+goto :menu
+
+:menu_blockers
+call :open_blockers
 pause
 goto :menu
 
 :menu_evidence
 call :open_evidence
-pause
-goto :menu
-
-:menu_identity
-call :show_identity
 pause
 goto :menu
 
@@ -155,8 +174,11 @@ if defined DIRTY (
 )
 echo [4/4] Checking required files...
 if not exist "%RC_DIR%\mvnw.cmd" exit /b 1
-if not exist "%RC_DIR%\run-generated-world.bat" exit /b 1
 if not exist "%RC_DIR%\docs\factions\stage22_m22_6_human_review_runbook.md" exit /b 1
+if not exist "%PS_TOOL%" (
+  echo [ERROR] Human-review PowerShell tool is missing. Update stage22-6-human-review-tools.
+  exit /b 1
+)
 echo [OK] Exact frozen RC is ready and clean.
 exit /b 0
 
@@ -164,6 +186,14 @@ exit /b 0
 java -version >nul 2>&1
 if errorlevel 1 (
   echo [ERROR] Java not found. Install/configure JDK 17.
+  exit /b 1
+)
+exit /b 0
+
+:check_powershell
+where.exe powershell.exe >nul 2>&1
+if errorlevel 1 (
+  echo [ERROR] Windows PowerShell was not found.
   exit /b 1
 )
 exit /b 0
@@ -200,52 +230,78 @@ popd >nul
 >>"%EVIDENCE_DIR%\local_clean_verify_result.txt" echo note=LOCAL MACHINE CHECK - NOT HUMAN EVIDENCE
 exit /b !VERIFY_RC!
 
-:b18
-call :prepare_rc
-if errorlevel 1 (
-  pause
-  exit /b 1
-)
-start "" "%RC_DIR%\docs\factions\stage22_m22_6_human_review_runbook.md"
-start "" "%EVIDENCE_DIR%\b18_responses.csv"
-echo.
-echo Formal B18 requires a pre-frozen blinded task packet and hidden answer key.
-set "WORLD_SEED="
-set /p "WORLD_SEED=Seed from B18 packet [1]: "
-if not defined WORLD_SEED set "WORLD_SEED=1"
-pushd "%RC_DIR%" >nul
-call run-generated-world.bat "!WORLD_SEED!"
-set "CLIENT_RC=!ERRORLEVEL!"
-popd >nul
-exit /b !CLIENT_RC!
-
-:open_runbook
+:build_packet
 call :prepare_rc
 if errorlevel 1 exit /b 1
+call :check_powershell
+if errorlevel 1 exit /b 1
+echo.
+echo Building packet from exact production-RC inputs. No human answers are generated.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS_TOOL%" -Action BuildPacket -RcDir "%RC_DIR%" -EvidenceDir "%EVIDENCE_DIR%"
+exit /b !ERRORLEVEL!
+
+:start_b19
+call :build_packet
+if errorlevel 1 exit /b 1
+echo.
+echo Enter a pseudonymous reviewer ID. Example: reviewer-01
+set "REVIEWER_ID="
+set /p "REVIEWER_ID=Reviewer ID: "
+if not defined REVIEWER_ID (
+  echo [ERROR] Reviewer ID is required.
+  exit /b 1
+)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS_TOOL%" -Action StartSession -RcDir "%RC_DIR%" -EvidenceDir "%EVIDENCE_DIR%" -ReviewerId "!REVIEWER_ID!"
+if errorlevel 1 exit /b 1
+call :open_b19
+exit /b 0
+
+:open_b19
+if not exist "%EVIDENCE_DIR%\packet\reviewer\B19_REVIEW_INSTRUCTIONS.txt" (
+  echo [ERROR] Build the packet first with menu item 4.
+  exit /b 1
+)
+start "" "%EVIDENCE_DIR%\packet\reviewer\B19_REVIEW_INSTRUCTIONS.txt"
+start "" explorer.exe "%EVIDENCE_DIR%\packet\reviewer\b19_grayscale"
+start "" "%EVIDENCE_DIR%\b19_responses.csv"
+echo.
+echo IMPORTANT: Do not open facilitator_private_DO_NOT_OPEN_BEFORE_REVIEW yet.
+exit /b 0
+
+:finish_b19
+echo.
+echo This action freezes reviewCompletedAtUtc and reveals the aggregate B19 score.
+echo Run it only after all 18 B19 samples have been answered or explicitly excluded.
+set "FINALIZE="
+set /p "FINALIZE=Type FINALIZE to continue: "
+if /I not "!FINALIZE!"=="FINALIZE" (
+  echo Cancelled.
+  exit /b 0
+)
+call :prepare_rc
+if errorlevel 1 exit /b 1
+call :check_powershell
+if errorlevel 1 exit /b 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS_TOOL%" -Action FinishSession -RcDir "%RC_DIR%" -EvidenceDir "%EVIDENCE_DIR%"
+if errorlevel 1 exit /b 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS_TOOL%" -Action Validate -RcDir "%RC_DIR%" -EvidenceDir "%EVIDENCE_DIR%"
+set "VAL_RC=!ERRORLEVEL!"
+if exist "%EVIDENCE_DIR%\validation_status.txt" start "" "%EVIDENCE_DIR%\validation_status.txt"
+exit /b !VAL_RC!
+
+:open_blockers
+call :build_packet
+if errorlevel 1 exit /b 1
+start "" "%EVIDENCE_DIR%\packet\reviewer\B18_BLOCKED.txt"
+start "" "%EVIDENCE_DIR%\packet\reviewer\B20_BLOCKED.txt"
 start "" "%RC_DIR%\docs\factions\stage22_m22_6_human_review_runbook.md"
-start "" explorer.exe "%EVIDENCE_DIR%"
 exit /b 0
 
 :open_evidence
 call :ensure_evidence
 start "" explorer.exe "%EVIDENCE_DIR%"
 start "" "%EVIDENCE_DIR%\review_identity.txt"
-start "" "%EVIDENCE_DIR%\b18_responses.csv"
-start "" "%EVIDENCE_DIR%\b19_responses.csv"
-start "" "%EVIDENCE_DIR%\b20_responses.csv"
-exit /b 0
-
-:show_identity
-call :prepare_rc
-if errorlevel 1 exit /b 1
-echo.
-echo buildSha=%RC_SHA%
-echo freezeManifestVersion=%FREEZE_MANIFEST%
-echo freezeFingerprint=%FREEZE_FINGERPRINT%
-echo reviewWorktree=%RC_DIR%
-echo evidenceDir=%EVIDENCE_DIR%
-echo.
-git -C "%RC_DIR%" status --short --branch
+if exist "%EVIDENCE_DIR%\packet_status.txt" start "" "%EVIDENCE_DIR%\packet_status.txt"
 exit /b 0
 
 :fatal
