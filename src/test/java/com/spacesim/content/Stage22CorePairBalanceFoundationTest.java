@@ -73,6 +73,9 @@ class Stage22CorePairBalanceFoundationTest {
         Stage22CorePairFreezeManifest.Snapshot second = Stage22CorePairFreezeManifest.captureCurrent();
 
         assertEquals(first, second);
+        assertEquals(first, Stage22CorePairFreezeManifest.captureFrozen(),
+                "literal schema-3 freeze pins must fail closed on any semantic surface drift");
+        assertEquals(first.freezeFingerprint(), Stage22CorePairFreezeManifest.frozenFingerprint());
         assertEquals(64, first.freezeFingerprint().length());
         assertEquals(21, first.scenarioVersions().size());
         assertEquals(Stage22CorePairBalanceEvidence.EMPIRE_FACTION_ID, first.empireFactionId());
