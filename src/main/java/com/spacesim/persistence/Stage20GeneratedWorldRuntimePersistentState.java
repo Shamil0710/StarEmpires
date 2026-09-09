@@ -60,6 +60,14 @@ public record Stage20GeneratedWorldRuntimePersistentState(
      *
      * <p>Those callers retain the historical ordinary {@link WorldSimulation} defaults. New live
      * captures must use the canonical constructor so custom scheduler configuration is not lost.</p>
+     *
+     * @param schemaVersion checkpoint schema version
+     * @param bridgeVersion exact runtime-composition contract
+     * @param campaign current generated campaign and Stage-18 industrial state
+     * @param worldState ordinary multi-system ECS/fleet/jump state
+     * @param activeSystemId active full-rate local system
+     * @param freight current physical fleet, cargo-lot and transport-order sidecar
+     * @param localFleetPhysicalStates exact Stage-20 kinematics for every in-system ordinary fleet
      */
     public Stage20GeneratedWorldRuntimePersistentState(
             int schemaVersion,
