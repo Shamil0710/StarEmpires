@@ -44,6 +44,15 @@ class Stage22CorePairPairedMetricsTest {
         assertEquals(4d, bySeed.get(Stage22CorePairExperimentProtocol.FIRST_SEED), 1e-12d);
         assertEquals(4.5d, bySeed.get(Stage22CorePairExperimentProtocol.FIRST_SEED + 1L), 1e-12d);
         assertEquals(4.25d, Stage22CorePairPairedMetrics.meanDifference(vector, "left", "right"), 1e-12d);
+
+        var summary = Stage22CorePairPairedMetrics.summarizeDifference(vector, "left", "right");
+        assertEquals(2, summary.pairedSeedCount());
+        assertEquals(4.25d, summary.meanDifference(), 1e-12d);
+        assertEquals(Math.sqrt(0.125d), summary.sampleStandardDeviation(), 1e-12d);
+        assertEquals(0.49d, summary.approximate95PercentHalfWidth(), 1e-12d);
+        assertEquals(3.76d, summary.approximate95PercentLowerBound(), 1e-12d);
+        assertEquals(4.74d, summary.approximate95PercentUpperBound(), 1e-12d);
+
         assertTrue(vector.observations().stream().anyMatch(row ->
                 row.metrics().get("left") < row.metrics().get("right")),
                 "fixture must retain an individual stochastic inversion instead of deleting it");
