@@ -1,187 +1,237 @@
 # Stage 22 M22.6 — core pair balance / freeze
 
-> Status: **IMPLEMENTATION IN PROGRESS**  
+> Status: **FROZEN MACHINE CANDIDATE — HUMAN SIGN-OFF PENDING**  
 > Pair: `core.empire` / `core.industrial_union`  
-> Stable identities: `faction.imperial_directorate` / `faction.industrial_combine`
+> Stable identities: `faction.imperial_directorate` / `faction.industrial_combine`  
+> Freeze manifest: `stage22.core_pair_freeze_manifest.v3`  
+> Frozen fingerprint: `6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`
 
-## 1. Scope
+M22.6 closes the first cross-package balance/freeze gate. It reuses the accepted Stage 17.5, 18,
+19, 20 and 21 authorities plus the authored Stage-22 package/profile/visual contracts. It does not add
+a faction-owned combat, economy, logistics, territory, recovery or strategic-decision authority.
 
-M22.6 closes the first cross-package balance/freeze gate. It does not add a faction-owned combat,
-economy, logistics, territory or recovery authority. Evidence must compose the accepted Stage 17.5,
-18, 19, 20 and 21 authorities plus the authored Stage-22 package/profile/visual contracts.
+This document records the current machine candidate. It is **not** a Stage-22 completion record: the
+B18–B20 human gates and final exact-SHA RC/sign-off still have to pass. A separate post-freeze
+integrated-campaign handoff is tracked outside M22.6 and must not be pulled into this balance PR.
 
-The canonical scenario contract is `Stage22CorePairBalanceCatalog` version
-`stage22.core_pair_balance_suite.v1`. B00-B20 are all present. B15-B17 are not deferred because the
-repository already contains production-ready territorial transition/control, treaty/market access,
-bounded policy review and finite Industrial Union retool authorities.
+---
 
-## 2. Equal-burden protocol
+## 1. Canonical scenario and paired protocol
 
-`Stage22CorePairExperimentProtocol` owns experiment coordinates only. It cannot change gameplay
-randomness or outcomes.
+`Stage22CorePairBalanceCatalog` owns the versioned B00–B20 contract
+`stage22.core_pair_balance_suite.v1`. All 21 scenarios are required because the repository already
+contains production-ready territory, treaty/access and finite retool authorities for B15–B17.
 
-For each seed it schedules exactly two runs:
+`Stage22CorePairExperimentProtocol` schedules exactly two runs for every seed:
 
-1. default slot/topology assignment;
-2. mirrored slot/topology/hazard assignment.
+1. DEFAULT assignment;
+2. MIRRORED slot/topology/hazard assignment.
 
-Faction identity and doctrine remain attached to the faction, never to the slot. The tuning schedule
-contains 30 paired seeds; the release-candidate schedule contains 100 paired seeds for materially
-stochastic scenario runners.
+Faction identity and doctrine stay attached to the faction rather than the slot. Tuning uses 30 paired
+seeds. Materially stochastic RC lanes use at least 100 paired seeds.
 
-## 3. Diagnostic pair evidence
+The seed pair is the independent statistical unit. DEFAULT and MIRRORED observations are averaged per
+seed before aggregation. Hard causal/integrity rules — authority ownership, actor-bounded knowledge,
+conservation, finite stores, physical arrival/admission and save/load continuation — remain strict on
+every individual run. Stochastic Empire survivability/robustness is accepted only when the paired
+mean difference retains a positive approximate 95% lower confidence bound. Individual inversions stay
+in raw evidence and causal traces; they are never deleted or converted into fake hard-rule failures.
 
-`Stage22CorePairBalanceEvidence` derives current burdens from the accepted package validators and
-production authorities. It deliberately does not calculate a synthetic power score or expected
-winner.
+---
 
-The pairwise hypothesis is:
+## 2. Machine acceptance state
 
-- Empire gains value through preparation, capital protection, reserves, repair and preservation;
-- Empire pays capital intensity, rare-node concentration and visible remote support mass;
-- Industrial Union gains value through series production, replacement throughput and commonality;
-- Industrial Union pays material hunger, correlated shared-network disruption and finite retool debt.
+The reconciled evidence ledger is `stage22_m22_6_acceptance_ledger.md`. At the current frozen machine
+candidate, B00–B17 are implemented through existing production authorities:
 
-Current executable gates require:
+- **B00/B01:** stable identities, content legality, profile/production persistence, authored-product
+  generated-world composition, final operation continuation and deterministic Stage-20.5 scheduler
+  persistence;
+- **B02:** matched finite cold start, ordinary logistics, zero free finished stock, Union paid retool,
+  midpoint industrial/production persistence and actor-bounded 30-pair knowledge evidence;
+- **B03/B04:** real facility construction and finite critical-material shortage/recovery through
+  Stage-18 material/work/storage/manufacturing authorities;
+- **B05:** 100-pair finite freight loss, destroyed-lot provenance and surviving alternate delivery;
+- **B06:** three physical multi-system raid lanes with ordinary FTL, Stage-21E supply decisions,
+  exact Stage-19 consequences, withheld-lane non-mutation and save continuation;
+- **B07:** one raw equal-burden authorization envelope, common tactical policy, paid replacement/retool
+  counter-cost and paired robustness without a scalar power score;
+- **B08:** the same persistent freight order is denied/admitted solely by survival of the physical
+  interdictor FleetId after exact Stage-19 resolution, with downstream physical production evidence;
+- **B09:** prepared-defense readiness, physical reserve arrival, finite support, three-contact
+  endurance, exhausted-stock fail-closed behavior and save continuation;
+- **B10:** exact strategic destroyer/tanker/support projection through ordinary FTL, physical reaction
+  mass burn and finite tanker replenishment across a generated-world checkpoint;
+- **B11:** actor-bounded command/datalink behavior reconstructed from persisted physical sensor/network
+  state rather than saved tactical omniscience;
+- **B12:** finite authored magazine exhaustion and ordinary Stage-19F replenishment with exact
+  post-reload continuation;
+- **B13/B14:** rolling physical attrition, actual generated-world FleetId loss, Stage-21E/21G loss and
+  paid replacement handoff, finite backlog, T50/T80 and lost-capability recovery evidence;
+- **B15:** actual generated-world FleetId, real FTL, exact core package, reconstructed readiness,
+  Stage-21D/E/F occupation and byte-identical midpoint/final continuation;
+- **B16:** actual core identities and ordinary `TradeController` prove pending/active/breached/recovered
+  physical trade-volume consequences across persistence;
+- **B17:** actor-observed threat → common strategic planner decision → finite Union series retool with
+  paid work/energy and explicit opportunity cost.
 
-- the exact same nine-role floor on both packages;
-- legal nonzero capital/support burdens on both sides;
-- visible tanker/repair support burden for remote projection;
-- measurable Industrial Union series-production improvement;
-- positive finite Union retool work/energy debt;
-- correlated Union commonality disruption of at least 25%, materially worse than isolated loss;
-- no faction-name shortcut in the pairwise contract.
+The AI competence gate is machine-proven rather than inferred. Equivalent actor-known evidence is
+identical before doctrine; the same doctrine and evidence choose the same strategic goal regardless of
+faction name; unobserved shortages/threats cannot manufacture candidates. Empire/Union divergence
+appears only after declarative doctrine is applied through the common planner.
 
-These checks observe existing authorities and are not fed back into gameplay.
+Equal-burden and cross-scenario Gate C evidence preserves raw dimensions. The current authored
+contrast remains causal: Union receives lower resource/replacement burden and series throughput but
+pays correlated commonality/retool exposure; Empire receives surviving protection/preparation value
+but pays capital/support burden. No global Pareto winner or faction-wide hidden combat/economic scalar
+is introduced.
 
-## 4. Freeze discovery
+---
 
-`Stage22CorePairFreezeManifest.captureCurrent()` gathers the semantic freeze surface:
+## 3. Literal schema-3 freeze surface
 
-- stable faction IDs;
-- package fingerprints;
-- production-manifest fingerprints;
-- engineering fingerprints;
-- manufacturing fingerprints;
-- physical shipyard fingerprints;
-- station-infrastructure fingerprints;
-- profile fingerprints/schema versions;
-- character-lineup fingerprints;
-- Industrial Union production-sidecar save version;
-- exact B00-B20 scenario versions;
-- aggregate SHA-256 freeze fingerprint.
+`Stage22CorePairFreezeManifest.captureFrozen()` compares the live semantic surface with literal pins
+and fails closed on any drift. The foundation acceptance executes this comparison in normal CI.
 
-The first exact-head CI run prints these values as `M22_6_DISCOVERY_FREEZE|...`. They are discovery
-values only. A later commit must replace discovery-only acceptance with literal expected pins before
-the package can be called frozen.
+The frozen aggregate fingerprint is:
 
-## 5. Remaining closure work
+```text
+6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4
+```
 
-This foundation is not M22.6 completion. Before freeze sign-off the branch still requires:
+Pinned package/content identities:
 
-- executable cross-package B00-B17 evidence using the common production/runtime authorities rather
-  than package-local smoke only;
-- deterministic probe, exact replay/save continuation and paired result vectors;
-- 30-seed tuning evidence and 100+ paired-seed RC regression for materially stochastic runners;
-- representative/outlier causal traces;
-- B18 causal-explanation evidence;
-- B19 Empire-vs-Union grayscale silhouette evidence;
-- B20 shared-style plus faction-overlay character evidence;
-- literal freeze pins for manifests/profiles/fingerprints/migrations/scenario versions;
-- final signed-off balance report and known-limitations section;
-- full exact-head CI, guarded merge, post-merge `main` CI and docs-only roadmap closeout.
-
-No Stage 23 implementation may start before those gates are complete.
-
-## 6. Runtime integration evidence — 2026-09-04
-
-The current continuation adds these probes; neither the scenario suite nor M22.6 is signed off:
-
-| Evidence | Executed authority and scope | Remaining boundary |
+| Surface | Empire | Industrial Union |
 | --- | --- | --- |
-| `Stage22CorePairFreightProbe` / B05 | 100 paired load-sensitivity seeds; finite Stage-18 stock loading; exact Stage-20 lost-lot provenance; surviving alternate-route delivery; byte-stable freight save and continuation; no reused destroyed ID | Two declared routes, not a stochastic generated-campaign balance batch. Stage-21D alternate-route planning does not rewrite an in-flight Stage-20 order. No automatic loss-to-salvage/replacement bridge is claimed. |
-| `Stage22CorePairRecoveryProbe` / B03, B14 | Both exact destroyer fits at 25/50/75% damage; paid missing-yard-support construction; physical Stage-21G repair through the Stage-18 yard; material/work rejection; facility persistence and repair continuation | Full recovery still needs replacement and rolling-attrition curves. Starting construction kits and repair stock are explicit scenario resources. |
+| package | `53e74820d135495aa3b9cc518c7a295c03d7112997a1903767248354e4da97b3` | `e42309a19e5f61675b96255556ec34f09c1f21c96d14c0dc2f19daa556efc5a7` |
+| production | `e9266a8f998197d8e1b54a387023ff8593c222108d802ec7e0aa823a51e66f05` | `b61e939f5fe7963379d253992e1b4682f7b9509a88fe5e14ea89eed701b9004b` |
+| engineering | `465c25304591faf850c48730b8c82f73f379d300367a5e41e3d535ede12f5c24` | `d03531431e0054afa4adb1e61fd4854d26d3f13bf098829d814244231e527506` |
+| manufacturing | `5fb1a97eb30b044e1c2d7c1efaa3e787a944105831b510443b17579acf08d19a` | `8f9811783f1094d6a3e1546c69db9728e8309dc46c093f383c68b5cdcf03917f` |
+| shipyard | `53a2525b9a76383c13f3b837330c6d3f29de13057afba92f7ceec7a30bf57448` | `9c0aa7b1c235bc4271a4e875f116ecef33310839c512332302423c03fd5bbe3a` |
+| station infrastructure | `2168d68878246a5b73023a3ff28688739df95866c1b1ac50d33d337f44914743` | `2168d68878246a5b73023a3ff28688739df95866c1b1ac50d33d337f44914743` |
+| character lineup | `c350beff8eda3e5f2b2b638db23aa898a80f56ead0a96896f086acd881535cea` | `fe66d6faaa00b6511fdca96dc3df641012d4a4cbe7f7dc1c900db0811c71d307` |
 
-The repair probe exposed two integration defects that catalog-only tests did not exercise:
+Profile/runtime pins:
 
-1. Neither industrial-station archetype includes the precision fabrication facility required by the
-   authored core yards. Stage-18H completion now projects a validated, fully paid construction order
-   into the existing station roster. The generated industrial restorer replays persisted completed
-   orders before validating installed facility identities. Power/labor allocations remain separate;
-   restoring a newly installed facility does not activate it for free. Existing save schema is retained.
-2. The Stage-21G component-repair path could encounter an invalid runtime shield contract after
-   consuming repair inputs. It now validates restored emitter capability before settlement. The raw
-   authoring catalogs remain distinct from the existing M22.6 runtime-completed core catalog; the
-   incompatible-catalog regression checks unchanged stock, yard work and engineering state.
+```text
+empire.profile = 7da3b54e02b7ee57cef1d403e863e466ff72fbdc63f4b25b0c1db7ab77a7d521
+core.profile   = 4269ac307ee11f29ba4fc64ddc6c276e3d2f7cb319bae6660c8fb871b1b1580d
+runtime.engineering = 3e568c106a9c4607587aa216333d6de366e06ac95b16629641933575e74056bf
+runtime.ammunition  = f0aff3cfce04d5df87aab37f70acc847e35845c630338f93bb09e1ffd965f591
+runtime.launchers   = b855113394d552ea887130de5bbca80da7485f04834c0f19e0ee6a9a289756f1
+runtime schema:migration = 1:1 for engineering, ammunition and launchers
+```
 
-`target/stage22-evidence/` retains source SHA, dirty-tree flag, content fingerprint, raw observations
-and limitations. CI archives these small reports on the exact tested checkout, including the PR
-merge-checkout SHA where applicable. A dirty local discovery run is not freeze evidence.
+The manifest also literally pins every B00–B20 scenario version and all current schema-version fields.
+A content/schema/scenario edit after this point is therefore an intentional freeze revision, not an
+implicit redefinition of the accepted candidate.
 
-### Tactical controls and a causal collision defect
+---
 
-`Stage22CorePairTacticalProbe` runs both exact destroyer fits with the common Stage-19 control,
-sensor, flight, launcher, protection and compartment-damage authorities. Thirty paired initial
-geometries cover normal engagement, either faction's destroyed sensor and a four-round magazine.
-Reports retain raw starting mass/crew/power/ammunition/reaction-mass burdens and timed state vectors.
-The common tactical policy is explicitly identified; equal role is not equal economic burden.
-An engineering-state save at the scenario start must reproduce the complete sampled continuation.
-This does not claim that an in-flight battle has a save/restore contract.
+## 4. Persistence and migration freeze
 
-The first physical traces exposed repeated armor/shield settlement while a penetrating residual
-was still traversing the same hull. A focused reproducer observed two impacts for one crossing.
-The shared Stage-19 weapon runtime now remembers resolved surface contacts until the residual
-leaves that hull, preserves the physical residual, and permits a later re-entry. The contact state
-is included in deterministic runtime fingerprints. Both native and externally resolved residuals
-are covered; no faction modifier or projectile deletion hides the repeated-impact defect.
+The Stage-20.5 generated-world continuation contract is part of the balance freeze because scheduler
+configuration changes remote authoritative state.
 
-Freeze discovery schema 2 also includes the **runtime-completed** engineering catalog, ammunition,
-launchers and their schema/migration versions. Raw package fingerprints alone omitted the executable
-sensor/shield mode projection and the launcher/ammunition catalogs. These additional values remain
-discovery evidence until the full balance and human-review gates are satisfied.
+Pinned persistence contract:
 
-### Committed encounter and treaty boundaries
+```text
+bridgeVersion = stage20_5.generated-world-runtime-bridge.v1
+checkpointSchemaVersion = 3
+fileFormatVersion = 4
+migrationVersion = stage20_5.generated-world-runtime-migration.v1
+supportedFileFormats = [1, 2, 3, 4]
+```
 
-The exact Stage-19 encounter resolver now accepts an explicit engineering/protection/ammunition/
-launcher universe while its default constructor retains legacy compatibility. Ordnance, defense,
-decoy and deception layers take weapon catalogs from their shared weapon authority. Previously those
-layers independently reloaded the old Stage-17.5I weapon pack, so a core kinetic module failed the
-guided-mount preflight even though the direct kinetic duel worked.
+Schema 3 stores strategic-step size and remote-update budget. Legacy formats 1–3 deliberately restore
+their historical scheduler defaults. Invalid future/unknown state remains fail-closed. The B15
+occupation continuation and the dedicated scheduler persistence regression protect this contract.
 
-`Stage22CorePairEncounterContinuationProbe` exercises three bounded encounters through the complete
-Stage-19 stack. It compares uninterrupted and saved/reloaded encounter-boundary continuation in both
-permutations, verifies that detached resolution does not mutate input world-owned components, and
-rejects any fit substitution or replenishment of spent rounds/reaction mass. The existing
-`Stage21EGeneratedWorldStage19Authority` already accepts a resolver; generated-world handoff/commit
-acceptance with actual core ships is still needed before claiming the campaign integration closed.
+---
 
-`Stage22CorePairTreatyProbe` uses the actual `faction.imperial_directorate` and
-`faction.industrial_combine` identities. It mirrors market-owner/visitor roles and verifies binary
-saves while offered, active and breached. An offer grants nothing; acceptance produces mutual access
-and a 0-bps exemption; breach restores denial and the declared 750-bps rate. This is authority and
-continuation evidence, not a physical trade-volume recovery curve.
+## 5. Release-candidate regression
 
-The [100-pair tactical archive](../evidence/stage22/m22_6/tactical-42ebd4cc/README.md) retains
-the clean-source `42ebd4cc` diagnostic runs and raw vectors. It is not a signed-off balance report.
+The `Stage 22 paired RC evidence` workflow runs seven independent materially stochastic lanes on one
+exact SHA:
 
-Full verification for `42ebd4cc` logged `BUILD SUCCESS`, 1,965 tests (zero failures/errors, one existing
-skip), successful Javadoc/coverage/package and evidence upload. The workflow nevertheless ended
-`cancelled` at the job's 15-minute boundary, so it is **not** a green merge gate. The job allowance is
-now 20 minutes to include setup and cleanup; the Maven command, tests and coverage gates are unchanged.
+- tactical sensitivity;
+- distributed raids;
+- equal-burden patrol;
+- prepared defense;
+- degraded command;
+- rolling attrition;
+- cross-scenario dominance.
 
-### Physical replacement
+Every lane executes 100 distinct seeds with DEFAULT + MIRRORED assignments and retains raw vectors,
+causal samples, Surefire reports and statistical summaries. `tools/stage22/summarize_evidence.py`
+rejects dirty/mixed source identity, incomplete/duplicate pairs, non-finite metrics and any hard-rule
+breach. Historical green RC runs are diagnostic only after the source SHA changes; final sign-off must
+reference the final frozen candidate SHA.
 
-`Stage22CorePairReplacementProbe` starts from a declared post-war loss obligation, opens the request
-through `SettlementRecoveryService`, and builds each exact destroyer through the ordinary Stage-18
-yard and Stage-21G commissioning authority. Empty stock and insufficient work cannot create a fleet.
-Successful commissioning consumes the complete hull-material and finished-module bill, allocates a
-fresh FleetId and leaves ammunition, reaction mass, electrical stores and shield reserves empty.
-Replaying from binary world/recovery/storage saves yields the same fleet and resource state; a
-second completion attempt cannot duplicate it. The source manufacturing and loss-producing battle
-remain explicit separate boundaries of this post-war fixture.
+Normal Java-17 `clean verify` remains mandatory in parallel. The pre-enforcement literal-freeze head
+`0ebfe6a6d655a28acbbb0823a555ac1d4cd5e3d3` passed CI run `34352758441`; the final reconciled
+candidate must pass its own normal CI and RC before human sign-off.
 
-The probe also reproduced three pre-settlement validation gaps: incompatible shield content,
-nonexistent berth system and negative operation tick could consume the build bill before failure.
-Stage-21G now validates those inputs and prepares the detached engineering component before settling
-the yard bill or allocating an ordinary entity/FleetId. Rejections preserve storage, work budget,
-world allocator state and recovery obligation.
+---
+
+## 6. Human B18–B20 gates
+
+Machine evidence cannot close L7. `stage22_m22_6_human_review_runbook.md` is the authority for the
+review packet and raw-response format.
+
+Required thresholds remain unchanged:
+
+- **B18 causal explanation:** at least 80% correct primary causal dependency;
+- **B19 grayscale ships:** at least 90% correct faction distinction and at least 80% correct role read;
+- **B20 character style:** at least 90% shared Character Master Prompt style-check pass rate.
+
+No submitted PR review or archived human response currently satisfies these gates. Assistant/image
+classification/prompt inspection is not a substitute. Review results must be tied to the final build
+SHA and the frozen fingerprint above.
+
+---
+
+## 7. Known limitations and explicit non-goals
+
+M22.6 is a balance/freeze milestone, not the final production-campaign integration milestone. It does
+not claim a newly introduced unified campaign coordinator, first-hour production-client journey,
+ordinary-client Stage-22 asset resolver or wall-clock-to-simulation-time logistics rewrite. Those
+integration concerns are tracked separately after the freeze so they do not contaminate balance
+acceptance or create duplicate authorities here.
+
+The bounded B00–B17 scenarios nevertheless cross the real common authorities required to support each
+balance conclusion. Where a scenario needs physical persistence, generated-world FleetIds, actual
+Stage-19 consequences, finite stock/work, ordinary trade, territorial transition or actor-bounded
+planning, the acceptance test uses that authority rather than a Stage-22 proxy score.
+
+No accepted limitation may waive:
+
+- a hard authority/persistence/conservation failure;
+- exact core content identity;
+- finite resource costs;
+- actor-bounded knowledge;
+- paired stochastic protocol;
+- human B18–B20 thresholds.
+
+---
+
+## 8. Closure checklist
+
+M22.6 may be signed off only when all of the following are true:
+
+- [x] B00–B17 machine acceptance implemented on the common authorities;
+- [x] AI competence and equal-burden/no-global-dominance machine gates implemented;
+- [x] literal schema-3 freeze pins and Stage-20.5 migration contract established;
+- [x] freeze drift is executable/fail-closed in normal CI;
+- [ ] final exact-SHA Java-17 `clean verify` is green;
+- [ ] final exact-SHA seven-lane 100-pair RC is green and raw evidence retained;
+- [ ] B18 human causal-explanation gate passes;
+- [ ] B19 human grayscale faction/role gate passes;
+- [ ] B20 human shared-character-style gate passes;
+- [ ] no unresolved review blockers remain;
+- [ ] signed-off report references the exact accepted SHA/fingerprint;
+- [ ] PR #355 is merged only after all gates above;
+- [ ] post-merge `main` verification is green;
+- [ ] roadmap/status closeout is performed after merged evidence, not before.
+
+Until the unchecked items are satisfied, M22.6 and Stage 22 remain open and Stage 23 must not start.
