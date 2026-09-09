@@ -13,30 +13,47 @@ import java.util.Map;
  * relaxes an acceptance threshold.</p>
  */
 final class Stage22CorePairPairedMetrics {
+    private static final double APPROXIMATE_95_PERCENT_Z = 1.96d;
+
     private Stage22CorePairPairedMetrics() { }
 
     static double meanDifference(
             Stage22CorePairMachineEvidenceBatch.ResultVector vector,
             String leftMetric,
             String rightMetric) {
-        LinkedHashMap<Long, PairAccumulator> pairs = new LinkedHashMap<>();
-        for (Stage22CorePairMachineEvidenceBatch.RunObservation observation : vector.observations()) {
-            Double left = observation.metrics().get(leftMetric);
-            Double right = observation.metrics().get(rightMetric);
-            if (left == null || right == null) {
-                throw new IllegalArgumentException(
-                        "Missing paired metric(s): " + leftMetric + ", " + rightMetric);
-            }
-            pairs.computeIfAbsent(observation.seed(), ignored -> new PairAccumulator())
-                    .add(observation.permutation(), left, right);
+        return summarizeDifference(vector, leftMetric, rightMetric).meanDifference();
+    }
+
+    static DifferenceSummary summarizeDifference(
+            Stage22CorePairMachineEvidenceBatch.ResultVector vector,
+            String leftMetric,
+            String rightMetric) {
+        Map<Long, Double> differences = differencesBySeed(vector, leftMetric, rightMetric);
+        int pairCount = differences.size();
+        if (pairCount < 2) {
+            throw new IllegalArgumentException("At least two complete mirrored seed pairs are required");
         }
-        if (pairs.size() != vector.pairedSeedCount()) {
-            throw new IllegalArgumentException("Paired metric reducer observed incomplete seed set");
-        }
-        return pairs.values().stream()
-                .mapToDouble(PairAccumulator::meanDifference)
+
+        double mean = differences.values().stream()
+                .mapToDouble(Double::doubleValue)
                 .average()
                 .orElseThrow();
+        double squaredDeviationSum = differences.values().stream()
+                .mapToDouble(value -> {
+                    double deviation = value - mean;
+                    return deviation * deviation;
+                })
+                .sum();
+        double sampleStandardDeviation = Math.sqrt(squaredDeviationSum / (pairCount - 1d));
+        double approximate95PercentHalfWidth = APPROXIMATE_95_PERCENT_Z
+                * sampleStandardDeviation / Math.sqrt(pairCount);
+        return new DifferenceSummary(
+                pairCount,
+                mean,
+                sampleStandardDeviation,
+                approximate95PercentHalfWidth,
+                mean - approximate95PercentHalfWidth,
+                mean + approximate95PercentHalfWidth);
     }
 
     static Map<Long, Double> differencesBySeed(
@@ -54,10 +71,21 @@ final class Stage22CorePairPairedMetrics {
             pairs.computeIfAbsent(observation.seed(), ignored -> new PairAccumulator())
                     .add(observation.permutation(), left, right);
         }
+        if (pairs.size() != vector.pairedSeedCount()) {
+            throw new IllegalArgumentException("Paired metric reducer observed incomplete seed set");
+        }
         LinkedHashMap<Long, Double> result = new LinkedHashMap<>();
         pairs.forEach((seed, pair) -> result.put(seed, pair.meanDifference()));
         return Map.copyOf(result);
     }
+
+    record DifferenceSummary(
+            int pairedSeedCount,
+            double meanDifference,
+            double sampleStandardDeviation,
+            double approximate95PercentHalfWidth,
+            double approximate95PercentLowerBound,
+            double approximate95PercentUpperBound) { }
 
     private static final class PairAccumulator {
         private double leftSum;
