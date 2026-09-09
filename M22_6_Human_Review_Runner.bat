@@ -41,8 +41,8 @@ echo [1] Prepare / verify exact frozen RC worktree
 echo [2] Run quick M22.6 machine preflight
 echo [3] Run full clean verify
 echo [4] Build / refresh blinded human-review packet
-echo [5] Start B19 human review session
-echo [6] Open B19 reviewer packet and response sheet
+echo [5] Start NEW B19 human review session and begin review
+echo [6] Run / resume interactive B19 review
 echo [7] Finish B19 session and calculate result
 echo [8] Open B18/B20 blockers and canonical runbook
 echo [9] Open evidence folder and exact identity
@@ -55,7 +55,7 @@ if "%CHOICE%"=="2" goto :menu_preflight
 if "%CHOICE%"=="3" goto :menu_verify
 if "%CHOICE%"=="4" goto :menu_build_packet
 if "%CHOICE%"=="5" goto :menu_start_b19
-if "%CHOICE%"=="6" goto :menu_open_b19
+if "%CHOICE%"=="6" goto :menu_run_b19
 if "%CHOICE%"=="7" goto :menu_finish_b19
 if "%CHOICE%"=="8" goto :menu_blockers
 if "%CHOICE%"=="9" goto :menu_evidence
@@ -89,8 +89,8 @@ call :start_b19
 pause
 goto :menu
 
-:menu_open_b19
-call :open_b19
+:menu_run_b19
+call :run_b19
 pause
 goto :menu
 
@@ -253,20 +253,21 @@ if not defined REVIEWER_ID (
 )
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS_TOOL%" -Action StartSession -RcDir "%RC_DIR%" -EvidenceDir "%EVIDENCE_DIR%" -ReviewerId "!REVIEWER_ID!"
 if errorlevel 1 exit /b 1
-call :open_b19
-exit /b 0
+call :run_b19
+exit /b !ERRORLEVEL!
 
-:open_b19
+:run_b19
+call :prepare_rc
+if errorlevel 1 exit /b 1
+call :check_powershell
+if errorlevel 1 exit /b 1
 if not exist "%EVIDENCE_DIR%\packet\reviewer\B19_REVIEW_INSTRUCTIONS.txt" (
-  echo [ERROR] Build the packet first with menu item 4.
+  echo [ERROR] Build the packet and start a session first.
   exit /b 1
 )
 start "" "%EVIDENCE_DIR%\packet\reviewer\B19_REVIEW_INSTRUCTIONS.txt"
-start "" explorer.exe "%EVIDENCE_DIR%\packet\reviewer\b19_grayscale"
-start "" "%EVIDENCE_DIR%\b19_responses.csv"
-echo.
-echo IMPORTANT: Do not open facilitator_private_DO_NOT_OPEN_BEFORE_REVIEW yet.
-exit /b 0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS_TOOL%" -Action RunB19 -RcDir "%RC_DIR%" -EvidenceDir "%EVIDENCE_DIR%"
+exit /b !ERRORLEVEL!
 
 :finish_b19
 echo.
@@ -302,6 +303,7 @@ call :ensure_evidence
 start "" explorer.exe "%EVIDENCE_DIR%"
 start "" "%EVIDENCE_DIR%\review_identity.txt"
 if exist "%EVIDENCE_DIR%\packet_status.txt" start "" "%EVIDENCE_DIR%\packet_status.txt"
+if exist "%EVIDENCE_DIR%\validation_status.txt" start "" "%EVIDENCE_DIR%\validation_status.txt"
 exit /b 0
 
 :fatal
