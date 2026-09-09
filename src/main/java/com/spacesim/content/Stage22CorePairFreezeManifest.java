@@ -204,7 +204,42 @@ public final class Stage22CorePairFreezeManifest {
             List<String> scenarioVersions,
             Map<String, String> runtimeContentFingerprints,
             String freezeFingerprint) {
-        /** Freezes collection ordering and rejects null mutable views. */
+        /**
+         * Freezes collection ordering and rejects null mutable views.
+         *
+         * @param schemaVersion freeze schema version
+         * @param manifestVersion freeze semantic version
+         * @param scenarioSuiteVersion canonical scenario suite version
+         * @param empireFactionId stable Empire save/runtime ID
+         * @param unionFactionId stable Industrial Union save/runtime ID
+         * @param empirePackageFingerprint Empire package fingerprint
+         * @param unionPackageFingerprint Industrial Union package fingerprint
+         * @param empireProductionFingerprint Empire production-manifest fingerprint
+         * @param unionProductionFingerprint Industrial Union production-manifest fingerprint
+         * @param empireEngineeringFingerprint Empire engineering fingerprint
+         * @param unionEngineeringFingerprint Industrial Union engineering fingerprint
+         * @param empireManufacturingFingerprint Empire manufacturing fingerprint
+         * @param unionManufacturingFingerprint Industrial Union manufacturing fingerprint
+         * @param empireShipyardFingerprint Empire physical shipyard fingerprint
+         * @param unionShipyardFingerprint Union physical shipyard fingerprint
+         * @param empireStationFingerprint shared Stage-18 station-infrastructure fingerprint observed by Empire validation
+         * @param unionStationFingerprint shared Stage-18 station-infrastructure fingerprint observed by Union validation
+         * @param empireProfileFingerprint Empire promoted profile-catalog fingerprint
+         * @param coreProfileCatalogFingerprint shared Stage-22 profile-catalog fingerprint containing Union profile
+         * @param empireCharacterFingerprint Empire character-lineup fingerprint
+         * @param unionCharacterFingerprint Industrial Union character-lineup fingerprint
+         * @param empireProfileSchemaVersion Empire profile schema version
+         * @param coreProfileSchemaVersion shared profile schema version
+         * @param unionProductionStateVersion Industrial Union production sidecar save version
+         * @param generatedRuntimeBridgeVersion Stage-20.5 generated-world runtime composition contract
+         * @param generatedRuntimeCheckpointSchemaVersion Stage-20.5 atomic checkpoint value schema
+         * @param generatedRuntimeCheckpointFileFormatVersion Stage-20.5 atomic checkpoint binary format
+         * @param generatedRuntimeMigrationVersion Stage-20.5 migration-table identity
+         * @param generatedRuntimeSupportedFileFormats intentionally readable Stage-20.5 binary formats
+         * @param scenarioVersions exact B00-B20 scenario version IDs
+         * @param runtimeContentFingerprints combined runtime engineering, weapon and schema/migration pins
+         * @param freezeFingerprint aggregate semantic freeze fingerprint
+         */
         public Snapshot {
             generatedRuntimeSupportedFileFormats = List.copyOf(generatedRuntimeSupportedFileFormats);
             scenarioVersions = List.copyOf(scenarioVersions);
