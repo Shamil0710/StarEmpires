@@ -714,7 +714,7 @@ public final class WorldMapRenderer {
         if (identity == null || identity.kind == null || !hasFinitePosition(transform)) {
             return false;
         }
-        SpriteBinding binding;
+        Stage20MinimumPlayableSpriteCatalog.SpriteBinding binding;
         if (identity.kind == IdentityComponent.Kind.STATION) {
             binding = Stage20MinimumPlayableSpriteCatalog.binding(VisualRole.TRADE_DOCK_STATION);
         } else if (identity.kind == IdentityComponent.Kind.ASTEROID) {
