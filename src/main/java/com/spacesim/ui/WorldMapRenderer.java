@@ -711,12 +711,26 @@ public final class WorldMapRenderer {
         }
         IdentityComponent identity = IDENTITIES.get(entity);
         TransformComponent transform = TRANSFORMS.get(entity);
-        return identity != null
-                && identity.kind != null
-                && hasFinitePosition(transform)
-                && layout.containsVisibleWorldPoint(
-                        transform.position.x,
-                        transform.position.y);
+        if (identity == null || identity.kind == null || !hasFinitePosition(transform)) {
+            return false;
+        }
+        SpriteBinding binding;
+        if (identity.kind == IdentityComponent.Kind.STATION) {
+            binding = Stage20MinimumPlayableSpriteCatalog.binding(VisualRole.TRADE_DOCK_STATION);
+        } else if (identity.kind == IdentityComponent.Kind.ASTEROID) {
+            binding = resourceBinding(ASTEROIDS.get(entity));
+        } else if (identity.kind == IdentityComponent.Kind.FLEET) {
+            ShipComponent ship = SHIPS.get(entity);
+            binding = Stage20MinimumPlayableSpriteCatalog.resolvePlayable(
+                    ship == null ? null : ship.type).binding();
+        } else {
+            return layout.containsVisibleWorldPoint(transform.position.x, transform.position.y);
+        }
+        double radius = Math.hypot(binding.nominalLengthM(), binding.nominalWidthM()) / 2d;
+        return transform.position.x + radius >= layout.getVisibleWorldMinX()
+                && transform.position.x - radius <= layout.getVisibleWorldMaxX()
+                && transform.position.y + radius >= layout.getVisibleWorldMinY()
+                && transform.position.y - radius <= layout.getVisibleWorldMaxY();
     }
 
     /** Проецирует позицию сущности после полной проверки компонента и границ мира. */
