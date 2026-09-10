@@ -2,6 +2,7 @@ package com.spacesim.presentation.asset;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.AtlasRegion;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding;
@@ -13,6 +14,7 @@ import java.util.Objects;
 /** GPU texture owner/drawer for the Stage-20.5E presentation-only sprite catalogue. */
 public final class Stage20MinimumPlayableTextureRenderer {
     private final Map<String, Texture> textures = new HashMap<>();
+    private final Map<String, AtlasRegion> visibleRegions = new HashMap<>();
     private boolean disposed;
 
     /** Loads every distinct minimum-pack texture from the classpath under the active libGDX context. */
@@ -57,7 +59,7 @@ public final class Stage20MinimumPlayableTextureRenderer {
         if (texture == null) {
             throw new IllegalArgumentException("minimum sprite texture is not loaded: " + sprite.texturePath());
         }
-        AtlasRegion region = sprite.region();
+        AtlasRegion region = visibleRegions.computeIfAbsent(sprite.assetId(), ignored -> visibleRegion(sprite));
         if (region.pixelX() + region.pixelWidth() > texture.getWidth()
                 || region.pixelY() + region.pixelHeight() > texture.getHeight()) {
             throw new IllegalArgumentException("sprite region exceeds texture: " + sprite.assetId());
@@ -81,6 +83,27 @@ public final class Stage20MinimumPlayableTextureRenderer {
                 false);
     }
 
+    // Fit the visible hull, not the transparent authoring canvas, to physical dimensions.
+    private static AtlasRegion visibleRegion(SpriteBinding sprite) {
+        Pixmap image = new Pixmap(Gdx.files.internal(sprite.texturePath()));
+        try {
+            AtlasRegion source = sprite.region();
+            int minX = source.pixelX() + source.pixelWidth(), minY = source.pixelY() + source.pixelHeight();
+            int maxX = -1, maxY = -1;
+            for (int y = source.pixelY(); y < source.pixelY() + source.pixelHeight(); y++) {
+                for (int x = source.pixelX(); x < source.pixelX() + source.pixelWidth(); x++) {
+                    if ((image.getPixel(x, y) & 255) > 0) {
+                        minX = Math.min(minX, x); minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            return maxX < 0 ? source : new AtlasRegion(minX, minY, maxX - minX + 1, maxY - minY + 1);
+        } finally {
+            image.dispose();
+        }
+    }
+
     /** Releases every renderer-owned texture exactly once. */
     public void dispose() {
         if (disposed) {
@@ -89,5 +112,6 @@ public final class Stage20MinimumPlayableTextureRenderer {
         disposed = true;
         textures.values().forEach(Texture::dispose);
         textures.clear();
+        visibleRegions.clear();
     }
 }
