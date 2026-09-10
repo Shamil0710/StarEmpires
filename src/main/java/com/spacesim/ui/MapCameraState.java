@@ -13,12 +13,20 @@ public final class MapCameraState {
     public static final float MAX_ZOOM = 1.0e12f;
     private static final float WHEEL_FACTOR = 1.18f;
 
+    private final float maximumZoom;
     private float zoom = 1f;
     private double panX;
     private double panY;
 
     /** Creates a fitted overview camera with unit zoom and zero pan. */
     public MapCameraState() {
+        this(MAX_ZOOM);
+    }
+
+    MapCameraState(float maximumZoom) {
+        requireFinite(maximumZoom, "maximumZoom");
+        if (maximumZoom < 1f) throw new IllegalArgumentException("maximum zoom below overview");
+        this.maximumZoom = maximumZoom;
     }
 
     /** @return current bounded presentation zoom */
@@ -76,7 +84,7 @@ public final class MapCameraState {
         requireFinite(cursorY, "cursorY");
         float previous = zoom;
         float requested = (float) (previous * Math.pow(WHEEL_FACTOR, -amountY));
-        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, requested));
+        zoom = Math.max(MIN_ZOOM, Math.min(maximumZoom, requested));
         double ratio = (double) zoom / previous;
         panX = cursorX - centerX - (cursorX - centerX - panX) * ratio;
         panY = cursorY - centerY - (cursorY - centerY - panY) * ratio;
@@ -121,7 +129,7 @@ public final class MapCameraState {
     public void inspect(double requested) {
         requireFinite(requested, "requested");
         if (requested <= 0d) throw new IllegalArgumentException("zoom must be positive");
-        zoom = (float) Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, requested));
+        zoom = (float) Math.max(MIN_ZOOM, Math.min(maximumZoom, requested));
     }
 
     private static void requireFinite(double value, String label) {

@@ -1,6 +1,5 @@
 package com.spacesim.ui;
 
-import com.badlogic.gdx.math.Vector2;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShipGlyph;
 
 import java.util.Objects;
@@ -32,26 +31,6 @@ final class TacticalShipMarkerMetrics {
             return 0f;
         }
         return (float) (worldLengthM * layout.getScale());
-    }
-
-    private static float roleLengthScale(ShipVisualRole role) {
-        return switch (role) {
-            case KINETIC -> 1.18f;
-            case MISSILE -> 0.96f;
-            case BEAM -> 1.22f;
-            case DEFENSIVE_EW -> 0.84f;
-            case BALANCED, UNCLASSIFIED -> 1f;
-        };
-    }
-
-    private static float roleWidthScale(ShipVisualRole role) {
-        return switch (role) {
-            case KINETIC -> 0.72f;
-            case MISSILE -> 1.22f;
-            case BEAM -> 0.74f;
-            case DEFENSIVE_EW -> 1.34f;
-            case BALANCED, UNCLASSIFIED -> 1f;
-        };
     }
 
     private static float roleEnvelopeScale(ShipVisualRole role) {

@@ -319,18 +319,6 @@ public final class WorldMapRenderer {
         return Stage20MinimumPlayableSpriteCatalog.binding(role);
     }
 
-    /** Returns a readable presentation width; no value is fed back into physical simulation. */
-    private static float shipSpriteWidth(VisualRole role) {
-        return switch (role) {
-            case UTILITY_SHIP -> 30f;
-            case CARGO_TRANSPORT_SHIP -> 40f;
-            case MINING_INDUSTRIAL_SHIP -> 38f;
-            case LIGHT_COMBAT_ESCORT_SHIP -> 36f;
-            case MEDIUM_COMBAT_SHIP -> 46f;
-            default -> 32f;
-        };
-    }
-
     /** Resolves live target/velocity direction solely for sprite rotation. */
     private float fleetHeadingDegrees(Entity fleet, TransformComponent transform) {
         float directionX = 0f;

@@ -30,10 +30,6 @@ import java.util.Objects;
  * {@link #withMinimumPlayableSprites()} replaces only those hull bodies with the Stage-20.5E pack.</p>
  */
 public final class TacticalPrototypeRenderer {
-    private static final float MIN_SHIP_LENGTH_PX = 18f;
-    private static final float MIN_SHIP_WIDTH_PX = 11f;
-    private static final float MIN_BODY_LENGTH_PX = 7f;
-    private static final float MIN_BODY_WIDTH_PX = 3f;
     private static final float MIN_SHIELD_RADIUS_PX = 12f;
     private static final float IMPACT_RADIUS_PX = 5f;
     private static final float DAMAGE_RADIUS_PX = 4f;
@@ -464,26 +460,6 @@ public final class TacticalPrototypeRenderer {
                 1f,
                 1f,
                 rotationDeg);
-    }
-
-    private static float roleLengthScale(ShipVisualRole role) {
-        return switch (role) {
-            case KINETIC -> 1.18f;
-            case MISSILE -> 0.96f;
-            case BEAM -> 1.22f;
-            case DEFENSIVE_EW -> 0.84f;
-            case BALANCED, UNCLASSIFIED -> 1f;
-        };
-    }
-
-    private static float roleWidthScale(ShipVisualRole role) {
-        return switch (role) {
-            case KINETIC -> 0.72f;
-            case MISSILE -> 1.22f;
-            case BEAM -> 0.74f;
-            case DEFENSIVE_EW -> 1.34f;
-            case BALANCED, UNCLASSIFIED -> 1f;
-        };
     }
 
     private void drawBody(WorldMapLayout layout, BodyGlyph body, float x, float y) {

@@ -47,7 +47,7 @@ public final class GeneratedWorldCommandUiRenderer {
     private final GlyphLayout glyph = new GlyphLayout();
     private final ArrayList<HitTarget> hitTargets = new ArrayList<>();
     private final MapCameraState systemMapCamera = new MapCameraState();
-    private final MapCameraState galaxyMapCamera = new MapCameraState();
+    private final MapCameraState galaxyMapCamera = new MapCameraState(12f);
 
     private GeneratedWorldUiFonts fonts;
     private ResponsiveUiMetrics metrics;
@@ -223,6 +223,9 @@ public final class GeneratedWorldCommandUiRenderer {
     public HitTarget hitTest(float x, float y) {
         for (int index = hitTargets.size() - 1; index >= 0; index--) {
             HitTarget target = hitTargets.get(index);
+            if (target.kind() == HitKind.LOCAL_OBJECT && !mapRect.contains(x, y)) {
+                continue;
+            }
             if (target.bounds().contains(x, y)) {
                 return target;
             }
