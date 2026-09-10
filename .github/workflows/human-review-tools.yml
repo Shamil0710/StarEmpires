@@ -1,0 +1,50 @@
+name: Human review packet validation
+on:
+  push:
+    branches: [stage22-6-human-review-tools]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  packet:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Build and verify the pinned B19 art packet
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $rc = Join-Path $env:RUNNER_TEMP 'frozen-rc'
+          $evidence = Join-Path $env:RUNNER_TEMP 'b19-evidence'
+          git worktree add --detach $rc 5fb4c523cf3d169677c602638b4f62726b915272
+          if ($LASTEXITCODE -ne 0) { throw 'RC checkout failed' }
+          $tool = Join-Path $pwd 'tools/human-review/M22_6_Human_Review_Tools.ps1'
+          & $tool -Action BuildPacket -RcDir $rc -EvidenceDir $evidence
+          $manifest = Get-Content "$evidence/packet/packet_manifest.json" -Raw | ConvertFrom-Json
+          if ($manifest.visualBuildSha -ne '2f4215e8881cf8b02df35eef92a667c917b47e80') { throw 'Wrong visual revision' }
+          $images = @(Get-ChildItem "$evidence/packet/reviewer/b19_grayscale" -Filter '*.png')
+          if ($images.Count -ne 18) { throw 'Expected 18 images' }
+          $keys = @(Import-Csv "$evidence/packet/facilitator_private_DO_NOT_OPEN_BEFORE_REVIEW/b19_answer_key.csv")
+          foreach ($key in $keys) {
+            $expected = (Get-FileHash -Algorithm SHA256 $key.assetRef).Hash.ToLowerInvariant()
+            if ($expected -ne $key.assetFingerprintOrDigest) { throw 'Packet uses stale sprite' }
+          }
+          Add-Type -AssemblyName System.Drawing
+          foreach ($image in $images) {
+            $bitmap = [Drawing.Bitmap]::new($image.FullName)
+            try {
+              if ($bitmap.Width -ne 768 -or $bitmap.Height -ne 512) { throw 'Incorrect canvas' }
+              for ($y=0; $y -lt 512; $y+=7) {
+                for ($x=0; $x -lt 768; $x+=7) {
+                  $c = $bitmap.GetPixel($x,$y)
+                  if ($c.R -ne $c.G -or $c.G -ne $c.B) { throw 'Image is not grayscale' }
+                }
+              }
+            } finally { $bitmap.Dispose() }
+          }
+          if (@(Import-Csv "$evidence/b19_responses.csv").Count -ne 0) { throw 'Builder created human answers' }
+          & $tool -Action BuildPacket -RcDir $rc -EvidenceDir $evidence
+          if (@(Get-ChildItem "$evidence/packet/reviewer/b19_grayscale" -Filter '*.png').Count -ne 18) { throw 'Rebuild left stale images' }

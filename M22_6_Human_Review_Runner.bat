@@ -9,7 +9,7 @@ set "FREEZE_MANIFEST=stage22.core_pair_freeze_manifest.v3"
 set "FREEZE_FINGERPRINT=6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4"
 set "REPO_ROOT="
 set "RC_DIR="
-set "EVIDENCE_DIR=%USERPROFILE%\Documents\StarEmpires-M22.6-HumanReview-5fb4c523"
+set "EVIDENCE_DIR=%USERPROFILE%\Documents\StarEmpires-M22.6-HumanReview-5fb4c523-art-2f4215e8"
 set "PS_TOOL=%~dp0tools\human-review\M22_6_Human_Review_Tools.ps1"
 
 call :find_repo "%~1"
@@ -24,7 +24,7 @@ goto :menu
 :menu
 cls
 echo ============================================================================
-echo StarEmpires M22.6 Human Review Runner v2
+echo StarEmpires M22.6 Human Review Runner v3 - art 2f4215e8
 echo ============================================================================
 echo Frozen SHA : %RC_SHA%
 echo Manifest   : %FREEZE_MANIFEST%
@@ -33,7 +33,7 @@ echo RC worktree: %RC_DIR%
 echo Evidence   : %EVIDENCE_DIR%
 echo.
 echo B18: BLOCKED until a formal pre-frozen blinded task packet exists.
-echo B19: READY through exact-RC blinded grayscale packet generation.
+echo B19: READY through pinned-art blinded grayscale packet generation.
 echo B20: BLOCKED until actual reviewed RC character renders/manifest exist.
 echo Machine checks do NOT satisfy human B18/B19/B20.
 echo.
@@ -236,7 +236,7 @@ if errorlevel 1 exit /b 1
 call :check_powershell
 if errorlevel 1 exit /b 1
 echo.
-echo Building packet from exact production-RC inputs. No human answers are generated.
+echo Building B19 from pinned art 2f4215e8; machine RC remains unchanged. No human answers are generated.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS_TOOL%" -Action BuildPacket -RcDir "%RC_DIR%" -EvidenceDir "%EVIDENCE_DIR%"
 exit /b !ERRORLEVEL!
 

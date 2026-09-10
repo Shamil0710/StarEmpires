@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('BuildPacket','StartSession','RunB19','FinishSession','Validate')]
     [string]$Action = 'BuildPacket',
     [Parameter(Mandatory=$true)][string]$RcDir,
@@ -13,7 +13,34 @@ $RcSha = '5fb4c523cf3d169677c602638b4f62726b915272'
 $FreezeManifest = 'stage22.core_pair_freeze_manifest.v3'
 $FreezeFingerprint = '6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4'
 $ScenarioSuiteVersion = 'stage22.core_pair_balance_suite.v1'
-$PacketVersion = 'm22.6-human-review-packet.v2'
+$PacketVersion = 'm22.6-human-review-packet.v3-art-refresh'
+$VisualSha = '2f4215e8881cf8b02df35eef92a667c917b47e80'
+$ToolRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$VisualDir = Join-Path (Split-Path -Parent $ToolRepo) 'StarEmpires-B19-art-2f4215e8'
+
+function Assert-VisualSource {
+    & git -C $ToolRepo cat-file -e $VisualSha 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        & git -C $ToolRepo fetch origin main
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch pinned visual source.' }
+    }
+    if (-not (Test-Path $VisualDir)) {
+        & git -C $ToolRepo worktree add --detach $VisualDir $VisualSha
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to prepare visual source worktree.' }
+    }
+    $visualHead = & git -C $VisualDir rev-parse HEAD
+    if ($LASTEXITCODE -ne 0 -or $visualHead -ne $VisualSha) { throw 'Visual source SHA mismatch.' }
+    $visualDirty = @(& git -C $VisualDir status --porcelain)
+    if ($LASTEXITCODE -ne 0 -or $visualDirty.Count -gt 0) { throw 'Visual source worktree is dirty.' }
+}
+
+function Assert-PacketIdentity {
+    $identity = Read-Identity
+    if ($identity['visualBuildSha'] -ne $VisualSha -or $identity['reviewPacketVersion'] -ne $PacketVersion) {
+        throw 'Stale visual review identity. Build a new packet in the new evidence directory.'
+    }
+}
+
 $IdentityPath = Join-Path $EvidenceDir 'review_identity.txt'
 $PacketDir = Join-Path $EvidenceDir 'packet'
 $ReviewerDir = Join-Path $PacketDir 'reviewer'
@@ -51,7 +78,7 @@ function Read-Identity {
 }
 
 function Save-Identity($map) {
-    $keys = @('buildSha','freezeManifestVersion','freezeFingerprint','scenarioSuiteVersion','reviewPacketVersion','reviewerAnonymousId','reviewStartedAtUtc','reviewCompletedAtUtc')
+    $keys = @('buildSha','visualBuildSha','freezeManifestVersion','freezeFingerprint','scenarioSuiteVersion','reviewPacketVersion','reviewerAnonymousId','reviewStartedAtUtc','reviewCompletedAtUtc')
     $lines = New-Object System.Collections.Generic.List[string]
     foreach ($k in $keys) {
         $v = if ($map.Contains($k)) { [string]$map[$k] } else { '' }
@@ -64,6 +91,7 @@ function Ensure-Identity {
     if (-not (Test-Path $EvidenceDir)) { New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null }
     $m = Read-Identity
     $m['buildSha'] = $RcSha
+    $m['visualBuildSha'] = $VisualSha
     $m['freezeManifestVersion'] = $FreezeManifest
     $m['freezeFingerprint'] = $FreezeFingerprint
     $m['scenarioSuiteVersion'] = $ScenarioSuiteVersion
@@ -117,6 +145,19 @@ function Ensure-ResponseHeaders {
 
 function Build-Packet {
     Assert-ExactRc
+    Assert-VisualSource
+    if (Test-Path $B19Responses) {
+        $recorded = @(Import-Csv $B19Responses | Where-Object { $_.answeredAtUtc -or $_.exclusionReason })
+        if ($recorded.Count -gt 0) { throw 'Recorded judgments exist. Resume review; do not rebuild its packet.' }
+    }
+    if (Test-Path $IdentityPath) {
+        $old = Read-Identity
+        if ($old.Contains('reviewPacketVersion') -and $old['reviewPacketVersion'] -notlike 'FILL*' -and $old['reviewPacketVersion'] -ne $PacketVersion) {
+            throw 'Old packet identity detected. Use the new evidence directory.'
+        }
+    }
+    if (Test-Path $B19Dir) { Get-ChildItem $B19Dir -Filter 'B19-*.png' -File | Remove-Item }
+
     Ensure-Identity
     Ensure-ResponseHeaders
     New-Item -ItemType Directory -Force -Path $B19Dir,$PrivateDir | Out-Null
@@ -131,10 +172,10 @@ function Build-Packet {
     foreach ($f in $factions) {
         foreach ($role in $roles) {
             $relative = "src/main/resources/assets/ships/$($f.AssetDir)/production/$role/${role}_base.png"
-            $source = Join-Path $RcDir ($relative -replace '/', [IO.Path]::DirectorySeparatorChar)
+            $source = Join-Path $VisualDir ($relative -replace '/', [IO.Path]::DirectorySeparatorChar)
             if (-not (Test-Path $source)) { throw "Required exact-RC production visual is missing: $relative" }
             $digest = (Get-FileHash -Algorithm SHA256 -Path $source).Hash.ToLowerInvariant()
-            $sampleHash = Get-Sha256Text("B19|$RcSha|$($f.Id)|$role|$digest")
+            $sampleHash = Get-Sha256Text("B19|$VisualSha|$($f.Id)|$role|$digest")
             $sampleId = 'B19-' + $sampleHash.Substring(0,12)
             $destination = Join-Path $B19Dir ($sampleId + '.png')
             New-GrayscalePng $source $destination
@@ -158,7 +199,7 @@ DO NOT open:
   packet\facilitator_private_DO_NOT_OPEN_BEFORE_REVIEW
 until menu item 7 has frozen the complete review.
 
-There are exactly 18 exact production-RC samples: 9 role families x 2 core factions.
+There are exactly 18 samples from pinned visual revision 2f4215e8: 9 role families x 2 core factions.
 Use runner menu item 5 to start and item 6 to run/resume the interactive review.
 The runner opens one grayscale image at a time and records UTC automatically.
 No correctness feedback is shown between samples.
@@ -203,6 +244,8 @@ This runner therefore refuses to manufacture B20 judgments or images.
 
     $manifest = [ordered]@{
         buildSha = $RcSha
+        visualBuildSha = $VisualSha
+        visualReviewScope = 'Art refresh; not evidence for the original RC visual freeze'
         freezeManifestVersion = $FreezeManifest
         freezeFingerprint = $FreezeFingerprint
         scenarioSuiteVersion = $ScenarioSuiteVersion
@@ -213,7 +256,7 @@ This runner therefore refuses to manufacture B20 judgments or images.
         b20 = [ordered]@{ status='BLOCKED'; reason='No canonical reviewed RC character render manifest/sample set available; proxies forbidden.' }
     }
     Write-Utf8 (Join-Path $PacketDir 'packet_manifest.json') (($manifest | ConvertTo-Json -Depth 5) + "`r`n")
-    Write-Utf8 (Join-Path $EvidenceDir 'packet_status.txt') "B18=BLOCKED`r`nB19=READY (18 blinded exact-RC grayscale samples)`r`nB20=BLOCKED`r`n"
+    Write-Utf8 (Join-Path $EvidenceDir 'packet_status.txt') "B18=BLOCKED`r`nB19=READY (18 blinded pinned-art grayscale samples)`r`nB20=BLOCKED`r`n"
     Write-Host "[OK] B19 blinded packet created: $B19Dir"
     Write-Host '[BLOCKED] B18: formal task/answer-key packet absent.'
     Write-Host '[BLOCKED] B20: actual reviewed RC character render manifest/samples absent.'
@@ -221,6 +264,8 @@ This runner therefore refuses to manufacture B20 judgments or images.
 
 function Start-Session {
     Assert-ExactRc
+    Assert-VisualSource
+    Assert-PacketIdentity
     if (-not (Test-Path $B19Key)) { throw 'BuildPacket must be run first.' }
     if ([string]::IsNullOrWhiteSpace($ReviewerId)) { throw 'ReviewerId is required for StartSession.' }
     if ($ReviewerId -match '[,\r\n]') { throw 'ReviewerId must not contain comma or line breaks.' }
@@ -232,7 +277,7 @@ function Start-Session {
     }
 
     $m = Read-Identity
-    $m['buildSha']=$RcSha; $m['freezeManifestVersion']=$FreezeManifest; $m['freezeFingerprint']=$FreezeFingerprint
+    $m['visualBuildSha']=$VisualSha; $m['buildSha']=$RcSha; $m['freezeManifestVersion']=$FreezeManifest; $m['freezeFingerprint']=$FreezeFingerprint
     $m['scenarioSuiteVersion']=$ScenarioSuiteVersion; $m['reviewPacketVersion']=$PacketVersion
     $m['reviewerAnonymousId']=$ReviewerId; $m['reviewStartedAtUtc']=Get-UtcNow; $m['reviewCompletedAtUtc']='FILL_AT_END'
     Save-Identity $m
@@ -250,6 +295,8 @@ function Save-B19Rows($Rows) { @($Rows) | Export-Csv -Path $B19Responses -NoType
 
 function Run-B19 {
     Assert-ExactRc
+    Assert-VisualSource
+    Assert-PacketIdentity
     $identity = Read-Identity
     if (-not $identity.Contains('reviewerAnonymousId') -or [string]$identity['reviewerAnonymousId'] -like 'FILL*') { throw 'StartSession must be run first.' }
     if (-not (Test-Path $B19Responses)) { throw 'B19 response sheet is missing.' }
@@ -309,6 +356,7 @@ function Assert-B19Complete {
 }
 
 function Finish-Session {
+    Assert-PacketIdentity
     Assert-B19Complete
     $m = Read-Identity
     if (-not $m.Contains('reviewerAnonymousId') -or [string]$m['reviewerAnonymousId'] -like 'FILL*') { throw 'StartSession must be run first.' }
@@ -319,9 +367,11 @@ function Finish-Session {
 
 function Validate-Evidence {
     Assert-ExactRc
+    Assert-VisualSource
+    Assert-PacketIdentity
     Assert-B19Complete
     $m = Read-Identity
-    $required = [ordered]@{ buildSha=$RcSha; freezeManifestVersion=$FreezeManifest; freezeFingerprint=$FreezeFingerprint; scenarioSuiteVersion=$ScenarioSuiteVersion; reviewPacketVersion=$PacketVersion }
+    $required = [ordered]@{ buildSha=$RcSha; visualBuildSha=$VisualSha; freezeManifestVersion=$FreezeManifest; freezeFingerprint=$FreezeFingerprint; scenarioSuiteVersion=$ScenarioSuiteVersion; reviewPacketVersion=$PacketVersion }
     foreach ($k in $required.Keys) {
         if (-not $m.Contains($k) -or [string]$m[$k] -ne [string]$required[$k]) { throw "Identity mismatch for $k" }
     }
@@ -357,6 +407,8 @@ function Validate-Evidence {
     $pass = ($fa -ge 0.90 -and $ra -ge 0.80)
     $lines = @(
         "buildSha=$RcSha",
+        "visualBuildSha=$VisualSha",
+        "visualReviewScope=Art refresh; original RC visual freeze requires reconciliation",
         "reviewPacketVersion=$PacketVersion",
         "factionCorrect=$factionCorrect",
         "factionJudgments=$scored",
