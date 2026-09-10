@@ -75,53 +75,57 @@ class LiveTacticalResourceConstraintAcceptanceTest {
 
     @Test
     void physicalPowerDenialRemovesTracksAndChangesTacticalDecisionWithoutPretendingSubsystemFailure() {
-        LiveTacticalBattleRuntimeState battle =
-                new LiveTacticalBattleRuntimeState(LiveTacticalBattleScenario.balanced4v4());
+        LiveTacticalBattleRuntimeState constrainedBattle = resourceDuel(POWER_STARVED_E, 191_200L);
+        LiveTacticalBattleRuntimeState freshBattle = resourceDuel(POWER_FRESH_E, 191_201L);
         LiveTacticalInitialReadinessService initial = new LiveTacticalInitialReadinessService();
-        var constrained = battle.requireCombatant(POWER_STARVED_E);
+        var constrained = constrainedBattle.requireCombatant(POWER_STARVED_E);
         initial.setModuleIntegrity(constrained, "core_reactor", 0.16d);
         initial.setSharedBusEnergyJ(constrained, 0d);
-        LiveTacticalBattleControlRuntime runtime = new LiveTacticalBattleControlRuntime(battle);
+        LiveTacticalBattleControlRuntime constrainedRuntime = new LiveTacticalBattleControlRuntime(constrainedBattle);
+        LiveTacticalBattleControlRuntime freshRuntime = new LiveTacticalBattleControlRuntime(freshBattle);
 
         for (int index = 0; index < 8; index++) {
-            runtime.advanceOneTick();
+            constrainedRuntime.advanceOneTick();
+            freshRuntime.advanceOneTick();
         }
 
-        var constrainedControl = runtime.controlState(POWER_STARVED_E);
-        var freshControl = runtime.controlState(POWER_FRESH_E);
+        var constrainedControl = constrainedRuntime.controlState(POWER_STARVED_E);
+        var freshControl = freshRuntime.controlState(POWER_FRESH_E);
         assertEquals(DecisionReason.READY, constrainedControl.survivalDecision().reason(),
                 "reactor integrity remains above the explicit subsystem-retreat threshold; the decision difference must come through engineering/sensing");
-        assertTrue(battle.visibleContacts(POWER_STARVED_E).isEmpty(),
+        assertTrue(constrainedBattle.visibleContacts(POWER_STARVED_E).isEmpty(),
                 "real power denial must prevent active-radar measurements instead of creating free tracks");
         assertFalse(constrainedControl.intent().targetSelected());
         assertFalse(constrainedControl.fireAuthorized());
         assertTrue(freshControl.intent().targetSelected(),
-                "fresh comparator must still acquire a hostile target under the same geometry");
+                "fresh comparator must still acquire a hostile target under identical duel geometry");
         assertTrue(freshControl.fireAuthorized());
     }
 
     @Test
     void thermallySaturatedSensorDeniesRadarAndChangesSameTickAiDecision() {
-        LiveTacticalBattleRuntimeState battle =
-                new LiveTacticalBattleRuntimeState(LiveTacticalBattleScenario.balanced4v4());
+        LiveTacticalBattleRuntimeState stressedBattle = resourceDuel(THERMAL_STRESSED_E, 191_202L);
+        LiveTacticalBattleRuntimeState freshBattle = resourceDuel(THERMAL_FRESH_E, 191_203L);
         LiveTacticalInitialReadinessService initial = new LiveTacticalInitialReadinessService();
-        var stressed = battle.requireCombatant(THERMAL_STRESSED_E);
+        var stressed = stressedBattle.requireCombatant(THERMAL_STRESSED_E);
         double sensorThermalCapacityJ = moduleAtMount(stressed, "utility_sensor").localThermalCapacityJ();
         initial.setLocalHeatJ(stressed, "utility_sensor", sensorThermalCapacityJ);
-        LiveTacticalBattleControlRuntime runtime = new LiveTacticalBattleControlRuntime(battle);
+        LiveTacticalBattleControlRuntime stressedRuntime = new LiveTacticalBattleControlRuntime(stressedBattle);
+        LiveTacticalBattleControlRuntime freshRuntime = new LiveTacticalBattleControlRuntime(freshBattle);
 
-        runtime.advanceOneTick();
+        stressedRuntime.advanceOneTick();
+        freshRuntime.advanceOneTick();
 
-        var stressedControl = runtime.controlState(THERMAL_STRESSED_E);
-        var freshControl = runtime.controlState(THERMAL_FRESH_E);
+        var stressedControl = stressedRuntime.controlState(THERMAL_STRESSED_E);
+        var freshControl = freshRuntime.controlState(THERMAL_FRESH_E);
         assertEquals(DecisionReason.READY, stressedControl.survivalDecision().reason(),
                 "thermal constraint should alter tactical information through the engineering grant path, not masquerade as structural damage");
-        assertTrue(battle.visibleContacts(THERMAL_STRESSED_E).isEmpty(),
+        assertTrue(stressedBattle.visibleContacts(THERMAL_STRESSED_E).isEmpty(),
                 "a sensor already at its physical local thermal capacity must not receive a free active-radar operation");
         assertFalse(stressedControl.intent().targetSelected());
         assertFalse(stressedControl.fireAuthorized());
         assertTrue(freshControl.intent().targetSelected(),
-                "cold comparator must acquire a hostile target on the same first sensing tick");
+                "cold comparator must acquire a hostile target on identical first-tick duel geometry");
         assertTrue(freshControl.fireAuthorized());
     }
 
@@ -147,6 +151,13 @@ class LiveTacticalResourceConstraintAcceptanceTest {
         new LiveTacticalInitialReadinessService().clearAmmunition(
                 battle.requireCombatant(AMMO_DEPLETED_E));
         return new LiveTacticalBattleControlRuntime(battle);
+    }
+
+    private static LiveTacticalBattleRuntimeState resourceDuel(long actorId, long targetId) {
+        LiveTacticalBattleScenario scenario = new LiveTacticalBattleScenario(List.of(
+                new CombatantSpec(actorId, Side.ALPHA, DoctrineId.E_BALANCED_CONTROL, 260d, 700d),
+                new CombatantSpec(targetId, Side.BETA, DoctrineId.E_BALANCED_CONTROL, 1_690d, 700d)));
+        return new LiveTacticalBattleRuntimeState(scenario);
     }
 
     private static ShipEngineeringCatalog.ModuleDefinition moduleAtMount(

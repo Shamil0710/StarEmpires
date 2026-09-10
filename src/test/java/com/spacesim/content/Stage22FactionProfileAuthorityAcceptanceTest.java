@@ -3,16 +3,20 @@ package com.spacesim.content;
 import com.spacesim.LargeDemoGalaxyFactory;
 import com.spacesim.content.Stage22FactionProfileCatalog.AuthoritySeam;
 import com.spacesim.content.Stage22FactionProfileCatalog.PolicyKind;
+import com.spacesim.world.FactionActorObservationSnapshot;
+import com.spacesim.world.FactionActorObservationSnapshot.ActorObservation;
+import com.spacesim.world.FactionActorObservationSnapshot.Domain;
 import com.spacesim.world.FactionActorObservationSnapshot.InterestKind;
 import com.spacesim.world.FactionActorObservationSnapshot.ObservationChannel;
 import com.spacesim.world.FactionActorObservationSnapshot.ObservationEvidence;
 import com.spacesim.world.FactionIdentityResolver;
+import com.spacesim.world.FactionInterestResolver;
 import com.spacesim.world.FactionLivingActorState;
+import com.spacesim.world.FactionStrategicGoalCandidateResolver;
 import com.spacesim.world.FactionStrategicGoalPlanner;
 import com.spacesim.world.FactionStrategicIntentState;
+import com.spacesim.world.FactionStrategicIntentStateCodec;
 import com.spacesim.world.StrategicGoalCandidate;
-import com.spacesim.world.StrategicGoalEvidence;
-import com.spacesim.world.StrategicGoalOutcomeSignal;
 import com.spacesim.world.StrategicGoalType;
 import com.spacesim.world.StrategicPlanningEnvelope;
 import org.junit.jupiter.api.Test;
@@ -21,14 +25,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** M22.1 architecture and core-pair proof over existing identity and strategic authorities. */
 class Stage22FactionProfileAuthorityAcceptanceTest {
     private static final String EMPIRE_ID = "faction.imperial_directorate";
     private static final String UNION_ID = "faction.industrial_combine";
+    private static final long REVIEW_TICK = 24L;
+    private static final StrategicPlanningEnvelope CONTESTED_BUDGET =
+            new StrategicPlanningEnvelope(16L, 24L, 8L, 32L);
 
     @Test
     void everyProfilePolicyIsDataBoundToTheSingleExistingAuthoritySeam() {
@@ -68,81 +77,106 @@ class Stage22FactionProfileAuthorityAcceptanceTest {
     }
 
     @Test
-    void equivalentEvidenceDivergesOnlyThroughExplicitProfileDoctrine() {
+    void equivalentActorKnownEvidenceDivergesOnlyThroughExplicitProfileDoctrineAndPersists() {
         Stage22FactionProfileCatalog catalog = Stage22FactionProfileLoader.loadDefault();
         var empireDoctrine = catalog.findDoctrine(catalog.findProfileForFaction(EMPIRE_ID).doctrineProfileRef())
                 .strategicDoctrine();
         var unionDoctrine = catalog.findDoctrine(catalog.findProfileForFaction(UNION_ID).doctrineProfileRef())
                 .strategicDoctrine();
 
-        List<StrategicGoalCandidate> empireOptions = supplyOptions(
-                empireDoctrine.preferenceBasisPoints(StrategicGoalType.DEFEND),
-                empireDoctrine.preferenceBasisPoints(StrategicGoalType.STOCKPILE));
-        List<StrategicGoalCandidate> unionOptions = supplyOptions(
-                unionDoctrine.preferenceBasisPoints(StrategicGoalType.DEFEND),
-                unionDoctrine.preferenceBasisPoints(StrategicGoalType.STOCKPILE));
+        var empireTrace = FactionInterestResolver.resolve(actorKnownPressure(EMPIRE_ID, true));
+        var unionTrace = FactionInterestResolver.resolve(actorKnownPressure(UNION_ID, true));
+        assertEquals(empireTrace.orderedEvidence(), unionTrace.orderedEvidence(),
+                "matched actors must reason from identical bounded evidence");
+
+        List<StrategicGoalCandidate> empireOptions =
+                FactionStrategicGoalCandidateResolver.resolve(empireTrace, empireDoctrine);
+        List<StrategicGoalCandidate> unionOptions =
+                FactionStrategicGoalCandidateResolver.resolve(unionTrace, unionDoctrine);
+        assertEquals(empireOptions,
+                FactionStrategicGoalCandidateResolver.resolve(empireTrace, empireDoctrine),
+                "candidate generation must be deterministic");
+        assertEquals(unionOptions,
+                FactionStrategicGoalCandidateResolver.resolve(unionTrace, unionDoctrine),
+                "candidate generation must be deterministic");
 
         var empire = review(EMPIRE_ID, empireOptions);
         var union = review(UNION_ID, unionOptions);
-        assertEquals(StrategicGoalType.DEFEND, empire.state().activeGoals().get(0).type());
-        assertEquals(StrategicGoalType.STOCKPILE, union.state().activeGoals().get(0).type());
+        assertEquals(1, empire.state().activeGoals().size());
+        assertEquals(1, union.state().activeGoals().size());
+        assertEquals(StrategicGoalType.DEFEND, empire.state().activeGoals().get(0).type(),
+                "Empire doctrine should spend the contested capacity on border defense");
+        assertEquals(StrategicGoalType.STOCKPILE, union.state().activeGoals().get(0).type(),
+                "Industrial Union doctrine should spend the same capacity on shortage resilience");
         assertNotEquals(
                 empire.state().activeGoals().get(0).type(),
                 union.state().activeGoals().get(0).type());
 
-        var sameInputsDifferentName = review(UNION_ID, empireOptions);
+        List<StrategicGoalCandidate> unionWithEmpireDoctrine =
+                FactionStrategicGoalCandidateResolver.resolve(unionTrace, empireDoctrine);
+        assertEquals(empireOptions, unionWithEmpireDoctrine,
+                "stable faction identity alone must not alter common candidate generation");
+        var sameDoctrineDifferentFaction = review(UNION_ID, unionWithEmpireDoctrine);
         assertEquals(
                 empire.state().activeGoals().get(0).type(),
-                sameInputsDifferentName.state().activeGoals().get(0).type());
-        assertEquals(
-                empire.projections().stream().map(row -> row.scoreBasisPoints()).toList(),
-                sameInputsDifferentName.projections().stream().map(row -> row.scoreBasisPoints()).toList());
+                sameDoctrineDifferentFaction.state().activeGoals().get(0).type(),
+                "the same doctrine and evidence must choose the same goal regardless of faction name");
+
+        byte[] checkpoint = FactionStrategicIntentStateCodec.encode(List.of(empire.state(), union.state()));
+        List<FactionStrategicIntentState> restored = FactionStrategicIntentStateCodec.decode(checkpoint);
+        assertEquals(List.of(empire.state(), union.state()), restored,
+                "profile-driven operational intent must survive ordinary Stage-21B persistence");
+        assertArrayEquals(checkpoint, FactionStrategicIntentStateCodec.encode(restored),
+                "restored intent checkpoint must remain byte deterministic");
+
+        var unionWithoutDeficit = FactionInterestResolver.resolve(actorKnownPressure(UNION_ID, false));
+        List<StrategicGoalCandidate> boundedOptions =
+                FactionStrategicGoalCandidateResolver.resolve(unionWithoutDeficit, unionDoctrine);
+        assertFalse(boundedOptions.stream().anyMatch(option -> option.type() == StrategicGoalType.STOCKPILE),
+                "high Union stockpile preference must not manufacture an unobserved shortage");
+        assertTrue(unionOptions.stream().anyMatch(option -> option.type() == StrategicGoalType.STOCKPILE));
     }
 
     private static FactionStrategicGoalPlanner.PlanningResult review(
             String factionId,
             List<StrategicGoalCandidate> candidates) {
         return FactionStrategicGoalPlanner.review(
-                FactionLivingActorState.initial(factionId, 24L),
+                FactionLivingActorState.initial(factionId, REVIEW_TICK),
                 FactionStrategicIntentState.initial(factionId),
                 candidates,
-                StrategicPlanningEnvelope.balanced(5L),
-                24L);
+                CONTESTED_BUDGET,
+                REVIEW_TICK);
     }
 
-    private static List<StrategicGoalCandidate> supplyOptions(int defendPreference, int stockpilePreference) {
-        String target = "route:stage22-profile-supply";
-        StrategicGoalEvidence evidence = new StrategicGoalEvidence(
-                InterestKind.SUPPLY_DEPENDENCY,
-                target,
+    private static FactionActorObservationSnapshot actorKnownPressure(String factionId, boolean includeDeficit) {
+        ActorObservation borderPressure = new ActorObservation(
+                Domain.SECURITY,
+                InterestKind.BORDER_SECURITY,
+                "system:stage22-contested-border",
                 8_000,
-                List.of(new ObservationEvidence(
-                        ObservationChannel.ECONOMIC_LEDGER,
-                        "economic-ledger:stage22-profile-supply",
-                        24L,
-                        -1L)));
-        return List.of(
-                candidate(StrategicGoalType.DEFEND, target, evidence, defendPreference),
-                candidate(StrategicGoalType.STOCKPILE, target, evidence, stockpilePreference));
-    }
-
-    private static StrategicGoalCandidate candidate(
-            StrategicGoalType type,
-            String target,
-            StrategicGoalEvidence evidence,
-            int doctrinePreference) {
-        return new StrategicGoalCandidate(
-                type,
-                target,
-                evidence,
-                evidence.priorityBasisPoints(),
-                8_500,
-                8_500,
-                doctrinePreference,
-                StrategicPlanningEnvelope.balanced(5L),
+                new ObservationEvidence(
+                        ObservationChannel.LOCAL_SENSOR_REPORT,
+                        "sensor-report:stage22-contested-border",
+                        REVIEW_TICK,
+                        -1L));
+        List<ActorObservation> economic = includeDeficit
+                ? List.of(new ActorObservation(
+                        Domain.ECONOMIC,
+                        InterestKind.RESOURCE_DEFICIT,
+                        "resource:stage22-reactor-feedstock",
+                        8_000,
+                        new ObservationEvidence(
+                                ObservationChannel.ECONOMIC_LEDGER,
+                                "economic-ledger:stage22-reactor-feedstock",
+                                REVIEW_TICK,
+                                -1L)))
+                : List.of();
+        return new FactionActorObservationSnapshot(
+                factionId,
+                REVIEW_TICK,
+                economic,
                 List.of(),
-                -1L,
-                24L,
-                StrategicGoalOutcomeSignal.NONE);
+                List.of(borderPressure),
+                List.of());
     }
 }

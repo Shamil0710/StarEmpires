@@ -14,6 +14,7 @@ import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.Stage175IFleetDoctrineCatalog.Doctrine;
+import com.spacesim.ship.Stage175IFleetDoctrineCatalog.DoctrineId;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,8 +30,10 @@ import java.util.TreeMap;
  *
  * <p>Acceptance scenarios may still author pristine state from a doctrine fixture. Production
  * strategic handoff may instead use {@link #importExact(List)} to install detached copies of exact
- * fitted engineering/damage/stores state. In both paths derived capability remains recomputed from
- * ordinary physical state and the contact registry remains actor-bounded.</p>
+ * fitted engineering/damage/stores state. M22.6 may use the catalog-aware overload to import an exact
+ * Stage-22 fit through the same Stage-19 runtime without assigning a Stage-17.5 doctrine as physical
+ * authority. In all paths derived capability remains recomputed from ordinary physical state and the
+ * contact registry remains actor-bounded.</p>
  */
 public final class LiveTacticalBattleRuntimeState {
     private final LiveTacticalBattleScenario scenario;
@@ -40,6 +43,7 @@ public final class LiveTacticalBattleRuntimeState {
     private final DerivedShipCalculator calculator;
     private final ShipShieldEngineeringAdapter shieldAdapter;
     private final ShieldFieldRuntime shieldRuntime;
+    private final boolean legacyDoctrineBindingRequired;
     private final TreeMap<Long, CombatantRuntime> combatantsById = new TreeMap<>();
     private final TreeMap<Long, List<ObservedContact>> visibleContactsByObserverId = new TreeMap<>();
 
@@ -52,17 +56,22 @@ public final class LiveTacticalBattleRuntimeState {
         this(
                 Objects.requireNonNull(scenario, "scenario"),
                 Map.of(),
-                Stage175ICombatTestContentPack.loadDoctrines());
+                Stage175ICombatTestContentPack.loadDoctrines(),
+                Stage175ICombatTestProtectionPack.load(),
+                true);
     }
 
     private LiveTacticalBattleRuntimeState(
             LiveTacticalBattleScenario scenario,
             Map<Long, ImportedCombatantState> importedByEntityId,
-            ShipEngineeringCatalog engineeringCatalog) {
+            ShipEngineeringCatalog engineeringCatalog,
+            ShipProtectionCatalog protectionCatalog,
+            boolean legacyDoctrineBindingRequired) {
         this.scenario = Objects.requireNonNull(scenario, "scenario");
         Objects.requireNonNull(importedByEntityId, "importedByEntityId");
         this.engineeringCatalog = Objects.requireNonNull(engineeringCatalog, "engineeringCatalog");
-        protectionCatalog = Stage175ICombatTestProtectionPack.load();
+        this.protectionCatalog = Objects.requireNonNull(protectionCatalog, "protectionCatalog");
+        this.legacyDoctrineBindingRequired = legacyDoctrineBindingRequired;
         engineeringRuntime = new ShipEngineeringRuntime(this.engineeringCatalog);
         calculator = new DerivedShipCalculator(this.engineeringCatalog);
         shieldAdapter = new ShipShieldEngineeringAdapter();
@@ -94,12 +103,47 @@ public final class LiveTacticalBattleRuntimeState {
      * @return independent Stage-19 battle state containing detached exact physical snapshots
      */
     public static LiveTacticalBattleRuntimeState importExact(List<ImportedCombatantState> combatants) {
+        ShipEngineeringCatalog catalog = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
+        return importExactInternal(
+                combatants,
+                catalog,
+                Stage175ICombatTestProtectionPack.load(),
+                true);
+    }
+
+    /**
+     * Imports exact fitted state from another accepted content package into the ordinary Stage-19 runtime.
+     *
+     * <p>This overload is deliberately content-agnostic. The supplied engineering catalog must contain
+     * every exact imported fit as a demonstrator and the supplied protection catalog must contain the
+     * corresponding hull layouts. The legacy {@link CombatantSpec#doctrineId()} field is populated with
+     * a compatibility placeholder because the Stage-19 scenario record predates package-neutral exact
+     * imports; it is not consulted for fit, stores, weapon loadout, damage or any numeric capability.
+     * Those remain entirely in the imported {@link EngineeringComponent} and supplied common catalogs.</p>
+     *
+     * @param combatants exact physical combatants with stable tactical identities and kinematics
+     * @param engineeringCatalog accepted engineering authority containing every exact imported fit
+     * @param protectionCatalog common Stage-17.5F protection authority projected for those hulls
+     * @return independent Stage-19 battle state containing detached exact physical snapshots
+     */
+    public static LiveTacticalBattleRuntimeState importExact(
+            List<ImportedCombatantState> combatants,
+            ShipEngineeringCatalog engineeringCatalog,
+            ShipProtectionCatalog protectionCatalog) {
+        return importExactInternal(combatants, engineeringCatalog, protectionCatalog, false);
+    }
+
+    private static LiveTacticalBattleRuntimeState importExactInternal(
+            List<ImportedCombatantState> combatants,
+            ShipEngineeringCatalog engineeringCatalog,
+            ShipProtectionCatalog protectionCatalog,
+            boolean legacyDoctrineBindingRequired) {
         Objects.requireNonNull(combatants, "combatants");
+        ShipEngineeringCatalog checkedEngineering = Objects.requireNonNull(engineeringCatalog, "engineeringCatalog");
+        ShipProtectionCatalog checkedProtection = Objects.requireNonNull(protectionCatalog, "protectionCatalog");
         if (combatants.size() < 2) {
             throw new IllegalArgumentException("exact tactical import requires at least two combatants");
         }
-        ShipEngineeringCatalog catalog =
-                Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
         TreeMap<Long, ImportedCombatantState> byId = new TreeMap<>();
         ArrayList<CombatantSpec> specs = new ArrayList<>(combatants.size());
         boolean alpha = false;
@@ -109,7 +153,12 @@ public final class LiveTacticalBattleRuntimeState {
             if (byId.putIfAbsent(checked.entityId(), checked) != null) {
                 throw new IllegalArgumentException("duplicate exact tactical entity id: " + checked.entityId());
             }
-            Doctrine doctrine = requireDoctrineForFit(catalog, checked.engineering().fit);
+            Doctrine doctrine = legacyDoctrineBindingRequired
+                    ? requireDoctrineForFit(checkedEngineering, checked.engineering().fit)
+                    : Stage175IFleetDoctrineCatalog.get(DoctrineId.E_BALANCED_CONTROL);
+            if (!legacyDoctrineBindingRequired) {
+                requireExactCatalogFit(checkedEngineering, checked.engineering().fit);
+            }
             specs.add(new CombatantSpec(
                     checked.entityId(), checked.side(), doctrine.id(), checked.xM(), checked.yM()));
             alpha |= checked.side() == Side.ALPHA;
@@ -119,7 +168,11 @@ public final class LiveTacticalBattleRuntimeState {
             throw new IllegalArgumentException("exact tactical import requires combatants on both sides");
         }
         return new LiveTacticalBattleRuntimeState(
-                new LiveTacticalBattleScenario(specs), byId, catalog);
+                new LiveTacticalBattleScenario(specs),
+                byId,
+                checkedEngineering,
+                checkedProtection,
+                legacyDoctrineBindingRequired);
     }
 
     /** @return immutable authored scenario/identity roster driving this battle */
@@ -130,14 +183,23 @@ public final class LiveTacticalBattleRuntimeState {
     /**
      * Returns the immutable engineering catalog that materialized this battle state.
      *
-     * <p>Authored Stage-19 scenarios retain the stable baseline catalog, while exact strategic
-     * imports retain the registered Stage-21 strategic-mobility composition. Downstream tactical
-     * runtimes must reuse this catalog rather than silently loading a different content universe.</p>
+     * <p>Authored Stage-19 scenarios retain the stable baseline catalog, while exact imports retain
+     * the caller-supplied accepted content universe. Downstream tactical runtimes must reuse this
+     * catalog rather than silently loading a different engineering authority.</p>
      *
      * @return battle-local immutable engineering content authority
      */
     public ShipEngineeringCatalog engineeringCatalog() {
         return engineeringCatalog;
+    }
+
+    /**
+     * Returns the protection catalog paired with this battle's engineering content.
+     *
+     * @return battle-local immutable protection authority
+     */
+    public ShipProtectionCatalog protectionCatalog() {
+        return protectionCatalog;
     }
 
     /** @return immutable combatants in canonical stable-identity order */
@@ -219,8 +281,11 @@ public final class LiveTacticalBattleRuntimeState {
     private CombatantRuntime materializeImported(CombatantSpec spec, ImportedCombatantState imported) {
         Doctrine doctrine = Stage175IFleetDoctrineCatalog.get(spec.doctrineId());
         EngineeringComponent source = imported.engineering();
-        if (!matchesDoctrineFit(engineeringCatalog, doctrine, source.fit)) {
+        if (legacyDoctrineBindingRequired && !matchesDoctrineFit(engineeringCatalog, doctrine, source.fit)) {
             throw new IllegalArgumentException("imported fit differs from resolved Stage-19 content identity");
+        }
+        if (!legacyDoctrineBindingRequired) {
+            requireExactCatalogFit(engineeringCatalog, source.fit);
         }
         HullDefinition hull = engineeringCatalog.findHull(source.fit.hullId());
         if (hull == null) {
@@ -256,6 +321,17 @@ public final class LiveTacticalBattleRuntimeState {
                         "Stage-19 exact import does not support fitted state: " + checked.hullId()));
     }
 
+    private static void requireExactCatalogFit(ShipEngineeringCatalog catalog, InstalledFit fit) {
+        InstalledFit checked = Objects.requireNonNull(fit, "fit");
+        boolean present = catalog.getDemonstratorFits().stream()
+                .map(InstalledFit::fromDemonstrator)
+                .anyMatch(checked::equals);
+        if (!present) {
+            throw new IllegalArgumentException(
+                    "Exact tactical import fit is not present in supplied engineering catalog: " + checked.hullId());
+        }
+    }
+
     private static boolean matchesDoctrineFit(
             ShipEngineeringCatalog catalog,
             Doctrine doctrine,
@@ -266,8 +342,7 @@ public final class LiveTacticalBattleRuntimeState {
             return true;
         }
         String strategicId = Stage175ICombatTestContentPack.stage21StrategicFitId(doctrine.fitId());
-        ShipEngineeringCatalog.DemonstratorFitDefinition strategic =
-                catalog.findDemonstratorFit(strategicId);
+        ShipEngineeringCatalog.DemonstratorFitDefinition strategic = catalog.findDemonstratorFit(strategicId);
         return strategic != null && InstalledFit.fromDemonstrator(strategic).equals(fit);
     }
 
@@ -344,7 +419,14 @@ public final class LiveTacticalBattleRuntimeState {
 
         /** @return immutable authored identity/side/content metadata */
         public CombatantSpec spec() { return spec; }
-        /** @return provisional Stage-19 content identity associated with the exact fit */
+        /**
+         * Returns legacy doctrine metadata.
+         *
+         * <p>For package-neutral exact imports this is compatibility metadata only; physical capability
+         * remains the imported engineering state and supplied battle-local catalogs.</p>
+         *
+         * @return legacy Stage-19 scenario doctrine metadata
+         */
         public Doctrine doctrine() { return doctrine; }
         /** @return production hull definition referenced by the installed fit */
         public HullDefinition hull() { return hull; }

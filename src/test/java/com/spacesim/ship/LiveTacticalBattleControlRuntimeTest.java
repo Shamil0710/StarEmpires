@@ -1,15 +1,23 @@
 package com.spacesim.ship;
 
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
+import com.spacesim.ship.LiveTacticalBattleScenario.CombatantSpec;
+import com.spacesim.ship.LiveTacticalBattleScenario.Side;
+import com.spacesim.ship.Stage175IFleetDoctrineCatalog.DoctrineId;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LiveTacticalBattleControlRuntimeTest {
+    private static final long NETWORK_RECEIVER_ID = 191_971L;
+
     @Test
     void balanced4v4UsesOneSharedActorBoundedControlAndPhysicalFlightTick() {
         LiveTacticalBattleRuntimeState battle =
@@ -50,6 +58,41 @@ class LiveTacticalBattleControlRuntimeTest {
     }
 
     @Test
+    void damagedLocalSensorCanUseOnlyPhysicalAlliedDatalinkAndLosesTargetWhenReceiverLinkIsDestroyed() {
+        LiveTacticalBattleRuntimeState linkedBattle = new LiveTacticalBattleRuntimeState(commandNetworkScenario());
+        disableMounts(linkedBattle, NETWORK_RECEIVER_ID, Set.of("utility_sensor"));
+        LiveTacticalBattleControlRuntime linked = new LiveTacticalBattleControlRuntime(linkedBattle);
+
+        linked.advanceOneTick();
+
+        var linkedContacts = linkedBattle.visibleContacts(NETWORK_RECEIVER_ID);
+        var linkedControl = linked.controlState(NETWORK_RECEIVER_ID);
+        assertFalse(linkedContacts.isEmpty(),
+                "sensor-blind receiver should acquire an allied measurement while both fitted datalink endpoints survive");
+        assertTrue(linkedContacts.stream().allMatch(contact ->
+                        linkedBattle.requireCombatant(contact.track().targetId()).spec().side() == Side.BETA),
+                "allied datalink may relay measurements but must not manufacture friendly or hidden truth contacts");
+        assertTrue(linkedControl.intent().targetSelected(),
+                "shared bounded measurement should be usable by the ordinary production tactical planner");
+        assertTrue(linkedContacts.stream().anyMatch(contact ->
+                        contact.track().targetId() == linkedControl.intent().targetId()),
+                "production control may only select a target materialized in the receiver-visible track domain");
+
+        LiveTacticalBattleRuntimeState severedBattle = new LiveTacticalBattleRuntimeState(commandNetworkScenario());
+        disableMounts(severedBattle, NETWORK_RECEIVER_ID, Set.of("utility_sensor", "utility_datalink"));
+        LiveTacticalBattleControlRuntime severed = new LiveTacticalBattleControlRuntime(severedBattle);
+
+        severed.advanceOneTick();
+
+        assertTrue(severedBattle.visibleContacts(NETWORK_RECEIVER_ID).isEmpty(),
+                "destroyed local sensor plus destroyed fitted receiver datalink must leave no hostile measurement authority");
+        assertFalse(severed.controlState(NETWORK_RECEIVER_ID).intent().targetSelected(),
+                "command planner must not recover a target from hidden battle truth after the network endpoint is lost");
+        assertFalse(severed.controlState(NETWORK_RECEIVER_ID).fireAuthorized(),
+                "no actor-visible target means no fire authorization after command-network severance");
+    }
+
+    @Test
     void same4v4FixedTicksProduceIdenticalWholeBattleControlFingerprint() {
         LiveTacticalBattleControlRuntime first = new LiveTacticalBattleControlRuntime(
                 new LiveTacticalBattleRuntimeState(LiveTacticalBattleScenario.balanced4v4()));
@@ -79,6 +122,42 @@ class LiveTacticalBattleControlRuntimeTest {
 
         assertEquals(0L, runtime.tick());
         assertEquals(before, runtime.fingerprint());
+    }
+
+    private static LiveTacticalBattleScenario commandNetworkScenario() {
+        return new LiveTacticalBattleScenario(List.of(
+                new CombatantSpec(NETWORK_RECEIVER_ID, Side.ALPHA, DoctrineId.B_MISSILE_STRIKE, 260d, 640d),
+                new CombatantSpec(191_972L, Side.ALPHA, DoctrineId.B_MISSILE_STRIKE, 260d, 760d),
+                new CombatantSpec(191_981L, Side.BETA, DoctrineId.B_MISSILE_STRIKE, 1_690d, 640d),
+                new CombatantSpec(191_982L, Side.BETA, DoctrineId.B_MISSILE_STRIKE, 1_690d, 760d)));
+    }
+
+    private static void disableMounts(
+            LiveTacticalBattleRuntimeState battle,
+            long entityId,
+            Set<String> mountIds) {
+        var combatant = battle.requireCombatant(entityId);
+        var component = combatant.engineering();
+        var before = component.instanceState;
+        TreeMap<String, Double> integrity = new TreeMap<>(before.damage().moduleDamage().moduleIntegrityByMount());
+        for (String mountId : mountIds) {
+            assertTrue(component.fit.installedModules().stream().anyMatch(row -> row.mountId().equals(mountId)),
+                    "network-degradation fixture must damage an actually installed mount: " + mountId);
+            integrity.put(mountId, 0d);
+        }
+        var damage = new ShipDamageRuntime.Snapshot(
+                before.damage().compartmentIntegrityById(),
+                new ShipEngineeringState.DamageState(integrity));
+        component.setRuntimeState(new ShipEngineeringRuntime(battle.engineeringCatalog()).initialize(
+                component.fit,
+                component.runtimeState.consumables(),
+                damage.moduleDamage()));
+        component.setInstanceState(new ShipInstanceRuntimeState(
+                damage,
+                before.shieldStatesByMount(),
+                before.maintenance(),
+                before.weaponLoadout(),
+                before.weaponMountRuntime()));
     }
 
     private static Map<Long, Double> reactionMassByEntity(LiveTacticalBattleRuntimeState battle) {

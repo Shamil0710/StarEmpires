@@ -43,7 +43,7 @@ public final class GameStateCodec {
     private static final int MAX_ENTITIES = 100_000;
     private static final int MAX_LEDGER_ENTRIES = 1_000_000;
     private static final int MAX_EVENTS = 100_000;
-    private static final int MAX_NEWS = 100_000;
+    private static final int MAX_NEWS = GlobalEventManager.MAX_PENDING_NEWS;
     private static final int MAX_LIST_ENTRIES = 1_000_000;
     private static final int MAX_ENGINEERING_ROWS = 4096;
 

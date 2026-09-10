@@ -5,6 +5,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
+import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.ship.ShipEngineeringRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringRuntime.OperatingCommand;
@@ -24,6 +25,11 @@ import java.util.Objects;
  * progression and commit to that catalog's {@link ShipEngineeringRuntime}, and always plans against
  * the current physical module damage. Unknown or ambiguous fitted content fails closed. Stage-10
  * legacy fleets without an {@link EngineeringComponent} never enter this resolver.</p>
+ *
+ * <p>M22.6 adds the accepted combined Empire/Industrial Union engineering package to this same
+ * production resolver. This is intentionally a catalog-routing extension only: core-faction ships
+ * receive no movement modifier and use the identical jump planning, commit, cooldown and idle
+ * recovery authority as every other fitted fleet.</p>
  */
 final class ProductionFittedJumpResolver implements FleetJumpService.FittedJumpResolver {
     private final List<CatalogRuntime> catalogs;
@@ -31,7 +37,8 @@ final class ProductionFittedJumpResolver implements FleetJumpService.FittedJumpR
     ProductionFittedJumpResolver() {
         this(List.of(
                 ShipEngineeringCatalogLoader.loadDefault(),
-                Stage175ICombatTestContentPack.loadStage21StrategicDoctrines()));
+                Stage175ICombatTestContentPack.loadStage21StrategicDoctrines(),
+                Stage22CorePairEngineeringCatalogLoader.loadDefault()));
     }
 
     ProductionFittedJumpResolver(List<ShipEngineeringCatalog> catalogs) {

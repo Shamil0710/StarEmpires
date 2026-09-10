@@ -24,6 +24,24 @@ class GameStateCodecTest {
     Path temporaryDirectory;
 
     @Test
+    void unreadNewsOverflowStillSavesAndContinuesByteExactly() {
+        SimulationSession original = SimulationSession.createDemo(ROOT_SEED);
+        var manager = original.getEventManager();
+        for (int index = 0; index <= com.spacesim.events.GlobalEventManager.MAX_PENDING_NEWS; index++) {
+            manager.publishNews(new com.spacesim.events.NewsArticle("news", "detail", null, index));
+        }
+        byte[] saved = GameStateCodec.encode(original.snapshot());
+        SimulationSession loaded = SimulationSession.restore(GameStateCodec.decode(saved));
+        assertArrayEquals(saved, GameStateCodec.encode(loaded.snapshot()));
+        assertEquals(1L, loaded.getEventManager().snapshotState().pendingNews().get(0).timestamp());
+        for (SimulationSession session : java.util.List.of(original, loaded)) {
+            session.getEventManager().publishNews(new com.spacesim.events.NewsArticle("next", null, null, 0L));
+            session.advanceFrame(1f);
+        }
+        assertArrayEquals(GameStateCodec.encode(original.snapshot()), GameStateCodec.encode(loaded.snapshot()));
+    }
+
+    @Test
     void binaryEncodeDecodeДаётExactGameStateRoundTrip() {
         SimulationSession session = progressedSession();
         MarketComponent market = firstMarket(session);

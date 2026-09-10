@@ -58,6 +58,10 @@ class GlobalEventManagerPersistenceTest {
 
     @Test
     void повреждённоеСостояниеМенеджераОтклоняется() {
+        var news = new GlobalEventManager.NewsState("headline", "body", false, 0f, 0f, 0f, 0f, 0L);
+        assertThrows(IllegalArgumentException.class, () -> new GlobalEventManager.State(
+                0d, 0L, Double.POSITIVE_INFINITY, 0d, List.of(),
+                java.util.Collections.nCopies(GlobalEventManager.MAX_PENDING_NEWS + 1, news)));
         assertThrows(IllegalArgumentException.class, () -> new GlobalEventManager.State(
                 -1d, 0L, 1d, 0d, List.of(), List.of()));
         assertThrows(IllegalArgumentException.class, () -> new GlobalEventManager.State(
