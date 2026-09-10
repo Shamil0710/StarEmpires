@@ -158,7 +158,7 @@ public final class GeneratedWorldUiModel {
                     ownerId,
                     factionName(ownerId),
                     sprite.binding(),
-                    sections));
+                    sections).withScale(sprite));
         }
 
         Set<String> commissionedSources = new HashSet<>();
@@ -168,8 +168,8 @@ public final class GeneratedWorldUiModel {
             }
             commissionedSources.add(outpost.source().sourceId());
             String ownerId = controller(active, galaxy);
-            SpriteBinding sprite = Stage20MinimumPlayableSpriteCatalog.resolveStation(
-                    outpost.stationArchetypeId(), false, stationGeometry).binding();
+            ResolvedSprite sprite = Stage20MinimumPlayableSpriteCatalog.resolveStation(
+                    outpost.stationArchetypeId(), false, stationGeometry);
             result.add(new LocalObjectView(
                     "outpost:" + outpost.site().siteId(),
                     ObjectKind.EXTRACTION_OUTPOST,
@@ -179,7 +179,7 @@ public final class GeneratedWorldUiModel {
                     outpost.source().position(),
                     ownerId,
                     factionName(ownerId),
-                    sprite,
+                    sprite.binding(),
                     List.of(
                             identitySection(
                                     outpost.site().siteId(), ownerId, factionName(ownerId),
@@ -196,7 +196,7 @@ public final class GeneratedWorldUiModel {
                                     "Оборудование",
                                     "Объект", outpost.facilityState().definitionId(),
                                     "Состояние", outpost.facilityState().enabled() ? "Работает" : "Отключено",
-                                    "Целостность", percent(outpost.facilityState().conditionFraction())))));
+                                    "Целостность", percent(outpost.facilityState().conditionFraction())))).withScale(sprite));
         }
 
         for (MaterializedSource source : runtime.industry().sourceOutposts().sources().sources()) {
@@ -222,7 +222,8 @@ public final class GeneratedWorldUiModel {
                                     "Товар", source.sourceState().outputCommodityId(),
                                     "Начальная масса", mass(source.sourceState().initialAccessibleMassKg()),
                                     "Остаток", mass(source.sourceState().remainingAccessibleMassKg()),
-                                    "Содержание", percent(source.sourceState().gradeFraction())))));
+                                    "Содержание", percent(source.sourceState().gradeFraction())))).withScale(
+                            Stage20MinimumPlayableSpriteCatalog.resolveResource(type, 180d, 140d)));
         }
 
         addCanonicalStaticObjects(result, active);
@@ -245,8 +246,8 @@ public final class GeneratedWorldUiModel {
                     .findFleet(new FleetId(military.fleetId())).orElseThrow();
             LocalPhysicalPosition position = runtime.arrival().materialization(active)
                     .physicalState(placement.localEntityId()).orElseThrow().position();
-            SpriteBinding sprite = Stage20MinimumPlayableSpriteCatalog.resolveShip(
-                    military.hullId(), ShipRole.MEDIUM_COMBAT, MILITARY_ENGINEERING).binding();
+            ResolvedSprite sprite = Stage20MinimumPlayableSpriteCatalog.resolveShip(
+                    military.hullId(), ShipRole.MEDIUM_COMBAT, MILITARY_ENGINEERING);
             result.add(new LocalObjectView(
                     "fleet:" + military.fleetId(),
                     ObjectKind.FLEET,
@@ -256,8 +257,8 @@ public final class GeneratedWorldUiModel {
                     position,
                     military.factionId(),
                     military.factionName(),
-                    sprite,
-                    military.sections()));
+                    sprite.binding(),
+                    military.sections()).withScale(sprite));
         }
     }
 
@@ -289,7 +290,7 @@ public final class GeneratedWorldUiModel {
                     state.stableFactionId(),
                     factionName(state.stableFactionId()),
                     runtime.freightSprite(state.fleetId()).binding(),
-                    sections));
+                    sections).withScale(runtime.freightSprite(state.fleetId())));
         }
     }
 

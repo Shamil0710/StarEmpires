@@ -269,14 +269,14 @@ public final class WorldMapRenderer {
                         Stage20MinimumPlayableSpriteCatalog.binding(VisualRole.TRADE_DOCK_STATION),
                         firstPoint.x,
                         firstPoint.y,
-                        44f,
+                        (float) (Stage20MinimumPlayableSpriteCatalog.binding(VisualRole.TRADE_DOCK_STATION).nominalLengthM() * layout.getScale()),
                         0f);
             } else if (identity.kind == IdentityComponent.Kind.ASTEROID) {
                 drawMinimumSprite(
                         resourceBinding(ASTEROIDS.get(entity)),
                         firstPoint.x,
                         firstPoint.y,
-                        ASTEROID_RADIUS * 2f,
+                        (float) (resourceBinding(ASTEROIDS.get(entity)).nominalLengthM() * layout.getScale()),
                         0f);
             } else if (identity.kind == IdentityComponent.Kind.FLEET) {
                 ShipComponent ship = SHIPS.get(entity);
@@ -286,7 +286,7 @@ public final class WorldMapRenderer {
                         resolved.binding(),
                         firstPoint.x,
                         firstPoint.y,
-                        shipSpriteWidth(resolved.binding().role()),
+                        (float) (resolved.worldLengthM() * layout.getScale()),
                         fleetHeadingDegrees(entity, transform));
             }
         }
@@ -302,7 +302,7 @@ public final class WorldMapRenderer {
             float width,
             float rotationDegrees) {
         float aspect = (float) (binding.nominalWidthM() / binding.nominalLengthM());
-        float height = Math.max(12f, width * aspect);
+        float height = width * aspect;
         minimumSprites.draw(spriteBatch, binding, centerX, centerY, width, height, rotationDegrees);
     }
 
@@ -317,18 +317,6 @@ public final class WorldMapRenderer {
             default -> VisualRole.RESOURCE_MINERAL;
         };
         return Stage20MinimumPlayableSpriteCatalog.binding(role);
-    }
-
-    /** Returns a readable presentation width; no value is fed back into physical simulation. */
-    private static float shipSpriteWidth(VisualRole role) {
-        return switch (role) {
-            case UTILITY_SHIP -> 30f;
-            case CARGO_TRANSPORT_SHIP -> 40f;
-            case MINING_INDUSTRIAL_SHIP -> 38f;
-            case LIGHT_COMBAT_ESCORT_SHIP -> 36f;
-            case MEDIUM_COMBAT_SHIP -> 46f;
-            default -> 32f;
-        };
     }
 
     /** Resolves live target/velocity direction solely for sprite rotation. */
@@ -723,12 +711,26 @@ public final class WorldMapRenderer {
         }
         IdentityComponent identity = IDENTITIES.get(entity);
         TransformComponent transform = TRANSFORMS.get(entity);
-        return identity != null
-                && identity.kind != null
-                && hasFinitePosition(transform)
-                && layout.containsVisibleWorldPoint(
-                        transform.position.x,
-                        transform.position.y);
+        if (identity == null || identity.kind == null || !hasFinitePosition(transform)) {
+            return false;
+        }
+        Stage20MinimumPlayableSpriteCatalog.SpriteBinding binding;
+        if (identity.kind == IdentityComponent.Kind.STATION) {
+            binding = Stage20MinimumPlayableSpriteCatalog.binding(VisualRole.TRADE_DOCK_STATION);
+        } else if (identity.kind == IdentityComponent.Kind.ASTEROID) {
+            binding = resourceBinding(ASTEROIDS.get(entity));
+        } else if (identity.kind == IdentityComponent.Kind.FLEET) {
+            ShipComponent ship = SHIPS.get(entity);
+            binding = Stage20MinimumPlayableSpriteCatalog.resolvePlayable(
+                    ship == null ? null : ship.type).binding();
+        } else {
+            return layout.containsVisibleWorldPoint(transform.position.x, transform.position.y);
+        }
+        double radius = Math.hypot(binding.nominalLengthM(), binding.nominalWidthM()) / 2d;
+        return transform.position.x + radius >= layout.getVisibleWorldMinX()
+                && transform.position.x - radius <= layout.getVisibleWorldMaxX()
+                && transform.position.y + radius >= layout.getVisibleWorldMinY()
+                && transform.position.y - radius <= layout.getVisibleWorldMaxY();
     }
 
     /** Проецирует позицию сущности после полной проверки компонента и границ мира. */

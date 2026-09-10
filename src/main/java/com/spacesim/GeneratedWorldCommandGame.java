@@ -91,6 +91,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     case Input.Keys.F3 -> switchTab(Tab.FACTIONS);
                     case Input.Keys.F4 -> switchTab(Tab.MILITARY);
                     case Input.Keys.F5 -> switchTab(Tab.LOGISTICS);
+                    case Input.Keys.HOME -> {
+                        renderer.resetSystemMapCamera();
+                        yield true;
+                    }
                     case Input.Keys.SPACE -> togglePause();
                     case Input.Keys.NUM_1 -> setTimeScale(1d);
                     case Input.Keys.NUM_2 -> setTimeScale(2d);
@@ -145,6 +149,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     status = "Активная область симуляции: система #" + target.value()
                             + ". Флоты не телепортированы.";
                     snapshot = model.capture();
+                }
+                if (hit.kind() == HitKind.LOCAL_OBJECT && isDoubleClick(hit)) {
+                    return renderer.focusLocalObject(snapshot, hit.id());
                 }
                 if ((hit.kind() == HitKind.FREIGHT || hit.kind() == HitKind.MILITARY)
                         && isDoubleClick(hit)) {
