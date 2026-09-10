@@ -27,8 +27,8 @@ public final class WorldMapLayout {
     /** Масштаб, при котором на карте виден весь мир. */
     public static final float MIN_ZOOM = 1f;
 
-    /** Максимальное шестикратное увеличение карты. */
-    public static final float MAX_ZOOM = 6f;
+    /** Максимальное увеличение для осмотра малых объектов. */
+    public static final float MAX_ZOOM = 256f;
 
     /** Множитель одного шага колеса мыши. */
     public static final float ZOOM_STEP = 1.25f;

@@ -269,14 +269,14 @@ public final class WorldMapRenderer {
                         Stage20MinimumPlayableSpriteCatalog.binding(VisualRole.TRADE_DOCK_STATION),
                         firstPoint.x,
                         firstPoint.y,
-                        44f,
+                        (float) (Stage20MinimumPlayableSpriteCatalog.binding(VisualRole.TRADE_DOCK_STATION).nominalLengthM() * layout.getScale()),
                         0f);
             } else if (identity.kind == IdentityComponent.Kind.ASTEROID) {
                 drawMinimumSprite(
                         resourceBinding(ASTEROIDS.get(entity)),
                         firstPoint.x,
                         firstPoint.y,
-                        ASTEROID_RADIUS * 2f,
+                        (float) (resourceBinding(ASTEROIDS.get(entity)).nominalLengthM() * layout.getScale()),
                         0f);
             } else if (identity.kind == IdentityComponent.Kind.FLEET) {
                 ShipComponent ship = SHIPS.get(entity);
@@ -286,7 +286,7 @@ public final class WorldMapRenderer {
                         resolved.binding(),
                         firstPoint.x,
                         firstPoint.y,
-                        shipSpriteWidth(resolved.binding().role()),
+                        (float) (resolved.worldLengthM() * layout.getScale()),
                         fleetHeadingDegrees(entity, transform));
             }
         }
@@ -302,7 +302,7 @@ public final class WorldMapRenderer {
             float width,
             float rotationDegrees) {
         float aspect = (float) (binding.nominalWidthM() / binding.nominalLengthM());
-        float height = Math.max(12f, width * aspect);
+        float height = width * aspect;
         minimumSprites.draw(spriteBatch, binding, centerX, centerY, width, height, rotationDegrees);
     }
 

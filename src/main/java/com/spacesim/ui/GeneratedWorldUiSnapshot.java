@@ -77,7 +77,26 @@ public record GeneratedWorldUiSnapshot(
             String factionId,
             String factionName,
             SpriteBinding sprite,
-            List<InfoSection> sections) implements Comparable<LocalObjectView> {
+            List<InfoSection> sections,
+            double physicalLengthM,
+            double physicalWidthM) implements Comparable<LocalObjectView> {
+        /** Compatibility projection for objects with nominal artwork dimensions only. */
+        public LocalObjectView(String stableId, ObjectKind kind, String name, String subtitle,
+                StarSystemId systemId, LocalPhysicalPosition position, String factionId,
+                String factionName, SpriteBinding sprite, List<InfoSection> sections) {
+            this(stableId, kind, name, subtitle, systemId, position, factionId, factionName,
+                    sprite, sections, sprite == null ? 0d : sprite.nominalLengthM(),
+                    sprite == null ? 0d : sprite.nominalWidthM());
+        }
+
+        /** Preserves engineering dimensions while passing the artwork into the UI. */
+        public LocalObjectView withScale(
+                com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite resolved) {
+            return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
+                    factionId, factionName, resolved.binding(), sections,
+                    resolved.worldLengthM(), resolved.worldWidthM());
+        }
+
         /**
          * Validates one selectable object projection.
          *
@@ -93,6 +112,11 @@ public record GeneratedWorldUiSnapshot(
          * @param sections structured inspector content
          */
         public LocalObjectView {
+            if (!Double.isFinite(physicalLengthM) || !Double.isFinite(physicalWidthM)
+                    || physicalLengthM < 0d || physicalWidthM < 0d
+                    || (sprite != null && (physicalLengthM == 0d || physicalWidthM == 0d))) {
+                throw new IllegalArgumentException("invalid physical dimensions");
+            }
             stableId = requireText(stableId, "stableId");
             Objects.requireNonNull(kind, "kind");
             name = requireText(name, "name");

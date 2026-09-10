@@ -20,8 +20,8 @@ final class TacticalShipMarkerMetrics {
         Objects.requireNonNull(ship, "ship");
         float baseLength = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
         float baseWidth = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
-        float length = baseLength * roleLengthScale(ship.role());
-        float width = baseWidth * roleWidthScale(ship.role());
+        float length = baseLength;
+        float width = baseWidth;
         float halfLength = length * 0.68f + HIT_PADDING_PX;
         float halfWidth = width * roleEnvelopeScale(ship.role()) * 0.5f + HIT_PADDING_PX;
         return new Bounds(halfLength, halfWidth);
@@ -31,13 +31,7 @@ final class TacticalShipMarkerMetrics {
         if (!Double.isFinite(worldLengthM) || worldLengthM <= 0d) {
             return 0f;
         }
-        Vector2 origin = new Vector2();
-        Vector2 end = new Vector2();
-        if (!layout.worldToScreen(0f, 0f, origin)
-                || !layout.worldToScreen((float) worldLengthM, 0f, end)) {
-            return 0f;
-        }
-        return Math.abs(end.x - origin.x);
+        return (float) (worldLengthM * layout.getScale());
     }
 
     private static float roleLengthScale(ShipVisualRole role) {

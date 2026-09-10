@@ -309,10 +309,14 @@ public final class GeneratedWorldCommandUiRenderer {
         String id = Objects.requireNonNull(stableId, "stableId");
         Layout layout = splitMapAndInspector();
         Rect content = inset(layout.map(), 28f * metrics.scale());
-        Point point = projectLocal(snapshot.localObjects(), content).get(id);
+        PhysicalMapProjection projection = localProjection(snapshot.localObjects(), content);
+        PhysicalMapProjection.Point point = projection.point(id);
         if (point == null) {
             return false;
         }
+        LocalObjectView object = snapshot.localObjects().stream()
+                .filter(value -> value.stableId().equals(id)).findFirst().orElseThrow();
+        systemMapCamera.inspect(projection.inspectionZoom(object, content.width(), content.height()));
         systemMapCamera.focus(point.x(), point.y(),
                 layout.map().x() + layout.map().width() * 0.5f,
                 layout.map().y() + layout.map().height() * 0.5f);
@@ -407,53 +411,80 @@ public final class GeneratedWorldCommandUiRenderer {
         panel(layout.inspector(), ImperialUiPalette.PANEL_SURFACE, ImperialUiPalette.GUNMETAL);
         drawGrid(layout.map());
 
-        Map<String, Point> points = applyCamera(
-                projectLocal(snapshot.localObjects(), inset(layout.map(), 28f * metrics.scale())),
-                layout.map(),
-                systemMapCamera);
+        PhysicalMapProjection projection = localProjection(snapshot.localObjects(),
+                inset(layout.map(), 28f * metrics.scale()));
+        double pixelsPerMetre = projection.pixelsPerMetre() * systemMapCamera.zoom();
+        Map<String, Point> points = new HashMap<>();
+        for (LocalObjectView object : snapshot.localObjects()) {
+            var base = projection.point(object.stableId());
+            points.put(object.stableId(), new Point(
+                    systemMapCamera.transformX(base.x(), layout.map().x() + layout.map().width() / 2f),
+                    systemMapCamera.transformY(base.y(), layout.map().y() + layout.map().height() / 2f)));
+        }
+        // Scissor oversized hulls against the map, including on HiDPI displays.
+        Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
+        float sx = (float) Gdx.graphics.getBackBufferWidth() / Gdx.graphics.getWidth();
+        float sy = (float) Gdx.graphics.getBackBufferHeight() / Gdx.graphics.getHeight();
+        Gdx.gl.glScissor((int) (layout.map().x() * sx), (int) (layout.map().y() * sy),
+                (int) (layout.map().width() * sx), (int) (layout.map().height() * sy));
         ArrayList<LocalObjectView> spriteObjects = new ArrayList<>();
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (LocalObjectView object : snapshot.localObjects()) {
             Point point = points.get(object.stableId());
-            if (point == null || !layout.map().contains(point.x(), point.y())) {
+            float physicalLength = (float) (object.physicalLengthM() * pixelsPerMetre);
+            float physicalWidth = (float) (object.physicalWidthM() * pixelsPerMetre);
+            float halfX = Math.max(markerSize(object.kind()), physicalLength) / 2f;
+            float halfY = Math.max(markerSize(object.kind()), physicalWidth) / 2f;
+            if (point == null || point.x() + halfX < layout.map().x()
+                    || point.x() - halfX > layout.map().right()
+                    || point.y() + halfY < layout.map().y()
+                    || point.y() - halfY > layout.map().top()) {
                 continue;
             }
             boolean selected = selection.kind() == SelectionKind.LOCAL_OBJECT
                     && selection.stableId().equals(object.stableId());
             float marker = markerSize(object.kind());
-            shapes.setColor(selected ? ImperialUiPalette.BRASS : factionColor(object.factionId()));
-            shapes.circle(point.x(), point.y(), marker * 0.58f, 24);
-            shapes.setColor(ImperialUiPalette.GRAPHITE);
-            shapes.circle(point.x(), point.y(), marker * 0.47f, 24);
-            if (object.sprite() == null) {
-                drawMarkerShape(object.kind(), point, marker * 0.34f);
-            } else {
+            if (object.sprite() == null || physicalLength < marker || selected) {
+                shapes.setColor(selected ? ImperialUiPalette.BRASS : factionColor(object.factionId()));
+                shapes.circle(point.x(), point.y(), marker * 0.58f, 24);
+                shapes.setColor(ImperialUiPalette.GRAPHITE);
+                shapes.circle(point.x(), point.y(), marker * 0.47f, 24);
+                if (object.sprite() == null) {
+                    drawMarkerShape(object.kind(), point, marker * 0.34f);
+                }
+            }
+            if (object.sprite() != null && physicalLength >= 1f && physicalWidth > 0f) {
                 spriteObjects.add(object);
             }
             hitTargets.add(new HitTarget(
                     HitKind.LOCAL_OBJECT,
                     object.stableId(),
                     null,
-                    centered(point, Math.max(metrics.hitRadius() * 2f, marker * 1.35f))));
+                    new Rect(point.x() - Math.max(metrics.hitRadius(), physicalLength / 2f),
+                            point.y() - Math.max(metrics.hitRadius(), physicalWidth / 2f),
+                            Math.max(metrics.hitRadius() * 2f, physicalLength),
+                            Math.max(metrics.hitRadius() * 2f, physicalWidth))));
         }
         shapes.end();
 
         batch.begin();
         for (LocalObjectView object : spriteObjects) {
             Point point = points.get(object.stableId());
-            float marker = markerSize(object.kind());
-            sprites.draw(batch, object.sprite(), point.x(), point.y(), marker * 1.22f, marker * 0.92f, 0f);
+            sprites.draw(batch, object.sprite(), point.x(), point.y(),
+                    (float) (object.physicalLengthM() * pixelsPerMetre),
+                    (float) (object.physicalWidthM() * pixelsPerMetre), 0f);
         }
         batch.end();
 
         drawMapLabels(snapshot.localObjects(), points, selection, layout.map());
+        Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
         batch.begin();
         fonts.title().setColor(ImperialUiPalette.IVORY);
         fonts.title().draw(batch, snapshot.activeSystemName(), layout.map().x() + 18f * metrics.scale(),
                 layout.map().top() - 16f * metrics.scale());
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
         fonts.small().draw(batch,
-                snapshot.localObjects().size() + " объектов  •  позиции Stage 20 SI  •  разнесение совпадающих маркеров только визуальное",
+                snapshot.localObjects().size() + " объектов  •  единый масштаб в метрах  •  двойной клик: крупный план  •  Home: обзор",
                 layout.map().x() + 18f * metrics.scale(), layout.map().top() - 46f * metrics.scale());
         batch.end();
 
@@ -1045,43 +1076,8 @@ public final class GeneratedWorldCommandUiRenderer {
         batch.end();
     }
 
-    private Map<String, Point> projectLocal(List<LocalObjectView> objects, Rect rect) {
-        HashMap<String, Point> result = new HashMap<>();
-        if (objects.isEmpty()) {
-            return result;
-        }
-        LocalPhysicalPosition reference = objects.get(0).position();
-        HashMap<String, RawPoint> raw = new HashMap<>();
-        double minX = Double.POSITIVE_INFINITY;
-        double maxX = Double.NEGATIVE_INFINITY;
-        double minY = Double.POSITIVE_INFINITY;
-        double maxY = Double.NEGATIVE_INFINITY;
-        for (LocalObjectView object : objects) {
-            var displacement = reference.displacementTo(object.position());
-            raw.put(object.stableId(), new RawPoint(displacement.deltaXM(), displacement.deltaYM()));
-            minX = Math.min(minX, displacement.deltaXM());
-            maxX = Math.max(maxX, displacement.deltaXM());
-            minY = Math.min(minY, displacement.deltaYM());
-            maxY = Math.max(maxY, displacement.deltaYM());
-        }
-        double spanX = Math.max(1d, maxX - minX);
-        double spanY = Math.max(1d, maxY - minY);
-        HashMap<String, Integer> occupancy = new HashMap<>();
-        for (LocalObjectView object : objects) {
-            RawPoint value = raw.get(object.stableId());
-            float x = rect.x() + (float) ((value.x() - minX) / spanX) * rect.width();
-            float y = rect.y() + (float) ((value.y() - minY) / spanY) * rect.height();
-            String bucket = Math.round(x / metrics.markerSize()) + ":" + Math.round(y / metrics.markerSize());
-            int ordinal = occupancy.merge(bucket, 1, Integer::sum) - 1;
-            if (ordinal > 0) {
-                double angle = ordinal * 2.399963229728653d;
-                float radius = metrics.markerSize() * (0.46f + 0.18f * ordinal);
-                x += (float) Math.cos(angle) * radius;
-                y += (float) Math.sin(angle) * radius;
-            }
-            result.put(object.stableId(), new Point(x, y));
-        }
-        return result;
+    private static PhysicalMapProjection localProjection(List<LocalObjectView> objects, Rect rect) {
+        return new PhysicalMapProjection(objects, rect.x(), rect.y(), rect.width(), rect.height());
     }
 
     private static Map<StarSystemId, Point> projectSystems(
