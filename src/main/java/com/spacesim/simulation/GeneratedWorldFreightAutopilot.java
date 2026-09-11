@@ -8,16 +8,17 @@ import com.spacesim.world.FleetLocationKind;
 import java.util.Objects;
 
 /**
- * Minimal ordinary-runtime freight circulation used by the generated-world playable viewer.
+ * Ordinary-runtime freight circulation used by the generated-world campaign.
  *
  * <p>The service does not invent cargo, routes, owners, fleets or arrival coordinates. It consumes
  * accepted orders, existing station inventory and finite generated extraction sources through the
  * same Stage-18/20.5 APIs covered by final acceptance. One call performs at most one lifecycle
- * operation per freighter, keeping rendering cadence separate from simulation authority.</p>
+ * operation per freighter. Every extraction and cargo-transfer budget is derived from the explicit
+ * simulation-time interval supplied by the campaign orchestrator, never from wall-clock time or
+ * render cadence.</p>
  */
 public final class GeneratedWorldFreightAutopilot {
-    private static final double HANDLING_INTERVAL_SECONDS = 60d;
-    private static final double MAX_CYCLE_LOAD_KG = 1d;
+    private static final double MASS_EPSILON_KG = 1.0e-9d;
 
     private final LiveRuntime runtime;
 
@@ -33,9 +34,18 @@ public final class GeneratedWorldFreightAutopilot {
     /**
      * Advances eligible accepted transport orders by one ordinary lifecycle action.
      *
-     * @return deterministic operation counters for UI diagnostics
+     * <p>The caller owns cadence. The supplied interval is also the only handling/extraction time
+     * budget granted to this decision, so repeated decisions cannot smuggle extra physical time into
+     * the logistics authority.</p>
+     *
+     * @param elapsedSimulationSeconds positive simulation-time interval represented by this decision
+     * @return deterministic operation counters for diagnostics
      */
-    public ActionReport advance() {
+    public ActionReport advance(double elapsedSimulationSeconds) {
+        if (!Double.isFinite(elapsedSimulationSeconds) || elapsedSimulationSeconds <= 0d) {
+            throw new IllegalArgumentException(
+                    "Freight autonomy interval must be positive finite simulation time");
+        }
         int loaded = 0;
         int unloaded = 0;
         int dispatched = 0;
@@ -47,41 +57,58 @@ public final class GeneratedWorldFreightAutopilot {
             }
             switch (fleet.phase()) {
                 case AT_SOURCE -> {
-                    if (fleet.cargoMassKg() <= 0d) {
-                        var order = runtime.freight().findOrder(fleet.activeOrderId()).orElseThrow();
-                        var endpoint = runtime.infrastructure().endpoint(order.sourceEndpointId());
-                        if (endpoint.storage().commodityMassKg(order.commodityId()) <= 0d) {
+                    var order = runtime.freight().findOrder(fleet.activeOrderId()).orElseThrow();
+                    var endpoint = runtime.infrastructure().endpoint(order.sourceEndpointId());
+                    FreighterState current = runtime.freight().findFreighter(fleet.fleetId()).orElseThrow();
+                    double remainingCapacityKg = Math.max(
+                            0d, current.cargoCapacityKg() - current.cargoMassKg());
+                    if (remainingCapacityKg > MASS_EPSILON_KG) {
+                        if (endpoint.storage().commodityMassKg(order.commodityId()) <= MASS_EPSILON_KG) {
                             var outpost = runtime.industry().sourceOutposts().outposts().stream()
-                                    .filter(value -> value.site().systemId().equals(fleet.currentSystemId()))
+                                    .filter(value -> value.site().systemId().equals(current.currentSystemId()))
                                     .filter(value -> value.source().sourceState().outputCommodityId()
                                             .equals(order.commodityId()))
                                     .findFirst().orElse(null);
                             if (outpost != null) {
-                                var extraction = runtime.extract(
-                                        outpost.site().siteId(), MAX_CYCLE_LOAD_KG, HANDLING_INTERVAL_SECONDS);
-                                if (extraction.committed() && extraction.outputMassStoredKg() > 0d) {
-                                    var staged = runtime.transferOutpostToOrderSource(
-                                            fleet.fleetId(),
-                                            outpost.site().siteId(),
-                                            extraction.outputMassStoredKg(),
-                                            HANDLING_INTERVAL_SECONDS);
-                                    if (staged.transferred()) {
-                                        extracted++;
+                                double stagingRateKgPerSecond = Math.min(
+                                        outpost.stationNode().handlingCapability().massRateKgPerSecond(),
+                                        endpoint.handlingCapability().massRateKgPerSecond());
+                                double extractionRequestKg = Math.min(
+                                        remainingCapacityKg,
+                                        stagingRateKgPerSecond * elapsedSimulationSeconds);
+                                if (extractionRequestKg > MASS_EPSILON_KG) {
+                                    var extraction = runtime.extract(
+                                            outpost.site().siteId(), extractionRequestKg,
+                                            elapsedSimulationSeconds);
+                                    if (extraction.committed() && extraction.outputMassStoredKg() > 0d) {
+                                        var staged = runtime.transferOutpostToOrderSource(
+                                                fleet.fleetId(),
+                                                outpost.site().siteId(),
+                                                extraction.outputMassStoredKg(),
+                                                elapsedSimulationSeconds);
+                                        if (staged.transferred()) {
+                                            extracted++;
+                                        }
                                     }
                                 }
                             }
                         }
-                        double available = endpoint.storage().commodityMassKg(order.commodityId());
-                        double mass = Math.min(MAX_CYCLE_LOAD_KG,
-                                Math.min(available, fleet.cargoCapacityKg()));
-                        if (mass > 0d && runtime.loadAtOrderSource(
-                                fleet.fleetId(), mass, simulationSeconds(),
-                                HANDLING_INTERVAL_SECONDS).transferred()) {
+                        current = runtime.freight().findFreighter(fleet.fleetId()).orElseThrow();
+                        remainingCapacityKg = Math.max(
+                                0d, current.cargoCapacityKg() - current.cargoMassKg());
+                        double availableKg = endpoint.storage().commodityMassKg(order.commodityId());
+                        double handlingBudgetKg = endpoint.handlingCapability().massRateKgPerSecond()
+                                * elapsedSimulationSeconds;
+                        double loadMassKg = Math.min(
+                                remainingCapacityKg, Math.min(availableKg, handlingBudgetKg));
+                        if (loadMassKg > MASS_EPSILON_KG && runtime.loadAtOrderSource(
+                                fleet.fleetId(), loadMassKg, simulationSeconds(),
+                                elapsedSimulationSeconds).transferred()) {
                             loaded++;
                         }
                     }
-                    FreighterState current = runtime.freight().findFreighter(fleet.fleetId()).orElseThrow();
-                    if (current.cargoMassKg() > 0d) {
+                    current = runtime.freight().findFreighter(fleet.fleetId()).orElseThrow();
+                    if (current.cargoMassKg() + MASS_EPSILON_KG >= current.cargoCapacityKg()) {
                         runtime.freight().dispatchOutbound(fleet.fleetId(), simulationSeconds());
                         dispatched++;
                     }
@@ -96,13 +123,21 @@ public final class GeneratedWorldFreightAutopilot {
                     }
                 }
                 case AT_DESTINATION -> {
-                    if (fleet.cargoMassKg() > 0d && runtime.unloadAtOrderDestination(
-                            fleet.fleetId(), fleet.cargoMassKg(),
-                            HANDLING_INTERVAL_SECONDS).transferred()) {
-                        unloaded++;
+                    if (fleet.cargoMassKg() > MASS_EPSILON_KG) {
+                        var endpoint = runtime.infrastructure().endpoint(
+                                runtime.freight().findOrder(fleet.activeOrderId()).orElseThrow()
+                                        .destinationEndpointId());
+                        double handlingBudgetKg = endpoint.handlingCapability().massRateKgPerSecond()
+                                * elapsedSimulationSeconds;
+                        double unloadMassKg = Math.min(fleet.cargoMassKg(), handlingBudgetKg);
+                        if (unloadMassKg > MASS_EPSILON_KG && runtime.unloadAtOrderDestination(
+                                fleet.fleetId(), unloadMassKg,
+                                elapsedSimulationSeconds).transferred()) {
+                            unloaded++;
+                        }
                     }
                     FreighterState current = runtime.freight().findFreighter(fleet.fleetId()).orElseThrow();
-                    if (current.cargoMassKg() <= 0d) {
+                    if (current.cargoMassKg() <= MASS_EPSILON_KG) {
                         runtime.freight().dispatchReturn(fleet.fleetId());
                         dispatched++;
                     }
