@@ -2,20 +2,23 @@ package com.spacesim.simulation;
 
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
+import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
 import com.spacesim.world.FleetLocationKind;
+import com.spacesim.world.StarSystemId;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
  * Ordinary-runtime freight circulation used by the generated-world campaign.
  *
  * <p>The service does not invent cargo, routes, owners, fleets or arrival coordinates. It consumes
- * accepted orders, existing station inventory and finite generated extraction sources through the
- * same Stage-18/20.5 APIs covered by final acceptance. One call performs at most one lifecycle
- * operation per freighter. Every extraction and cargo-transfer budget is derived from the explicit
- * simulation-time interval supplied by the campaign orchestrator, never from wall-clock time or
- * render cadence.</p>
+ * accepted orders, existing station inventory, the ordinary diplomatic market-access resolver and
+ * finite generated extraction sources through the same Stage-18/20.5 APIs covered by final
+ * acceptance. One call performs at most one lifecycle operation per freighter. Every extraction and
+ * cargo-transfer budget is derived from the explicit simulation-time interval supplied by the
+ * campaign orchestrator, never from wall-clock time or render cadence.</p>
  */
 public final class GeneratedWorldFreightAutopilot {
     private static final double MASS_EPSILON_KG = 1.0e-9d;
@@ -57,7 +60,11 @@ public final class GeneratedWorldFreightAutopilot {
             }
             switch (fleet.phase()) {
                 case AT_SOURCE -> {
-                    var order = runtime.freight().findOrder(fleet.activeOrderId()).orElseThrow();
+                    TransportOrderState order = runtime.freight()
+                            .findOrder(fleet.activeOrderId()).orElseThrow();
+                    if (!hasLegalOrderAccess(fleet, order)) {
+                        continue;
+                    }
                     var endpoint = runtime.infrastructure().endpoint(order.sourceEndpointId());
                     FreighterState current = runtime.freight().findFreighter(fleet.fleetId()).orElseThrow();
                     double remainingCapacityKg = Math.max(
@@ -148,6 +155,42 @@ public final class GeneratedWorldFreightAutopilot {
             }
         }
         return new ActionReport(loaded, unloaded, dispatched, jumpsRequested, extracted);
+    }
+
+    private boolean hasLegalOrderAccess(FreighterState fleet, TransportOrderState order) {
+        return hasLegalEndpointAccess(order.sourceEndpointId(), fleet.stableFactionId())
+                && hasLegalEndpointAccess(order.destinationEndpointId(), fleet.stableFactionId());
+    }
+
+    private boolean hasLegalEndpointAccess(String endpointId, String participantFactionId) {
+        var endpoint = runtime.infrastructure().endpoint(endpointId);
+        String owner = endpoint.generatedIndustrial()
+                ? industrialStationOwner(endpointId)
+                : territorialController(endpoint.systemId());
+        return owner != null
+                && runtime.world().evaluateFactionMarketAccess(owner, participantFactionId).allowed();
+    }
+
+    private String industrialStationOwner(String stationId) {
+        return runtime.industry().industrial().stations().stream()
+                .filter(value -> value.stationId().equals(stationId))
+                .map(value -> value.stableFactionId())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "generated industrial endpoint lacks its accepted owner: " + stationId));
+    }
+
+    private String territorialController(StarSystemId systemId) {
+        List<String> controllers = runtime.world().snapshot().factionStrategies().stream()
+                .filter(value -> value.controlledSystems().contains(systemId))
+                .map(value -> value.factionContentId())
+                .sorted()
+                .toList();
+        if (controllers.size() > 1) {
+            throw new IllegalStateException(
+                    "freight endpoint system has ambiguous territorial control: " + systemId);
+        }
+        return controllers.isEmpty() ? null : controllers.get(0);
     }
 
     private double simulationSeconds() {
