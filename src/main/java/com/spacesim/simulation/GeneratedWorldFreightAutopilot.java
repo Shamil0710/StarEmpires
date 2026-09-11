@@ -7,7 +7,6 @@ import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.StarSystemId;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -16,7 +15,9 @@ import java.util.Objects;
  * <p>The service does not invent cargo, routes, owners, fleets or arrival coordinates. It consumes
  * accepted orders, existing station inventory, the ordinary diplomatic market-access resolver and
  * finite generated extraction sources through the same Stage-18/20.5 APIs covered by final
- * acceptance. One call performs at most one lifecycle operation per freighter. Every extraction and
+ * acceptance. Canonical infrastructure in unclaimed space remains neutral rather than receiving an
+ * invented faction owner; controlled and generated-industrial endpoints use the existing diplomatic
+ * authority. One call performs at most one lifecycle operation per freighter. Every extraction and
  * cargo-transfer budget is derived from the explicit simulation-time interval supplied by the
  * campaign orchestrator, never from wall-clock time or render cadence.</p>
  */
@@ -167,9 +168,13 @@ public final class GeneratedWorldFreightAutopilot {
         var endpoint = runtime.infrastructure().endpoint(endpointId);
         String owner = endpoint.generatedIndustrial()
                 ? industrialStationOwner(endpointId)
-                : territorialController(endpoint.systemId());
-        return owner != null
-                && runtime.world().evaluateFactionMarketAccess(owner, participantFactionId).allowed();
+                : runtime.world().controllingFaction(endpoint.systemId()).orElse(null);
+        if (owner == null) {
+            // Canonical infrastructure in unclaimed space is neutral. There is no faction market
+            // owner whose persistent diplomacy could legally grant or deny access.
+            return true;
+        }
+        return runtime.world().evaluateFactionMarketAccess(owner, participantFactionId).allowed();
     }
 
     private String industrialStationOwner(String stationId) {
@@ -179,19 +184,6 @@ public final class GeneratedWorldFreightAutopilot {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "generated industrial endpoint lacks its accepted owner: " + stationId));
-    }
-
-    private String territorialController(StarSystemId systemId) {
-        List<String> controllers = runtime.world().snapshot().factionStrategies().stream()
-                .filter(value -> value.controlledSystems().contains(systemId))
-                .map(value -> value.factionContentId())
-                .sorted()
-                .toList();
-        if (controllers.size() > 1) {
-            throw new IllegalStateException(
-                    "freight endpoint system has ambiguous territorial control: " + systemId);
-        }
-        return controllers.isEmpty() ? null : controllers.get(0);
     }
 
     private double simulationSeconds() {
