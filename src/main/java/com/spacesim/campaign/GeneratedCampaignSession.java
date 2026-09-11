@@ -166,7 +166,7 @@ public final class GeneratedCampaignSession {
             fixedTicks += executed;
             if (executed == 1L
                     && afterTick % autonomousDecisionPeriodTicks(activeClock()) == 0L) {
-                lastAction = freightAutopilot.advance();
+                lastAction = freightAutopilot.advance(AUTONOMOUS_DECISION_PERIOD_SECONDS);
                 autonomousDecisions++;
             }
 
