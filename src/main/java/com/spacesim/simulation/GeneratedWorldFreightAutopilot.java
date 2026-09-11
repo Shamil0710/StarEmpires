@@ -71,8 +71,9 @@ public final class GeneratedWorldFreightAutopilot {
                             0d, current.cargoCapacityKg() - current.cargoMassKg());
                     if (remainingCapacityKg > MASS_EPSILON_KG) {
                         if (endpoint.storage().commodityMassKg(order.commodityId()) <= MASS_EPSILON_KG) {
+                            StarSystemId sourceSystemId = current.currentSystemId();
                             var outpost = runtime.industry().sourceOutposts().outposts().stream()
-                                    .filter(value -> value.site().systemId().equals(current.currentSystemId()))
+                                    .filter(value -> value.site().systemId().equals(sourceSystemId))
                                     .filter(value -> value.source().sourceState().outputCommodityId()
                                             .equals(order.commodityId()))
                                     .findFirst().orElse(null);
