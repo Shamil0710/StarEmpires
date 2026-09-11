@@ -226,7 +226,13 @@ public final class GeneratedCampaignSession {
             long fixedTicks,
             int autonomousDecisions,
             ActionReport lastAutonomousAction) {
-        /** Validates non-negative counters and a present diagnostic report. */
+        /**
+         * Validates non-negative counters and a present diagnostic report.
+         *
+         * @param fixedTicks authoritative local fixed ticks executed
+         * @param autonomousDecisions freight-policy decisions executed at canonical tick boundaries
+         * @param lastAutonomousAction diagnostics from the final autonomous decision in this call
+         */
         public AdvanceReport {
             if (fixedTicks < 0L || autonomousDecisions < 0) {
                 throw new IllegalArgumentException("Campaign advance counters cannot be negative");
