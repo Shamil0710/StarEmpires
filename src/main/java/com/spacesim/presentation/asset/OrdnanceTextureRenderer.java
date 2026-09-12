@@ -1,6 +1,7 @@
 package com.spacesim.presentation.asset;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.spacesim.presentation.asset.OrdnanceSpriteCatalog.SpriteVariant;
@@ -13,18 +14,22 @@ import java.util.Objects;
 /** GPU owner/drawer for presentation-only tactical projectile and missile sprites. */
 public final class OrdnanceTextureRenderer {
     private final Map<String, Texture> textures = new HashMap<>();
+    private final Map<String, VisibleRegion> visibleRegions = new HashMap<>();
     private boolean disposed;
 
     /** Loads the complete ordnance pack under an active libGDX graphics context. */
     public OrdnanceTextureRenderer() {
-        Map<String, Texture> loaded = new HashMap<>();
+        Map<String, Texture> loadedTextures = new HashMap<>();
+        Map<String, VisibleRegion> loadedRegions = new HashMap<>();
         try {
             for (String path : OrdnanceSpriteCatalog.allTexturePaths()) {
-                loaded.put(path, load(path));
+                loadedTextures.put(path, load(path));
+                loadedRegions.put(path, visibleRegion(path));
             }
-            textures.putAll(loaded);
+            textures.putAll(loadedTextures);
+            visibleRegions.putAll(loadedRegions);
         } catch (RuntimeException failure) {
-            loaded.values().forEach(Texture::dispose);
+            loadedTextures.values().forEach(Texture::dispose);
             throw failure;
         }
     }
@@ -44,6 +49,10 @@ public final class OrdnanceTextureRenderer {
 
     /**
      * Draws one supported body at the exact physical screen dimensions supplied by the caller.
+     *
+     * <p>The source region is cropped to non-transparent pixels before scaling. Generated artwork can
+     * therefore retain authoring padding without making the visible projectile or missile smaller than
+     * its authoritative physical {@code widthM/lengthM} projection.</p>
      *
      * @param batch active caller-owned batch
      * @param body immutable tactical body projection
@@ -76,7 +85,8 @@ public final class OrdnanceTextureRenderer {
         SpriteVariant variant = OrdnanceSpriteCatalog.resolve(
                 glyph.kind(), glyph.bodyId(), glyph.lengthM(), glyph.widthM());
         Texture texture = textures.get(variant.texturePath());
-        if (texture == null) {
+        VisibleRegion region = visibleRegions.get(variant.texturePath());
+        if (texture == null || region == null) {
             throw new IllegalStateException("ordnance texture is not loaded: " + variant.texturePath());
         }
         target.draw(
@@ -90,10 +100,10 @@ public final class OrdnanceTextureRenderer {
                 1f,
                 1f,
                 OrdnanceSpriteCatalog.rotationDegrees(glyph.headingRad()),
-                0,
-                0,
-                texture.getWidth(),
-                texture.getHeight(),
+                region.pixelX(),
+                region.pixelY(),
+                region.pixelWidth(),
+                region.pixelHeight(),
                 false,
                 false);
     }
@@ -106,11 +116,42 @@ public final class OrdnanceTextureRenderer {
         disposed = true;
         textures.values().forEach(Texture::dispose);
         textures.clear();
+        visibleRegions.clear();
     }
 
     private static Texture load(String path) {
         Texture texture = new Texture(Gdx.files.internal(path));
         texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         return texture;
+    }
+
+    // Fit the visible projectile/missile, not its transparent generated-image canvas, to physical dimensions.
+    private static VisibleRegion visibleRegion(String path) {
+        Pixmap image = new Pixmap(Gdx.files.internal(path));
+        try {
+            int minX = image.getWidth();
+            int minY = image.getHeight();
+            int maxX = -1;
+            int maxY = -1;
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
+                    if ((image.getPixel(x, y) & 255) > 0) {
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            if (maxX < 0) {
+                return new VisibleRegion(0, 0, image.getWidth(), image.getHeight());
+            }
+            return new VisibleRegion(minX, minY, maxX - minX + 1, maxY - minY + 1);
+        } finally {
+            image.dispose();
+        }
+    }
+
+    private record VisibleRegion(int pixelX, int pixelY, int pixelWidth, int pixelHeight) {
     }
 }
