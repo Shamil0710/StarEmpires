@@ -108,14 +108,15 @@ public record GeneratedWorldUiSnapshot(
 
         /**
          * Preserves simulation-authoritative dimensions while passing artwork into the UI. Governed
-         * core-faction cargo projections are upgraded to exact Stage-22 production artwork here, after
-         * physical scale has already been resolved by the current runtime authority.
+         * core-faction compatibility ship projections are upgraded to exact Stage-22 production artwork
+         * here only for explicitly mapped roles, after physical scale has already been resolved by the
+         * current runtime authority.
          *
          * @param resolved artwork with resolved physical dimensions
          * @return projection retaining physical scale and, when governed, production faction artwork
          */
         public LocalObjectView withScale(ResolvedSprite resolved) {
-            ResolvedSprite selected = Stage22ProductionShipSpriteAdapter.upgradeCoreCargoProjection(
+            ResolvedSprite selected = Stage22ProductionShipSpriteAdapter.upgradeCoreProjection(
                     stableId,
                     factionId,
                     Objects.requireNonNull(resolved, "resolved"),
