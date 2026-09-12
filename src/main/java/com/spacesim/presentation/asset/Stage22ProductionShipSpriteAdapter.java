@@ -1,11 +1,14 @@
 package com.spacesim.presentation.asset;
 
+import com.spacesim.content.Stage22EmpirePackageCatalog;
+import com.spacesim.content.Stage22IndustrialUnionPackageCatalog;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.AtlasRegion;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ScaleAuthority;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.VisualRole;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.ResolvedVisual;
+import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
 
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +38,69 @@ public final class Stage22ProductionShipSpriteAdapter {
      */
     public static ResolvedSprite adapt(ResolvedVisual resolved) {
         ResolvedVisual visual = Objects.requireNonNull(resolved, "resolved");
+        return adaptAtScale(
+                visual,
+                visual.worldLengthM(),
+                visual.worldWidthM(),
+                ScaleAuthority.EXACT_PHYSICAL_CONTENT,
+                CURRENT_VERSION + '#' + visual.key().fitFingerprint());
+    }
+
+    /**
+     * Replaces legacy cargo artwork for the two governed core factions while preserving the current
+     * runtime's physical scale authority until the provisional Stage-20.5 freight hull/fit is migrated.
+     *
+     * <p>For a governed production faction there is deliberately no fallback after the cargo role is
+     * recognized: missing/stale Stage-22 content propagates as an explicit resolver error. Non-core
+     * factions and non-cargo roles retain the supplied legacy projection.</p>
+     *
+     * @param stableEntityId persistent local/fleet identity used by the production binding key
+     * @param stableFactionId authoritative stable owning faction
+     * @param legacy current runtime physical projection
+     * @param runtimeState current presentation state
+     * @return production artwork at unchanged simulation-authoritative world dimensions, or legacy when not governed
+     */
+    public static ResolvedSprite upgradeCoreCargoProjection(
+            String stableEntityId,
+            String stableFactionId,
+            ResolvedSprite legacy,
+            RuntimeVisualState runtimeState) {
+        ResolvedSprite physical = Objects.requireNonNull(legacy, "legacy");
+        if (physical.binding().role() != VisualRole.CARGO_TRANSPORT_SHIP
+                || !isCoreProductionFaction(stableFactionId)) {
+            return physical;
+        }
+        ResolvedVisual visual = Stage22ProductionShipVisualResolver.resolveRole(
+                stableEntityId,
+                stableFactionId,
+                "role.support.freight",
+                Objects.requireNonNull(runtimeState, "runtimeState"));
+        return adaptAtScale(
+                visual,
+                physical.worldLengthM(),
+                physical.worldWidthM(),
+                physical.scaleAuthority(),
+                physical.scaleAuthorityId() + "|visual=" + visual.key().visualBindingId()
+                        + ':' + visual.key().fitFingerprint());
+    }
+
+    /** @return whether a classpath path is inside an accepted Stage-22 ship production tree. */
+    public static boolean isProductionPath(String path) {
+        if (path == null) {
+            return false;
+        }
+        String value = path.strip();
+        return value.startsWith("assets/ships/")
+                && value.contains("/production/")
+                && value.endsWith("_base.png");
+    }
+
+    private static ResolvedSprite adaptAtScale(
+            ResolvedVisual visual,
+            double worldLengthM,
+            double worldWidthM,
+            ScaleAuthority scaleAuthority,
+            String scaleAuthorityId) {
         if (!isProductionPath(visual.assetRef())) {
             throw new IllegalArgumentException(
                     "Stage-22 production adapter refuses non-production asset: " + visual.assetRef());
@@ -52,21 +118,15 @@ public final class Stage22ProductionShipSpriteAdapter {
                 List.of());
         return new ResolvedSprite(
                 binding,
-                visual.worldLengthM(),
-                visual.worldWidthM(),
-                ScaleAuthority.EXACT_PHYSICAL_CONTENT,
-                CURRENT_VERSION + '#' + visual.key().fitFingerprint());
+                worldLengthM,
+                worldWidthM,
+                Objects.requireNonNull(scaleAuthority, "scaleAuthority"),
+                Objects.requireNonNull(scaleAuthorityId, "scaleAuthorityId"));
     }
 
-    /** @return whether a classpath path is inside an accepted Stage-22 ship production tree. */
-    public static boolean isProductionPath(String path) {
-        if (path == null) {
-            return false;
-        }
-        String value = path.strip();
-        return value.startsWith("assets/ships/")
-                && value.contains("/production/")
-                && value.endsWith("_base.png");
+    private static boolean isCoreProductionFaction(String factionId) {
+        return Stage22EmpirePackageCatalog.STABLE_FACTION_ID.equals(factionId)
+                || Stage22IndustrialUnionPackageCatalog.STABLE_FACTION_ID.equals(factionId);
     }
 
     private static VisualRole visualRole(String roleId) {
