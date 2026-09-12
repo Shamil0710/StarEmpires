@@ -4,9 +4,9 @@ The current-system map uses one of four packaged space backgrounds under the tac
 
 ## Identity and determinism
 
-Background choice is presentation-only and is a pure function of the persistent generated-world seed and stable `StarSystemId`. It does not consume the simulation RNG and does not introduce a second persistence authority. The same campaign and system therefore resolve the same background after restart, save/load, UI navigation, or a different rendering order.
+Background choice is presentation-only and is a pure function of the persistent generated-world seed and stable `SectorId`. It does not consume the simulation RNG and does not introduce a second persistence authority. The same campaign and sector therefore resolve the same background after restart, save/load, UI navigation, or a different rendering order. Every star system contained by that sector uses the same image.
 
-The current selector applies a stable 64-bit mixing function to `(worldSeed, systemId)` and maps the result to the ordered background catalogue. Reordering, adding, or removing catalogue entries intentionally changes this presentation mapping and should be treated as a visual compatibility change.
+The current selector applies a stable 64-bit mixing function to `(worldSeed, sectorId)` and maps the result to the ordered background catalogue. The strategic presentation projection obtains each system's real containing `SectorId` from authoritative `GalaxyTopology`; the renderer may enter through the active `StarSystemId`, but that ID is only used to resolve the containing sector and is not part of the background hash. Reordering, adding, or removing catalogue entries intentionally changes this presentation mapping and should be treated as a visual compatibility change.
 
 ## Rendering contract
 
@@ -22,4 +22,4 @@ This does not change system geometry, physical scale, simulation state, save for
 
 ## Regression coverage
 
-`SectorSpaceBackgroundCatalogTest` verifies stable repeat selection, participation of the world seed, distribution across the complete four-image pack, and presence of valid packaged JPEG resources.
+`SectorSpaceBackgroundCatalogTest` verifies stable repeat selection, identical resolution for multiple systems in the same sector, participation of the world seed, distribution across the complete four-image pack, rejection of unbound systems, and presence of valid packaged JPEG resources.
