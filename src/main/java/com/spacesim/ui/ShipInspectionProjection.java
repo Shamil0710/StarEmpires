@@ -1,11 +1,14 @@
 package com.spacesim.ui;
 
+import com.spacesim.content.ship.ShipEngineeringCatalog.DemonstratorFitDefinition;
 import com.spacesim.ship.LiveTacticalBattleDeceptionRuntime;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.CombatantRuntime;
 import com.spacesim.ship.ShieldFieldRuntime.State;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ui.ScaledTacticalDebugSnapshot.CombatantDebug;
 import com.spacesim.ui.ShipInspectionSnapshot.ShieldSummary;
 import com.spacesim.ui.ShipInspectionSnapshot.TrackSummary;
+import com.spacesim.ui.ShipInspectionSnapshot.VisualIdentity;
 import com.spacesim.ui.ShipInspectionSnapshot.WeaponFeed;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShipGlyph;
 
@@ -68,13 +71,16 @@ public final class ShipInspectionProjection {
         List<TrackSummary> tracks = row.tracks().stream()
                 .map(track -> new TrackSummary(track.targetId(), track.informationState(), track.positionKnown()))
                 .toList();
+        VisualIdentity visualIdentity = combatant.stableFactionId() == null
+                ? null
+                : new VisualIdentity(combatant.stableFactionId(), combatant.engineering().fit);
 
         return Optional.of(new ShipInspectionSnapshot(
                 entityId,
                 combatant.spec().side(),
                 glyph.role(),
                 combatant.hull().id(),
-                combatant.doctrine().fitId(),
+                exactFitId(runtime, combatant.engineering().fit),
                 combatant.spec().doctrineId(),
                 glyph.wreck(),
                 row.meanCompartmentIntegrity(),
@@ -100,7 +106,19 @@ public final class ShipInspectionProjection {
                 row.survivalReason().name(),
                 formationText(row),
                 "N/A — no authoritative acceleration field",
-                "N/A — no selected-ship ECM/ECCM inspection field"));
+                "N/A — no selected-ship ECM/ECCM inspection field",
+                visualIdentity));
+    }
+
+    private static String exactFitId(
+            LiveTacticalBattleDeceptionRuntime runtime,
+            InstalledFit installedFit) {
+        return runtime.battleState().engineeringCatalog().getDemonstratorFits().stream()
+                .filter(definition -> InstalledFit.fromDemonstrator(definition).equals(installedFit))
+                .map(DemonstratorFitDefinition::id)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Selected tactical ship has no exact battle-local fit identity: " + installedFit.hullId()));
     }
 
     private static ShieldSummary shieldSummary(Map<String, State> states) {
