@@ -23,9 +23,21 @@ public final class OrdnanceSpriteCatalog {
     private static final String ROOT = "assets/ordnance/";
     private static final double DIMENSION_EPSILON_M = 1e-9d;
 
-    /** One immutable authored ordnance image. */
+    /**
+     * One immutable authored ordnance image.
+     *
+     * @param assetId stable non-blank presentation asset identity
+     * @param kind supported tactical ordnance body kind
+     * @param texturePath non-blank classpath texture path
+     */
     public record SpriteVariant(String assetId, BodyKind kind, String texturePath) {
-        /** Validates presentation metadata only. */
+        /**
+         * Validates presentation metadata only.
+         *
+         * @param assetId stable non-blank presentation asset identity
+         * @param kind supported tactical ordnance body kind
+         * @param texturePath non-blank classpath texture path
+         */
         public SpriteVariant {
             assetId = requireText(assetId, "assetId");
             Objects.requireNonNull(kind, "kind");
