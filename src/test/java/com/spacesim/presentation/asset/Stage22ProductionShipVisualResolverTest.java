@@ -112,7 +112,7 @@ class Stage22ProductionShipVisualResolverTest {
 
     @Test
     void coreCargoUpgradeChangesOnlyArtworkAndKeepsCurrentPhysicalScale() {
-        ResolvedSprite legacy = legacyCargo(321d, 87d);
+        ResolvedSprite legacy = legacySprite(VisualRole.CARGO_TRANSPORT_SHIP, 321d, 87d);
 
         ResolvedSprite empire = Stage22ProductionShipSpriteAdapter.upgradeCoreCargoProjection(
                 "fleet:501",
@@ -142,6 +142,39 @@ class Stage22ProductionShipVisualResolverTest {
     }
 
     @Test
+    void coreMediumCombatCompatibilityUsesFactionDestroyerArtWithoutRewritingPhysicalHull() {
+        ResolvedSprite provisional = legacySprite(VisualRole.MEDIUM_COMBAT_SHIP, 230d, 74d);
+
+        ResolvedSprite empire = Stage22ProductionShipSpriteAdapter.upgradeCoreProjection(
+                "fleet:601",
+                Stage22EmpirePackageCatalog.STABLE_FACTION_ID,
+                provisional,
+                RuntimeVisualState.IDLE);
+        ResolvedSprite union = Stage22ProductionShipSpriteAdapter.upgradeCoreProjection(
+                "fleet:602",
+                Stage22IndustrialUnionPackageCatalog.STABLE_FACTION_ID,
+                provisional,
+                RuntimeVisualState.THRUSTING);
+        ResolvedSprite generatedCompatibility = Stage22ProductionShipSpriteAdapter.upgradeCoreProjection(
+                "fleet:603",
+                "faction.alpha",
+                provisional,
+                RuntimeVisualState.IDLE);
+
+        assertEquals("assets/ships/empire/production/destroyer/destroyer_base.png",
+                empire.binding().texturePath());
+        assertEquals("assets/ships/industrial_union/production/destroyer/destroyer_base.png",
+                union.binding().texturePath());
+        assertEquals(230d, empire.worldLengthM());
+        assertEquals(74d, empire.worldWidthM());
+        assertEquals(230d, union.worldLengthM());
+        assertEquals(74d, union.worldWidthM());
+        assertEquals(provisional.scaleAuthority(), empire.scaleAuthority());
+        assertEquals(provisional.scaleAuthority(), union.scaleAuthority());
+        assertSame(provisional, generatedCompatibility);
+    }
+
+    @Test
     void unsupportedFactionAndRoleFailClosed() {
         assertThrows(IllegalArgumentException.class, () -> Stage22ProductionShipVisualResolver.resolveRole(
                 "fleet:404", "faction.unknown", "role.support.freight", RuntimeVisualState.IDLE));
@@ -152,10 +185,10 @@ class Stage22ProductionShipVisualResolverTest {
                 RuntimeVisualState.IDLE));
     }
 
-    private static ResolvedSprite legacyCargo(double lengthM, double widthM) {
+    private static ResolvedSprite legacySprite(VisualRole role, double lengthM, double widthM) {
         SpriteBinding binding = new SpriteBinding(
-                "legacy.test.freight",
-                VisualRole.CARGO_TRANSPORT_SHIP,
+                "legacy.test." + role.name().toLowerCase(java.util.Locale.ROOT),
+                role,
                 "assets/ships/ship_sprite_reference_pack_v1.png",
                 new AtlasRegion(0, 0, 1, 1),
                 0.5f,
