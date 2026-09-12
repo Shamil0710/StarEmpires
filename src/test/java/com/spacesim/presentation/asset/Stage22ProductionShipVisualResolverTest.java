@@ -5,6 +5,8 @@ import com.spacesim.content.Stage22EmpirePackageCatalog;
 import com.spacesim.content.Stage22EmpirePackageLoader;
 import com.spacesim.content.Stage22IndustrialUnionPackageCatalog;
 import com.spacesim.content.Stage22IndustrialUnionPackageLoader;
+import com.spacesim.content.ship.Stage22EmpireEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage22IndustrialUnionEngineeringCatalogLoader;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.AtlasRegion;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ScaleAuthority;
@@ -12,6 +14,7 @@ import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.Sprit
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.VisualRole;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.ResolvedVisual;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -72,6 +75,40 @@ class Stage22ProductionShipVisualResolverTest {
                     family.refitFitId(),
                     family.roleId());
         });
+    }
+
+    @Test
+    void installedEngineeringFitResolvesThroughSameExactProductionAuthority() {
+        var empireFamily = Stage22EmpirePackageLoader.loadDefault().shipFamilies().stream()
+                .filter(family -> family.roleId().equals("role.military.destroyer"))
+                .findFirst().orElseThrow();
+        var empireEngineering = Stage22EmpireEngineeringCatalogLoader.loadDefault();
+        InstalledFit empireInstalled = InstalledFit.fromDemonstrator(
+                empireEngineering.findDemonstratorFit(empireFamily.primaryFitId()));
+        ResolvedVisual empire = Stage22ProductionShipVisualResolver.resolveInstalledFit(
+                "fleet:701",
+                Stage22EmpirePackageCatalog.STABLE_FACTION_ID,
+                empireInstalled,
+                RuntimeVisualState.IDLE);
+
+        var unionFamily = Stage22IndustrialUnionPackageLoader.loadDefault().shipFamilies().stream()
+                .filter(family -> family.roleId().equals("role.military.destroyer"))
+                .findFirst().orElseThrow();
+        var unionEngineering = Stage22IndustrialUnionEngineeringCatalogLoader.loadDefault();
+        InstalledFit unionInstalled = InstalledFit.fromDemonstrator(
+                unionEngineering.findDemonstratorFit(unionFamily.primaryFitId()));
+        ResolvedVisual union = Stage22ProductionShipVisualResolver.resolveInstalledFit(
+                "fleet:702",
+                Stage22IndustrialUnionPackageCatalog.STABLE_FACTION_ID,
+                unionInstalled,
+                RuntimeVisualState.THRUSTING);
+
+        assertEquals(empireFamily.primaryFitId(), empire.key().fitId());
+        assertEquals(empireFamily.roleId(), empire.key().roleId());
+        assertEquals("assets/ships/empire/production/destroyer/destroyer_base.png", empire.assetRef());
+        assertEquals(unionFamily.primaryFitId(), union.key().fitId());
+        assertEquals(unionFamily.roleId(), union.key().roleId());
+        assertEquals("assets/ships/industrial_union/production/destroyer/destroyer_base.png", union.assetRef());
     }
 
     @Test
