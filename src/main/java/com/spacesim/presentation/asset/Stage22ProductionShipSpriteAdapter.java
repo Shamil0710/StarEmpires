@@ -173,7 +173,12 @@ public final class Stage22ProductionShipSpriteAdapter {
         return upgradeCoreProjection(stableEntityId, stableFactionId, physical, runtimeState);
     }
 
-    /** @return whether a classpath path is inside an accepted Stage-22 ship production tree. */
+    /**
+     * Checks whether a classpath path is inside an accepted Stage-22 ship production tree.
+     *
+     * @param path classpath asset path to validate
+     * @return whether the path identifies an accepted production base sprite
+     */
     public static boolean isProductionPath(String path) {
         if (path == null) {
             return false;
