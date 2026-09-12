@@ -23,7 +23,7 @@ import java.util.Objects;
  */
 public final class Stage22ProductionShipSpriteAdapter {
     /** Versioned handoff contract between the Stage-22 resolver and the existing generated-world UI. */
-    public static final String CURRENT_VERSION = "stage22_7.production-ship-sprite-adapter.v1";
+    public static final String CURRENT_VERSION = "stage22_7.production-ship-sprite-adapter.v2";
 
     private Stage22ProductionShipSpriteAdapter() {
         throw new AssertionError("utility class");
@@ -47,12 +47,13 @@ public final class Stage22ProductionShipSpriteAdapter {
     }
 
     /**
-     * Replaces legacy cargo artwork for the two governed core factions while preserving the current
-     * runtime's physical scale authority until the provisional Stage-20.5 freight hull/fit is migrated.
+     * Upgrades a governed core-faction compatibility projection to the corresponding Stage-22
+     * production artwork while preserving the current runtime's physical scale authority.
      *
-     * <p>For a governed production faction there is deliberately no fallback after the cargo role is
-     * recognized: missing/stale Stage-22 content propagates as an explicit resolver error. Non-core
-     * factions and non-cargo roles retain the supplied legacy projection.</p>
+     * <p>Current compatibility mappings are intentionally narrow: cargo transport maps to the authored
+     * freight family and the provisional Stage-21 medium combat hull maps to the authored destroyer
+     * family. No mapping is inferred for world-generated compatibility factions such as faction.alpha
+     * or faction.beta, and unsupported roles retain their supplied projection.</p>
      *
      * @param stableEntityId persistent local/fleet identity used by the production binding key
      * @param stableFactionId authoritative stable owning faction
@@ -60,20 +61,27 @@ public final class Stage22ProductionShipSpriteAdapter {
      * @param runtimeState current presentation state
      * @return production artwork at unchanged simulation-authoritative world dimensions, or legacy when not governed
      */
-    public static ResolvedSprite upgradeCoreCargoProjection(
+    public static ResolvedSprite upgradeCoreProjection(
             String stableEntityId,
             String stableFactionId,
             ResolvedSprite legacy,
             RuntimeVisualState runtimeState) {
         ResolvedSprite physical = Objects.requireNonNull(legacy, "legacy");
-        if (physical.binding().role() != VisualRole.CARGO_TRANSPORT_SHIP
-                || !isCoreProductionFaction(stableFactionId)) {
+        if (!isCoreProductionFaction(stableFactionId)) {
+            return physical;
+        }
+        String roleId = switch (physical.binding().role()) {
+            case CARGO_TRANSPORT_SHIP -> "role.support.freight";
+            case MEDIUM_COMBAT_SHIP -> "role.military.destroyer";
+            default -> null;
+        };
+        if (roleId == null) {
             return physical;
         }
         ResolvedVisual visual = Stage22ProductionShipVisualResolver.resolveRole(
                 stableEntityId,
                 stableFactionId,
-                "role.support.freight",
+                roleId,
                 Objects.requireNonNull(runtimeState, "runtimeState"));
         return adaptAtScale(
                 visual,
@@ -82,6 +90,27 @@ public final class Stage22ProductionShipSpriteAdapter {
                 physical.scaleAuthority(),
                 physical.authorityId() + "|visual=" + visual.key().visualBindingId()
                         + ':' + visual.key().fitFingerprint());
+    }
+
+    /**
+     * Backwards-compatible cargo-only entry point retained for callers that explicitly require freight.
+     *
+     * @param stableEntityId persistent local/fleet identity
+     * @param stableFactionId authoritative stable owning faction
+     * @param legacy current runtime physical projection
+     * @param runtimeState current presentation state
+     * @return cargo production artwork when governed; otherwise the supplied projection
+     */
+    public static ResolvedSprite upgradeCoreCargoProjection(
+            String stableEntityId,
+            String stableFactionId,
+            ResolvedSprite legacy,
+            RuntimeVisualState runtimeState) {
+        ResolvedSprite physical = Objects.requireNonNull(legacy, "legacy");
+        if (physical.binding().role() != VisualRole.CARGO_TRANSPORT_SHIP) {
+            return physical;
+        }
+        return upgradeCoreProjection(stableEntityId, stableFactionId, physical, runtimeState);
     }
 
     /** @return whether a classpath path is inside an accepted Stage-22 ship production tree. */
