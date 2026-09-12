@@ -1,9 +1,12 @@
 package com.spacesim.presentation.asset;
 
 import com.spacesim.world.SectorId;
+import com.spacesim.world.StarSystemId;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /** Deterministic presentation-only catalogue for sector space backgrounds. */
 public final class SectorSpaceBackgroundCatalog {
@@ -12,6 +15,7 @@ public final class SectorSpaceBackgroundCatalog {
             "assets/backgrounds/sector_space_02.jpg",
             "assets/backgrounds/sector_space_03.jpg",
             "assets/backgrounds/sector_space_04.jpg");
+    private static final ConcurrentMap<StarSystemId, SectorId> SYSTEM_SECTORS = new ConcurrentHashMap<>();
 
     private SectorSpaceBackgroundCatalog() {
     }
@@ -19,6 +23,19 @@ public final class SectorSpaceBackgroundCatalog {
     /** @return immutable ordered list of packaged background texture paths */
     public static List<String> allTexturePaths() {
         return TEXTURE_PATHS;
+    }
+
+    /**
+     * Records the authoritative topology relationship used only to resolve a system to its sector
+     * at the presentation boundary. Re-registering the same system with the same sector is harmless.
+     *
+     * @param systemId stable star-system identity
+     * @param sectorId stable containing-sector identity
+     */
+    public static void registerSystemSector(StarSystemId systemId, SectorId sectorId) {
+        SYSTEM_SECTORS.put(
+                Objects.requireNonNull(systemId, "systemId"),
+                Objects.requireNonNull(sectorId, "sectorId"));
     }
 
     /**
@@ -47,6 +64,23 @@ public final class SectorSpaceBackgroundCatalog {
      */
     public static String texturePath(long worldSeed, SectorId sectorId) {
         return TEXTURE_PATHS.get(textureIndex(worldSeed, sectorId));
+    }
+
+    /**
+     * Resolves a system through the authoritative topology binding, then applies sector selection.
+     * This overload exists so the command renderer does not need to duplicate topology lookup logic.
+     *
+     * @param worldSeed persistent generated-world seed
+     * @param systemId stable active-system identity
+     * @return packaged texture path selected for the containing sector
+     */
+    public static String texturePath(long worldSeed, StarSystemId systemId) {
+        StarSystemId checked = Objects.requireNonNull(systemId, "systemId");
+        SectorId sectorId = SYSTEM_SECTORS.get(checked);
+        if (sectorId == null) {
+            throw new IllegalStateException("No sector binding registered for star system " + checked.value());
+        }
+        return texturePath(worldSeed, sectorId);
     }
 
     private static long mix64(long value) {
