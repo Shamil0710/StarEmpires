@@ -1,5 +1,7 @@
 package com.spacesim.simulation;
 
+import com.spacesim.content.Stage18ExtractionCatalogLoader;
+import com.spacesim.content.Stage18ResourceOntologyLoader;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
 import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
@@ -79,12 +81,11 @@ public final class GeneratedWorldFreightAutopilot {
                                             .equals(order.commodityId()))
                                     .findFirst().orElse(null);
                             if (outpost != null) {
-                                double stagingRateKgPerSecond = Math.min(
-                                        outpost.stationNode().handlingCapability().massRateKgPerSecond(),
-                                        endpoint.handlingCapability().massRateKgPerSecond());
-                                double extractionRequestKg = Math.min(
+                                double extractionRequestKg = feasibleExtractionSourceMassKg(
+                                        outpost,
+                                        endpoint,
                                         remainingCapacityKg,
-                                        stagingRateKgPerSecond * elapsedSimulationSeconds);
+                                        elapsedSimulationSeconds);
                                 if (extractionRequestKg > MASS_EPSILON_KG) {
                                     var extraction = runtime.extract(
                                             outpost.site().siteId(), extractionRequestKg,
@@ -117,7 +118,7 @@ public final class GeneratedWorldFreightAutopilot {
                         }
                     }
                     current = runtime.freight().findFreighter(fleet.fleetId()).orElseThrow();
-                    if (current.cargoMassKg() + MASS_EPSILON_KG >= current.cargoCapacityKg()) {
+                    if (current.cargoMassKg() > MASS_EPSILON_KG) {
                         runtime.freight().dispatchOutbound(fleet.fleetId(), simulationSeconds());
                         dispatched++;
                     }
@@ -157,6 +158,62 @@ public final class GeneratedWorldFreightAutopilot {
             }
         }
         return new ActionReport(loaded, unloaded, dispatched, jumpsRequested, extracted);
+    }
+
+    private double feasibleExtractionSourceMassKg(
+            com.spacesim.persistence.Stage20SourceOutpostMaterializer.MaterializedExtractionOutpost outpost,
+            com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint endpoint,
+            double remainingFreightCapacityKg,
+            double elapsedSimulationSeconds) {
+        var source = outpost.source().sourceState();
+        var method = Stage18ExtractionCatalogLoader.loadDefault()
+                .findMethod(outpost.site().extractionMethodId());
+        if (method == null) {
+            throw new IllegalStateException(
+                    "generated extraction site references missing installed method: "
+                            + outpost.site().extractionMethodId());
+        }
+        var commodity = Stage18ResourceOntologyLoader.loadDefault()
+                .findCommodity(source.outputCommodityId());
+        if (commodity == null) {
+            throw new IllegalStateException(
+                    "generated extraction source references missing installed commodity: "
+                            + source.outputCommodityId());
+        }
+        double recoveryFraction = source.gradeFraction()
+                * source.sourceRecoveryFraction()
+                * method.recoveryFraction();
+        if (!Double.isFinite(recoveryFraction) || recoveryFraction <= MASS_EPSILON_KG) {
+            return 0d;
+        }
+
+        var facility = outpost.facilityCapability();
+        double maxSourceMassKg = source.remainingAccessibleMassKg();
+        maxSourceMassKg = Math.min(
+                maxSourceMassKg,
+                method.maxSourceKgPerSecond() * elapsedSimulationSeconds);
+        maxSourceMassKg = Math.min(
+                maxSourceMassKg,
+                facility.effectiveProcessPowerW() * elapsedSimulationSeconds
+                        / method.energyJPerSourceKg());
+        maxSourceMassKg = Math.min(
+                maxSourceMassKg,
+                facility.effectiveEngineeringWorkRate() * elapsedSimulationSeconds
+                        / method.workSecondsPerSourceKg());
+        maxSourceMassKg = Math.min(
+                maxSourceMassKg,
+                facility.effectiveMaintenanceWorkRate() * elapsedSimulationSeconds
+                        / method.maintenanceWorkSecondsPerSourceKg());
+
+        double outpostStorageOutputKg = outpost.storage().remainingCapacityKg(commodity.storageClassId());
+        double stagingOutputKg = Math.min(
+                outpost.stationNode().handlingCapability().massRateKgPerSecond(),
+                endpoint.handlingCapability().massRateKgPerSecond()) * elapsedSimulationSeconds;
+        double outputBudgetKg = Math.min(
+                remainingFreightCapacityKg,
+                Math.min(outpostStorageOutputKg, stagingOutputKg));
+        maxSourceMassKg = Math.min(maxSourceMassKg, outputBudgetKg / recoveryFraction);
+        return Math.max(0d, maxSourceMassKg);
     }
 
     private boolean hasLegalOrderAccess(FreighterState fleet, TransportOrderState order) {
