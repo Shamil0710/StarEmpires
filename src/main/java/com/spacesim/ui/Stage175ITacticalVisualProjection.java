@@ -25,13 +25,13 @@ import java.util.Objects;
 /**
  * Pure Stage-17.5I adapter from authoritative combat state into tactical presentation primitives.
  *
- * <p>This class owns no simulation state and exposes no mutation back-channel. All scaling constants
- * are cosmetic read-only choices. They influence only glyph size/trails/debris placement and never
+ * <p>This class owns no simulation state and exposes no mutation back-channel. Physical ordnance
+ * dimensions are projected without readability inflation so ships, missiles and kinetic rounds keep
+ * one common world scale. Cosmetic constants affect only trails, decoys, debris and shields and never
  * feed combat equations, culling, guidance, protection or persistence.</p>
  */
 public final class Stage175ITacticalVisualProjection {
     private static final double TRAIL_SECONDS = 0.05d;
-    private static final double MIN_BODY_MARKER_M = 12d;
     private static final double MIN_DECOY_MARKER_M = 18d;
     private static final double SHIELD_RADIUS_MULTIPLIER = 0.62d;
     private static final int WRECK_DEBRIS_COUNT = 6;
@@ -101,29 +101,28 @@ public final class Stage175ITacticalVisualProjection {
     }
 
     /**
-     * Projects one authoritative kinetic body.
+     * Projects one authoritative kinetic body at its exact physical dimensions.
      *
      * @param body physical projectile body
      * @return this projection builder
      */
     public Stage175ITacticalVisualProjection addKinetic(ProjectileBody body) {
         ProjectileBody checked = Objects.requireNonNull(body, "body");
-        double markerLength = Math.max(MIN_BODY_MARKER_M, checked.lengthM());
-        double markerWidth = Math.max(MIN_BODY_MARKER_M * 0.32d, checked.diameterM());
         bodies.add(new BodyGlyph(
                 BodyKind.KINETIC_PROJECTILE,
                 checked.projectileId(),
                 checked.xM(),
                 checked.yM(),
                 heading(checked.velocityXMps(), checked.velocityYMps()),
-                markerLength,
-                markerWidth,
+                checked.lengthM(),
+                checked.diameterM(),
                 checked.speedMps() * TRAIL_SECONDS));
         return this;
     }
 
     /**
-     * Projects one authoritative guided body as an offensive missile or defensive interceptor.
+     * Projects one authoritative guided body as an offensive missile or defensive interceptor at its
+     * exact physical dimensions.
      *
      * @param body physical guided body
      * @param interceptor whether presentation should identify this body as an interceptor
@@ -137,8 +136,8 @@ public final class Stage175ITacticalVisualProjection {
                 checked.xM(),
                 checked.yM(),
                 heading(checked.velocityXMps(), checked.velocityYMps()),
-                Math.max(MIN_BODY_MARKER_M, checked.lengthM()),
-                Math.max(MIN_BODY_MARKER_M * 0.4d, checked.diameterM()),
+                checked.lengthM(),
+                checked.diameterM(),
                 checked.speedMps() * TRAIL_SECONDS));
         return this;
     }
