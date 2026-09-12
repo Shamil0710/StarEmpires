@@ -2,18 +2,18 @@
 
 ## Purpose
 
-M22.7C introduces one deterministic, fail-closed presentation authority for authored Stage-22 ship visuals. The resolver is intentionally read-only: artwork, alpha bounds, pivots and visual-profile metadata never become simulation, collision, fitting, economy, sensor or persistence authority.
+M22.7C provides one deterministic, fail-closed presentation authority for authored Stage-22 ship visuals across the production-client system, global, tactical and inspector surfaces. Artwork, alpha bounds, pivots and visual-profile metadata remain presentation-only and never become simulation, collision, fitting, economy, sensor or persistence authority.
 
-The current integration establishes the production resolver and a generated-world UI compatibility seam for ships that already carry one of the two canonical governed core faction identities. It does **not** rename or reinterpret world-generated compatibility factions, does **not** claim that provisional Stage-20.5/21 freight or military engineering has already been replaced in simulation, and does **not** mark the deferred human aesthetic review in #361 as passed.
+Human aesthetic approval remains deferred under #361. That review state is deliberately independent from automated binding correctness.
 
 ## Authoritative selection key
 
-`Stage22ProductionShipVisualResolver` resolves a visual from accepted Stage-22 content authorities and records a complete immutable `BindingKey` containing:
+`Stage22ProductionShipVisualResolver` resolves a visual from accepted Stage-22 content authorities and records an immutable `BindingKey` containing:
 
 - stable runtime/entity identity;
 - stable faction identity;
 - systemic faction-profile identity;
-- ship visual-profile identity and its governed maturity status;
+- ship visual-profile identity and governed maturity status;
 - authored ship family and common role;
 - exact Stage-22 hull and fit IDs;
 - exact semantic fit fingerprint;
@@ -22,73 +22,91 @@ The current integration establishes the production resolver and a generated-worl
 - faction-profile catalog fingerprint;
 - runtime presentation state (`IDLE`, `THRUSTING`, or `DAMAGED`).
 
-The broad faction ship visual profile currently remains `CONCEPT`, consistent with deferred human review #361. That status is retained in the key. It is deliberately separate from exact engine-binding legality: the selected exact-fit `VisualBindingDefinition` must be `PRODUCTION`, its pinned fit fingerprint must match the current engineering catalog, and its classpath asset must exist.
+The broad ship visual profile may remain `CONCEPT` while an exact engine binding is `PRODUCTION`. These are separate authorities: the exact binding must be production-approved, its pinned fit fingerprint must match the current engineering catalogue and its classpath PNG must exist.
 
 ## Fail-closed rules
 
-For a governed production faction and a recognized authored role/fit, the resolver never falls back to Stage-20.5 artwork. The following conditions are explicit errors:
+For a governed production faction and a recognized authored role/fit, the resolver does not silently substitute legacy Stage-20.5 artwork. Missing faction authority, absent exact binding, stale fingerprint, missing engineering content, package/profile mismatch or missing production PNG are explicit errors.
 
-- missing faction production authority;
-- missing authored role or exact fit;
-- missing exact visual binding;
-- non-production exact binding;
-- stale fit fingerprint;
-- missing engineering fit or hull;
-- package/profile mismatch;
-- missing production PNG.
-
-Non-core factions remain outside this Stage-22 authority and continue through their existing presentation path until they receive authored production packages.
+Non-core factions stay outside Stage-22 production visual authority until they receive authored packages. Compatibility presentation for those identities is intentional and is not a production-binding fallback.
 
 ## Faction identity boundary
 
-The accepted Stage-20 generated-world profile currently uses `faction.alpha` and `faction.beta`. Stage-22 identity governance explicitly classifies those IDs as `WORLD_GENERATED`, assigns no canonical package key to them and requires their stable IDs to be preserved. They therefore **must not** be guessed, renamed or visually masqueraded as the Empire or Industrial Union.
+The accepted Stage-20 generated-world profile currently uses `faction.alpha` and `faction.beta`. Stage-22 identity governance classifies those IDs as `WORLD_GENERATED`, assigns no canonical package key to them and requires their stable IDs to be preserved. They must not be guessed, renamed or visually masqueraded as the Empire or Industrial Union.
 
-The current canonical core package identities are:
+The canonical governed package identities are:
 
 - Empire: `faction.imperial_directorate` / `core.empire`;
 - Industrial Union: `faction.industrial_combine` / `core.industrial_union`.
 
-Only those canonical IDs enter the Stage-22 production ship resolver. Existing `faction.alpha` / `faction.beta` generated campaigns remain on their compatibility artwork until campaign composition gains an explicit authoritative core-faction lineage; that is a campaign/content migration concern, not a presentation alias.
+Only these canonical IDs enter Stage-22 production ship authority. Migrating ordinary generated campaigns from compatibility lineages to authored core factions is a campaign/content-composition concern outside M22.7C.
 
-## Current system-map compatibility handoff
+## System-map handoff
 
-`GeneratedWorldUiSnapshot.LocalObjectView.withScale()` is the current production-client seam. The UI model first obtains physical dimensions from the existing runtime authority; `Stage22ProductionShipSpriteAdapter` may then replace only the artwork for a canonical core-faction ship whose compatibility role is explicitly mapped.
+`GeneratedWorldUiSnapshot.LocalObjectView.withScale()` keeps the existing runtime physical projection and delegates artwork replacement to `Stage22ProductionShipSpriteAdapter` when the object already carries a canonical core faction identity.
 
-Current mappings are deliberately narrow:
+Current compatibility mappings are deliberately narrow:
 
 - cargo transport -> Stage-22 `role.support.freight`;
 - provisional medium combat hull -> Stage-22 `role.military.destroyer`.
 
-For core identities this produces the faction-specific production base PNGs, including:
+The adapter preserves the runtime-provided world length, width and scale authority. The provisional Stage-21 military destroyer therefore remains physically 230 x 74 m until engineering content is explicitly migrated. Artwork cannot rewrite the simulation envelope.
+
+## Global-map handoff
+
+`GlobalFleetMapSnapshot.FleetMarker` now carries player-known authoritative stable faction identity plus immutable `InstalledFit` for owned fleets. `GlobalFleetMapModel` obtains those values only from player-owned physical fleet state; it does not scan or reveal unrelated remote NPC entities.
+
+`GlobalFleetMapRenderer` resolves Stage-22 artwork only when both canonical core faction identity and exact installed engineering identity are present. Missing exact core binding fails closed. Legacy/non-core fleet markers retain their prior strategic representation.
+
+## Tactical handoff
+
+`LiveTacticalBattleRuntimeState.ImportedCombatantState` carries an optional stable campaign/world faction ID through the exact strategic-to-tactical import. Authored validation scenarios continue to carry only `ALPHA` / `BETA` battle side; those side labels are never promoted into faction identity.
+
+`ScaledLiveTacticalSimulationProjection` copies stable faction identity and immutable `InstalledFit` into `TacticalPrototypeVisualSnapshot.ShipGlyph`.
+
+The Stage-21 tactical compatibility authority is exact-fit based. `Stage22ProductionShipSpriteAdapter.upgradeStage21TacticalProjection(...)` requires the installed fit to equal one of the five registered Stage-21 strategic variants from the accepted engineering catalogue. All five variants use the physical `hull.test_doctrine_destroyer_v1` envelope (230 x 74 m). Only after that equality proof does the adapter select faction-authored Stage-22 destroyer art. Old schematic role (`KINETIC`, `MISSILE`, `BEAM`, `DEFENSIVE_EW`, `BALANCED`) is not used to decide the faction hull artwork.
+
+`TacticalPrototypeRenderer` consumes that common adapter. Wrecks remain on the explicit derelict path; non-wreck core strategic combatants use the validated Stage-22 production binding.
+
+## Inspector handoff
+
+`ShipInspectionProjection` resolves `fitId` from exact equality between the installed fit and the battle-local engineering catalogue rather than reporting only the doctrine base fit. When campaign faction identity exists, the immutable inspection snapshot carries `VisualIdentity(stableFactionId, InstalledFit)`.
+
+`ShipInspectionPanelRenderer` uses the same Stage-21 tactical adapter as the main tactical renderer. Its enlarged preview therefore selects the same faction destroyer artwork from the same exact identity inputs. Side-only and non-core inspection cards retain compatibility artwork and do not invent faction aliases.
+
+## Renderer contract
+
+`Stage20MinimumPlayableTextureRenderer` remains the shared GPU owner for compatibility clients. Stage-20.5 textures are eagerly available. A texture outside that pack is accepted lazily only when `Stage22ProductionShipSpriteAdapter.isProductionPath(...)` validates it under `assets/ships/.../production/..._base.png`.
+
+For production PNGs the renderer derives the source image size and alpha-crops transparent authoring margins before drawing. Unknown non-production paths are rejected rather than substituted.
+
+Current faction production examples include:
 
 - `assets/ships/empire/production/freight/freight_base.png`;
 - `assets/ships/industrial_union/production/freight/freight_base.png`;
 - `assets/ships/empire/production/destroyer/destroyer_base.png`;
 - `assets/ships/industrial_union/production/destroyer/destroyer_base.png`.
 
-The adapter preserves the runtime-provided world length, world width and scale authority. In particular, the Stage-21 provisional military destroyer remains physically 230 x 74 m until its engineering content is explicitly migrated. Artwork cannot silently rewrite that envelope. The Stage-22 visual binding and fingerprint are appended to presentation provenance so the compatibility handoff remains diagnosable.
-
-## Renderer contract
-
-`Stage20MinimumPlayableTextureRenderer` remains the GPU owner used by the generated-world client. Stage-20.5 textures are still eagerly loaded. A texture outside that pack is accepted lazily only when `Stage22ProductionShipSpriteAdapter.isProductionPath(...)` validates it as a Stage-22 ship production base PNG under `assets/ships/.../production/..._base.png`.
-
-For those production PNGs the renderer derives the full source image size at runtime and alpha-crops transparent authoring margins before drawing. Unknown non-production paths are still rejected rather than substituted.
-
 ## Regression evidence
 
 Automated coverage verifies that:
 
-- Empire and Industrial Union freight roles resolve to different faction production assets;
-- every authored primary/refit fit for both current factions resolves through an exact production binding;
-- exact fit fingerprints remain pinned and validated;
-- runtime visual state participates in the deterministic key;
+- Empire and Industrial Union resolve distinct freight and destroyer assets;
+- every authored Stage-22 primary/refit fit resolves through an exact production binding;
+- installed Stage-22 engineering fits resolve through the same authority as explicit fit IDs;
+- fit fingerprints remain pinned and validated;
+- runtime visual state participates in the deterministic binding key;
 - broad profile `CONCEPT` status remains distinct from exact binding `PRODUCTION` legality;
 - unknown faction/role requests fail closed;
-- the renderer adapter preserves exact Stage-22 scale for direct production use;
-- canonical core cargo compatibility changes only artwork while preserving current physical scale authority;
-- canonical core medium-combat compatibility resolves faction destroyer artwork while preserving the provisional 230 x 74 m physical hull;
-- `faction.alpha` / `faction.beta` generated freight retains its exact stable identity and legacy compatibility artwork rather than being silently rebound to a core package.
+- system-map compatibility preserves runtime physical scale;
+- global snapshots expose exact faction/fit identity only for player-owned fleets;
+- exact Stage-21 tactical fits select destroyer art independently of schematic role;
+- core tactical visual selection rejects a base/non-strategic or missing fit instead of guessing;
+- non-core and `faction.alpha` / `faction.beta` identities remain on compatibility art;
+- exact imported tactical faction/fit identity reaches `ShipGlyph`;
+- side-only tactical fixtures do not invent campaign faction identity;
+- exact imported faction/fit identity reaches the ship-inspection snapshot.
 
-## Remaining M22.7C work
+## M22.7C completion boundary
 
-This document does not close #364. Global and tactical surfaces still need authoritative stable faction plus legal fit/content identity before they can use this resolver without guessing. The legacy tactical snapshot currently exposes scenario side (`ALPHA` / `BETA`) and doctrine role/fit but no campaign stable faction identity; those side labels must not be treated as aliases for Empire/Industrial Union. Inspector/global integration must likewise carry authoritative identity into their immutable snapshots instead of creating a second role-only or filename-heuristic visual authority.
+M22.7C is complete when the exact branch head passes full CI. No remaining resolver-specific surface requires a second visual authority. The next campaign work should not rename `faction.alpha` / `faction.beta` inside presentation code; it should compose or migrate authoritative campaign faction/content lineage explicitly in the appropriate M22.7 campaign stage.
