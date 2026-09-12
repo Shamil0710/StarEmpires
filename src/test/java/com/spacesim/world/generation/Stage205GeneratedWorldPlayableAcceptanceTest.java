@@ -61,7 +61,7 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
         assertNotNull(militaryEntity.getComponent(EngineeringComponent.class));
 
         LiveRuntime automatic = Stage20GeneratedWorldRuntimeBridge.restore(bootstrap.captureState());
-        var automaticReport = new GeneratedWorldFreightAutopilot(automatic).advance();
+        var automaticReport = new GeneratedWorldFreightAutopilot(automatic).advance(60d);
         assertTrue(automaticReport.changedState());
         long canonicalStationCount = bootstrap.captureState().campaign().materializedWorld()
                 .worldRows().stream()

@@ -1,5 +1,6 @@
 package com.spacesim.ui;
 
+import com.spacesim.world.SectorId;
 import com.spacesim.world.StarSystemId;
 
 import java.util.List;
@@ -45,6 +46,7 @@ public record GalaxyStrategicMapSnapshot(
      *
      * @param id stable system ID
      * @param name system display name
+     * @param sectorId stable containing-sector ID
      * @param sectorName containing sector display name
      * @param galaxyX authoritative strategic X coordinate
      * @param galaxyY authoritative strategic Y coordinate
@@ -57,6 +59,7 @@ public record GalaxyStrategicMapSnapshot(
     public record SystemView(
             StarSystemId id,
             String name,
+            SectorId sectorId,
             String sectorName,
             double galaxyX,
             double galaxyY,
@@ -66,7 +69,8 @@ public record GalaxyStrategicMapSnapshot(
             boolean active,
             boolean selectedNeighbor) {
         /**
-         * Validates one immutable strategic system marker.
+         * Source-compatible presentation constructor for callers that predate explicit sector IDs.
+         * Production topology projection uses the canonical constructor with the real {@link SectorId}.
          *
          * @param id stable system ID
          * @param name system display name
@@ -79,9 +83,41 @@ public record GalaxyStrategicMapSnapshot(
          * @param active whether this is the currently active system
          * @param selectedNeighbor whether this is the selected direct jump neighbor
          */
+        public SystemView(
+                StarSystemId id,
+                String name,
+                String sectorName,
+                double galaxyX,
+                double galaxyY,
+                String controllerFactionId,
+                String controllerDisplayName,
+                int neighborCount,
+                boolean active,
+                boolean selectedNeighbor) {
+            this(id, name, new SectorId(Objects.requireNonNull(id, "Galaxy map system ID not set").value()),
+                    sectorName, galaxyX, galaxyY, controllerFactionId, controllerDisplayName,
+                    neighborCount, active, selectedNeighbor);
+        }
+
+        /**
+         * Validates one immutable strategic system marker.
+         *
+         * @param id stable system ID
+         * @param name system display name
+         * @param sectorId stable containing-sector ID
+         * @param sectorName containing sector display name
+         * @param galaxyX authoritative strategic X coordinate
+         * @param galaxyY authoritative strategic Y coordinate
+         * @param controllerFactionId controlling faction ID, or {@code null}
+         * @param controllerDisplayName resolved controller display name
+         * @param neighborCount number of direct jump neighbors
+         * @param active whether this is the currently active system
+         * @param selectedNeighbor whether this is the selected direct jump neighbor
+         */
         public SystemView {
             Objects.requireNonNull(id, "Galaxy map system ID not set");
             name = Objects.requireNonNull(name, "Galaxy map system name not set");
+            Objects.requireNonNull(sectorId, "Galaxy map sector ID not set");
             sectorName = Objects.requireNonNull(sectorName, "Galaxy map sector name not set");
             controllerDisplayName = Objects.requireNonNull(
                     controllerDisplayName, "Galaxy map controller display name not set");

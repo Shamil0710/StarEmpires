@@ -1,6 +1,7 @@
 package com.spacesim.ui;
 
 import com.spacesim.ship.LiveTacticalBattleScenario.Side;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.Stage175IFleetDoctrineCatalog.DoctrineId;
 import com.spacesim.ship.TrackState.InformationState;
 
@@ -14,7 +15,7 @@ import java.util.Objects;
  * @param side authored battle side
  * @param role presentation-only schematic role
  * @param hullId authoritative hull content identity
- * @param fitId authored installed-fit content identity
+ * @param fitId exact installed-fit content identity resolved from the battle-local engineering catalogue
  * @param doctrineId acceptance doctrine identity selecting the physical fit/stores
  * @param wreck whether the visual projection currently represents a wreck
  * @param meanIntegrity mean current compartment integrity
@@ -41,6 +42,7 @@ import java.util.Objects;
  * @param formation current read-only formation diagnostic
  * @param acceleration explicit unavailable-value text until an authoritative acceleration field exists
  * @param ecmEccm explicit unavailable-value text until an aggregate selected-ship ECM/ECCM field exists
+ * @param visualIdentity optional exact campaign faction plus installed engineering identity for visual binding
  */
 public record ShipInspectionSnapshot(
         long entityId,
@@ -73,16 +75,17 @@ public record ShipInspectionSnapshot(
         String survivalReason,
         String formation,
         String acceleration,
-        String ecmEccm) {
+        String ecmEccm,
+        VisualIdentity visualIdentity) {
 
     /**
-     * Validates and freezes one selected-ship inspection projection.
+     * Source-compatible constructor for pre-M22.7C callers without campaign visual identity.
      *
      * @param entityId stable physical combatant identity
      * @param side authored battle side
      * @param role presentation-only schematic role
      * @param hullId authoritative hull content identity
-     * @param fitId authored installed-fit content identity
+     * @param fitId exact installed-fit content identity
      * @param doctrineId acceptance doctrine identity selecting the physical fit/stores
      * @param wreck whether the visual projection currently represents a wreck
      * @param meanIntegrity mean current compartment integrity
@@ -98,7 +101,7 @@ public record ShipInspectionSnapshot(
      * @param velocityXMps current x velocity
      * @param velocityYMps current y velocity
      * @param speedMps current scalar speed
-     * @param headingRad current projected heading
+     * @param headingRad current visual heading
      * @param currentTargetId actor-selected authoritative target, or zero
      * @param fireRequested tactical policy fire request
      * @param fireAuthorized survival-filtered fire authorization
@@ -107,8 +110,111 @@ public record ShipInspectionSnapshot(
      * @param survivalAction current survival action name
      * @param survivalReason current survival decision reason name
      * @param formation current read-only formation diagnostic
-     * @param acceleration explicit unavailable-value text where applicable
-     * @param ecmEccm explicit unavailable-value text where applicable
+     * @param acceleration explicit unavailable-value acceleration text
+     * @param ecmEccm explicit unavailable-value ECM/ECCM text
+     */
+    public ShipInspectionSnapshot(
+            long entityId,
+            Side side,
+            ShipVisualRole role,
+            String hullId,
+            String fitId,
+            DoctrineId doctrineId,
+            boolean wreck,
+            double meanIntegrity,
+            double minimumModuleIntegrity,
+            ShieldSummary shields,
+            double sharedBusEnergyJ,
+            double shipHeatStoredJ,
+            double localHeatStoredJ,
+            double reactionMassKg,
+            long ammunitionCount,
+            double xM,
+            double yM,
+            double velocityXMps,
+            double velocityYMps,
+            double speedMps,
+            double headingRad,
+            long currentTargetId,
+            boolean fireRequested,
+            boolean fireAuthorized,
+            List<WeaponFeed> weaponFeeds,
+            List<TrackSummary> tracks,
+            String survivalAction,
+            String survivalReason,
+            String formation,
+            String acceleration,
+            String ecmEccm) {
+        this(
+                entityId,
+                side,
+                role,
+                hullId,
+                fitId,
+                doctrineId,
+                wreck,
+                meanIntegrity,
+                minimumModuleIntegrity,
+                shields,
+                sharedBusEnergyJ,
+                shipHeatStoredJ,
+                localHeatStoredJ,
+                reactionMassKg,
+                ammunitionCount,
+                xM,
+                yM,
+                velocityXMps,
+                velocityYMps,
+                speedMps,
+                headingRad,
+                currentTargetId,
+                fireRequested,
+                fireAuthorized,
+                weaponFeeds,
+                tracks,
+                survivalAction,
+                survivalReason,
+                formation,
+                acceleration,
+                ecmEccm,
+                null);
+    }
+
+    /**
+     * Validates and freezes one selected-ship inspection projection.
+     *
+     * @param entityId stable physical combatant identity
+     * @param side authored battle side
+     * @param role presentation-only schematic role
+     * @param hullId authoritative hull content identity
+     * @param fitId exact installed-fit content identity
+     * @param doctrineId acceptance doctrine identity selecting the physical fit/stores
+     * @param wreck whether the visual projection currently represents a wreck
+     * @param meanIntegrity mean current compartment integrity
+     * @param minimumModuleIntegrity minimum current fitted-module integrity
+     * @param shields aggregate current authoritative shield runtime state
+     * @param sharedBusEnergyJ current shared stored electrical energy
+     * @param shipHeatStoredJ current ship-level stored heat
+     * @param localHeatStoredJ total local stored heat across fitted mounts
+     * @param reactionMassKg current physical reaction mass
+     * @param ammunitionCount current total physical ammunition item count
+     * @param xM current local x position
+     * @param yM current local y position
+     * @param velocityXMps current x velocity
+     * @param velocityYMps current y velocity
+     * @param speedMps current scalar speed
+     * @param headingRad current visual heading
+     * @param currentTargetId actor-selected authoritative target, or zero
+     * @param fireRequested tactical policy fire request
+     * @param fireAuthorized survival-filtered fire authorization
+     * @param weaponFeeds physical ammunition-feed identity bindings
+     * @param tracks current actor-local visible track summaries
+     * @param survivalAction current survival action name
+     * @param survivalReason current survival decision reason name
+     * @param formation current read-only formation diagnostic
+     * @param acceleration explicit unavailable-value acceleration text
+     * @param ecmEccm explicit unavailable-value ECM/ECCM text
+     * @param visualIdentity optional exact campaign faction plus installed engineering identity
      */
     public ShipInspectionSnapshot {
         if (entityId <= 0L) {
@@ -148,6 +254,25 @@ public record ShipInspectionSnapshot(
     }
 
     /**
+     * Exact optional identity required to select governed production artwork without side/role guessing.
+     *
+     * @param stableFactionId authoritative campaign/world faction identity
+     * @param installedFit immutable exact engineering fit detached into the tactical runtime
+     */
+    public record VisualIdentity(String stableFactionId, InstalledFit installedFit) {
+        /**
+         * Validates one exact visual identity.
+         *
+         * @param stableFactionId authoritative campaign/world faction identity
+         * @param installedFit immutable exact engineering fit detached into the tactical runtime
+         */
+        public VisualIdentity {
+            requireNonBlank(stableFactionId, "stableFactionId");
+            installedFit = Objects.requireNonNull(installedFit, "installedFit");
+        }
+    }
+
+    /**
      * Aggregate authoritative shield runtime state without inventing a percentage capacity.
      *
      * @param emitterCount current fitted shield-emitter state count
@@ -168,8 +293,8 @@ public record ShipInspectionSnapshot(
          * @param emitterCount current fitted shield-emitter state count
          * @param collapsedCount current collapsed emitter count
          * @param totalReserveJ sum of current shield field reserve energy
-         * @param totalAccumulatedHeatJ sum of shield-runtime accumulated heat
-         * @param minimumEmitterIntegrity minimum emitter integrity, or zero when no emitter exists
+         * @param totalAccumulatedHeatJ sum of shield-runtime accumulated interaction/recharge heat
+         * @param minimumEmitterIntegrity minimum current emitter integrity, or zero when no emitter exists
          */
         public ShieldSummary {
             if (emitterCount < 0 || collapsedCount < 0 || collapsedCount > emitterCount) {
@@ -194,7 +319,7 @@ public record ShipInspectionSnapshot(
          *
          * @param mountId fitted module mount identity
          * @param interfaceId module-local ammunition interface identity
-         * @param ammunitionContentId stable ammunition content identity
+         * @param ammunitionContentId stable ammunition content identity occupying the feed
          */
         public WeaponFeed {
             requireNonBlank(mountId, "mountId");
@@ -216,7 +341,7 @@ public record ShipInspectionSnapshot(
          *
          * @param targetId observed physical target identity
          * @param informationState actor-local current information quality
-         * @param positionKnown whether Cartesian target position is currently known
+         * @param positionKnown whether this actor currently knows Cartesian target position
          */
         public TrackSummary {
             if (targetId <= 0L) {

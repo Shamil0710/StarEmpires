@@ -5,12 +5,18 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
+import com.spacesim.presentation.asset.Stage22ProductionShipSpriteAdapter;
+import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
 import com.spacesim.ship.LiveTacticalBattleScenario.Side;
+import com.spacesim.world.Stage20SpecialLocationWorld.LocationKind;
 
 import java.util.Locale;
 import java.util.Optional;
 
-/** Presentation-only right-side inspection panel with an enlarged schematic selected-ship preview. */
+/** Presentation-only right-side inspection panel with a faction-aware selected-ship sprite preview. */
 public final class ShipInspectionPanelRenderer {
     private static final float MIN_PANEL_WIDTH_PX = 260f;
     private static final float MAX_PANEL_WIDTH_PX = 390f;
@@ -25,6 +31,7 @@ public final class ShipInspectionPanelRenderer {
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
     private final BitmapFont font = new BitmapFont();
+    private Stage20MinimumPlayableTextureRenderer previewSprites;
     private boolean disposed;
 
     /** Creates the panel resources and a compact readable debug font scale. */
@@ -75,6 +82,10 @@ public final class ShipInspectionPanelRenderer {
     /** Releases panel-owned graphics resources. */
     public void dispose() {
         if (!disposed) {
+            if (previewSprites != null) {
+                previewSprites.dispose();
+                previewSprites = null;
+            }
             font.dispose();
             batch.dispose();
             shapes.dispose();
@@ -103,57 +114,61 @@ public final class ShipInspectionPanelRenderer {
             float height) {
         float centerX = left + width * 0.5f;
         float centerY = height - 105f;
+        ResolvedSprite resolved = resolvePreviewSprite(data);
         float length = Math.min(150f, width * 0.46f);
-        float bodyWidth = length * previewWidthScale(data.role());
+        float bodyWidth = (float) (length * resolved.worldWidthM() / resolved.worldLengthM());
+        bodyWidth = Math.max(18f, Math.min(width * 0.62f, bodyWidth));
         TacticalSidePalette.Rgba sideColor = sideColor(data.side());
 
         shapes.setProjectionMatrix(matrix);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(sideColor.r(), sideColor.g(), sideColor.b(), 0.95f);
-        drawPreviewHull(centerX, centerY, length + 10f, bodyWidth + 8f, data.role());
         shapes.setColor(PREVIEW_FILL);
-        drawPreviewHull(centerX, centerY, length, bodyWidth, data.role());
+        shapes.circle(centerX, centerY, Math.max(length, bodyWidth) * 0.64f, 48);
         shapes.end();
+
+        batch.setProjectionMatrix(matrix);
+        batch.setColor(Color.WHITE);
+        batch.begin();
+        previewSprites().draw(
+                batch,
+                resolved.binding(),
+                centerX,
+                centerY,
+                length,
+                bodyWidth,
+                90f);
+        batch.end();
+        batch.setColor(Color.WHITE);
 
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(sideColor.r(), sideColor.g(), sideColor.b(), 1f);
-        shapes.circle(centerX, centerY, Math.max(length, bodyWidth) * 0.63f, 48);
-        shapes.line(centerX, centerY + length * 0.62f, centerX, centerY + length * 0.74f);
+        shapes.circle(centerX, centerY, Math.max(length, bodyWidth) * 0.68f, 48);
+        shapes.line(centerX, centerY + length * 0.60f, centerX, centerY + length * 0.74f);
         shapes.end();
     }
 
-    private void drawPreviewHull(float x, float y, float length, float width, ShipVisualRole role) {
-        switch (role) {
-            case KINETIC -> {
-                shapes.triangle(x, y + length * 0.55f, x - width * 0.28f, y, x, y - length * 0.45f);
-                shapes.triangle(x, y + length * 0.55f, x, y - length * 0.45f, x + width * 0.28f, y);
-            }
-            case MISSILE -> {
-                shapes.triangle(x, y + length * 0.50f, x - width * 0.36f, y - length * 0.40f,
-                        x + width * 0.36f, y - length * 0.40f);
-                shapes.rect(x - width * 0.62f, y - length * 0.20f, width * 0.18f, length * 0.42f);
-                shapes.rect(x + width * 0.44f, y - length * 0.20f, width * 0.18f, length * 0.42f);
-            }
-            case BEAM -> {
-                shapes.triangle(x, y + length * 0.52f, x - width * 0.26f, y, x, y - length * 0.46f);
-                shapes.triangle(x, y + length * 0.52f, x, y - length * 0.46f, x + width * 0.26f, y);
-                shapes.rect(x - width * 0.30f, y + length * 0.04f, width * 0.10f, length * 0.44f);
-                shapes.rect(x + width * 0.20f, y + length * 0.04f, width * 0.10f, length * 0.44f);
-            }
-            case DEFENSIVE_EW -> {
-                shapes.triangle(x, y + length * 0.38f, x - width * 0.40f, y, x, y - length * 0.38f);
-                shapes.triangle(x, y + length * 0.38f, x, y - length * 0.38f, x + width * 0.40f, y);
-                shapes.circle(x - width * 0.55f, y, width * 0.12f, 16);
-                shapes.circle(x + width * 0.55f, y, width * 0.12f, 16);
-            }
-            case BALANCED, UNCLASSIFIED -> shapes.triangle(
-                    x,
-                    y + length * 0.52f,
-                    x - width * 0.46f,
-                    y - length * 0.42f,
-                    x + width * 0.46f,
-                    y - length * 0.42f);
+    private ResolvedSprite resolvePreviewSprite(ShipInspectionSnapshot data) {
+        ResolvedSprite resolved = data.wreck()
+                ? Stage20MinimumPlayableSpriteCatalog.resolveSpecialLocation(LocationKind.DERELICT)
+                : Stage20MinimumPlayableSpriteCatalog.resolveCombatRole(data.role());
+        if (!data.wreck() && data.visualIdentity() != null) {
+            resolved = Stage22ProductionShipSpriteAdapter.upgradeStage21TacticalProjection(
+                    "combatant:" + data.entityId(),
+                    data.visualIdentity().stableFactionId(),
+                    data.visualIdentity().installedFit(),
+                    resolved,
+                    data.meanIntegrity() < 0.999_999d
+                            ? RuntimeVisualState.DAMAGED
+                            : RuntimeVisualState.IDLE);
         }
+        return resolved;
+    }
+
+    private Stage20MinimumPlayableTextureRenderer previewSprites() {
+        if (previewSprites == null) {
+            previewSprites = new Stage20MinimumPlayableTextureRenderer();
+        }
+        return previewSprites;
     }
 
     private void drawText(
@@ -175,6 +190,10 @@ public final class ShipInspectionPanelRenderer {
         font.draw(batch, data.role() + "  |  " + data.doctrineId(), x, y);
         y -= line;
         font.setColor(TEXT_SECONDARY);
+        if (data.visualIdentity() != null) {
+            font.draw(batch, crop("Faction: " + data.visualIdentity().stableFactionId(), width), x, y);
+            y -= line;
+        }
         font.draw(batch, crop("Hull: " + data.hullId(), width), x, y);
         y -= line;
         font.draw(batch, crop("Fit: " + data.fitId(), width), x, y);
@@ -254,16 +273,6 @@ public final class ShipInspectionPanelRenderer {
         font.draw(batch, "Left-click a tactical ship", left + PAD, height - 82f);
         font.draw(batch, "to inspect authoritative state.", left + PAD, height - 100f);
         batch.end();
-    }
-
-    private static float previewWidthScale(ShipVisualRole role) {
-        return switch (role) {
-            case KINETIC -> 0.34f;
-            case MISSILE -> 0.68f;
-            case BEAM -> 0.38f;
-            case DEFENSIVE_EW -> 0.76f;
-            case BALANCED, UNCLASSIFIED -> 0.52f;
-        };
     }
 
     private static TacticalSidePalette.Rgba sideColor(Side side) {

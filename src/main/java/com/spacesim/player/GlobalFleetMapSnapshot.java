@@ -1,5 +1,6 @@
 package com.spacesim.player;
 
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.world.ConstructionProjectId;
 import com.spacesim.world.ConstructionProjectStatus;
 import com.spacesim.world.FleetId;
@@ -159,13 +160,35 @@ public record GlobalFleetMapSnapshot(
      * @param transitDestination destination while jump transit is active, otherwise null
      * @param activeDirectControl whether this is the selected direct-control fleet
      * @param orderType current explicit delegated order type, or HOLD when none is assigned
+     * @param stableFactionId authoritative stable owner identity when the owned fleet has one
+     * @param installedFit exact immutable installed engineering payload when the owned fleet exposes it
      */
     public record FleetMarker(
             FleetId fleetId,
             StarSystemId systemId,
             StarSystemId transitDestination,
             boolean activeDirectControl,
-            FleetOrderType orderType) implements Comparable<FleetMarker> {
+            FleetOrderType orderType,
+            String stableFactionId,
+            InstalledFit installedFit) implements Comparable<FleetMarker> {
+        /**
+         * Source-compatible constructor for callers that do not yet project engineering identity.
+         *
+         * @param fleetId stable owned fleet ID
+         * @param systemId current system or null in transit
+         * @param transitDestination active jump destination or null
+         * @param activeDirectControl direct-control flag
+         * @param orderType explicit/default order type
+         */
+        public FleetMarker(
+                FleetId fleetId,
+                StarSystemId systemId,
+                StarSystemId transitDestination,
+                boolean activeDirectControl,
+                FleetOrderType orderType) {
+            this(fleetId, systemId, transitDestination, activeDirectControl, orderType, null, null);
+        }
+
         /**
          * Validates one owned fleet marker.
          *
@@ -174,12 +197,17 @@ public record GlobalFleetMapSnapshot(
          * @param transitDestination active jump destination or null
          * @param activeDirectControl direct-control flag
          * @param orderType explicit/default order type
+         * @param stableFactionId optional authoritative stable owner identity
+         * @param installedFit optional exact installed engineering payload
          */
         public FleetMarker {
             fleetId = Objects.requireNonNull(fleetId, "Global map FleetId not set");
             orderType = Objects.requireNonNull(orderType, "Global map fleet order not set");
             if (systemId == null && transitDestination == null) {
                 throw new IllegalArgumentException("Global map fleet requires current or transit system");
+            }
+            if (stableFactionId != null) {
+                stableFactionId = requireText(stableFactionId, "Global map fleet stable faction cannot be blank");
             }
         }
 
@@ -190,7 +218,7 @@ public record GlobalFleetMapSnapshot(
     }
 
     /**
-     * One player-owned live construction project on the global strategic map.
+     * One player-owned live construction project on the strategic map.
      *
      * @param projectId stable project ID
      * @param systemId physical project system

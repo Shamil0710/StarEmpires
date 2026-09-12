@@ -1,11 +1,13 @@
 package com.spacesim.ui;
 
 import com.spacesim.content.ContentCatalog;
+import com.spacesim.presentation.asset.SectorSpaceBackgroundCatalog;
 import com.spacesim.world.FactionDiplomacyState;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionStrategicState;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.JumpConnection;
+import com.spacesim.world.SectorNode;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.StarSystemNode;
 import com.spacesim.world.WorldFactionIdentityState;
@@ -53,10 +55,14 @@ public final class GalaxyStrategicMapModel {
         List<GalaxyStrategicMapSnapshot.SystemView> systems = new ArrayList<>(topology.systems().size());
         for (StarSystemNode system : topology.systems()) {
             String controllerId = checkedWorld.controllingFaction(system.id()).orElse(null);
+            SectorNode sector = topology.sectorOf(system.id()).orElseThrow(
+                    () -> new IllegalStateException("System has no containing sector: " + system.id()));
+            SectorSpaceBackgroundCatalog.registerSystemSector(system.id(), sector.id());
             systems.add(new GalaxyStrategicMapSnapshot.SystemView(
                     system.id(),
                     system.name(),
-                    topology.sectorOf(system.id()).map(sector -> sector.name()).orElse("Unassigned"),
+                    sector.id(),
+                    sector.name(),
                     system.x(),
                     system.y(),
                     controllerId,

@@ -11,6 +11,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.Align;
 import com.spacesim.economy.Money;
+import com.spacesim.presentation.asset.SectorSpaceBackgroundTextureRenderer;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.FreightView;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.InfoSection;
@@ -44,6 +45,8 @@ public final class GeneratedWorldCommandUiRenderer {
     private final SpriteBatch batch = new SpriteBatch();
     private final Stage20MinimumPlayableTextureRenderer sprites =
             new Stage20MinimumPlayableTextureRenderer();
+    private final SectorSpaceBackgroundTextureRenderer sectorBackgrounds =
+            new SectorSpaceBackgroundTextureRenderer();
     private final GlyphLayout glyph = new GlyphLayout();
     private final ArrayList<HitTarget> hitTargets = new ArrayList<>();
     private final MapCameraState systemMapCamera = new MapCameraState();
@@ -116,7 +119,7 @@ public final class GeneratedWorldCommandUiRenderer {
         /** Select one local-system object. */ LOCAL_OBJECT,
         /** Select one global system. */ SYSTEM,
         /** Select one faction. */ FACTION,
-        /** Select one freighter/order. */ FREIGHT,
+        /** Select one physical freighter. */ FREIGHT,
         /** Select one ordinary military fleet. */ MILITARY,
         /** Make the selected global system the active inspected system. */ ACTIVATE_SYSTEM
     }
@@ -412,6 +415,11 @@ public final class GeneratedWorldCommandUiRenderer {
         mapRect = layout.map();
         panel(layout.map(), ImperialUiPalette.MAP_SURFACE, ImperialUiPalette.GUNMETAL);
         panel(layout.inspector(), ImperialUiPalette.PANEL_SURFACE, ImperialUiPalette.GUNMETAL);
+        Rect backgroundRect = inset(layout.map(), Math.max(2f, 4f * metrics.scale()));
+        batch.begin();
+        sectorBackgrounds.draw(batch, snapshot.worldSeed(), snapshot.activeSystemId(),
+                backgroundRect.x(), backgroundRect.y(), backgroundRect.width(), backgroundRect.height());
+        batch.end();
         drawGrid(layout.map());
 
         PhysicalMapProjection projection = localProjection(snapshot.localObjects(),
@@ -1174,6 +1182,7 @@ public final class GeneratedWorldCommandUiRenderer {
         if (fonts != null) {
             fonts.dispose();
         }
+        sectorBackgrounds.dispose();
         sprites.dispose();
         batch.dispose();
         shapes.dispose();

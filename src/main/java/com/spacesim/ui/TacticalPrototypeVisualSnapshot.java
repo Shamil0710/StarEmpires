@@ -1,5 +1,7 @@
 package com.spacesim.ui;
 
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -64,6 +66,8 @@ public record TacticalPrototypeVisualSnapshot(
      * @param thrustFraction presentation fraction [0,1] derived from authoritative thrust command/state
      * @param integrityFraction mean physical compartment integrity [0,1]
      * @param wreck whether authoritative damage state has no surviving compartment integrity
+     * @param stableFactionId optional authoritative campaign/world faction identity; never inferred from side
+     * @param installedFit optional exact immutable installed engineering payload
      */
     public record ShipGlyph(
             long entityId,
@@ -76,7 +80,9 @@ public record TacticalPrototypeVisualSnapshot(
             double widthM,
             double thrustFraction,
             double integrityFraction,
-            boolean wreck) {
+            boolean wreck,
+            String stableFactionId,
+            InstalledFit installedFit) {
         /**
          * Validates one immutable ship glyph.
          *
@@ -91,6 +97,8 @@ public record TacticalPrototypeVisualSnapshot(
          * @param thrustFraction presentation fraction [0,1] derived from authoritative thrust command/state
          * @param integrityFraction mean physical compartment integrity [0,1]
          * @param wreck whether authoritative damage state has no surviving compartment integrity
+         * @param stableFactionId optional authoritative campaign/world stable faction identity
+         * @param installedFit optional exact installed engineering payload
          */
         public ShipGlyph {
             requirePositiveId(entityId, "entityId");
@@ -103,6 +111,43 @@ public record TacticalPrototypeVisualSnapshot(
             requirePositiveFinite(widthM, "widthM");
             requireUnit(thrustFraction, "thrustFraction");
             requireUnit(integrityFraction, "integrityFraction");
+            if (stableFactionId != null) {
+                stableFactionId = stableFactionId.strip();
+                if (stableFactionId.isEmpty()) {
+                    throw new IllegalArgumentException("stableFactionId must be null or non-blank");
+                }
+            }
+        }
+
+        /**
+         * Source-compatible full constructor for existing role-aware tactical projections.
+         *
+         * @param entityId stable authoritative owner identity
+         * @param side presentation-only side projected from authoritative scenario membership
+         * @param role presentation-only role projected from authored doctrine/fit identity
+         * @param xM world x position in meters
+         * @param yM world y position in meters
+         * @param headingRad world heading in radians
+         * @param lengthM physical hull length
+         * @param widthM physical hull width
+         * @param thrustFraction presentation fraction [0,1] derived from authoritative thrust command/state
+         * @param integrityFraction mean physical compartment integrity [0,1]
+         * @param wreck whether authoritative damage state has no surviving compartment integrity
+         */
+        public ShipGlyph(
+                long entityId,
+                TacticalSide side,
+                ShipVisualRole role,
+                double xM,
+                double yM,
+                double headingRad,
+                double lengthM,
+                double widthM,
+                double thrustFraction,
+                double integrityFraction,
+                boolean wreck) {
+            this(entityId, side, role, xM, yM, headingRad, lengthM, widthM,
+                    thrustFraction, integrityFraction, wreck, null, null);
         }
 
         /**
@@ -131,7 +176,7 @@ public record TacticalPrototypeVisualSnapshot(
                 double integrityFraction,
                 boolean wreck) {
             this(entityId, side, ShipVisualRole.UNCLASSIFIED, xM, yM, headingRad, lengthM, widthM,
-                    thrustFraction, integrityFraction, wreck);
+                    thrustFraction, integrityFraction, wreck, null, null);
         }
 
         /**
@@ -158,7 +203,8 @@ public record TacticalPrototypeVisualSnapshot(
                 double integrityFraction,
                 boolean wreck) {
             this(entityId, TacticalSide.NEUTRAL, ShipVisualRole.UNCLASSIFIED,
-                    xM, yM, headingRad, lengthM, widthM, thrustFraction, integrityFraction, wreck);
+                    xM, yM, headingRad, lengthM, widthM, thrustFraction, integrityFraction,
+                    wreck, null, null);
         }
     }
 
@@ -307,7 +353,7 @@ public record TacticalPrototypeVisualSnapshot(
         /**
          * Validates one immutable impact glyph.
          *
-         * @param eventId stable event identity
+         * @param eventId stable presentation/event identity
          * @param kind presentation category derived from authoritative physical result
          * @param xM world impact x
          * @param yM world impact y
