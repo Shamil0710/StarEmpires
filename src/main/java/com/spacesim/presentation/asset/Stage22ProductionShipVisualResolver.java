@@ -31,7 +31,8 @@ import java.util.Objects;
  * <p>The resolver projects the accepted Stage-22 faction profile, authored package, exact engineering
  * fit and production visual binding into one immutable presentation result. It never mutates simulation
  * state and deliberately provides no Stage-20.5 sprite fallback: a production faction/role/fit with a
- * missing, stale or non-production binding is an explicit error.</p>
+ * missing, stale or non-production exact binding is an explicit error. Broader faction-profile maturity
+ * remains visible in the key and is intentionally separate from exact asset legality/human approval.</p>
  */
 public final class Stage22ProductionShipVisualResolver {
     private static final Stage22FactionProfileCatalog FACTION_PROFILES = Stage22FactionProfileLoader.loadDefault();
@@ -55,6 +56,7 @@ public final class Stage22ProductionShipVisualResolver {
      * @param stableFactionId authoritative stable faction identity
      * @param systemicProfileId exact Stage-22 systemic faction profile
      * @param shipVisualProfileId exact faction ship visual profile
+     * @param shipVisualProfileStatus broader governed profile maturity, distinct from exact binding approval
      * @param familyId authored Stage-22 ship family
      * @param roleId common Stage-22 role taxonomy ID
      * @param hullId exact hull belonging to the visual fit
@@ -70,6 +72,7 @@ public final class Stage22ProductionShipVisualResolver {
             String stableFactionId,
             String systemicProfileId,
             String shipVisualProfileId,
+            AssetStatus shipVisualProfileStatus,
             String familyId,
             String roleId,
             String hullId,
@@ -84,6 +87,7 @@ public final class Stage22ProductionShipVisualResolver {
             stableFactionId = requireText(stableFactionId, "stableFactionId");
             systemicProfileId = requireText(systemicProfileId, "systemicProfileId");
             shipVisualProfileId = requireText(shipVisualProfileId, "shipVisualProfileId");
+            shipVisualProfileStatus = Objects.requireNonNull(shipVisualProfileStatus, "shipVisualProfileStatus");
             familyId = requireText(familyId, "familyId");
             roleId = requireText(roleId, "roleId");
             hullId = requireText(hullId, "hullId");
@@ -213,7 +217,6 @@ public final class Stage22ProductionShipVisualResolver {
                 FACTION_PROFILES.findVisual(systemic.shipVisualProfileRef()),
                 "ship visual profile " + systemic.shipVisualProfileRef());
         if (visualProfile.kind() != Stage22FactionProfileCatalog.VisualKind.SHIP
-                || visualProfile.status() != AssetStatus.PRODUCTION
                 || !visualProfile.packageKey().equals(authority.packageKey())) {
             throw new IllegalStateException("invalid production ship visual profile: " + visualProfile.id());
         }
@@ -223,6 +226,7 @@ public final class Stage22ProductionShipVisualResolver {
                 authority.stableFactionId(),
                 systemic.profileId(),
                 visualProfile.id(),
+                visualProfile.status(),
                 family.familyId(),
                 family.roleId(),
                 hull.id(),
