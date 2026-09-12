@@ -13,6 +13,8 @@ import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShieldGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShipGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.TacticalSide;
 import com.spacesim.ui.TacticalSidePalette.Rgba;
+import com.spacesim.presentation.asset.OrdnanceSpriteCatalog;
+import com.spacesim.presentation.asset.OrdnanceTextureRenderer;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
@@ -31,7 +33,9 @@ import java.util.Objects;
  * changing any authoritative combat physics. The compatibility constructor keeps schematic hulls;
  * {@link #withMinimumPlayableSprites()} replaces those hull bodies with the Stage-20.5E pack and,
  * when exact campaign faction plus Stage-21 strategic fit identity are present, the validated
- * Stage-22 production destroyer artwork.</p>
+ * Stage-22 production destroyer artwork. The same sprite-enabled path now also replaces kinetic,
+ * guided-missile and interceptor markers with presentation-only ordnance art while preserving the
+ * exact projected physical body dimensions.</p>
  */
 public final class TacticalPrototypeRenderer {
     private static final float MIN_SHIELD_RADIUS_PX = 12f;
@@ -60,6 +64,7 @@ public final class TacticalPrototypeRenderer {
     private final ShapeRenderer shapes;
     private final SpriteBatch spriteBatch;
     private final Stage20MinimumPlayableTextureRenderer minimumSprites;
+    private final OrdnanceTextureRenderer ordnanceSprites;
     private final Vector2 a = new Vector2();
     private final Vector2 b = new Vector2();
     private boolean disposed;
@@ -75,12 +80,15 @@ public final class TacticalPrototypeRenderer {
         this.minimumSprites = useMinimumPlayableSprites
                 ? new Stage20MinimumPlayableTextureRenderer()
                 : null;
+        this.ordnanceSprites = useMinimumPlayableSprites
+                ? OrdnanceTextureRenderer.tryCreate()
+                : null;
     }
 
     /**
-     * Creates the existing tactical renderer with Stage-20.5E production sprite binding enabled.
+     * Creates the existing tactical renderer with production sprite binding enabled.
      *
-     * @return renderer consuming the same immutable tactical snapshots with sprite ship bodies
+     * @return renderer consuming the same immutable tactical snapshots with sprite ship/ordnance bodies
      */
     public static TacticalPrototypeRenderer withMinimumPlayableSprites() {
         return new TacticalPrototypeRenderer(true);
@@ -106,7 +114,10 @@ public final class TacticalPrototypeRenderer {
         shapes.setProjectionMatrix(projectionMatrix);
         drawTrailsAndBeams(layout, snapshot);
         drawShields(layout, snapshot);
-        drawShipsAndBodies(layout, snapshot, minimumSprites == null);
+        if (ordnanceSprites != null) {
+            drawSpriteBodies(projectionMatrix, layout, snapshot);
+        }
+        drawShipsAndBodies(layout, snapshot, minimumSprites == null, ordnanceSprites != null);
         drawShipCues(layout, snapshot);
         drawImpactsAndDamage(layout, snapshot);
     }
@@ -116,6 +127,11 @@ public final class TacticalPrototypeRenderer {
         if (!disposed) {
             if (minimumSprites != null) {
                 minimumSprites.dispose();
+            }
+            if (ordnanceSprites != null) {
+                ordnanceSprites.dispose();
+            }
+            if (spriteBatch != null) {
                 spriteBatch.dispose();
             }
             shapes.dispose();
@@ -170,7 +186,8 @@ public final class TacticalPrototypeRenderer {
     private void drawShipsAndBodies(
             WorldMapLayout layout,
             TacticalPrototypeVisualSnapshot snapshot,
-            boolean drawSchematicShips) {
+            boolean drawSchematicShips,
+            boolean spriteOrdnanceActive) {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         if (drawSchematicShips) {
             for (ShipGlyph ship : snapshot.ships()) {
@@ -181,6 +198,9 @@ public final class TacticalPrototypeRenderer {
             }
         }
         for (BodyGlyph body : snapshot.bodies()) {
+            if (spriteOrdnanceActive && OrdnanceSpriteCatalog.supports(body.kind())) {
+                continue;
+            }
             if (!project(layout, body.xM(), body.yM(), a)) {
                 continue;
             }
@@ -221,6 +241,26 @@ public final class TacticalPrototypeRenderer {
                     length,
                     width,
                     (float) Math.toDegrees(ship.headingRad()));
+        }
+        spriteBatch.end();
+        spriteBatch.setColor(Color.WHITE);
+    }
+
+    private void drawSpriteBodies(
+            Matrix4 projectionMatrix,
+            WorldMapLayout layout,
+            TacticalPrototypeVisualSnapshot snapshot) {
+        spriteBatch.setProjectionMatrix(projectionMatrix);
+        spriteBatch.setColor(Color.WHITE);
+        spriteBatch.begin();
+        for (BodyGlyph body : snapshot.bodies()) {
+            if (!OrdnanceSpriteCatalog.supports(body.kind())
+                    || !project(layout, body.xM(), body.yM(), a)) {
+                continue;
+            }
+            float length = screenLength(layout, body.lengthM());
+            float width = screenLength(layout, body.widthM());
+            ordnanceSprites.draw(spriteBatch, body, a.x, a.y, width, length);
         }
         spriteBatch.end();
         spriteBatch.setColor(Color.WHITE);
