@@ -129,29 +129,34 @@ public final class OrdnanceTextureRenderer {
     private static VisibleRegion visibleRegion(String path) {
         Pixmap image = new Pixmap(Gdx.files.internal(path));
         try {
-            int minX = image.getWidth();
-            int minY = image.getHeight();
-            int maxX = -1;
-            int maxY = -1;
-            for (int y = 0; y < image.getHeight(); y++) {
-                for (int x = 0; x < image.getWidth(); x++) {
-                    if ((image.getPixel(x, y) & 255) > 0) {
-                        minX = Math.min(minX, x);
-                        minY = Math.min(minY, y);
-                        maxX = Math.max(maxX, x);
-                        maxY = Math.max(maxY, y);
-                    }
-                }
-            }
-            if (maxX < 0) {
-                return new VisibleRegion(0, 0, image.getWidth(), image.getHeight());
-            }
-            return new VisibleRegion(minX, minY, maxX - minX + 1, maxY - minY + 1);
+            return visibleRegion(image);
         } finally {
             image.dispose();
         }
     }
 
-    private record VisibleRegion(int pixelX, int pixelY, int pixelWidth, int pixelHeight) {
+    static VisibleRegion visibleRegion(Pixmap image) {
+        Pixmap source = Objects.requireNonNull(image, "image");
+        int minX = source.getWidth();
+        int minY = source.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < source.getHeight(); y++) {
+            for (int x = 0; x < source.getWidth(); x++) {
+                if ((source.getPixel(x, y) & 255) > 0) {
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                }
+            }
+        }
+        if (maxX < 0) {
+            return new VisibleRegion(0, 0, source.getWidth(), source.getHeight());
+        }
+        return new VisibleRegion(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+
+    record VisibleRegion(int pixelX, int pixelY, int pixelWidth, int pixelHeight) {
     }
 }

@@ -1,5 +1,6 @@
 package com.spacesim.presentation.asset;
 
+import com.badlogic.gdx.graphics.Pixmap;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.BodyKind;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +34,25 @@ class OrdnanceSpriteCatalogTest {
             assertEquals(0, alpha(image.getRGB(image.getWidth() - 1, image.getHeight() - 1)),
                     variant.texturePath());
             assertTrue(hasVisiblePixel(image), variant.texturePath());
+        }
+    }
+
+    @Test
+    void runtimeAlphaBoundsCropTransparentAuthoringCanvas() throws IOException {
+        for (var variant : OrdnanceSpriteCatalog.allVariants()) {
+            byte[] encoded = resourceBytes(variant.texturePath());
+            Pixmap image = new Pixmap(encoded, 0, encoded.length);
+            try {
+                var region = OrdnanceTextureRenderer.visibleRegion(image);
+                assertTrue(region.pixelX() >= 0 && region.pixelY() >= 0, variant.texturePath());
+                assertTrue(region.pixelWidth() > 0 && region.pixelHeight() > 0, variant.texturePath());
+                assertTrue(region.pixelX() + region.pixelWidth() <= image.getWidth(), variant.texturePath());
+                assertTrue(region.pixelY() + region.pixelHeight() <= image.getHeight(), variant.texturePath());
+                assertTrue(region.pixelWidth() < image.getWidth() || region.pixelHeight() < image.getHeight(),
+                        variant.texturePath());
+            } finally {
+                image.dispose();
+            }
         }
     }
 
@@ -92,6 +112,14 @@ class OrdnanceSpriteCatalogTest {
             BufferedImage result = ImageIO.read(stream);
             assertNotNull(result, path);
             return result;
+        }
+    }
+
+    private static byte[] resourceBytes(String path) throws IOException {
+        try (InputStream stream = OrdnanceSpriteCatalogTest.class.getClassLoader()
+                .getResourceAsStream(path)) {
+            assertNotNull(stream, path);
+            return stream.readAllBytes();
         }
     }
 
