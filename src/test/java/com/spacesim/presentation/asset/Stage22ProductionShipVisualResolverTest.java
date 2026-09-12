@@ -5,13 +5,20 @@ import com.spacesim.content.Stage22EmpirePackageCatalog;
 import com.spacesim.content.Stage22EmpirePackageLoader;
 import com.spacesim.content.Stage22IndustrialUnionPackageCatalog;
 import com.spacesim.content.Stage22IndustrialUnionPackageLoader;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.AtlasRegion;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ScaleAuthority;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.VisualRole;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.ResolvedVisual;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -104,6 +111,37 @@ class Stage22ProductionShipVisualResolverTest {
     }
 
     @Test
+    void coreCargoUpgradeChangesOnlyArtworkAndKeepsCurrentPhysicalScale() {
+        ResolvedSprite legacy = legacyCargo(321d, 87d);
+
+        ResolvedSprite empire = Stage22ProductionShipSpriteAdapter.upgradeCoreCargoProjection(
+                "fleet:501",
+                Stage22EmpirePackageCatalog.STABLE_FACTION_ID,
+                legacy,
+                RuntimeVisualState.IDLE);
+        ResolvedSprite union = Stage22ProductionShipSpriteAdapter.upgradeCoreCargoProjection(
+                "fleet:502",
+                Stage22IndustrialUnionPackageCatalog.STABLE_FACTION_ID,
+                legacy,
+                RuntimeVisualState.IDLE);
+        ResolvedSprite unknown = Stage22ProductionShipSpriteAdapter.upgradeCoreCargoProjection(
+                "fleet:503",
+                "faction.third_party",
+                legacy,
+                RuntimeVisualState.IDLE);
+
+        assertEquals("assets/ships/empire/production/freight/freight_base.png", empire.binding().texturePath());
+        assertEquals("assets/ships/industrial_union/production/freight/freight_base.png", union.binding().texturePath());
+        assertEquals(legacy.worldLengthM(), empire.worldLengthM());
+        assertEquals(legacy.worldWidthM(), empire.worldWidthM());
+        assertEquals(legacy.worldLengthM(), union.worldLengthM());
+        assertEquals(legacy.worldWidthM(), union.worldWidthM());
+        assertEquals(legacy.scaleAuthority(), empire.scaleAuthority());
+        assertEquals(legacy.scaleAuthority(), union.scaleAuthority());
+        assertSame(legacy, unknown);
+    }
+
+    @Test
     void unsupportedFactionAndRoleFailClosed() {
         assertThrows(IllegalArgumentException.class, () -> Stage22ProductionShipVisualResolver.resolveRole(
                 "fleet:404", "faction.unknown", "role.support.freight", RuntimeVisualState.IDLE));
@@ -112,6 +150,26 @@ class Stage22ProductionShipVisualResolverTest {
                 Stage22EmpirePackageCatalog.STABLE_FACTION_ID,
                 "role.unsupported.test",
                 RuntimeVisualState.IDLE));
+    }
+
+    private static ResolvedSprite legacyCargo(double lengthM, double widthM) {
+        SpriteBinding binding = new SpriteBinding(
+                "legacy.test.freight",
+                VisualRole.CARGO_TRANSPORT_SHIP,
+                "assets/ships/ship_sprite_reference_pack_v1.png",
+                new AtlasRegion(0, 0, 1, 1),
+                0.5f,
+                0.5f,
+                SourceFacing.RIGHT,
+                lengthM,
+                widthM,
+                List.of());
+        return new ResolvedSprite(
+                binding,
+                lengthM,
+                widthM,
+                ScaleAuthority.EXACT_PHYSICAL_CONTENT,
+                "test.runtime.physical-authority");
     }
 
     private static void assertFitResolves(String factionId, String fitId, String roleId) {
