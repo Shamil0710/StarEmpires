@@ -4,7 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.spacesim.world.SectorId;
+import com.spacesim.world.StarSystemId;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -27,11 +27,12 @@ public final class SectorSpaceBackgroundTextureRenderer {
     }
 
     /**
-     * Draws the stable background for one sector, using an aspect-preserving center crop.
+     * Draws the stable background for the active system's containing sector, using an
+     * aspect-preserving center crop.
      *
      * @param batch active caller-owned sprite batch
      * @param worldSeed persistent generated-world seed
-     * @param sectorId stable current-sector identity
+     * @param systemId stable active-system identity; its sector binding comes from topology projection
      * @param x destination left edge
      * @param y destination bottom edge
      * @param width positive destination width
@@ -40,7 +41,7 @@ public final class SectorSpaceBackgroundTextureRenderer {
     public void draw(
             SpriteBatch batch,
             long worldSeed,
-            SectorId sectorId,
+            StarSystemId systemId,
             float x,
             float y,
             float width,
@@ -54,7 +55,7 @@ public final class SectorSpaceBackgroundTextureRenderer {
                 || width <= 0f || height <= 0f) {
             throw new IllegalArgumentException("background destination must be finite and positive-sized");
         }
-        String path = SectorSpaceBackgroundCatalog.texturePath(worldSeed, sectorId);
+        String path = SectorSpaceBackgroundCatalog.texturePath(worldSeed, systemId);
         Texture texture = textures.get(path);
         if (texture == null) {
             throw new IllegalArgumentException("sector background texture is not loaded: " + path);
