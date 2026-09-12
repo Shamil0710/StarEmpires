@@ -16,6 +16,8 @@ import com.spacesim.ui.TacticalSidePalette.Rgba;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
+import com.spacesim.presentation.asset.Stage22ProductionShipSpriteAdapter;
+import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
 import com.spacesim.world.Stage20SpecialLocationWorld.LocationKind;
 
 import java.util.Objects;
@@ -27,7 +29,9 @@ import java.util.Objects;
  * reference to simulation engines, entities, combat services or persistence and therefore cannot
  * become combat authority. The complete renderer may be replaced by sprites/VFX in Stage 23 without
  * changing any authoritative combat physics. The compatibility constructor keeps schematic hulls;
- * {@link #withMinimumPlayableSprites()} replaces only those hull bodies with the Stage-20.5E pack.</p>
+ * {@link #withMinimumPlayableSprites()} replaces those hull bodies with the Stage-20.5E pack and,
+ * when exact campaign faction plus Stage-21 strategic fit identity are present, the validated
+ * Stage-22 production destroyer artwork.</p>
  */
 public final class TacticalPrototypeRenderer {
     private static final float MIN_SHIELD_RADIUS_PX = 12f;
@@ -199,6 +203,14 @@ public final class TacticalPrototypeRenderer {
             ResolvedSprite resolved = ship.wreck()
                     ? Stage20MinimumPlayableSpriteCatalog.resolveSpecialLocation(LocationKind.DERELICT)
                     : Stage20MinimumPlayableSpriteCatalog.resolveCombatRole(ship.role());
+            if (!ship.wreck() && ship.stableFactionId() != null) {
+                resolved = Stage22ProductionShipSpriteAdapter.upgradeStage21TacticalProjection(
+                        "combatant:" + ship.entityId(),
+                        ship.stableFactionId(),
+                        ship.installedFit(),
+                        resolved,
+                        runtimeVisualState(ship));
+            }
             float length = screenLength(layout, ship.lengthM());
             float width = screenLength(layout, ship.widthM());
             minimumSprites.draw(
@@ -212,6 +224,16 @@ public final class TacticalPrototypeRenderer {
         }
         spriteBatch.end();
         spriteBatch.setColor(Color.WHITE);
+    }
+
+    private static RuntimeVisualState runtimeVisualState(ShipGlyph ship) {
+        if (ship.integrityFraction() < 0.999_999d) {
+            return RuntimeVisualState.DAMAGED;
+        }
+        if (ship.thrustFraction() > 1e-9d) {
+            return RuntimeVisualState.THRUSTING;
+        }
+        return RuntimeVisualState.IDLE;
     }
 
     private void drawShip(WorldMapLayout layout, ShipGlyph ship, float x, float y) {
