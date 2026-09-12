@@ -1,6 +1,7 @@
 package com.spacesim.ui;
 
 import com.spacesim.content.ContentCatalog;
+import com.spacesim.presentation.asset.SectorSpaceBackgroundCatalog;
 import com.spacesim.world.FactionDiplomacyState;
 import com.spacesim.world.FactionEconomicState;
 import com.spacesim.world.FactionStrategicState;
@@ -56,6 +57,7 @@ public final class GalaxyStrategicMapModel {
             String controllerId = checkedWorld.controllingFaction(system.id()).orElse(null);
             SectorNode sector = topology.sectorOf(system.id()).orElseThrow(
                     () -> new IllegalStateException("System has no containing sector: " + system.id()));
+            SectorSpaceBackgroundCatalog.registerSystemSector(system.id(), sector.id());
             systems.add(new GalaxyStrategicMapSnapshot.SystemView(
                     system.id(),
                     system.name(),
