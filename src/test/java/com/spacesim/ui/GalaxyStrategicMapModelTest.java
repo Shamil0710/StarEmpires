@@ -3,6 +3,7 @@ package com.spacesim.ui;
 import com.spacesim.LargeDemoGalaxyFactory;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.presentation.asset.SectorSpaceBackgroundCatalog;
 import com.spacesim.world.GalaxyTopology;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldSimulation;
@@ -42,6 +43,10 @@ class GalaxyStrategicMapModelTest {
         for (GalaxyStrategicMapSnapshot.SystemView system : snapshot.systems()) {
             assertEquals(topology.neighbors(system.id()).size(), system.neighborCount());
             assertEquals(world.controllingFaction(system.id()).orElse(null), system.controllerFactionId());
+            assertEquals(topology.sectorOf(system.id()).orElseThrow().id(), system.sectorId());
+            assertEquals(
+                    SectorSpaceBackgroundCatalog.texturePath(24_001L, system.sectorId()),
+                    SectorSpaceBackgroundCatalog.texturePath(24_001L, system.id()));
         }
         assertTrue(topology.neighbors(active).contains(snapshot.selectedNeighborId()));
     }
