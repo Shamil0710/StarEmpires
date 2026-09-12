@@ -5,6 +5,7 @@ import com.spacesim.content.Stage22EmpirePackageCatalog;
 import com.spacesim.content.Stage22EmpirePackageLoader;
 import com.spacesim.content.Stage22IndustrialUnionPackageCatalog;
 import com.spacesim.content.Stage22IndustrialUnionPackageLoader;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ScaleAuthority;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.ResolvedVisual;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,23 @@ class Stage22ProductionShipVisualResolverTest {
         assertNotEquals(idle.key(), thrusting.key());
         assertEquals(RuntimeVisualState.IDLE, idle.key().runtimeState());
         assertEquals(RuntimeVisualState.THRUSTING, thrusting.key().runtimeState());
+    }
+
+    @Test
+    void adapterPreservesProductionPathAndExactScaleForCurrentRenderer() {
+        ResolvedVisual visual = Stage22ProductionShipVisualResolver.resolveRole(
+                "fleet:303",
+                Stage22EmpirePackageCatalog.STABLE_FACTION_ID,
+                "role.support.freight",
+                RuntimeVisualState.IDLE);
+        var adapted = Stage22ProductionShipSpriteAdapter.adapt(visual);
+
+        assertEquals(visual.assetRef(), adapted.binding().texturePath());
+        assertTrue(Stage22ProductionShipSpriteAdapter.isProductionPath(adapted.binding().texturePath()));
+        assertEquals(visual.worldLengthM(), adapted.worldLengthM());
+        assertEquals(visual.worldWidthM(), adapted.worldWidthM());
+        assertEquals(ScaleAuthority.EXACT_PHYSICAL_CONTENT, adapted.scaleAuthority());
+        assertTrue(adapted.binding().assetId().startsWith("stage22.production:"));
     }
 
     @Test
