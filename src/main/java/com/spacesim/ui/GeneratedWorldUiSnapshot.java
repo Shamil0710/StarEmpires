@@ -1,6 +1,9 @@
 package com.spacesim.ui;
 
+import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding;
+import com.spacesim.presentation.asset.Stage22ProductionShipSpriteAdapter;
+import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.StarSystemId;
 
@@ -64,7 +67,7 @@ public record GeneratedWorldUiSnapshot(
      * @param position authoritative local physical position
      * @param factionId stable owner/controller ID, or empty when unknown/unowned
      * @param factionName player-facing owner/controller label
-     * @param sprite optional minimum-pack sprite binding
+     * @param sprite optional minimum-pack or validated Stage-22 production sprite binding
      * @param sections structured inspector content
      * @param physicalLengthM physical or nominal length in metres
      * @param physicalWidthM physical or nominal width in metres
@@ -104,15 +107,22 @@ public record GeneratedWorldUiSnapshot(
         }
 
         /**
-         * Preserves engineering dimensions while passing the artwork into the UI.
-         * @param resolved artwork with resolved dimensions
-         * @return projection retaining the resolved physical length and width
+         * Preserves simulation-authoritative dimensions while passing artwork into the UI. Governed
+         * core-faction cargo projections are upgraded to exact Stage-22 production artwork here, after
+         * physical scale has already been resolved by the current runtime authority.
+         *
+         * @param resolved artwork with resolved physical dimensions
+         * @return projection retaining physical scale and, when governed, production faction artwork
          */
-        public LocalObjectView withScale(
-                com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite resolved) {
+        public LocalObjectView withScale(ResolvedSprite resolved) {
+            ResolvedSprite selected = Stage22ProductionShipSpriteAdapter.upgradeCoreCargoProjection(
+                    stableId,
+                    factionId,
+                    Objects.requireNonNull(resolved, "resolved"),
+                    RuntimeVisualState.IDLE);
             return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
-                    factionId, factionName, resolved.binding(), sections,
-                    resolved.worldLengthM(), resolved.worldWidthM());
+                    factionId, factionName, selected.binding(), sections,
+                    selected.worldLengthM(), selected.worldWidthM());
         }
 
         /**
@@ -126,7 +136,7 @@ public record GeneratedWorldUiSnapshot(
          * @param position authoritative local physical position
          * @param factionId stable owner/controller ID, or empty when unknown/unowned
          * @param factionName player-facing owner/controller label
-         * @param sprite optional minimum-pack sprite binding
+         * @param sprite optional minimum-pack or validated Stage-22 production sprite binding
          * @param sections structured inspector content
          * @param physicalLengthM physical or nominal length in metres; zero for point markers
          * @param physicalWidthM physical or nominal width in metres; zero for point markers
