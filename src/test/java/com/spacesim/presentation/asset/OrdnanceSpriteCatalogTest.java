@@ -1,6 +1,5 @@
 package com.spacesim.presentation.asset;
 
-import com.badlogic.gdx.graphics.Pixmap;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.BodyKind;
 import org.junit.jupiter.api.Test;
 
@@ -38,21 +37,21 @@ class OrdnanceSpriteCatalogTest {
     }
 
     @Test
-    void runtimeAlphaBoundsCropTransparentAuthoringCanvas() throws IOException {
+    void runtimeAlphaBoundsCropTransparentAuthoringCanvasWithoutNativeBackend() throws IOException {
         for (var variant : OrdnanceSpriteCatalog.allVariants()) {
-            byte[] encoded = resourceBytes(variant.texturePath());
-            Pixmap image = new Pixmap(encoded, 0, encoded.length);
-            try {
-                var region = OrdnanceTextureRenderer.visibleRegion(image);
-                assertTrue(region.pixelX() >= 0 && region.pixelY() >= 0, variant.texturePath());
-                assertTrue(region.pixelWidth() > 0 && region.pixelHeight() > 0, variant.texturePath());
-                assertTrue(region.pixelX() + region.pixelWidth() <= image.getWidth(), variant.texturePath());
-                assertTrue(region.pixelY() + region.pixelHeight() <= image.getHeight(), variant.texturePath());
-                assertTrue(region.pixelWidth() < image.getWidth() || region.pixelHeight() < image.getHeight(),
-                        variant.texturePath());
-            } finally {
-                image.dispose();
-            }
+            BufferedImage image = image(variant.texturePath());
+            var region = OrdnanceTextureRenderer.visibleRegion(
+                    image.getWidth(),
+                    image.getHeight(),
+                    (x, y) -> alpha(image.getRGB(x, y)));
+
+            assertTrue(region.pixelX() >= 0 && region.pixelY() >= 0, variant.texturePath());
+            assertTrue(region.pixelWidth() > 0 && region.pixelHeight() > 0, variant.texturePath());
+            assertTrue(region.pixelX() + region.pixelWidth() <= image.getWidth(), variant.texturePath());
+            assertTrue(region.pixelY() + region.pixelHeight() <= image.getHeight(), variant.texturePath());
+            assertTrue(region.pixelWidth() < image.getWidth() || region.pixelHeight() < image.getHeight(),
+                    variant.texturePath());
+            assertTrue(visibleBoundsContainEveryOpaquePixel(image, region), variant.texturePath());
         }
     }
 
@@ -115,14 +114,6 @@ class OrdnanceSpriteCatalogTest {
         }
     }
 
-    private static byte[] resourceBytes(String path) throws IOException {
-        try (InputStream stream = OrdnanceSpriteCatalogTest.class.getClassLoader()
-                .getResourceAsStream(path)) {
-            assertNotNull(stream, path);
-            return stream.readAllBytes();
-        }
-    }
-
     private static boolean hasVisiblePixel(BufferedImage image) {
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
@@ -132,6 +123,22 @@ class OrdnanceSpriteCatalogTest {
             }
         }
         return false;
+    }
+
+    private static boolean visibleBoundsContainEveryOpaquePixel(
+            BufferedImage image,
+            OrdnanceTextureRenderer.VisibleRegion region) {
+        int maxX = region.pixelX() + region.pixelWidth();
+        int maxY = region.pixelY() + region.pixelHeight();
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                if (alpha(image.getRGB(x, y)) > 0
+                        && (x < region.pixelX() || x >= maxX || y < region.pixelY() || y >= maxY)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static int alpha(int argb) {
