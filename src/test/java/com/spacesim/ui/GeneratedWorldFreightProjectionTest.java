@@ -1,9 +1,8 @@
 package com.spacesim.ui;
 
 import com.spacesim.campaign.GeneratedCampaignSession;
-import com.spacesim.content.Stage22EmpirePackageCatalog;
-import com.spacesim.content.Stage22IndustrialUnionPackageCatalog;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
+import com.spacesim.presentation.asset.Stage22ProductionShipSpriteAdapter;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.LocalObjectView;
 import com.spacesim.world.FleetJumpPhase;
 import com.spacesim.world.FleetLocationKind;
@@ -11,29 +10,44 @@ import com.spacesim.world.StarSystemId;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeneratedWorldFreightProjectionTest {
     @Test
-    void generatedClientUsesFactionProductionFreightArtWithoutChangingPhysicalScaleAuthority() {
+    void generatedCompatibilityFactionsKeepTheirOwnIdentityAndDoNotMasqueradeAsCoreProductionPackages() {
         GeneratedCampaignSession campaign = GeneratedCampaignSession.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         var runtime = campaign.runtime();
         GeneratedWorldUiModel model = new GeneratedWorldUiModel(
                 campaign.rootSeed(), runtime, campaign.content());
+        Set<String> observedOwners = new HashSet<>();
 
-        assertProductionFreightProjection(
-                runtime,
-                model,
-                Stage22EmpirePackageCatalog.STABLE_FACTION_ID,
-                "assets/ships/empire/production/freight/freight_base.png");
-        assertProductionFreightProjection(
-                runtime,
-                model,
-                Stage22IndustrialUnionPackageCatalog.STABLE_FACTION_ID,
-                "assets/ships/industrial_union/production/freight/freight_base.png");
+        for (FreighterState freight : runtime.freight().capture().freighters()) {
+            if (!freight.operational()) {
+                continue;
+            }
+            observedOwners.add(freight.stableFactionId());
+            runtime.world().activateSystem(freight.currentSystemId());
+
+            var legacyPhysical = runtime.freightSprite(freight.fleetId());
+            LocalObjectView projected = projectedFleet(model, freight.fleetId().value());
+
+            assertEquals(freight.stableFactionId(), projected.factionId());
+            assertEquals(legacyPhysical.binding().texturePath(), projected.sprite().texturePath());
+            assertEquals(legacyPhysical.worldLengthM(), projected.physicalLengthM());
+            assertEquals(legacyPhysical.worldWidthM(), projected.physicalWidthM());
+            assertFalse(Stage22ProductionShipSpriteAdapter.isProductionPath(projected.sprite().texturePath()),
+                    "world-generated compatibility factions must not silently bind to a core package");
+        }
+
+        assertFalse(observedOwners.isEmpty());
+        assertTrue(Set.of("faction.alpha", "faction.beta").containsAll(observedOwners));
     }
 
     @Test
@@ -116,27 +130,6 @@ class GeneratedWorldFreightProjectionTest {
         resumed.advanceFrame(0.1f);
 
         assertEquals(continuous.captureState(), resumed.captureState());
-    }
-
-    private static void assertProductionFreightProjection(
-            com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
-            GeneratedWorldUiModel model,
-            String factionId,
-            String expectedTexturePath) {
-        FreighterState freight = runtime.freight().capture().freighters().stream()
-                .filter(FreighterState::operational)
-                .filter(value -> factionId.equals(value.stableFactionId()))
-                .findFirst().orElseThrow();
-        runtime.world().activateSystem(freight.currentSystemId());
-
-        var legacyPhysical = runtime.freightSprite(freight.fleetId());
-        LocalObjectView projected = projectedFleet(model, freight.fleetId().value());
-
-        assertEquals(factionId, projected.factionId());
-        assertEquals(expectedTexturePath, projected.sprite().texturePath());
-        assertTrue(projected.sprite().assetId().startsWith("stage22.production:"));
-        assertEquals(legacyPhysical.worldLengthM(), projected.physicalLengthM());
-        assertEquals(legacyPhysical.worldWidthM(), projected.physicalWidthM());
     }
 
     private static FreighterState orderedOperationalFreighter(GeneratedCampaignSession campaign) {
