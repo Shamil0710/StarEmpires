@@ -1,11 +1,11 @@
 package com.spacesim.presentation.asset;
 
-import com.spacesim.world.StarSystemId;
+import com.spacesim.world.SectorId;
 
 import java.util.List;
 import java.util.Objects;
 
-/** Deterministic presentation-only catalogue for current-system space backgrounds. */
+/** Deterministic presentation-only catalogue for sector space backgrounds. */
 public final class SectorSpaceBackgroundCatalog {
     private static final List<String> TEXTURE_PATHS = List.of(
             "assets/backgrounds/sector_space_01.jpg",
@@ -22,30 +22,31 @@ public final class SectorSpaceBackgroundCatalog {
     }
 
     /**
-     * Chooses one background as a pure function of persistent campaign/system identity.
+     * Chooses one background as a pure function of persistent campaign/sector identity.
      *
      * <p>No shared or stateful RNG is consumed. Rendering order, application restarts and save/load
-     * therefore cannot change the selected background for the same world and system.</p>
+     * therefore cannot change the selected background for the same world and sector. Every star
+     * system belonging to the same sector resolves the same texture.</p>
      *
      * @param worldSeed persistent generated-world seed
-     * @param systemId stable star-system identity
+     * @param sectorId stable sector identity
      * @return index in {@link #allTexturePaths()}
      */
-    public static int textureIndex(long worldSeed, StarSystemId systemId) {
-        long system = Objects.requireNonNull(systemId, "systemId").value();
+    public static int textureIndex(long worldSeed, SectorId sectorId) {
+        long sector = Objects.requireNonNull(sectorId, "sectorId").value();
         long value = worldSeed
-                ^ Long.rotateLeft(system * 0x9E3779B97F4A7C15L, 21)
+                ^ Long.rotateLeft(sector * 0x9E3779B97F4A7C15L, 21)
                 ^ 0xD1B54A32D192ED03L;
         return (int) Long.remainderUnsigned(mix64(value), TEXTURE_PATHS.size());
     }
 
     /**
      * @param worldSeed persistent generated-world seed
-     * @param systemId stable star-system identity
-     * @return packaged texture path selected for that sector/system
+     * @param sectorId stable sector identity
+     * @return packaged texture path selected for that sector
      */
-    public static String texturePath(long worldSeed, StarSystemId systemId) {
-        return TEXTURE_PATHS.get(textureIndex(worldSeed, systemId));
+    public static String texturePath(long worldSeed, SectorId sectorId) {
+        return TEXTURE_PATHS.get(textureIndex(worldSeed, sectorId));
     }
 
     private static long mix64(long value) {
