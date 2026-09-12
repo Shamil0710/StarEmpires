@@ -10,6 +10,7 @@ import com.spacesim.ui.TacticalPrototypeVisualSnapshot.BodyGlyph;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.IntBinaryOperator;
 
 /** GPU owner/drawer for presentation-only tactical projectile and missile sprites. */
 public final class OrdnanceTextureRenderer {
@@ -129,21 +130,27 @@ public final class OrdnanceTextureRenderer {
     private static VisibleRegion visibleRegion(String path) {
         Pixmap image = new Pixmap(Gdx.files.internal(path));
         try {
-            return visibleRegion(image);
+            return visibleRegion(
+                    image.getWidth(),
+                    image.getHeight(),
+                    (x, y) -> image.getPixel(x, y) & 255);
         } finally {
             image.dispose();
         }
     }
 
-    static VisibleRegion visibleRegion(Pixmap image) {
-        Pixmap source = Objects.requireNonNull(image, "image");
-        int minX = source.getWidth();
-        int minY = source.getHeight();
+    static VisibleRegion visibleRegion(int width, int height, IntBinaryOperator alphaAt) {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("image dimensions must be positive");
+        }
+        IntBinaryOperator alphaReader = Objects.requireNonNull(alphaAt, "alphaAt");
+        int minX = width;
+        int minY = height;
         int maxX = -1;
         int maxY = -1;
-        for (int y = 0; y < source.getHeight(); y++) {
-            for (int x = 0; x < source.getWidth(); x++) {
-                if ((source.getPixel(x, y) & 255) > 0) {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (alphaReader.applyAsInt(x, y) > 0) {
                     minX = Math.min(minX, x);
                     minY = Math.min(minY, y);
                     maxX = Math.max(maxX, x);
@@ -152,7 +159,7 @@ public final class OrdnanceTextureRenderer {
             }
         }
         if (maxX < 0) {
-            return new VisibleRegion(0, 0, source.getWidth(), source.getHeight());
+            return new VisibleRegion(0, 0, width, height);
         }
         return new VisibleRegion(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
