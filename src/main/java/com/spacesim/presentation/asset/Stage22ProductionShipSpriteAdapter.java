@@ -80,7 +80,7 @@ public final class Stage22ProductionShipSpriteAdapter {
                 physical.worldLengthM(),
                 physical.worldWidthM(),
                 physical.scaleAuthority(),
-                physical.scaleAuthorityId() + "|visual=" + visual.key().visualBindingId()
+                physical.authorityId() + "|visual=" + visual.key().visualBindingId()
                         + ':' + visual.key().fitFingerprint());
     }
 
