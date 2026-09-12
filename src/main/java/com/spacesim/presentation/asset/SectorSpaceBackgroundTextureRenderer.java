@@ -4,13 +4,13 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.spacesim.world.StarSystemId;
+import com.spacesim.world.SectorId;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** GPU owner/drawer for deterministic current-system space backgrounds. */
+/** GPU owner/drawer for deterministic sector space backgrounds. */
 public final class SectorSpaceBackgroundTextureRenderer {
     private static final float READABILITY_DIM = 0.62f;
 
@@ -27,11 +27,11 @@ public final class SectorSpaceBackgroundTextureRenderer {
     }
 
     /**
-     * Draws the stable background for one sector/system, using an aspect-preserving center crop.
+     * Draws the stable background for one sector, using an aspect-preserving center crop.
      *
      * @param batch active caller-owned sprite batch
      * @param worldSeed persistent generated-world seed
-     * @param systemId stable current-system identity
+     * @param sectorId stable current-sector identity
      * @param x destination left edge
      * @param y destination bottom edge
      * @param width positive destination width
@@ -40,7 +40,7 @@ public final class SectorSpaceBackgroundTextureRenderer {
     public void draw(
             SpriteBatch batch,
             long worldSeed,
-            StarSystemId systemId,
+            SectorId sectorId,
             float x,
             float y,
             float width,
@@ -54,7 +54,7 @@ public final class SectorSpaceBackgroundTextureRenderer {
                 || width <= 0f || height <= 0f) {
             throw new IllegalArgumentException("background destination must be finite and positive-sized");
         }
-        String path = SectorSpaceBackgroundCatalog.texturePath(worldSeed, systemId);
+        String path = SectorSpaceBackgroundCatalog.texturePath(worldSeed, sectorId);
         Texture texture = textures.get(path);
         if (texture == null) {
             throw new IllegalArgumentException("sector background texture is not loaded: " + path);
