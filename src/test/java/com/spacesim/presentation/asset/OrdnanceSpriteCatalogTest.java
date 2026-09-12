@@ -54,6 +54,29 @@ class OrdnanceSpriteCatalogTest {
     }
 
     @Test
+    void knownStage175IPhysicalProfilesResolveToStableSemanticSprites() {
+        assertEquals("sprite.ordnance.kinetic_penetrator_a",
+                OrdnanceSpriteCatalog.resolve(BodyKind.KINETIC_PROJECTILE, 4L, 1.8d, 0.075d).assetId());
+        assertEquals("sprite.ordnance.kinetic_shell",
+                OrdnanceSpriteCatalog.resolve(BodyKind.KINETIC_PROJECTILE, 4L, 0.45d, 0.05d).assetId());
+        assertEquals("sprite.ordnance.guided_missile_a",
+                OrdnanceSpriteCatalog.resolve(BodyKind.GUIDED_MISSILE, 1L, 5.8d, 0.65d).assetId());
+        assertEquals("sprite.ordnance.guided_micro_missile",
+                OrdnanceSpriteCatalog.resolve(BodyKind.GUIDED_MISSILE, 1L, 2.4d, 0.36d).assetId());
+        assertEquals("sprite.ordnance.interceptor_missile",
+                OrdnanceSpriteCatalog.resolve(BodyKind.INTERCEPTOR, 99L, 3.4d, 0.42d).assetId());
+    }
+
+    @Test
+    void unknownPhysicalProfileKeepsDeterministicBodyIdFallback() {
+        var fallback = OrdnanceSpriteCatalog.resolve(BodyKind.GUIDED_MISSILE, 7L);
+        assertEquals(fallback,
+                OrdnanceSpriteCatalog.resolve(BodyKind.GUIDED_MISSILE, 7L, 9.9d, 0.9d));
+        assertThrows(IllegalArgumentException.class,
+                () -> OrdnanceSpriteCatalog.resolve(BodyKind.GUIDED_MISSILE, 7L, 0d, 0.9d));
+    }
+
+    @Test
     void authoredUpFacingSpritesRotateIntoRuntimeHeading() {
         assertEquals(-90f, OrdnanceSpriteCatalog.rotationDegrees(0d), 0.0001f);
         assertEquals(0f, OrdnanceSpriteCatalog.rotationDegrees(Math.PI / 2d), 0.0001f);

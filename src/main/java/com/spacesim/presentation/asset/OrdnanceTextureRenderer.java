@@ -73,7 +73,8 @@ public final class OrdnanceTextureRenderer {
             throw new IllegalArgumentException("render transform must be finite and positive-sized");
         }
 
-        SpriteVariant variant = OrdnanceSpriteCatalog.resolve(glyph.kind(), glyph.bodyId());
+        SpriteVariant variant = OrdnanceSpriteCatalog.resolve(
+                glyph.kind(), glyph.bodyId(), glyph.lengthM(), glyph.widthM());
         Texture texture = textures.get(variant.texturePath());
         if (texture == null) {
             throw new IllegalStateException("ordnance texture is not loaded: " + variant.texturePath());

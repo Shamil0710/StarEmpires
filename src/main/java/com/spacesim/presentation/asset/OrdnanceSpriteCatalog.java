@@ -10,17 +10,18 @@ import java.util.Objects;
 /**
  * Presentation-only catalogue for tactical projectile and missile artwork.
  *
- * <p>The catalogue deliberately carries no physical dimensions, damage values, guidance data,
- * collision radius or other simulation authority. Render size always comes from the projected
- * {@code BodyGlyph.lengthM()/widthM()} values. Multiple visual variants are selected only from the
- * stable body identity, so replaying the same snapshot produces the same artwork without adding
- * simulation randomness.</p>
+ * <p>The catalogue deliberately carries no damage values, guidance data, collision radius or other
+ * simulation authority. Render size always comes from the projected {@code BodyGlyph.lengthM()/widthM()}
+ * values. Known Stage-17.5I authored ammunition profiles are mapped from their already-authoritative
+ * physical dimensions to a stable matching silhouette. Unknown/future profiles retain the original
+ * deterministic body-id fallback, so replaying the same snapshot never adds presentation randomness.</p>
  */
 public final class OrdnanceSpriteCatalog {
     /** Stable contract version for the first generated ordnance sprite pack. */
-    public static final String CURRENT_VERSION = "stage22_7.tactical-ordnance-sprites.v1";
+    public static final String CURRENT_VERSION = "stage22_7.tactical-ordnance-sprites.v2";
 
     private static final String ROOT = "assets/ordnance/";
+    private static final double DIMENSION_EPSILON_M = 1e-9d;
 
     /** One immutable authored ordnance image. */
     public record SpriteVariant(String assetId, BodyKind kind, String texturePath) {
@@ -89,6 +90,27 @@ public final class OrdnanceSpriteCatalog {
         return variants.get(index);
     }
 
+    /**
+     * Resolves a known authored ammunition profile before falling back to stable body identity.
+     *
+     * <p>The dimensional profiles below mirror the current Stage-17.5I ammunition sidecar and are
+     * presentation metadata only. They do not alter body dimensions, collision, damage or guidance.
+     * Exact physical dimensions still come from the authoritative body projection.</p>
+     *
+     * @param kind supported presentation category
+     * @param bodyId positive stable body identity used only for unknown-profile fallback
+     * @param lengthM authoritative physical body length
+     * @param widthM authoritative physical body diameter/width
+     * @return immutable authored variant
+     */
+    public static SpriteVariant resolve(BodyKind kind, long bodyId, double lengthM, double widthM) {
+        Objects.requireNonNull(kind, "kind");
+        requirePositiveFinite(lengthM, "lengthM");
+        requirePositiveFinite(widthM, "widthM");
+        SpriteVariant authored = resolveKnownStage175IProfile(kind, lengthM, widthM);
+        return authored != null ? authored : resolve(kind, bodyId);
+    }
+
     /** @return deterministic immutable list of every authored ordnance variant */
     public static List<SpriteVariant> allVariants() {
         return List.of(
@@ -115,6 +137,37 @@ public final class OrdnanceSpriteCatalog {
         return (float) Math.toDegrees(headingRad) - 90f;
     }
 
+    private static SpriteVariant resolveKnownStage175IProfile(BodyKind kind, double lengthM, double widthM) {
+        if (kind == BodyKind.KINETIC_PROJECTILE) {
+            if (sameDimensions(lengthM, widthM, 1.8d, 0.075d)) {
+                return KINETIC.get(0); // ammo.test_kinetic_dart_150kg_v1
+            }
+            if (sameDimensions(lengthM, widthM, 0.45d, 0.05d)) {
+                return KINETIC.get(1); // ammo.test_pd_slug_5kg_v1
+            }
+        } else if (kind == BodyKind.GUIDED_MISSILE) {
+            if (sameDimensions(lengthM, widthM, 5.8d, 0.65d)) {
+                return GUIDED.get(2); // ammo.test_anti_ship_missile_2t_v1
+            }
+            if (sameDimensions(lengthM, widthM, 2.4d, 0.36d)) {
+                return GUIDED.get(4); // ammo.test_radar_repeater_decoy_300kg_v1 when projected as a body
+            }
+        } else if (kind == BodyKind.INTERCEPTOR
+                && sameDimensions(lengthM, widthM, 3.4d, 0.42d)) {
+            return INTERCEPTORS.get(0); // ammo.test_interceptor_750kg_v1
+        }
+        return null;
+    }
+
+    private static boolean sameDimensions(
+            double actualLengthM,
+            double actualWidthM,
+            double expectedLengthM,
+            double expectedWidthM) {
+        return Math.abs(actualLengthM - expectedLengthM) <= DIMENSION_EPSILON_M
+                && Math.abs(actualWidthM - expectedWidthM) <= DIMENSION_EPSILON_M;
+    }
+
     private static Map<BodyKind, List<SpriteVariant>> createVariants() {
         Map<BodyKind, List<SpriteVariant>> result = new EnumMap<>(BodyKind.class);
         result.put(BodyKind.KINETIC_PROJECTILE, KINETIC);
@@ -137,5 +190,11 @@ public final class OrdnanceSpriteCatalog {
             throw new IllegalArgumentException(label + " must not be blank");
         }
         return normalized;
+    }
+
+    private static void requirePositiveFinite(double value, String label) {
+        if (!Double.isFinite(value) || value <= 0d) {
+            throw new IllegalArgumentException(label + " must be finite and positive");
+        }
     }
 }
