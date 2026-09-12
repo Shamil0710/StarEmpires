@@ -3,12 +3,16 @@ package com.spacesim.player;
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
 import com.spacesim.components.ArchetypeComponent;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.EntityIdComponent;
+import com.spacesim.components.FactionComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.constants.Constants;
+import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.world.ConstructionProjectId;
 import com.spacesim.world.FleetId;
+import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.StarSystemId;
 import org.junit.jupiter.api.Test;
@@ -32,6 +36,22 @@ class GlobalFleetMapModelTest {
         assertEquals(runtime.player().ownedFleetIds().size(), initial.fleets().size());
         assertTrue(initial.fleets().stream().allMatch(marker ->
                 runtime.player().ownedFleetIds().contains(marker.fleetId())));
+        for (GlobalFleetMapSnapshot.FleetMarker marker : initial.fleets()) {
+            FleetPlacementState placement = runtime.world().findFleet(marker.fleetId()).orElseThrow();
+            Entity entity = placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                    ? runtime.world().findSession(placement.systemId()).orElseThrow()
+                            .getEntityRegistry().require(placement.localEntityId())
+                    : EntityStateMapper.restore(placement.transitState().entityState());
+            FactionComponent faction = entity.getComponent(FactionComponent.class);
+            EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
+            String expectedFaction = faction == null
+                    ? null
+                    : runtime.world().findFactionStableId(faction.factionId).orElse(null);
+            assertEquals(expectedFaction, marker.stableFactionId(),
+                    "global owned-fleet marker must carry exact stable world faction identity");
+            assertEquals(engineering == null ? null : engineering.fit, marker.installedFit(),
+                    "global owned-fleet marker must carry exact immutable installed engineering state");
+        }
         assertTrue(initial.projects().isEmpty());
         assertTrue(initial.stations().isEmpty());
 
