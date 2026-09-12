@@ -83,6 +83,24 @@ public final class Stage22ProductionShipVisualResolver {
             String packageFingerprint,
             String factionProfileCatalogFingerprint,
             RuntimeVisualState runtimeState) {
+        /**
+         * Validates one complete deterministic production-visual binding key.
+         *
+         * @param stableEntityId stable runtime/save identity of the presented ship or fleet
+         * @param stableFactionId authoritative stable faction identity
+         * @param systemicProfileId exact Stage-22 systemic faction profile
+         * @param shipVisualProfileId exact faction ship visual profile
+         * @param shipVisualProfileStatus broader governed profile maturity
+         * @param familyId authored Stage-22 ship family
+         * @param roleId common Stage-22 role taxonomy ID
+         * @param hullId exact hull belonging to the visual fit
+         * @param fitId exact legal engineering fit represented by the asset
+         * @param fitFingerprint exact semantic fit fingerprint pinned by the binding
+         * @param visualBindingId exact Stage-22 production visual binding
+         * @param packageFingerprint authored faction-package fingerprint
+         * @param factionProfileCatalogFingerprint Stage-22 systemic-profile catalog fingerprint
+         * @param runtimeState runtime presentation state
+         */
         public BindingKey {
             stableEntityId = requireText(stableEntityId, "stableEntityId");
             stableFactionId = requireText(stableFactionId, "stableFactionId");
@@ -117,6 +135,15 @@ public final class Stage22ProductionShipVisualResolver {
             String authorityDocument,
             double worldLengthM,
             double worldWidthM) {
+        /**
+         * Validates one resolved production visual.
+         *
+         * @param key complete deterministic binding key
+         * @param assetRef classpath production PNG
+         * @param authorityDocument canonical faction visual authority document
+         * @param worldLengthM exact hull length from the faction engineering catalog
+         * @param worldWidthM exact hull width from the faction engineering catalog
+         */
         public ResolvedVisual {
             key = Objects.requireNonNull(key, "key");
             assetRef = requireText(assetRef, "assetRef");
