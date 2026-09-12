@@ -121,6 +121,18 @@ public record TacticalPrototypeVisualSnapshot(
 
         /**
          * Source-compatible full constructor for existing role-aware tactical projections.
+         *
+         * @param entityId stable authoritative owner identity
+         * @param side presentation-only side projected from authoritative scenario membership
+         * @param role presentation-only role projected from authored doctrine/fit identity
+         * @param xM world x position in meters
+         * @param yM world y position in meters
+         * @param headingRad world heading in radians
+         * @param lengthM physical hull length
+         * @param widthM physical hull width
+         * @param thrustFraction presentation fraction [0,1] derived from authoritative thrust command/state
+         * @param integrityFraction mean physical compartment integrity [0,1]
+         * @param wreck whether authoritative damage state has no surviving compartment integrity
          */
         public ShipGlyph(
                 long entityId,
