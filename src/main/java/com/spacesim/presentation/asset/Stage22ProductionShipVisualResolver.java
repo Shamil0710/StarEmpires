@@ -18,6 +18,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.DemonstratorFitDefinitio
 import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
 import com.spacesim.content.ship.Stage22EmpireEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22IndustrialUnionEngineeringCatalogLoader;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 
 import java.net.URL;
 import java.util.LinkedHashMap;
@@ -172,6 +173,44 @@ public final class Stage22ProductionShipVisualResolver {
                             + stableFactionId + " -> " + checkedFit);
         }
         return resolve(authority, stableEntityId, family, checkedFit, runtimeState);
+    }
+
+    /**
+     * Resolves one installed engineering fit by semantic equality against the governed faction catalog.
+     * Surfaces that already hold authoritative {@link InstalledFit} state therefore do not need their
+     * own string-ID lookup or role heuristic.
+     *
+     * @param stableEntityId stable runtime/save entity or fleet identity
+     * @param stableFactionId authoritative stable faction identity
+     * @param installedFit exact installed engineering payload
+     * @param runtimeState current presentation state
+     * @return fail-closed exact production visual
+     */
+    public static ResolvedVisual resolveInstalledFit(
+            String stableEntityId,
+            String stableFactionId,
+            InstalledFit installedFit,
+            RuntimeVisualState runtimeState) {
+        FactionVisualAuthority authority = authority(stableFactionId);
+        InstalledFit checked = Objects.requireNonNull(installedFit, "installedFit");
+        List<String> matches = authority.engineering().getDemonstratorFits().stream()
+                .filter(definition -> InstalledFit.fromDemonstrator(definition).equals(checked))
+                .map(DemonstratorFitDefinition::id)
+                .filter(authority.familyByFit()::containsKey)
+                .sorted()
+                .toList();
+        if (matches.size() != 1) {
+            throw new IllegalArgumentException(
+                    "installed fit must match exactly one governed production definition for "
+                            + stableFactionId + ": matches=" + matches);
+        }
+        String fitId = matches.get(0);
+        return resolve(
+                authority,
+                stableEntityId,
+                authority.familyByFit().get(fitId),
+                fitId,
+                runtimeState);
     }
 
     private static ResolvedVisual resolve(
