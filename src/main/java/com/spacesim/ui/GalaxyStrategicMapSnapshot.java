@@ -1,5 +1,6 @@
 package com.spacesim.ui;
 
+import com.spacesim.world.SectorId;
 import com.spacesim.world.StarSystemId;
 
 import java.util.List;
@@ -45,6 +46,7 @@ public record GalaxyStrategicMapSnapshot(
      *
      * @param id stable system ID
      * @param name system display name
+     * @param sectorId stable containing-sector ID
      * @param sectorName containing sector display name
      * @param galaxyX authoritative strategic X coordinate
      * @param galaxyY authoritative strategic Y coordinate
@@ -57,6 +59,7 @@ public record GalaxyStrategicMapSnapshot(
     public record SystemView(
             StarSystemId id,
             String name,
+            SectorId sectorId,
             String sectorName,
             double galaxyX,
             double galaxyY,
@@ -70,6 +73,7 @@ public record GalaxyStrategicMapSnapshot(
          *
          * @param id stable system ID
          * @param name system display name
+         * @param sectorId stable containing-sector ID
          * @param sectorName containing sector display name
          * @param galaxyX authoritative strategic X coordinate
          * @param galaxyY authoritative strategic Y coordinate
@@ -82,6 +86,7 @@ public record GalaxyStrategicMapSnapshot(
         public SystemView {
             Objects.requireNonNull(id, "Galaxy map system ID not set");
             name = Objects.requireNonNull(name, "Galaxy map system name not set");
+            Objects.requireNonNull(sectorId, "Galaxy map sector ID not set");
             sectorName = Objects.requireNonNull(sectorName, "Galaxy map sector name not set");
             controllerDisplayName = Objects.requireNonNull(
                     controllerDisplayName, "Galaxy map controller display name not set");
