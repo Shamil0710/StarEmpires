@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -38,7 +39,7 @@ class GeneratedCampaignCoordinatorTest {
         var after = restored.captureState();
 
         assertEquals(before, after);
-        assertEquals(campaign.encode(), restored.encode());
+        assertArrayEquals(campaign.encode(), restored.encode());
         assertEquals(
                 fleetIdsBefore,
                 restored.session().captureState().worldState().fleets().stream()
