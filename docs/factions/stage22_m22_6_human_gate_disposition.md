@@ -67,6 +67,13 @@ packets. It does no fuzzy NLP scoring. A selected choice is correct only when it
 free text is accepted only when it exactly normalizes to an equivalent frozen before review. `PASS`
 requires `correct / total >= 0.80`.
 
+## Exact-head verification after tooling integration
+
+The final tooling/disposition commit intentionally carries the `[m22-rc]` marker so the repository's
+Stage-22 paired RC workflow reruns all seven canonical 100-pair lanes on the same exact HEAD as the
+ordinary CI gate. Historical green runs remain useful context but are not substituted for this final
+exact-head verification.
+
 ## M22.6 close condition
 
 M22.6 may advance to final merge only when:
