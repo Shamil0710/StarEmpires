@@ -1,0 +1,58 @@
+name: Stage 22 paired RC evidence
+
+on:
+  push:
+    branches: [main, stage22-6-core-pair-balance-freeze]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[m22-rc]')
+    name: RC ${{ matrix.lane }} (100 paired seeds)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - lane: tactical
+            test: Stage22CorePairTacticalSensitivityAcceptanceTest
+          - lane: raids
+            test: Stage22CorePairDistributedRaidMachineEvidenceAcceptanceTest
+          - lane: patrol
+            test: Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest
+          - lane: defense
+            test: Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest
+          - lane: command
+            test: Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest
+          - lane: attrition
+            test: Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest
+          - lane: dominance
+            test: Stage22CorePairCrossScenarioDominanceAcceptanceTest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Check paired statistics arithmetic
+        run: python3 -m unittest discover -s tools/stage22 -p 'test_*.py'
+      - name: Execute existing assertions with the canonical RC schedule
+        run: ./mvnw --batch-mode --no-transfer-progress -Dstage22.evidenceProfile=rc -Dtest=${{ matrix.test }} test
+      - name: Summarize raw paired observations
+        run: python3 tools/stage22/summarize_evidence.py target/stage22-evidence --minimum-pairs 100 --output target/stage22-evidence/statistics.json
+      - name: Retain raw vectors, causal samples and source identity
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m22-rc-${{ matrix.lane }}-${{ github.sha }}
+          path: |
+            target/stage22-evidence/
+            target/surefire-reports/
+          if-no-files-found: error
+          retention-days: 14

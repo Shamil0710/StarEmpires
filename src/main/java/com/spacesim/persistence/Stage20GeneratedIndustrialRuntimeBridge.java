@@ -1,5 +1,6 @@
 package com.spacesim.persistence;
 
+import com.spacesim.content.Stage18ManufacturingProductRegistry;
 import com.spacesim.economy.Stage18StationStorage.StationStorageSnapshot;
 import com.spacesim.persistence.Stage18IndustrialState.FacilityInstallationSnapshot;
 import com.spacesim.persistence.Stage18IndustrialState.YardInstallationSnapshot;
@@ -32,7 +33,8 @@ public final class Stage20GeneratedIndustrialRuntimeBridge {
     }
 
     /**
-     * Performs first materialization from accepted Stage-20F bootstrap authority.
+     * Performs first materialization from accepted Stage-20F bootstrap authority using the baseline
+     * Stage-18 manufactured-product vocabulary.
      *
      * @param saved exact Stage-20K campaign snapshot before initial industrial materialization
      * @param specialization matching accepted Stage-20F specialization authority
@@ -41,9 +43,33 @@ public final class Stage20GeneratedIndustrialRuntimeBridge {
     public static MaterializedGeneratedIndustrialRuntime materializeBootstrap(
             Stage20GeneratedCampaignPersistentState saved,
             OperationalSpecializationReport specialization) {
+        return materializeBootstrap(
+                saved,
+                specialization,
+                Stage18ManufacturingProductRegistry.loadDefault());
+    }
+
+    /**
+     * Performs first materialization with an explicitly composed ordinary Stage-18 product registry.
+     *
+     * <p>The registry is forwarded only to the industrial station materializer. Source outposts own
+     * mass commodities rather than countable manufactured products and therefore keep their existing
+     * Stage-20.5A authority unchanged.</p>
+     *
+     * @param saved exact Stage-20K campaign snapshot before initial industrial materialization
+     * @param specialization matching accepted Stage-20F specialization authority
+     * @param products explicit manufactured-product vocabulary for generated industrial stations
+     * @return live composed industrial/source registry
+     */
+    public static MaterializedGeneratedIndustrialRuntime materializeBootstrap(
+            Stage20GeneratedCampaignPersistentState saved,
+            OperationalSpecializationReport specialization,
+            Stage18ManufacturingProductRegistry products) {
         Stage20GeneratedCampaignPersistentState base = Objects.requireNonNull(saved, "saved");
         MaterializedIndustrialRegistry industrial = Stage20IndustrialEntityMaterializer.materializeBootstrap(
-                base, Objects.requireNonNull(specialization, "specialization"));
+                base,
+                Objects.requireNonNull(specialization, "specialization"),
+                Objects.requireNonNull(products, "products"));
         Stage18IndustrialState withIndustrial = industrial.captureIndustrialState(base.industrialState());
         Stage20GeneratedCampaignPersistentState intermediate = replaceIndustry(base, withIndustrial);
         MaterializedSourceOutpostRegistry sourceOutposts = Stage20SourceOutpostMaterializer.materialize(intermediate);
@@ -51,18 +77,34 @@ public final class Stage20GeneratedIndustrialRuntimeBridge {
     }
 
     /**
-     * Restores both industrial station families from one already-materialized campaign snapshot.
+     * Restores both industrial station families from one already-materialized campaign snapshot using
+     * the baseline Stage-18 manufactured-product vocabulary.
      *
      * @param saved exact saved campaign carrying ordinary Stage-18 industrial/source state
      * @return live composed industrial/source registry
      */
     public static MaterializedGeneratedIndustrialRuntime restore(
             Stage20GeneratedCampaignPersistentState saved) {
+        return restore(saved, Stage18ManufacturingProductRegistry.loadDefault());
+    }
+
+    /**
+     * Restores both industrial station families with an explicitly composed Stage-18 product registry.
+     *
+     * @param saved exact saved campaign carrying ordinary Stage-18 industrial/source state
+     * @param products explicit manufactured-product vocabulary for generated industrial stations
+     * @return live composed industrial/source registry
+     */
+    public static MaterializedGeneratedIndustrialRuntime restore(
+            Stage20GeneratedCampaignPersistentState saved,
+            Stage18ManufacturingProductRegistry products) {
         Stage20GeneratedCampaignPersistentState base = Objects.requireNonNull(saved, "saved");
         MaterializedSourceOutpostRegistry sourceOutposts = Stage20SourceOutpostMaterializer.materialize(base);
         Stage20GeneratedCampaignPersistentState industrialView = replaceIndustry(
                 base, industrialStationView(base));
-        MaterializedIndustrialRegistry industrial = Stage20IndustrialEntityMaterializer.restore(industrialView);
+        MaterializedIndustrialRegistry industrial = Stage20IndustrialEntityMaterializer.restore(
+                industrialView,
+                Objects.requireNonNull(products, "products"));
         return new MaterializedGeneratedIndustrialRuntime(industrial, sourceOutposts);
     }
 

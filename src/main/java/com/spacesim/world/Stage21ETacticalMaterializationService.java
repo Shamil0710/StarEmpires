@@ -165,11 +165,15 @@ public final class Stage21ETacticalMaterializationService {
             if (!canonical.equals(combatants)) {
                 throw new IllegalArgumentException("tactical combatants must be in canonical FleetId order");
             }
+            if (canonical.stream().map(PhysicalCombatant::fleetId).distinct().count() != canonical.size()) {
+                throw new IllegalArgumentException("tactical request contains a duplicate FleetId");
+            }
             long operationCount = combatants.stream().filter(row -> row.side() == CombatSide.OPERATION).count();
             long contactCount = combatants.stream().filter(row -> row.side() == CombatSide.CONTACT).count();
             if (operationCount <= 0L || contactCount <= 0L) {
                 throw new IllegalArgumentException("tactical request requires both physical sides");
             }
+            combatants = List.copyOf(canonical);
         }
     }
 
