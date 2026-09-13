@@ -316,11 +316,12 @@ final class TacticalVfxState {
     }
 
     private void advanceWreckEffects(List<ShipGlyph> ships, double seconds) {
-        for (int index = wreckEffects.size() - 1; index >= 0; index--) {
-            WreckEffect effect = wreckEffects.get(index);
+        int writeIndex = 0;
+        int originalSize = wreckEffects.size();
+        for (int readIndex = 0; readIndex < originalSize; readIndex++) {
+            WreckEffect effect = wreckEffects.get(readIndex);
             ShipGlyph ship = findShip(ships, effect.entityId);
             if (ship == null || !ship.wreck()) {
-                wreckEffects.remove(index);
                 continue;
             }
             effect.xM = ship.xM();
@@ -332,8 +333,15 @@ final class TacticalVfxState {
                 effect.nextPulseIndex++;
             }
             if (effect.ageSeconds >= effect.lifetimeSeconds) {
-                wreckEffects.remove(index);
+                continue;
             }
+            if (writeIndex != readIndex) {
+                wreckEffects.set(writeIndex, effect);
+            }
+            writeIndex++;
+        }
+        if (writeIndex < originalSize) {
+            wreckEffects.subList(writeIndex, originalSize).clear();
         }
     }
 
