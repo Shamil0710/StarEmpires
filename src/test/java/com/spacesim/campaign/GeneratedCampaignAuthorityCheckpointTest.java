@@ -4,9 +4,14 @@ import com.spacesim.campaign.GeneratedCampaignAuthorityCheckpoint.RestoredAuthor
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
+import com.spacesim.world.FactionStrategicIntentState;
+import com.spacesim.world.SettlementRecoveryState;
+import com.spacesim.world.Stage21HNpcMissionState;
+import com.spacesim.world.StrategicOperationState;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -78,6 +83,83 @@ class GeneratedCampaignAuthorityCheckpointTest {
         assertEquals(beforeSave.transitions(), afterLoad.transitions());
         assertEquals(beforeSave.recovery(), afterLoad.recovery());
         assertEquals(beforeSave.npcMissions(), afterLoad.npcMissions());
+    }
+
+    @Test
+    void mutatedLateStageAuthoritiesAndStableIdentitiesSurviveNativeCheckpointRestore() {
+        GeneratedCampaignSession original = GeneratedCampaignSession.create(ROOT_SEED);
+        RestoredAuthorities baseline = GeneratedCampaignAuthorityCheckpoint.restore(
+                Stage21IGeneratedWorldRuntimePersistenceCodec.decodeOrMigrate(
+                        Stage20GeneratedWorldRuntimePersistenceCodec.encode(original.captureState())));
+
+        List<FactionStrategicIntentState> mutatedIntents = baseline.strategicIntents().stream()
+                .map(intent -> new FactionStrategicIntentState(
+                        intent.factionContentId(),
+                        Math.addExact(intent.nextGoalSequence(), 5L),
+                        intent.lastActorReviewCount(),
+                        intent.goals()))
+                .toList();
+        StrategicOperationState mutatedOperations = new StrategicOperationState(
+                Math.addExact(baseline.operations().nextOperationId(), 7L),
+                baseline.operations().operations());
+        SettlementRecoveryState recovery = baseline.recovery();
+        SettlementRecoveryState mutatedRecovery = new SettlementRecoveryState(
+                SettlementRecoveryState.CURRENT_VERSION,
+                recovery.simulationTick(),
+                Math.addExact(recovery.nextSettlementId(), 11L),
+                Math.addExact(recovery.nextReplacementDemandId(), 13L),
+                recovery.settlements(),
+                recovery.payments(),
+                recovery.demobilizations(),
+                recovery.losses(),
+                recovery.replacementDemands());
+        Stage21HNpcMissionState npcMissions = baseline.npcMissions();
+        Stage21HNpcMissionState mutatedNpcMissions = new Stage21HNpcMissionState(
+                Stage21HNpcMissionState.CURRENT_VERSION,
+                npcMissions.simulationTick(),
+                Math.addExact(npcMissions.nextMissionSequence(), 17L),
+                npcMissions.npcs(),
+                npcMissions.missions(),
+                npcMissions.reputations(),
+                npcMissions.storyChains());
+
+        List<String> factionIdsBeforeSave = mutatedIntents.stream()
+                .map(FactionStrategicIntentState::factionContentId)
+                .toList();
+        var fleetIdsBeforeSave = baseline.session().captureState().worldState().fleets().stream()
+                .map(placement -> placement.id())
+                .toList();
+        Stage21IGeneratedWorldRuntimePersistentState mutatedCheckpoint =
+                GeneratedCampaignAuthorityCheckpoint.capture(
+                        baseline.session(),
+                        baseline.actors(),
+                        mutatedIntents,
+                        baseline.diplomacy(),
+                        baseline.warfare(),
+                        baseline.commands(),
+                        mutatedOperations,
+                        baseline.transitions(),
+                        mutatedRecovery,
+                        mutatedNpcMissions);
+
+        RestoredAuthorities restored = GeneratedCampaignAuthorityCheckpoint.restore(
+                Stage21IGeneratedWorldRuntimePersistenceCodec.decode(
+                        Stage21IGeneratedWorldRuntimePersistenceCodec.encode(mutatedCheckpoint)));
+
+        assertEquals(mutatedIntents, restored.strategicIntents());
+        assertEquals(mutatedOperations, restored.operations());
+        assertEquals(mutatedRecovery, restored.recovery());
+        assertEquals(mutatedNpcMissions, restored.npcMissions());
+        assertEquals(
+                factionIdsBeforeSave,
+                restored.strategicIntents().stream()
+                        .map(FactionStrategicIntentState::factionContentId)
+                        .toList());
+        assertEquals(
+                fleetIdsBeforeSave,
+                restored.session().captureState().worldState().fleets().stream()
+                        .map(placement -> placement.id())
+                        .toList());
     }
 
     @Test
