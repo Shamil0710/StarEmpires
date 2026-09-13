@@ -1,5 +1,7 @@
 package com.spacesim.campaign;
 
+import com.spacesim.persistence.Stage20FreightPersistentState;
+import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
@@ -8,6 +10,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeneratedCampaignSessionTest {
@@ -86,6 +89,96 @@ class GeneratedCampaignSessionTest {
         assertEquals(1, continuousReport.autonomousDecisions());
         assertEquals(continuousReport.autonomousDecisions(), resumedReport.autonomousDecisions());
         assertEquals(continuous.captureState(), resumed.captureState());
+    }
+
+    @Test
+    void inTransitFreightCheckpointPreservesFleetOrderAndCargoProvenance() {
+        GeneratedCampaignSession continuous = GeneratedCampaignSession.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage20FreightPersistentState initialFreight = continuous.captureState().freight();
+        Stage20FreightPersistentState.FreighterState initialFreighter = initialFreight.freighters().stream()
+                .filter(freighter -> freighter.phase() == Stage20FreightPersistentState.FreightPhase.AT_SOURCE)
+                .filter(freighter -> !freighter.activeOrderId().isBlank())
+                .findFirst()
+                .orElseThrow();
+        var fleetId = initialFreighter.fleetId();
+        String orderId = initialFreighter.activeOrderId();
+        Stage20FreightPersistentState.TransportOrderState initialOrder = initialFreight.orders().stream()
+                .filter(order -> order.orderId().equals(orderId))
+                .findFirst()
+                .orElseThrow();
+
+        Stage20GeneratedWorldRuntimePersistentState checkpoint = null;
+        Stage20FreightPersistentState.CargoLotState loadedLot = null;
+        int guard = 0;
+        while (guard++ < 40) {
+            continuous.advanceFrame(0.1f);
+            Stage20GeneratedWorldRuntimePersistentState candidate = continuous.captureState();
+            loadedLot = candidate.freight().cargoLots().stream()
+                    .filter(lot -> lot.fleetId().equals(fleetId))
+                    .filter(lot -> lot.orderId().equals(orderId))
+                    .findFirst()
+                    .orElse(null);
+            boolean hasAuthoritativeJump = candidate.worldState().fleetJumps().stream()
+                    .anyMatch(jump -> jump.fleetId().equals(fleetId));
+            if (loadedLot != null && hasAuthoritativeJump) {
+                checkpoint = candidate;
+                break;
+            }
+        }
+
+        assertNotNull(checkpoint,
+                "accepted generated freight must enter ordinary FleetJumpState with physical cargo");
+        assertNotNull(loadedLot);
+        assertEquals(initialOrder.sourceProvenanceId(), loadedLot.sourceProvenanceId());
+
+        Stage20FreightPersistentState.TransportOrderState checkpointOrder = checkpoint.freight().orders().stream()
+                .filter(order -> order.orderId().equals(orderId))
+                .findFirst()
+                .orElseThrow();
+        Stage20FreightPersistentState.FreighterState checkpointFreighter = checkpoint.freight().freighters().stream()
+                .filter(freighter -> freighter.fleetId().equals(fleetId))
+                .findFirst()
+                .orElseThrow();
+        var jump = checkpoint.worldState().fleetJumps().stream()
+                .filter(value -> value.fleetId().equals(fleetId))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(initialOrder.orderId(), checkpointOrder.orderId());
+        assertEquals(initialOrder.fleetId(), checkpointOrder.fleetId());
+        assertEquals(initialOrder.orderedSystems(), checkpointOrder.orderedSystems());
+        assertEquals(initialOrder.sourceProvenanceId(), checkpointOrder.sourceProvenanceId());
+        assertEquals(orderId, checkpointFreighter.activeOrderId());
+        assertEquals(Stage20FreightPersistentState.FreightPhase.OUTBOUND, checkpointFreighter.phase());
+        assertEquals(checkpointOrder.orderedSystems().get(0), jump.originSystemId());
+        assertEquals(checkpointOrder.orderedSystems().get(1), jump.destinationSystemId());
+
+        GeneratedCampaignSession resumed = GeneratedCampaignSession.restore(checkpoint);
+        assertEquals(checkpoint, resumed.captureState(),
+                "restore must not regenerate or rename an in-flight accepted freight route");
+        Stage20FreightPersistentState.CargoLotState restoredLot = resumed.captureState().freight().cargoLots().stream()
+                .filter(lot -> lot.lotId().equals(loadedLot.lotId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(loadedLot, restoredLot);
+        assertEquals(fleetId, restoredLot.fleetId());
+        assertEquals(orderId, restoredLot.orderId());
+        assertEquals(initialOrder.sourceProvenanceId(), restoredLot.sourceProvenanceId());
+
+        for (int frame = 0; frame < 40; frame++) {
+            continuous.advanceFrame(0.1f);
+            resumed.advanceFrame(0.1f);
+        }
+
+        assertEquals(continuous.captureState(), resumed.captureState(),
+                "the same in-flight cargo must continue deterministically after checkpoint restore");
+        Stage20FreightPersistentState continuedFreight = resumed.captureState().freight();
+        assertTrue(continuedFreight.freighters().stream().anyMatch(freighter -> freighter.fleetId().equals(fleetId)));
+        assertTrue(continuedFreight.orders().stream().anyMatch(order ->
+                order.orderId().equals(orderId)
+                        && order.fleetId().equals(fleetId)
+                        && order.sourceProvenanceId().equals(initialOrder.sourceProvenanceId())));
     }
 
     @Test
