@@ -17,6 +17,7 @@ import com.spacesim.ui.TacticalVfxState.Flash;
 import com.spacesim.ui.TacticalVfxState.FlashKind;
 import com.spacesim.ui.TacticalVfxState.Particle;
 import com.spacesim.ui.TacticalVfxState.ParticleKind;
+import com.spacesim.ui.TacticalVfxState.WreckEffect;
 
 /** Presentation-only additive bloom and bounded particle pass for the tactical view. */
 final class TacticalVfxRenderer {
@@ -31,6 +32,7 @@ final class TacticalVfxRenderer {
     private static final Color PENETRATION_GLOW = new Color(1.00f, 0.25f, 0.16f, 1f);
     private static final Color DESTRUCTION_GLOW = new Color(1.00f, 0.46f, 0.12f, 1f);
     private static final Color DESTRUCTION_CORE = new Color(1.00f, 0.93f, 0.70f, 1f);
+    private static final Color WRECK_GLOW = new Color(0.92f, 0.24f, 0.10f, 1f);
     private static final Color DAMAGE_GLOW = new Color(1.00f, 0.20f, 0.12f, 1f);
     private static final Color FRAGMENT_BODY = new Color(0.78f, 0.56f, 0.34f, 0.90f);
 
@@ -58,6 +60,7 @@ final class TacticalVfxRenderer {
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
         batch.begin();
         drawContinuousBloom(layout, snapshot);
+        drawWreckAfterglow(layout);
         drawFlashes(layout);
         drawParticleGlow(layout);
         batch.end();
@@ -141,6 +144,20 @@ final class TacticalVfxRenderer {
         }
     }
 
+    private void drawWreckAfterglow(WorldMapLayout layout) {
+        for (WreckEffect effect : state.wreckEffects()) {
+            double remaining = effect.remainingFraction();
+            if (remaining <= 0d) {
+                continue;
+            }
+            float alpha = (float) (0.10d * Math.sqrt(remaining));
+            drawWorldGlow(layout, effect.xM(), effect.yM(), effect.radiusM() * 1.15d,
+                    WRECK_GLOW, alpha, 5f, 118f);
+            drawWorldGlow(layout, effect.xM(), effect.yM(), effect.radiusM() * 0.42d,
+                    DESTRUCTION_CORE, alpha * 0.38f, 3f, 52f);
+        }
+    }
+
     private void drawFlashes(WorldMapLayout layout) {
         for (Flash flash : state.flashes()) {
             double remaining = flash.remainingFraction();
@@ -149,11 +166,14 @@ final class TacticalVfxRenderer {
             }
             Color color = flashColor(flash.kind());
             float alpha = (float) (remaining * remaining * flashBaseAlpha(flash.kind()));
+            boolean destruction = flash.kind() == FlashKind.DESTRUCTION
+                    || flash.kind() == FlashKind.SECONDARY_DETONATION;
             drawWorldGlow(layout, flash.xM(), flash.yM(), flash.radiusM(), color,
-                    alpha, 6f, flash.kind() == FlashKind.DESTRUCTION ? 220f : 92f);
-            if (flash.kind() == FlashKind.DESTRUCTION) {
+                    alpha, 6f, destruction ? 220f : 92f);
+            if (destruction) {
+                float coreAlpha = flash.kind() == FlashKind.DESTRUCTION ? 0.78f : 0.52f;
                 drawWorldGlow(layout, flash.xM(), flash.yM(), flash.radiusM() * 0.38d,
-                        DESTRUCTION_CORE, (float) (0.78d * remaining), 5f, 110f);
+                        DESTRUCTION_CORE, (float) (coreAlpha * remaining), 5f, 110f);
             }
         }
     }
@@ -251,7 +271,7 @@ final class TacticalVfxRenderer {
             case SHIELD -> SHIELD_GLOW;
             case ARMOR -> ARMOR_GLOW;
             case PENETRATION -> PENETRATION_GLOW;
-            case DESTRUCTION -> DESTRUCTION_GLOW;
+            case DESTRUCTION, SECONDARY_DETONATION -> DESTRUCTION_GLOW;
         };
     }
 
@@ -261,6 +281,7 @@ final class TacticalVfxRenderer {
             case ARMOR -> 0.50f;
             case PENETRATION -> 0.62f;
             case DESTRUCTION -> 0.72f;
+            case SECONDARY_DETONATION -> 0.48f;
         };
     }
 
