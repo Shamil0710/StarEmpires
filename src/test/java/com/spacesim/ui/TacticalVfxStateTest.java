@@ -13,6 +13,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TacticalVfxStateTest {
@@ -61,6 +63,27 @@ class TacticalVfxStateTest {
     }
 
     @Test
+    void stateCollectionsExposeStableReadOnlyViewsWithoutPerReadCopies() {
+        TacticalVfxState state = new TacticalVfxState();
+        List<TacticalVfxState.Particle> particles = state.particles();
+        List<Flash> flashes = state.flashes();
+        List<TacticalVfxState.WreckEffect> wreckEffects = state.wreckEffects();
+
+        state.advance(snapshot(
+                List.of(aliveShip(10L)),
+                List.of(new ImpactGlyph(74L, ImpactKind.PENETRATION, 1d, 2d, 3.0e8d))), 0d);
+
+        assertSame(particles, state.particles());
+        assertSame(flashes, state.flashes());
+        assertSame(wreckEffects, state.wreckEffects());
+        assertFalse(particles.isEmpty());
+        assertFalse(flashes.isEmpty());
+        assertThrows(UnsupportedOperationException.class, particles::clear);
+        assertThrows(UnsupportedOperationException.class, flashes::clear);
+        assertThrows(UnsupportedOperationException.class, wreckEffects::clear);
+    }
+
+    @Test
     void wreckTransitionCreatesOneDestructionBurstButMaterializedWreckDoesNot() {
         TacticalVfxState state = new TacticalVfxState();
         state.advance(snapshot(List.of(aliveShip(11L)), List.of()), 0d);
@@ -88,6 +111,23 @@ class TacticalVfxStateTest {
     }
 
     @Test
+    void reappearingWreckDoesNotLookLikeAliveToWreckTransition() {
+        TacticalVfxState state = new TacticalVfxState();
+        state.advance(snapshot(List.of(aliveShip(51L), aliveShip(52L)), List.of()), 0d);
+        state.advance(snapshot(List.of(aliveShip(52L)), List.of()), 0d);
+
+        state.advance(snapshot(List.of(wreckedShip(51L), aliveShip(52L)), List.of()), 0d);
+
+        assertFalse(state.flashes().stream()
+                .anyMatch(flash -> flash.kind() == FlashKind.DESTRUCTION));
+
+        state.advance(snapshot(List.of(wreckedShip(51L), wreckedShip(52L)), List.of()), 0d);
+        assertEquals(1L, state.flashes().stream()
+                .filter(flash -> flash.kind() == FlashKind.DESTRUCTION)
+                .count());
+    }
+
+    @Test
     void destructionScaleFollowsPhysicalHullDimensions() {
         TacticalVfxState small = destructionState(ship(21L, 80d, 24d, false), ship(21L, 80d, 24d, true));
         TacticalVfxState capital = destructionState(ship(22L, 620d, 150d, false), ship(22L, 620d, 150d, true));
@@ -111,12 +151,8 @@ class TacticalVfxStateTest {
             second.advance(wreck, 0.10d);
         }
 
-        List<Flash> firstSecondary = first.flashes().stream()
-                .filter(flash -> flash.kind() == FlashKind.SECONDARY_DETONATION)
-                .toList();
-        List<Flash> secondSecondary = second.flashes().stream()
-                .filter(flash -> flash.kind() == FlashKind.SECONDARY_DETONATION)
-                .toList();
+        List<Flash> firstSecondary = secondaryFlashes(first);
+        List<Flash> secondSecondary = secondaryFlashes(second);
 
         assertFalse(firstSecondary.isEmpty());
         assertEquals(firstSecondary.size(), secondSecondary.size());
@@ -128,6 +164,35 @@ class TacticalVfxStateTest {
             assertEquals(a.radiusM(), b.radiusM(), 0d);
             assertEquals(a.remainingFraction(), b.remainingFraction(), 0d);
         }
+    }
+
+    @Test
+    void multiWreckSecondaryDetonationsPreserveStableEntityOrder() {
+        TacticalVfxState combined = new TacticalVfxState();
+        combined.advance(snapshot(List.of(aliveShip(61L), aliveShip(62L)), List.of()), 0d);
+        TacticalPrototypeVisualSnapshot combinedWrecks = snapshot(
+                List.of(wreckedShip(61L), wreckedShip(62L)), List.of());
+        combined.advance(combinedWrecks, 0d);
+
+        TacticalVfxState firstOnly = destructionState(aliveShip(61L), wreckedShip(61L));
+        TacticalPrototypeVisualSnapshot firstWreck = snapshot(List.of(wreckedShip(61L)), List.of());
+        TacticalVfxState secondOnly = destructionState(aliveShip(62L), wreckedShip(62L));
+        TacticalPrototypeVisualSnapshot secondWreck = snapshot(List.of(wreckedShip(62L)), List.of());
+
+        for (int index = 0; index < 5; index++) {
+            combined.advance(combinedWrecks, 0.10d);
+            firstOnly.advance(firstWreck, 0.10d);
+            secondOnly.advance(secondWreck, 0.10d);
+        }
+
+        List<Flash> combinedSecondary = secondaryFlashes(combined);
+        List<Flash> firstSecondary = secondaryFlashes(firstOnly);
+        List<Flash> secondSecondary = secondaryFlashes(secondOnly);
+        assertEquals(2, combinedSecondary.size());
+        assertEquals(1, firstSecondary.size());
+        assertEquals(1, secondSecondary.size());
+        assertFlashPositionEquals(firstSecondary.get(0), combinedSecondary.get(0));
+        assertFlashPositionEquals(secondSecondary.get(0), combinedSecondary.get(1));
     }
 
     @Test
@@ -211,6 +276,18 @@ class TacticalVfxStateTest {
                 .filter(flash -> flash.kind() == FlashKind.DESTRUCTION)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private static List<Flash> secondaryFlashes(TacticalVfxState state) {
+        return state.flashes().stream()
+                .filter(flash -> flash.kind() == FlashKind.SECONDARY_DETONATION)
+                .toList();
+    }
+
+    private static void assertFlashPositionEquals(Flash expected, Flash actual) {
+        assertEquals(expected.xM(), actual.xM(), 0d);
+        assertEquals(expected.yM(), actual.yM(), 0d);
+        assertEquals(expected.radiusM(), actual.radiusM(), 0d);
     }
 
     private static TacticalPrototypeVisualSnapshot snapshot(

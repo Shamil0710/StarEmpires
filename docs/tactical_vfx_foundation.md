@@ -83,6 +83,22 @@ Hard presentation budgets:
 Oldest presentation entries are discarded when the visual budget is exceeded. This degradation is
 allowed because VFX never owns simulation truth.
 
+### Runtime allocation discipline
+
+The tactical render loop exposes stable unmodifiable views over active particles, flashes and wreck
+effects instead of allocating a fresh `List.copyOf(...)` every time the renderer reads state.
+
+Alive-to-wreck transition history is retained in reusable primitive `long[]` / `boolean[]` buffers.
+This replaces per-frame `HashMap<Long, Boolean>` construction and `Map.copyOf(...)` while preserving
+the same semantic rule: only an entity that existed alive in the immediately preceding snapshot can
+trigger destruction VFX. A wreck that disappears and later rematerializes does not create a false
+burst.
+
+Lingering wreck effects resolve their owner through binary search over the snapshot's already sorted
+`ships` list, avoiding a temporary `HashMap<Long, ShipGlyph>` on every presentation frame. These are
+presentation-performance changes only and do not alter effect timing, simulation authority or save
+state.
+
 ## Visual language
 
 The default palette is intentionally restrained:
@@ -104,8 +120,10 @@ large ships feel massive without filling the screen with persistent bloom.
 
 - one-shot triggering for repeated impact snapshots;
 - deterministic particle emission from stable event identity;
+- stable read-only collection views that reflect state updates without per-read copying;
 - one-shot destruction on an alive-to-wreck transition;
 - no phantom destruction or lingering heat when an already-wrecked object is first materialized;
+- no false destruction when an absent entity later rematerializes as a wreck;
 - destruction scale derived from physical hull dimensions;
 - deterministic secondary detonation placement for stable entity identity;
 - automatic expiry of lingering wreck effects without rearming;
