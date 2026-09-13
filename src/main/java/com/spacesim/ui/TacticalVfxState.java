@@ -222,8 +222,8 @@ final class TacticalVfxState {
     void advance(TacticalPrototypeVisualSnapshot snapshot, double frameSeconds) {
         Objects.requireNonNull(snapshot, "snapshot");
         double seconds = sanitizeFrameSeconds(frameSeconds);
-        particles.removeIf(particle -> !particle.advance(seconds));
-        flashes.removeIf(flash -> !flash.advance(seconds));
+        advanceParticles(seconds);
+        advanceFlashes(seconds);
         advanceWreckEffects(snapshot.ships(), seconds);
 
         for (ImpactGlyph impact : snapshot.impacts()) {
@@ -250,6 +250,42 @@ final class TacticalVfxState {
 
     int seenImpactCount() {
         return seenImpactEvents.size();
+    }
+
+    private void advanceParticles(double seconds) {
+        int writeIndex = 0;
+        int originalSize = particles.size();
+        for (int readIndex = 0; readIndex < originalSize; readIndex++) {
+            Particle particle = particles.get(readIndex);
+            if (!particle.advance(seconds)) {
+                continue;
+            }
+            if (writeIndex != readIndex) {
+                particles.set(writeIndex, particle);
+            }
+            writeIndex++;
+        }
+        if (writeIndex < originalSize) {
+            particles.subList(writeIndex, originalSize).clear();
+        }
+    }
+
+    private void advanceFlashes(double seconds) {
+        int writeIndex = 0;
+        int originalSize = flashes.size();
+        for (int readIndex = 0; readIndex < originalSize; readIndex++) {
+            Flash flash = flashes.get(readIndex);
+            if (!flash.advance(seconds)) {
+                continue;
+            }
+            if (writeIndex != readIndex) {
+                flashes.set(writeIndex, flash);
+            }
+            writeIndex++;
+        }
+        if (writeIndex < originalSize) {
+            flashes.subList(writeIndex, originalSize).clear();
+        }
     }
 
     private void observeWreckTransitions(List<ShipGlyph> ships) {
@@ -413,15 +449,9 @@ final class TacticalVfxState {
     }
 
     private void enforceBudgets() {
-        while (particles.size() > MAX_PARTICLES) {
-            particles.remove(0);
-        }
-        while (flashes.size() > MAX_FLASHES) {
-            flashes.remove(0);
-        }
-        while (wreckEffects.size() > MAX_WRECK_EFFECTS) {
-            wreckEffects.remove(0);
-        }
+        trimOldestToBudget(particles, MAX_PARTICLES);
+        trimOldestToBudget(flashes, MAX_FLASHES);
+        trimOldestToBudget(wreckEffects, MAX_WRECK_EFFECTS);
     }
 
     private void trimSeenEvents() {
@@ -455,6 +485,13 @@ final class TacticalVfxState {
             }
         }
         return null;
+    }
+
+    private static <T> void trimOldestToBudget(ArrayList<T> values, int maximum) {
+        int overflow = values.size() - maximum;
+        if (overflow > 0) {
+            values.subList(0, overflow).clear();
+        }
     }
 
     private static double destructionRadius(double lengthM, double widthM) {
