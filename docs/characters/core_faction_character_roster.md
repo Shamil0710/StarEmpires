@@ -2,12 +2,12 @@
 
 Status: production-art mapping for the two Stage-23 core factions.
 
-The generated-world client currently exposes provisional Stage-20 faction identities `faction.alpha` and `faction.beta`. The character presentation layer maps them explicitly as a compatibility bridge only:
+The character presentation layer follows the governed Stage-22 systemic faction profiles instead of introducing presentation-only faction aliases. Runtime selection is resolved by authoritative stable faction ID through `Stage22FactionProfileCatalog.findProfileForFaction(...)`, then the portrait atlas is selected from the profile package key:
 
-- `faction.alpha` → Empire
-- `faction.beta` → Industrial Union
+- `core.empire` → Empire portrait roster;
+- `core.industrial_union` → Industrial Union portrait roster.
 
-The bridge changes presentation only; it does not rename or mutate simulation, persistence, economy, diplomacy, territory or AI authority. Canonical IDs `faction.empire` and `faction.industrial_union` are also accepted by the portrait renderer so the art survives the later identity migration without broad substring matching.
+The current Stage-22 profile catalog binds those packages to the existing authoritative runtime/save faction identities. The portrait renderer does not rename, alias or mutate simulation identities and does not affect persistence, economy, diplomacy, territory, AI or any other simulation authority.
 
 ## Empire — `assets/characters/empire/character_roster.png`
 
@@ -38,4 +38,5 @@ Left to right, six 56×84 cells:
 - transparent background;
 - renderer removes near-zero-alpha fringe before uploading the texture, preventing faint edge halos;
 - art is presentation-only and can be absent without affecting simulation state;
-- the Factions tab shows the corresponding six-person roster when one of the two core factions is selected.
+- faction-to-roster selection is derived from the governed Stage-22 systemic profile package key;
+- the Factions tab shows the corresponding six-person roster when one of the two governed core factions is selected.
