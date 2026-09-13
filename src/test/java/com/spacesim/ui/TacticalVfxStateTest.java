@@ -13,6 +13,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TacticalVfxStateTest {
@@ -61,6 +63,27 @@ class TacticalVfxStateTest {
     }
 
     @Test
+    void stateCollectionsExposeStableReadOnlyViewsWithoutPerReadCopies() {
+        TacticalVfxState state = new TacticalVfxState();
+        List<TacticalVfxState.Particle> particles = state.particles();
+        List<Flash> flashes = state.flashes();
+        List<TacticalVfxState.WreckEffect> wreckEffects = state.wreckEffects();
+
+        state.advance(snapshot(
+                List.of(aliveShip(10L)),
+                List.of(new ImpactGlyph(74L, ImpactKind.PENETRATION, 1d, 2d, 3.0e8d))), 0d);
+
+        assertSame(particles, state.particles());
+        assertSame(flashes, state.flashes());
+        assertSame(wreckEffects, state.wreckEffects());
+        assertFalse(particles.isEmpty());
+        assertFalse(flashes.isEmpty());
+        assertThrows(UnsupportedOperationException.class, particles::clear);
+        assertThrows(UnsupportedOperationException.class, flashes::clear);
+        assertThrows(UnsupportedOperationException.class, wreckEffects::clear);
+    }
+
+    @Test
     void wreckTransitionCreatesOneDestructionBurstButMaterializedWreckDoesNot() {
         TacticalVfxState state = new TacticalVfxState();
         state.advance(snapshot(List.of(aliveShip(11L)), List.of()), 0d);
@@ -85,6 +108,23 @@ class TacticalVfxStateTest {
         assertFalse(materializedWreck.flashes().stream()
                 .anyMatch(flash -> flash.kind() == FlashKind.DESTRUCTION));
         assertTrue(materializedWreck.wreckEffects().isEmpty());
+    }
+
+    @Test
+    void reappearingWreckDoesNotLookLikeAliveToWreckTransition() {
+        TacticalVfxState state = new TacticalVfxState();
+        state.advance(snapshot(List.of(aliveShip(51L), aliveShip(52L)), List.of()), 0d);
+        state.advance(snapshot(List.of(aliveShip(52L)), List.of()), 0d);
+
+        state.advance(snapshot(List.of(wreckedShip(51L), aliveShip(52L)), List.of()), 0d);
+
+        assertFalse(state.flashes().stream()
+                .anyMatch(flash -> flash.kind() == FlashKind.DESTRUCTION));
+
+        state.advance(snapshot(List.of(wreckedShip(51L), wreckedShip(52L)), List.of()), 0d);
+        assertEquals(1L, state.flashes().stream()
+                .filter(flash -> flash.kind() == FlashKind.DESTRUCTION)
+                .count());
     }
 
     @Test
