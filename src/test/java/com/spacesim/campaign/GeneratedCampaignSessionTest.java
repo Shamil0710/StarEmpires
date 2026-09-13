@@ -131,6 +131,7 @@ class GeneratedCampaignSessionTest {
                 "accepted generated freight must enter ordinary FleetJumpState with physical cargo");
         assertNotNull(loadedLot);
         assertEquals(initialOrder.sourceProvenanceId(), loadedLot.sourceProvenanceId());
+        String loadedLotId = loadedLot.lotId();
 
         Stage20FreightPersistentState.TransportOrderState checkpointOrder = checkpoint.freight().orders().stream()
                 .filter(order -> order.orderId().equals(orderId))
@@ -158,7 +159,7 @@ class GeneratedCampaignSessionTest {
         assertEquals(checkpoint, resumed.captureState(),
                 "restore must not regenerate or rename an in-flight accepted freight route");
         Stage20FreightPersistentState.CargoLotState restoredLot = resumed.captureState().freight().cargoLots().stream()
-                .filter(lot -> lot.lotId().equals(loadedLot.lotId()))
+                .filter(lot -> lot.lotId().equals(loadedLotId))
                 .findFirst()
                 .orElseThrow();
         assertEquals(loadedLot, restoredLot);
