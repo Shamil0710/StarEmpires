@@ -7,6 +7,7 @@ import com.badlogic.gdx.InputAdapter;
 import com.spacesim.campaign.GeneratedCampaignCoordinator;
 import com.spacesim.campaign.GeneratedCampaignSession;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
+import com.spacesim.ui.FactionCharacterPortraitOverlay;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.SelectionKind;
@@ -32,6 +33,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private GeneratedCampaignSession session;
     private GeneratedWorldUiModel model;
     private GeneratedWorldCommandUiRenderer renderer;
+    private FactionCharacterPortraitOverlay characterPortraitOverlay;
     private GeneratedWorldUiSnapshot snapshot;
     private Tab tab = Tab.SYSTEM;
     private UiSelection selection = UiSelection.none();
@@ -64,6 +66,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     public void create() {
         bindCampaign(GeneratedCampaignCoordinator.create(initialSeed));
         renderer = new GeneratedWorldCommandUiRenderer();
+        characterPortraitOverlay = new FactionCharacterPortraitOverlay();
         savePath = Gdx.files.local(SAVE_FILE).file().toPath();
         legacySavePath = Gdx.files.local(LEGACY_SAVE_FILE).file().toPath();
         snapshot = model.capture();
@@ -314,6 +317,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         snapshot = model.capture();
         renderer.render(snapshot, tab, selection, detailScrollRows, listScrollRows,
                 session.isPaused(), session.timeScale(), status);
+        characterPortraitOverlay.render(snapshot, tab, selection);
     }
 
     /** Keeps the UI in logical screen coordinates and regenerates fonts for the new pixel size. */
@@ -321,6 +325,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     public void resize(int width, int height) {
         if (renderer != null) {
             renderer.resize(width, height);
+        }
+        if (characterPortraitOverlay != null) {
+            characterPortraitOverlay.resize(width, height);
         }
     }
 
@@ -332,6 +339,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         }
         if (renderer != null) {
             renderer.dispose();
+        }
+        if (characterPortraitOverlay != null) {
+            characterPortraitOverlay.dispose();
         }
     }
 

@@ -6,6 +6,7 @@ import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.StarSystemSimulationState;
+import com.spacesim.world.WorldSimulation;
 import com.spacesim.world.WorldState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState.LocalFleetPhysicalState;
 
@@ -27,7 +28,8 @@ import java.util.Map;
 @SuppressWarnings("doclint:missing")
 public final class Stage20GeneratedWorldRuntimePersistenceCodec {
     private static final int MAGIC = 0x53323552; // S25R
-    private static final int FILE_FORMAT_VERSION = 3;
+    private static final int FILE_FORMAT_VERSION = 4;
+    private static final int ENGINEERING_INSTANCE_FILE_FORMAT_VERSION = 3;
     private static final int PHYSICAL_SIDECAR_FILE_FORMAT_VERSION = 2;
     private static final int LEGACY_FILE_FORMAT_VERSION = 1;
     private static final int MAX_LOCAL_FLEETS = 1_000_000;
@@ -41,7 +43,7 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
     }
 
     /**
-     * Encodes the generated campaign, ordinary world and freight state as one deterministic payload.
+     * Encodes the generated campaign, ordinary world, scheduler and freight state as one deterministic payload.
      *
      * @param state complete validated runtime checkpoint
      * @return new binary payload
@@ -59,6 +61,8 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
                 output.writeInt(checked.schemaVersion());
                 writeText(output, checked.bridgeVersion());
                 output.writeLong(checked.activeSystemId().value());
+                output.writeInt(checked.strategicStepTicks());
+                output.writeInt(checked.remoteUpdateBudgetPerFrame());
                 writePayload(output, campaign, "campaign");
                 writePayload(output, world, "world");
                 writePayload(output, freight, "freight");
@@ -78,6 +82,11 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
     /**
      * Decodes and cross-validates one atomic Stage-20.5 generated-world runtime checkpoint.
      *
+     * <p>Versions 1-3 predate persisted scheduler configuration and therefore retain the exact
+     * historical restore behavior: ordinary {@link WorldSimulation} scheduler defaults. Version 4
+     * and later current-format files carry the scheduler explicitly, so a custom generated-world
+     * budget cannot silently collapse to a process default after load.</p>
+     *
      * @param bytes encoded checkpoint
      * @return immutable validated checkpoint
      */
@@ -92,20 +101,33 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
             }
             int fileVersion = input.readInt();
             if (fileVersion != FILE_FORMAT_VERSION
+                    && fileVersion != ENGINEERING_INSTANCE_FILE_FORMAT_VERSION
                     && fileVersion != PHYSICAL_SIDECAR_FILE_FORMAT_VERSION
                     && fileVersion != LEGACY_FILE_FORMAT_VERSION) {
                 throw new IllegalArgumentException(
                         "Unsupported Stage-20.5 runtime file version: " + fileVersion);
             }
             int schemaVersion = input.readInt();
-            int expectedSchema = fileVersion == LEGACY_FILE_FORMAT_VERSION
-                    ? 1 : Stage20GeneratedWorldRuntimePersistentState.CURRENT_VERSION;
+            int expectedSchema;
+            if (fileVersion == LEGACY_FILE_FORMAT_VERSION) {
+                expectedSchema = 1;
+            } else if (fileVersion < FILE_FORMAT_VERSION) {
+                expectedSchema = 2;
+            } else {
+                expectedSchema = Stage20GeneratedWorldRuntimePersistentState.CURRENT_VERSION;
+            }
             if (schemaVersion != expectedSchema) {
                 throw new IllegalArgumentException(
                         "runtime checkpoint schema differs from its file format: " + schemaVersion);
             }
             String bridgeVersion = readText(input, "bridgeVersion");
             StarSystemId activeSystemId = new StarSystemId(input.readLong());
+            int strategicStepTicks = fileVersion >= FILE_FORMAT_VERSION
+                    ? input.readInt()
+                    : WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS;
+            int remoteUpdateBudgetPerFrame = fileVersion >= FILE_FORMAT_VERSION
+                    ? input.readInt()
+                    : WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME;
             Stage20GeneratedCampaignPersistentState campaign =
                     Stage20GeneratedCampaignPersistenceCodec.decode(readPayload(input, "campaign"));
             WorldState world = WorldStateCodec.decode(readPayload(input, "world"));
@@ -115,7 +137,7 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
                     fileVersion >= PHYSICAL_SIDECAR_FILE_FORMAT_VERSION
                     ? readLocalFleetPhysicalStates(input)
                     : migrateLegacyLocalFleetPhysicalStates(world, freight);
-            if (fileVersion >= FILE_FORMAT_VERSION) {
+            if (fileVersion >= ENGINEERING_INSTANCE_FILE_FORMAT_VERSION) {
                 world = readAndApplyEngineeringInstanceStates(input, world);
             }
             if (input.read() != -1) {
@@ -128,6 +150,8 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
                     campaign,
                     world,
                     activeSystemId,
+                    strategicStepTicks,
+                    remoteUpdateBudgetPerFrame,
                     freight,
                     localPhysical);
         } catch (EOFException exception) {

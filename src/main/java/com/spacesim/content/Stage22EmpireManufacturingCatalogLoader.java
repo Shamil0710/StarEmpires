@@ -5,7 +5,8 @@ import com.spacesim.content.Stage18ManufacturingCatalog.ProductBindingDefinition
 import java.util.List;
 
 /**
- * Composes M22.3 Empire manufactured modules into the accepted Stage-18 manufacturing grammar.
+ * Composes M22.3 Empire manufactured modules and M22.6 exact ammunition into the accepted Stage-18
+ * manufacturing grammar.
  *
  * <p>This loader does not own manufacturing state. It extends the immutable Stage-18 catalog with
  * reviewed Stage-22 profiles/bindings, while the ordinary Stage-18 runtime remains the sole producer
@@ -24,6 +25,7 @@ public final class Stage22EmpireManufacturingCatalogLoader {
                 Stage18ManufacturingCatalogLoader.loadDefault(),
                 Stage22CommonManufacturingProfiles.definitions(),
                 List.of(
+                        binding("ammo.empire_axial_dart_150kg_v1", "manufacturing.profile.kinetic_ammunition"),
                         binding("module.empire_reactor_service_v1", "manufacturing.profile.reactor"),
                         binding("module.empire_drive_endurance_v1", "manufacturing.profile.drive"),
                         binding("module.empire_sensor_command_v1", "manufacturing.profile.sensor"),

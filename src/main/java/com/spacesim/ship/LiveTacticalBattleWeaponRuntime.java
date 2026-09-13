@@ -4,8 +4,6 @@ import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.Vector3d;
 import com.spacesim.content.ship.ShipProtectionCatalog;
-import com.spacesim.content.ship.Stage175ICombatTestContentPack;
-import com.spacesim.content.ship.Stage175ICombatTestProtectionPack;
 import com.spacesim.content.weapon.Stage175ICombatTestWeaponPack;
 import com.spacesim.content.weapon.WeaponAmmunitionCatalog;
 import com.spacesim.content.weapon.WeaponLauncherCatalog;
@@ -22,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * Shared Stage-19I physical weapon/body/protection execution over one multi-combatant runtime.
@@ -49,20 +48,47 @@ public final class LiveTacticalBattleWeaponRuntime {
     private final List<ProjectileBody> projectiles = new ArrayList<>();
     private final TreeMap<Long, Long> shotsBySourceEntityId = new TreeMap<>();
     private final TreeMap<Long, Long> impactsByTargetEntityId = new TreeMap<>();
+    // A surface response is charged once while a residual remains inside that hull. Leaving the
+    // footprint releases the contact so a later physical re-entry can collide normally.
+    private final TreeMap<Long, TreeSet<Long>> surfaceContactsByProjectileId = new TreeMap<>();
 
     private long nextProjectileId = 190_000L;
 
     /**
-     * Creates shared weapon/protection execution over one materialized/control-driven battle.
+     * Creates shared weapon/protection execution over one materialized/control-driven legacy battle.
+     *
+     * <p>The battle-local protection catalog is always reused. The no-argument content path preserves
+     * the accepted Stage-17.5I ammunition/launcher fixtures for existing callers.</p>
      *
      * @param controlRuntime production multi-combatant sensing/AI/engineering/flight runtime
      */
     public LiveTacticalBattleWeaponRuntime(LiveTacticalBattleControlRuntime controlRuntime) {
+        this(
+                controlRuntime,
+                Stage175ICombatTestWeaponPack.loadAmmunition(),
+                Stage175ICombatTestWeaponPack.loadLaunchers());
+    }
+
+    /**
+     * Creates shared weapon/protection execution with explicit battle-package ammunition and launchers.
+     *
+     * <p>This is a content injection seam only: all firing, body motion, collision, shield, material
+     * response and local damage continue through this same Stage-19 runtime. The supplied catalogs are
+     * validated by the ordinary Stage-17.5E loaders before they reach this constructor.</p>
+     *
+     * @param controlRuntime production multi-combatant sensing/AI/engineering/flight runtime
+     * @param ammunitionCatalog physical ammunition content matching the battle engineering catalog
+     * @param launcherCatalog launcher operating profiles matching the battle engineering catalog
+     */
+    public LiveTacticalBattleWeaponRuntime(
+            LiveTacticalBattleControlRuntime controlRuntime,
+            WeaponAmmunitionCatalog ammunitionCatalog,
+            WeaponLauncherCatalog launcherCatalog) {
         this.controlRuntime = Objects.requireNonNull(controlRuntime, "controlRuntime");
         engineeringCatalog = battleState().engineeringCatalog();
-        protectionCatalog = Stage175ICombatTestProtectionPack.load();
-        ammunitionCatalog = Stage175ICombatTestWeaponPack.loadAmmunition();
-        launcherCatalog = Stage175ICombatTestWeaponPack.loadLaunchers();
+        protectionCatalog = battleState().protectionCatalog();
+        this.ammunitionCatalog = Objects.requireNonNull(ammunitionCatalog, "ammunitionCatalog");
+        this.launcherCatalog = Objects.requireNonNull(launcherCatalog, "launcherCatalog");
         calculator = new DerivedShipCalculator(engineeringCatalog);
         weaponAdapter = new ShipWeaponEngineeringAdapter();
         shieldAdapter = new ShipShieldEngineeringAdapter();
@@ -112,6 +138,16 @@ public final class LiveTacticalBattleWeaponRuntime {
     /** @return shared production control runtime */
     public LiveTacticalBattleControlRuntime controlRuntime() {
         return controlRuntime;
+    }
+
+    /** @return immutable physical ammunition content shared by every layer of this battle */
+    public WeaponAmmunitionCatalog ammunitionCatalog() {
+        return ammunitionCatalog;
+    }
+
+    /** @return immutable launcher content shared by every layer of this battle */
+    public WeaponLauncherCatalog launcherCatalog() {
+        return launcherCatalog;
     }
 
     /** @return immutable current physical projectile-body set in deterministic creation order */
@@ -173,6 +209,7 @@ public final class LiveTacticalBattleWeaponRuntime {
         PositionSnapshot targetPosition = new PositionSnapshot(targetXM, targetYM);
         KineticProtectionRuntime.Result result = resolveImpact(target, checkedBody, targetPosition);
         recordImpact(targetEntityId);
+        rememberResidualContact(result, targetEntityId);
         return result;
     }
 
@@ -210,7 +247,21 @@ public final class LiveTacticalBattleWeaponRuntime {
                 controlRuntime.fingerprint(),
                 sources,
                 targets,
-                List.copyOf(projectiles));
+                List.copyOf(projectiles),
+                surfaceContactSnapshot());
+    }
+
+    private Map<Long, List<Long>> surfaceContactSnapshot() {
+        Map<Long, List<Long>> result = new TreeMap<>();
+        surfaceContactsByProjectileId.forEach((id, targets) -> result.put(id, List.copyOf(targets)));
+        return result;
+    }
+
+    private void rememberResidualContact(KineticProtectionRuntime.Result result, long targetId) {
+        if (result.postProtectionProjectile() != null) {
+            surfaceContactsByProjectileId.computeIfAbsent(
+                    result.postProtectionProjectile().projectileId(), ignored -> new TreeSet<>()).add(targetId);
+        }
     }
 
     private void advanceLauncherCycles() {
@@ -327,6 +378,7 @@ public final class LiveTacticalBattleWeaponRuntime {
                     impactBody,
                     impact.targetPositionAtImpact);
             recordImpact(impact.target.spec().entityId());
+            rememberResidualContact(result, impact.target.spec().entityId());
 
             if (result.postProtectionProjectile() != null) {
                 double remainingSeconds = LiveTacticalBattleControlRuntime.TICK_SECONDS * (1d - impact.fraction);
@@ -336,6 +388,9 @@ public final class LiveTacticalBattleWeaponRuntime {
         }
         projectiles.clear();
         projectiles.addAll(survivors);
+        var survivingIds = survivors.stream().map(ProjectileBody::projectileId)
+                .collect(java.util.stream.Collectors.toSet());
+        surfaceContactsByProjectileId.keySet().retainAll(survivingIds);
     }
 
     private ImpactCandidate firstImpact(
@@ -358,6 +413,14 @@ public final class LiveTacticalBattleWeaponRuntime {
                             "target start position");
             double halfLength = target.hull().boundingDimensionsM().lengthM() * 0.5d;
             double halfWidth = target.hull().boundingDimensionsM().widthM() * 0.5d;
+            TreeSet<Long> contacts = surfaceContactsByProjectileId.get(body.projectileId());
+            if (contacts != null && contacts.contains(target.spec().entityId())) {
+                boolean stillInside = Math.abs(body.xM() - start.xM) <= halfLength + EPSILON
+                        && Math.abs(body.yM() - start.yM) <= halfWidth + EPSILON;
+                if (stillInside) continue;
+                contacts.remove(target.spec().entityId());
+                if (contacts.isEmpty()) surfaceContactsByProjectileId.remove(body.projectileId());
+            }
             var fraction = TacticalCollisionGeometry.firstSegmentAabbHitFraction(
                     body.xM() - start.xM,
                     body.yM() - start.yM,
@@ -708,13 +771,15 @@ public final class LiveTacticalBattleWeaponRuntime {
      * @param sources canonical stable-entity weapon projections
      * @param targets canonical stable-entity protection projections
      * @param projectiles current independent physical projectile bodies
+     * @param surfaceContactsByProjectileId hull surfaces already resolved for residuals still traversing them
      */
     public record BattleWeaponFingerprint(
             long tick,
             LiveTacticalBattleControlRuntime.BattleControlFingerprint controlFingerprint,
             List<SourceWeaponFingerprint> sources,
             List<TargetProtectionFingerprint> targets,
-            List<ProjectileBody> projectiles) {
+            List<ProjectileBody> projectiles,
+            Map<Long, List<Long>> surfaceContactsByProjectileId) {
         /**
          * Validates and freezes the whole-battle weapon projection.
          *
@@ -723,6 +788,7 @@ public final class LiveTacticalBattleWeaponRuntime {
          * @param sources canonical stable-entity weapon projections
          * @param targets canonical stable-entity protection projections
          * @param projectiles current independent physical projectile bodies
+         * @param surfaceContactsByProjectileId hull surfaces already resolved for residuals still traversing them
          */
         public BattleWeaponFingerprint {
             if (tick < 0L) {
@@ -732,6 +798,10 @@ public final class LiveTacticalBattleWeaponRuntime {
             sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
             targets = List.copyOf(Objects.requireNonNull(targets, "targets"));
             projectiles = List.copyOf(Objects.requireNonNull(projectiles, "projectiles"));
+            var contacts = new TreeMap<Long, List<Long>>();
+            Objects.requireNonNull(surfaceContactsByProjectileId, "surfaceContactsByProjectileId")
+                    .forEach((id, targetsForBody) -> contacts.put(id, List.copyOf(targetsForBody)));
+            surfaceContactsByProjectileId = Collections.unmodifiableMap(contacts);
         }
     }
 }
