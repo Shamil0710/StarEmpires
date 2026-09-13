@@ -4,8 +4,9 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
+import com.spacesim.campaign.GeneratedCampaignCoordinator;
 import com.spacesim.campaign.GeneratedCampaignSession;
-import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
+import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.SelectionKind;
@@ -18,15 +19,16 @@ import com.spacesim.world.StarSystemId;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 
-/** Player-facing command interface over the accepted generated Stage-20/20.5 world. */
+/** Player-facing command interface over the accepted integrated generated campaign. */
 public final class GeneratedWorldCommandGame extends ApplicationAdapter {
-    private static final String SAVE_FILE = "saves/generated-world-runtime.s25";
+    private static final String SAVE_FILE = "saves/generated-campaign.s21i";
+    private static final String LEGACY_SAVE_FILE = "saves/generated-world-runtime.s25";
 
     private final long initialSeed;
 
+    private GeneratedCampaignCoordinator campaign;
     private GeneratedCampaignSession session;
     private GeneratedWorldUiModel model;
     private GeneratedWorldCommandUiRenderer renderer;
@@ -37,6 +39,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private int listScrollRows;
     private String status = "Генерация принятого мира…";
     private Path savePath;
+    private Path legacySavePath;
     private boolean middleDragging;
     private int dragPointer = -1;
     private float previousDragX;
@@ -56,13 +59,13 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         this.initialSeed = initialSeed;
     }
 
-    /** Generates the accepted world and binds the read-only UI to its ordinary campaign session. */
+    /** Generates the accepted world and binds the read-only UI to its integrated campaign. */
     @Override
     public void create() {
-        session = GeneratedCampaignSession.create(initialSeed);
-        model = new GeneratedWorldUiModel(session.rootSeed(), session.runtime(), session.content());
+        bindCampaign(GeneratedCampaignCoordinator.create(initialSeed));
         renderer = new GeneratedWorldCommandUiRenderer();
         savePath = Gdx.files.local(SAVE_FILE).file().toPath();
+        legacySavePath = Gdx.files.local(LEGACY_SAVE_FILE).file().toPath();
         snapshot = model.capture();
         status = "Мир сгенерирован: " + snapshot.galaxy().systems().size()
                 + " систем, " + snapshot.localObjects().size() + " объектов в активной системе.";
@@ -261,17 +264,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private boolean save() {
         try {
-            byte[] bytes = Stage20GeneratedWorldRuntimePersistenceCodec.encode(session.captureState());
-            Files.createDirectories(savePath.getParent());
-            Path temporary = savePath.resolveSibling(savePath.getFileName() + ".tmp");
-            Files.write(temporary, bytes);
-            try {
-                Files.move(temporary, savePath,
-                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
-                Files.move(temporary, savePath, StandardCopyOption.REPLACE_EXISTING);
-            }
-            status = "Мир сохранён: " + SAVE_FILE + ".";
+            Stage21IGeneratedWorldRuntimePersistenceCodec.write(savePath, campaign.captureState());
+            status = "Кампания сохранена: " + SAVE_FILE + ".";
         } catch (IOException | RuntimeException exception) {
             status = "Ошибка сохранения: " + safeMessage(exception);
         }
@@ -280,20 +274,27 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private boolean load() {
         try {
-            var checkpoint = Stage20GeneratedWorldRuntimePersistenceCodec.decode(
-                    Files.readAllBytes(savePath));
-            session = GeneratedCampaignSession.restore(checkpoint);
-            model = new GeneratedWorldUiModel(session.rootSeed(), session.runtime(), session.content());
+            Path source = Files.exists(savePath) ? savePath : legacySavePath;
+            bindCampaign(GeneratedCampaignCoordinator.restore(
+                    Stage21IGeneratedWorldRuntimePersistenceCodec.readOrMigrate(source)));
             selection = UiSelection.none();
             detailScrollRows = 0;
             listScrollRows = 0;
             renderer.resetSystemMapCamera();
             snapshot = model.capture();
-            status = "Сохранённый generated world загружен без повторной генерации.";
+            status = source.equals(legacySavePath)
+                    ? "Старое сохранение generated world мигрировано в полную кампанию без повторной генерации."
+                    : "Полная кампания Stage-21I загружена без повторной генерации.";
         } catch (IOException | RuntimeException exception) {
             status = "Ошибка загрузки: " + safeMessage(exception);
         }
         return true;
+    }
+
+    private void bindCampaign(GeneratedCampaignCoordinator nextCampaign) {
+        campaign = nextCampaign;
+        session = campaign.session();
+        model = new GeneratedWorldUiModel(session.rootSeed(), session.runtime(), session.content());
     }
 
     private boolean exit() {
