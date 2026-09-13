@@ -58,7 +58,12 @@ public final class FactionCharacterPortraitOverlay implements Disposable {
         resize(Math.max(1, Gdx.graphics.getWidth()), Math.max(1, Gdx.graphics.getHeight()));
     }
 
-    /** Updates the overlay projection after a window resize. */
+    /**
+     * Updates the overlay projection after a window resize.
+     *
+     * @param viewportWidth current viewport width in pixels
+     * @param viewportHeight current viewport height in pixels
+     */
     public void resize(int viewportWidth, int viewportHeight) {
         if (disposed || viewportWidth <= 0 || viewportHeight <= 0) {
             return;
@@ -71,7 +76,13 @@ public final class FactionCharacterPortraitOverlay implements Disposable {
         batch.setProjectionMatrix(camera.combined);
     }
 
-    /** Renders a six-person roster only while a core faction is selected on the factions tab. */
+    /**
+     * Renders a six-person roster only while a core faction is selected on the factions tab.
+     *
+     * @param snapshot current generated-world UI snapshot
+     * @param tab currently active command UI tab
+     * @param selection current UI selection
+     */
     public void render(GeneratedWorldUiSnapshot snapshot, Tab tab, UiSelection selection) {
         if (disposed || snapshot == null || tab != Tab.FACTIONS || selection == null
                 || selection.kind() != SelectionKind.FACTION) {
