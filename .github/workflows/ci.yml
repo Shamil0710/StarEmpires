@@ -28,6 +28,11 @@ jobs:
           java-version: "17"
           cache: maven
 
+      - name: Test B18 human-review tooling
+        shell: bash
+        run: |
+          python3 tools/stage22/test_b18_review.py
+
       - name: Test, check coverage, build Javadoc and package desktop JAR
         shell: bash
         run: |
