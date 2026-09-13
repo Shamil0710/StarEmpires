@@ -4,6 +4,7 @@ import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ImpactGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ImpactKind;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShipGlyph;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.TacticalSide;
+import com.spacesim.ui.TacticalVfxState.Flash;
 import com.spacesim.ui.TacticalVfxState.FlashKind;
 import org.junit.jupiter.api.Test;
 
@@ -77,11 +78,91 @@ class TacticalVfxStateTest {
                 .filter(flash -> flash.kind() == FlashKind.DESTRUCTION)
                 .count());
         assertEquals(particlesAfterTransition, state.particles().size());
+        assertEquals(1, state.wreckEffects().size());
 
         TacticalVfxState materializedWreck = new TacticalVfxState();
         materializedWreck.advance(snapshot(List.of(wreckedShip(12L)), List.of()), 0d);
         assertFalse(materializedWreck.flashes().stream()
                 .anyMatch(flash -> flash.kind() == FlashKind.DESTRUCTION));
+        assertTrue(materializedWreck.wreckEffects().isEmpty());
+    }
+
+    @Test
+    void destructionScaleFollowsPhysicalHullDimensions() {
+        TacticalVfxState small = destructionState(ship(21L, 80d, 24d, false), ship(21L, 80d, 24d, true));
+        TacticalVfxState capital = destructionState(ship(22L, 620d, 150d, false), ship(22L, 620d, 150d, true));
+
+        double smallRadius = destructionFlash(small).radiusM();
+        double capitalRadius = destructionFlash(capital).radiusM();
+
+        assertTrue(capitalRadius > smallRadius * 4d);
+        assertTrue(capital.wreckEffects().get(0).radiusM() > small.wreckEffects().get(0).radiusM());
+        assertTrue(capital.wreckEffects().get(0).pulseCount() > small.wreckEffects().get(0).pulseCount());
+    }
+
+    @Test
+    void secondaryDetonationsAreDeterministicForStableEntityIdentity() {
+        TacticalVfxState first = destructionState(aliveShip(31L), wreckedShip(31L));
+        TacticalVfxState second = destructionState(aliveShip(31L), wreckedShip(31L));
+        TacticalPrototypeVisualSnapshot wreck = snapshot(List.of(wreckedShip(31L)), List.of());
+
+        for (int index = 0; index < 5; index++) {
+            first.advance(wreck, 0.10d);
+            second.advance(wreck, 0.10d);
+        }
+
+        List<Flash> firstSecondary = first.flashes().stream()
+                .filter(flash -> flash.kind() == FlashKind.SECONDARY_DETONATION)
+                .toList();
+        List<Flash> secondSecondary = second.flashes().stream()
+                .filter(flash -> flash.kind() == FlashKind.SECONDARY_DETONATION)
+                .toList();
+
+        assertFalse(firstSecondary.isEmpty());
+        assertEquals(firstSecondary.size(), secondSecondary.size());
+        for (int index = 0; index < firstSecondary.size(); index++) {
+            Flash a = firstSecondary.get(index);
+            Flash b = secondSecondary.get(index);
+            assertEquals(a.xM(), b.xM(), 0d);
+            assertEquals(a.yM(), b.yM(), 0d);
+            assertEquals(a.radiusM(), b.radiusM(), 0d);
+            assertEquals(a.remainingFraction(), b.remainingFraction(), 0d);
+        }
+    }
+
+    @Test
+    void lingeringWreckEffectExpiresWithoutRearming() {
+        TacticalVfxState state = destructionState(aliveShip(41L), wreckedShip(41L));
+        TacticalPrototypeVisualSnapshot wreck = snapshot(List.of(wreckedShip(41L)), List.of());
+        assertFalse(state.wreckEffects().isEmpty());
+
+        for (int index = 0; index < 40; index++) {
+            state.advance(wreck, 0.10d);
+        }
+
+        assertTrue(state.wreckEffects().isEmpty());
+        long primaryBursts = state.flashes().stream()
+                .filter(flash -> flash.kind() == FlashKind.DESTRUCTION)
+                .count();
+        assertTrue(primaryBursts <= 1L);
+    }
+
+    @Test
+    void wreckEffectBudgetRemainsBoundedUnderMassDestruction() {
+        ArrayList<ShipGlyph> alive = new ArrayList<>();
+        ArrayList<ShipGlyph> wrecked = new ArrayList<>();
+        for (long id = 100L; id < 180L; id++) {
+            alive.add(ship(id, 120d + id, 36d, false));
+            wrecked.add(ship(id, 120d + id, 36d, true));
+        }
+        TacticalVfxState state = new TacticalVfxState();
+        state.advance(snapshot(alive, List.of()), 0d);
+
+        state.advance(snapshot(wrecked, List.of()), 0d);
+
+        assertTrue(state.wreckEffects().size() <= TacticalVfxState.MAX_WRECK_EFFECTS);
+        assertTrue(state.particles().size() <= TacticalVfxState.MAX_PARTICLES);
+        assertTrue(state.flashes().size() <= TacticalVfxState.MAX_FLASHES);
     }
 
     @Test
@@ -118,6 +199,20 @@ class TacticalVfxStateTest {
         assertEquals(startX + velocityX * 0.10d, advanced.xM(), 1e-9d);
     }
 
+    private static TacticalVfxState destructionState(ShipGlyph alive, ShipGlyph wrecked) {
+        TacticalVfxState state = new TacticalVfxState();
+        state.advance(snapshot(List.of(alive), List.of()), 0d);
+        state.advance(snapshot(List.of(wrecked), List.of()), 0d);
+        return state;
+    }
+
+    private static Flash destructionFlash(TacticalVfxState state) {
+        return state.flashes().stream()
+                .filter(flash -> flash.kind() == FlashKind.DESTRUCTION)
+                .findFirst()
+                .orElseThrow();
+    }
+
     private static TacticalPrototypeVisualSnapshot snapshot(
             List<ShipGlyph> ships,
             List<ImpactGlyph> impacts) {
@@ -131,21 +226,14 @@ class TacticalVfxStateTest {
     }
 
     private static ShipGlyph aliveShip(long id) {
-        return new ShipGlyph(
-                id,
-                TacticalSide.ALPHA,
-                ShipVisualRole.BALANCED,
-                0d,
-                0d,
-                0d,
-                120d,
-                36d,
-                0.75d,
-                1d,
-                false);
+        return ship(id, 120d, 36d, false);
     }
 
     private static ShipGlyph wreckedShip(long id) {
+        return ship(id, 120d, 36d, true);
+    }
+
+    private static ShipGlyph ship(long id, double lengthM, double widthM, boolean wreck) {
         return new ShipGlyph(
                 id,
                 TacticalSide.ALPHA,
@@ -153,10 +241,10 @@ class TacticalVfxStateTest {
                 0d,
                 0d,
                 0d,
-                120d,
-                36d,
-                0d,
-                0d,
-                true);
+                lengthM,
+                widthM,
+                wreck ? 0d : 0.75d,
+                wreck ? 0d : 1d,
+                wreck);
     }
 }
