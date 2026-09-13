@@ -9,11 +9,11 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.Disposable;
+import com.spacesim.content.Stage22FactionProfileCatalog;
+import com.spacesim.content.Stage22FactionProfileLoader;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.SelectionKind;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.UiSelection;
-
-import java.util.Locale;
 
 /**
  * Presentation-only character roster strip for the two production-complete core factions.
@@ -22,20 +22,16 @@ import java.util.Locale;
  * renders six transparent character cut-outs over the faction inspector. Missing art degrades to
  * no overlay and therefore cannot affect generation, persistence, AI, economy or combat.</p>
  *
- * <p>The Stage-20 playable-world bootstrap still exposes the provisional identities
- * {@code faction.alpha} and {@code faction.beta}. Until Stage-22 replaces that evidence policy with
- * canonical core-faction identities, this presentation layer maps alpha to Empire and beta to
- * Industrial Union explicitly. The aliases are deliberately exact and must not be broadened to
- * substring matching because legacy/post-core faction names can contain similar words.</p>
+ * <p>Faction identity is resolved only through the governed Stage-22 systemic-profile catalog.
+ * The overlay never invents, aliases or rewrites runtime faction IDs. It selects presentation art
+ * from the profile package key after the catalog has resolved the authoritative stable faction ID.</p>
  */
 public final class FactionCharacterPortraitOverlay implements Disposable {
     private static final String EMPIRE_ASSET = "assets/characters/empire/character_roster.png";
     private static final String INDUSTRIAL_UNION_ASSET =
             "assets/characters/industrial_union/character_roster.png";
-    private static final String EMPIRE_ID = "faction.empire";
-    private static final String INDUSTRIAL_UNION_ID = "faction.industrial_union";
-    private static final String STAGE20_EMPIRE_ALIAS = "faction.alpha";
-    private static final String STAGE20_INDUSTRIAL_UNION_ALIAS = "faction.beta";
+    private static final String EMPIRE_PACKAGE = "core.empire";
+    private static final String INDUSTRIAL_UNION_PACKAGE = "core.industrial_union";
     private static final int PORTRAIT_COUNT = 6;
     private static final int SOURCE_WIDTH = 56;
     private static final int SOURCE_HEIGHT = 84;
@@ -50,6 +46,7 @@ public final class FactionCharacterPortraitOverlay implements Disposable {
     private final OrthographicCamera camera = new OrthographicCamera();
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
+    private final Stage22FactionProfileCatalog factionProfiles = loadFactionProfilesOptional();
     private final Texture empire = loadOptional(EMPIRE_ASSET);
     private final Texture industrialUnion = loadOptional(INDUSTRIAL_UNION_ASSET);
     private int width;
@@ -86,7 +83,7 @@ public final class FactionCharacterPortraitOverlay implements Disposable {
         if (faction == null) {
             return;
         }
-        Texture roster = resolveRoster(faction.factionId(), faction.displayName());
+        Texture roster = resolveRoster(faction.factionId());
         if (roster != null) {
             drawRoster(roster);
         }
@@ -130,29 +127,38 @@ public final class FactionCharacterPortraitOverlay implements Disposable {
         batch.end();
     }
 
-    private Texture resolveRoster(String factionId, String displayName) {
-        String id = normalize(factionId);
-        if (INDUSTRIAL_UNION_ID.equals(id) || STAGE20_INDUSTRIAL_UNION_ALIAS.equals(id)) {
-            return industrialUnion;
+    private Texture resolveRoster(String factionId) {
+        RosterKind kind = resolveRosterKind(factionProfiles, factionId);
+        if (kind == null) {
+            return null;
         }
-        if (EMPIRE_ID.equals(id) || STAGE20_EMPIRE_ALIAS.equals(id)) {
-            return empire;
-        }
-
-        // Exact display-name fallbacks support migrated saves/content without misclassifying
-        // similarly named factions such as an Imperial Directorate.
-        String name = normalize(displayName);
-        if ("индустриальный союз".equals(name) || "industrial union".equals(name)) {
-            return industrialUnion;
-        }
-        if ("империя".equals(name) || "empire".equals(name)) {
-            return empire;
-        }
-        return null;
+        return switch (kind) {
+            case EMPIRE -> empire;
+            case INDUSTRIAL_UNION -> industrialUnion;
+        };
     }
 
-    private static String normalize(String value) {
-        return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
+    static RosterKind resolveRosterKind(Stage22FactionProfileCatalog profiles, String factionId) {
+        if (profiles == null || factionId == null || factionId.isBlank()) {
+            return null;
+        }
+        var profile = profiles.findProfileForFaction(factionId.strip());
+        if (profile == null) {
+            return null;
+        }
+        return switch (profile.packageKey()) {
+            case EMPIRE_PACKAGE -> RosterKind.EMPIRE;
+            case INDUSTRIAL_UNION_PACKAGE -> RosterKind.INDUSTRIAL_UNION;
+            default -> null;
+        };
+    }
+
+    private static Stage22FactionProfileCatalog loadFactionProfilesOptional() {
+        try {
+            return Stage22FactionProfileLoader.loadDefault();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static Texture loadOptional(String path) {
@@ -190,5 +196,10 @@ public final class FactionCharacterPortraitOverlay implements Disposable {
         }
         batch.dispose();
         shapes.dispose();
+    }
+
+    enum RosterKind {
+        EMPIRE,
+        INDUSTRIAL_UNION
     }
 }
