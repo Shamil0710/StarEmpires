@@ -5,10 +5,9 @@ import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ImpactKind;
 import com.spacesim.ui.TacticalPrototypeVisualSnapshot.ShipGlyph;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -211,8 +210,13 @@ final class TacticalVfxState {
     private final ArrayList<Particle> particles = new ArrayList<>();
     private final ArrayList<Flash> flashes = new ArrayList<>();
     private final ArrayList<WreckEffect> wreckEffects = new ArrayList<>();
+    private final List<Particle> particleView = Collections.unmodifiableList(particles);
+    private final List<Flash> flashView = Collections.unmodifiableList(flashes);
+    private final List<WreckEffect> wreckEffectView = Collections.unmodifiableList(wreckEffects);
     private final LinkedHashSet<Long> seenImpactEvents = new LinkedHashSet<>();
-    private Map<Long, Boolean> previousWreckState = Map.of();
+    private long[] previousShipIds = new long[0];
+    private boolean[] previousShipWrecks = new boolean[0];
+    private int previousShipCount;
     private boolean wreckBaselineEstablished;
 
     void advance(TacticalPrototypeVisualSnapshot snapshot, double frameSeconds) {
@@ -233,15 +237,15 @@ final class TacticalVfxState {
     }
 
     List<Particle> particles() {
-        return List.copyOf(particles);
+        return particleView;
     }
 
     List<Flash> flashes() {
-        return List.copyOf(flashes);
+        return flashView;
     }
 
     List<WreckEffect> wreckEffects() {
-        return List.copyOf(wreckEffects);
+        return wreckEffectView;
     }
 
     int seenImpactCount() {
@@ -249,31 +253,39 @@ final class TacticalVfxState {
     }
 
     private void observeWreckTransitions(List<ShipGlyph> ships) {
-        HashMap<Long, Boolean> current = new HashMap<>();
+        int previousIndex = 0;
         for (ShipGlyph ship : ships) {
-            current.put(ship.entityId(), ship.wreck());
+            long entityId = ship.entityId();
+            while (previousIndex < previousShipCount && previousShipIds[previousIndex] < entityId) {
+                previousIndex++;
+            }
+            boolean existedPreviously = previousIndex < previousShipCount
+                    && previousShipIds[previousIndex] == entityId;
             if (wreckBaselineEstablished
                     && ship.wreck()
-                    && Boolean.FALSE.equals(previousWreckState.get(ship.entityId()))) {
+                    && existedPreviously
+                    && !previousShipWrecks[previousIndex]) {
                 spawnDestruction(ship);
             }
         }
-        previousWreckState = Map.copyOf(current);
+
+        ensurePreviousShipCapacity(ships.size());
+        for (int index = 0; index < ships.size(); index++) {
+            ShipGlyph ship = ships.get(index);
+            previousShipIds[index] = ship.entityId();
+            previousShipWrecks[index] = ship.wreck();
+        }
+        previousShipCount = ships.size();
         wreckBaselineEstablished = true;
     }
 
     private void advanceWreckEffects(List<ShipGlyph> ships, double seconds) {
-        if (wreckEffects.isEmpty()) {
-            return;
-        }
-        HashMap<Long, ShipGlyph> shipsById = new HashMap<>();
-        for (ShipGlyph ship : ships) {
-            shipsById.put(ship.entityId(), ship);
-        }
-        wreckEffects.removeIf(effect -> {
-            ShipGlyph ship = shipsById.get(effect.entityId);
+        for (int index = wreckEffects.size() - 1; index >= 0; index--) {
+            WreckEffect effect = wreckEffects.get(index);
+            ShipGlyph ship = findShip(ships, effect.entityId);
             if (ship == null || !ship.wreck()) {
-                return true;
+                wreckEffects.remove(index);
+                continue;
             }
             effect.xM = ship.xM();
             effect.yM = ship.yM();
@@ -283,8 +295,10 @@ final class TacticalVfxState {
                 spawnSecondaryDetonation(effect, effect.nextPulseIndex);
                 effect.nextPulseIndex++;
             }
-            return effect.ageSeconds >= effect.lifetimeSeconds;
-        });
+            if (effect.ageSeconds >= effect.lifetimeSeconds) {
+                wreckEffects.remove(index);
+            }
+        }
     }
 
     private void spawnImpact(ImpactGlyph impact) {
@@ -415,6 +429,32 @@ final class TacticalVfxState {
             Long oldest = seenImpactEvents.iterator().next();
             seenImpactEvents.remove(oldest);
         }
+    }
+
+    private void ensurePreviousShipCapacity(int required) {
+        if (previousShipIds.length >= required) {
+            return;
+        }
+        int capacity = Math.max(required, Math.max(8, previousShipIds.length * 2));
+        previousShipIds = new long[capacity];
+        previousShipWrecks = new boolean[capacity];
+    }
+
+    private static ShipGlyph findShip(List<ShipGlyph> ships, long entityId) {
+        int low = 0;
+        int high = ships.size() - 1;
+        while (low <= high) {
+            int middle = (low + high) >>> 1;
+            ShipGlyph ship = ships.get(middle);
+            if (ship.entityId() < entityId) {
+                low = middle + 1;
+            } else if (ship.entityId() > entityId) {
+                high = middle - 1;
+            } else {
+                return ship;
+            }
+        }
+        return null;
     }
 
     private static double destructionRadius(double lengthM, double widthM) {
