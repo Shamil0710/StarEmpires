@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-09-03 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 ACTIVE — M22.0–M22.5 complete, M22.6 NEXT.**
+> **Последняя синхронизация: 2026-09-13 / Stage 20–21 COMPLETE; M22.0–M22.5 complete; M22.6 merged (#355); M22.7 ACTIVE / PARTIAL.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 > Art maintenance: [Empire sprite refresh](empire_sprite_refresh.md) replaces the nine M22.3
@@ -568,7 +568,7 @@ Core-faction note: the same Stage-21 machinery expresses meaningfully different 
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
-**ACTIVE. M22.0, M22.1, M22.2, M22.3, M22.4 and M22.5 are complete. M22.6 — core pair balance/freeze is OPEN/NEXT.**
+**ACTIVE. M22.0, M22.1, M22.2, M22.3, M22.4 and M22.5 are complete. M22.6 — core pair balance/freeze merged in #355; M22.7 — Integrated Campaign Handoff is ACTIVE / PARTIAL.**
 
 M22.2 implementation merged in PR #346 as `ccd38f1d9d34c84b2f562635295a76826cdbbd11`; exact-head PR CI and post-merge main CI are green. The M22.2 closure adds only shared faction-neutral authoring contracts.
 
@@ -690,7 +690,7 @@ Stage 17 COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
 → Stage 21 RPG / Living World COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
-→ Stage 22 Content / Balance Alpha ACTIVE — M22.0 COMPLETE; M22.1 COMPLETE; M22.2 COMPLETE; M22.3 COMPLETE; M22.4 COMPLETE; M22.5 COMPLETE; M22.6 NEXT
+→ Stage 22 Content / Balance Alpha ACTIVE — M22.0 COMPLETE; M22.1 COMPLETE; M22.2 COMPLETE; M22.3 COMPLETE; M22.4 COMPLETE; M22.5 COMPLETE; M22.6 merged; M22.7 ACTIVE / PARTIAL
 → Stage 23 RC / final presentation replacement and polish for the core pair PLANNED
 → Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
@@ -703,3 +703,9 @@ Detailed faction/content execution, ID migration and post-core package sequencin
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
 file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.
+
+## M22.7 integration handoff (2026-09-13)
+
+Execution contract: [M22.7 roadmap](stage22_7_integrated_campaign_handoff_roadmap.md).
+Current evidence and remaining gates: [integration audit](m22_7_integration_audit_2026_09_13.md).
+Stage 23 remains PLANNED until those gates are actually closed. Human gates retain their owner-directed deferrals (#361, #370); no human PASS is inferred.

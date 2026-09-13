@@ -52,6 +52,21 @@ class GeneratedCampaignFreightDeliveryAcceptanceTest {
         assertNotNull(inTransitLot);
         assertEquals(initialOrder.sourceProvenanceId(), inTransitLot.sourceProvenanceId());
 
+        var departure = inTransitCheckpoint.worldState().fleetJumps().stream()
+                .filter(jump -> jump.fleetId().equals(fleetId))
+                .findFirst().orElseThrow();
+        double fixedStepSeconds = bootstrap.runtime().world()
+                .findSession(bootstrap.runtime().world().getActiveSystemId()).orElseThrow()
+                .getClock().getFixedStepSeconds();
+        double remainingDepartureSeconds = (departure.phaseEndsTick()
+                - bootstrap.runtime().world().getAuthoritativeWorldTick()) * fixedStepSeconds;
+        assertTrue(remainingDepartureSeconds <= FIRST_HOUR_AT_8X_REAL_SECONDS * 8d,
+                () -> "First-hour scenario cannot finish even its current departure phase: order="
+                        + orderId + ", fleet=" + fleetId + ", remainingDepartureSeconds="
+                        + remainingDepartureSeconds + ", plannedOneWaySeconds="
+                        + initialOrder.oneWayDeliverySeconds()
+                        + ". Preserve physical timing; provide a feasible first-hour scenario.");
+
         Stage20FreightPersistentState.TransportOrderState checkpointOrder =
                 order(inTransitCheckpoint.freight(), orderId);
         Stage20FreightPersistentState.FreighterState checkpointFreighter =

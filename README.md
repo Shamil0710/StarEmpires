@@ -19,7 +19,7 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-08-27 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 OPEN/NEXT.**
+**Последняя синхронизация README: 2026-09-13 / Stage 20–21 COMPLETE; M22.0–M22.5 COMPLETE; M22.6 merged (#355); M22.7 ACTIVE / PARTIAL.**
 
 Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md).
 
@@ -30,7 +30,7 @@
 | **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining, combat, progression | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **COMPLETE** |
 | **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **COMPLETE — Stage 20–21** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | **OPEN/NEXT — Stage 22** |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | **ACTIVE — M22.7 integration** |
 | **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED |
 
 На текущем roadmap завершены Stages **0–21**, включая **Stage 20A–20L physical-world generation**,
@@ -44,7 +44,12 @@ persistent NPCs/missions/reputation/discovery grounded in living-world state (21
 gate: read-only integrated UI projection, supported-save migration, representative cooperation/conflict
 corpus, core-pair doctrine acceptance, bounded workload evidence and non-vacuous long-run soak.
 
-**Stage 22 Content / Technology / Balance Alpha теперь OPEN/NEXT, но его реализация ещё не начата.**
+**M22.7 Integrated Campaign Handoff выполняется; Stage 23 ещё не открыт.**
+
+Обычный запуск: `run-generated-world.bat`. В этой ветке клиент сохраняет составную кампанию
+в `saves/generated-campaign.s21i` и поддерживает миграцию прежнего `saves/generated-world-runtime.s25`.
+Сериализация Stage-21 состояний ещё не означает их полную игровую интеграцию.
+Точный остаток работ и ограничения: [M22.7 integration audit](docs/m22_7_integration_audit_2026_09_13.md).
 
 ## Что уже реализовано
 
