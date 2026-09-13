@@ -10,7 +10,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Presentation-only temporal state for tactical particles and flashes.
@@ -23,6 +22,7 @@ final class TacticalVfxState {
     static final int MAX_PARTICLES = 512;
     static final int MAX_FLASHES = 96;
     static final int MAX_SEEN_IMPACTS = 2048;
+    static final int MAX_WRECK_EFFECTS = 48;
     private static final double MAX_FRAME_SECONDS = 0.10d;
 
     enum ParticleKind {
@@ -36,7 +36,8 @@ final class TacticalVfxState {
         SHIELD,
         ARMOR,
         PENETRATION,
-        DESTRUCTION
+        DESTRUCTION,
+        SECONDARY_DETONATION
     }
 
     static final class Particle {
@@ -149,8 +150,67 @@ final class TacticalVfxState {
         }
     }
 
+    static final class WreckEffect {
+        private final long entityId;
+        private final double radiusM;
+        private final double lifetimeSeconds;
+        private final int pulseCount;
+        private double xM;
+        private double yM;
+        private double ageSeconds;
+        private int nextPulseIndex;
+
+        private WreckEffect(
+                long entityId,
+                double xM,
+                double yM,
+                double radiusM,
+                double lifetimeSeconds,
+                int pulseCount) {
+            this.entityId = entityId;
+            this.xM = xM;
+            this.yM = yM;
+            this.radiusM = radiusM;
+            this.lifetimeSeconds = lifetimeSeconds;
+            this.pulseCount = pulseCount;
+        }
+
+        long entityId() {
+            return entityId;
+        }
+
+        double xM() {
+            return xM;
+        }
+
+        double yM() {
+            return yM;
+        }
+
+        double radiusM() {
+            return radiusM;
+        }
+
+        double remainingFraction() {
+            return Math.max(0d, 1d - ageSeconds / lifetimeSeconds);
+        }
+
+        int pulseCount() {
+            return pulseCount;
+        }
+
+        int emittedPulseCount() {
+            return nextPulseIndex;
+        }
+
+        private double pulseTimeSeconds(int pulseIndex) {
+            return lifetimeSeconds * (0.14d + (0.58d * (pulseIndex + 1d) / (pulseCount + 1d)));
+        }
+    }
+
     private final ArrayList<Particle> particles = new ArrayList<>();
     private final ArrayList<Flash> flashes = new ArrayList<>();
+    private final ArrayList<WreckEffect> wreckEffects = new ArrayList<>();
     private final LinkedHashSet<Long> seenImpactEvents = new LinkedHashSet<>();
     private Map<Long, Boolean> previousWreckState = Map.of();
     private boolean wreckBaselineEstablished;
@@ -160,6 +220,7 @@ final class TacticalVfxState {
         double seconds = sanitizeFrameSeconds(frameSeconds);
         particles.removeIf(particle -> !particle.advance(seconds));
         flashes.removeIf(flash -> !flash.advance(seconds));
+        advanceWreckEffects(snapshot.ships(), seconds);
 
         for (ImpactGlyph impact : snapshot.impacts()) {
             if (seenImpactEvents.add(impact.eventId())) {
@@ -179,6 +240,10 @@ final class TacticalVfxState {
         return List.copyOf(flashes);
     }
 
+    List<WreckEffect> wreckEffects() {
+        return List.copyOf(wreckEffects);
+    }
+
     int seenImpactCount() {
         return seenImpactEvents.size();
     }
@@ -195,6 +260,31 @@ final class TacticalVfxState {
         }
         previousWreckState = Map.copyOf(current);
         wreckBaselineEstablished = true;
+    }
+
+    private void advanceWreckEffects(List<ShipGlyph> ships, double seconds) {
+        if (wreckEffects.isEmpty()) {
+            return;
+        }
+        HashMap<Long, ShipGlyph> shipsById = new HashMap<>();
+        for (ShipGlyph ship : ships) {
+            shipsById.put(ship.entityId(), ship);
+        }
+        wreckEffects.removeIf(effect -> {
+            ShipGlyph ship = shipsById.get(effect.entityId);
+            if (ship == null || !ship.wreck()) {
+                return true;
+            }
+            effect.xM = ship.xM();
+            effect.yM = ship.yM();
+            effect.ageSeconds += seconds;
+            while (effect.nextPulseIndex < effect.pulseCount
+                    && effect.ageSeconds >= effect.pulseTimeSeconds(effect.nextPulseIndex)) {
+                spawnSecondaryDetonation(effect, effect.nextPulseIndex);
+                effect.nextPulseIndex++;
+            }
+            return effect.ageSeconds >= effect.lifetimeSeconds;
+        });
     }
 
     private void spawnImpact(ImpactGlyph impact) {
@@ -230,8 +320,7 @@ final class TacticalVfxState {
     }
 
     private void spawnDestruction(ShipGlyph ship) {
-        double hullScale = Math.max(ship.widthM() * 0.45d, ship.lengthM() * 0.16d);
-        double radius = Math.max(4d, hullScale);
+        double radius = destructionRadius(ship.lengthM(), ship.widthM());
         flashes.add(new Flash(
                 ship.xM(),
                 ship.yM(),
@@ -245,6 +334,39 @@ final class TacticalVfxState {
                 ParticleKind.HOT_FRAGMENT, 0.65d, 1.65d);
         spawnRadial(seed ^ 0xBB67AE8584CAA73BL, ship.xM(), ship.yM(), radius * 0.70d,
                 Math.max(8, fragments / 2), ParticleKind.PLASMA, 0.35d, 0.95d);
+
+        double duration = clamp(0.85d + ship.lengthM() / 260d, 1.0d, 2.6d);
+        int pulseCount = (int) Math.round(clamp(1.5d + ship.lengthM() / 180d, 2d, 5d));
+        wreckEffects.add(new WreckEffect(
+                ship.entityId(),
+                ship.xM(),
+                ship.yM(),
+                radius,
+                duration,
+                pulseCount));
+    }
+
+    private void spawnSecondaryDetonation(WreckEffect effect, int pulseIndex) {
+        long seed = mix64(effect.entityId ^ (0xD1B54A32D192ED03L * (pulseIndex + 1L)));
+        DeterministicRandom random = new DeterministicRandom(seed);
+        double angle = random.nextUnit() * Math.PI * 2d;
+        double offset = effect.radiusM * (0.15d + random.nextUnit() * 0.55d);
+        double xM = effect.xM + Math.cos(angle) * offset;
+        double yM = effect.yM + Math.sin(angle) * offset;
+        double pulseScale = 0.44d + random.nextUnit() * 0.28d;
+        double pulseRadius = effect.radiusM * pulseScale;
+
+        flashes.add(new Flash(
+                xM,
+                yM,
+                pulseRadius * 1.65d,
+                0.24d,
+                FlashKind.SECONDARY_DETONATION));
+        int fragments = (int) Math.round(clamp(4d + pulseRadius / 8d, 5d, 12d));
+        spawnRadial(seed ^ 0x94D049BB133111EBL, xM, yM, pulseRadius,
+                fragments, ParticleKind.HOT_FRAGMENT, 0.35d, 0.90d);
+        spawnRadial(seed ^ 0xBF58476D1CE4E5B9L, xM, yM, pulseRadius * 0.65d,
+                Math.max(3, fragments / 2), ParticleKind.PLASMA, 0.20d, 0.55d);
     }
 
     private void spawnRadial(
@@ -283,6 +405,9 @@ final class TacticalVfxState {
         while (flashes.size() > MAX_FLASHES) {
             flashes.remove(0);
         }
+        while (wreckEffects.size() > MAX_WRECK_EFFECTS) {
+            wreckEffects.remove(0);
+        }
     }
 
     private void trimSeenEvents() {
@@ -290,6 +415,10 @@ final class TacticalVfxState {
             Long oldest = seenImpactEvents.iterator().next();
             seenImpactEvents.remove(oldest);
         }
+    }
+
+    private static double destructionRadius(double lengthM, double widthM) {
+        return Math.max(4d, Math.max(widthM * 0.45d, lengthM * 0.16d));
     }
 
     private static double sanitizeFrameSeconds(double frameSeconds) {
