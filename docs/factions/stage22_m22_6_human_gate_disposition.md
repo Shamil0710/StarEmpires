@@ -21,7 +21,9 @@ against the production game presentation. For M22.6 this means:
   through a purpose-built packet rather than the complete production UI. Tracked in issue #370.
 
 Deferred means `DEFERRED_BY_OWNER`, never `PASS`. Existing human-response packets remain diagnostic
-material and cannot be relabelled as successful acceptance.
+material and cannot be relabelled as successful acceptance. In particular, the frozen B18 packet must
+not be completed merely to satisfy M22.6 after this owner disposition; issue #370 is the acceptance
+tracking authority for the future production-UI review.
 
 ## Why B18 is deferred until the production UI exists
 
