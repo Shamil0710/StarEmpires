@@ -10,15 +10,23 @@ public final class MapCameraState {
     /** Minimum useful overview zoom. */
     public static final float MIN_ZOOM = 0.60f;
     /** Maximum inspection zoom. */
-    public static final float MAX_ZOOM = 12f;
+    public static final float MAX_ZOOM = 1.0e12f;
     private static final float WHEEL_FACTOR = 1.18f;
 
+    private final float maximumZoom;
     private float zoom = 1f;
-    private float panX;
-    private float panY;
+    private double panX;
+    private double panY;
 
     /** Creates a fitted overview camera with unit zoom and zero pan. */
     public MapCameraState() {
+        this(MAX_ZOOM);
+    }
+
+    MapCameraState(float maximumZoom) {
+        requireFinite(maximumZoom, "maximumZoom");
+        if (maximumZoom < 1f) throw new IllegalArgumentException("maximum zoom below overview");
+        this.maximumZoom = maximumZoom;
     }
 
     /** @return current bounded presentation zoom */
@@ -28,12 +36,12 @@ public final class MapCameraState {
 
     /** @return current horizontal screen-space pan */
     public float panX() {
-        return panX;
+        return (float) panX;
     }
 
     /** @return current vertical screen-space pan */
     public float panY() {
-        return panY;
+        return (float) panY;
     }
 
     /** Restores the fitted overview. */
@@ -76,8 +84,8 @@ public final class MapCameraState {
         requireFinite(cursorY, "cursorY");
         float previous = zoom;
         float requested = (float) (previous * Math.pow(WHEEL_FACTOR, -amountY));
-        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, requested));
-        float ratio = zoom / previous;
+        zoom = Math.max(MIN_ZOOM, Math.min(maximumZoom, requested));
+        double ratio = (double) zoom / previous;
         panX = cursorX - centerX - (cursorX - centerX - panX) * ratio;
         panY = cursorY - centerY - (cursorY - centerY - panY) * ratio;
     }
@@ -90,7 +98,7 @@ public final class MapCameraState {
      * @param centerX viewport center X
      * @param centerY viewport center Y
      */
-    public void focus(float pointX, float pointY, float centerX, float centerY) {
+    public void focus(double pointX, double pointY, float centerX, float centerY) {
         requireFinite(pointX, "pointX");
         requireFinite(pointY, "pointY");
         panX = -(pointX - centerX) * zoom;
@@ -102,8 +110,8 @@ public final class MapCameraState {
      * @param centerX viewport center X
      * @return transformed screen X for one fitted base-projection point
      */
-    public float transformX(float pointX, float centerX) {
-        return centerX + (pointX - centerX) * zoom + panX;
+    public float transformX(double pointX, float centerX) {
+        return (float) (centerX + (pointX - centerX) * zoom + panX);
     }
 
     /**
@@ -111,12 +119,21 @@ public final class MapCameraState {
      * @param centerY viewport center Y
      * @return transformed screen Y for one fitted base-projection point
      */
-    public float transformY(float pointY, float centerY) {
-        return centerY + (pointY - centerY) * zoom + panY;
+    public float transformY(double pointY, float centerY) {
+        return (float) (centerY + (pointY - centerY) * zoom + panY);
     }
 
-    private static void requireFinite(float value, String label) {
-        if (!Float.isFinite(value)) {
+    /** Sets an inspection zoom before focusing a physical object.
+     * @param requested positive pixels-per-metre-derived zoom
+     */
+    public void inspect(double requested) {
+        requireFinite(requested, "requested");
+        if (requested <= 0d) throw new IllegalArgumentException("zoom must be positive");
+        zoom = (float) Math.max(MIN_ZOOM, Math.min(maximumZoom, requested));
+    }
+
+    private static void requireFinite(double value, String label) {
+        if (!Double.isFinite(value)) {
             throw new IllegalArgumentException(label + " must be finite");
         }
     }

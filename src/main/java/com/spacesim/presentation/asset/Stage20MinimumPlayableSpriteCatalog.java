@@ -237,10 +237,10 @@ public final class Stage20MinimumPlayableSpriteCatalog {
                 : exactRole;
         SpriteBinding binding = binding(shipVisualRole(role));
         HullDefinition hull = Objects.requireNonNull(engineering, "engineering").findHull(id);
-        if (exactRole == null || hull == null) {
+        if (hull == null) {
             return fallback(binding);
         }
-        validateHardpointAlignment(hull, binding);
+        if (exactRole != null) validateHardpointAlignment(hull, binding);
         return new ResolvedSprite(
                 binding,
                 hull.boundingDimensionsM().lengthM(),

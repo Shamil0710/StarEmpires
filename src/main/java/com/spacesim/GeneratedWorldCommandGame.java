@@ -9,6 +9,7 @@ import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.simulation.GeneratedWorldFreightAutopilot;
+import com.spacesim.ui.FactionCharacterPortraitOverlay;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.SelectionKind;
@@ -36,6 +37,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private GeneratedWorldUiModel model;
     private GeneratedWorldFreightAutopilot autopilot;
     private GeneratedWorldCommandUiRenderer renderer;
+    private FactionCharacterPortraitOverlay characterPortraitOverlay;
     private GeneratedWorldUiSnapshot snapshot;
     private Tab tab = Tab.SYSTEM;
     private UiSelection selection = UiSelection.none();
@@ -73,6 +75,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         model = new GeneratedWorldUiModel(generated.rootSeed(), runtime, generated.content());
         autopilot = new GeneratedWorldFreightAutopilot(runtime);
         renderer = new GeneratedWorldCommandUiRenderer();
+        characterPortraitOverlay = new FactionCharacterPortraitOverlay();
         savePath = Gdx.files.local(SAVE_FILE).file().toPath();
         snapshot = model.capture();
         status = "Мир сгенерирован: " + snapshot.galaxy().systems().size()
@@ -91,6 +94,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     case Input.Keys.F3 -> switchTab(Tab.FACTIONS);
                     case Input.Keys.F4 -> switchTab(Tab.MILITARY);
                     case Input.Keys.F5 -> switchTab(Tab.LOGISTICS);
+                    case Input.Keys.HOME -> {
+                        renderer.resetSystemMapCamera();
+                        yield true;
+                    }
                     case Input.Keys.SPACE -> togglePause();
                     case Input.Keys.NUM_1 -> setTimeScale(1d);
                     case Input.Keys.NUM_2 -> setTimeScale(2d);
@@ -145,6 +152,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     status = "Активная область симуляции: система #" + target.value()
                             + ". Флоты не телепортированы.";
                     snapshot = model.capture();
+                }
+                if (hit.kind() == HitKind.LOCAL_OBJECT && isDoubleClick(hit)) {
+                    return renderer.focusLocalObject(snapshot, hit.id());
                 }
                 if ((hit.kind() == HitKind.FREIGHT || hit.kind() == HitKind.MILITARY)
                         && isDoubleClick(hit)) {
@@ -339,6 +349,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         snapshot = model.capture();
         renderer.render(snapshot, tab, selection, detailScrollRows, listScrollRows,
                 paused, timeScale, status);
+        characterPortraitOverlay.render(snapshot, tab, selection);
     }
 
     /** Keeps the UI in logical screen coordinates and regenerates fonts for the new pixel size. */
@@ -346,6 +357,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     public void resize(int width, int height) {
         if (renderer != null) {
             renderer.resize(width, height);
+        }
+        if (characterPortraitOverlay != null) {
+            characterPortraitOverlay.resize(width, height);
         }
     }
 
@@ -357,6 +371,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         }
         if (renderer != null) {
             renderer.dispose();
+        }
+        if (characterPortraitOverlay != null) {
+            characterPortraitOverlay.dispose();
         }
     }
 

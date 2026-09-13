@@ -1,0 +1,146 @@
+[
+  {
+    "family": "corvette",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      149,
+      714,
+      363
+    ],
+    "colors": 13882,
+    "bytes": 237821,
+    "opaquePixels": 97443
+  },
+  {
+    "family": "frigate",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      160,
+      714,
+      352
+    ],
+    "colors": 12330,
+    "bytes": 208062,
+    "opaquePixels": 91058
+  },
+  {
+    "family": "destroyer",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      152,
+      714,
+      359
+    ],
+    "colors": 14683,
+    "bytes": 213666,
+    "opaquePixels": 89801
+  },
+  {
+    "family": "cruiser",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      155,
+      714,
+      357
+    ],
+    "colors": 17744,
+    "bytes": 226411,
+    "opaquePixels": 93678
+  },
+  {
+    "family": "battleship",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      156,
+      714,
+      356
+    ],
+    "colors": 15141,
+    "bytes": 229874,
+    "opaquePixels": 91106
+  },
+  {
+    "family": "carrier",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      123,
+      714,
+      388
+    ],
+    "colors": 19279,
+    "bytes": 318905,
+    "opaquePixels": 137124
+  },
+  {
+    "family": "freight",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      158,
+      714,
+      354
+    ],
+    "colors": 17890,
+    "bytes": 213830,
+    "opaquePixels": 93196
+  },
+  {
+    "family": "tanker",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      158,
+      714,
+      354
+    ],
+    "colors": 19129,
+    "bytes": 258246,
+    "opaquePixels": 108095
+  },
+  {
+    "family": "fleet_support",
+    "canvas": [
+      768,
+      512
+    ],
+    "bounds": [
+      54,
+      154,
+      714,
+      357
+    ],
+    "colors": 16336,
+    "bytes": 235674,
+    "opaquePixels": 92765
+  }
+]

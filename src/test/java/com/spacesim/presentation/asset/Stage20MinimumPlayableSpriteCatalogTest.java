@@ -25,6 +25,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage20MinimumPlayableSpriteCatalogTest {
     @Test
+    void everyGeneratedEngineeringHullKeepsItsActualDimensions() {
+        var engineering = com.spacesim.content.ship.Stage21GeneratedMilitaryEngineeringCatalog.load();
+        for (var fit : engineering.getDemonstratorFits()) {
+            var hull = engineering.findHull(fit.hullId());
+            var resolved = Stage20MinimumPlayableSpriteCatalog.resolveShip(hull.id(),
+                    Stage20MinimumPlayableSpriteCatalog.ShipRole.MEDIUM_COMBAT, engineering);
+            assertEquals(hull.boundingDimensionsM().lengthM(), resolved.worldLengthM());
+            assertEquals(hull.boundingDimensionsM().widthM(), resolved.worldWidthM());
+            assertEquals(Stage20MinimumPlayableSpriteCatalog.ScaleAuthority.EXACT_PHYSICAL_CONTENT,
+                    resolved.scaleAuthority());
+        }
+    }
+
+    @Test
     void everyMinimumRoleIsBoundAndEveryPngHasRealTransparentAlpha() throws IOException {
         List<Stage20MinimumPlayableSpriteCatalog.SpriteBinding> bindings =
                 Stage20MinimumPlayableSpriteCatalog.allBindings();

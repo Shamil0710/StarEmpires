@@ -30,10 +30,6 @@ import java.util.Objects;
  * {@link #withMinimumPlayableSprites()} replaces only those hull bodies with the Stage-20.5E pack.</p>
  */
 public final class TacticalPrototypeRenderer {
-    private static final float MIN_SHIP_LENGTH_PX = 18f;
-    private static final float MIN_SHIP_WIDTH_PX = 11f;
-    private static final float MIN_BODY_LENGTH_PX = 7f;
-    private static final float MIN_BODY_WIDTH_PX = 3f;
     private static final float MIN_SHIELD_RADIUS_PX = 12f;
     private static final float IMPACT_RADIUS_PX = 5f;
     private static final float DAMAGE_RADIUS_PX = 4f;
@@ -203,10 +199,8 @@ public final class TacticalPrototypeRenderer {
             ResolvedSprite resolved = ship.wreck()
                     ? Stage20MinimumPlayableSpriteCatalog.resolveSpecialLocation(LocationKind.DERELICT)
                     : Stage20MinimumPlayableSpriteCatalog.resolveCombatRole(ship.role());
-            float length = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()))
-                    * roleLengthScale(ship.role());
-            float width = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()))
-                    * roleWidthScale(ship.role());
+            float length = screenLength(layout, ship.lengthM());
+            float width = screenLength(layout, ship.widthM());
             minimumSprites.draw(
                     spriteBatch,
                     resolved.binding(),
@@ -221,10 +215,10 @@ public final class TacticalPrototypeRenderer {
     }
 
     private void drawShip(WorldMapLayout layout, ShipGlyph ship, float x, float y) {
-        float baseLength = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
-        float baseWidth = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
-        float length = baseLength * roleLengthScale(ship.role());
-        float width = baseWidth * roleWidthScale(ship.role());
+        float baseLength = screenLength(layout, ship.lengthM());
+        float baseWidth = screenLength(layout, ship.widthM());
+        float length = baseLength;
+        float width = baseWidth;
         float cos = (float) Math.cos(ship.headingRad());
         float sin = (float) Math.sin(ship.headingRad());
         float rearX = x - cos * length * 0.45f;
@@ -301,10 +295,10 @@ public final class TacticalPrototypeRenderer {
             }
             float centerX = a.x;
             float centerY = a.y;
-            float baseLength = Math.max(MIN_SHIP_LENGTH_PX, screenLength(layout, ship.lengthM()));
-            float baseWidth = Math.max(MIN_SHIP_WIDTH_PX, screenLength(layout, ship.widthM()));
-            float length = baseLength * roleLengthScale(ship.role());
-            float width = baseWidth * roleWidthScale(ship.role());
+            float baseLength = screenLength(layout, ship.lengthM());
+            float baseWidth = screenLength(layout, ship.widthM());
+            float length = baseLength;
+            float width = baseWidth;
             float cos = (float) Math.cos(ship.headingRad());
             float sin = (float) Math.sin(ship.headingRad());
             setColor(TacticalSidePalette.outline(ship.side()));
@@ -468,29 +462,9 @@ public final class TacticalPrototypeRenderer {
                 rotationDeg);
     }
 
-    private static float roleLengthScale(ShipVisualRole role) {
-        return switch (role) {
-            case KINETIC -> 1.18f;
-            case MISSILE -> 0.96f;
-            case BEAM -> 1.22f;
-            case DEFENSIVE_EW -> 0.84f;
-            case BALANCED, UNCLASSIFIED -> 1f;
-        };
-    }
-
-    private static float roleWidthScale(ShipVisualRole role) {
-        return switch (role) {
-            case KINETIC -> 0.72f;
-            case MISSILE -> 1.22f;
-            case BEAM -> 0.74f;
-            case DEFENSIVE_EW -> 1.34f;
-            case BALANCED, UNCLASSIFIED -> 1f;
-        };
-    }
-
     private void drawBody(WorldMapLayout layout, BodyGlyph body, float x, float y) {
-        float length = Math.max(MIN_BODY_LENGTH_PX, screenLength(layout, body.lengthM()));
-        float width = Math.max(MIN_BODY_WIDTH_PX, screenLength(layout, body.widthM()));
+        float length = screenLength(layout, body.lengthM());
+        float width = screenLength(layout, body.widthM());
         shapes.setColor(BODY_OUTLINE_COLOR);
         drawBodyShape(body, x, y, length, width);
         shapes.setColor(bodyColor(body));
@@ -578,10 +552,6 @@ public final class TacticalPrototypeRenderer {
         if (!Double.isFinite(worldLengthM) || worldLengthM <= 0d) {
             return 0f;
         }
-        if (!layout.worldToScreen(0f, 0f, a)
-                || !layout.worldToScreen((float) worldLengthM, 0f, b)) {
-            return 0f;
-        }
-        return Math.abs(b.x - a.x);
+        return (float) (worldLengthM * layout.getScale());
     }
 }

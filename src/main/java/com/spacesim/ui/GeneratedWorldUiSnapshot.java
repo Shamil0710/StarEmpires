@@ -66,6 +66,8 @@ public record GeneratedWorldUiSnapshot(
      * @param factionName player-facing owner/controller label
      * @param sprite optional minimum-pack sprite binding
      * @param sections structured inspector content
+     * @param physicalLengthM physical or nominal length in metres
+     * @param physicalWidthM physical or nominal width in metres
      */
     public record LocalObjectView(
             String stableId,
@@ -77,7 +79,42 @@ public record GeneratedWorldUiSnapshot(
             String factionId,
             String factionName,
             SpriteBinding sprite,
-            List<InfoSection> sections) implements Comparable<LocalObjectView> {
+            List<InfoSection> sections,
+            double physicalLengthM,
+            double physicalWidthM) implements Comparable<LocalObjectView> {
+        /**
+         * Compatibility projection for objects with nominal artwork dimensions only.
+         * @param stableId persistent object identity
+         * @param kind object family
+         * @param name display name
+         * @param subtitle role or state label
+         * @param systemId owning system
+         * @param position authoritative physical position
+         * @param factionId owner identifier
+         * @param factionName owner display name
+         * @param sprite optional artwork binding
+         * @param sections inspector content
+         */
+        public LocalObjectView(String stableId, ObjectKind kind, String name, String subtitle,
+                StarSystemId systemId, LocalPhysicalPosition position, String factionId,
+                String factionName, SpriteBinding sprite, List<InfoSection> sections) {
+            this(stableId, kind, name, subtitle, systemId, position, factionId, factionName,
+                    sprite, sections, sprite == null ? 0d : sprite.nominalLengthM(),
+                    sprite == null ? 0d : sprite.nominalWidthM());
+        }
+
+        /**
+         * Preserves engineering dimensions while passing the artwork into the UI.
+         * @param resolved artwork with resolved dimensions
+         * @return projection retaining the resolved physical length and width
+         */
+        public LocalObjectView withScale(
+                com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.ResolvedSprite resolved) {
+            return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
+                    factionId, factionName, resolved.binding(), sections,
+                    resolved.worldLengthM(), resolved.worldWidthM());
+        }
+
         /**
          * Validates one selectable object projection.
          *
@@ -91,8 +128,15 @@ public record GeneratedWorldUiSnapshot(
          * @param factionName player-facing owner/controller label
          * @param sprite optional minimum-pack sprite binding
          * @param sections structured inspector content
+         * @param physicalLengthM physical or nominal length in metres; zero for point markers
+         * @param physicalWidthM physical or nominal width in metres; zero for point markers
          */
         public LocalObjectView {
+            if (!Double.isFinite(physicalLengthM) || !Double.isFinite(physicalWidthM)
+                    || physicalLengthM < 0d || physicalWidthM < 0d
+                    || (sprite != null && (physicalLengthM == 0d || physicalWidthM == 0d))) {
+                throw new IllegalArgumentException("invalid physical dimensions");
+            }
             stableId = requireText(stableId, "stableId");
             Objects.requireNonNull(kind, "kind");
             name = requireText(name, "name");

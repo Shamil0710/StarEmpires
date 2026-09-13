@@ -3,6 +3,9 @@
 > **Последняя синхронизация: 2026-09-03 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 ACTIVE — M22.0–M22.5 complete, M22.6 NEXT.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
+> Art maintenance: [Empire sprite refresh](empire_sprite_refresh.md) replaces the nine M22.3
+> ship texture sets against the M22.4 Union quality benchmark; M22.6 status is unchanged.
+
 ## 1. Главный инвариант
 
 **Star Empires** — 2D top-down space sandbox/RPG/strategy с живой физической экономикой и миром, существующим независимо от игрока.

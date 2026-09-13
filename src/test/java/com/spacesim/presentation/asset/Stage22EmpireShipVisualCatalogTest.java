@@ -21,6 +21,39 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage22EmpireShipVisualCatalogTest {
     @Test
+    void refreshedArtKeepsProductionResolutionDetailAndEngineeringAspect() throws IOException {
+        var engineering = Stage22EmpireEngineeringCatalogLoader.loadDefault();
+        for (var visual : Stage22EmpireShipVisualCatalog.loadDefault().families()) {
+            String path = visual.assets().baseTexturePath();
+            BufferedImage base = readPng(path);
+            assertEquals(768, base.getWidth(), path);
+            assertEquals(512, base.getHeight(), path);
+            assertTrue(base.getColorModel().hasAlpha(), path);
+            Set<Integer> colors = new HashSet<>();
+            int minX = 768, minY = 512, maxX = -1, maxY = -1;
+            for (int y = 0; y < 512; y++) {
+                for (int x = 0; x < 768; x++) {
+                    if (alpha(base, x, y) == 0) continue;
+                    colors.add(base.getRGB(x, y) & 0xffffff);
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                }
+            }
+            assertTrue(colors.size() >= 10000, "schematic/flat art regression: " + path);
+            assertTrue(minX >= 48 && maxX < 720 && minY >= 48 && maxY < 464, path);
+            assertEquals(767, minX + maxX, 2, path);
+            assertEquals(511, minY + maxY, 2, path);
+            var fit = engineering.findDemonstratorFit(visual.primaryFitId());
+            var dimensions = engineering.findHull(fit.hullId()).boundingDimensionsM();
+            double expectedAspect = dimensions.lengthM() / dimensions.widthM();
+            double actualAspect = (maxX - minX + 1d) / (maxY - minY + 1d);
+            assertEquals(expectedAspect, actualAspect, 0.03, path);
+        }
+    }
+
+    @Test
     void productionCatalogCoversTheExactNineRoleFloorAndEngineeringGeometry() {
         var packageCatalog = Stage22EmpirePackageLoader.loadDefault();
         var engineering = Stage22EmpireEngineeringCatalogLoader.loadDefault();
