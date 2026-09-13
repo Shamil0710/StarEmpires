@@ -129,13 +129,13 @@ public final class FactionCharacterPortraitOverlay implements Disposable {
 
     private Texture resolveRoster(String factionId) {
         RosterKind kind = resolveRosterKind(factionProfiles, factionId);
-        if (kind == null) {
-            return null;
+        if (kind == RosterKind.EMPIRE) {
+            return empire;
         }
-        return switch (kind) {
-            case EMPIRE -> empire;
-            case INDUSTRIAL_UNION -> industrialUnion;
-        };
+        if (kind == RosterKind.INDUSTRIAL_UNION) {
+            return industrialUnion;
+        }
+        return null;
     }
 
     static RosterKind resolveRosterKind(Stage22FactionProfileCatalog profiles, String factionId) {
