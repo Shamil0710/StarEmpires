@@ -8,7 +8,13 @@ import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.warfare.Stage19ConflictRuntime;
 import com.spacesim.world.DiplomaticLifecycleService;
 import com.spacesim.world.FactionActorObservationSnapshot;
+import com.spacesim.world.FleetCommandGroupService;
+import com.spacesim.world.FleetCommandState;
+import com.spacesim.world.FleetCommandState.CommandGroupState;
+import com.spacesim.world.FleetForceRegistry;
+import com.spacesim.world.FleetId;
 import com.spacesim.world.Stage21HNpcMissionService;
+import com.spacesim.world.StarSystemId;
 
 import java.util.List;
 import java.util.Objects;
@@ -20,10 +26,11 @@ import java.util.Objects;
  * economy, freight and clocks remain inside {@link GeneratedCampaignSession}; Stage-21 autonomous
  * actor state remains inside its accepted owner; Stage-21C diplomacy, Stage-19 conflict state and
  * Stage-21H NPC/mission state are materialized through their accepted mutable services over that
- * same campaign. Stage-21D-G canonical values remain exact persisted snapshots until their existing
- * production services are composed. This class only keeps those accepted owners together so the
- * ordinary client creates, advances, saves and restores one coherent campaign instead of saving the
- * Stage-20 runtime in isolation.</p>
+ * same campaign. Stage-21D command metadata is retained only as the latest immutable canonical state
+ * returned by its accepted production services. Stage-21E-G canonical values remain exact persisted
+ * snapshots until their existing production services are composed. This class only keeps those
+ * accepted owners together so the ordinary client creates, advances, saves and restores one coherent
+ * campaign instead of saving the Stage-20 runtime in isolation.</p>
  *
  * <p>New campaigns are lifted through the accepted Stage-21 migration path. Existing Stage-20.5
  * saves can therefore enter the same coordinator without ad-hoc default reconstruction, while
@@ -43,9 +50,11 @@ public final class GeneratedCampaignCoordinator {
     static final long LIVING_ACTOR_REVIEW_CADENCE_TICKS = 1_200L;
 
     private final RestoredAuthorities authorities;
+    private FleetCommandState fleetCommands;
 
     private GeneratedCampaignCoordinator(RestoredAuthorities authorities) {
         this.authorities = Objects.requireNonNull(authorities, "authorities");
+        this.fleetCommands = authorities.commands();
     }
 
     /**
@@ -115,6 +124,59 @@ public final class GeneratedCampaignCoordinator {
     }
 
     /**
+     * Returns the current canonical Stage-21D command metadata.
+     *
+     * <p>The returned value is immutable. Physical fleets remain owned by the ordinary world; this
+     * coordinator only retains replacements returned by the accepted Stage-21D command services.</p>
+     *
+     * @return current immutable fleet-command state
+     */
+    public FleetCommandState fleetCommands() {
+        return fleetCommands;
+    }
+
+    /**
+     * Forms one Stage-21D command group over caller-provided read-only reconstruction of ordinary fleets.
+     *
+     * <p>This is a production orchestration seam, not a second fleet authority: validation and identity
+     * allocation are delegated to {@link FleetCommandGroupService}, while the supplied registry remains
+     * a read-only projection of the same physical world. No fleet is moved, created or reassigned here.</p>
+     *
+     * @param forces read-only reconstruction of ordinary physical fleets
+     * @param factionId owning dense faction identifier
+     * @param name display name
+     * @param memberFleetIds ordinary fleet identities to wrap
+     * @param homeSystemId designated home system
+     * @param reserve whether the group is held as reserve
+     * @param homeDefense whether the group is restricted to home-defense offensive commitments
+     * @param maxStrategicRiskBps maximum accepted route risk in basis points
+     * @return newly allocated canonical command-group metadata
+     */
+    public CommandGroupState formFleetCommandGroup(
+            FleetForceRegistry forces,
+            int factionId,
+            String name,
+            List<FleetId> memberFleetIds,
+            StarSystemId homeSystemId,
+            boolean reserve,
+            boolean homeDefense,
+            int maxStrategicRiskBps) {
+        FleetCommandGroupService.FormationResult formed = new FleetCommandGroupService(
+                session().runtime().world().getTopology()).form(
+                        fleetCommands,
+                        Objects.requireNonNull(forces, "forces"),
+                        factionId,
+                        name,
+                        memberFleetIds,
+                        homeSystemId,
+                        reserve,
+                        homeDefense,
+                        maxStrategicRiskBps);
+        fleetCommands = formed.state();
+        return formed.group();
+    }
+
+    /**
      * Returns the accepted mutable Stage-21H NPC/mission/reputation/story owner.
      *
      * <p>Mission callers must continue to pass ordinary world, freight, industry, discovery and
@@ -173,7 +235,7 @@ public final class GeneratedCampaignCoordinator {
                 authorities.strategicIntents(),
                 authorities.diplomacy(),
                 authorities.warfare(),
-                authorities.commands(),
+                fleetCommands,
                 authorities.operations(),
                 authorities.transitions(),
                 authorities.recovery(),
