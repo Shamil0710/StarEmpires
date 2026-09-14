@@ -27,7 +27,7 @@ Stage-22 content plan уже предусматривает `fleet carrier`, `ca
 Цена этих преимуществ:
 
 - hangar/storage/service mass and volume;
-- finite propellant, ordnance, countermeasures and spares;
+- finite propellant, ordnance, countermeasures and service inputs;
 - finite launch/recovery/service throughput;
 - необходимость escort/screen;
 - уязвимость к EW, dedicated point defence, interceptors и fast raiders;
@@ -65,7 +65,8 @@ M22.8 обязан переиспользовать существующие aut
 - viewer-owned sortie state;
 - teleport launch/recovery;
 - infinite datalink/control capacity;
-- reset fuel/ammunition/damage on tactical materialization or save/load.
+- reset fuel/ammunition/damage on tactical materialization or save/load;
+- отдельную `aviation economy`, если потребность уже выражается существующими Stage-18 commodities, ammunition definitions, components and repair contracts.
 
 Если существующий authority не способен выразить обязательный параметр, M22.8A должен сначала доказать gap и расширить ближайший общий reusable contract минимально.
 
@@ -174,29 +175,118 @@ Fallback должен опираться только на locally known/allowed
 
 ---
 
-# 5. Что является расходником
+# 5. Расходники и обязательная привязка к Stage-18 economy
 
 Сам reusable fighter/drone **не является расходником**. Он persistent manufactured asset до момента физического уничтожения.
 
-M22.8 вводит/нормализует четыре класса operational stores через Stage-18 physical inventory:
+M22.8 **не вводит отдельную авиационную экономику по умолчанию**. Operational UI может показывать агрегированные категории `Propellant`, `Aviation Ordnance`, `Countermeasures`, `Service Supplies`, но authoritative quantities обязаны разрешаться в уже существующие физические Stage-18 commodities, ammunition definitions, components and repair inputs.
 
-| Ресурс | Назначение |
-| --- | --- |
-| **Propellant / reaction mass** | launch, transit, manoeuvre, combat, recovery reserve |
-| **Aviation ordnance** | interceptor missiles, anti-ship missiles/torpedoes, gun ammunition where applicable |
-| **Countermeasures** | decoys, expendable jammer/flare/chaff-like setting equivalents |
-| **Spare parts / service inputs** | inspection, maintenance and repair through ordinary industrial contracts |
+Текущий Stage-18 audit уже доказывает следующие reusable seams:
 
-Энергия не становится универсальным одноразовым item только ради aviation. Recharge использует обычные carrier power/thermal authorities; если конкретный technology family требует manufactured consumable, это должно следовать из Stage-18 content model.
+- reaction mass interface и commodity binding уже существуют; baseline пример связывает `REACTION_MASS` с `commodity.material.purified_water`;
+- `manufacturing.profile.guided_ammunition` и `manufacturing.profile.kinetic_ammunition` уже производят физические ammunition items из Stage-18 materials/components;
+- guided ammunition уже имеет roles `STRIKE`, `INTERCEPTOR` и `DECOY` в production/test content lineage;
+- repair/maintenance уже расходуют конкретные `INDUSTRIAL_CHEMICALS`, engineering materials и `HEAVY/ELECTRICAL/PRECISION_COMPONENTS`, поэтому новый универсальный commodity `SPARE_PARTS` не требуется без отдельного доказанного gameplay need;
+- Stage-18 finished-product policy уже предусматривает `Drone Definition` как производимый finished industrial product, поэтому SmallCraft manufacturing должен расширить этот общий seam, а не создавать отдельную фабрику «авиационных очков».
+
+## 5.1 Propellant / reaction mass
+
+Для каждого small-craft drive M22.8 authoring задаёт обычный consumable binding через существующий reaction-mass interface.
+
+Допустимый пример:
+
+```text
+small-craft drive
+→ REACTION_MASS interface
+→ commodity.material.purified_water
+```
+
+если конкретная propulsion technology действительно совместима с водой.
+
+Другой drive может использовать другой уже существующий или technology-specific commodity только при физическом/логистическом основании. Запрещён универсальный `FIGHTER_FUEL`, если он лишь дублирует существующую Stage-18 commodity chain.
+
+## 5.2 Aviation ordnance
+
+`Aviation Ordnance` — **UI/logistics category, а не единый commodity**.
+
+Внутри неё находятся реальные ammunition definitions:
+
+```text
+interceptor missile
+anti-ship missile
+torpedo
+gun ammunition where applicable
+```
+
+Они производятся через существующие kinetic/guided ammunition manufacturing profiles и хранятся/перемещаются как physical inventory. Авиационная версия боеприпаса может получить отдельную content definition/loadout compatibility, но не получает бесплатный или скрытый production path.
+
+## 5.3 Countermeasures
+
+`Countermeasures` также являются **категорией реальных expendable definitions**, а не абстрактными очками.
+
+Existing `DECOY` guided-ammunition lineage является доказанным reusable seam. M22.8 может авторить нужные варианты:
+
+```text
+radar repeater decoy
+active jammer decoy
+thermal / optical decoy
+other setting-consistent expendable countermeasure
+```
+
+только если различие создаёт meaningful sensor/EW gameplay.
+
+Такие items используют ordinary ordnance/manufacturing/storage rules и при необходимости физически материализуются через common guided-body authority.
+
+## 5.4 Service Supplies вместо generic Spare Parts
+
+Carrier UI может показывать агрегат `Service Supplies`, но authoritative ремонт и обслуживание small craft должны расходовать конкретные существующие inputs, например:
+
+```text
+INDUSTRIAL_CHEMICALS
+HEAVY_COMPONENTS
+ELECTRICAL_COMPONENTS
+PRECISION_COMPONENTS
+LIGHT_ALLOY
+STRUCTURAL_ALLOY
+REFRACTORY_ALLOY
+other existing material only when actual repair profile requires it
+```
+
+Конкретный набор определяется повреждённой subsystem/content definition через ordinary repair/service contracts.
+
+**Не создавать `commodity.spare_parts` только ради M22.8.** Новый отдельный spare-parts commodity допустим только через explicit architecture/content review, если будет доказано, что его отдельное производство, хранение или логистика создают meaningful gameplay decision, которое нельзя выразить существующими component families.
+
+## 5.5 Energy / recharge
+
+Энергия не становится авиационным consumable item. Recharge использует обычные carrier/reactor/electrical/thermal authorities и simulation time.
+
+Если конкретная technology физически требует transported energy storage/fuel cartridge, это отдельный technology/content decision и не является общим правилом M22.8.
+
+## 5.6 Replacement airframes
+
+Уничтоженный fighter/drone не ремонтируется из `Service Supplies` и не восстанавливается автоматически.
+
+Replacement craft является отдельным manufactured product:
+
+```text
+Stage-18 materials/components
++ required fabrication/assembly capabilities
++ SmallCraft manufacturing profile / product binding
++ work / energy / time
+→ new persistent SmallCraft instance
+```
+
+M22.8 обязан добавить production bindings/recipes для production small-craft definitions поверх существующей Stage-18 manufacturing architecture.
 
 ## Hard logistics rules
 
 - no free refuel/rearm on recovery;
 - no repair from nothing;
 - destroyed craft require newly manufactured/replacement airframe;
-- damaged craft consume repair work/materials according to ordinary repair authority;
-- ordnance consumption reaches real manufacturing/storage/logistics demand;
-- campaign save/load preserves exact remaining stores.
+- damaged craft consume ordinary repair work/materials/components;
+- ordnance/countermeasure consumption reaches real manufacturing/storage/logistics demand;
+- aggregated UI categories never become separate hidden inventories;
+- campaign save/load preserves exact underlying commodities, ammunition items, craft state and queues.
 
 ---
 
@@ -543,7 +633,7 @@ Mission kill должен быть legitimate outcome, если target поте�
 
 ## Carrier vs line battleship
 
-- carrier advantage на большой дистанции при хорошей разведке и space control;
+- carrier advantage на большой дистанции при хорошей разведке и room to operate;
 - battleship advantage резко растёт после прорыва в direct-fire geometry;
 - carrier не должен выигрывать честную close-range artillery duel за счёт абстрактной class bonus.
 
@@ -598,9 +688,9 @@ Physical chain:
 
 ```text
 resource/component production
-→ small-craft manufacturing
-→ aviation ordnance production
-→ propellant / spares
+→ SmallCraft manufacturing through ordinary Stage-18 product bindings
+→ guided/kinetic aviation ordnance manufacturing
+→ physical propellant commodity + real countermeasure ammunition + repair/service components
 → storage and freight
 → carrier/base resupply
 → sortie consumption and losses
@@ -615,7 +705,28 @@ Loadout carrier должен быть реальным strategic choice:
 - long-deployment stores-heavy package;
 - high-tempo short operation.
 
-Нельзя создавать отдельные «aviation points» вне ordinary inventory, если они не соответствуют реальному manufactured resource.
+### Economic reuse invariant
+
+M22.8 implementation должна прежде всего **bind existing Stage-18 economy**, а не расширять commodity ontology без необходимости:
+
+```text
+Propellant UI
+→ real compatible Stage-18 commodity via REACTION_MASS binding
+
+Aviation Ordnance UI
+→ physical ammunition definitions produced through existing manufacturing profiles
+
+Countermeasures UI
+→ physical DECOY / other expendable ammunition definitions
+
+Service Supplies UI
+→ aggregation of actual repair/maintenance materials and component families
+
+Replacement Craft
+→ manufactured SmallCraft finished product
+```
+
+Запрещено создавать отдельные `aviation points`, `fighter ammo points`, generic `SPARE_PARTS` или скрытые carrier-only stocks, если они не соответствуют самостоятельному physical commodity с доказанным gameplay value.
 
 ---
 
@@ -654,10 +765,12 @@ Tactical aggregation/dematerialization обязана commit-back реальны
 ```text
 AIR WING: total / ready / airborne / turnaround / damaged / lost
 MISSION ALLOCATION: CAP / QRA / STRIKE / RECON-EW / RESERVE
-AVIATION STORES: propellant / interceptor ordnance / strike ordnance / countermeasures / spares
+AVIATION STORES: propellant / interceptor ordnance / strike ordnance / countermeasures / service supplies
 HANGAR STATUS: storage / ready slots / launch / recovery / service throughput
 ACTIVE SORTIES: mission / target or patrol area / fuel reserve / ETA / recovery destination
 ```
+
+`AVIATION STORES` — presentation aggregation only. Inspector/details должны позволять при необходимости раскрыть реальные underlying commodity/ammunition/component quantities; UI aggregate не имеет собственного inventory authority.
 
 Player commands работают через same validators/authorities as AI:
 
@@ -752,26 +865,30 @@ M22.8A audit определяет, какие existing carrier/small-craft conce
 
 # 25. Implementation sequence
 
-## M22.8A — authority/content audit + ADR
+## M22.8A — authority/content/economy audit + ADR
 
 - inventory current carrier hulls, hangar modules/capabilities, aviation-store fields, guided ordnance, drone/recon content and visual assets;
+- audit Stage-18 resource ontology, `REACTION_MASS` bindings, ammunition manufacturing profiles, repair/service inputs and finished-product seams relevant to carrier aviation;
 - document exact semantic meaning of existing fields;
+- classify every planned carrier consumable as `REUSE_EXISTING_COMMODITY / REUSE_AMMUNITION_DEFINITION / UI_AGGREGATE_ONLY / NEW_CONTENT_BINDING / ARCHITECTURE_CHANGE_REQUIRED`;
+- explicitly prove that generic `SPARE_PARTS`, `AVIATION_ORDNANCE` or `FIGHTER_FUEL` commodities are unnecessary unless new evidence shows otherwise;
 - identify reusable authorities and real gaps;
 - ADR: small craft extends common combat/economy/persistence model;
 - define schema/migration needs;
 - freeze initial role/content floor.
 
-**Exit:** no unresolved competing-authority question.
+**Exit:** no unresolved competing-authority/economy question and no planned hidden carrier-only resource pool.
 
-## M22.8B — SmallCraft definitions and compatibility
+## M22.8B — SmallCraft definitions, manufacturing and compatibility
 
 - shared definition/instance model;
 - CREWED/AUTONOMOUS control mode;
 - physical budgets and hardpoints;
 - hangar compatibility validation;
+- Stage-18 SmallCraft manufacturing profile/product bindings using existing materials/components/facilities where possible;
 - content fingerprint integration.
 
-**Tests:** valid/invalid compatibility, deterministic loading, future/corrupt content fail-closed.
+**Tests:** valid/invalid compatibility, deterministic loading, manufacturing input conservation, future/corrupt content fail-closed.
 
 ## M22.8C — Hangar runtime capability
 
@@ -782,16 +899,17 @@ M22.8A audit определяет, какие existing carrier/small-craft conce
 
 **Tests:** throughput, damage degradation, queue determinism, persistence.
 
-## M22.8D — Aviation inventory and service economy
+## M22.8D — Aviation inventory + Stage-18 economic bindings
 
-- propellant/reaction mass;
-- aviation ordnance;
-- countermeasures;
-- spare/service inputs;
-- real storage and transfer;
+- bind small-craft reaction mass to compatible existing Stage-18 commodities through ordinary `REACTION_MASS` interfaces;
+- bind interceptor/strike/gun ammunition to physical ammunition definitions and existing kinetic/guided manufacturing profiles;
+- author countermeasure definitions by reusing the existing `DECOY`/guided-ordnance seam where applicable;
+- express service/maintenance through actual Stage-18 chemicals/materials/components instead of a new generic spare-parts commodity;
+- provide UI aggregation for Propellant / Ordnance / Countermeasures / Service Supplies without creating a second inventory;
+- real storage, transfer, loading and unloading;
 - no free replenishment.
 
-**Tests:** conservation, insufficient stores, refill/rearm through ordinary transfer, save/load.
+**Tests:** conservation, insufficient stores, correct underlying commodity depletion, refill/rearm/service through ordinary transfer, aggregate-vs-underlying inventory consistency, save/load.
 
 ## M22.8E — Sortie lifecycle
 
@@ -824,7 +942,7 @@ carrier
 → interception
 → finite expenditure/loss
 → recovery
-→ refuel/rearm/repair
+→ refuel/rearm/repair through real Stage-18 stocks
 → second sortie
 ```
 
@@ -866,12 +984,12 @@ carrier
 ## M22.8K — Campaign logistics / replacement / faction behavior
 
 - manufacturing and resupply paths;
-- replacement airframes;
-- repair/spares consumption;
+- replacement airframes through ordinary SmallCraft manufacturing;
+- repair/service consumption of real Stage-18 inputs;
 - readiness impact;
 - Stage-21 faction decision consequences from losses/stores shortages.
 
-**Tests:** attrition without free replacement, convoy loss impacts sorties, recovery after resupply.
+**Tests:** attrition without free replacement, convoy loss impacts sorties, component/ordnance shortage has causal effect, recovery after resupply.
 
 ## M22.8L — Production UI / command integration
 
@@ -879,9 +997,10 @@ carrier
 - validated mission commands;
 - camera/overlay integration;
 - known-information-only enemy display;
-- build/content fingerprint diagnostics.
+- build/content fingerprint diagnostics;
+- aggregate aviation-store presentation resolves to inspectable authoritative inventory.
 
-**Tests:** read-only projection purity, invalid command rejection, player/AI shared validation path.
+**Tests:** read-only projection purity, invalid command rejection, player/AI shared validation path, no UI-owned inventory.
 
 ## M22.8M — persistence / migration / deterministic continuation
 
@@ -889,6 +1008,7 @@ carrier
 - mid-sortie save/load;
 - queue/service state;
 - damaged/airborne/diverted craft;
+- underlying commodity/ammunition/service-input state;
 - supported migration and future/corrupt fail-closed behavior.
 
 **Tests:** roundtrip and continuation hash across 1×/8× where presentation is non-authoritative.
@@ -917,10 +1037,11 @@ M22.8 cannot be closed by unit tests only.
 
 ## A. Persistence / conservation
 
-- no free craft, ammunition, propellant, countermeasures or spares after recovery/reload;
+- no free craft, ammunition, propellant, countermeasures or service inputs after recovery/reload;
 - destroyed craft stay destroyed until real replacement is manufactured/transferred;
 - same stable craft/wing identities survive supported save/load;
-- mid-sortie save/load does not duplicate mission, launch or consumption.
+- mid-sortie save/load does not duplicate mission, launch or consumption;
+- UI aggregate totals reconcile with authoritative Stage-18 commodities/ammunition/components.
 
 ## B. Carrier vs battleship
 
@@ -957,9 +1078,10 @@ M22.8 cannot be closed by unit tests only.
 
 ## H. Long-run campaign
 
-- repeated sorties create measurable resupply/repair/replacement demand;
+- repeated sorties create measurable resupply/repair/replacement demand through ordinary Stage-18 goods;
 - convoy/industry disruption reduces readiness through real stocks;
-- recovered logistics can restore operations without hidden grants.
+- recovered logistics can restore operations without hidden grants;
+- shortage of precision/electrical/heavy components or relevant materials can lawfully reduce maintenance/replacement throughput instead of being masked by generic spare-parts points.
 
 ## I. Performance
 
@@ -996,12 +1118,13 @@ M22.8 handoff manifest must contain:
 
 - final small-craft/hangar/store schemas and fingerprints;
 - carrier doctrine/content roster;
+- Stage-18 economy binding map for propellant, ordnance, countermeasures, service inputs and SmallCraft manufacturing;
 - persistence/migration version;
 - production UI/command surfaces;
 - accepted balance delta report;
 - tactical/performance baselines;
 - list of remaining presentation-only polish for Stage 23E/F;
-- no unresolved mandatory simulation seam.
+- no unresolved mandatory simulation/economy seam.
 
 Stage 23 may improve:
 
@@ -1011,7 +1134,7 @@ Stage 23 may improve:
 - performance after profiling;
 - save recovery UX;
 
-но не должен впервые implement core sortie causality, free-resource fixes or missing persistence.
+но не должен впервые implement core sortie causality, free-resource fixes, missing economy bindings or missing persistence.
 
 ---
 
@@ -1039,18 +1162,21 @@ Stage 23 may improve:
 M22.8 COMPLETE только когда одновременно:
 
 - [ ] M22.7 accepted, merged, and resulting `main` verified;
-- [ ] authority/content audit and ADR accepted;
+- [ ] authority/content/economy audit and ADR accepted;
 - [ ] SmallCraft uses shared Stage-17.5/18/19 physical/combat/economy authorities;
+- [ ] planned carrier stores are mapped to real Stage-18 commodities/ammunition/components or explicitly justified new content bindings;
+- [ ] no generic `FIGHTER_FUEL`, `AVIATION_ORDNANCE`, `SPARE_PARTS` or hidden carrier-only resource pool exists without explicit architecture review and demonstrated gameplay need;
+- [ ] SmallCraft replacement airframes have ordinary Stage-18 manufacturing recipes/product bindings;
 - [ ] real finite craft identities/losses exist without automatic replacement;
 - [ ] hangar launch/recovery/service throughput is finite, damage-aware and persistent;
-- [ ] propellant, ordnance, countermeasures and spares are physical/conserved;
+- [ ] propellant, ordnance, countermeasures and service inputs are physical/conserved;
 - [ ] deterministic sortie lifecycle including abort/divert/loss exists;
 - [ ] CAP/interception vertical slice passes end-to-end;
 - [ ] strike/escort/recon/EW missions use actor-bounded information;
 - [ ] drones have degraded-link/autonomous fallback without omniscience;
 - [ ] carrier tactical AI maintains standoff, screen, CAP/QRA, strike and retreat behavior;
 - [ ] ordinary fleet/industry/logistics consequences reach Stage-21 strategic decisions;
-- [ ] Carrier Operations UI and player commands use shared validators;
+- [ ] Carrier Operations UI and player commands use shared validators and do not own a parallel inventory;
 - [ ] mid-sortie composed save/load and persistence migration pass;
 - [ ] carrier-vs-battleship/missile/raider/carrier/EW/damaged-hangar acceptance matrix passes;
 - [ ] long-run resupply/repair/replacement economy shows no hidden grants;
@@ -1075,4 +1201,4 @@ M22.6 Core Pair Balance / Freeze COMPLETE
 
 Главный acceptance narrative M22.8:
 
-> **Авианосная группа обнаруживает угрозу через обычные sensors/tracks, поднимает конечное число реально существующих craft, расходует физическое топливо и боеприпасы, выполняет CAP/escort/strike/recon/EW через общую combat authority, несёт постоянные потери, возвращает выжившие аппараты через конечную recovery/service capacity, пополняется через обычную экономику и после save/load продолжает ту же операцию без бесплатных ресурсов, reset или параллельной симуляции.**
+> **Авианосная группа обнаруживает угрозу через обычные sensors/tracks, поднимает конечное число реально существующих craft, расходует физическое топливо и боеприпасы из существующей Stage-18 экономики, выполняет CAP/escort/strike/recon/EW через общую combat authority, несёт постоянные потери, возвращает выжившие аппараты через конечную recovery/service capacity, обслуживается реальными material/component inputs, пополняется и заменяет airframes через обычную промышленность и после save/load продолжает ту же операцию без бесплатных ресурсов, reset или параллельной симуляции.**
