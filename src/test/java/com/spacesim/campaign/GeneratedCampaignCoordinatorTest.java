@@ -25,7 +25,7 @@ class GeneratedCampaignCoordinatorTest {
         GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         campaign.session().setTimeScale(4d);
-        campaign.session().advanceFrame(0.1f);
+        campaign.advanceFrame(0.1f);
 
         var before = campaign.captureState();
         var fleetIdsBefore = campaign.session().captureState().worldState().fleets().stream()
@@ -66,6 +66,60 @@ class GeneratedCampaignCoordinatorTest {
     }
 
     @Test
+    void coordinatorAdvanceRunsDueLivingActorsAndPersistsTheirNextDeadline() {
+        GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        var beforeActors = campaign.authorities().actors().capture();
+        assertFalse(beforeActors.isEmpty());
+        assertTrue(beforeActors.stream().allMatch(state -> state.completedReviewCount() == 0L));
+
+        campaign.session().setPaused(false);
+        campaign.session().setTimeScale(1d);
+        var advance = campaign.advanceFrame(0.1f);
+
+        assertTrue(advance.fixedTicks() > 0L);
+        long nowTick = campaign.session().runtime().world().getAuthoritativeWorldTick();
+        var afterActors = campaign.authorities().actors().capture();
+        assertEquals(beforeActors.size(), afterActors.size());
+        assertTrue(afterActors.stream().allMatch(state -> state.completedReviewCount() == 1L));
+        assertTrue(afterActors.stream().allMatch(state -> state.lastReviewTick() == nowTick));
+        assertTrue(afterActors.stream().allMatch(state ->
+                state.nextReviewTick() == nowTick + GeneratedCampaignCoordinator.LIVING_ACTOR_REVIEW_CADENCE_TICKS));
+    }
+
+    @Test
+    void saveBeforeFirstLivingActorDeadlineContinuesDeterministicallyExactlyOnce() {
+        GeneratedCampaignCoordinator source = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        var checkpoint = source.captureState();
+
+        GeneratedCampaignCoordinator first = GeneratedCampaignCoordinator.restore(checkpoint);
+        GeneratedCampaignCoordinator second = GeneratedCampaignCoordinator.restore(checkpoint);
+        first.session().setPaused(false);
+        second.session().setPaused(false);
+        first.session().setTimeScale(1d);
+        second.session().setTimeScale(1d);
+
+        first.advanceFrame(0.1f);
+        second.advanceFrame(0.1f);
+
+        assertArrayEquals(first.encode(), second.encode(),
+                "same checkpoint and frame input must produce byte-identical composed campaign continuation");
+        assertTrue(first.authorities().actors().capture().stream()
+                .allMatch(state -> state.completedReviewCount() == 1L));
+
+        var afterReview = first.captureState();
+        first.advanceFrame(0f);
+        assertEquals(afterReview, first.captureState(),
+                "zero-delta presentation must not duplicate a living-actor review at the same world tick");
+
+        first.session().setPaused(true);
+        first.advanceFrame(1f);
+        assertEquals(afterReview, first.captureState(),
+                "paused campaign must not advance physical or living-world authority");
+    }
+
+    @Test
     void productionClientOrchestrationSmokeCreatesViewDispatchesWorldCommandAndContinuesAfterSaveLoad()
             throws Exception {
         GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
@@ -85,7 +139,7 @@ class GeneratedCampaignCoordinatorTest {
         campaign.session().runtime().world().activateSystem(targetSystem);
         campaign.session().setPaused(false);
         campaign.session().setTimeScale(4d);
-        var advance = campaign.session().advanceFrame(0.1f);
+        var advance = campaign.advanceFrame(0.1f);
         assertTrue(advance.fixedTicks() > 0L);
         assertEquals(targetSystem, campaign.session().runtime().world().getActiveSystemId());
 
@@ -103,7 +157,7 @@ class GeneratedCampaignCoordinatorTest {
         assertNotEquals(initialSystem, targetSystem);
         assertEquals(targetSystem, restoredView.activeSystemId());
 
-        restored.session().advanceFrame(0.1f);
+        restored.advanceFrame(0.1f);
         assertNotEquals(beforeReload, restored.captureState(),
                 "restored production campaign must continue from the saved authoritative state");
     }
