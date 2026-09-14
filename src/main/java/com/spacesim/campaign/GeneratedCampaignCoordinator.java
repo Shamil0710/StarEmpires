@@ -8,6 +8,7 @@ import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.warfare.Stage19ConflictRuntime;
 import com.spacesim.world.DiplomaticLifecycleService;
 import com.spacesim.world.FactionActorObservationSnapshot;
+import com.spacesim.world.Stage21HNpcMissionService;
 
 import java.util.List;
 import java.util.Objects;
@@ -17,12 +18,12 @@ import java.util.Objects;
  *
  * <p>The coordinator deliberately owns no competing gameplay authority. The mutable physical world,
  * economy, freight and clocks remain inside {@link GeneratedCampaignSession}; Stage-21 autonomous
- * actor state remains inside its accepted owner; Stage-21C diplomacy and Stage-19 conflict state are
- * materialized through their accepted mutable services over that same world. Later Stage-21 state
- * without an accepted live owner remains an exact persisted snapshot until its production owner is
- * composed. This class only keeps those accepted owners together so the ordinary client creates,
- * advances, saves and restores one coherent campaign instead of saving the Stage-20 runtime in
- * isolation.</p>
+ * actor state remains inside its accepted owner; Stage-21C diplomacy, Stage-19 conflict state and
+ * Stage-21H NPC/mission state are materialized through their accepted mutable services over that
+ * same campaign. Stage-21D-G canonical values remain exact persisted snapshots until their existing
+ * production services are composed. This class only keeps those accepted owners together so the
+ * ordinary client creates, advances, saves and restores one coherent campaign instead of saving the
+ * Stage-20 runtime in isolation.</p>
  *
  * <p>New campaigns are lifted through the accepted Stage-21 migration path. Existing Stage-20.5
  * saves can therefore enter the same coordinator without ad-hoc default reconstruction, while
@@ -111,6 +112,19 @@ public final class GeneratedCampaignCoordinator {
      */
     public Stage19ConflictRuntime warfare() {
         return authorities.warfareRuntime();
+    }
+
+    /**
+     * Returns the accepted mutable Stage-21H NPC/mission/reputation/story owner.
+     *
+     * <p>Mission callers must continue to pass ordinary world, freight, industry, discovery and
+     * operation authorities required by the service. This accessor does not create a parallel truth
+     * source; it exposes the service that owns only the accepted Stage-21H RPG sidecar.</p>
+     *
+     * @return shared campaign Stage-21H mission authority
+     */
+    public Stage21HNpcMissionService npcMissions() {
+        return authorities.npcMissionService();
     }
 
     /**
