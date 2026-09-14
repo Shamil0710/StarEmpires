@@ -114,9 +114,12 @@ class GeneratedCampaignCoordinatorTest {
                 "zero-delta presentation must not duplicate a living-actor review at the same world tick");
 
         first.session().setPaused(true);
+        var pausedState = first.captureState();
+        assertNotEquals(afterReview, pausedState,
+                "pause state is part of the persisted campaign scheduler contract");
         first.advanceFrame(1f);
-        assertEquals(afterReview, first.captureState(),
-                "paused campaign must not advance physical or living-world authority");
+        assertEquals(pausedState, first.captureState(),
+                "paused campaign must not advance physical or living-world authority after the pause command");
     }
 
     @Test
