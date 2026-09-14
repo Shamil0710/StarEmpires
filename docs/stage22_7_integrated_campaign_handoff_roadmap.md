@@ -1,12 +1,13 @@
 # Star Empires — M22.7 Integrated Campaign Handoff roadmap
 
 > **Статус:** ACTIVE / PARTIAL — реализация в PR #360 и #376; M22.6 merged через #355.  
-> **Позиция:** `M22.6 core pair balance/freeze → M22.7 integrated campaign handoff → Stage 23 Polish / RC`.  
+> **Позиция:** `M22.6 core pair balance/freeze → M22.7 integrated campaign handoff → M22.8 Carrier Air Wing / Small Craft Operations → Stage 23 Polish / RC`.  
 > **Основание:** аудит связности проекта от 2026-09-04, выполненный на `main` `93b9b6729634bbdd37eea962c1d1047cfc4af282` и отдельно на рабочем PR #355.  
-> **Назначение:** закрыть интеграционный разрыв между уже реализованными Stage 20–22 подсистемами и обычной длительной кампанией до начала RC-polish.
+> **Назначение:** закрыть интеграционный разрыв между уже реализованными Stage 20–22 подсистемами и обычной длительной кампанией до следующего feature gate M22.8 и последующего RC-polish.
 
 > Текущий аудит и фактические блокеры: [M22.7 integration audit](m22_7_integration_audit_2026_09_13.md).
 > Owner dispositions #359/#361/#370 override только сроки человеческой проверки; DEFERRED не означает PASS.
+> Следующий feature contract после полного закрытия M22.7: [M22.8 Carrier Air Wing / Small Craft Operations](stage22_8_carrier_air_wing_operations_roadmap.md).
 
 ## 1. Почему нужен отдельный M22.7
 
@@ -147,7 +148,7 @@ Missing/invalid binding должен давать явную diagnostic/fallback
 
 ## Empire / Union parity gate
 
-До Stage 23 требуется минимум:
+До M22.8/Stage 23 требуется минимум:
 
 - устранить resolution/detail-class mismatch, из-за которого одна core faction получает существенно более слабые production sprites в обычном клиенте;
 - in-engine review трёх сравнительных role pairs: destroyer/escort, freighter, support/logistics;
@@ -156,7 +157,7 @@ Missing/invalid binding должен давать явную diagnostic/fallback
 - damage/emissive/engine layer alignment, если layer заявлен production manifest;
 - screenshot evidence именно из ordinary production client.
 
-Полное художественное доведение всех release assets остаётся Stage 23E, но M22.7 не может передать в Stage 23 client, который выбирает неправильный каталог.
+Полное художественное доведение всех release assets остаётся Stage 23E, но M22.7 не может передать в M22.8 production client, который выбирает неправильный каталог.
 
 ## Character calibration gate
 
@@ -282,7 +283,7 @@ M22.7 не обязан оптимизировать без измерений, 
 - 1×/8× simulation throughput;
 - memory/entity/event growth over representative session.
 
-Stage 23F владеет optimization/hardening against these baselines.
+Stage 23F владеет optimization/hardening against these baselines; M22.8 добавляет собственные carrier/small-craft tactical baselines поверх этого измерительного фундамента.
 
 ---
 
@@ -299,9 +300,9 @@ Stage 23F владеет optimization/hardening against these baselines.
 - asset resolver/fingerprint contract;
 - simulation-time scheduling invariant;
 - M22.7 acceptance evidence and known limitations;
-- Stage 23 entry manifest.
+- M22.8 entry contract + Stage 23 baseline handoff information.
 
-Repository hygiene до Stage 23:
+Repository hygiene до последующих gates:
 
 - triage старых открытых PR #210, #242, #243, #284;
 - для каждого определить `still required / superseded / partially reusable / close`;
@@ -311,22 +312,24 @@ Repository hygiene до Stage 23:
 
 ---
 
-# 9. Что остаётся Stage 23 после M22.7
+# 9. Что происходит после M22.7
 
-M22.7 не поглощает Stage 23. После него Stage 23 получает уже **единую функциональную кампанию** и занимается release quality:
+M22.7 не поглощает будущие feature/polish stages. После него **M22.8 Carrier Air Wing / Small Craft Operations** получает уже единую functional campaign и добавляет общую carrier/small-craft combat/logistics/persistence вертикаль согласно `docs/stage22_8_carrier_air_wing_operations_roadmap.md`.
 
-- **23A:** RC scope lock/change control над M22.6 freeze + M22.7 handoff manifest;
+Только после M22.8 Stage 23 получает единую functional campaign с принятой carrier-вертикалью и занимается release quality:
+
+- **23A:** RC scope lock/change control над M22.6 freeze + M22.7 handoff + M22.8 balance delta/handoff manifest;
 - **23B:** production information architecture, search/filter/navigation, inspector polish и validated actions;
 - **23C:** resolution/accessibility/input rebinding/RU-EN localization;
 - **23D:** onboarding и first-session pacing поверх M22.7 causal journey;
-- **23E:** полный final art/VFX/audio replacement и visual polish;
-- **23F:** profiler-driven performance/memory/long-session hardening;
+- **23E:** полный final art/VFX/audio replacement и visual polish, включая remaining carrier/small-craft presentation-only debt;
+- **23F:** profiler-driven performance/memory/long-session hardening against M22.7 and M22.8 baselines;
 - **23G:** save slots, rotating autosaves, recovery UX, migration diagnostics;
 - **23H:** ready-to-run Windows package с bundled/supported Java runtime strategy, без Maven/JDK для пользователя;
 - **23I:** campaign journeys/manual playtest/regression closure;
 - **23J:** exact-package RC acceptance.
 
-Stage 23 MUST NOT begin if production launcher still omits accepted Stage-21/22 state owners or if save/load does not preserve the composed campaign.
+M22.8 MUST NOT begin before M22.7 is accepted/merged. Stage 23 MUST NOT begin before M22.8 is accepted/merged, and in all cases production launcher/save composition from M22.7 remains the authority boundary.
 
 ---
 
@@ -409,7 +412,7 @@ M22.7 COMPLETE только когда одновременно:
 - [ ] legacy PR triage recorded;
 - [ ] exact PR head required CI green;
 - [ ] PR merged and resulting `main` verified;
-- [ ] Stage 23 marked OPEN/NEXT only after this evidence.
+- [ ] M22.8 marked OPEN/NEXT only after this evidence; Stage 23 remains PLANNED.
 
 ---
 
@@ -424,8 +427,9 @@ M22.0 identity/migration COMPLETE
 → M22.3 Empire package COMPLETE
 → M22.4 Industrial Union package COMPLETE
 → M22.5 civilian/minor ecosystem COMPLETE
-→ M22.6 paired balance/freeze ACTIVE/NEXT
-→ M22.7 Integrated Campaign Handoff PLANNED
+→ M22.6 paired balance/freeze COMPLETE
+→ M22.7 Integrated Campaign Handoff ACTIVE / PARTIAL
+→ M22.8 Carrier Air Wing / Small Craft Operations PLANNED
 → Stage 23 Polish / Release Candidate PLANNED
 → post-core faction horizon
 ```
@@ -434,4 +438,4 @@ M22.0 identity/migration COMPLETE
 
 > **Из обычной сборки доставить дефицитный материал, увидеть его влияние на производство, участвовать в охране/перехвате следующего конвоя, получить реальные повреждения, отремонтироваться и продолжить ту же историю после загрузки — с теми же физическими IDs, грузом, целями фракций и causal event history.**
 
-Именно этот gate превращает сильные отдельные simulation systems в одну проверяемую campaign до начала RC-polish.
+Именно этот gate превращает сильные отдельные simulation systems в одну проверяемую campaign и создаёт необходимый production/persistence foundation для M22.8; только после M22.8 проект передаётся в Stage 23 RC-polish.
