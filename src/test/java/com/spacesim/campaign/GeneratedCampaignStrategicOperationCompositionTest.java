@@ -5,8 +5,10 @@ import com.spacesim.world.FleetCommandState.OrderSource;
 import com.spacesim.world.FleetCommandState.OrderType;
 import com.spacesim.world.FleetForceRegistry;
 import com.spacesim.world.FleetLocationKind;
+import com.spacesim.world.FleetOperationalAvailability;
 import com.spacesim.world.FleetOrderSubmissionService;
 import com.spacesim.world.FleetReadinessEvaluator;
+import com.spacesim.world.FleetReadinessState;
 import com.spacesim.world.StrategicOperationService.SupplyDecision;
 import com.spacesim.world.StrategicOperationState.OperationStatus;
 import com.spacesim.world.StrategicOperationState.RulesOfEngagement;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -116,9 +119,14 @@ class GeneratedCampaignStrategicOperationCompositionTest {
     }
 
     private static FleetForceRegistry reconstructForces(GeneratedCampaignCoordinator campaign) {
+        var world = campaign.session().captureState().worldState();
+        Map<com.spacesim.world.FleetId, FleetOperationalAvailability> availability = world.fleets().stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        placement -> placement.id(),
+                        placement -> new FleetOperationalAvailability(Integer.MAX_VALUE, FleetReadinessState.FULL)));
         return FleetForceRegistry.reconstruct(
-                campaign.session().captureState().worldState(),
+                world,
                 new FleetReadinessEvaluator(ShipEngineeringCatalogLoader.loadDefault()),
-                Map.of());
+                availability);
     }
 }
