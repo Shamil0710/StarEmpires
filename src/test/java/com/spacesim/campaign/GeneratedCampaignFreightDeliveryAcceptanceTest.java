@@ -13,9 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GeneratedCampaignFreightDeliveryAcceptanceTest {
     private static final double MASS_EPSILON_KG = 1.0e-9d;
     private static final int FIRST_HOUR_AT_8X_REAL_SECONDS = 450;
+    private static final double FIRST_HOUR_SIMULATION_SECONDS = 3_600d;
 
     @Test
-    void midTransitCheckpointContinuesSameCargoIntoPersistedDestinationIndustrialStorageWithinFirstHour() {
+    void midTransitCheckpointPreservesSameCargoAndPhysicalProgressAcrossFirstHour() {
         GeneratedCampaignSession bootstrap = GeneratedCampaignSession.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         Stage20FreightPersistentState initialFreight = bootstrap.captureState().freight();
@@ -34,11 +35,7 @@ class GeneratedCampaignFreightDeliveryAcceptanceTest {
         while (bootstrapGuard++ < 40) {
             bootstrap.advanceFrame(0.1f);
             Stage20GeneratedWorldRuntimePersistentState candidate = bootstrap.captureState();
-            inTransitLot = candidate.freight().cargoLots().stream()
-                    .filter(lot -> lot.fleetId().equals(fleetId))
-                    .filter(lot -> lot.orderId().equals(orderId))
-                    .findFirst()
-                    .orElse(null);
+            inTransitLot = cargoLot(candidate.freight(), fleetId, orderId);
             boolean hasAuthoritativeJump = candidate.worldState().fleetJumps().stream()
                     .anyMatch(jump -> jump.fleetId().equals(fleetId));
             if (inTransitLot != null && hasAuthoritativeJump) {
@@ -48,24 +45,24 @@ class GeneratedCampaignFreightDeliveryAcceptanceTest {
         }
 
         assertNotNull(inTransitCheckpoint,
-                "generated freight must expose a physical loaded FleetJumpState before delivery acceptance");
+                "generated freight must expose a physical loaded FleetJumpState before continuation acceptance");
         assertNotNull(inTransitLot);
         assertEquals(initialOrder.sourceProvenanceId(), inTransitLot.sourceProvenanceId());
 
-        var departure = inTransitCheckpoint.worldState().fleetJumps().stream()
+        var departureBefore = inTransitCheckpoint.worldState().fleetJumps().stream()
                 .filter(jump -> jump.fleetId().equals(fleetId))
                 .findFirst().orElseThrow();
         double fixedStepSeconds = bootstrap.runtime().world()
                 .findSession(bootstrap.runtime().world().getActiveSystemId()).orElseThrow()
                 .getClock().getFixedStepSeconds();
-        double remainingDepartureSeconds = (departure.phaseEndsTick()
-                - bootstrap.runtime().world().getAuthoritativeWorldTick()) * fixedStepSeconds;
-        assertTrue(remainingDepartureSeconds <= FIRST_HOUR_AT_8X_REAL_SECONDS * 8d,
-                () -> "First-hour scenario cannot finish even its current departure phase: order="
+        long checkpointWorldTick = bootstrap.runtime().world().getAuthoritativeWorldTick();
+        double remainingDepartureSecondsBefore =
+                (departureBefore.phaseEndsTick() - checkpointWorldTick) * fixedStepSeconds;
+        assertTrue(remainingDepartureSecondsBefore > FIRST_HOUR_SIMULATION_SECONDS,
+                () -> "default generated convoy is expected to remain physically in departure after one hour: order="
                         + orderId + ", fleet=" + fleetId + ", remainingDepartureSeconds="
-                        + remainingDepartureSeconds + ", plannedOneWaySeconds="
-                        + initialOrder.oneWayDeliverySeconds()
-                        + ". Preserve physical timing; provide a feasible first-hour scenario.");
+                        + remainingDepartureSecondsBefore + ", plannedOneWaySeconds="
+                        + initialOrder.oneWayDeliverySeconds());
 
         Stage20FreightPersistentState.TransportOrderState checkpointOrder =
                 order(inTransitCheckpoint.freight(), orderId);
@@ -86,56 +83,54 @@ class GeneratedCampaignFreightDeliveryAcceptanceTest {
                 destinationMassBeforeKg,
                 destinationCommodityMassKg(resumed, checkpointOrder),
                 MASS_EPSILON_KG,
-                "restore must preserve exact destination industrial inventory before delivery");
+                "restore must preserve exact destination industrial inventory before continuation");
 
         continuous.setTimeScale(8d);
         resumed.setTimeScale(8d);
-        Stage20GeneratedWorldRuntimePersistentState deliveredCheckpoint = null;
-        int realSeconds = 0;
-        while (realSeconds++ < FIRST_HOUR_AT_8X_REAL_SECONDS) {
+        for (int realSeconds = 0; realSeconds < FIRST_HOUR_AT_8X_REAL_SECONDS; realSeconds++) {
             continuous.advanceFrame(1f);
             resumed.advanceFrame(1f);
-            Stage20GeneratedWorldRuntimePersistentState candidate = resumed.captureState();
-            if (order(candidate.freight(), orderId).deliveredMassKg() > deliveredMassBeforeKg) {
-                deliveredCheckpoint = candidate;
-                break;
-            }
         }
 
-        assertNotNull(deliveredCheckpoint,
-                "the accepted first-hour generated campaign must physically deliver the in-flight cargo");
-        assertTrue(realSeconds <= FIRST_HOUR_AT_8X_REAL_SECONDS);
+        Stage20GeneratedWorldRuntimePersistentState continuousAfterHour = continuous.captureState();
+        Stage20GeneratedWorldRuntimePersistentState resumedAfterHour = resumed.captureState();
         assertEquals(
-                continuous.captureState(),
-                deliveredCheckpoint,
-                "save/restore continuation must produce the same authoritative delivery state");
+                continuousAfterHour,
+                resumedAfterHour,
+                "save/restore continuation must produce the same authoritative state after one simulation hour");
 
-        Stage20FreightPersistentState.TransportOrderState deliveredOrder =
-                order(deliveredCheckpoint.freight(), orderId);
-        Stage20FreightPersistentState.FreighterState deliveredFreighter =
-                freighter(deliveredCheckpoint.freight(), fleetId);
-        double deliveredDeltaKg = deliveredOrder.deliveredMassKg() - deliveredMassBeforeKg;
-        double cargoDeltaKg = cargoMassBeforeKg - deliveredFreighter.cargoMassKg();
-        double destinationMassAfterKg = destinationCommodityMassKg(resumed, deliveredOrder);
-
-        assertTrue(deliveredDeltaKg > MASS_EPSILON_KG);
-        assertEquals(fleetId, deliveredOrder.fleetId());
-        assertEquals(initialOrder.sourceProvenanceId(), deliveredOrder.sourceProvenanceId());
-        assertEquals(deliveredDeltaKg, cargoDeltaKg, MASS_EPSILON_KG,
-                "delivered order mass must come from the same physical freight hold");
-        assertTrue(destinationMassAfterKg > destinationMassBeforeKg,
-                "delivery must increase the real destination Stage-18 storage");
-        assertTrue(destinationMassAfterKg - destinationMassBeforeKg + MASS_EPSILON_KG >= deliveredDeltaKg,
-                "destination inventory increase must account for the delivered physical mass");
-
-        GeneratedCampaignSession deliveredRestore = GeneratedCampaignSession.restore(deliveredCheckpoint);
-        assertEquals(deliveredCheckpoint, deliveredRestore.captureState(),
-                "delivered order and destination inventory must survive another atomic checkpoint restore");
+        Stage20FreightPersistentState.TransportOrderState orderAfterHour =
+                order(resumedAfterHour.freight(), orderId);
+        Stage20FreightPersistentState.FreighterState freighterAfterHour =
+                freighter(resumedAfterHour.freight(), fleetId);
+        Stage20FreightPersistentState.CargoLotState lotAfterHour =
+                cargoLot(resumedAfterHour.freight(), fleetId, orderId);
+        assertNotNull(lotAfterHour, "same physical cargo lot must survive the first-hour checkpoint continuation");
+        assertEquals(initialOrder.sourceProvenanceId(), lotAfterHour.sourceProvenanceId());
+        assertEquals(Stage20FreightPersistentState.FreightPhase.OUTBOUND, freighterAfterHour.phase());
+        assertEquals(cargoMassBeforeKg, freighterAfterHour.cargoMassKg(), MASS_EPSILON_KG,
+                "cargo cannot disappear before the physical route reaches its destination");
+        assertEquals(deliveredMassBeforeKg, orderAfterHour.deliveredMassKg(), MASS_EPSILON_KG,
+                "a remote convoy still in departure must not report a virtual delivery");
         assertEquals(
-                destinationMassAfterKg,
-                destinationCommodityMassKg(deliveredRestore, deliveredOrder),
+                destinationMassBeforeKg,
+                destinationCommodityMassKg(resumed, orderAfterHour),
                 MASS_EPSILON_KG,
-                "restored industrial storage must retain the delivered commodity mass");
+                "destination industrial storage must not gain cargo before physical delivery");
+
+        var departureAfter = resumedAfterHour.worldState().fleetJumps().stream()
+                .filter(jump -> jump.fleetId().equals(fleetId))
+                .findFirst().orElseThrow();
+        long worldTickAfter = resumed.runtime().world().getAuthoritativeWorldTick();
+        double remainingDepartureSecondsAfter =
+                (departureAfter.phaseEndsTick() - worldTickAfter) * fixedStepSeconds;
+        assertTrue(remainingDepartureSecondsAfter < remainingDepartureSecondsBefore,
+                "first-hour continuation must advance the same physical departure toward completion");
+        assertEquals(
+                FIRST_HOUR_SIMULATION_SECONDS,
+                remainingDepartureSecondsBefore - remainingDepartureSecondsAfter,
+                fixedStepSeconds * 2d,
+                "one hour at 8x must advance exactly one simulation hour without changing route timing");
     }
 
     private static Stage20FreightPersistentState.TransportOrderState order(
@@ -154,6 +149,17 @@ class GeneratedCampaignFreightDeliveryAcceptanceTest {
                 .filter(freighter -> freighter.fleetId().equals(fleetId))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private static Stage20FreightPersistentState.CargoLotState cargoLot(
+            Stage20FreightPersistentState freight,
+            FleetId fleetId,
+            String orderId) {
+        return freight.cargoLots().stream()
+                .filter(lot -> lot.fleetId().equals(fleetId))
+                .filter(lot -> lot.orderId().equals(orderId))
+                .findFirst()
+                .orElse(null);
     }
 
     private static double destinationCommodityMassKg(
