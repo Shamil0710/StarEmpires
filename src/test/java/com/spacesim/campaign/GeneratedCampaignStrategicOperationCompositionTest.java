@@ -1,6 +1,6 @@
 package com.spacesim.campaign;
 
-import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage21GeneratedMilitaryEngineeringCatalog;
 import com.spacesim.world.FleetCommandState.OrderSource;
 import com.spacesim.world.FleetCommandState.OrderType;
 import com.spacesim.world.FleetForceRegistry;
@@ -126,7 +126,7 @@ class GeneratedCampaignStrategicOperationCompositionTest {
                         placement -> new FleetOperationalAvailability(Integer.MAX_VALUE, FleetReadinessState.FULL)));
         return FleetForceRegistry.reconstruct(
                 world,
-                new FleetReadinessEvaluator(ShipEngineeringCatalogLoader.loadDefault()),
+                new FleetReadinessEvaluator(Stage21GeneratedMilitaryEngineeringCatalog.load()),
                 availability);
     }
 }
