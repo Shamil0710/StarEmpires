@@ -3,6 +3,8 @@ package com.spacesim.campaign;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.ui.GeneratedWorldUiModel;
+import com.spacesim.world.DiplomaticLifecycleState.RelationEvent;
+import com.spacesim.world.DiplomaticLifecycleState.RelationFactor;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
@@ -120,6 +122,52 @@ class GeneratedCampaignCoordinatorTest {
         first.advanceFrame(1f);
         assertEquals(pausedState, first.captureState(),
                 "paused campaign must not advance physical or living-world authority after the pause command");
+    }
+
+    @Test
+    void restoredDiplomacyAndWarfareRemainLiveSharedAuthoritiesAcrossNativeSave() {
+        GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        var actorIds = campaign.authorities().actors().capture().stream()
+                .map(state -> state.factionContentId())
+                .toList();
+        assertTrue(actorIds.size() >= 2, "production campaign needs two actors for a diplomacy lifecycle proof");
+        String observer = actorIds.get(0);
+        String counterparty = actorIds.get(1);
+        long tick = campaign.session().runtime().world().getAuthoritativeWorldTick();
+
+        campaign.diplomacy().remember(
+                observer,
+                counterparty,
+                new RelationEvent(
+                        "m22.7:relation:before-save",
+                        RelationFactor.THREAT,
+                        -25,
+                        tick,
+                        "m22.7:subject:before-save"));
+
+        var diplomacyBeforeSave = campaign.diplomacy().snapshot();
+        var warfareBeforeSave = campaign.warfare().snapshot();
+        GeneratedCampaignCoordinator restored = GeneratedCampaignCoordinator.decodeOrMigrate(campaign.encode());
+
+        assertEquals(diplomacyBeforeSave, restored.diplomacy().snapshot());
+        assertEquals(warfareBeforeSave, restored.warfare().snapshot());
+
+        restored.diplomacy().remember(
+                observer,
+                counterparty,
+                new RelationEvent(
+                        "m22.7:relation:after-load",
+                        RelationFactor.REMEMBERED_ACTION,
+                        10,
+                        tick,
+                        "m22.7:subject:after-load"));
+        assertNotEquals(diplomacyBeforeSave, restored.diplomacy().snapshot(),
+                "restored diplomacy must remain a live owner rather than an immutable save snapshot");
+
+        GeneratedCampaignCoordinator continued = GeneratedCampaignCoordinator.decodeOrMigrate(restored.encode());
+        assertEquals(restored.diplomacy().snapshot(), continued.diplomacy().snapshot());
+        assertEquals(restored.warfare().snapshot(), continued.warfare().snapshot());
     }
 
     @Test
