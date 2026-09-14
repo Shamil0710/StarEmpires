@@ -17,6 +17,7 @@ import com.spacesim.world.FactionLivingActorRuntime;
 import com.spacesim.world.FactionStrategicIntentState;
 import com.spacesim.world.FleetCommandState;
 import com.spacesim.world.SettlementRecoveryState;
+import com.spacesim.world.Stage21HNpcMissionService;
 import com.spacesim.world.Stage21HNpcMissionState;
 import com.spacesim.world.StrategicOperationState;
 import com.spacesim.world.TerritorialTransitionState;
@@ -30,10 +31,10 @@ import java.util.Objects;
  *
  * <p>This class owns no gameplay state. Capture embeds snapshots from the existing Stage-21A-H
  * owners into their already accepted persistence envelopes, while restore materializes the mutable
- * owners that already exist for Stage-21A, Stage-21C diplomacy and Stage-19 warfare. Later Stage-21
- * state without an accepted mutable runtime remains an immutable handoff until its production owner
- * is composed. Physical world, economy, fleets, diplomacy, operations, recovery and RPG state keep
- * their original authorities.</p>
+ * owners that already exist for Stage-21A, Stage-21C diplomacy, Stage-19 warfare and Stage-21H RPG
+ * missions. Stage-21D-G state remains an exact immutable handoff until its existing production
+ * services are composed around the canonical state values. Physical world, economy, fleets,
+ * diplomacy, operations, recovery and RPG state keep their original authorities.</p>
  */
 public final class GeneratedCampaignAuthorityCheckpoint {
     private GeneratedCampaignAuthorityCheckpoint() {
@@ -111,8 +112,9 @@ public final class GeneratedCampaignAuthorityCheckpoint {
      *
      * <p>Stage-21C diplomacy is rebuilt over the same restored {@link GeneratedCampaignSession}
      * world authority and the same restored {@link Stage19ConflictRuntime}; no second world or war
-     * state is created. Stage-21D-H values remain exact immutable snapshots until their existing
-     * mutable production owners are composed in later M22.7 slices.</p>
+     * state is created. Stage-21H is restored through its accepted mutable
+     * {@link Stage21HNpcMissionService}. Stage-21D-G values remain exact canonical snapshots until
+     * their existing production services are composed in later M22.7 slices.</p>
      *
      * @param checkpoint native or migrated final Stage-21 checkpoint
      * @return independent restored campaign handoff
@@ -134,6 +136,7 @@ public final class GeneratedCampaignAuthorityCheckpoint {
                 session.runtime().world(),
                 warfareRuntime,
                 stage21C.diplomacyLifecycle());
+        Stage21HNpcMissionService npcMissionService = new Stage21HNpcMissionService(stage21H.npcMissionState());
 
         return new RestoredAuthorities(
                 session,
@@ -145,15 +148,16 @@ public final class GeneratedCampaignAuthorityCheckpoint {
                 stage21E.operationState(),
                 stage21F.territorialTransitions(),
                 stage21G.settlementRecovery(),
-                stage21H.npcMissionState());
+                npcMissionService);
     }
 
     /**
      * Restored references to the accepted authority owners and later-stage snapshots.
      *
      * <p>The record is an orchestration handoff only. The ordinary campaign, Stage-21A actor
-     * scheduler, Stage-21C diplomacy and Stage-19 warfare are the original mutable owners. Later
-     * Stage-21 snapshots remain immutable values and must not be mutated through parallel state.</p>
+     * scheduler, Stage-21C diplomacy, Stage-19 warfare and Stage-21H mission service are their
+     * original mutable production owners. Stage-21D-G remain canonical immutable state values and
+     * must only be replaced with values returned by their accepted production services.</p>
      *
      * @param session independently restored ordinary generated-world campaign
      * @param actors independently restored Stage-21A actor scheduler
@@ -164,7 +168,7 @@ public final class GeneratedCampaignAuthorityCheckpoint {
      * @param operations exact Stage-21E operation snapshot
      * @param transitions exact Stage-21F transition snapshot
      * @param recovery exact Stage-21G recovery snapshot
-     * @param npcMissions exact Stage-21H RPG snapshot
+     * @param npcMissionService mutable accepted Stage-21H RPG owner
      */
     public record RestoredAuthorities(
             GeneratedCampaignSession session,
@@ -176,7 +180,7 @@ public final class GeneratedCampaignAuthorityCheckpoint {
             StrategicOperationState operations,
             TerritorialTransitionState transitions,
             SettlementRecoveryState recovery,
-            Stage21HNpcMissionState npcMissions) {
+            Stage21HNpcMissionService npcMissionService) {
         /**
          * Validates that every restored authority reference is present and freezes the intent list.
          *
@@ -189,7 +193,7 @@ public final class GeneratedCampaignAuthorityCheckpoint {
          * @param operations exact Stage-21E operation snapshot
          * @param transitions exact Stage-21F transition snapshot
          * @param recovery exact Stage-21G recovery snapshot
-         * @param npcMissions exact Stage-21H RPG snapshot
+         * @param npcMissionService mutable accepted Stage-21H RPG owner
          */
         public RestoredAuthorities {
             Objects.requireNonNull(session, "session");
@@ -201,7 +205,7 @@ public final class GeneratedCampaignAuthorityCheckpoint {
             Objects.requireNonNull(operations, "operations");
             Objects.requireNonNull(transitions, "transitions");
             Objects.requireNonNull(recovery, "recovery");
-            Objects.requireNonNull(npcMissions, "npcMissions");
+            Objects.requireNonNull(npcMissionService, "npcMissionService");
         }
 
         /** @return exact current Stage-21C diplomacy snapshot for persistence compatibility */
@@ -212,6 +216,11 @@ public final class GeneratedCampaignAuthorityCheckpoint {
         /** @return exact current Stage-19 warfare snapshot for persistence compatibility */
         public Stage19ConflictState warfare() {
             return warfareRuntime.snapshot();
+        }
+
+        /** @return exact current Stage-21H mission snapshot for persistence compatibility */
+        public Stage21HNpcMissionState npcMissions() {
+            return npcMissionService.snapshot();
         }
     }
 }
