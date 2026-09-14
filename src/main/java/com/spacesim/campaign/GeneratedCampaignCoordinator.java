@@ -5,7 +5,9 @@ import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimeMigration;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
+import com.spacesim.world.FactionActorObservationSnapshot;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -23,6 +25,18 @@ import java.util.Objects;
  * native Stage-21I saves retain the complete accepted authority chain.</p>
  */
 public final class GeneratedCampaignCoordinator {
+    /** Accepted Stage-21I workload evidence caps expensive actor reviews at seven per batch. */
+    static final int LIVING_ACTOR_REVIEW_BUDGET = 7;
+
+    /**
+     * Deterministic medium strategic cadence for ordinary campaign actor reviews.
+     *
+     * <p>The value is expressed in authoritative simulation ticks and is persisted indirectly by
+     * each actor's next-review deadline. Event wakeups may still authorize an earlier review. The
+     * coordinator does not poll actors from wall-clock/render time.</p>
+     */
+    static final long LIVING_ACTOR_REVIEW_CADENCE_TICKS = 1_200L;
+
     private final RestoredAuthorities authorities;
 
     private GeneratedCampaignCoordinator(RestoredAuthorities authorities) {
@@ -69,6 +83,40 @@ public final class GeneratedCampaignCoordinator {
     /** @return the single mutable ordinary generated-world session used by simulation and UI */
     public GeneratedCampaignSession session() {
         return authorities.session();
+    }
+
+    /**
+     * Advances the ordinary physical campaign and then runs the due Stage-21A actor lifecycle at
+     * the resulting authoritative world tick.
+     *
+     * <p>This method is the production orchestration seam intentionally absent from the Stage-21A
+     * physical runtime bridge. Actor review stays outside Stage-20 simulation because publishing
+     * actor knowledge is an explicit information-boundary step. The current composed client has no
+     * accepted Stage-20-to-Stage-21 observation publisher yet, so this handoff publishes an honest
+     * empty actor-bounded snapshot rather than manufacturing omniscient observations. That advances
+     * persisted lifecycle/deadline state without inventing strategic evidence; later M22.7 slices
+     * can replace the publisher with accepted delivered knowledge while retaining the same runtime
+     * owner and scheduler.</p>
+     *
+     * <p>No living-world review executes when the physical session advances zero fixed ticks, so a
+     * paused campaign or a zero-delta render cannot mutate Stage-21 state after load.</p>
+     *
+     * @param realDeltaSeconds finite non-negative presentation delta
+     * @return the ordinary physical campaign advance diagnostics
+     */
+    public GeneratedCampaignSession.AdvanceReport advanceFrame(float realDeltaSeconds) {
+        GeneratedCampaignSession.AdvanceReport report = authorities.session().advanceFrame(realDeltaSeconds);
+        if (report.fixedTicks() == 0L) {
+            return report;
+        }
+
+        long nowTick = authorities.session().runtime().world().getAuthoritativeWorldTick();
+        authorities.actors().reviewDue(
+                nowTick,
+                LIVING_ACTOR_REVIEW_BUDGET,
+                LIVING_ACTOR_REVIEW_CADENCE_TICKS,
+                factionId -> emptyActorSnapshot(factionId, nowTick));
+        return report;
     }
 
     /**
@@ -120,5 +168,15 @@ public final class GeneratedCampaignCoordinator {
      */
     RestoredAuthorities authorities() {
         return authorities;
+    }
+
+    private static FactionActorObservationSnapshot emptyActorSnapshot(String factionId, long nowTick) {
+        return new FactionActorObservationSnapshot(
+                factionId,
+                nowTick,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
     }
 }
