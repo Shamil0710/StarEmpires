@@ -5,12 +5,16 @@ import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.ui.GeneratedWorldUiModel;
 import com.spacesim.world.DiplomaticLifecycleState.RelationEvent;
 import com.spacesim.world.DiplomaticLifecycleState.RelationFactor;
+import com.spacesim.world.Stage21HNpcMissionState.NpcAvailability;
+import com.spacesim.world.Stage21HNpcMissionState.NpcRole;
+import com.spacesim.world.Stage21HNpcMissionState.NpcState;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -168,6 +172,46 @@ class GeneratedCampaignCoordinatorTest {
         GeneratedCampaignCoordinator continued = GeneratedCampaignCoordinator.decodeOrMigrate(restored.encode());
         assertEquals(restored.diplomacy().snapshot(), continued.diplomacy().snapshot());
         assertEquals(restored.warfare().snapshot(), continued.warfare().snapshot());
+    }
+
+    @Test
+    void restoredNpcMissionAuthorityRemainsLiveAcrossNativeSave() {
+        GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        assertTrue(campaign.npcMissions().snapshot().npcs().isEmpty(),
+                "Stage-20.5 migration should add an empty Stage-21H sidecar before live composition");
+
+        String factionId = campaign.authorities().actors().capture().get(0).factionContentId();
+        StarSystemId firstSystem = campaign.session().runtime().world().getTopology().systems().stream()
+                .map(system -> system.id())
+                .findFirst()
+                .orElseThrow();
+        long tick = campaign.session().runtime().world().getAuthoritativeWorldTick();
+        NpcState npc = new NpcState(
+                "npc.m22.7.live-owner",
+                "npc.m22.7.live-owner",
+                NpcRole.OFFICIAL,
+                factionId,
+                firstSystem,
+                NpcAvailability.AVAILABLE,
+                List.of());
+
+        campaign.npcMissions().installNpcRoster(List.of(npc));
+        var beforeSave = campaign.npcMissions().snapshot();
+        GeneratedCampaignCoordinator restored = GeneratedCampaignCoordinator.decodeOrMigrate(campaign.encode());
+        assertEquals(beforeSave, restored.npcMissions().snapshot());
+
+        restored.npcMissions().updateNpcPresence(
+                npc.npcId(),
+                firstSystem,
+                NpcAvailability.DISPLACED,
+                tick);
+        assertNotEquals(beforeSave, restored.npcMissions().snapshot(),
+                "restored Stage-21H must remain a live owner rather than a passive checkpoint value");
+
+        GeneratedCampaignCoordinator continued = GeneratedCampaignCoordinator.decodeOrMigrate(restored.encode());
+        assertEquals(restored.npcMissions().snapshot(), continued.npcMissions().snapshot());
+        assertEquals(NpcAvailability.DISPLACED, continued.npcMissions().snapshot().npcs().get(0).availability());
     }
 
     @Test
