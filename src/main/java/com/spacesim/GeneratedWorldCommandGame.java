@@ -305,12 +305,12 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         return true;
     }
 
-    /** Advances the ordinary campaign session and renders its current read-only projection. */
+    /** Advances the integrated campaign and renders its current read-only projection. */
     @Override
     public void render() {
         float delta = Math.min(0.1f, Math.max(0f, Gdx.graphics.getDeltaTime()));
         try {
-            session.advanceFrame(delta);
+            campaign.advanceFrame(delta);
         } catch (RuntimeException exception) {
             status = "Автономная симуляция остановила операцию: " + safeMessage(exception);
         }
