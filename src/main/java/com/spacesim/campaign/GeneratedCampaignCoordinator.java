@@ -5,6 +5,8 @@ import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimeMigration;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
+import com.spacesim.warfare.Stage19ConflictRuntime;
+import com.spacesim.world.DiplomaticLifecycleService;
 import com.spacesim.world.FactionActorObservationSnapshot;
 
 import java.util.List;
@@ -15,10 +17,12 @@ import java.util.Objects;
  *
  * <p>The coordinator deliberately owns no competing gameplay authority. The mutable physical world,
  * economy, freight and clocks remain inside {@link GeneratedCampaignSession}; Stage-21 autonomous
- * actor state remains inside its accepted owner; later Stage-21 authority snapshots keep their
- * existing persistence contracts. This class only keeps those accepted owners together so the
- * ordinary client creates, advances, saves and restores one coherent campaign instead of saving the
- * Stage-20 runtime in isolation.</p>
+ * actor state remains inside its accepted owner; Stage-21C diplomacy and Stage-19 conflict state are
+ * materialized through their accepted mutable services over that same world. Later Stage-21 state
+ * without an accepted live owner remains an exact persisted snapshot until its production owner is
+ * composed. This class only keeps those accepted owners together so the ordinary client creates,
+ * advances, saves and restores one coherent campaign instead of saving the Stage-20 runtime in
+ * isolation.</p>
  *
  * <p>New campaigns are lifted through the accepted Stage-21 migration path. Existing Stage-20.5
  * saves can therefore enter the same coordinator without ad-hoc default reconstruction, while
@@ -83,6 +87,30 @@ public final class GeneratedCampaignCoordinator {
     /** @return the single mutable ordinary generated-world session used by simulation and UI */
     public GeneratedCampaignSession session() {
         return authorities.session();
+    }
+
+    /**
+     * Returns the accepted mutable Stage-21C diplomacy owner over this campaign's ordinary world.
+     *
+     * <p>Player and autonomous callers must use this service rather than mutating persisted
+     * diplomatic snapshots or constructing a second lifecycle owner.</p>
+     *
+     * @return shared campaign diplomacy authority
+     */
+    public DiplomaticLifecycleService diplomacy() {
+        return authorities.diplomacyService();
+    }
+
+    /**
+     * Returns the accepted mutable Stage-19 actor-known conflict owner shared by diplomacy.
+     *
+     * <p>The runtime remains an information/policy extension; physical warfare consequences are
+     * still owned by their existing simulation and combat authorities.</p>
+     *
+     * @return shared campaign warfare authority
+     */
+    public Stage19ConflictRuntime warfare() {
+        return authorities.warfareRuntime();
     }
 
     /**
