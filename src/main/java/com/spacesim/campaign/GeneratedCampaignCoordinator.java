@@ -7,7 +7,6 @@ import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.warfare.Stage19ConflictRuntime;
 import com.spacesim.world.DiplomaticLifecycleService;
-import com.spacesim.world.FactionActorObservationSnapshot;
 import com.spacesim.world.FactionIdentityResolver;
 import com.spacesim.world.FleetCommandGroupService;
 import com.spacesim.world.FleetCommandState;
@@ -297,9 +296,9 @@ public final class GeneratedCampaignCoordinator {
      * Advances the ordinary physical campaign and then runs due Stage-21A actor reviews at the
      * resulting authoritative simulation tick.
      *
-     * <p>The current composed client has no accepted Stage-20-to-Stage-21 observation publisher yet,
-     * so it publishes an honest empty actor-bounded snapshot rather than manufacturing omniscient
-     * evidence. Zero-tick frames never mutate Stage-21 lifecycle state.</p>
+     * <p>Stage-21A receives only facts already persisted as actor-bounded Stage-21C relation memory.
+     * The observation adapter has no world/truth reference, so zero-tick frames and hidden generated
+     * state cannot mutate or leak into autonomous reasoning.</p>
      *
      * @param realDeltaSeconds finite non-negative presentation delta
      * @return ordinary physical campaign advance diagnostics
@@ -315,7 +314,10 @@ public final class GeneratedCampaignCoordinator {
                 nowTick,
                 LIVING_ACTOR_REVIEW_BUDGET,
                 LIVING_ACTOR_REVIEW_CADENCE_TICKS,
-                factionId -> emptyActorSnapshot(factionId, nowTick));
+                factionId -> GeneratedCampaignActorObservationPublisher.publish(
+                        factionId,
+                        nowTick,
+                        authorities.diplomacy()));
         return report;
     }
 
@@ -358,15 +360,5 @@ public final class GeneratedCampaignCoordinator {
      */
     RestoredAuthorities authorities() {
         return authorities;
-    }
-
-    private static FactionActorObservationSnapshot emptyActorSnapshot(String factionId, long nowTick) {
-        return new FactionActorObservationSnapshot(
-                factionId,
-                nowTick,
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of());
     }
 }
