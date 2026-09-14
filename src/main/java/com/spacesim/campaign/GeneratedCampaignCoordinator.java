@@ -15,6 +15,12 @@ import com.spacesim.world.FleetForceRegistry;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.Stage21HNpcMissionService;
 import com.spacesim.world.StarSystemId;
+import com.spacesim.world.StrategicOperationService;
+import com.spacesim.world.StrategicOperationState;
+import com.spacesim.world.StrategicOperationState.OperationState;
+import com.spacesim.world.StrategicOperationState.RulesOfEngagement;
+import com.spacesim.world.StrategicOperationState.SupplyPolicy;
+import com.spacesim.world.StrategicOperationState.WithdrawalPolicy;
 
 import java.util.List;
 import java.util.Objects;
@@ -26,11 +32,11 @@ import java.util.Objects;
  * economy, freight and clocks remain inside {@link GeneratedCampaignSession}; Stage-21 autonomous
  * actor state remains inside its accepted owner; Stage-21C diplomacy, Stage-19 conflict state and
  * Stage-21H NPC/mission state are materialized through their accepted mutable services over that
- * same campaign. Stage-21D command metadata is retained only as the latest immutable canonical state
- * returned by its accepted production services. Stage-21E-G canonical values remain exact persisted
- * snapshots until their existing production services are composed. This class only keeps those
- * accepted owners together so the ordinary client creates, advances, saves and restores one coherent
- * campaign instead of saving the Stage-20 runtime in isolation.</p>
+ * same campaign. Stage-21D command and Stage-21E operation metadata are retained only as the latest
+ * immutable canonical states returned by their accepted production services. Stage-21F-G canonical
+ * values remain exact persisted snapshots until their existing production services are composed.
+ * This class only keeps those accepted owners together so the ordinary client creates, advances,
+ * saves and restores one coherent campaign instead of saving the Stage-20 runtime in isolation.</p>
  *
  * <p>New campaigns are lifted through the accepted Stage-21 migration path. Existing Stage-20.5
  * saves can therefore enter the same coordinator without ad-hoc default reconstruction, while
@@ -50,11 +56,15 @@ public final class GeneratedCampaignCoordinator {
     static final long LIVING_ACTOR_REVIEW_CADENCE_TICKS = 1_200L;
 
     private final RestoredAuthorities authorities;
+    private final StrategicOperationService strategicOperationService;
     private FleetCommandState fleetCommands;
+    private StrategicOperationState operations;
 
     private GeneratedCampaignCoordinator(RestoredAuthorities authorities) {
         this.authorities = Objects.requireNonNull(authorities, "authorities");
+        this.strategicOperationService = new StrategicOperationService();
         this.fleetCommands = authorities.commands();
+        this.operations = authorities.operations();
     }
 
     /**
@@ -177,6 +187,53 @@ public final class GeneratedCampaignCoordinator {
     }
 
     /**
+     * Returns the current canonical Stage-21E strategic-operation metadata.
+     *
+     * <p>The returned value is immutable. Movement, readiness, supply and combat facts remain in
+     * their ordinary owners; this coordinator retains only replacements returned by the accepted
+     * {@link StrategicOperationService}.</p>
+     *
+     * @return current immutable strategic-operation state
+     */
+    public StrategicOperationState operations() {
+        return operations;
+    }
+
+    /**
+     * Admits one Stage-21E operation from an already accepted active Stage-21D order.
+     *
+     * <p>This method deliberately does not submit or synthesize a Stage-21D order. Order admission
+     * remains the responsibility of the existing Stage-21D production authority and its route,
+     * economy, knowledge and risk policies. Stage-21E validates the accepted order against the
+     * supplied read-only physical force reconstruction and records only operation metadata.</p>
+     *
+     * @param forces read-only reconstruction of ordinary physical fleets
+     * @param commandGroupId Stage-21D command group owning an accepted active order
+     * @param rulesOfEngagement explicit Stage-21E engagement policy
+     * @param supplyPolicy explicit Stage-21E readiness/supply thresholds
+     * @param withdrawalPolicy explicit Stage-21E physical fallback policy
+     * @return newly allocated canonical operation metadata
+     */
+    public OperationState beginStrategicOperation(
+            FleetForceRegistry forces,
+            long commandGroupId,
+            RulesOfEngagement rulesOfEngagement,
+            SupplyPolicy supplyPolicy,
+            WithdrawalPolicy withdrawalPolicy) {
+        long operationId = operations.nextOperationId();
+        operations = strategicOperationService.beginFromActiveOrder(
+                operations,
+                fleetCommands,
+                Objects.requireNonNull(forces, "forces"),
+                commandGroupId,
+                session().runtime().world().getAuthoritativeWorldTick(),
+                Objects.requireNonNull(rulesOfEngagement, "rulesOfEngagement"),
+                Objects.requireNonNull(supplyPolicy, "supplyPolicy"),
+                Objects.requireNonNull(withdrawalPolicy, "withdrawalPolicy"));
+        return operations.requireOperation(operationId);
+    }
+
+    /**
      * Returns the accepted mutable Stage-21H NPC/mission/reputation/story owner.
      *
      * <p>Mission callers must continue to pass ordinary world, freight, industry, discovery and
@@ -236,7 +293,7 @@ public final class GeneratedCampaignCoordinator {
                 authorities.diplomacy(),
                 authorities.warfare(),
                 fleetCommands,
-                authorities.operations(),
+                operations,
                 authorities.transitions(),
                 authorities.recovery(),
                 authorities.npcMissions());
