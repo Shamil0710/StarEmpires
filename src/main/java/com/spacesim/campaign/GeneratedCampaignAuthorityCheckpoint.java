@@ -10,11 +10,14 @@ import com.spacesim.persistence.Stage21FGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21GGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21HGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
+import com.spacesim.warfare.Stage19ConflictRuntime;
+import com.spacesim.world.DiplomaticLifecycleService;
 import com.spacesim.world.DiplomaticLifecycleState;
 import com.spacesim.world.FactionLivingActorRuntime;
 import com.spacesim.world.FactionStrategicIntentState;
 import com.spacesim.world.FleetCommandState;
 import com.spacesim.world.SettlementRecoveryState;
+import com.spacesim.world.Stage21HNpcMissionService;
 import com.spacesim.world.Stage21HNpcMissionState;
 import com.spacesim.world.StrategicOperationState;
 import com.spacesim.world.TerritorialTransitionState;
@@ -27,10 +30,11 @@ import java.util.Objects;
  * authority chain.
  *
  * <p>This class owns no gameplay state. Capture embeds snapshots from the existing Stage-21A-H
- * owners into their already accepted persistence envelopes, while restore exposes those same
- * immutable snapshots together with an independently restored ordinary campaign session and actor
- * scheduler. Physical world, economy, fleets, diplomacy, operations, recovery and RPG state keep
- * their original authorities.</p>
+ * owners into their already accepted persistence envelopes, while restore materializes the mutable
+ * owners that already exist for Stage-21A, Stage-21C diplomacy, Stage-19 warfare and Stage-21H RPG
+ * missions. Stage-21D-G state remains an exact immutable handoff until its existing production
+ * services are composed around the canonical state values. Physical world, economy, fleets,
+ * diplomacy, operations, recovery and RPG state keep their original authorities.</p>
  */
 public final class GeneratedCampaignAuthorityCheckpoint {
     private GeneratedCampaignAuthorityCheckpoint() {
@@ -104,8 +108,13 @@ public final class GeneratedCampaignAuthorityCheckpoint {
     }
 
     /**
-     * Restores the ordinary campaign and Stage-21A scheduler while retaining exact immutable
-     * snapshots for every later accepted authority owner.
+     * Restores the ordinary campaign and every accepted mutable owner currently required by M22.7.
+     *
+     * <p>Stage-21C diplomacy is rebuilt over the same restored {@link GeneratedCampaignSession}
+     * world authority and the same restored {@link Stage19ConflictRuntime}; no second world or war
+     * state is created. Stage-21H is restored through its accepted mutable
+     * {@link Stage21HNpcMissionService}. Stage-21D-G values remain exact canonical snapshots until
+     * their existing production services are composed in later M22.7 slices.</p>
      *
      * @param checkpoint native or migrated final Stage-21 checkpoint
      * @return independent restored campaign handoff
@@ -121,72 +130,97 @@ public final class GeneratedCampaignAuthorityCheckpoint {
         Stage21BGeneratedWorldRuntimePersistentState stage21B = stage21C.stage21BRuntime();
         Stage21AGeneratedWorldRuntimePersistentState stage21A = stage21B.stage21ARuntime();
 
+        GeneratedCampaignSession session = GeneratedCampaignSession.restore(stage21A.stage20Runtime());
+        Stage19ConflictRuntime warfareRuntime = new Stage19ConflictRuntime(stage21C.warfareState());
+        DiplomaticLifecycleService diplomacyService = new DiplomaticLifecycleService(
+                session.runtime().world(),
+                warfareRuntime,
+                stage21C.diplomacyLifecycle());
+        Stage21HNpcMissionService npcMissionService = new Stage21HNpcMissionService(stage21H.npcMissionState());
+
         return new RestoredAuthorities(
-                GeneratedCampaignSession.restore(stage21A.stage20Runtime()),
+                session,
                 FactionLivingActorRuntime.restore(stage21A.livingActors()),
                 stage21B.strategicIntents(),
-                stage21C.diplomacyLifecycle(),
-                stage21C.warfareState(),
+                diplomacyService,
+                warfareRuntime,
                 stage21D.fleetCommandState(),
                 stage21E.operationState(),
                 stage21F.territorialTransitions(),
                 stage21G.settlementRecovery(),
-                stage21H.npcMissionState());
+                npcMissionService);
     }
 
     /**
-     * Restored references to the original accepted authority snapshots.
+     * Restored references to the accepted authority owners and later-stage snapshots.
      *
-     * <p>The record is an orchestration handoff only. Mutable continuation must be performed by the
-     * original production owners/services for each snapshot type.</p>
+     * <p>The record is an orchestration handoff only. The ordinary campaign, Stage-21A actor
+     * scheduler, Stage-21C diplomacy, Stage-19 warfare and Stage-21H mission service are their
+     * original mutable production owners. Stage-21D-G remain canonical immutable state values and
+     * must only be replaced with values returned by their accepted production services.</p>
      *
      * @param session independently restored ordinary generated-world campaign
      * @param actors independently restored Stage-21A actor scheduler
      * @param strategicIntents exact Stage-21B intent snapshots
-     * @param diplomacy exact Stage-21C diplomacy snapshot
-     * @param warfare exact Stage-19 conflict snapshot
+     * @param diplomacyService mutable accepted Stage-21C diplomacy owner over the restored world
+     * @param warfareRuntime mutable accepted Stage-19 conflict owner used by diplomacy
      * @param commands exact Stage-21D command snapshot
      * @param operations exact Stage-21E operation snapshot
      * @param transitions exact Stage-21F transition snapshot
      * @param recovery exact Stage-21G recovery snapshot
-     * @param npcMissions exact Stage-21H RPG snapshot
+     * @param npcMissionService mutable accepted Stage-21H RPG owner
      */
     public record RestoredAuthorities(
             GeneratedCampaignSession session,
             FactionLivingActorRuntime actors,
             List<FactionStrategicIntentState> strategicIntents,
-            DiplomaticLifecycleState diplomacy,
-            Stage19ConflictState warfare,
+            DiplomaticLifecycleService diplomacyService,
+            Stage19ConflictRuntime warfareRuntime,
             FleetCommandState commands,
             StrategicOperationState operations,
             TerritorialTransitionState transitions,
             SettlementRecoveryState recovery,
-            Stage21HNpcMissionState npcMissions) {
+            Stage21HNpcMissionService npcMissionService) {
         /**
          * Validates that every restored authority reference is present and freezes the intent list.
          *
          * @param session independently restored ordinary generated-world campaign
          * @param actors independently restored Stage-21A actor scheduler
          * @param strategicIntents exact Stage-21B intent snapshots
-         * @param diplomacy exact Stage-21C diplomacy snapshot
-         * @param warfare exact Stage-19 conflict snapshot
+         * @param diplomacyService mutable accepted Stage-21C diplomacy owner
+         * @param warfareRuntime mutable accepted Stage-19 conflict owner
          * @param commands exact Stage-21D command snapshot
          * @param operations exact Stage-21E operation snapshot
          * @param transitions exact Stage-21F transition snapshot
          * @param recovery exact Stage-21G recovery snapshot
-         * @param npcMissions exact Stage-21H RPG snapshot
+         * @param npcMissionService mutable accepted Stage-21H RPG owner
          */
         public RestoredAuthorities {
             Objects.requireNonNull(session, "session");
             Objects.requireNonNull(actors, "actors");
             strategicIntents = List.copyOf(Objects.requireNonNull(strategicIntents, "strategicIntents"));
-            Objects.requireNonNull(diplomacy, "diplomacy");
-            Objects.requireNonNull(warfare, "warfare");
+            Objects.requireNonNull(diplomacyService, "diplomacyService");
+            Objects.requireNonNull(warfareRuntime, "warfareRuntime");
             Objects.requireNonNull(commands, "commands");
             Objects.requireNonNull(operations, "operations");
             Objects.requireNonNull(transitions, "transitions");
             Objects.requireNonNull(recovery, "recovery");
-            Objects.requireNonNull(npcMissions, "npcMissions");
+            Objects.requireNonNull(npcMissionService, "npcMissionService");
+        }
+
+        /** @return exact current Stage-21C diplomacy snapshot for persistence compatibility */
+        public DiplomaticLifecycleState diplomacy() {
+            return diplomacyService.snapshot();
+        }
+
+        /** @return exact current Stage-19 warfare snapshot for persistence compatibility */
+        public Stage19ConflictState warfare() {
+            return warfareRuntime.snapshot();
+        }
+
+        /** @return exact current Stage-21H mission snapshot for persistence compatibility */
+        public Stage21HNpcMissionState npcMissions() {
+            return npcMissionService.snapshot();
         }
     }
 }

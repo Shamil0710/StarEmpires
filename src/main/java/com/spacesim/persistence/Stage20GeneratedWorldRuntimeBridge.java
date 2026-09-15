@@ -6,6 +6,7 @@ import com.spacesim.components.FactionComponent;
 import com.spacesim.components.IdentityComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TransformComponent;
+import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.content.Stage18ManufacturingProductRegistry;
 import com.spacesim.content.Stage18ResourceOntologyCatalog;
 import com.spacesim.content.Stage18ResourceOntologyLoader;
@@ -78,7 +79,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
     }
 
     /**
-     * Performs the one-time bootstrap materialization into an existing ordinary generated topology.
+     * Performs the one-time bootstrap materialization into an existing ordinary generated topology
+     * using the baseline Stage-18 manufactured-product vocabulary.
      *
      * @param campaign exact accepted Stage-20K campaign
      * @param specialization exact accepted Stage-20F operating authority
@@ -89,12 +91,42 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             Stage20GeneratedCampaignPersistentState campaign,
             OperationalSpecializationReport specialization,
             WorldSimulation world) {
+        return materializeBootstrap(
+                campaign,
+                specialization,
+                world,
+                Stage18ManufacturingProductRegistry.loadDefault());
+    }
+
+    /**
+     * Performs one-time bootstrap materialization with an explicitly composed ordinary Stage-18
+     * manufactured-product registry.
+     *
+     * <p>This overload is a content-composition seam only. It does not add faction-specific behavior
+     * to Stage 20; later content layers may extend the ordinary Stage-18 product vocabulary and pass
+     * the resulting registry down to the existing industrial and logistics authorities.</p>
+     *
+     * @param campaign exact accepted Stage-20K campaign
+     * @param specialization exact accepted Stage-20F operating authority
+     * @param world ordinary live world with the exact generated topology
+     * @param products explicit ordinary Stage-18 manufactured-product vocabulary
+     * @return composed live generated-world runtime
+     */
+    public static LiveRuntime materializeBootstrap(
+            Stage20GeneratedCampaignPersistentState campaign,
+            OperationalSpecializationReport specialization,
+            WorldSimulation world,
+            Stage18ManufacturingProductRegistry products) {
         Stage20GeneratedCampaignPersistentState saved = Objects.requireNonNull(campaign, "campaign");
         WorldSimulation runtime = Objects.requireNonNull(world, "world");
+        Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
         MaterializedGeneratedIndustrialRuntime industry =
                 Stage20GeneratedIndustrialRuntimeBridge.materializeBootstrap(
-                        saved, Objects.requireNonNull(specialization, "specialization"));
-        InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(saved, industry);
+                        saved,
+                        Objects.requireNonNull(specialization, "specialization"),
+                        productRegistry);
+        InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(
+                saved, industry, productRegistry);
         Stage20FreightPersistentState freightState = Stage20FreightRuntimeMaterializer.materializeBootstrap(
                 saved,
                 specialization,
@@ -105,23 +137,44 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 Stage20LiveArrivalAuthorityIntegration.restoreAndBind(saved, runtime);
         materializeFreightEntities(runtime, freightState, arrival);
         Stage20FreightRuntime freight = Stage20FreightRuntime.restore(freightState);
-        return new LiveRuntime(saved, runtime, industry, infrastructure, freight, arrival);
+        return new LiveRuntime(
+                saved, runtime, industry, infrastructure, freight, arrival, productRegistry);
     }
 
     /**
-     * Restores a composed runtime without invoking any Stage-20 generator or planner.
+     * Restores a composed runtime without invoking any Stage-20 generator or planner using the
+     * baseline Stage-18 manufactured-product vocabulary.
      *
      * @param checkpoint exact decoded atomic runtime checkpoint
      * @return independent restored live runtime
      */
     public static LiveRuntime restore(Stage20GeneratedWorldRuntimePersistentState checkpoint) {
+        return restore(checkpoint, Stage18ManufacturingProductRegistry.loadDefault());
+    }
+
+    /**
+     * Restores a composed runtime with an explicitly composed ordinary Stage-18 product registry.
+     *
+     * @param checkpoint exact decoded atomic runtime checkpoint
+     * @param products explicit ordinary Stage-18 manufactured-product vocabulary
+     * @return independent restored live runtime
+     */
+    public static LiveRuntime restore(
+            Stage20GeneratedWorldRuntimePersistentState checkpoint,
+            Stage18ManufacturingProductRegistry products) {
         Stage20GeneratedWorldRuntimePersistentState saved = Objects.requireNonNull(
                 checkpoint, "checkpoint");
-        WorldSimulation world = WorldSimulation.restore(saved.worldState(), saved.activeSystemId());
+        Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
+        WorldSimulation world = WorldSimulation.restore(
+                saved.worldState(),
+                ContentCatalogLoader.loadDefault(),
+                saved.activeSystemId(),
+                saved.strategicStepTicks(),
+                saved.remoteUpdateBudgetPerFrame());
         MaterializedGeneratedIndustrialRuntime industry =
-                Stage20GeneratedIndustrialRuntimeBridge.restore(saved.campaign());
+                Stage20GeneratedIndustrialRuntimeBridge.restore(saved.campaign(), productRegistry);
         InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(
-                saved.campaign(), industry);
+                saved.campaign(), industry, productRegistry);
         Stage20FreightRuntime freight = Stage20FreightRuntime.restore(
                 saved.campaign(),
                 saved.freight(),
@@ -133,7 +186,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         registerRestoredLocalFleetPhysicalStates(
                 world, saved.localFleetPhysicalStates(), arrival);
         validateAndRegisterRestoredFreight(world, saved.freight(), arrival);
-        return new LiveRuntime(saved.campaign(), world, industry, infrastructure, freight, arrival);
+        return new LiveRuntime(
+                saved.campaign(), world, industry, infrastructure, freight, arrival, productRegistry);
     }
 
     private static void materializeFreightEntities(
@@ -307,7 +361,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 MaterializedGeneratedIndustrialRuntime industry,
                 InfrastructureRegistry infrastructure,
                 Stage20FreightRuntime freight,
-                Stage20LiveArrivalAuthorityIntegration arrival) {
+                Stage20LiveArrivalAuthorityIntegration arrival,
+                Stage18ManufacturingProductRegistry products) {
             this.campaignAuthority = Objects.requireNonNull(campaignAuthority, "campaignAuthority");
             this.world = Objects.requireNonNull(world, "world");
             this.industry = Objects.requireNonNull(industry, "industry");
@@ -316,7 +371,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             this.arrival = Objects.requireNonNull(arrival, "arrival");
             this.logistics = new Stage18LogisticsRuntime(
                     Stage18ResourceOntologyLoader.loadDefault(),
-                    Stage18ManufacturingProductRegistry.loadDefault());
+                    Objects.requireNonNull(products, "products"));
         }
 
         /** @return ordinary multi-system simulation authority */
@@ -392,6 +447,38 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     sourceEndpoint.storage(),
                     order.commodityId(),
                     massKg,
+                    handling,
+                    handling.openInterval(durationSeconds));
+        }
+
+        /**
+         * Transfers a countable manufactured product between two canonical generated-world station
+         * endpoints through the ordinary Stage-18 logistics authority.
+         *
+         * @param sourceStationId exact source station identity
+         * @param destinationStationId exact destination station identity
+         * @param productContentId ordinary Stage-18 manufactured-product content ID
+         * @param count positive product-unit count
+         * @param durationSeconds finite physical handling interval
+         * @return ordinary Stage-18 physical transfer result
+         */
+        public TransferResult transferProductBetweenEndpoints(
+                String sourceStationId,
+                String destinationStationId,
+                String productContentId,
+                int count,
+                double durationSeconds) {
+            RuntimeEndpoint source = infrastructure.endpoint(sourceStationId);
+            RuntimeEndpoint destination = infrastructure.endpoint(destinationStationId);
+            HandlingCapability handling = intersectHandling(
+                    "stage20_5.product-transfer:" + source.stationId() + ':' + destination.stationId(),
+                    source.handlingCapability(),
+                    destination.handlingCapability());
+            return logistics.transferProduct(
+                    source.storage(),
+                    destination.storage(),
+                    productContentId,
+                    count,
                     handling,
                     handling.openInterval(durationSeconds));
         }
@@ -551,6 +638,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     campaign,
                     world.snapshot(),
                     world.getActiveSystemId(),
+                    world.getStrategicStepTicks(),
+                    world.getRemoteUpdateBudgetPerFrame(),
                     freightState,
                     localPhysical);
         }
@@ -702,7 +791,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
      * @param position exact generated local physical position
      * @param storage ordinary mutable Stage-18 storage
      * @param handlingCapability ordinary physical handling interface
-     * @param generatedIndustrial whether Stage-20.5C owns this endpoint runtime
+     * @param generatedIndustrial whether Stage-20.5 owns this endpoint runtime
      */
     public record RuntimeEndpoint(
             StarSystemId systemId,
@@ -716,12 +805,12 @@ public final class Stage20GeneratedWorldRuntimeBridge {
          * Validates one exact endpoint binding.
          *
          * @param systemId exact generated system
-         * @param stationId exact generated station identity
+         * @param stationId exact generated station placement ID
          * @param stationArchetypeId exact Stage-18 station archetype
          * @param position exact generated local physical position
          * @param storage ordinary mutable Stage-18 storage
          * @param handlingCapability ordinary physical handling interface
-         * @param generatedIndustrial whether Stage-20.5C owns this endpoint runtime
+         * @param generatedIndustrial whether Stage-20.5 owns this endpoint runtime
          */
         public RuntimeEndpoint {
             Objects.requireNonNull(systemId, "systemId");
@@ -746,9 +835,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
 
         private static InfrastructureRegistry materialize(
                 Stage20GeneratedCampaignPersistentState campaign,
-                MaterializedGeneratedIndustrialRuntime industry) {
+                MaterializedGeneratedIndustrialRuntime industry,
+                Stage18ManufacturingProductRegistry products) {
             Stage18ResourceOntologyCatalog ontology = Stage18ResourceOntologyLoader.loadDefault();
-            Stage18ManufacturingProductRegistry products = Stage18ManufacturingProductRegistry.loadDefault();
+            Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
             Stage18StationInfrastructureCatalog infrastructure =
                     Stage18StationInfrastructureCatalogLoader.loadDefault();
             Map<String, StationStorageSnapshot> savedStorage = new HashMap<>();
@@ -800,7 +890,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                             "canonical infrastructure references unknown Stage-18 archetype: " + archetypeId);
                 }
                 Stage18StationIndustrialNode node = Stage18StationIndustrialNode.instantiate(
-                        stationId, ORBITAL_LOCATION_TAG, archetype, ontology, products);
+                        stationId, ORBITAL_LOCATION_TAG, archetype, ontology, productRegistry);
                 Stage18StationStorage storage = node.storage();
                 StationStorageSnapshot persisted = savedStorage.get(stationId);
                 if (persisted != null) {
@@ -809,7 +899,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                         throw new IllegalArgumentException(
                                 "canonical infrastructure storage differs from its archetype");
                     }
-                    storage = Stage18StationStorage.restore(ontology, products, persisted);
+                    storage = Stage18StationStorage.restore(ontology, productRegistry, persisted);
                 }
                 if (result.putIfAbsent(stationId, new RuntimeEndpoint(
                         systemId,

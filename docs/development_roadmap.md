@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-09-03 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 ACTIVE — M22.0–M22.5 complete, M22.6 NEXT.**
+> **Последняя синхронизация: 2026-09-14 / Stage 20–21 COMPLETE; M22.0–M22.5 complete; M22.6 merged (#355); M22.7 ACTIVE / PARTIAL; M22.8 PLANNED.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 > Art maintenance: [Empire sprite refresh](empire_sprite_refresh.md) replaces the nine M22.3
@@ -71,7 +71,7 @@ Canonical faction contracts:
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **COMPLETE** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance | 22 | **ACTIVE — M22.6** |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance + integrated campaign + carrier/small-craft operations | 22 | **ACTIVE — M22.7; M22.8 PLANNED** |
 | **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
 
 Manual merge gate remains mandatory while `main` is unprotected:
@@ -413,7 +413,7 @@ Must honor:
 - hubs, forks, cycles, alternate paths, gateways, remote/frontier pockets and bounded chokepoints;
 - machine-readable anti-linearity, route-redundancy, articulation/bridge and gateway-concentration diagnostics;
 - spatially correlated resource geography derived from Stage-18 physical host/environment conditions plus local deterministic variance;
-- regional comparative advantage instead of uniform self-sufficiency or `sector = production bonus` shortcuts;
+- regional comparative advantage instead of uniform sector bonuses;
 - essential economic viability through physically reachable supply chains without requiring every system/sector to produce everything;
 - strategic scarcity/dependency strong enough to create trade, stockpiling, infrastructure, diplomacy, security, expansion and warfare incentives;
 - faction-start placement after topology/resource generation, with asymmetric but recoverable starts and anti-accidental-monopoly checks;
@@ -568,7 +568,7 @@ Core-faction note: the same Stage-21 machinery expresses meaningfully different 
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
-**ACTIVE. M22.0, M22.1, M22.2, M22.3, M22.4 and M22.5 are complete. M22.6 — core pair balance/freeze is OPEN/NEXT.**
+**ACTIVE. M22.0–M22.5 are complete; M22.6 core pair balance/freeze merged in #355; M22.7 Integrated Campaign Handoff is ACTIVE / PARTIAL; M22.8 Carrier Air Wing / Small Craft Operations is PLANNED and blocked by M22.7.**
 
 M22.2 implementation merged in PR #346 as `ccd38f1d9d34c84b2f562635295a76826cdbbd11`; exact-head PR CI and post-merge main CI are green. The M22.2 closure adds only shared faction-neutral authoring contracts.
 
@@ -622,6 +622,12 @@ M22.3 completion evidence: `docs/stage22_3_completion_record.md`.
 M22.4 completion evidence: `docs/stage22_4_completion_record.md`.  
 M22.5 completion evidence: `docs/stage22_5_completion_record.md`.
 
+M22.7 execution contract: `docs/stage22_7_integrated_campaign_handoff_roadmap.md`.  
+M22.7 current evidence: `docs/m22_7_integration_audit_2026_09_13.md`.  
+M22.8 execution contract: `docs/stage22_8_carrier_air_wing_operations_roadmap.md`.
+
+M22.8 is a deliberate post-freeze feature extension. It must reuse Stage-17.5/18/19 combat/economy authorities, consume the composed campaign/persistence foundation closed by M22.7, and re-open only carrier/small-craft-related balance evidence affected by the new capability. It does not authorize a parallel carrier combat engine or hidden aviation resource pool.
+
 Cross-media production plan for faction packages, ships, stations, NPCs, missions, locations,
 characters, UI art, VFX, audio, localization, manifests, alpha floors and cut rules:
 `docs/content_production_plan_stage21_23.md`.
@@ -631,7 +637,7 @@ Faction design authority:
 
 ## 11. Stage 23 — Polish / Release Candidate
 
-**PLANNED.**
+**PLANNED — blocked by M22.7 and M22.8.**
 
 UX/onboarding/accessibility/performance/content validation/save hardening after fundamental simulation/content architecture is stable.
 
@@ -690,7 +696,7 @@ Stage 17 COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
 → Stage 21 RPG / Living World COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
-→ Stage 22 Content / Balance Alpha ACTIVE — M22.0 COMPLETE; M22.1 COMPLETE; M22.2 COMPLETE; M22.3 COMPLETE; M22.4 COMPLETE; M22.5 COMPLETE; M22.6 NEXT
+→ Stage 22 Content / Balance Alpha ACTIVE — M22.0 COMPLETE; M22.1 COMPLETE; M22.2 COMPLETE; M22.3 COMPLETE; M22.4 COMPLETE; M22.5 COMPLETE; M22.6 merged; M22.7 ACTIVE / PARTIAL; M22.8 PLANNED
 → Stage 23 RC / final presentation replacement and polish for the core pair PLANNED
 → Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
@@ -699,7 +705,21 @@ Detailed faction/content execution, ID migration and post-core package sequencin
 `docs/factions/faction_implementation_roadmap.md`; evidence gates are defined in
 `docs/factions/faction_balance_validation_framework.md`. These documents refine the sequence without changing the live stage status in this roadmap.
 
-**Immediate implementation priority is M22.6 — core pair balance/freeze.** M22.0–M22.5 are accepted upstream contracts. Per the faction execution roadmap, M22.6 must close integrity/content legality and AI competence first, then equal-burden normalization, B00–B14 and B18–B20 paired evidence, outlier/event-trace review, causal content/policy tuning, repeated full paired batches and the manifest/profile/fingerprint/balance-report freeze. M22.6 implementation is intentionally not begun in the M22.5 closeout.
+**Immediate implementation priority is M22.7 — Integrated Campaign Handoff.** M22.6 is accepted upstream and merged. M22.7 remains ACTIVE / PARTIAL until its campaign coordinator, simulation-time scheduling, composed save/load, first-hour causal journey, production-client smoke, graphical/human gates and remaining integration evidence are actually closed. **M22.8 is PLANNED only and must not begin before M22.7 is COMPLETE and merged.**
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
-file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.
+file and the stage-specific execution contracts are authoritative for current implementation status.
+
+## M22.7 integration handoff (2026-09-13)
+
+Execution contract: [M22.7 roadmap](stage22_7_integrated_campaign_handoff_roadmap.md).
+Current evidence and remaining gates: [integration audit](m22_7_integration_audit_2026_09_13.md).
+M22.8 remains PLANNED until M22.7 is actually closed. Human gates retain their owner-directed deferrals (#361, #370); no human PASS is inferred.
+
+## M22.8 Carrier Air Wing / Small Craft Operations (planned 2026-09-14)
+
+Execution contract: [M22.8 carrier/small-craft roadmap](stage22_8_carrier_air_wing_operations_roadmap.md).
+
+M22.8 adds persistent reusable fighters/drones, finite carrier stores and hangar throughput, deterministic sortie/recovery/service lifecycle, CAP/interception/escort/strike/recon/EW missions, carrier tactical doctrine, campaign logistics/replacement, composed persistence and production UI on top of existing authorities. Because this capability is introduced after the M22.6 balance freeze, M22.8 must re-run the affected carrier/direct-weapon, missile/PD/interceptor, fleet-composition and logistics balance evidence before Stage 23 may open.
+
+Stage 23 remains PLANNED until both M22.7 and M22.8 have been accepted, merged and their resulting `main` state verified.

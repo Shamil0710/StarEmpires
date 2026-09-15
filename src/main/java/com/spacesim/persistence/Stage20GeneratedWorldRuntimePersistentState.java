@@ -7,6 +7,7 @@ import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.StarSystemId;
+import com.spacesim.world.WorldSimulation;
 import com.spacesim.world.WorldState;
 
 import java.util.ArrayList;
@@ -26,11 +27,17 @@ import java.util.Objects;
  * responsible for refreshing that mirror before construction; decode never silently repairs a
  * cross-envelope mismatch. Route, cargo, ownership and lifecycle state remain freight-owned.</p>
  *
+ * <p>The multi-system scheduler changes remote simulation state and is therefore part of exact
+ * continuation authority. Its strategic-step size and per-frame remote budget are persisted beside
+ * the active system instead of being reconstructed from process defaults after load.</p>
+ *
  * @param schemaVersion checkpoint schema version
  * @param bridgeVersion exact runtime-composition contract
  * @param campaign current generated campaign and Stage-18 industrial state
  * @param worldState ordinary multi-system ECS/fleet/jump state
  * @param activeSystemId active full-rate local system
+ * @param strategicStepTicks number of fixed ticks represented by one remote coarse update
+ * @param remoteUpdateBudgetPerFrame maximum remote coarse updates allowed per render frame
  * @param freight current physical fleet, cargo-lot and transport-order sidecar
  * @param localFleetPhysicalStates exact Stage-20 kinematics for every in-system ordinary fleet
  */
@@ -41,19 +48,57 @@ public record Stage20GeneratedWorldRuntimePersistentState(
         Stage20GeneratedCampaignPersistentState campaign,
         WorldState worldState,
         StarSystemId activeSystemId,
+        int strategicStepTicks,
+        int remoteUpdateBudgetPerFrame,
         Stage20FreightPersistentState freight,
         List<LocalFleetPhysicalState> localFleetPhysicalStates) {
     /** Current atomic Stage-20.5 generated-runtime checkpoint schema. */
-    public static final int CURRENT_VERSION = 2;
+    public static final int CURRENT_VERSION = 3;
 
     /**
-     * Validates all cross-envelope identity and active-route invariants.
+     * Source-compatible constructor for callers that predate persisted scheduler configuration.
+     *
+     * <p>Those callers retain the historical ordinary {@link WorldSimulation} defaults. New live
+     * captures must use the canonical constructor so custom scheduler configuration is not lost.</p>
      *
      * @param schemaVersion checkpoint schema version
      * @param bridgeVersion exact runtime-composition contract
      * @param campaign current generated campaign and Stage-18 industrial state
      * @param worldState ordinary multi-system ECS/fleet/jump state
      * @param activeSystemId active full-rate local system
+     * @param freight current physical fleet, cargo-lot and transport-order sidecar
+     * @param localFleetPhysicalStates exact Stage-20 kinematics for every in-system ordinary fleet
+     */
+    public Stage20GeneratedWorldRuntimePersistentState(
+            int schemaVersion,
+            String bridgeVersion,
+            Stage20GeneratedCampaignPersistentState campaign,
+            WorldState worldState,
+            StarSystemId activeSystemId,
+            Stage20FreightPersistentState freight,
+            List<LocalFleetPhysicalState> localFleetPhysicalStates) {
+        this(
+                schemaVersion,
+                bridgeVersion,
+                campaign,
+                worldState,
+                activeSystemId,
+                WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS,
+                WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME,
+                freight,
+                localFleetPhysicalStates);
+    }
+
+    /**
+     * Validates all cross-envelope identity, scheduler and active-route invariants.
+     *
+     * @param schemaVersion checkpoint schema version
+     * @param bridgeVersion exact runtime-composition contract
+     * @param campaign current generated campaign and Stage-18 industrial state
+     * @param worldState ordinary multi-system ECS/fleet/jump state
+     * @param activeSystemId active full-rate local system
+     * @param strategicStepTicks number of fixed ticks represented by one remote coarse update
+     * @param remoteUpdateBudgetPerFrame maximum remote coarse updates allowed per render frame
      * @param freight current physical fleet, cargo-lot and transport-order sidecar
      * @param localFleetPhysicalStates exact Stage-20 kinematics for every in-system ordinary fleet
      */
@@ -69,6 +114,14 @@ public record Stage20GeneratedWorldRuntimePersistentState(
         Objects.requireNonNull(campaign, "campaign");
         Objects.requireNonNull(worldState, "worldState");
         Objects.requireNonNull(activeSystemId, "activeSystemId");
+        if (strategicStepTicks <= 1) {
+            throw new IllegalArgumentException(
+                    "Stage-20.5 strategic step must aggregate more than one fixed tick");
+        }
+        if (remoteUpdateBudgetPerFrame <= 0) {
+            throw new IllegalArgumentException(
+                    "Stage-20.5 remote update budget must be positive");
+        }
         Objects.requireNonNull(freight, "freight");
         ArrayList<LocalFleetPhysicalState> physical = new ArrayList<>(
                 Objects.requireNonNull(localFleetPhysicalStates, "localFleetPhysicalStates"));

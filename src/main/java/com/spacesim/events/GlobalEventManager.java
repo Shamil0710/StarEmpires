@@ -4,8 +4,10 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import com.spacesim.constants.Constants;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -21,6 +23,13 @@ import java.util.random.RandomGenerator;
  * выполняет дополнительного случайного вызова.</p>
  */
 public class GlobalEventManager {
+    /**
+     * Maximum unread presentation articles retained per session, matching the existing save bound.
+     * Overflow expires the oldest enqueued article; economic events and their revisions are retained
+     * independently. Retention depends only on publication order, never on wall-clock or UI cadence.
+     */
+    public static final int MAX_PENDING_NEWS = 100_000;
+
     private static final double DEFAULT_SPAWN_RATE_PER_SECOND = -60d * Math.log1p(-0.001d);
     private static final float DEFAULT_EVENT_DURATION_SECONDS = 30f;
     private static final double EVENT_TIME_EPSILON_SECONDS = 1e-9d;
@@ -188,12 +197,15 @@ public class GlobalEventManager {
             }
             activeEvents = List.copyOf(Objects.requireNonNull(activeEvents, "Список событий не задан"));
             pendingNews = List.copyOf(Objects.requireNonNull(pendingNews, "Список новостей не задан"));
+            if (pendingNews.size() > MAX_PENDING_NEWS) {
+                throw new IllegalArgumentException("pendingNews exceeds the persistent retention limit");
+            }
         }
     }
 
     private final List<EconomyEvent> activeEvents = new ArrayList<>();
     private final List<EconomyEvent> activeEventsView = Collections.unmodifiableList(activeEvents);
-    private final List<NewsArticle> pendingNews = new ArrayList<>();
+    private final Deque<NewsArticle> pendingNews = new ArrayDeque<>();
     private final RandomGenerator random;
     private final double spawnRatePerSecond;
 
@@ -348,7 +360,7 @@ public class GlobalEventManager {
 
         NewsArticle article = NewsGenerator.generate(checkedEvent, simulationTimeSeconds);
         activeEvents.add(checkedEvent);
-        pendingNews.add(article);
+        publishNews(article);
         eventRevision++;
     }
 
@@ -383,11 +395,16 @@ public class GlobalEventManager {
 
     /**
      * Добавляет deterministic gameplay news в persistent очередь без изменения RNG/event set.
+     * At capacity, the oldest unread presentation article expires before the new article is queued.
      *
      * @param article статья с game-time timestamp
      */
     public void publishNews(NewsArticle article) {
-        pendingNews.add(Objects.requireNonNull(article, "Публикуемая новость не задана"));
+        NewsArticle checked = Objects.requireNonNull(article, "Публикуемая новость не задана");
+        if (pendingNews.size() == MAX_PENDING_NEWS) {
+            pendingNews.removeFirst();
+        }
+        pendingNews.addLast(checked);
     }
 
     /**
