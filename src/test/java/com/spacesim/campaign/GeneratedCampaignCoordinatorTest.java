@@ -6,8 +6,11 @@ import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeneratedCampaignCoordinatorTest {
@@ -66,5 +69,47 @@ class GeneratedCampaignCoordinatorTest {
         assertEquals(campaign.transitions(), restored.transitions());
         assertEquals(campaign.recovery(), restored.recovery());
         assertEquals(campaign.npcMissions(), restored.npcMissions());
+    }
+
+    @Test
+    void nativeSaveRestoreContinuesAtEightTimesSpeedWithoutIdentityOrStateDivergence() {
+        GeneratedCampaignCoordinator continuous = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        continuous.setTimeScale(8d);
+        continuous.advanceFrame(0.05f);
+
+        Stage21IGeneratedWorldRuntimePersistentState checkpoint = continuous.captureState();
+        byte[] payload = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(checkpoint);
+        GeneratedCampaignCoordinator resumed = GeneratedCampaignCoordinator.restore(
+                Stage21IGeneratedWorldRuntimePersistenceCodec.decode(payload));
+
+        assertEquals(
+                continuous.actors().capture().stream().map(state -> state.factionContentId()).toList(),
+                resumed.actors().capture().stream().map(state -> state.factionContentId()).toList());
+        assertEquals(continuous.captureState(), resumed.captureState());
+
+        var continuousReport = continuous.advanceFrame(0.05f);
+        var resumedReport = resumed.advanceFrame(0.05f);
+
+        assertEquals(continuousReport.fixedTicks(), resumedReport.fixedTicks());
+        assertEquals(continuousReport.autonomousDecisions(), resumedReport.autonomousDecisions());
+        assertEquals(continuous.captureState(), resumed.captureState());
+    }
+
+    @Test
+    void malformedNativeCheckpointFailsClosedWithoutMutatingLiveCampaign() {
+        GeneratedCampaignCoordinator live = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        live.advanceFrame(0.1f);
+        Stage21IGeneratedWorldRuntimePersistentState before = live.captureState();
+        byte[] encoded = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(before);
+        byte[] malformed = Arrays.copyOf(encoded, encoded.length + 1);
+        malformed[malformed.length - 1] = 0x5a;
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> Stage21IGeneratedWorldRuntimePersistenceCodec.decode(malformed));
+        assertEquals(before, live.captureState(),
+                "a rejected checkpoint must not mutate the running campaign authority");
     }
 }
