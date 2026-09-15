@@ -11,6 +11,7 @@ import com.spacesim.simulation.SimulationClock;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 
 import java.util.Objects;
+import java.util.function.LongConsumer;
 
 /**
  * Ordinary headless lifecycle for one playable generated campaign.
@@ -32,6 +33,7 @@ public final class GeneratedCampaignSession {
 
     private static final double PERIOD_ALIGNMENT_TOLERANCE_SECONDS = 0.000_001d;
     private static final ActionReport NO_AUTONOMOUS_ACTIONS = new ActionReport(0, 0, 0, 0, 0);
+    private static final LongConsumer NO_TICK_OBSERVER = ignored -> { };
 
     private final long rootSeed;
     private final ContentCatalog content;
@@ -132,6 +134,23 @@ public final class GeneratedCampaignSession {
      * @return deterministic orchestration diagnostics for this call
      */
     public AdvanceReport advanceFrame(float realDeltaSeconds) {
+        return advanceFrame(realDeltaSeconds, NO_TICK_OBSERVER);
+    }
+
+    /**
+     * Advances the same runtime and observes each completed authoritative tick after freight policy.
+     *
+     * <p>This package-level seam lets the composed campaign coordinator advance later accepted
+     * authorities at exact tick boundaries without creating another clock. The observer receives no
+     * control over Stage-20 progression and is never invoked for fractional, paused or zero-scale
+     * frames.</p>
+     *
+     * @param realDeltaSeconds finite non-negative presentation delta
+     * @param afterFixedTick observer invoked once after every completed authoritative fixed tick
+     * @return deterministic orchestration diagnostics for this call
+     */
+    AdvanceReport advanceFrame(float realDeltaSeconds, LongConsumer afterFixedTick) {
+        LongConsumer observer = Objects.requireNonNull(afterFixedTick, "afterFixedTick");
         if (!Float.isFinite(realDeltaSeconds) || realDeltaSeconds < 0f) {
             throw new IllegalArgumentException("Frame delta must be finite and non-negative");
         }
@@ -168,6 +187,9 @@ public final class GeneratedCampaignSession {
                     && afterTick % autonomousDecisionPeriodTicks(activeClock()) == 0L) {
                 lastAction = freightAutopilot.advance(AUTONOMOUS_DECISION_PERIOD_SECONDS);
                 autonomousDecisions++;
+            }
+            if (executed == 1L) {
+                observer.accept(afterTick);
             }
 
             remaining -= slice;
