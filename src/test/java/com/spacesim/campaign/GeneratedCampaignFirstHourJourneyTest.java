@@ -34,10 +34,8 @@ class GeneratedCampaignFirstHourJourneyTest {
         assertNotNull(inFlightLot,
                 "ordinary generated campaign must materialize physical cargo during the first hour");
 
+        var midStage20 = campaign.session().captureState();
         var midJourney = campaign.captureState();
-        var midStage20 = midJourney.stage21HRuntime().stage21GRuntime().stage21FRuntime()
-                .stage21ERuntime().stage21DRuntime().stage21CRuntime().stage21BRuntime()
-                .stage21ARuntime().stage20Runtime();
         CargoLotState savedLot = inFlightLot;
         TransportOrderState savedOrder = midStage20.freight().orders().stream()
                 .filter(order -> order.orderId().equals(savedLot.orderId()))
@@ -86,19 +84,20 @@ class GeneratedCampaignFirstHourJourneyTest {
                 "terminal causal outcome must be a physical delivery, shortage signal or loss");
 
         long nowTick = campaign.runtime().world().getAuthoritativeWorldTick();
+        TransportOrderState finalOutcome = outcome;
         var snapshot = GeneratedCampaignFactionObservationPublisher.publish(
-                campaign.session().captureState(), outcome.stableFactionId(), nowTick);
+                campaign.session().captureState(), finalOutcome.stableFactionId(), nowTick);
         var observation = snapshot.economic().stream()
-                .filter(row -> row.targetId().equals(outcome.orderId()))
+                .filter(row -> row.targetId().equals(finalOutcome.orderId()))
                 .findFirst()
                 .orElseThrow();
         var trace = FactionInterestResolver.resolve(snapshot);
 
-        assertEquals(outcome.orderId(), observation.evidence().provenanceId());
+        assertEquals(finalOutcome.orderId(), observation.evidence().provenanceId());
         assertTrue(trace.orderedEvidence().stream().anyMatch(evidence ->
-                        evidence.targetId().equals(outcome.orderId())
+                        evidence.targetId().equals(finalOutcome.orderId())
                                 && evidence.supportingObservations().stream().anyMatch(row ->
-                                row.evidence().provenanceId().equals(outcome.orderId()))),
+                                row.evidence().provenanceId().equals(finalOutcome.orderId()))),
                 "the same transport identity must remain visible in downstream faction reasoning");
     }
 }
