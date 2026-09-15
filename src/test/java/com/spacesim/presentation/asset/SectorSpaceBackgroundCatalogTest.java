@@ -4,6 +4,8 @@ import com.spacesim.world.SectorId;
 import com.spacesim.world.StarSystemId;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
@@ -87,6 +89,20 @@ class SectorSpaceBackgroundCatalogTest {
                 assertNotNull(stream, "missing packaged background: " + path);
                 assertEquals(0xFF, stream.read(), "JPEG SOI byte 1: " + path);
                 assertEquals(0xD8, stream.read(), "JPEG SOI byte 2: " + path);
+            }
+        }
+    }
+
+    @Test
+    void packagedBackgroundsDecodeThroughRuntimeSafeImageReader() throws IOException {
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        for (String path : SectorSpaceBackgroundCatalog.allTexturePaths()) {
+            try (InputStream stream = loader.getResourceAsStream(path)) {
+                assertNotNull(stream, "missing packaged background: " + path);
+                BufferedImage image = ImageIO.read(stream);
+                assertNotNull(image, "unsupported packaged JPEG: " + path);
+                assertTrue(image.getWidth() > 0, "non-positive background width: " + path);
+                assertTrue(image.getHeight() > 0, "non-positive background height: " + path);
             }
         }
     }
