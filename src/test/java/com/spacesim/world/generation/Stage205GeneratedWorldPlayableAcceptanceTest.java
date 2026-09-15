@@ -193,6 +193,65 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
         assertFalse(finalRestore.world().getFleetPlacements().isEmpty());
     }
 
+    @Test
+    void materializedFreightCadenceMatchesAcceptedCommitmentAndReservationDemand() {
+        var generated = Stage20PlayableGeneratedWorldFactory.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        var persistentFreight = generated.runtime().freight().capture();
+        var authority = generated.specialization().yardInstallation().inventory()
+                .operatingState().freightOwnership();
+
+        boolean observedIndustrialHeadroom = false;
+        for (var allocation : authority.allocations()) {
+            var demand = allocation.demand();
+            double scheduledKgPerSecond = 0d;
+            for (var slot : allocation.assignedSlots()) {
+                var fleet = persistentFreight.freighters().stream()
+                        .filter(value -> value.stableFactionId().equals(slot.stableFactionId()))
+                        .filter(value -> value.ownershipOrdinal() == slot.ownershipOrdinal())
+                        .findFirst().orElseThrow();
+                var order = persistentFreight.orders().stream()
+                        .filter(value -> value.fleetId().equals(fleet.fleetId()))
+                        .findFirst().orElseThrow();
+                scheduledKgPerSecond += fleet.cargoCapacityKg() / order.roundTripCycleSeconds();
+            }
+            double tolerance = Math.max(1.0e-9d, demand.reservedInputKgPerSecond() * 1.0e-9d);
+            assertEquals(demand.reservedInputKgPerSecond(), scheduledKgPerSecond, tolerance,
+                    "industrial freight recurrence must equal the accepted reservation rate");
+            if (demand.minimumCapacityRoute().orElseThrow().sustainableCargoThroughputKgPerSecond()
+                    > demand.reservedInputKgPerSecond() + tolerance) {
+                observedIndustrialHeadroom = true;
+            }
+        }
+        assertTrue(observedIndustrialHeadroom,
+                "acceptance fixture must contain route headroom so max-capacity cadence would fail");
+
+        for (var faction : authority.bootstrapOwnership().factions()) {
+            for (var allocation : faction.remoteCommitments()) {
+                var matchingSlots = faction.materializationSlots().stream()
+                        .filter(slot -> slot.commitment().isPresent())
+                        .filter(slot -> slot.commitment().orElseThrow().commitmentKey()
+                                .equals(allocation.commitmentKey()))
+                        .toList();
+                assertEquals(allocation.allocatedFreighters(), matchingSlots.size());
+                double scheduledKgPerSecond = 0d;
+                for (var slot : matchingSlots) {
+                    var fleet = persistentFreight.freighters().stream()
+                            .filter(value -> value.stableFactionId().equals(slot.stableFactionId()))
+                            .filter(value -> value.ownershipOrdinal() == slot.ownershipOrdinal())
+                            .findFirst().orElseThrow();
+                    var order = persistentFreight.orders().stream()
+                            .filter(value -> value.fleetId().equals(fleet.fleetId()))
+                            .findFirst().orElseThrow();
+                    scheduledKgPerSecond += fleet.cargoCapacityKg() / order.roundTripCycleSeconds();
+                }
+                double tolerance = Math.max(1.0e-9d, allocation.deliveredKgPerSecond() * 1.0e-9d);
+                assertEquals(allocation.deliveredKgPerSecond(), scheduledKgPerSecond, tolerance,
+                        "essential freight recurrence must equal the accepted commitment rate");
+            }
+        }
+    }
+
     private static Candidate candidate(LiveRuntime runtime) {
         for (var order : runtime.freight().capture().orders()) {
             for (var outpost : runtime.industry().sourceOutposts().outposts()) {
