@@ -4,11 +4,8 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
-import com.spacesim.content.ContentCatalogLoader;
-import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge;
-import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
-import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceCodec;
-import com.spacesim.simulation.GeneratedWorldFreightAutopilot;
+import com.spacesim.campaign.GeneratedCampaignCoordinator;
+import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.ui.FactionCharacterPortraitOverlay;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind;
@@ -18,24 +15,19 @@ import com.spacesim.ui.GeneratedWorldCommandUiRenderer.UiSelection;
 import com.spacesim.ui.GeneratedWorldUiModel;
 import com.spacesim.ui.GeneratedWorldUiSnapshot;
 import com.spacesim.world.StarSystemId;
-import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 
-/** Player-facing command interface over the accepted generated Stage-20/20.5 world. */
+/** Player-facing command interface over the accepted generated campaign authority chain. */
 public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private static final String SAVE_FILE = "saves/generated-world-runtime.s25";
-    private static final float AUTOPILOT_INTERVAL_SECONDS = 0.35f;
 
     private final long initialSeed;
 
-    private LiveRuntime runtime;
+    private GeneratedCampaignCoordinator campaign;
     private GeneratedWorldUiModel model;
-    private GeneratedWorldFreightAutopilot autopilot;
     private GeneratedWorldCommandUiRenderer renderer;
     private FactionCharacterPortraitOverlay characterPortraitOverlay;
     private GeneratedWorldUiSnapshot snapshot;
@@ -43,9 +35,6 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private UiSelection selection = UiSelection.none();
     private int detailScrollRows;
     private int listScrollRows;
-    private float autopilotAccumulator;
-    private boolean paused;
-    private double timeScale = 1d;
     private String status = "Генерация принятого мира…";
     private Path savePath;
     private boolean middleDragging;
@@ -67,20 +56,19 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         this.initialSeed = initialSeed;
     }
 
-    /** Generates the accepted world, binds the read-only UI and starts ordinary freight circulation. */
+    /** Generates the accepted world and binds the UI to the ordinary composed campaign lifecycle. */
     @Override
     public void create() {
-        var generated = Stage20PlayableGeneratedWorldFactory.create(initialSeed);
-        runtime = generated.runtime();
-        model = new GeneratedWorldUiModel(generated.rootSeed(), runtime, generated.content());
-        autopilot = new GeneratedWorldFreightAutopilot(runtime);
+        campaign = GeneratedCampaignCoordinator.create(initialSeed);
+        model = new GeneratedWorldUiModel(campaign.rootSeed(), campaign.runtime(), campaign.content());
         renderer = new GeneratedWorldCommandUiRenderer();
         characterPortraitOverlay = new FactionCharacterPortraitOverlay();
         savePath = Gdx.files.local(SAVE_FILE).file().toPath();
         snapshot = model.capture();
         status = "Мир сгенерирован: " + snapshot.galaxy().systems().size()
                 + " систем, " + snapshot.localObjects().size() + " объектов в активной системе.";
-        setAllClocks(false, 1d);
+        campaign.setPaused(false);
+        campaign.setTimeScale(1d);
         Gdx.input.setInputProcessor(input());
     }
 
@@ -145,7 +133,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 };
                 if (hit.kind() == HitKind.ACTIVATE_SYSTEM) {
                     StarSystemId target = new StarSystemId(Long.parseLong(hit.id()));
-                    runtime.world().activateSystem(target);
+                    campaign.runtime().world().activateSystem(target);
                     renderer.resetSystemMapCamera();
                     tab = Tab.SYSTEM;
                     selection = UiSelection.none();
@@ -220,6 +208,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     }
 
     private boolean focusFleet(long fleetIdValue) {
+        var runtime = campaign.runtime();
         var placement = runtime.world().findFleet(new com.spacesim.world.FleetId(fleetIdValue))
                 .orElse(null);
         if (placement == null) {
@@ -259,40 +248,22 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     }
 
     private boolean togglePause() {
-        paused = !paused;
-        setAllClocks(paused, timeScale);
+        boolean paused = !campaign.isPaused();
+        campaign.setPaused(paused);
         status = paused ? "Симуляция приостановлена." : "Симуляция продолжена.";
         return true;
     }
 
     private boolean setTimeScale(double scale) {
-        timeScale = scale;
-        setAllClocks(paused, timeScale);
+        campaign.setTimeScale(scale);
         status = String.format(Locale.ROOT, "Скорость симуляции ×%.0f.", scale);
         return true;
     }
 
-    private void setAllClocks(boolean pause, double scale) {
-        for (var system : runtime.world().getTopology().systems()) {
-            var clock = runtime.world().findSession(system.id()).orElseThrow().getClock();
-            clock.setTimeScale(scale);
-            clock.setPaused(pause);
-        }
-    }
-
     private boolean save() {
         try {
-            byte[] bytes = Stage20GeneratedWorldRuntimePersistenceCodec.encode(runtime.captureState());
-            Files.createDirectories(savePath.getParent());
-            Path temporary = savePath.resolveSibling(savePath.getFileName() + ".tmp");
-            Files.write(temporary, bytes);
-            try {
-                Files.move(temporary, savePath,
-                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
-                Files.move(temporary, savePath, StandardCopyOption.REPLACE_EXISTING);
-            }
-            status = "Мир сохранён: " + SAVE_FILE + ".";
+            Stage21IGeneratedWorldRuntimePersistenceCodec.write(savePath, campaign.captureState());
+            status = "Кампания сохранена: " + SAVE_FILE + ".";
         } catch (IOException | RuntimeException exception) {
             status = "Ошибка сохранения: " + safeMessage(exception);
         }
@@ -301,24 +272,20 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private boolean load() {
         try {
-            var checkpoint = Stage20GeneratedWorldRuntimePersistenceCodec.decode(
-                    Files.readAllBytes(savePath));
-            runtime = Stage20GeneratedWorldRuntimeBridge.restore(checkpoint);
-            model = new GeneratedWorldUiModel(
-                    checkpoint.campaign().generationIdentity().worldSeed(),
-                    runtime,
-                    ContentCatalogLoader.loadDefault());
-            autopilot = new GeneratedWorldFreightAutopilot(runtime);
-            paused = runtime.world().findSession(runtime.world().getActiveSystemId())
-                    .orElseThrow().getClock().isPaused();
-            timeScale = runtime.world().findSession(runtime.world().getActiveSystemId())
-                    .orElseThrow().getClock().getTimeScale();
+            var checkpoint = Stage21IGeneratedWorldRuntimePersistenceCodec.readOrMigrate(savePath);
+            GeneratedCampaignCoordinator candidate = GeneratedCampaignCoordinator.restore(checkpoint);
+            GeneratedWorldUiModel candidateModel = new GeneratedWorldUiModel(
+                    candidate.rootSeed(), candidate.runtime(), candidate.content());
+            GeneratedWorldUiSnapshot candidateSnapshot = candidateModel.capture();
+
+            campaign = candidate;
+            model = candidateModel;
+            snapshot = candidateSnapshot;
             selection = UiSelection.none();
             detailScrollRows = 0;
             listScrollRows = 0;
             renderer.resetSystemMapCamera();
-            snapshot = model.capture();
-            status = "Сохранённый generated world загружен без повторной генерации.";
+            status = "Сохранённая кампания загружена без повторной генерации.";
         } catch (IOException | RuntimeException exception) {
             status = "Ошибка загрузки: " + safeMessage(exception);
         }
@@ -330,25 +297,18 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         return true;
     }
 
-    /** Advances the ordinary generated runtime and renders its current read-only projection. */
+    /** Advances the composed campaign session and renders its current read-only projection. */
     @Override
     public void render() {
         float delta = Math.min(0.1f, Math.max(0f, Gdx.graphics.getDeltaTime()));
-        runtime.advanceFrame(delta);
-        if (!paused) {
-            autopilotAccumulator += delta;
-            if (autopilotAccumulator >= AUTOPILOT_INTERVAL_SECONDS) {
-                autopilotAccumulator = 0f;
-                try {
-                    autopilot.advance();
-                } catch (RuntimeException exception) {
-                    status = "Автологистика остановила операцию: " + safeMessage(exception);
-                }
-            }
+        try {
+            campaign.advanceFrame(delta);
+        } catch (RuntimeException exception) {
+            status = "Автономная симуляция остановила операцию: " + safeMessage(exception);
         }
         snapshot = model.capture();
         renderer.render(snapshot, tab, selection, detailScrollRows, listScrollRows,
-                paused, timeScale, status);
+                campaign.isPaused(), campaign.timeScale(), status);
         characterPortraitOverlay.render(snapshot, tab, selection);
     }
 

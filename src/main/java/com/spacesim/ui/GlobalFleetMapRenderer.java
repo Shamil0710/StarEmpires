@@ -5,7 +5,13 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.spacesim.content.Stage22EmpirePackageCatalog;
+import com.spacesim.content.Stage22IndustrialUnionPackageCatalog;
 import com.spacesim.player.GlobalFleetMapSnapshot;
+import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
+import com.spacesim.presentation.asset.Stage22ProductionShipSpriteAdapter;
+import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver;
+import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.StarSystemId;
 
@@ -19,13 +25,17 @@ import java.util.Objects;
  * <p>All visibility/classification is prepared by {@link com.spacesim.player.GlobalFleetMapModel};
  * the renderer therefore has no access to WorldSimulation or hidden entities. Stage-16 project and
  * owned-station markers are presentation-only projections of the authoritative construction
- * management snapshot.</p>
+ * management snapshot. When an owned fleet already carries a canonical Stage-22 core faction and an
+ * exact installed engineering fit, its icon is resolved through the same M22.7C production authority
+ * used by the system map; no player-affiliation or order-type heuristic is used.</p>
  */
 public final class GlobalFleetMapRenderer {
     private static final float PADDING = 70f;
     private static final float SYSTEM_RADIUS = 8f;
     private static final float SELECTED_RADIUS = 13f;
     private static final float FLEET_OFFSET = 14f;
+    private static final float PRODUCTION_FLEET_ICON_LENGTH = 18f;
+    private static final float MIN_PRODUCTION_FLEET_ICON_WIDTH = 6f;
     private static final float PROJECT_OFFSET_X = -18f;
     private static final float PROJECT_OFFSET_Y = 20f;
     private static final float STATION_OFFSET_X = 18f;
@@ -34,6 +44,7 @@ public final class GlobalFleetMapRenderer {
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
     private final BitmapFont font = new BitmapFont();
+    private Stage20MinimumPlayableTextureRenderer shipSprites;
 
     /** Creates isolated renderer-owned libGDX resources. */
     public GlobalFleetMapRenderer() {
@@ -137,7 +148,9 @@ public final class GlobalFleetMapRenderer {
         shapes.end();
 
         batch.setProjectionMatrix(camera.combined);
+        batch.setColor(Color.WHITE);
         batch.begin();
+        drawProductionFleetIcons(checked, points);
         for (GlobalFleetMapSnapshot.SystemMarker system : checked.systems()) {
             Point point = points.get(system.systemId());
             if (point == null) {
@@ -191,10 +204,62 @@ public final class GlobalFleetMapRenderer {
             font.draw(batch, "Owned " + station.stationDisplayName(), x + 7f, y + 5f);
         }
         batch.end();
+        batch.setColor(Color.WHITE);
+    }
+
+    private void drawProductionFleetIcons(
+            GlobalFleetMapSnapshot snapshot,
+            Map<StarSystemId, Point> points) {
+        for (GlobalFleetMapSnapshot.FleetMarker fleet : snapshot.fleets()) {
+            if (fleet.stableFactionId() == null
+                    || fleet.installedFit() == null
+                    || !isCoreProductionFaction(fleet.stableFactionId())) {
+                continue;
+            }
+            StarSystemId anchor = fleet.systemId() != null ? fleet.systemId() : fleet.transitDestination();
+            Point point = points.get(anchor);
+            if (point == null) {
+                continue;
+            }
+            var visual = Stage22ProductionShipVisualResolver.resolveInstalledFit(
+                    "fleet:" + fleet.fleetId().value(),
+                    fleet.stableFactionId(),
+                    fleet.installedFit(),
+                    RuntimeVisualState.IDLE);
+            var sprite = Stage22ProductionShipSpriteAdapter.adapt(visual);
+            float y = point.y() - FLEET_OFFSET - (fleet.fleetId().value() % 4L) * 5f;
+            float iconWidth = Math.max(
+                    MIN_PRODUCTION_FLEET_ICON_WIDTH,
+                    PRODUCTION_FLEET_ICON_LENGTH * (float) (visual.worldWidthM() / visual.worldLengthM()));
+            shipSprites().draw(
+                    batch,
+                    sprite.binding(),
+                    point.x(),
+                    y,
+                    PRODUCTION_FLEET_ICON_LENGTH,
+                    iconWidth,
+                    0f);
+        }
+    }
+
+    private Stage20MinimumPlayableTextureRenderer shipSprites() {
+        if (shipSprites == null) {
+            shipSprites = new Stage20MinimumPlayableTextureRenderer();
+        }
+        return shipSprites;
+    }
+
+    private static boolean isCoreProductionFaction(String factionId) {
+        return Stage22EmpirePackageCatalog.STABLE_FACTION_ID.equals(factionId)
+                || Stage22IndustrialUnionPackageCatalog.STABLE_FACTION_ID.equals(factionId);
     }
 
     /** Releases renderer-owned GPU resources. */
     public void dispose() {
+        if (shipSprites != null) {
+            shipSprites.dispose();
+            shipSprites = null;
+        }
         shapes.dispose();
         batch.dispose();
         font.dispose();
