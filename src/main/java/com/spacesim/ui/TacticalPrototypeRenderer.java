@@ -65,6 +65,7 @@ public final class TacticalPrototypeRenderer {
     private final SpriteBatch spriteBatch;
     private final Stage20MinimumPlayableTextureRenderer minimumSprites;
     private final OrdnanceTextureRenderer ordnanceSprites;
+    private final TacticalVfxRenderer vfxRenderer;
     private final Vector2 a = new Vector2();
     private final Vector2 b = new Vector2();
     private boolean disposed;
@@ -83,6 +84,7 @@ public final class TacticalPrototypeRenderer {
         this.ordnanceSprites = useMinimumPlayableSprites
                 ? OrdnanceTextureRenderer.tryCreate()
                 : null;
+        this.vfxRenderer = new TacticalVfxRenderer();
     }
 
     /**
@@ -120,6 +122,7 @@ public final class TacticalPrototypeRenderer {
         drawShipsAndBodies(layout, snapshot, minimumSprites == null, ordnanceSprites != null);
         drawShipCues(layout, snapshot);
         drawImpactsAndDamage(layout, snapshot);
+        vfxRenderer.render(projectionMatrix, layout, snapshot);
     }
 
     /** Releases renderer-owned libGDX resources. */
@@ -134,6 +137,7 @@ public final class TacticalPrototypeRenderer {
             if (spriteBatch != null) {
                 spriteBatch.dispose();
             }
+            vfxRenderer.dispose();
             shapes.dispose();
             disposed = true;
         }
