@@ -52,12 +52,20 @@ public final class GeneratedCampaignSession {
     /**
      * Creates one new campaign through the accepted generated-world production bootstrap.
      *
+     * <p>The raw Stage-20.5 bootstrap historically places every generated freighter at the exact
+     * major-hub center. M22.7 normalizes that freshly-created atomic checkpoint into deterministic
+     * physical traffic berths and immediately restores it through the existing bridge. This is a
+     * one-time new-campaign operation; save-game resume never regenerates or re-berths ships.</p>
+     *
      * @param rootSeed deterministic generated-world seed
      * @return ordinary long-lived campaign session
      */
     public static GeneratedCampaignSession create(long rootSeed) {
         var generated = Stage20PlayableGeneratedWorldFactory.create(rootSeed);
-        return new GeneratedCampaignSession(generated.rootSeed(), generated.content(), generated.runtime());
+        Stage20GeneratedWorldRuntimePersistentState berthed =
+                GeneratedCampaignInitialTrafficBerth.apply(generated.runtime().captureState());
+        LiveRuntime runtime = Stage20GeneratedWorldRuntimeBridge.restore(berthed);
+        return new GeneratedCampaignSession(generated.rootSeed(), generated.content(), runtime);
     }
 
     /**
