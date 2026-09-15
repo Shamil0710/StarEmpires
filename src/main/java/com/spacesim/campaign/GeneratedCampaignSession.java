@@ -183,6 +183,9 @@ public final class GeneratedCampaignSession {
                         "Campaign frame slice crossed more than one authoritative fixed tick");
             }
             fixedTicks += executed;
+            if (executed == 1L) {
+                observeFreightDeliveryDeadlines(afterTick);
+            }
             if (executed == 1L
                     && afterTick % autonomousDecisionPeriodTicks(activeClock()) == 0L) {
                 lastAction = freightAutopilot.advance(AUTONOMOUS_DECISION_PERIOD_SECONDS);
@@ -198,6 +201,13 @@ public final class GeneratedCampaignSession {
             }
         }
         return new AdvanceReport(fixedTicks, autonomousDecisions, lastAction);
+    }
+
+    private void observeFreightDeliveryDeadlines(long authoritativeTick) {
+        double simulationSeconds = authoritativeTick * (double) activeClock().getFixedStepSeconds();
+        for (var fleet : runtime.freight().capture().freighters()) {
+            runtime.freight().observeDeliveryDelay(fleet.fleetId(), simulationSeconds);
+        }
     }
 
     private SimulationClock activeClock() {
