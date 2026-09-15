@@ -3,6 +3,7 @@ package com.spacesim.campaign;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimeMigration;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
+import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GeneratedCampaignCoordinatorTest {
     @Test
     void newCampaignCapturesOneNativeFinalStage21Checkpoint() {
-        GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(22_700_101L);
+        GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
 
         Stage21IGeneratedWorldRuntimePersistentState checkpoint = campaign.captureState();
         GeneratedCampaignCoordinator restored = GeneratedCampaignCoordinator.restore(checkpoint);
@@ -27,7 +29,8 @@ class GeneratedCampaignCoordinatorTest {
 
     @Test
     void legacyStage20LineageSurvivesRestoreAndSubsequentNativeSave() {
-        GeneratedCampaignSession legacySession = GeneratedCampaignSession.create(22_700_102L);
+        GeneratedCampaignSession legacySession = GeneratedCampaignSession.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         Stage21IGeneratedWorldRuntimePersistentState migrated =
                 Stage21IGeneratedWorldRuntimeMigration.migrate(legacySession.captureState());
 
@@ -41,7 +44,8 @@ class GeneratedCampaignCoordinatorTest {
 
     @Test
     void finalCodecRoundTripPreservesEveryComposedAuthoritySnapshot() {
-        GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(22_700_103L);
+        GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         campaign.actors().capture().forEach(state -> campaign.actors().setCommitmentUntilTick(
                 state.factionContentId(),
                 state.nextReviewTick() + 17L));
