@@ -22,6 +22,21 @@ if not defined JAVA_EXE (
     goto :failure
 )
 
+set "JAVA_VERSION="
+set "JAVA_MAJOR="
+for /f "tokens=3" %%V in ('"%JAVA_EXE%" -version 2^>^&1 ^| findstr /i "version"') do if not defined JAVA_VERSION set "JAVA_VERSION=%%~V"
+for /f "tokens=1 delims=." %%M in ("%JAVA_VERSION%") do set "JAVA_MAJOR=%%M"
+
+if not "%JAVA_MAJOR%"=="17" (
+    echo [ERROR] Star Empires currently requires JDK 17 for the desktop runtime.
+    echo Detected Java: %JAVA_VERSION%
+    echo Executable: %JAVA_EXE%
+    echo Configure JAVA_HOME to a JDK 17 installation and launch this file again.
+    goto :failure
+)
+
+echo Using Java %JAVA_VERSION%: %JAVA_EXE%
+
 if not exist "%PROJECT_DIR%mvnw.cmd" (
     echo [ERROR] Maven Wrapper was not found: %PROJECT_DIR%mvnw.cmd
     goto :failure
