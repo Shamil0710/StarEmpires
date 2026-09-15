@@ -136,6 +136,14 @@ public final class GeneratedCampaignCoordinator {
     /**
      * Forms one Stage-21D command group over a read-only reconstruction of ordinary fleets.
      *
+     * @param forces read-only physical fleet reconstruction used for formation validation
+     * @param factionId numeric ordinary-world faction owner
+     * @param name player/AI-visible command-group name
+     * @param memberFleetIds physical fleets assigned to the group
+     * @param homeSystemId canonical home system for the group
+     * @param reserve whether the group is retained as strategic reserve
+     * @param homeDefense whether the group is constrained to home-defense duty
+     * @param maxStrategicRiskBps maximum accepted strategic-route risk in basis points
      * @return newly allocated canonical command-group metadata
      */
     public CommandGroupState formFleetCommandGroup(
@@ -169,6 +177,14 @@ public final class GeneratedCampaignCoordinator {
      * strategic-risk authorities. The coordinator stores only the canonical replacement returned by
      * {@link FleetOrderSubmissionService}; physical fleet placement is never mutated here.</p>
      *
+     * @param forces read-only physical fleet reconstruction used for order validation
+     * @param commandGroupId accepted Stage-21D command group receiving the order
+     * @param type requested canonical fleet-order type
+     * @param source player or AI provenance for the order
+     * @param targetSystemId canonical physical destination system
+     * @param accessPolicy existing authority for legal transit through candidate systems
+     * @param servicePolicy existing authority for required destination service capability
+     * @param riskPolicy existing authority for strategic-route risk acceptance
      * @return accepted canonical fleet-order metadata
      */
     public FleetOrderState submitFleetOrder(
@@ -203,6 +219,11 @@ public final class GeneratedCampaignCoordinator {
     /**
      * Admits one Stage-21E operation from an already accepted active Stage-21D order.
      *
+     * @param forces read-only physical fleet reconstruction backing the command group
+     * @param commandGroupId accepted Stage-21D command group with an active order
+     * @param rulesOfEngagement canonical combat escalation constraints
+     * @param supplyPolicy canonical supply/readiness continuation constraints
+     * @param withdrawalPolicy canonical withdrawal conditions
      * @return newly allocated canonical operation metadata
      */
     public OperationState beginStrategicOperation(
@@ -227,6 +248,8 @@ public final class GeneratedCampaignCoordinator {
     /**
      * Reconciles an existing Stage-21E operation against current ordinary physical readiness/supply.
      *
+     * @param operationId accepted Stage-21E operation to review
+     * @param forces current read-only physical fleet reconstruction
      * @return canonical review and continuation decision
      */
     public SupplyReview reviewStrategicOperationSupply(long operationId, FleetForceRegistry forces) {
@@ -251,6 +274,9 @@ public final class GeneratedCampaignCoordinator {
      * the ordinary world. The coordinator retains the returned Stage-21F metadata and any canonical
      * Stage-21E lifecycle replacement produced by that service.</p>
      *
+     * @param forces current read-only physical fleet reconstruction
+     * @param identities accepted content-to-world faction identity resolver
+     * @param operationId accepted Stage-21E invasion operation being reconciled
      * @return canonical territorial reconciliation result
      */
     public TerritorialTransitionService.AdvanceResult advanceTerritorialTransition(
