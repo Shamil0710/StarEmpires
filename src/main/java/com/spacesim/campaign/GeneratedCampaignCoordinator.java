@@ -28,6 +28,9 @@ import java.util.Objects;
  * envelope instead of introducing another persistence format.</p>
  */
 public final class GeneratedCampaignCoordinator {
+    private static final long ACTOR_REVIEW_CADENCE_TICKS = 600L;
+    private static final int MAX_ACTOR_REVIEWS_PER_TICK = 8;
+
     private final GeneratedCampaignSession session;
     private final FactionLivingActorRuntime actors;
     private final List<FactionStrategicIntentState> strategicIntents;
@@ -219,12 +222,28 @@ public final class GeneratedCampaignCoordinator {
     }
 
     /**
-     * Advances the ordinary campaign session without creating a second clock.
+     * Advances the ordinary campaign and reviews due Stage-21A actors at exact authoritative ticks.
+     *
+     * <p>Freight, physical movement and industry advance first inside the accepted Stage-20 session.
+     * A due actor then receives a read-only freight-ledger projection from that exact tick. The
+     * projection reuses the persistent Stage-20 order ID as evidence/decision provenance and owns no
+     * replacement gameplay state.</p>
      *
      * @param realDeltaSeconds finite non-negative presentation delta
      * @return deterministic ordinary-session advance diagnostics
      */
     public GeneratedCampaignSession.AdvanceReport advanceFrame(float realDeltaSeconds) {
-        return session.advanceFrame(realDeltaSeconds);
+        return session.advanceFrame(realDeltaSeconds, this::reviewActorsAtTick);
+    }
+
+    private void reviewActorsAtTick(long authoritativeTick) {
+        actors.reviewDue(
+                authoritativeTick,
+                MAX_ACTOR_REVIEWS_PER_TICK,
+                ACTOR_REVIEW_CADENCE_TICKS,
+                factionId -> GeneratedCampaignFactionObservationPublisher.publish(
+                        session.captureState(),
+                        factionId,
+                        authoritativeTick));
     }
 }
