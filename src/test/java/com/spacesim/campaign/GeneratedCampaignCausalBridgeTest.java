@@ -4,8 +4,6 @@ import com.spacesim.world.FactionInterestResolver;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -51,8 +49,21 @@ class GeneratedCampaignCausalBridgeTest {
         coarse.setTimeScale(8d);
         fine.setTimeScale(8d);
 
-        coarse.advanceFrame(0.1f);
-        for (int frame = 0; frame < 8; frame++) {
+        long startTick = coarse.runtime().world().getAuthoritativeWorldTick();
+        long firstReviewTick = coarse.actors().capture().stream()
+                .mapToLong(state -> state.nextReviewTick())
+                .min()
+                .orElseThrow();
+        long ticksToAdvance = Math.max(1L, firstReviewTick - startTick);
+
+        long wholeEightTickFrames = ticksToAdvance / 8L;
+        for (long frame = 0L; frame < wholeEightTickFrames; frame++) {
+            coarse.advanceFrame(0.1f);
+        }
+        for (long tick = wholeEightTickFrames * 8L; tick < ticksToAdvance; tick++) {
+            coarse.advanceFrame(0.0125f);
+        }
+        for (long tick = 0L; tick < ticksToAdvance; tick++) {
             fine.advanceFrame(0.0125f);
         }
 
@@ -61,7 +72,7 @@ class GeneratedCampaignCausalBridgeTest {
         assertTrue(coarse.actors().capture().stream()
                         .mapToLong(state -> state.completedReviewCount())
                         .sum() > 0L,
-                "ordinary campaign progression must execute due faction reviews");
+                "ordinary campaign progression must execute the first due faction review");
         assertEquals(
                 coarse.actors().capture().stream().map(state -> state.factionContentId()).toList(),
                 fine.actors().capture().stream().map(state -> state.factionContentId()).toList());
