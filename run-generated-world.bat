@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 set "PROJECT_DIR=%~dp0"
 set "WORLD_SEED=%~1"
@@ -12,30 +12,59 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "JAVA_EXE="
-if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
-if not defined JAVA_EXE for /f "delims=" %%J in ('where.exe java 2^>nul') do if not defined JAVA_EXE set "JAVA_EXE=%%J"
+rem Star Empires currently targets Java 17. Do not trust the user's global JAVA_HOME/PATH:
+rem IntelliJ frequently leaves a newer project/runtime JDK there. Prefer an already-installed
+rem JDK 17 and use it only for this launcher process.
+set "JAVA17_HOME="
+set "JAVA17_VERSION="
 
-if not defined JAVA_EXE (
-    echo [ERROR] Java was not found in JAVA_HOME or PATH.
-    echo Install JDK 17, configure JAVA_HOME, and restart the terminal.
+if defined JAVA_HOME call :probe_java_home "%JAVA_HOME%"
+
+if not defined JAVA17_HOME if exist "%USERPROFILE%\.jdks" (
+    for /d %%D in ("%USERPROFILE%\.jdks\*") do if not defined JAVA17_HOME call :probe_java_home "%%~fD"
+)
+
+if not defined JAVA17_HOME if exist "%ProgramFiles%\Eclipse Adoptium" (
+    for /d %%D in ("%ProgramFiles%\Eclipse Adoptium\jdk-17*") do if not defined JAVA17_HOME call :probe_java_home "%%~fD"
+)
+
+if not defined JAVA17_HOME if exist "%ProgramFiles%\Microsoft" (
+    for /d %%D in ("%ProgramFiles%\Microsoft\jdk-17*") do if not defined JAVA17_HOME call :probe_java_home "%%~fD"
+)
+
+if not defined JAVA17_HOME if exist "%ProgramFiles%\Java" (
+    for /d %%D in ("%ProgramFiles%\Java\jdk-17*") do if not defined JAVA17_HOME call :probe_java_home "%%~fD"
+)
+
+if not defined JAVA17_HOME if defined ProgramFiles(x86) if exist "%ProgramFiles(x86)%\Eclipse Adoptium" (
+    for /d %%D in ("%ProgramFiles(x86)%\Eclipse Adoptium\jdk-17*") do if not defined JAVA17_HOME call :probe_java_home "%%~fD"
+)
+
+if not defined JAVA17_HOME (
+    for /f "delims=" %%J in ('where.exe java 2^>nul') do if not defined JAVA17_HOME call :probe_java_exe "%%~fJ"
+)
+
+if not defined JAVA17_HOME (
+    echo [ERROR] Star Empires requires a JDK 17 desktop runtime, but no JDK 17 installation was found.
+    echo.
+    echo Searched:
+    echo   JAVA_HOME
+    echo   %%USERPROFILE%%\.jdks\*   ^(IntelliJ IDEA downloaded JDKs^)
+    echo   %%ProgramFiles%%\Eclipse Adoptium\jdk-17*
+    echo   %%ProgramFiles%%\Microsoft\jdk-17*
+    echo   %%ProgramFiles%%\Java\jdk-17*
+    echo   java.exe entries on PATH
+    echo.
+    echo Install JDK 17 in IntelliJ IDEA ^(Project Structure ^> SDKs^) or with your preferred JDK distribution,
+    echo then launch this file again. You do not need to replace your global JDK 24 configuration.
     goto :failure
 )
 
-set "JAVA_VERSION="
-set "JAVA_MAJOR="
-for /f "tokens=3" %%V in ('"%JAVA_EXE%" -version 2^>^&1 ^| findstr /i "version"') do if not defined JAVA_VERSION set "JAVA_VERSION=%%~V"
-for /f "tokens=1 delims=." %%M in ("%JAVA_VERSION%") do set "JAVA_MAJOR=%%M"
+set "JAVA_HOME=%JAVA17_HOME%"
+set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
+set "PATH=%JAVA_HOME%\bin;%PATH%"
 
-if not "%JAVA_MAJOR%"=="17" (
-    echo [ERROR] Star Empires currently requires JDK 17 for the desktop runtime.
-    echo Detected Java: %JAVA_VERSION%
-    echo Executable: %JAVA_EXE%
-    echo Configure JAVA_HOME to a JDK 17 installation and launch this file again.
-    goto :failure
-)
-
-echo Using Java %JAVA_VERSION%: %JAVA_EXE%
+echo Using Java %JAVA17_VERSION%: %JAVA_EXE%
 
 if not exist "%PROJECT_DIR%mvnw.cmd" (
     echo [ERROR] Maven Wrapper was not found: %PROJECT_DIR%mvnw.cmd
@@ -87,6 +116,35 @@ if not "%APP_EXIT_CODE%"=="0" (
 
 popd
 exit /b %APP_EXIT_CODE%
+
+:probe_java_home
+if defined JAVA17_HOME goto :eof
+set "CANDIDATE_HOME=%~1"
+if not defined CANDIDATE_HOME goto :eof
+if not exist "%CANDIDATE_HOME%\bin\java.exe" goto :eof
+call :read_java_major "%CANDIDATE_HOME%\bin\java.exe"
+if "%CANDIDATE_MAJOR%"=="17" (
+    set "JAVA17_HOME=%CANDIDATE_HOME%"
+    set "JAVA17_VERSION=%CANDIDATE_VERSION%"
+)
+goto :eof
+
+:probe_java_exe
+if defined JAVA17_HOME goto :eof
+set "CANDIDATE_EXE=%~1"
+if not exist "%CANDIDATE_EXE%" goto :eof
+call :read_java_major "%CANDIDATE_EXE%"
+if not "%CANDIDATE_MAJOR%"=="17" goto :eof
+for %%D in ("%CANDIDATE_EXE%\..\..") do set "JAVA17_HOME=%%~fD"
+set "JAVA17_VERSION=%CANDIDATE_VERSION%"
+goto :eof
+
+:read_java_major
+set "CANDIDATE_VERSION="
+set "CANDIDATE_MAJOR="
+for /f "tokens=3" %%V in ('"%~1" -version 2^>^&1 ^| findstr /i "version"') do if not defined CANDIDATE_VERSION set "CANDIDATE_VERSION=%%~V"
+for /f "tokens=1 delims=." %%M in ("%CANDIDATE_VERSION%") do set "CANDIDATE_MAJOR=%%M"
+goto :eof
 
 :failure
 echo.
