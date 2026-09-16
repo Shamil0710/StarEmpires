@@ -364,8 +364,16 @@ public final class Stage20PlayableGeneratedWorldFactory {
     }
 
     private static String generatedFactionName(String factionId) {
-        String suffix = factionId.substring(factionId.lastIndexOf('.') + 1).replace('_', ' ');
-        return suffix.isBlank() ? factionId : Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1);
+        return switch (factionId) {
+            case "faction.alpha" -> "Империя";
+            case "faction.beta" -> "Индустриальный Союз";
+            default -> {
+                String suffix = factionId.substring(factionId.lastIndexOf('.') + 1).replace('_', ' ');
+                yield suffix.isBlank()
+                        ? factionId
+                        : Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1);
+            }
+        };
     }
 
     private record BootstrapFixture(

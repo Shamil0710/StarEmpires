@@ -274,11 +274,16 @@ public final class GeneratedWorldUiModel {
             if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
                 continue;
             }
+            LocalPhysicalPosition position = runtime.arrival().materialization(active)
+                    .physicalState(placement.localEntityId()).orElseThrow(
+                            () -> new IllegalStateException(
+                                    "local freight projection lacks exact physical state: " + state.fleetId()))
+                    .position();
             FreightView freight = freightByFleet.get(state.fleetId().value());
             List<InfoSection> sections = freight == null
                     ? List.of(identitySection(
                             state.fleetId().toString(), state.stableFactionId(),
-                            factionName(state.stableFactionId()), active, state.physicalState().position()))
+                            factionName(state.stableFactionId()), active, position))
                     : freight.sections();
             result.add(new LocalObjectView(
                     "fleet:" + state.fleetId().value(),
@@ -286,7 +291,7 @@ public final class GeneratedWorldUiModel {
                     freight == null ? "Транспорт #" + state.fleetId().value() : freight.name(),
                     localizePhase(state.phase().name()),
                     active,
-                    state.physicalState().position(),
+                    position,
                     state.stableFactionId(),
                     factionName(state.stableFactionId()),
                     runtime.freightSprite(state.fleetId()).binding(),

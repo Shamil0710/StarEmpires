@@ -1,10 +1,11 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-09-03 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 ACTIVE — M22.0–M22.5 complete, M22.6 NEXT.**
+> **Последняя синхронизация: 2026-09-15 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 ACTIVE — M22.0–M22.6 complete, M22.7 FINAL ACCEPTANCE.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 > Art maintenance: [Empire sprite refresh](empire_sprite_refresh.md) replaces the nine M22.3
-> ship texture sets against the M22.4 Union quality benchmark; M22.6 status is unchanged.
+> ship texture sets against the M22.4 Union quality benchmark. Human-only aesthetic approval remains
+> explicitly deferred to post-release issue #361 and is not M22.7 passed evidence.
 
 ## 1. Главный инвариант
 
@@ -71,8 +72,8 @@ Canonical faction contracts:
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **COMPLETE** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance | 22 | **ACTIVE — M22.6** |
-| **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance + integrated campaign handoff | 22 | **FINAL ACCEPTANCE — M22.7** |
+| **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED / BLOCKED UNTIL M22.7 CLOSES |
 
 Manual merge gate remains mandatory while `main` is unprotected:
 
@@ -568,7 +569,7 @@ Core-faction note: the same Stage-21 machinery expresses meaningfully different 
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
-**ACTIVE. M22.0, M22.1, M22.2, M22.3, M22.4 and M22.5 are complete. M22.6 — core pair balance/freeze is OPEN/NEXT.**
+**ACTIVE — final M22.7 acceptance. M22.0–M22.6 are complete; M22.7 Integrated Campaign Handoff is the only current Stage-22 gate.**
 
 M22.2 implementation merged in PR #346 as `ccd38f1d9d34c84b2f562635295a76826cdbbd11`; exact-head PR CI and post-merge main CI are green. The M22.2 closure adds only shared faction-neutral authoring contracts.
 
@@ -577,6 +578,23 @@ M22.3 Empire production package merged in PR #349 as `53cd7dcc2e0bbc7a9dbd08599c
 M22.4 Industrial Union production package merged in PR #351 as `490d38729cba03798398f36c3ac46a98e5748495`; exact implementation-head CI and post-merge `main` CI are green. The package closes Union serial-production/commonality, correlated fragility, shipyard, NPC/mission, visual/character, solo B00–B14 and persistence/fingerprint gates, including nine role-specific production sprites and their automated quality contract.
 
 M22.5 shared civilian/minor ecosystem merged in PR #353 as `854a40464eaf72e7ee86047f0de1f3ab7c7c5ed6`; exact implementation-head CI run `33754120684` / job `100644294043` and post-merge `main` CI run `33756484564` / job `100652040418` are green. The closure adds legal freight/tanker/mining/salvage/neutral-traffic production/support paths, stable package-free minor identities, B08 physical convoy/interdiction and B16 treaty/market-route shock acceptance, plus byte-stable save migration without introducing a third sovereign package or parallel authority.
+
+M22.6 core-pair balance/freeze merged in PR #355 as `9693ede2653c1fd187a904c406cc9750919a4496`. Machine scope is complete: B00–B17 paired evidence, fail-closed freeze/persistence, deterministic scheduler continuation and the frozen core-pair simulation/content fingerprint are accepted. Human-only B18 explanation review remains deferred to issue #370 and B19/B20 visual review remains deferred to #361; these deferrals are not PASS evidence and do not block M22.7 by explicit owner disposition.
+
+M22.7 is the final Stage-22 integration gate on PR #360. It does not add a new economy, diplomacy, logistics or warfare model. It closes:
+
+- one `GeneratedCampaignCoordinator` over the ordinary Stage-20/20.5 runtime and accepted Stage-21A–I authorities;
+- deterministic simulation-tick scheduling for autonomous freight/faction cadence across 1x/2x/4x/8x and save/load;
+- exact live freight movement/projection so moving ships are not rendered from stale checkpoint mirrors;
+- centralized production ship/content resolution with explicit missing-asset diagnostics;
+- one native Stage-21I composed checkpoint retaining stable world/faction/fleet/order/cargo identities and supported migration lineage;
+- a causal first-hour ordinary campaign journey linking the same transport/cargo identity through physical consequence, observation and faction decision, including midpoint save/load;
+- production-client boot/navigation/selection/strategy/logistics/save/reload smoke;
+- dense civilian traffic throughput evidence at 1x and 8x;
+- launcher/README/roadmap/save/asset/scheduling documentation truth and a Stage-23 entry manifest.
+
+M22.7 authoritative handoff contract: `docs/m22_7_integrated_campaign_handoff.md`.  
+M22.7 execution/governance override: `docs/m22_7_kickoff_override.md`.
 
 Expands the accepted physical/manufacturable language:
 
@@ -620,7 +638,9 @@ M22.2 completion evidence: `docs/stage22_2_completion_record.md`.
 M22.3 completion evidence: `docs/stage22_3_completion_record.md`.
 
 M22.4 completion evidence: `docs/stage22_4_completion_record.md`.  
-M22.5 completion evidence: `docs/stage22_5_completion_record.md`.
+M22.5 completion evidence: `docs/stage22_5_completion_record.md`.  
+M22.6 merged acceptance: PR #355 / main `9693ede2653c1fd187a904c406cc9750919a4496`.  
+M22.7 final handoff evidence: `docs/m22_7_integrated_campaign_handoff.md` + acceptance issue #368.
 
 Cross-media production plan for faction packages, ships, stations, NPCs, missions, locations,
 characters, UI art, VFX, audio, localization, manifests, alpha floors and cut rules:
@@ -631,7 +651,7 @@ Faction design authority:
 
 ## 11. Stage 23 — Polish / Release Candidate
 
-**PLANNED.**
+**PLANNED — BLOCKED UNTIL M22.7 ACCEPTANCE CLOSES.**
 
 UX/onboarding/accessibility/performance/content validation/save hardening after fundamental simulation/content architecture is stable.
 
@@ -690,8 +710,8 @@ Stage 17 COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
 → Stage 21 RPG / Living World COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
-→ Stage 22 Content / Balance Alpha ACTIVE — M22.0 COMPLETE; M22.1 COMPLETE; M22.2 COMPLETE; M22.3 COMPLETE; M22.4 COMPLETE; M22.5 COMPLETE; M22.6 NEXT
-→ Stage 23 RC / final presentation replacement and polish for the core pair PLANNED
+→ Stage 22 Content / Balance Alpha — M22.0–M22.6 COMPLETE; M22.7 FINAL ACCEPTANCE
+→ Stage 23 RC / final presentation replacement and polish — BLOCKED UNTIL M22.7 CLOSES
 → Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
 
@@ -699,7 +719,7 @@ Detailed faction/content execution, ID migration and post-core package sequencin
 `docs/factions/faction_implementation_roadmap.md`; evidence gates are defined in
 `docs/factions/faction_balance_validation_framework.md`. These documents refine the sequence without changing the live stage status in this roadmap.
 
-**Immediate implementation priority is M22.6 — core pair balance/freeze.** M22.0–M22.5 are accepted upstream contracts. Per the faction execution roadmap, M22.6 must close integrity/content legality and AI competence first, then equal-burden normalization, B00–B14 and B18–B20 paired evidence, outlier/event-trace review, causal content/policy tuning, repeated full paired batches and the manifest/profile/fingerprint/balance-report freeze. M22.6 implementation is intentionally not begun in the M22.5 closeout.
+**Immediate implementation priority is M22.7 acceptance/closure.** M22.6 is merged and machine-complete under the recorded owner deferrals. M22.7 must close exact-head CI, unified campaign ownership, deterministic freight movement/scheduling, final Stage-21I persistence, causal first-hour identity continuity, production-client smoke, 1x/8x baseline, launcher/documentation truth and issue #368 before any Stage-23 implementation begins.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
-file and `docs/stage21_living_world_roadmap.md` are authoritative for current implementation status.
+file plus `docs/m22_7_integrated_campaign_handoff.md` are authoritative for current implementation status.

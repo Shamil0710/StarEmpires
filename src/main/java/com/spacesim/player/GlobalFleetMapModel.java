@@ -1,5 +1,9 @@
 package com.spacesim.player;
 
+import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EngineeringComponent;
+import com.spacesim.components.FactionComponent;
+import com.spacesim.persistence.EntityStateMapper;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetJumpState;
 import com.spacesim.world.FleetLocationKind;
@@ -19,10 +23,12 @@ import java.util.Set;
  * Builds the global strategic map strictly from player-known authoritative state.
  *
  * <p>No arbitrary remote NPC entity scan occurs here. The model projects discovered topology,
- * explicit persistent threat intel and player-owned FleetIds only. Stage-16 construction projects
- * and completed stations are projected through {@link PlayerConstructionManagementModel}, keeping
- * all economic/progress calculations in the authoritative read model rather than duplicating them
- * in map/UI code.</p>
+ * explicit persistent threat intel and player-owned FleetIds only. For those already-owned fleets it
+ * may additionally project their own stable faction and immutable engineering fit so presentation can
+ * resolve faction art without scanning or leaking unrelated remote entities. Stage-16 construction
+ * projects and completed stations are projected through {@link PlayerConstructionManagementModel},
+ * keeping all economic/progress calculations in the authoritative read model rather than duplicating
+ * them in map/UI code.</p>
  */
 public final class GlobalFleetMapModel {
     private GlobalFleetMapModel() {
@@ -106,12 +112,25 @@ public final class GlobalFleetMapModel {
             if (systemId == null && transitDestination == null) {
                 continue;
             }
+
+            Entity entity = placement.locationKind() == FleetLocationKind.IN_SYSTEM
+                    ? checked.world().findSession(placement.systemId()).orElseThrow()
+                            .getEntityRegistry().require(placement.localEntityId())
+                    : EntityStateMapper.restore(placement.transitState().entityState());
+            FactionComponent faction = entity.getComponent(FactionComponent.class);
+            EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
+            String stableFactionId = faction == null
+                    ? null
+                    : checked.world().findFactionStableId(faction.factionId).orElse(null);
+
             fleets.add(new GlobalFleetMapSnapshot.FleetMarker(
                     fleetId,
                     systemId,
                     transitDestination,
                     fleetId.equals(player.activeFleetId()),
-                    orderByFleet.getOrDefault(fleetId, FleetOrderType.HOLD)));
+                    orderByFleet.getOrDefault(fleetId, FleetOrderType.HOLD),
+                    stableFactionId,
+                    engineering == null ? null : engineering.fit));
         }
 
         PlayerConstructionManagementSnapshot construction =

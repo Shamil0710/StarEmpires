@@ -32,8 +32,9 @@ import java.util.TreeMap;
  * strategic handoff may instead use {@link #importExact(List)} to install detached copies of exact
  * fitted engineering/damage/stores state. M22.6 may use the catalog-aware overload to import an exact
  * Stage-22 fit through the same Stage-19 runtime without assigning a Stage-17.5 doctrine as physical
- * authority. In all paths derived capability remains recomputed from ordinary physical state and the
- * contact registry remains actor-bounded.</p>
+ * authority. Exact strategic imports may additionally carry their authoritative stable faction identity;
+ * authored ALPHA/BETA fixtures do not fabricate one. In all paths derived capability remains recomputed
+ * from ordinary physical state and the contact registry remains actor-bounded.</p>
  */
 public final class LiveTacticalBattleRuntimeState {
     private final LiveTacticalBattleScenario scenario;
@@ -274,8 +275,14 @@ public final class LiveTacticalBattleRuntimeState {
                 doctrine.weaponLoadout(),
                 WeaponMountRuntime.RuntimeState.empty());
         return new CombatantRuntime(
-                spec, doctrine, hull, damageLayout,
-                new EngineeringComponent(fit, operatingState, instanceState), 0d, 0d);
+                spec,
+                doctrine,
+                hull,
+                damageLayout,
+                new EngineeringComponent(fit, operatingState, instanceState),
+                null,
+                0d,
+                0d);
     }
 
     private CombatantRuntime materializeImported(CombatantSpec spec, ImportedCombatantState imported) {
@@ -308,8 +315,14 @@ public final class LiveTacticalBattleRuntimeState {
         EngineeringComponent detached = new EngineeringComponent(
                 source.fit, source.runtimeState, source.instanceState);
         return new CombatantRuntime(
-                spec, doctrine, hull, layout, detached,
-                imported.velocityXMps(), imported.velocityYMps());
+                spec,
+                doctrine,
+                hull,
+                layout,
+                detached,
+                imported.stableFactionId(),
+                imported.velocityXMps(),
+                imported.velocityYMps());
     }
 
     private static Doctrine requireDoctrineForFit(ShipEngineeringCatalog catalog, InstalledFit fit) {
@@ -351,6 +364,7 @@ public final class LiveTacticalBattleRuntimeState {
      *
      * @param entityId positive stable tactical identity supplied by the caller
      * @param side local battle allegiance only
+     * @param stableFactionId optional authoritative campaign/world stable faction identity; never inferred from side
      * @param engineering exact current fitted engineering state to copy into the tactical runtime
      * @param xM exact local x coordinate in meters
      * @param yM exact local y coordinate in meters
@@ -360,16 +374,40 @@ public final class LiveTacticalBattleRuntimeState {
     public record ImportedCombatantState(
             long entityId,
             Side side,
+            String stableFactionId,
             EngineeringComponent engineering,
             double xM,
             double yM,
             double velocityXMps,
             double velocityYMps) {
         /**
+         * Source-compatible exact import without campaign faction identity.
+         *
+         * @param entityId positive stable tactical identity
+         * @param side local battle allegiance only
+         * @param engineering exact current fitted engineering state
+         * @param xM exact local x coordinate in meters
+         * @param yM exact local y coordinate in meters
+         * @param velocityXMps exact local x velocity in meters per second
+         * @param velocityYMps exact local y velocity in meters per second
+         */
+        public ImportedCombatantState(
+                long entityId,
+                Side side,
+                EngineeringComponent engineering,
+                double xM,
+                double yM,
+                double velocityXMps,
+                double velocityYMps) {
+            this(entityId, side, null, engineering, xM, yM, velocityXMps, velocityYMps);
+        }
+
+        /**
          * Validates one exact import row.
          *
          * @param entityId positive stable tactical identity supplied by the caller
          * @param side local battle allegiance only
+         * @param stableFactionId optional authoritative campaign/world stable faction identity
          * @param engineering exact current fitted engineering state
          * @param xM exact local x coordinate in meters
          * @param yM exact local y coordinate in meters
@@ -379,6 +417,12 @@ public final class LiveTacticalBattleRuntimeState {
         public ImportedCombatantState {
             if (entityId <= 0L) throw new IllegalArgumentException("entityId must be positive");
             Objects.requireNonNull(side, "side");
+            if (stableFactionId != null) {
+                stableFactionId = stableFactionId.strip();
+                if (stableFactionId.isEmpty()) {
+                    throw new IllegalArgumentException("stableFactionId must be null or non-blank");
+                }
+            }
             Objects.requireNonNull(engineering, "engineering");
             Objects.requireNonNull(engineering.fit, "engineering.fit");
             Objects.requireNonNull(engineering.runtimeState, "engineering.runtimeState");
@@ -398,6 +442,7 @@ public final class LiveTacticalBattleRuntimeState {
         private final ShipProtectionCatalog.HullDamageLayout damageLayout;
         private final TransformComponent transform;
         private final EngineeringComponent engineering;
+        private final String stableFactionId;
 
         private CombatantRuntime(
                 CombatantSpec spec,
@@ -405,6 +450,7 @@ public final class LiveTacticalBattleRuntimeState {
                 HullDefinition hull,
                 ShipProtectionCatalog.HullDamageLayout damageLayout,
                 EngineeringComponent engineering,
+                String stableFactionId,
                 double velocityXMps,
                 double velocityYMps) {
             this.spec = Objects.requireNonNull(spec, "spec");
@@ -412,6 +458,7 @@ public final class LiveTacticalBattleRuntimeState {
             this.hull = Objects.requireNonNull(hull, "hull");
             this.damageLayout = Objects.requireNonNull(damageLayout, "damageLayout");
             this.engineering = Objects.requireNonNull(engineering, "engineering");
+            this.stableFactionId = stableFactionId;
             this.transform = new TransformComponent();
             this.transform.position.set((float) spec.xM(), (float) spec.yM());
             this.transform.velocity.set((float) velocityXMps, (float) velocityYMps);
@@ -436,6 +483,8 @@ public final class LiveTacticalBattleRuntimeState {
         public TransformComponent transform() { return transform; }
         /** @return authoritative detached fitted physical state for this tactical runtime */
         public EngineeringComponent engineering() { return engineering; }
+        /** @return imported stable campaign/world faction identity, or null for authored side-only fixtures */
+        public String stableFactionId() { return stableFactionId; }
 
         /** @return true only after all fitted structure and installed local subsystems are physically destroyed */
         public boolean fullyDestroyed() {

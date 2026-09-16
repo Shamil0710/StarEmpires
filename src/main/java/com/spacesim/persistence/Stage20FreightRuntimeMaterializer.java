@@ -504,7 +504,7 @@ public final class Stage20FreightRuntimeMaterializer {
         RouteAssessment route = allocation.route();
         world.requireNeighborRoute(route.orderedSystems());
         double roundTrip = roundTrip(payloadKg, allocation.allocatedFreighters(),
-                route.sustainableCargoThroughputKgPerSecond(), route.travelTimeS());
+                allocation.deliveredKgPerSecond(), route.travelTimeS());
         String orderId = "freight-order:essential:" + slot.stableFactionId() + ':'
                 + slot.ownershipOrdinal();
         return new TransportOrderState(
@@ -536,7 +536,7 @@ public final class Stage20FreightRuntimeMaterializer {
         world.requireNeighborRoute(route.orderedSystems());
         int count = assignment.allocation().assignedSlots().size();
         double roundTrip = roundTrip(
-                payloadKg, count, route.sustainableCargoThroughputKgPerSecond(), route.travelTimeS());
+                payloadKg, count, demand.reservedInputKgPerSecond(), route.travelTimeS());
         String orderId = "freight-order:industrial:" + slot.stableFactionId() + ':'
                 + slot.ownershipOrdinal();
         return new TransportOrderState(
@@ -557,9 +557,10 @@ public final class Stage20FreightRuntimeMaterializer {
     }
 
     private static double roundTrip(
-            double payloadKg, int allocatedFreighters, double sustainableThroughputKgPerSecond,
+            double payloadKg, int allocatedFreighters, double orderedDemandKgPerSecond,
             double oneWaySeconds) {
-        double cycle = payloadKg * allocatedFreighters / sustainableThroughputKgPerSecond;
+        requirePositiveFinite(orderedDemandKgPerSecond, "orderedDemandKgPerSecond");
+        double cycle = payloadKg * allocatedFreighters / orderedDemandKgPerSecond;
         if (!Double.isFinite(cycle) || cycle <= oneWaySeconds) {
             throw new IllegalArgumentException("retained freight cadence is not a physical round trip");
         }

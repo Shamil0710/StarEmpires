@@ -19,10 +19,12 @@ import java.util.Objects;
  *
  * <p>The projection has no clock and performs no mutation. It exposes every materialized ship plus
  * current kinetic/residual, STRIKE, INTERCEPTOR and DECOY bodies through the existing immutable
- * tactical snapshot consumed by {@link TacticalPrototypeRenderer}. Fields that do not yet have a
- * scaled authoritative read model (current thrust fraction, historical beam/impact events and shield
- * arcs) are deliberately left at neutral/empty presentation values rather than reconstructed from
- * guesses.</p>
+ * tactical snapshot consumed by {@link TacticalPrototypeRenderer}. Exact strategic imports preserve
+ * their stable faction identity and installed fit for presentation binding; authored side-only
+ * fixtures retain null faction identity rather than inferring it from ALPHA/BETA. Fields that do not
+ * yet have a scaled authoritative read model (current thrust fraction, historical beam/impact events
+ * and shield arcs) are deliberately left at neutral/empty presentation values rather than
+ * reconstructed from guesses.</p>
  */
 public final class ScaledLiveTacticalSimulationProjection {
     /**
@@ -80,7 +82,9 @@ public final class ScaledLiveTacticalSimulationProjection {
                 combatant.hull().boundingDimensionsM().widthM(),
                 0d,
                 integrity,
-                integrity <= 0d);
+                integrity <= 0d,
+                combatant.stableFactionId(),
+                combatant.engineering().fit);
     }
 
     private static TacticalSide tacticalSide(Side side) {

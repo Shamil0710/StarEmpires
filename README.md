@@ -19,9 +19,9 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-08-27 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 OPEN/NEXT.**
+**Последняя синхронизация README: 2026-09-15 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 — M22.7 FINAL ACCEPTANCE.**
 
-Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md).
+Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md). Точный контракт финального handoff Stage 22: [`docs/m22_7_integrated_campaign_handoff.md`](docs/m22_7_integrated_campaign_handoff.md).
 
 | Milestone | Цель | Статус |
 | --- | --- | --- |
@@ -30,8 +30,8 @@
 | **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining, combat, progression | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **COMPLETE** |
 | **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **COMPLETE — Stage 20–21** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance | **OPEN/NEXT — Stage 22** |
-| **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance + integrated campaign handoff | **FINAL ACCEPTANCE — M22.7** |
+| **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED — Stage 23 |
 
 На текущем roadmap завершены Stages **0–21**, включая **Stage 20A–20L physical-world generation**,
 обязательный **Stage 20.5 runtime + visual integration gate** и полный **Stage 21 Living World**.
@@ -44,7 +44,11 @@ persistent NPCs/missions/reputation/discovery grounded in living-world state (21
 gate: read-only integrated UI projection, supported-save migration, representative cooperation/conflict
 corpus, core-pair doctrine acceptance, bounded workload evidence and non-vacuous long-run soak.
 
-**Stage 22 Content / Technology / Balance Alpha теперь OPEN/NEXT, но его реализация ещё не начата.**
+**Stage 22 находится на финальном gate M22.7 Integrated Campaign Handoff.** Ветка PR #360 объединяет
+единый production campaign coordinator, финальный Stage-21I checkpoint, deterministic scheduling,
+causal first-hour freight/observation/decision proof, production-client smoke, 1x/8x throughput baseline
+и синхронизацию launcher/docs. Stage 23 не начинается до закрытия M22.7 acceptance issue #368 и merge
+точного зелёного PR head.
 
 ## Что уже реализовано
 
@@ -146,7 +150,7 @@ Pre-Stage17 migration также покрыта historical Stage-16 fixture бе
 
 ## Persistence
 
-Актуальная архитектура описана в [`docs/persistence_model.md`](docs/persistence_model.md).
+Актуальная архитектура описана в [`docs/persistence_model.md`](docs/persistence_model.md), а финальный generated-campaign handoff — в [`docs/m22_7_integrated_campaign_handoff.md`](docs/m22_7_integrated_campaign_handoff.md).
 
 Current nested versions:
 
@@ -195,7 +199,7 @@ Scalability contract: [`docs/simulation_scalability_architecture.md`](docs/simul
 .\run.cmd
 ```
 
-Запуск принятого сгенерированного мира с новым command UI:
+Запуск интегрированной production generated campaign:
 
 ```powershell
 .\run-generated-world.bat
@@ -207,10 +211,12 @@ Scalability contract: [`docs/simulation_scalability_architecture.md`](docs/simul
 .\run-generated-world.bat 1
 ```
 
+`run-generated-world.bat` запускает тот же `GeneratedCampaignCoordinator`, который используется для
+обычной симуляции и финального Stage-21I save/load; это не отдельный демонстрационный runtime.
 В generated-world UI: `F1`–`F5` переключают системную, глобальную, фракционную, военную и
 логистическую вкладки; колесо над картой масштабирует её, удержание средней кнопки перемещает
 камеру, а двойной клик по кораблю в списке логистики или военных сил открывает его систему.
-`F8`/`F9` сохраняют и загружают runtime без повторной генерации.
+`F8`/`F9` сохраняют и загружают тот же composed runtime без повторной генерации.
 
 Только сборка:
 
@@ -303,7 +309,10 @@ branch from exact green main
 - [`docs/stage21g_peace_recovery_replacement.md`](docs/stage21g_peace_recovery_replacement.md) — accepted Stage-21G peace/demobilization/physical-recovery/replacement implementation and acceptance map;
 - [`docs/stage21h_npc_missions_reputation_discovery.md`](docs/stage21h_npc_missions_reputation_discovery.md) — accepted Stage-21H NPC/mission/reputation/discovery implementation and acceptance map;
 - [`docs/stage21i_living_world_final_gate_completion_record.md`](docs/stage21i_living_world_final_gate_completion_record.md) — Stage-21I final UI/migration/corpus/performance/soak closeout evidence;
-- [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — next content/technology/balance alpha plan;
+- [`docs/stage22_content_balance_plan.md`](docs/stage22_content_balance_plan.md) — Stage-22 content/technology/balance plan;
+- [`docs/m22_7_kickoff_override.md`](docs/m22_7_kickoff_override.md) — M22.7 execution order and issue gate;
+- [`docs/m22_7_integrated_campaign_handoff.md`](docs/m22_7_integrated_campaign_handoff.md) — final campaign composition, save contract, launcher truth, baselines and Stage-23 entry manifest;
+- [`docs/ui/stage22-production-ship-visual-resolver.md`](docs/ui/stage22-production-ship-visual-resolver.md) — production ship visual resolver/fallback diagnostics;
 - [`docs/content_production_plan_stage21_23.md`](docs/content_production_plan_stage21_23.md) — faction/ship/character/mission/media production;
 - [`docs/stage23_release_candidate_roadmap.md`](docs/stage23_release_candidate_roadmap.md) — polish, packaging and RC gate.
 
@@ -317,8 +326,8 @@ Stage 17 COMPLETE
 → Stage 20 world generation COMPLETE
 → Stage 20.5 runtime + visual integration COMPLETE
 → Stage 21 living world COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
-→ Stage 22 content/technology/balance alpha OPEN/NEXT
-→ Stage 23 polish/release candidate PLANNED
+→ Stage 22 M22.7 integrated campaign handoff — FINAL ACCEPTANCE
+→ Stage 23 polish/release candidate — BLOCKED until M22.7 gate closes
 ```
 
 ## Лицензия
