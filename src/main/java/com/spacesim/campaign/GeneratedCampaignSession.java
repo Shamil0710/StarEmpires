@@ -213,8 +213,12 @@ public final class GeneratedCampaignSession {
 
     private void observeFreightDeliveryDeadlines(long authoritativeTick) {
         double simulationSeconds = authoritativeTick * (double) activeClock().getFixedStepSeconds();
-        for (var fleet : runtime.freight().capture().freighters()) {
-            runtime.freight().observeDeliveryDelay(fleet.fleetId(), simulationSeconds);
+        var freight = runtime.freight();
+        for (var fleet : freight.capture().freighters()) {
+            if (fleet.activeOrderId().isEmpty()) {
+                continue;
+            }
+            freight.observeDeliveryDelay(fleet.fleetId(), simulationSeconds);
         }
     }
 
