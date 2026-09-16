@@ -1,8 +1,10 @@
 package com.spacesim.campaign;
 
+import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
 import com.spacesim.persistence.Stage228SmallCraftPersistenceMapper;
+import com.spacesim.world.SmallCraftFitAuthority;
 import com.spacesim.world.SmallCraftRegistry;
 
 import java.util.Objects;
@@ -12,7 +14,9 @@ import java.util.Objects;
  *
  * <p>This class does not create a parallel campaign simulation. Stage-20/21 progression remains
  * owned by the embedded coordinator; M22.8A adds only the individual small-craft identity registry
- * and a versioned persistence envelope around the accepted Stage-21 checkpoint.</p>
+ * and a versioned persistence envelope around the accepted Stage-21 checkpoint. Small-craft fit
+ * admission reuses the accepted Stage-22 core-pair production engineering catalog and ordinary
+ * Stage-17.5 fitting authority.</p>
  */
 public final class Stage228CampaignAuthority {
     private final GeneratedCampaignCoordinator coordinator;
@@ -32,22 +36,28 @@ public final class Stage228CampaignAuthority {
      * @return M22.8 authority extension over the ordinary campaign
      */
     public static Stage228CampaignAuthority create(long rootSeed) {
+        SmallCraftFitAuthority fitAuthority = productionFitAuthority();
         return new Stage228CampaignAuthority(
                 GeneratedCampaignCoordinator.create(rootSeed),
-                SmallCraftRegistry.empty());
+                SmallCraftRegistry.empty(fitAuthority));
     }
 
     /**
      * Restores a current M22.8 checkpoint exactly.
+     *
+     * <p>Decoded craft rows are admitted only after their design IDs resolve through the current
+     * Stage-22 production catalog and their exact physical state passes the ordinary Stage-17.5
+     * fitting validator.</p>
      *
      * @param checkpoint current M22.8 campaign envelope
      * @return independent restored authority
      */
     public static Stage228CampaignAuthority restore(Stage228GeneratedCampaignPersistentState checkpoint) {
         Stage228GeneratedCampaignPersistentState saved = Objects.requireNonNull(checkpoint, "checkpoint");
+        SmallCraftFitAuthority fitAuthority = productionFitAuthority();
         return new Stage228CampaignAuthority(
                 GeneratedCampaignCoordinator.restore(saved.stage21Runtime()),
-                Stage228SmallCraftPersistenceMapper.restore(saved.smallCraft()));
+                Stage228SmallCraftPersistenceMapper.restore(saved.smallCraft(), fitAuthority));
     }
 
     /**
@@ -91,5 +101,9 @@ public final class Stage228CampaignAuthority {
      */
     public GeneratedCampaignSession.AdvanceReport advanceFrame(float realDeltaSeconds) {
         return coordinator.advanceFrame(realDeltaSeconds);
+    }
+
+    private static SmallCraftFitAuthority productionFitAuthority() {
+        return new SmallCraftFitAuthority(Stage22CorePairEngineeringCatalogLoader.loadDefault());
     }
 }
