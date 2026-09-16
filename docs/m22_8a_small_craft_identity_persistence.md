@@ -13,6 +13,10 @@ Implemented contract:
 - IDs are positive, monotonic and allocated through a persisted next-ID watermark;
 - one `SmallCraftState` owns stable faction/design identity plus the accepted Stage-17.5 installed fit, runtime consumables/power/thermal state and instance damage/shield/maintenance/weapon continuity;
 - ammunition and reaction mass therefore remain physical Stage-17.5 interface loads, not M22.8 counters;
+- `designId` is an authored production fit ID from the accepted Stage-22 core-pair engineering catalog; arbitrary small-craft hull/module strings are not accepted;
+- `SmallCraftFitAuthority` resolves `designId` through `Stage22CorePairEngineeringCatalogLoader`, requires the persisted `InstalledFit` to match the authored fit exactly, and reuses the ordinary `ShipFittingValidator` for hull/module/mount, mass/volume, power/heat and consumable-interface budgets;
+- the registry applies that same production-fit authority on completed-craft registration, restore and physical-state replacement, so persistence or commit-back cannot bypass fitting rules;
+- this slice does **not** author fighter/interceptor hulls or modules early: M22.8J remains responsible for real small-craft content. Acceptance tests intentionally use an existing Stage-22 production fit only to prove the shared content/fitting path;
 - the M22.8 sidecar reuses `EntityState.EngineeringState` and `EngineeringStatePersistenceMapper` instead of defining a second fighter engineering schema;
 - persistent rows are deterministically sorted by craft ID and reject duplicates or allocator watermark rollback;
 - `Stage228GeneratedCampaignPersistentState` wraps the accepted Stage-21I checkpoint unchanged and adds only the M22.8 small-craft sidecar;
@@ -45,7 +49,10 @@ Automated tests added by this slice cover:
 - a reserved-but-not-yet-registered identity is not reused after save/load;
 - duplicate IDs and allocator-watermark rollback fail closed;
 - current M22.8 campaign envelope capture/restore preserves the accepted Stage-21 state and the M22.8A sidecar exactly;
-- native M22.8 bytes round-trip deterministically and legacy Stage-21 native bytes migrate with zero small craft.
+- native M22.8 bytes round-trip deterministically and legacy Stage-21 native bytes migrate with zero small craft;
+- a registered craft must resolve to an authored production fit and match that fit exactly;
+- an unknown `designId`, fit drift during physical-state replacement, or malformed persisted fit fails closed through the shared production fitting authority;
+- the production-backed fixture uses real Stage-22 authored mount/interface IDs and therefore exercises ordinary Stage-17.5 ammunition/reaction-mass validation rather than a parallel fighter schema.
 
 The production F8/F9 wiring is compiled as part of the normal client build and uses the same codec exercised by the persistence acceptance tests.
 
