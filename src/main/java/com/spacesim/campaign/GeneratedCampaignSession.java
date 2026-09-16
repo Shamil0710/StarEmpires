@@ -53,9 +53,12 @@ public final class GeneratedCampaignSession {
      * Creates one new campaign through the accepted generated-world production bootstrap.
      *
      * <p>The raw Stage-20.5 bootstrap historically places every generated freighter at the exact
-     * major-hub center. M22.7 normalizes that freshly-created atomic checkpoint into deterministic
-     * physical traffic berths and immediately restores it through the existing bridge. This is a
-     * one-time new-campaign operation; save-game resume never regenerates or re-berths ships.</p>
+     * major-hub center and initializes all accepted bootstrap commitments as though they were first
+     * created at campaign second zero. M22.7 normalizes that freshly-created atomic checkpoint into
+     * deterministic physical traffic berths and retains one deterministic oldest essential supply
+     * commitment as already due at the opening checkpoint. Physical route duration is unchanged.
+     * This is a one-time new-campaign operation; save-game resume never regenerates, re-berths or
+     * re-dates freight state.</p>
      *
      * @param rootSeed deterministic generated-world seed
      * @return ordinary long-lived campaign session
@@ -64,7 +67,9 @@ public final class GeneratedCampaignSession {
         var generated = Stage20PlayableGeneratedWorldFactory.create(rootSeed);
         Stage20GeneratedWorldRuntimePersistentState berthed =
                 GeneratedCampaignInitialTrafficBerth.apply(generated.runtime().captureState());
-        LiveRuntime runtime = Stage20GeneratedWorldRuntimeBridge.restore(berthed);
+        Stage20GeneratedWorldRuntimePersistentState prepared =
+                GeneratedCampaignInitialFreightCommitment.apply(berthed);
+        LiveRuntime runtime = Stage20GeneratedWorldRuntimeBridge.restore(prepared);
         return new GeneratedCampaignSession(generated.rootSeed(), generated.content(), runtime);
     }
 
@@ -124,7 +129,7 @@ public final class GeneratedCampaignSession {
     }
 
     /**
-     * Applies one time scale to every existing system clock.
+     * Applies one time scale through the ordinary campaign clock authority.
      *
      * @param scale finite non-negative simulation speed multiplier
      */
