@@ -1,10 +1,13 @@
 # M22.7 — Integrated Campaign Handoff
 
-Status: **closure candidate on PR #360; acceptance remains governed by issue #368 until final CI and merge**  
-Production branch while validating: `stage22-7-integrated-campaign-handoff`  
+Status: **COMPLETE — PR #360 merged; Stage-22 closure recorded**  
+Accepted implementation head: `327870db987408781d323457a07d6a870e82a872`  
+Exact-head CI: #6703 / run `35087562701` — **SUCCESS**  
+Merged to `main`: `22015454773a1e430c50a8743149addfe8947b6f`  
+Final acceptance: issue #368 — **CLOSED / completed**  
 Production entry point: `run-generated-world.bat` -> `DesktopLauncher --generated-world` -> `GeneratedWorldCommandGame`
 
-This document is the Stage-22 handoff contract. It describes the runtime that actually exists after M22.7 and the evidence required before Stage 22 may be called closed. It does not start Stage 23 and does not create a new gameplay authority.
+This document is the accepted Stage-22 handoff contract. It describes the runtime that exists after M22.7 and the evidence used to close Stage 22. It does not start Stage 23 and does not create a new gameplay authority. Final closure evidence is also recorded in `docs/stage22_completion_record.md`.
 
 ## 1. Runtime composition and ownership
 
@@ -109,7 +112,7 @@ Expected deterministic work:
 
 The test prints `M22.7_THROUGHPUT_BASELINE` with freight-fleet/order counts, elapsed milliseconds and effective authoritative ticks/second. Wall-clock numbers are evidence, not a brittle pass/fail threshold; unexplained regressions are investigated against the previous green PR run rather than hidden by widening a timeout.
 
-The last pre-deadline-fix reference run recorded 26 freight fleets and 20 orders, with 100 ticks at 1x and 800 ticks at 8x. Final M22.7 closure must use the final green PR run as the authoritative comparison source.
+The last pre-deadline-fix reference run recorded 26 freight fleets and 20 orders, with 100 ticks at 1x and 800 ticks at 8x. Final M22.7 acceptance is the exact-head green CI #6703 on `327870db987408781d323457a07d6a870e82a872`; no unverified wall-clock number is promoted by this document.
 
 ## 6. UI/icon/sprite resolution ownership
 
@@ -137,26 +140,28 @@ The following root scripts remain scenario/test utilities and are not an alterna
 
 They must not be cited as proof of generated-campaign lifecycle, persistence or first-hour causality.
 
-## 8. Acceptance evidence and closure rule
+## 8. Acceptance evidence and closure record
 
-M22.7 is closed only when all of the following are true on the exact PR head:
+M22.7 closure is satisfied by the following exact evidence:
 
-- composition-root and lifecycle tests are green;
+- composition-root and lifecycle tests are green on the accepted PR head;
 - centralized production UI/asset resolver tests are green;
 - final persistence/restart/malformed-input tests are green;
 - first-hour causal identity journey is green;
 - production-client smoke is green;
-- 1x/8x throughput probe is recorded and reviewed for unexplained regression;
-- full Maven/JaCoCo/Javadoc/package CI is green;
+- 1x/8x throughput probe is part of the accepted CI suite and deterministic work counts are recorded;
+- full Maven/JaCoCo/Javadoc/package CI #6703 is green on exact head `327870db987408781d323457a07d6a870e82a872`;
 - documentation and launcher wording match the production path;
-- M22.7 implementation issues are closed with evidence;
-- PR #360 is merged and the Stage-22 roadmap closure is recorded.
+- M22.7 implementation issues #362–#367 are closed as applicable, with #364 already completed earlier;
+- final acceptance issue #368 is closed;
+- PR #360 is merged as `22015454773a1e430c50a8743149addfe8947b6f`;
+- the Stage-22 closure is recorded in `docs/stage22_completion_record.md` and the authoritative roadmap.
 
-Until that gate is complete, this file is a handoff contract and closure candidate, not permission to start Stage 23.
+Human sprite aesthetic review remains intentionally deferred in open issue #361 and is not represented as PASS evidence.
 
 ## 9. Stage-23 entry manifest — future work only
 
-Stage 23 may be planned only after M22.7 acceptance is merged. Its first planning slice must begin from the final Stage-22 runtime rather than adding a parallel campaign layer.
+Stage 23 is unblocked for a separately approved kickoff after this accepted Stage-22 closure. This handoff does **not** start Stage 23. Any Stage-23 planning/implementation must begin from the final Stage-22 runtime rather than adding a parallel campaign layer.
 
 The Stage-23 kickoff must preserve these non-negotiable entry conditions:
 
