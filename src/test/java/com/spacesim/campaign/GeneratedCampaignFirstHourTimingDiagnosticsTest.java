@@ -21,7 +21,7 @@ class GeneratedCampaignFirstHourTimingDiagnosticsTest {
                         order.stableFactionId(),
                         order.assignmentKind(),
                         order.oneWayDeliverySeconds(),
-                        order.roundTripCadenceSeconds(),
+                        order.roundTripCycleSeconds(),
                         order.orderedSystems()));
         System.out.println("M22.7_FIRST_HOUR_FREIGHT_TIMING_END");
     }
