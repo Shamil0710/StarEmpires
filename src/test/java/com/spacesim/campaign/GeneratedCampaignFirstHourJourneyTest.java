@@ -3,7 +3,8 @@ package com.spacesim.campaign;
 import com.spacesim.persistence.Stage20FreightPersistentState.CargoLotState;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
 import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
-import com.spacesim.world.FactionInterestResolver;
+import com.spacesim.world.FactionActorObservationSnapshot.InterestKind;
+import com.spacesim.world.FactionInterestResolver.DecisionTrace;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
@@ -50,6 +51,7 @@ class GeneratedCampaignFirstHourJourneyTest {
 
         TransportOrderState outcome = null;
         FreightPhase outcomePhase = null;
+        long outcomeTick = -1L;
         while (framesUsed < FIRST_HOUR_FRAME_BUDGET && outcome == null) {
             campaign.advanceFrame(EIGHT_TIMES_PRESENTATION_FRAME_SECONDS);
             framesUsed++;
@@ -70,6 +72,7 @@ class GeneratedCampaignFirstHourJourneyTest {
                     || currentFleet.phase() == FreightPhase.DESTROYED) {
                 outcome = currentOrder;
                 outcomePhase = currentFleet.phase();
+                outcomeTick = campaign.runtime().world().getAuthoritativeWorldTick();
             }
         }
 
@@ -83,21 +86,41 @@ class GeneratedCampaignFirstHourJourneyTest {
                         || outcomePhase == FreightPhase.DESTROYED,
                 "terminal causal outcome must be a physical delivery, shortage signal or loss");
 
-        long nowTick = campaign.runtime().world().getAuthoritativeWorldTick();
         TransportOrderState finalOutcome = outcome;
-        var snapshot = GeneratedCampaignFactionObservationPublisher.publish(
-                campaign.session().captureState(), finalOutcome.stableFactionId(), nowTick);
-        var observation = snapshot.economic().stream()
-                .filter(row -> row.targetId().equals(finalOutcome.orderId()))
-                .findFirst()
-                .orElseThrow();
-        var trace = FactionInterestResolver.resolve(snapshot);
+        InterestKind expectedInterest = outcomePhase == FreightPhase.DESTROYED
+                || finalOutcome.delayedDeliveryCount() > 0L
+                ? InterestKind.RESOURCE_DEFICIT
+                : InterestKind.SUPPLY_DEPENDENCY;
+        DecisionTrace productionDecision = null;
+        while (framesUsed < FIRST_HOUR_FRAME_BUDGET && productionDecision == null) {
+            var candidate = campaign.latestDecisionTrace(finalOutcome.stableFactionId()).orElse(null);
+            if (candidate != null
+                    && candidate.observationTick() >= outcomeTick
+                    && candidate.orderedEvidence().stream().anyMatch(evidence ->
+                    evidence.kind() == expectedInterest
+                            && evidence.targetId().equals(finalOutcome.orderId())
+                            && evidence.supportingObservations().stream().anyMatch(row ->
+                            row.evidence().provenanceId().equals(finalOutcome.orderId())))) {
+                productionDecision = candidate;
+                break;
+            }
+            campaign.advanceFrame(EIGHT_TIMES_PRESENTATION_FRAME_SECONDS);
+            framesUsed++;
+        }
 
-        assertEquals(finalOutcome.orderId(), observation.evidence().provenanceId());
-        assertTrue(trace.orderedEvidence().stream().anyMatch(evidence ->
-                        evidence.targetId().equals(finalOutcome.orderId())
+        assertNotNull(productionDecision,
+                "the ordinary Stage-21A actor runtime must review the same freight outcome within the first hour");
+        assertEquals(finalOutcome.stableFactionId(), productionDecision.factionContentId());
+        assertTrue(productionDecision.observationTick() >= outcomeTick,
+                "faction decision must be based on an observation at or after the physical freight outcome");
+        assertEquals(productionDecision.observationTick(), campaign.actors()
+                        .findState(finalOutcome.stableFactionId()).orElseThrow().lastReviewTick(),
+                "decision trace must come from the actor runtime's completed scheduled review");
+        assertTrue(productionDecision.orderedEvidence().stream().anyMatch(evidence ->
+                        evidence.kind() == expectedInterest
+                                && evidence.targetId().equals(finalOutcome.orderId())
                                 && evidence.supportingObservations().stream().anyMatch(row ->
                                 row.evidence().provenanceId().equals(finalOutcome.orderId()))),
-                "the same transport identity must remain visible in downstream faction reasoning");
+                "the same transport identity must remain visible in the production faction decision");
     }
 }
