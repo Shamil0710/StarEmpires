@@ -10,7 +10,11 @@ package com.spacesim.world;
  * @param value positive monotonic campaign identity
  */
 public record SmallCraftId(long value) implements Comparable<SmallCraftId> {
-    /** Validates one persistent identity. */
+    /**
+     * Validates one persistent identity.
+     *
+     * @param value positive monotonic campaign identity
+     */
     public SmallCraftId {
         if (value <= 0L) {
             throw new IllegalArgumentException("SmallCraftId must be positive");
