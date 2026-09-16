@@ -31,7 +31,7 @@ class Stage228CampaignAuthorityTest {
         Stage228CampaignAuthority restored = Stage228CampaignAuthority.restore(saved);
 
         assertEquals(saved, restored.captureState());
-        assertEquals(original.rootSeed(), restored.rootSeed());
+        assertEquals(original.coordinator().rootSeed(), restored.coordinator().rootSeed());
         assertEquals(0, restored.smallCraft().size());
     }
 }
