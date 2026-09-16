@@ -40,7 +40,7 @@ import java.util.TreeMap;
  * silently fall back to randomly oriented entry lanes.</p>
  *
  * <p>The historical single-supplier result embedded in the source probe remains diagnostic evidence;
- * it is not consulted when deciding the resolved whole-seed status. No failed economic result may
+ * it is not consulted when deciding the resolved v3 whole-seed status. No failed economic result may
  * request another resource, station, topology edge or root seed through this wrapper.</p>
  */
 public final class Stage20ResolvedGeneratedWorldProductionProbe {
@@ -57,7 +57,7 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
      * @param version resolved probe version
      * @param rootSeed exact root seed
      * @param sourceProbeVersion preserved physical generation probe version
-     * @param representativeProfileVersion representative profile version
+     * @param representativeProfileVersion v3 representative profile version
      * @param generation finalized generated-world evidence with topology-facing jump endpoints
      * @param coordinatedFreightAcceptance present exactly for accepted faction-start placement
      * @param seedAcceptance authoritative resolved-freight whole-seed result
@@ -75,11 +75,11 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
          *
          * @param version resolved probe version
          * @param rootSeed exact root seed
-         * @param sourceProbeVersion preserved generation version
-         * @param representativeProfileVersion representative profile version
+         * @param sourceProbeVersion preserved physical generation probe version
+         * @param representativeProfileVersion v3 representative profile version
          * @param generation finalized generated-world evidence
-         * @param coordinatedFreightAcceptance present exactly for accepted placement
-         * @param seedAcceptance authoritative whole-seed result
+         * @param coordinatedFreightAcceptance present exactly for accepted faction-start placement
+         * @param seedAcceptance authoritative resolved-freight whole-seed result
          */
         public ResolvedProbeResult {
             version = requireText(version, "version");
@@ -123,10 +123,10 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
     }
 
     /**
-     * Runs the resolved production path for one exact seed and explicit representative profile.
+     * Runs the resolved production path for one exact seed and explicit v3 profile.
      *
      * @param rootSeed exact root seed
-     * @param profile explicit representative profile and coordinated freight policy
+     * @param profile explicit representative v3 profile and coordinated freight policy
      * @return immutable resolved production result
      */
     public static ResolvedProbeResult run(long rootSeed, DerivedProfile profile) {
@@ -185,18 +185,13 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
     }
 
     /**
-     * Runs the ordinary integrated-campaign production path.
-     *
-     * <p>Historical Stage-20 representative profiles remain reproducible with their diagnostic
-     * {@code faction.alpha}/{@code faction.beta} identities. The ordinary M22.7 campaign instead
-     * promotes the two participant slots to the canonical Stage-22 Empire and Industrial Union
-     * stable IDs before any placement, economy, freight or persistence authority is materialized.</p>
+     * Runs the resolved production path under the current representative v3 profile.
      *
      * @param rootSeed exact root seed
-     * @return resolved production result under the current M22.7 campaign profile
+     * @return resolved production result under the current representative v3 profile
      */
     public static ResolvedProbeResult runCurrent(long rootSeed) {
-        return run(rootSeed, Stage227GeneratedCampaignProbeProfile.deriveCurrent());
+        return run(rootSeed, Stage20RepresentativeGeneratedWorldProbeProfileV3.deriveCurrent());
     }
 
     private static ProbeResult withDirectionalJumpAnchors(ProbeResult source) {
