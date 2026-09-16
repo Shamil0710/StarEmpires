@@ -35,11 +35,11 @@ import java.util.TreeMap;
 final class GeneratedCampaignInitialTrafficBerth {
     private static final long ANGLE_BUCKETS = 1_000_003L;
     /**
-     * Consecutive berth shells are separated by twice the sum of their top-down bounding radii.
-     * This leaves one additional combined-radius clearance beyond mere non-overlap while retaining
-     * a scale that follows actual ship dimensions rather than camera or route-authoring units.
+     * Consecutive berth shells retain slightly more than twice the sum of their top-down bounding
+     * radii. The small physical margin prevents subtraction/translation rounding at large local SI
+     * coordinates from erasing the promised one-hull-radius center clearance.
      */
-    private static final double BERTH_CLEARANCE_FACTOR = 2d;
+    private static final double BERTH_CLEARANCE_FACTOR = 2.05d;
 
     private GeneratedCampaignInitialTrafficBerth() {
         throw new AssertionError("No instances");
