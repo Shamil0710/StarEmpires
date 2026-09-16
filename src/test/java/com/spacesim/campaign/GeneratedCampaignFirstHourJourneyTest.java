@@ -3,6 +3,7 @@ package com.spacesim.campaign;
 import com.spacesim.persistence.Stage20FreightPersistentState.CargoLotState;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
 import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
+import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistenceCodec;
 import com.spacesim.world.FactionActorObservationSnapshot.InterestKind;
 import com.spacesim.world.FactionInterestResolver.DecisionTrace;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
@@ -23,6 +24,9 @@ class GeneratedCampaignFirstHourJourneyTest {
         GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         campaign.setTimeScale(8d);
+        var autonomousFactionIds = campaign.actors().capture().stream()
+                .map(state -> state.factionContentId())
+                .toList();
 
         CargoLotState inFlightLot = null;
         int framesUsed = 0;
@@ -30,24 +34,30 @@ class GeneratedCampaignFirstHourJourneyTest {
             campaign.advanceFrame(EIGHT_TIMES_PRESENTATION_FRAME_SECONDS);
             framesUsed++;
             var freight = campaign.session().captureState().freight();
-            inFlightLot = freight.cargoLots().stream().findFirst().orElse(null);
+            inFlightLot = freight.cargoLots().stream()
+                    .filter(lot -> freight.orders().stream().anyMatch(order ->
+                            order.orderId().equals(lot.orderId())
+                                    && autonomousFactionIds.contains(order.stableFactionId())))
+                    .findFirst()
+                    .orElse(null);
         }
         assertNotNull(inFlightLot,
-                "ordinary generated campaign must materialize physical cargo during the first hour");
+                "ordinary generated campaign must materialize autonomous-faction physical cargo during the first hour");
 
         var midStage20 = campaign.session().captureState();
-        var midJourney = campaign.captureState();
+        byte[] midJourneyBytes = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(campaign.captureState());
         CargoLotState savedLot = inFlightLot;
         TransportOrderState savedOrder = midStage20.freight().orders().stream()
                 .filter(order -> order.orderId().equals(savedLot.orderId()))
                 .findFirst()
                 .orElseThrow();
 
-        campaign = GeneratedCampaignCoordinator.restore(midJourney);
+        campaign = GeneratedCampaignCoordinator.restore(
+                Stage21IGeneratedWorldRuntimePersistenceCodec.decode(midJourneyBytes));
         campaign.setTimeScale(8d);
         assertTrue(campaign.session().captureState().freight().cargoLots().stream()
                         .anyMatch(savedLot::equals),
-                "save/reload must preserve the exact physical cargo-lot identity and provenance");
+                "save/codec/reload must preserve the exact physical cargo-lot identity and provenance");
 
         TransportOrderState outcome = null;
         FreightPhase outcomePhase = null;
