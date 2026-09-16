@@ -28,7 +28,16 @@ public record SmallCraftState(
         RuntimeState runtimeState,
         ShipInstanceRuntimeState instanceState) implements Comparable<SmallCraftState> {
 
-    /** Validates one complete individual physical-craft state. */
+    /**
+     * Validates one complete individual physical-craft state.
+     *
+     * @param id stable campaign identity
+     * @param stableFactionId stable owning faction identity
+     * @param designId stable authored design/fit identity
+     * @param fit exact installed hull/module fit
+     * @param runtimeState propulsion/power/thermal and physical consumable state
+     * @param instanceState damage/shield/maintenance/weapon continuity state
+     */
     public SmallCraftState {
         Objects.requireNonNull(id, "id");
         stableFactionId = requireText(stableFactionId, "stableFactionId");
