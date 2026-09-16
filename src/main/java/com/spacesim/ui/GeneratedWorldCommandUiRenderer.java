@@ -483,7 +483,8 @@ public final class GeneratedWorldCommandUiRenderer {
             Point point = points.get(object.stableId());
             sprites.draw(batch, object.sprite(), point.x(), point.y(),
                     (float) (object.physicalLengthM() * pixelsPerMetre),
-                    (float) (object.physicalWidthM() * pixelsPerMetre), 0f);
+                    (float) (object.physicalWidthM() * pixelsPerMetre),
+                    MovementAlignedHeading.degrees(object.headingRad()));
         }
         batch.end();
 
