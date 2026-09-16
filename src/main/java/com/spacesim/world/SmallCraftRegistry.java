@@ -11,18 +11,26 @@ import java.util.TreeMap;
  * M22.8 identity registry for individual physical small craft.
  *
  * <p>The registry owns identity continuity only. It neither manufactures craft nor replenishes any
- * physical resource. Future Stage-18 integration must authorize physical production before reserving
- * an ID and registering its supplied engineering state.</p>
+ * physical resource. Every registered/restored/replaced craft state is validated through one bound
+ * {@link SmallCraftFitAuthority}, so identity continuity cannot bypass the ordinary Stage-17.5
+ * production-content and physical fitting budgets. Future Stage-18 integration must still authorize
+ * physical production before reserving an ID and registering its supplied engineering state.</p>
  */
 public final class SmallCraftRegistry {
+    private final SmallCraftFitAuthority fitAuthority;
     private final SmallCraftIdAllocator allocator;
     private final TreeMap<SmallCraftId, SmallCraftState> craftById = new TreeMap<>();
 
-    private SmallCraftRegistry(SmallCraftIdAllocator allocator, Collection<SmallCraftState> states) {
+    private SmallCraftRegistry(
+            SmallCraftFitAuthority fitAuthority,
+            SmallCraftIdAllocator allocator,
+            Collection<SmallCraftState> states) {
+        this.fitAuthority = Objects.requireNonNull(fitAuthority, "fitAuthority");
         this.allocator = Objects.requireNonNull(allocator, "allocator");
         Objects.requireNonNull(states, "states");
         for (SmallCraftState state : states) {
             SmallCraftState checked = Objects.requireNonNull(state, "small-craft state");
+            this.fitAuthority.requireValid(checked);
             if (craftById.putIfAbsent(checked.id(), checked) != null) {
                 throw new IllegalArgumentException("Duplicate small-craft ID: " + checked.id());
             }
@@ -33,20 +41,35 @@ public final class SmallCraftRegistry {
         }
     }
 
-    /** @return new empty registry with no free or seeded craft */
-    public static SmallCraftRegistry empty() {
-        return new SmallCraftRegistry(SmallCraftIdAllocator.empty(), List.of());
+    /**
+     * Creates a new empty registry with no free or seeded craft.
+     *
+     * @param fitAuthority production-content and Stage-17.5 fitting authority
+     * @return empty identity registry bound to the supplied production catalog
+     */
+    public static SmallCraftRegistry empty(SmallCraftFitAuthority fitAuthority) {
+        return new SmallCraftRegistry(
+                Objects.requireNonNull(fitAuthority, "fitAuthority"),
+                SmallCraftIdAllocator.empty(),
+                List.of());
     }
 
     /**
-     * Restores exact persistent registry contents.
+     * Restores exact persistent registry contents and validates every craft against production content.
      *
      * @param nextId next unused allocator value
      * @param states individual physical craft states
+     * @param fitAuthority production-content and Stage-17.5 fitting authority
      * @return independent restored registry
      */
-    public static SmallCraftRegistry restore(long nextId, Collection<SmallCraftState> states) {
-        return new SmallCraftRegistry(SmallCraftIdAllocator.restore(nextId), states);
+    public static SmallCraftRegistry restore(
+            long nextId,
+            Collection<SmallCraftState> states,
+            SmallCraftFitAuthority fitAuthority) {
+        return new SmallCraftRegistry(
+                Objects.requireNonNull(fitAuthority, "fitAuthority"),
+                SmallCraftIdAllocator.restore(nextId),
+                states);
     }
 
     /**
@@ -64,6 +87,9 @@ public final class SmallCraftRegistry {
     /**
      * Registers an externally authorized completed physical craft.
      *
+     * <p>The physical-production authorization remains external (M22.8G), but the supplied craft must
+     * already resolve to one authored production fit and pass the ordinary Stage-17.5 fitting validator.</p>
+     *
      * @param state exact individual craft state using a previously reserved ID
      */
     public void registerProducedCraft(SmallCraftState state) {
@@ -71,13 +97,18 @@ public final class SmallCraftRegistry {
         if (checked.id().value() >= allocator.nextValue()) {
             throw new IllegalArgumentException("Small-craft ID was not reserved by this registry");
         }
-        if (craftById.putIfAbsent(checked.id(), checked) != null) {
+        if (craftById.containsKey(checked.id())) {
             throw new IllegalArgumentException("Small-craft ID already registered: " + checked.id());
         }
+        fitAuthority.requireValid(checked);
+        craftById.put(checked.id(), checked);
     }
 
     /**
      * Replaces physical state for an existing craft without changing its identity or ownership/design identity.
+     *
+     * <p>The replacement must still match the authored production fit and ordinary Stage-17.5 physical
+     * fitting budgets, preventing save/load or commit-back code from silently installing an ad-hoc fit.</p>
      *
      * @param state updated physical state
      */
@@ -91,6 +122,7 @@ public final class SmallCraftRegistry {
                 || !current.designId().equals(checked.designId())) {
             throw new IllegalArgumentException("Physical-state replacement cannot rewrite craft identity metadata");
         }
+        fitAuthority.requireValid(checked);
         craftById.put(checked.id(), checked);
     }
 
@@ -115,5 +147,10 @@ public final class SmallCraftRegistry {
     /** @return exact next unused identity watermark for persistence */
     public long nextIdValue() {
         return allocator.nextValue();
+    }
+
+    /** @return semantic fingerprint of the production engineering catalog bound to this registry */
+    public String engineeringCatalogFingerprint() {
+        return fitAuthority.catalogFingerprint();
     }
 }
