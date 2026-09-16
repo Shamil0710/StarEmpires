@@ -71,6 +71,7 @@ public record GeneratedWorldUiSnapshot(
      * @param sections structured inspector content
      * @param physicalLengthM physical or nominal length in metres
      * @param physicalWidthM physical or nominal width in metres
+     * @param headingRad presentation heading in radians; zero points along +X
      */
     public record LocalObjectView(
             String stableId,
@@ -84,7 +85,8 @@ public record GeneratedWorldUiSnapshot(
             SpriteBinding sprite,
             List<InfoSection> sections,
             double physicalLengthM,
-            double physicalWidthM) implements Comparable<LocalObjectView> {
+            double physicalWidthM,
+            double headingRad) implements Comparable<LocalObjectView> {
         /**
          * Compatibility projection for objects with nominal artwork dimensions only.
          * @param stableId persistent object identity
@@ -103,7 +105,31 @@ public record GeneratedWorldUiSnapshot(
                 String factionName, SpriteBinding sprite, List<InfoSection> sections) {
             this(stableId, kind, name, subtitle, systemId, position, factionId, factionName,
                     sprite, sections, sprite == null ? 0d : sprite.nominalLengthM(),
-                    sprite == null ? 0d : sprite.nominalWidthM());
+                    sprite == null ? 0d : sprite.nominalWidthM(), 0d);
+        }
+
+        /**
+         * Compatibility projection preserving the historical physical-dimension constructor.
+         *
+         * @param stableId persistent object identity
+         * @param kind object family
+         * @param name display name
+         * @param subtitle role or state label
+         * @param systemId owning system
+         * @param position authoritative physical position
+         * @param factionId owner identifier
+         * @param factionName owner display name
+         * @param sprite optional artwork binding
+         * @param sections inspector content
+         * @param physicalLengthM physical or nominal length in metres
+         * @param physicalWidthM physical or nominal width in metres
+         */
+        public LocalObjectView(String stableId, ObjectKind kind, String name, String subtitle,
+                StarSystemId systemId, LocalPhysicalPosition position, String factionId,
+                String factionName, SpriteBinding sprite, List<InfoSection> sections,
+                double physicalLengthM, double physicalWidthM) {
+            this(stableId, kind, name, subtitle, systemId, position, factionId, factionName,
+                    sprite, sections, physicalLengthM, physicalWidthM, 0d);
         }
 
         /**
@@ -113,7 +139,7 @@ public record GeneratedWorldUiSnapshot(
          * current runtime authority.
          *
          * @param resolved artwork with resolved physical dimensions
-         * @return projection retaining physical scale and, when governed, production faction artwork
+         * @return projection retaining physical scale, heading and, when governed, production faction artwork
          */
         public LocalObjectView withScale(ResolvedSprite resolved) {
             ResolvedSprite selected = Stage22ProductionShipSpriteAdapter.upgradeCoreProjection(
@@ -123,7 +149,19 @@ public record GeneratedWorldUiSnapshot(
                     RuntimeVisualState.IDLE);
             return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
                     factionId, factionName, selected.binding(), sections,
-                    selected.worldLengthM(), selected.worldWidthM());
+                    selected.worldLengthM(), selected.worldWidthM(), headingRad);
+        }
+
+        /**
+         * Returns the same immutable projection with a presentation-only ship heading.
+         *
+         * @param resolvedHeadingRad finite counter-clockwise heading in radians from +X
+         * @return projection retaining identity, physical position, dimensions and artwork
+         */
+        public LocalObjectView withHeadingRad(double resolvedHeadingRad) {
+            return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
+                    factionId, factionName, sprite, sections,
+                    physicalLengthM, physicalWidthM, resolvedHeadingRad);
         }
 
         /**
@@ -141,12 +179,16 @@ public record GeneratedWorldUiSnapshot(
          * @param sections structured inspector content
          * @param physicalLengthM physical or nominal length in metres; zero for point markers
          * @param physicalWidthM physical or nominal width in metres; zero for point markers
+         * @param headingRad presentation-only counter-clockwise heading in radians from +X
          */
         public LocalObjectView {
             if (!Double.isFinite(physicalLengthM) || !Double.isFinite(physicalWidthM)
                     || physicalLengthM < 0d || physicalWidthM < 0d
                     || (sprite != null && (physicalLengthM == 0d || physicalWidthM == 0d))) {
                 throw new IllegalArgumentException("invalid physical dimensions");
+            }
+            if (!Double.isFinite(headingRad)) {
+                throw new IllegalArgumentException("headingRad must be finite");
             }
             stableId = requireText(stableId, "stableId");
             Objects.requireNonNull(kind, "kind");
