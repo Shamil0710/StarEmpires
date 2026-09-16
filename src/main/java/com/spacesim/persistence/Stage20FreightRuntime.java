@@ -257,12 +257,17 @@ public final class Stage20FreightRuntime {
     /**
      * Starts the persisted loaded producer-to-consumer route.
      *
+     * <p>The order's delivery deadline is an already-authoritative service commitment. Dispatching
+     * late must not slide that commitment to {@code dispatchTime + physicalTravelTime}; otherwise
+     * source-side delay can never become an observable shortage. A fresh deadline is created only
+     * after the empty freighter completes its return to source for the next recurring cycle.</p>
+     *
      * @param fleetId stable carrying fleet identity
      * @param simulationSeconds authoritative dispatch time
      */
     public void dispatchOutbound(FleetId fleetId, double simulationSeconds) {
         FreighterState fleet = requireFreighter(fleetId);
-        TransportOrderState order = requireOrder(fleet);
+        requireOrder(fleet);
         requirePhase(fleet, FreightPhase.AT_SOURCE);
         requireNonNegativeFinite(simulationSeconds, "simulationSeconds");
         if (fleet.cargoMassKg() <= EPSILON) {
@@ -271,11 +276,6 @@ public final class Stage20FreightRuntime {
         if (fleet.routeIndex() != 0) {
             throw new IllegalStateException("outbound dispatch must begin at route origin");
         }
-        orders.put(order.orderId(), copyOrder(
-                order,
-                simulationSeconds + order.oneWayDeliverySeconds(),
-                order.deliveredMassKg(),
-                order.delayedDeliveryCount()));
         freighters.put(fleetId, copyFreighter(
                 fleet, fleet.currentSystemId(), fleet.physicalState(), FreightPhase.OUTBOUND,
                 fleet.routeIndex(), requireHold(fleetId).snapshot()));
