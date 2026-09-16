@@ -35,6 +35,7 @@ import com.spacesim.ui.GeneratedWorldUiSnapshot.ObjectKind;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetPlacementState;
+import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.Stage20LocalInfrastructureLayout.PlacementKind;
 import com.spacesim.world.Stage20SpecialLocationWorld.LocationKind;
@@ -244,8 +245,9 @@ public final class GeneratedWorldUiModel {
             }
             FleetPlacementState placement = runtime.world()
                     .findFleet(new FleetId(military.fleetId())).orElseThrow();
-            LocalPhysicalPosition position = runtime.arrival().materialization(active)
-                    .physicalState(placement.localEntityId()).orElseThrow().position();
+            LocalPhysicalKinematics kinematics = runtime.arrival().materialization(active)
+                    .physicalState(placement.localEntityId()).orElseThrow();
+            LocalPhysicalPosition position = kinematics.position();
             ResolvedSprite sprite = Stage20MinimumPlayableSpriteCatalog.resolveShip(
                     military.hullId(), ShipRole.MEDIUM_COMBAT, MILITARY_ENGINEERING);
             result.add(new LocalObjectView(
@@ -258,7 +260,9 @@ public final class GeneratedWorldUiModel {
                     military.factionId(),
                     military.factionName(),
                     sprite.binding(),
-                    military.sections()).withScale(sprite));
+                    military.sections()).withScale(sprite).withHeadingRad(
+                            MovementAlignedHeading.radians(
+                                    kinematics.velocityXMps(), kinematics.velocityYMps())));
         }
     }
 
@@ -274,11 +278,11 @@ public final class GeneratedWorldUiModel {
             if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
                 continue;
             }
-            LocalPhysicalPosition position = runtime.arrival().materialization(active)
+            LocalPhysicalKinematics kinematics = runtime.arrival().materialization(active)
                     .physicalState(placement.localEntityId()).orElseThrow(
                             () -> new IllegalStateException(
-                                    "local freight projection lacks exact physical state: " + state.fleetId()))
-                    .position();
+                                    "local freight projection lacks exact physical state: " + state.fleetId()));
+            LocalPhysicalPosition position = kinematics.position();
             FreightView freight = freightByFleet.get(state.fleetId().value());
             List<InfoSection> sections = freight == null
                     ? List.of(identitySection(
@@ -295,7 +299,9 @@ public final class GeneratedWorldUiModel {
                     state.stableFactionId(),
                     factionName(state.stableFactionId()),
                     runtime.freightSprite(state.fleetId()).binding(),
-                    sections).withScale(runtime.freightSprite(state.fleetId())));
+                    sections).withScale(runtime.freightSprite(state.fleetId())).withHeadingRad(
+                            MovementAlignedHeading.radians(
+                                    kinematics.velocityXMps(), kinematics.velocityYMps())));
         }
     }
 
@@ -328,7 +334,7 @@ public final class GeneratedWorldUiModel {
                     ? null
                     : Stage20MinimumPlayableSpriteCatalog.resolvePlayable(ship.type).binding();
             EntityDetailsUI.DetailsText legacy = EntityDetailsUI.describe(entity, session.getEntityRegistry());
-            result.add(new LocalObjectView(
+            LocalObjectView projected = new LocalObjectView(
                     "entity:" + idComponent.id.value(),
                     kind,
                     legacy.title(),
@@ -343,7 +349,12 @@ public final class GeneratedWorldUiModel {
                                     idComponent.id.toString(), ownerId, factionName(ownerId), active,
                                     LocalPhysicalPosition.origin().translated(
                                             transform.position.x, transform.position.y)),
-                            textSection("Состояние", legacy.body()))));
+                            textSection("Состояние", legacy.body())));
+            if (ship != null && transform.velocity != null) {
+                projected = projected.withHeadingRad(MovementAlignedHeading.radians(
+                        transform.velocity.x, transform.velocity.y));
+            }
+            result.add(projected);
         }
     }
 
