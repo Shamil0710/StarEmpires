@@ -9,6 +9,10 @@ import com.spacesim.world.FactionInterestResolver.DecisionTrace;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
+import java.util.Comparator;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,8 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GeneratedCampaignFirstHourJourneyTest {
     private static final float EIGHT_TIMES_PRESENTATION_FRAME_SECONDS = 0.1f;
     private static final double SIMULATION_SECONDS_PER_FRAME = 0.8d;
+    private static final double FIRST_HOUR_SIMULATION_SECONDS = 3_600d;
     private static final int FIRST_HOUR_FRAME_BUDGET =
-            (int) Math.ceil(3_600d / SIMULATION_SECONDS_PER_FRAME);
+            (int) Math.ceil(FIRST_HOUR_SIMULATION_SECONDS / SIMULATION_SECONDS_PER_FRAME);
 
     @Test
     void physicalCargoIdentitySurvivesMidJourneyReloadAndReachesFactionDecisionWithinFirstHour() {
@@ -34,15 +39,24 @@ class GeneratedCampaignFirstHourJourneyTest {
             campaign.advanceFrame(EIGHT_TIMES_PRESENTATION_FRAME_SECONDS);
             framesUsed++;
             var freight = campaign.session().captureState().freight();
+            var ordersById = freight.orders().stream().collect(Collectors.toMap(
+                    TransportOrderState::orderId,
+                    Function.identity()));
             inFlightLot = freight.cargoLots().stream()
-                    .filter(lot -> freight.orders().stream().anyMatch(order ->
-                            order.orderId().equals(lot.orderId())
-                                    && autonomousFactionIds.contains(order.stableFactionId())))
-                    .findFirst()
+                    .filter(lot -> {
+                        TransportOrderState order = ordersById.get(lot.orderId());
+                        return order != null
+                                && autonomousFactionIds.contains(order.stableFactionId())
+                                && order.deliveryDeadlineSeconds() < FIRST_HOUR_SIMULATION_SECONDS;
+                    })
+                    .min(Comparator
+                            .comparingDouble((CargoLotState lot) ->
+                                    ordersById.get(lot.orderId()).deliveryDeadlineSeconds())
+                            .thenComparing(CargoLotState::lotId))
                     .orElse(null);
         }
         assertNotNull(inFlightLot,
-                "ordinary generated campaign must materialize autonomous-faction physical cargo during the first hour");
+                "ordinary generated campaign must materialize autonomous-faction physical cargo with an authoritative first-hour deadline");
 
         var midStage20 = campaign.session().captureState();
         byte[] midJourneyBytes = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(campaign.captureState());
@@ -51,6 +65,8 @@ class GeneratedCampaignFirstHourJourneyTest {
                 .filter(order -> order.orderId().equals(savedLot.orderId()))
                 .findFirst()
                 .orElseThrow();
+        assertTrue(savedOrder.deliveryDeadlineSeconds() < FIRST_HOUR_SIMULATION_SECONDS,
+                "tracked cargo must be committed to a physical first-hour delivery deadline before reload");
 
         campaign = GeneratedCampaignCoordinator.restore(
                 Stage21IGeneratedWorldRuntimePersistenceCodec.decode(midJourneyBytes));
