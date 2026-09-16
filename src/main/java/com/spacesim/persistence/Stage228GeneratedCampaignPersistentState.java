@@ -25,7 +25,14 @@ public record Stage228GeneratedCampaignPersistentState(
     /** Current M22.8 campaign runtime contract. */
     public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v1";
 
-    /** Validates envelope identity and embedded accepted authorities. */
+    /**
+     * Validates envelope identity and embedded accepted authorities.
+     *
+     * @param schemaVersion exact M22.8 envelope schema
+     * @param runtimeVersion exact M22.8 runtime identifier
+     * @param stage21Runtime complete accepted Stage-21I checkpoint
+     * @param smallCraft individual M22.8A craft persistence sidecar
+     */
     public Stage228GeneratedCampaignPersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported M22.8 campaign schema: " + schemaVersion);
