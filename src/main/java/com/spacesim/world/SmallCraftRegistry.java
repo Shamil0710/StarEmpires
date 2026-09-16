@@ -1,5 +1,7 @@
 package com.spacesim.world;
 
+import com.spacesim.components.EngineeringComponent;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -105,6 +107,40 @@ public final class SmallCraftRegistry {
     }
 
     /**
+     * Materializes the exact Stage-17.5 engineering payload of one existing craft into an ECS component.
+     *
+     * <p>This operation does not remove the persistent craft, change identity, grant consumables or assign
+     * any tactical/hangar state. Later M22.8 tactical integration may attach the returned component to an
+     * entity while this registry remains the identity owner.</p>
+     *
+     * @param id stable craft identity
+     * @return independent engineering component carrying the craft's exact physical state
+     */
+    public EngineeringComponent materializeEngineering(SmallCraftId id) {
+        SmallCraftState current = requireExisting(id);
+        return SmallCraftEngineeringMaterializationBridge.materialize(current);
+    }
+
+    /**
+     * Commits a materialized Stage-17.5 engineering component back into the same persistent craft.
+     *
+     * <p>The bridge preserves identity/faction/design metadata, and the resulting state is revalidated
+     * against the bound production fit authority before it replaces the persistent physical state. No
+     * ammunition, reaction mass, damage or maintenance value is reset during the transition.</p>
+     *
+     * @param id stable pre-existing craft identity
+     * @param engineering exact materialized engineering component after lawful simulation
+     */
+    public void commitMaterializedEngineering(
+            SmallCraftId id,
+            EngineeringComponent engineering) {
+        SmallCraftState current = requireExisting(id);
+        replacePhysicalState(SmallCraftEngineeringMaterializationBridge.dematerialize(
+                current,
+                Objects.requireNonNull(engineering, "engineering")));
+    }
+
+    /**
      * Replaces physical state for an existing craft without changing its identity or ownership/design identity.
      *
      * <p>The replacement must still match the authored production fit and ordinary Stage-17.5 physical
@@ -152,5 +188,14 @@ public final class SmallCraftRegistry {
     /** @return semantic fingerprint of the production engineering catalog bound to this registry */
     public String engineeringCatalogFingerprint() {
         return fitAuthority.catalogFingerprint();
+    }
+
+    private SmallCraftState requireExisting(SmallCraftId id) {
+        SmallCraftId checkedId = Objects.requireNonNull(id, "id");
+        SmallCraftState current = craftById.get(checkedId);
+        if (current == null) {
+            throw new IllegalArgumentException("Unknown small-craft ID: " + checkedId);
+        }
+        return current;
     }
 }
