@@ -1,5 +1,7 @@
 package com.spacesim.campaign;
 
+import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.persistence.Stage20FreightPersistentState;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState;
@@ -7,26 +9,37 @@ import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState.Loca
 import com.spacesim.world.FleetId;
 import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.LocalPhysicalPosition;
-import com.spacesim.world.calibration.Stage20LocalRouteSemanticBandCatalog.BandId;
-import com.spacesim.world.calibration.Stage20LocalRouteSemanticBandCatalogLoader;
+import com.spacesim.world.StarSystemId;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * One-time M22.7 new-campaign normalization that places generated freight assets in deterministic
- * traffic berths instead of materializing every ship at the exact major-hub center coordinate.
+ * physical traffic berths instead of materializing every ship at the exact major-hub center.
  *
  * <p>This is not a presentation offset and does not create a second movement authority. The method
  * rewrites the initial atomic Stage-20.5 checkpoint before the ordinary campaign session adopts it;
  * both the freight compatibility mirror and the authoritative local fleet physical state receive the
  * same exact SI position. Restore then proceeds through the existing runtime bridge.</p>
+ *
+ * <p>Berth spacing is deliberately derived from the installed physical hull envelope. Stage-20A's
+ * {@code STATION_TO_STATION} semantic band describes travel between major facilities and therefore
+ * must not be reused as a docking/traffic-berth radius.</p>
  */
 final class GeneratedCampaignInitialTrafficBerth {
     private static final long ANGLE_BUCKETS = 1_000_003L;
+    /**
+     * Consecutive berth shells are separated by twice the sum of their top-down bounding radii.
+     * This leaves one additional combined-radius clearance beyond mere non-overlap while retaining
+     * a scale that follows actual ship dimensions rather than camera or route-authoring units.
+     */
+    private static final double BERTH_CLEARANCE_FACTOR = 2d;
 
     private GeneratedCampaignInitialTrafficBerth() {
         throw new AssertionError("No instances");
@@ -35,10 +48,10 @@ final class GeneratedCampaignInitialTrafficBerth {
     /**
      * Moves only operational freight rows in a just-created campaign to stable local traffic berths.
      *
-     * <p>The berth radius is not an arbitrary screen-space constant. It reuses the accepted minimum
-     * {@code STATION_TO_STATION} operational distance from the Stage-20A SI calibration authority.
-     * Stable FleetId determines azimuth, so the same seed and physical identity always obtain the
-     * same berth and ships do not stack on one another.</p>
+     * <p>Stable FleetId determines azimuth. Within each system, FleetId order determines concentric
+     * berth shells whose radii are derived from each hull's exact top-down bounding circle. Different
+     * shells therefore remain physically separated even if two deterministic azimuths are nearly
+     * identical.</p>
      *
      * @param checkpoint exact freshly-created runtime checkpoint
      * @return equivalent checkpoint with non-overlapping physical freight berths
@@ -46,17 +59,15 @@ final class GeneratedCampaignInitialTrafficBerth {
     static Stage20GeneratedWorldRuntimePersistentState apply(
             Stage20GeneratedWorldRuntimePersistentState checkpoint) {
         Stage20GeneratedWorldRuntimePersistentState source = Objects.requireNonNull(checkpoint, "checkpoint");
-        double berthRadiusM = Stage20LocalRouteSemanticBandCatalogLoader.loadDefault().bands().stream()
-                .filter(band -> band.id() == BandId.STATION_TO_STATION)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("missing STATION_TO_STATION calibration"))
-                .minDistanceM();
+        ShipEngineeringCatalog engineering = Stage175ICombatTestContentPack.load();
+        Map<FleetId, Double> berthRadiusByFleet = berthRadii(source.freight(), engineering);
 
         Stage20FreightPersistentState freight = source.freight();
         ArrayList<FreighterState> movedFreighters = new ArrayList<>(freight.freighters().size());
         Map<FleetId, LocalPhysicalKinematics> movedByFleet = new HashMap<>();
         for (FreighterState fleet : freight.freighters()) {
-            if (!fleet.operational()) {
+            Double berthRadiusM = berthRadiusByFleet.get(fleet.fleetId());
+            if (berthRadiusM == null) {
                 movedFreighters.add(fleet);
                 continue;
             }
@@ -113,6 +124,53 @@ final class GeneratedCampaignInitialTrafficBerth {
                 source.remoteUpdateBudgetPerFrame(),
                 movedFreight,
                 movedPhysical);
+    }
+
+    private static Map<FleetId, Double> berthRadii(
+            Stage20FreightPersistentState freight,
+            ShipEngineeringCatalog engineering) {
+        TreeMap<StarSystemId, List<FreighterState>> bySystem = new TreeMap<>();
+        for (FreighterState fleet : freight.freighters()) {
+            if (fleet.operational()) {
+                bySystem.computeIfAbsent(fleet.currentSystemId(), ignored -> new ArrayList<>()).add(fleet);
+            }
+        }
+
+        HashMap<FleetId, Double> result = new HashMap<>();
+        for (List<FreighterState> fleets : bySystem.values()) {
+            fleets.sort(Comparator.comparingLong(value -> value.fleetId().value()));
+            double previousHullRadiusM = 0d;
+            double berthRadiusM = 0d;
+            for (FreighterState fleet : fleets) {
+                double hullRadiusM = topDownBoundingRadiusM(engineering, fleet);
+                if (berthRadiusM == 0d) {
+                    berthRadiusM = BERTH_CLEARANCE_FACTOR * hullRadiusM;
+                } else {
+                    berthRadiusM += BERTH_CLEARANCE_FACTOR * (previousHullRadiusM + hullRadiusM);
+                }
+                result.put(fleet.fleetId(), berthRadiusM);
+                previousHullRadiusM = hullRadiusM;
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static double topDownBoundingRadiusM(
+            ShipEngineeringCatalog engineering,
+            FreighterState fleet) {
+        ShipEngineeringCatalog.HullDefinition hull = engineering.findHull(fleet.hullId());
+        if (hull == null) {
+            throw new IllegalStateException(
+                    "freight berth requires installed hull geometry: " + fleet.hullId());
+        }
+        double halfLengthM = hull.boundingDimensionsM().lengthM() * 0.5d;
+        double halfWidthM = hull.boundingDimensionsM().widthM() * 0.5d;
+        double radiusM = StrictMath.hypot(halfLengthM, halfWidthM);
+        if (!Double.isFinite(radiusM) || radiusM <= 0d) {
+            throw new IllegalStateException(
+                    "freight berth requires positive finite top-down hull geometry: " + fleet.hullId());
+        }
+        return radiusM;
     }
 
     private static double deterministicAngle(FleetId fleetId) {
