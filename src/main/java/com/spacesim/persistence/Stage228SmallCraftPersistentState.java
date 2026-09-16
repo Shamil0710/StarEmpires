@@ -50,7 +50,14 @@ public record Stage228SmallCraftPersistentState(
             String stableFactionId,
             String designId,
             EntityState.EngineeringState engineering) {
-        /** Validates one physical craft row. */
+        /**
+         * Validates one physical craft row.
+         *
+         * @param id stable campaign craft identity
+         * @param stableFactionId stable owning faction identity
+         * @param designId stable authored design/fit identity
+         * @param engineering exact Stage-17.5 fitted physical state
+         */
         public CraftState {
             Objects.requireNonNull(id, "id");
             stableFactionId = requireText(stableFactionId, "stableFactionId");
@@ -61,7 +68,15 @@ public record Stage228SmallCraftPersistentState(
         }
     }
 
-    /** Validates version, deterministic ordering, uniqueness and allocator continuity. */
+    /**
+     * Validates version, deterministic ordering, uniqueness and allocator continuity.
+     *
+     * @param schemaVersion exact M22.8A schema
+     * @param runtimeVersion exact runtime contract identifier
+     * @param semanticContract explicit identity/material-state semantic contract
+     * @param nextCraftId next unused campaign-global small-craft ID
+     * @param craft individual physical craft rows
+     */
     public Stage228SmallCraftPersistentState {
         if (schemaVersion != CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported M22.8A small-craft schema: " + schemaVersion);
