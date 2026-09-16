@@ -1,6 +1,6 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-09-15 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 ACTIVE — M22.0–M22.6 complete, M22.7 FINAL ACCEPTANCE.**
+> **Последняя синхронизация: 2026-09-16 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 COMPLETE — M22.0–M22.7 accepted.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
 > Art maintenance: [Empire sprite refresh](empire_sprite_refresh.md) replaces the nine M22.3
@@ -72,8 +72,8 @@ Canonical faction contracts:
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **COMPLETE** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance + integrated campaign handoff | 22 | **FINAL ACCEPTANCE — M22.7** |
-| **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | PLANNED / BLOCKED UNTIL M22.7 CLOSES |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance + integrated campaign handoff | 22 | **COMPLETE** |
+| **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | **PLANNED / NOT STARTED** |
 
 Manual merge gate remains mandatory while `main` is unprotected:
 
@@ -569,7 +569,7 @@ Core-faction note: the same Stage-21 machinery expresses meaningfully different 
 
 ## 10. Stage 22 — Content / Technology / Balance Alpha
 
-**ACTIVE — final M22.7 acceptance. M22.0–M22.6 are complete; M22.7 Integrated Campaign Handoff is the only current Stage-22 gate.**
+**COMPLETE — M22.0–M22.7 accepted.**
 
 M22.2 implementation merged in PR #346 as `ccd38f1d9d34c84b2f562635295a76826cdbbd11`; exact-head PR CI and post-merge main CI are green. The M22.2 closure adds only shared faction-neutral authoring contracts.
 
@@ -581,7 +581,9 @@ M22.5 shared civilian/minor ecosystem merged in PR #353 as `854a40464eaf72e7ee86
 
 M22.6 core-pair balance/freeze merged in PR #355 as `9693ede2653c1fd187a904c406cc9750919a4496`. Machine scope is complete: B00–B17 paired evidence, fail-closed freeze/persistence, deterministic scheduler continuation and the frozen core-pair simulation/content fingerprint are accepted. Human-only B18 explanation review remains deferred to issue #370 and B19/B20 visual review remains deferred to #361; these deferrals are not PASS evidence and do not block M22.7 by explicit owner disposition.
 
-M22.7 is the final Stage-22 integration gate on PR #360. It does not add a new economy, diplomacy, logistics or warfare model. It closes:
+M22.7 Integrated Campaign Handoff merged in PR #360. Accepted implementation head `327870db987408781d323457a07d6a870e82a872` passed exact-head CI #6703 / run `35087562701`; final acceptance umbrella #368 and implementation issues #362–#367 are closed as applicable. PR #360 merged to `main` as `22015454773a1e430c50a8743149addfe8947b6f`.
+
+M22.7 closes:
 
 - one `GeneratedCampaignCoordinator` over the ordinary Stage-20/20.5 runtime and accepted Stage-21A–I authorities;
 - deterministic simulation-tick scheduling for autonomous freight/faction cadence across 1x/2x/4x/8x and save/load;
@@ -594,7 +596,10 @@ M22.7 is the final Stage-22 integration gate on PR #360. It does not add a new e
 - launcher/README/roadmap/save/asset/scheduling documentation truth and a Stage-23 entry manifest.
 
 M22.7 authoritative handoff contract: `docs/m22_7_integrated_campaign_handoff.md`.  
-M22.7 execution/governance override: `docs/m22_7_kickoff_override.md`.
+M22.7 execution/governance override: `docs/m22_7_kickoff_override.md`.  
+Stage-22 final completion record: `docs/stage22_completion_record.md`.
+
+Human sprite aesthetic approval remains explicitly deferred in open issue #361 and is not Stage-22 PASS evidence. Automated legality/content/runtime-binding checks are not deferred.
 
 Expands the accepted physical/manufacturable language:
 
@@ -619,8 +624,7 @@ Stage 22 production-complete major-faction scope is intentionally limited to:
 2. **Индустриальный Союз** — M22.4 contrast production package — **COMPLETE**.
 
 M22.2 is the completed shared faction-neutral role/mission/production/visual authoring seam required before either
-bulk package. Stage 22 must implement core-pair differentiation through common mechanics and then
-perform pairwise fleet, industry, logistics, economy, NPC/content and long-run balance. It must **not**
+bulk package. Stage 22 implements core-pair differentiation through common mechanics and pairwise fleet, industry, logistics, economy, NPC/content and long-run balance. It does **not**
 require production-complete Директорат / Лигу Свободных Систем / Пограничную Конфедерацию /
 Консорциум / Кочевой Флот.
 
@@ -640,7 +644,7 @@ M22.3 completion evidence: `docs/stage22_3_completion_record.md`.
 M22.4 completion evidence: `docs/stage22_4_completion_record.md`.  
 M22.5 completion evidence: `docs/stage22_5_completion_record.md`.  
 M22.6 merged acceptance: PR #355 / main `9693ede2653c1fd187a904c406cc9750919a4496`.  
-M22.7 final handoff evidence: `docs/m22_7_integrated_campaign_handoff.md` + acceptance issue #368.
+M22.7 final handoff evidence: PR #360 / accepted head `327870db987408781d323457a07d6a870e82a872` / CI #6703 / merge `22015454773a1e430c50a8743149addfe8947b6f` / acceptance issue #368 / `docs/stage22_completion_record.md`.
 
 Cross-media production plan for faction packages, ships, stations, NPCs, missions, locations,
 characters, UI art, VFX, audio, localization, manifests, alpha floors and cut rules:
@@ -651,7 +655,7 @@ Faction design authority:
 
 ## 11. Stage 23 — Polish / Release Candidate
 
-**PLANNED — BLOCKED UNTIL M22.7 ACCEPTANCE CLOSES.**
+**PLANNED / NOT STARTED — unblocked by Stage-22 closure; requires a separate approved kickoff.**
 
 UX/onboarding/accessibility/performance/content validation/save hardening after fundamental simulation/content architecture is stable.
 
@@ -710,8 +714,8 @@ Stage 17 COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
 → Stage 21 RPG / Living World COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
-→ Stage 22 Content / Balance Alpha — M22.0–M22.6 COMPLETE; M22.7 FINAL ACCEPTANCE
-→ Stage 23 RC / final presentation replacement and polish — BLOCKED UNTIL M22.7 CLOSES
+→ Stage 22 Content / Balance Alpha COMPLETE — M22.0–M22.7 accepted
+→ Stage 23 RC / final presentation replacement and polish — PLANNED / NOT STARTED
 → Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
 
@@ -719,7 +723,7 @@ Detailed faction/content execution, ID migration and post-core package sequencin
 `docs/factions/faction_implementation_roadmap.md`; evidence gates are defined in
 `docs/factions/faction_balance_validation_framework.md`. These documents refine the sequence without changing the live stage status in this roadmap.
 
-**Immediate implementation priority is M22.7 acceptance/closure.** M22.6 is merged and machine-complete under the recorded owner deferrals. M22.7 must close exact-head CI, unified campaign ownership, deterministic freight movement/scheduling, final Stage-21I persistence, causal first-hour identity continuity, production-client smoke, 1x/8x baseline, launcher/documentation truth and issue #368 before any Stage-23 implementation begins.
+**Stage 22 is closed.** PR #360 is merged, exact-head CI #6703 is green, acceptance #368 is closed and `docs/stage22_completion_record.md` records the final evidence. Stage 23 is now eligible for a separately approved kickoff, but no Stage-23 implementation is started by this closure change. Open human visual debt #361 remains explicitly deferred and is not retroactive PASS evidence.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
-file plus `docs/m22_7_integrated_campaign_handoff.md` are authoritative for current implementation status.
+file plus `docs/m22_7_integrated_campaign_handoff.md` and `docs/stage22_completion_record.md` are authoritative for current implementation status.
