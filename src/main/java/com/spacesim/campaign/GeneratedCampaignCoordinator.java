@@ -7,6 +7,8 @@ import com.spacesim.persistence.Stage21IGeneratedWorldRuntimeMigration;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState.MigrationProvenance;
 import com.spacesim.world.DiplomaticLifecycleState;
+import com.spacesim.world.FactionInterestResolver.DecisionTrace;
+import com.spacesim.world.FactionLivingActorKernel.ReviewResult;
 import com.spacesim.world.FactionLivingActorRuntime;
 import com.spacesim.world.FactionStrategicIntentState;
 import com.spacesim.world.FleetCommandState;
@@ -17,6 +19,8 @@ import com.spacesim.world.TerritorialTransitionState;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeMap;
 
 /**
  * Ordinary production composition root for one generated campaign.
@@ -42,6 +46,7 @@ public final class GeneratedCampaignCoordinator {
     private final SettlementRecoveryState recovery;
     private final Stage21HNpcMissionState npcMissions;
     private final MigrationProvenance migrationProvenance;
+    private final TreeMap<String, DecisionTrace> latestDecisionTraceByFaction = new TreeMap<>();
 
     private GeneratedCampaignCoordinator(
             GeneratedCampaignAuthorityCheckpoint.RestoredAuthorities restored,
@@ -193,6 +198,24 @@ public final class GeneratedCampaignCoordinator {
         return migrationProvenance;
     }
 
+    /**
+     * Returns the latest decision trace actually produced by the production Stage-21A actor runtime.
+     *
+     * <p>This is ephemeral read-only diagnostics, not an additional gameplay or persistence owner.
+     * A restored coordinator intentionally starts without historical diagnostics and records new
+     * traces only when its accepted actor runtime performs later scheduled reviews.</p>
+     *
+     * @param factionContentId stable autonomous faction identity
+     * @return latest completed production review trace for that faction, when one has run
+     */
+    public Optional<DecisionTrace> latestDecisionTrace(String factionContentId) {
+        String factionId = Objects.requireNonNull(factionContentId, "factionContentId").strip();
+        if (factionId.isEmpty()) {
+            throw new IllegalArgumentException("factionContentId cannot be blank");
+        }
+        return Optional.ofNullable(latestDecisionTraceByFaction.get(factionId));
+    }
+
     /** @return whether campaign progression is paused */
     public boolean isPaused() {
         return session.isPaused();
@@ -237,7 +260,7 @@ public final class GeneratedCampaignCoordinator {
     }
 
     private void reviewActorsAtTick(long authoritativeTick) {
-        actors.reviewDue(
+        var batch = actors.reviewDue(
                 authoritativeTick,
                 MAX_ACTOR_REVIEWS_PER_TICK,
                 ACTOR_REVIEW_CADENCE_TICKS,
@@ -245,5 +268,8 @@ public final class GeneratedCampaignCoordinator {
                         session.captureState(),
                         factionId,
                         authoritativeTick));
+        for (ReviewResult review : batch.reviews()) {
+            latestDecisionTraceByFaction.put(review.updatedState().factionContentId(), review.trace());
+        }
     }
 }
