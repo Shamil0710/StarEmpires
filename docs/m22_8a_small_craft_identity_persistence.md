@@ -16,6 +16,8 @@ Implemented contract:
 - the M22.8 sidecar reuses `EntityState.EngineeringState` and `EngineeringStatePersistenceMapper` instead of defining a second fighter engineering schema;
 - persistent rows are deterministically sorted by craft ID and reject duplicates or allocator watermark rollback;
 - `Stage228GeneratedCampaignPersistentState` wraps the accepted Stage-21I checkpoint unchanged and adds only the M22.8 small-craft sidecar;
+- native M22.8 campaign files persist that envelope through `Stage228GeneratedCampaignPersistenceCodec`, while supported Stage-20.5/21A-I saves migrate through the accepted Stage-21 chain into an empty non-granting sidecar;
+- the player-facing `GeneratedWorldCommandGame` F8/F9 path uses the M22.8 authority/envelope directly while retaining the existing save-file path so previously written campaigns remain discoverable and migratable;
 - Stage-21 adoption initializes an empty sidecar. It does not synthesize craft, ammunition, propellant, repairs or replacements;
 - `Stage228CampaignAuthority` delegates ordinary world progression to the accepted `GeneratedCampaignCoordinator` and owns no second campaign clock.
 
@@ -42,6 +44,9 @@ Automated tests added by this slice cover:
 - exact craft-state capture/restore preserves ammunition quantity/mass, reaction mass, damage and maintenance age;
 - a reserved-but-not-yet-registered identity is not reused after save/load;
 - duplicate IDs and allocator-watermark rollback fail closed;
-- current M22.8 campaign envelope capture/restore preserves the accepted Stage-21 state and the M22.8A sidecar exactly.
+- current M22.8 campaign envelope capture/restore preserves the accepted Stage-21 state and the M22.8A sidecar exactly;
+- native M22.8 bytes round-trip deterministically and legacy Stage-21 native bytes migrate with zero small craft.
+
+The production F8/F9 wiring is compiled as part of the normal client build and uses the same codec exercised by the persistence acceptance tests.
 
 This document does not mark M22.8A accepted until the implementation PR passes exact-head CI, merges to `main`, and post-merge verification is checked.
