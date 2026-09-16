@@ -33,6 +33,14 @@ Time-scale controls are applied uniformly to every system clock. Ordinary suppor
 
 M22.7E also observes physical freight delivery deadlines on completed authoritative ticks before the next autonomous decision. This keeps delay/shortage consequences deterministic across different frame partitioning and across save/load.
 
+### Opening freight commitment
+
+The calibrated generated-world routes remain physical. For the default public seed, the accepted Stage-20 route authority gives the ordinary bootstrap orders one-way travel times of roughly 992,669–993,259 simulation seconds (about 11.5 days). M22.7 does **not** shorten those distances or travel times to satisfy a first-hour test.
+
+Stage-20 bootstrap freight rows describe already accepted essential-supply commitments, not offers created at campaign second zero. On creation of a **new** integrated campaign, `GeneratedCampaignInitialFreightCommitment` therefore retains the stable first essential bootstrap order as the oldest opening obligation and marks that obligation due at the campaign epoch. No cargo, route, fleet, mass, propulsion capability or order identity is invented or accelerated. The ordinary freight autopilot must still load real source inventory into the real assigned fleet and dispatch it through the accepted physical route.
+
+`Stage20FreightRuntime.dispatchOutbound` preserves an already-authoritative delivery deadline. Dispatching late may not silently rewrite the obligation to `dispatch time + ETA`, because that would erase source-side lateness before it can become a shortage observation. After a completed return trip reaches the source, the existing recurring-cycle logic creates the next deadline from the physical one-way duration. Save-game restore never reapplies the opening normalization; it restores the exact persisted deadline and missed-delivery history.
+
 ## 2. Final save contract
 
 The native save format is `Stage21IGeneratedWorldRuntimePersistentState`:
@@ -71,9 +79,11 @@ The continuity key is preserved across:
 
 `transport order -> fleet -> cargo lot -> physical route -> delivery / crossed delivery deadline / physical loss -> causal observation -> faction decision`
 
-A midpoint save is encoded, decoded and restored through the final Stage-21I persistence path. The same cargo-lot, fleet and transport-order identities must still be present after reload. The journey succeeds only when that same tracked chain creates a delivery, delay/shortage or physical-loss consequence which is then published as a causal observation and referenced by a faction decision.
+The first-hour proof deliberately allows a crossed service deadline to be the physical consequence when the calibrated inter-system route itself is longer than one simulation hour. The deadline crossing is produced by the same ordinary freight runtime that owns the physical order and cargo; it is not a test-side flag or synthetic actor input.
 
-This test is intentionally not a debug-scripted narrative. A failure to produce a consequence is treated as a production causality bug, not as a reason to relax the assertion.
+A midpoint save is encoded, decoded and restored through the final Stage-21I persistence path after the real cargo lot exists and before the tracked opening obligation is observed as overdue. The same cargo-lot, fleet and transport-order identities must still be present after reload. The journey succeeds only when that same tracked chain creates a delivery, delay/shortage or physical-loss consequence which is then published as a causal observation and referenced by a faction decision.
+
+This test is intentionally not a debug-scripted narrative. A failure to produce a consequence is treated as a production causality bug, not as a reason to relax the one-hour assertion or compress the physical route model.
 
 ## 4. Production-client smoke
 
