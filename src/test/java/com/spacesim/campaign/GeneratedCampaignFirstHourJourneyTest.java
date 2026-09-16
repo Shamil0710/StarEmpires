@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeneratedCampaignFirstHourJourneyTest {
-    private static final float EIGHT_TIMES_PRESENTATION_FRAME_SECONDS = 0.1f;
-    private static final double SIMULATION_SECONDS_PER_FRAME = 0.8d;
+    private static final float EIGHT_TIMES_PRESENTATION_FRAME_SECONDS = 0.05f;
+    private static final double SIMULATION_SECONDS_PER_FRAME = 0.4d;
     private static final double FIRST_HOUR_SIMULATION_SECONDS = 3_600d;
     private static final int FIRST_HOUR_FRAME_BUDGET =
             (int) Math.ceil(FIRST_HOUR_SIMULATION_SECONDS / SIMULATION_SECONDS_PER_FRAME);
