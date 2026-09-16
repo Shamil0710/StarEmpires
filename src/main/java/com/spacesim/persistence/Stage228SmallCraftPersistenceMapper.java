@@ -1,6 +1,7 @@
 package com.spacesim.persistence;
 
 import com.spacesim.components.EngineeringComponent;
+import com.spacesim.world.SmallCraftFitAuthority;
 import com.spacesim.world.SmallCraftRegistry;
 import com.spacesim.world.SmallCraftState;
 
@@ -35,15 +36,22 @@ public final class Stage228SmallCraftPersistenceMapper {
     /**
      * Restores an independent registry without manufacturing or replenishing any craft.
      *
+     * <p>Every decoded row is checked against the supplied production engineering catalog and the
+     * ordinary Stage-17.5 fitting validator before the restored registry is returned.</p>
+     *
      * @param state validated M22.8A sidecar
+     * @param fitAuthority production-content and Stage-17.5 fitting authority
      * @return independent runtime registry
      */
-    public static SmallCraftRegistry restore(Stage228SmallCraftPersistentState state) {
+    public static SmallCraftRegistry restore(
+            Stage228SmallCraftPersistentState state,
+            SmallCraftFitAuthority fitAuthority) {
         Stage228SmallCraftPersistentState checked = Objects.requireNonNull(state, "state");
+        SmallCraftFitAuthority authority = Objects.requireNonNull(fitAuthority, "fitAuthority");
         List<SmallCraftState> rows = checked.craft().stream()
                 .map(Stage228SmallCraftPersistenceMapper::restoreCraft)
                 .toList();
-        return SmallCraftRegistry.restore(checked.nextCraftId(), rows);
+        return SmallCraftRegistry.restore(checked.nextCraftId(), rows, authority);
     }
 
     private static Stage228SmallCraftPersistentState.CraftState captureCraft(SmallCraftState state) {
