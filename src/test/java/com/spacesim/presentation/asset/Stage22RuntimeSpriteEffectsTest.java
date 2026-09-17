@@ -20,6 +20,19 @@ class Stage22RuntimeSpriteEffectsTest {
     }
 
     @Test
+    void zeroPropulsionClearsPreviouslyAttachedRuntimeMetadata() {
+        SpriteBinding source = Stage20MinimumPlayableSpriteCatalog.resolvePlayable(null).binding();
+        SpriteBinding thrusting = Stage22RuntimeSpriteEffects.withPropulsion(source, 1d);
+        SpriteBinding idle = Stage22RuntimeSpriteEffects.withPropulsion(thrusting, 0d);
+
+        assertEquals(1d, Stage22RuntimeSpriteEffects.propulsionFraction(thrusting));
+        assertEquals(0d, Stage22RuntimeSpriteEffects.propulsionFraction(idle));
+        assertEquals(source.assetId(), idle.assetId());
+        assertEquals(source.texturePath(), idle.texturePath());
+        assertEquals(source.role(), idle.role());
+    }
+
+    @Test
     void propulsionMetadataPreservesEveryAuthoredFieldExceptRuntimeAssetSuffix() {
         SpriteBinding source = Stage20MinimumPlayableSpriteCatalog.resolvePlayable(null).binding();
         SpriteBinding runtime = Stage22RuntimeSpriteEffects.withPropulsion(source, 0.625d);
