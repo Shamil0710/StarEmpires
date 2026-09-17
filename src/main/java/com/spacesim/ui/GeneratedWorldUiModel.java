@@ -74,6 +74,13 @@ public final class GeneratedWorldUiModel {
     private final Stage20GeneratedCampaignPersistentState campaign;
     private final Stage20StationPhysicalGeometryProfile stationGeometry;
 
+    /**
+     * Creates a live read model and captures only the immutable generated-world authority once.
+     *
+     * @param worldSeed exact campaign seed
+     * @param runtime live Stage-20.5 runtime
+     * @param content installed content catalogue
+     */
     public GeneratedWorldUiModel(long worldSeed, LiveRuntime runtime, ContentCatalog content) {
         this.worldSeed = worldSeed;
         this.runtime = Objects.requireNonNull(runtime, "runtime");
