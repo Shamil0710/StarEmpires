@@ -25,7 +25,16 @@ public final class Stage22EnginePlumeGeometry {
             float widthPixels,
             float rotationDegrees,
             float alpha) {
-        /** Validates finite positive effect geometry. */
+        /**
+         * Validates finite positive effect geometry.
+         *
+         * @param centerX plume center X
+         * @param centerY plume center Y
+         * @param lengthPixels plume length along the ship forward axis
+         * @param widthPixels plume transverse width
+         * @param rotationDegrees same counter-clockwise runtime rotation as the hull
+         * @param alpha additive overlay alpha
+         */
         public PlumeTransform {
             if (!Float.isFinite(centerX) || !Float.isFinite(centerY)
                     || !Float.isFinite(lengthPixels) || !Float.isFinite(widthPixels)
