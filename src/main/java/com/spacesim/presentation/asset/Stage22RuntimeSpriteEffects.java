@@ -20,20 +20,24 @@ public final class Stage22RuntimeSpriteEffects {
 
     /**
      * Returns one runtime presentation binding carrying a normalized propulsion activity hint.
+     * Existing runtime propulsion metadata is replaced, including when activity returns to zero.
      *
      * @param binding authored or already-resolved sprite binding
      * @param propulsionFraction normalized simulation-authoritative propulsion activity
-     * @return original binding for zero activity, otherwise an equivalent runtime-effect binding
+     * @return equivalent binding carrying exactly the requested runtime propulsion state
      */
     public static SpriteBinding withPropulsion(SpriteBinding binding, double propulsionFraction) {
         SpriteBinding source = Objects.requireNonNull(binding, "binding");
         requireFraction(propulsionFraction);
-        if (propulsionFraction == 0d) {
+        String authoredAssetId = stripRuntimePropulsion(source.assetId());
+        if (propulsionFraction == 0d && authoredAssetId.equals(source.assetId())) {
             return source;
         }
+        String runtimeAssetId = propulsionFraction == 0d
+                ? authoredAssetId
+                : authoredAssetId + PROPULSION_MARKER + Double.toHexString(propulsionFraction);
         return new SpriteBinding(
-                stripRuntimePropulsion(source.assetId())
-                        + PROPULSION_MARKER + Double.toHexString(propulsionFraction),
+                runtimeAssetId,
                 source.role(),
                 source.texturePath(),
                 source.region(),
