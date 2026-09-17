@@ -4,6 +4,7 @@ import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.Resol
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding;
 import com.spacesim.presentation.asset.Stage22ProductionShipSpriteAdapter;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
+import com.spacesim.presentation.asset.Stage22RuntimeSpriteEffects;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.StarSystemId;
 
@@ -118,7 +119,8 @@ public record GeneratedWorldUiSnapshot(
 
         /**
          * Preserves simulation-authoritative dimensions while passing artwork into the UI.
-         * Production artwork receives the same runtime propulsion state as the projection.
+         * Production artwork receives the same runtime propulsion state as the projection, and the
+         * final binding carries the same normalized value as presentation-only effect metadata.
          */
         public LocalObjectView withScale(ResolvedSprite resolved) {
             RuntimeVisualState runtimeState = propulsionFraction > 0d
@@ -128,8 +130,10 @@ public record GeneratedWorldUiSnapshot(
                     factionId,
                     Objects.requireNonNull(resolved, "resolved"),
                     runtimeState);
+            SpriteBinding runtimeBinding = Stage22RuntimeSpriteEffects.withPropulsion(
+                    selected.binding(), propulsionFraction);
             return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
-                    factionId, factionName, selected.binding(), sections,
+                    factionId, factionName, runtimeBinding, sections,
                     selected.worldLengthM(), selected.worldWidthM(), headingRad, propulsionFraction);
         }
 
