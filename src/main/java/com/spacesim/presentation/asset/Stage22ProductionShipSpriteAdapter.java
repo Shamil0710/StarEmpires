@@ -28,7 +28,7 @@ import java.util.Objects;
  */
 public final class Stage22ProductionShipSpriteAdapter {
     /** Versioned handoff contract between the Stage-22 resolver and existing compatibility clients. */
-    public static final String CURRENT_VERSION = "stage22_7.production-ship-sprite-adapter.v3";
+    public static final String CURRENT_VERSION = "stage22_7.production-ship-sprite-adapter.v4";
 
     private static final ShipEngineeringCatalog STAGE21_TACTICAL_ENGINEERING =
             Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
@@ -46,12 +46,13 @@ public final class Stage22ProductionShipSpriteAdapter {
      */
     public static ResolvedSprite adapt(ResolvedVisual resolved) {
         ResolvedVisual visual = Objects.requireNonNull(resolved, "resolved");
-        return adaptAtScale(
+        ResolvedSprite adapted = adaptAtScale(
                 visual,
                 visual.worldLengthM(),
                 visual.worldWidthM(),
                 ScaleAuthority.EXACT_PHYSICAL_CONTENT,
                 CURRENT_VERSION + '#' + visual.key().fitFingerprint());
+        return withRuntimeState(adapted, visual.key().runtimeState());
     }
 
     /**
@@ -75,8 +76,9 @@ public final class Stage22ProductionShipSpriteAdapter {
             ResolvedSprite legacy,
             RuntimeVisualState runtimeState) {
         ResolvedSprite physical = Objects.requireNonNull(legacy, "legacy");
+        RuntimeVisualState state = Objects.requireNonNull(runtimeState, "runtimeState");
         if (!isCoreProductionFaction(stableFactionId)) {
-            return physical;
+            return withRuntimeState(physical, state);
         }
         String roleId = switch (physical.binding().role()) {
             case CARGO_TRANSPORT_SHIP -> "role.support.freight";
@@ -84,20 +86,21 @@ public final class Stage22ProductionShipSpriteAdapter {
             default -> null;
         };
         if (roleId == null) {
-            return physical;
+            return withRuntimeState(physical, state);
         }
         ResolvedVisual visual = Stage22ProductionShipVisualResolver.resolveRole(
                 stableEntityId,
                 stableFactionId,
                 roleId,
-                Objects.requireNonNull(runtimeState, "runtimeState"));
-        return adaptAtScale(
+                state);
+        ResolvedSprite adapted = adaptAtScale(
                 visual,
                 physical.worldLengthM(),
                 physical.worldWidthM(),
                 physical.scaleAuthority(),
                 physical.authorityId() + "|visual=" + visual.key().visualBindingId()
                         + ':' + visual.key().fitFingerprint());
+        return withRuntimeState(adapted, state);
     }
 
     /**
@@ -122,8 +125,9 @@ public final class Stage22ProductionShipSpriteAdapter {
             ResolvedSprite legacy,
             RuntimeVisualState runtimeState) {
         ResolvedSprite physical = Objects.requireNonNull(legacy, "legacy");
+        RuntimeVisualState state = Objects.requireNonNull(runtimeState, "runtimeState");
         if (!isCoreProductionFaction(stableFactionId)) {
-            return physical;
+            return withRuntimeState(physical, state);
         }
         InstalledFit fit = Objects.requireNonNull(installedFit,
                 "core tactical production visual requires exact installedFit");
@@ -141,8 +145,8 @@ public final class Stage22ProductionShipSpriteAdapter {
                 stableEntityId,
                 stableFactionId,
                 "role.military.destroyer",
-                Objects.requireNonNull(runtimeState, "runtimeState"));
-        return adaptAtScale(
+                state);
+        ResolvedSprite adapted = adaptAtScale(
                 visual,
                 hull.boundingDimensionsM().lengthM(),
                 hull.boundingDimensionsM().widthM(),
@@ -150,6 +154,7 @@ public final class Stage22ProductionShipSpriteAdapter {
                 STAGE21_TACTICAL_ENGINEERING.getFingerprint() + '#' + strategic.id()
                         + "|visual=" + visual.key().visualBindingId()
                         + ':' + visual.key().fitFingerprint());
+        return withRuntimeState(adapted, state);
     }
 
     /**
@@ -167,10 +172,11 @@ public final class Stage22ProductionShipSpriteAdapter {
             ResolvedSprite legacy,
             RuntimeVisualState runtimeState) {
         ResolvedSprite physical = Objects.requireNonNull(legacy, "legacy");
+        RuntimeVisualState state = Objects.requireNonNull(runtimeState, "runtimeState");
         if (physical.binding().role() != VisualRole.CARGO_TRANSPORT_SHIP) {
-            return physical;
+            return withRuntimeState(physical, state);
         }
-        return upgradeCoreProjection(stableEntityId, stableFactionId, physical, runtimeState);
+        return upgradeCoreProjection(stableEntityId, stableFactionId, physical, state);
     }
 
     /**
@@ -216,6 +222,25 @@ public final class Stage22ProductionShipSpriteAdapter {
                 worldWidthM,
                 Objects.requireNonNull(scaleAuthority, "scaleAuthority"),
                 Objects.requireNonNull(scaleAuthorityId, "scaleAuthorityId"));
+    }
+
+    private static ResolvedSprite withRuntimeState(
+            ResolvedSprite sprite,
+            RuntimeVisualState runtimeState) {
+        ResolvedSprite source = Objects.requireNonNull(sprite, "sprite");
+        RuntimeVisualState state = Objects.requireNonNull(runtimeState, "runtimeState");
+        double propulsionFraction = state == RuntimeVisualState.THRUSTING ? 1d : 0d;
+        SpriteBinding binding = Stage22RuntimeSpriteEffects.withPropulsion(
+                source.binding(), propulsionFraction);
+        if (binding == source.binding()) {
+            return source;
+        }
+        return new ResolvedSprite(
+                binding,
+                source.worldLengthM(),
+                source.worldWidthM(),
+                source.scaleAuthority(),
+                source.authorityId());
     }
 
     private static boolean isCoreProductionFaction(String factionId) {
