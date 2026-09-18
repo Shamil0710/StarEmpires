@@ -16,6 +16,7 @@ import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage228CampaignAuthorityTest {
@@ -47,6 +48,7 @@ class Stage228CampaignAuthorityTest {
         original.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
                 id, 8L, 80d, 4_000d, 1d, 100d));
         Stage228GeneratedCampaignPersistentState base = original.captureState();
+        long currentTick = original.coordinator().runtime().world().getAuthoritativeWorldTick();
         Stage228HangarPersistentState occupied = new Stage228HangarPersistentState(
                 Stage228HangarPersistentState.CURRENT_VERSION,
                 Stage228HangarPersistentState.CURRENT_RUNTIME_VERSION,
@@ -91,6 +93,7 @@ class Stage228CampaignAuthorityTest {
                 Stage228FlightDeckPersistentState.CURRENT_VERSION,
                 Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
                 Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                currentTick,
                 java.util.List.of(new Stage228FlightDeckPersistentState.DeckProfileState(
                         "carrier:authority-launch",
                         "mission_primary",
@@ -103,7 +106,7 @@ class Stage228CampaignAuthorityTest {
                                 "carrier:authority-launch",
                                 "mission_primary",
                                 OperationKind.LAUNCH,
-                                100L),
+                                currentTick),
                         OperationPhase.AWAITING_HANDOFF,
                         0d,
                         null)));
@@ -118,6 +121,31 @@ class Stage228CampaignAuthorityTest {
                 restored.hangars().find(id).orElseThrow().state());
         assertEquals(OperationPhase.AWAITING_HANDOFF,
                 restored.flightDeck().activeFor(id).orElseThrow().phase());
+    }
+
+    @Test
+    void restoreRejectsFlightDeckWatermarkAheadOfCampaignTime() {
+        Stage228CampaignAuthority original = Stage228CampaignAuthority.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage228GeneratedCampaignPersistentState base = original.captureState();
+        long currentTick = original.coordinator().runtime().world().getAuthoritativeWorldTick();
+        Stage228FlightDeckPersistentState futureDeck =
+                new Stage228FlightDeckPersistentState(
+                        Stage228FlightDeckPersistentState.CURRENT_VERSION,
+                        Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
+                        Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                        currentTick + 1L,
+                        java.util.List.of(),
+                        java.util.List.of(),
+                        java.util.List.of());
+
+        assertThrows(IllegalArgumentException.class, () ->
+                Stage228CampaignAuthority.restore(
+                        Stage228GeneratedCampaignPersistentState.compose(
+                                base.stage21Runtime(),
+                                base.smallCraft(),
+                                base.hangars(),
+                                futureDeck)));
     }
 
     @Test
