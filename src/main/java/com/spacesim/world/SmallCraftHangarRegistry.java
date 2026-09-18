@@ -84,9 +84,11 @@ public final class SmallCraftHangarRegistry {
         BayDefinition checkedBay = Objects.requireNonNull(bay, "bay");
         Objects.requireNonNull(state, "state");
         requireCraftExists(checkedId);
+        requireHostKindCompatible(checkedBay);
         if (assignmentByCraft.containsKey(checkedId)) {
             throw new IllegalArgumentException("Craft already occupies a bay: " + checkedId);
         }
+        requireHostKindCompatible(checkedBay);
         CraftFootprint footprint = craftRegistry.physicalFootprint(checkedId);
         Usage current = usage(checkedBay.id());
         if (!SmallCraftHangarCapacity.canAccept(checkedBay, current, footprint)) {
@@ -159,6 +161,7 @@ public final class SmallCraftHangarRegistry {
      */
     public CapacityStatus capacityStatus(BayDefinition bay) {
         BayDefinition checkedBay = Objects.requireNonNull(bay, "bay");
+        requireHostKindCompatible(checkedBay);
         return SmallCraftHangarCapacity.status(checkedBay, usage(checkedBay.id()));
     }
 
@@ -208,6 +211,16 @@ public final class SmallCraftHangarRegistry {
             result.merge(assignment.state(), 1L, Long::sum);
         }
         return Collections.unmodifiableMap(result);
+    }
+
+    private void requireHostKindCompatible(BayDefinition bay) {
+        for (Assignment assignment : assignmentByCraft.values()) {
+            if (assignment.bayId().equals(bay.id())
+                    && assignment.hostKind() != bay.hostKind()) {
+                throw new IllegalArgumentException(
+                        "Bay host kind disagrees with persisted occupancy: " + bay.id());
+            }
+        }
     }
 
     private Assignment requireAssignment(SmallCraftId craftId) {
