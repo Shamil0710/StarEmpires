@@ -22,6 +22,7 @@ import java.util.TreeSet;
  * @param schemaVersion exact sidecar schema
  * @param runtimeVersion exact runtime contract
  * @param semanticContract explicit no-teleport queue contract
+ * @param lastProcessedTick last authoritative tick consumed by deck operations, or -1
  * @param profiles physical deck handling profiles
  * @param queued queued launch/recovery requests
  * @param active active per-bay operations
@@ -30,6 +31,7 @@ public record Stage228FlightDeckPersistentState(
         int schemaVersion,
         String runtimeVersion,
         String semanticContract,
+        long lastProcessedTick,
         List<DeckProfileState> profiles,
         List<RequestState> queued,
         List<ActiveState> active) {
@@ -170,10 +172,38 @@ public record Stage228FlightDeckPersistentState(
         }
     }
 
+    /**
+     * Compatibility constructor for pre-watermark call sites inside the unmerged C slice.
+     *
+     * @param schemaVersion exact schema
+     * @param runtimeVersion exact runtime ID
+     * @param semanticContract semantic contract
+     * @param profiles physical profiles
+     * @param queued queued requests
+     * @param active active operations
+     */
+    public Stage228FlightDeckPersistentState(
+            int schemaVersion,
+            String runtimeVersion,
+            String semanticContract,
+            List<DeckProfileState> profiles,
+            List<RequestState> queued,
+            List<ActiveState> active) {
+        this(
+                schemaVersion,
+                runtimeVersion,
+                semanticContract,
+                -1L,
+                profiles,
+                queued,
+                active);
+    }
+
     /** Validates version, uniqueness and deterministic ordering.
      * @param schemaVersion exact schema
      * @param runtimeVersion exact runtime ID
      * @param semanticContract semantic contract
+     * @param lastProcessedTick last consumed authoritative tick, or -1
      * @param profiles physical profiles
      * @param queued queued requests
      * @param active active operations
@@ -192,6 +222,9 @@ public record Stage228FlightDeckPersistentState(
         if (!CURRENT_SEMANTIC_CONTRACT.equals(semanticContract)) {
             throw new IllegalArgumentException(
                     "Unsupported M22.8C flight-deck semantic contract: " + semanticContract);
+        }
+        if (lastProcessedTick < -1L) {
+            throw new IllegalArgumentException("lastProcessedTick cannot be below -1");
         }
 
         ArrayList<DeckProfileState> profileCopy =
@@ -251,6 +284,7 @@ public record Stage228FlightDeckPersistentState(
                 CURRENT_VERSION,
                 CURRENT_RUNTIME_VERSION,
                 CURRENT_SEMANTIC_CONTRACT,
+                -1L,
                 List.of(),
                 List.of(),
                 List.of());
