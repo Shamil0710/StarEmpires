@@ -346,7 +346,8 @@ public final class GeneratedWorldCommandUiRenderer {
         LocalObjectView object = snapshot.localObjects().stream()
                 .filter(value -> value.stableId().equals(id)).findFirst().orElseThrow();
         systemMapCamera.inspect(projection.inspectionZoom(object, content.width(), content.height()));
-        PresentationMotionSmoother.Point displayed = localObjectMotion.current(id);
+        PresentationMotionSmoother.Point displayed = previousRenderedTab == Tab.SYSTEM
+                ? localObjectMotion.current(id) : null;
         double focusX = displayed == null ? point.x() : displayed.x();
         double focusY = displayed == null ? point.y() : displayed.y();
         systemMapCamera.focus(focusX, focusY,
