@@ -67,6 +67,7 @@ public final class GeneratedWorldCommandUiRenderer {
     private Rect systemProjectionRect = Rect.empty();
     private boolean systemProjectionRefit = true;
     private String followedLocalObjectId = "";
+    private Tab previousRenderedTab;
     private boolean disposed;
 
     /** Top-level production UI surfaces. */
@@ -216,6 +217,10 @@ public final class GeneratedWorldCommandUiRenderer {
         mapRect = Rect.empty();
         beginFrame();
         drawFrameChrome(snapshot, tab, paused, timeScale, status);
+        if (tab == Tab.SYSTEM && previousRenderedTab != Tab.SYSTEM) {
+            localObjectMotion.reset();
+        }
+        previousRenderedTab = tab;
         switch (tab) {
             case SYSTEM -> drawSystem(snapshot, selection, detailScrollRows);
             case GALAXY -> drawGalaxy(snapshot, selection, detailScrollRows);
