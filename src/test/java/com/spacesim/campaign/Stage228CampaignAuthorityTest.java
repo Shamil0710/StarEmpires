@@ -1,11 +1,14 @@
 package com.spacesim.campaign;
 
+import com.spacesim.content.ship.ShipEngineeringCatalog.Dimensions3d;
 import com.spacesim.persistence.Stage228FlightDeckPersistentState;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
 import com.spacesim.persistence.Stage228HangarPersistentState;
 import com.spacesim.world.ProductionSmallCraftFixture;
 import com.spacesim.world.SmallCraftFlightDeckOperations.OperationKind;
 import com.spacesim.world.SmallCraftFlightDeckOperations.OperationPhase;
+import com.spacesim.world.SmallCraftHangarCapacity.BayDefinition;
+import com.spacesim.world.SmallCraftHangarCapacity.BayId;
 import com.spacesim.world.SmallCraftHangarCapacity.HostKind;
 import com.spacesim.world.SmallCraftHangarCapacity.OccupancyState;
 import com.spacesim.world.SmallCraftId;
@@ -115,6 +118,70 @@ class Stage228CampaignAuthorityTest {
                 restored.hangars().find(id).orElseThrow().state());
         assertEquals(OperationPhase.AWAITING_HANDOFF,
                 restored.flightDeck().activeFor(id).orElseThrow().phase());
+    }
+
+    @Test
+    void flightDeckAdvancesOnlyOnExistingCampaignFixedTick() {
+        Stage228CampaignAuthority seed = Stage228CampaignAuthority.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        SmallCraftId id = seed.smallCraft().reserveIdentityForCompletedProduction();
+        seed.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
+                id, 8L, 80d, 4_000d, 1d, 100d));
+        Stage228GeneratedCampaignPersistentState base = seed.captureState();
+        long currentTick = seed.coordinator().runtime().world().getAuthoritativeWorldTick();
+        long requestTick = currentTick + 1L;
+        BayId bayId = new BayId("carrier:tick-test", "mission_primary");
+        Stage228HangarPersistentState occupied = new Stage228HangarPersistentState(
+                Stage228HangarPersistentState.CURRENT_VERSION,
+                Stage228HangarPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228HangarPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                java.util.List.of(new Stage228HangarPersistentState.AssignmentState(
+                        id,
+                        bayId.hostStableId(),
+                        bayId.bayStableId(),
+                        HostKind.SHIP,
+                        OccupancyState.READY)));
+        Stage228FlightDeckPersistentState flightDeck = new Stage228FlightDeckPersistentState(
+                Stage228FlightDeckPersistentState.CURRENT_VERSION,
+                Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                currentTick,
+                java.util.List.of(new Stage228FlightDeckPersistentState.DeckProfileState(
+                        bayId.hostStableId(),
+                        bayId.bayStableId(),
+                        100d,
+                        100d)),
+                java.util.List.of(new Stage228FlightDeckPersistentState.RequestState(
+                        id,
+                        bayId.hostStableId(),
+                        bayId.bayStableId(),
+                        OperationKind.LAUNCH,
+                        requestTick)),
+                java.util.List.of());
+        Stage228CampaignAuthority authority = Stage228CampaignAuthority.restore(
+                Stage228GeneratedCampaignPersistentState.compose(
+                        base.stage21Runtime(), base.smallCraft(), occupied, flightDeck));
+        float fixedStep = authority.coordinator().session().fixedStepSeconds();
+        BayDefinition bay = new BayDefinition(
+                bayId,
+                HostKind.SHIP,
+                new Dimensions3d(1_000d, 1_000d, 1_000d),
+                1_000_000_000d,
+                1_000_000_000d,
+                1d);
+
+        GeneratedCampaignSession.AdvanceReport report = authority.advanceFrame(
+                fixedStep,
+                tick -> java.util.Map.of(bayId, bay));
+
+        assertEquals(1L, report.fixedTicks());
+        assertEquals(requestTick, authority.flightDeck().lastProcessedTick());
+        assertEquals(OccupancyState.LAUNCHING,
+                authority.hangars().find(id).orElseThrow().state());
+        assertEquals(OperationPhase.CYCLING,
+                authority.flightDeck().activeFor(id).orElseThrow().phase());
+        assertTrue(authority.flightDeck().activeFor(id).orElseThrow()
+                .remainingWorkSeconds() < 100d);
     }
 
     @Test
