@@ -94,7 +94,9 @@ public final class SmallCraftHangarRegistry {
                     "Craft does not fit current physical bay capacity: " + checkedId
                             + " -> " + checkedBay.id());
         }
-        assignmentByCraft.put(checkedId, new Assignment(checkedId, checkedBay.id(), state));
+        assignmentByCraft.put(
+                checkedId,
+                new Assignment(checkedId, checkedBay.id(), checkedBay.hostKind(), state));
     }
 
     /**
@@ -108,7 +110,11 @@ public final class SmallCraftHangarRegistry {
         Assignment current = requireAssignment(checkedId);
         assignmentByCraft.put(
                 checkedId,
-                new Assignment(checkedId, current.bayId(), Objects.requireNonNull(state, "state")));
+                new Assignment(
+                        checkedId,
+                        current.bayId(),
+                        current.hostKind(),
+                        Objects.requireNonNull(state, "state")));
     }
 
     /**
@@ -224,20 +230,24 @@ public final class SmallCraftHangarRegistry {
      *
      * @param craftId stable craft identity
      * @param bayId stable host-local physical bay
+     * @param hostKind physical host family
      * @param state finite occupancy/handling state
      */
     public record Assignment(
             SmallCraftId craftId,
             BayId bayId,
+            SmallCraftHangarCapacity.HostKind hostKind,
             OccupancyState state) implements Comparable<Assignment> {
         /** Validates one assignment.
          * @param craftId stable craft identity
          * @param bayId stable physical bay identity
+         * @param hostKind physical host family
          * @param state finite occupancy/handling state
          */
         public Assignment {
             Objects.requireNonNull(craftId, "craftId");
             Objects.requireNonNull(bayId, "bayId");
+            Objects.requireNonNull(hostKind, "hostKind");
             Objects.requireNonNull(state, "state");
         }
 
