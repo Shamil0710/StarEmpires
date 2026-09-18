@@ -27,7 +27,7 @@ public final class Stage228HangarPersistenceMapper {
                         value.craftId(),
                         value.bayId().hostStableId(),
                         value.bayId().bayStableId(),
-                        inferHostKind(value),
+                        value.hostKind(),
                         value.state()))
                 .toList();
         return new Stage228HangarPersistentState(
@@ -53,21 +53,11 @@ public final class Stage228HangarPersistenceMapper {
                 .map(value -> new Assignment(
                         value.craftId(),
                         new BayId(value.hostStableId(), value.bayStableId()),
+                        value.hostKind(),
                         value.occupancyState()))
                 .toList();
         return SmallCraftHangarRegistry.restore(craft, assignments);
     }
 
-    /*
-     * Host kind is a property of the current resolved bay. Assignment itself intentionally contains
-     * only stable IDs so runtime capacity can change after damage. Persistence keeps the authored
-     * host family for validation/evidence; infer it from the stable namespace accepted by M22.8B.
-     */
-    private static com.spacesim.world.SmallCraftHangarCapacity.HostKind inferHostKind(
-            Assignment assignment) {
-        String host = assignment.bayId().hostStableId();
-        return host.startsWith("station:") || host.startsWith("outpost:")
-                ? com.spacesim.world.SmallCraftHangarCapacity.HostKind.STATION
-                : com.spacesim.world.SmallCraftHangarCapacity.HostKind.SHIP;
-    }
+
 }
