@@ -52,6 +52,28 @@ class SmallCraftFlightDeckOperationsTest {
     }
 
     @Test
+    void duplicateAuthoritativeTickCannotAdvanceDeckWorkTwice() {
+        Fixture fixture = fixture(1);
+        SmallCraftId craft = fixture.ids().get(0);
+        fixture.hangars().assign(craft, fixture.bay(), OccupancyState.READY);
+        SmallCraftFlightDeckOperations operations = operations(fixture, 4d, 3d);
+        operations.requestLaunch(craft, fixture.bay().id(), 5L);
+
+        operations.advanceFixedTick(5L, 1d, Map.of(fixture.bay().id(), fixture.bay()));
+        assertEquals(3d,
+                operations.activeFor(craft).orElseThrow().remainingWorkSeconds(), 1e-9);
+        assertEquals(5L, operations.lastProcessedTick());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> operations.advanceFixedTick(
+                        5L,
+                        1d,
+                        Map.of(fixture.bay().id(), fixture.bay())));
+        assertEquals(3d,
+                operations.activeFor(craft).orElseThrow().remainingWorkSeconds(), 1e-9);
+    }
+
+    @Test
     void damagedDeckProgressUsesExactFixedTicksAndStopsAtZeroIntegrity() {
         Fixture fixture = fixture(1);
         SmallCraftId craft = fixture.ids().get(0);
