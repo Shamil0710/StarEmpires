@@ -33,9 +33,16 @@ public final class SmallCraftHangarRegistry {
             Collection<Assignment> assignments) {
         this.craftRegistry = Objects.requireNonNull(craftRegistry, "craftRegistry");
         Objects.requireNonNull(assignments, "assignments");
+        TreeMap<BayId, SmallCraftHangarCapacity.HostKind> hostKindByBay = new TreeMap<>();
         for (Assignment assignment : assignments) {
             Assignment checked = Objects.requireNonNull(assignment, "assignment");
             requireCraftExists(checked.craftId());
+            SmallCraftHangarCapacity.HostKind previousHostKind =
+                    hostKindByBay.putIfAbsent(checked.bayId(), checked.hostKind());
+            if (previousHostKind != null && previousHostKind != checked.hostKind()) {
+                throw new IllegalArgumentException(
+                        "Persisted bay has conflicting host families: " + checked.bayId());
+            }
             if (assignmentByCraft.putIfAbsent(checked.craftId(), checked) != null) {
                 throw new IllegalArgumentException(
                         "Duplicate hangar assignment for craft " + checked.craftId());
