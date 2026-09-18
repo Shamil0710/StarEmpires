@@ -31,7 +31,8 @@ class Stage228GeneratedCampaignPersistenceCodecTest {
         Stage228GeneratedCampaignPersistentState original =
                 Stage228GeneratedCampaignPersistentState.compose(
                         coordinator.captureState(),
-                        Stage228SmallCraftPersistenceMapper.capture(registry));
+                        Stage228SmallCraftPersistenceMapper.capture(registry),
+                        Stage228HangarPersistentState.empty());
 
         byte[] first = Stage228GeneratedCampaignPersistenceCodec.encode(original);
         Stage228GeneratedCampaignPersistentState decoded =
@@ -69,6 +70,7 @@ class Stage228GeneratedCampaignPersistenceCodecTest {
         assertEquals(stage21, adopted.stage21Runtime());
         assertTrue(adopted.smallCraft().craft().isEmpty());
         assertEquals(1L, adopted.smallCraft().nextCraftId());
+        assertTrue(adopted.hangars().assignments().isEmpty());
     }
 
     @Test
@@ -77,7 +79,9 @@ class Stage228GeneratedCampaignPersistenceCodecTest {
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         byte[] valid = Stage228GeneratedCampaignPersistenceCodec.encode(
                 Stage228GeneratedCampaignPersistentState.compose(
-                        coordinator.captureState(), Stage228SmallCraftPersistentState.empty()));
+                        coordinator.captureState(),
+                        Stage228SmallCraftPersistentState.empty(),
+                        Stage228HangarPersistentState.empty()));
 
         byte[] trailing = Arrays.copyOf(valid, valid.length + 1);
         byte[] truncated = Arrays.copyOf(valid, valid.length - 1);
