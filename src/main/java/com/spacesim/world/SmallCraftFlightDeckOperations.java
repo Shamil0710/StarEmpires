@@ -31,6 +31,7 @@ public final class SmallCraftFlightDeckOperations {
     private final TreeMap<BayId, DeckProfile> profiles = new TreeMap<>();
     private final TreeSet<Request> queue = new TreeSet<>();
     private final TreeMap<BayId, ActiveOperation> activeByBay = new TreeMap<>();
+    private long lastProcessedTick;
 
     /**
      * Creates one sequencer over existing physical hangar occupancy.
@@ -41,15 +42,20 @@ public final class SmallCraftFlightDeckOperations {
     public SmallCraftFlightDeckOperations(
             SmallCraftHangarRegistry hangars,
             Collection<DeckProfile> profiles) {
-        this(hangars, profiles, List.of(), List.of());
+        this(hangars, profiles, List.of(), List.of(), -1L);
     }
 
     private SmallCraftFlightDeckOperations(
             SmallCraftHangarRegistry hangars,
             Collection<DeckProfile> profiles,
             Collection<Request> queued,
-            Collection<ActiveOperation> active) {
+            Collection<ActiveOperation> active,
+            long lastProcessedTick) {
         this.hangars = Objects.requireNonNull(hangars, "hangars");
+        if (lastProcessedTick < -1L) {
+            throw new IllegalArgumentException("lastProcessedTick cannot be below -1");
+        }
+        this.lastProcessedTick = lastProcessedTick;
         Objects.requireNonNull(profiles, "profiles");
         for (DeckProfile profile : profiles) {
             DeckProfile checked = Objects.requireNonNull(profile, "profile");
@@ -101,7 +107,27 @@ public final class SmallCraftFlightDeckOperations {
             Collection<DeckProfile> profiles,
             Collection<Request> queued,
             Collection<ActiveOperation> active) {
-        return new SmallCraftFlightDeckOperations(hangars, profiles, queued, active);
+        return restore(hangars, profiles, queued, active, -1L);
+    }
+
+    /**
+     * Restores exact deterministic launch/recovery state and its authoritative-tick watermark.
+     *
+     * @param hangars restored physical occupancy authority
+     * @param profiles persisted physical deck profiles
+     * @param queued exact queued requests
+     * @param active exact active operations
+     * @param lastProcessedTick last authoritative tick already consumed, or -1 before any tick
+     * @return independent restored sequencer
+     */
+    public static SmallCraftFlightDeckOperations restore(
+            SmallCraftHangarRegistry hangars,
+            Collection<DeckProfile> profiles,
+            Collection<Request> queued,
+            Collection<ActiveOperation> active,
+            long lastProcessedTick) {
+        return new SmallCraftFlightDeckOperations(
+                hangars, profiles, queued, active, lastProcessedTick);
     }
 
     /** Physical operation kind sharing one safe bay sequence. */
@@ -360,6 +386,10 @@ public final class SmallCraftFlightDeckOperations {
         if (authoritativeTick < 0L) {
             throw new IllegalArgumentException("authoritativeTick cannot be negative");
         }
+        if (authoritativeTick <= lastProcessedTick) {
+            throw new IllegalArgumentException(
+                    "Flight-deck tick must advance strictly beyond persisted watermark");
+        }
         requirePositive(fixedStepSeconds, "fixedStepSeconds");
         Map<BayId, BayDefinition> checkedBays = immutableBayMap(bayDefinitions);
 
@@ -393,6 +423,12 @@ public final class SmallCraftFlightDeckOperations {
                 completeCycle(active);
             }
         }
+        lastProcessedTick = authoritativeTick;
+    }
+
+    /** @return last authoritative tick consumed by this sequencer, or -1 before any tick */
+    public long lastProcessedTick() {
+        return lastProcessedTick;
     }
 
     /** @return deterministic immutable physical deck profiles ordered by bay ID */
