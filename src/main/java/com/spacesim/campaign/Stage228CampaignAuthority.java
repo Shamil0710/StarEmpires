@@ -35,7 +35,7 @@ public final class Stage228CampaignAuthority {
     }
 
     /**
-     * Creates a new campaign with no seeded or free small craft.
+     * Creates a new campaign with no seeded/free small craft and no invented hangar occupancy.
      *
      * @param rootSeed deterministic generated-world root seed
      * @return M22.8 authority extension over the ordinary campaign
@@ -54,7 +54,8 @@ public final class Stage228CampaignAuthority {
      *
      * <p>Decoded craft rows are admitted only after their design IDs resolve through the current
      * Stage-22 production catalog and their exact physical state passes the ordinary Stage-17.5
-     * fitting validator.</p>
+     * fitting validator. Hangar occupancy is restored only after those individual craft identities
+     * exist, so a persisted bay assignment cannot manufacture an asset.</p>
      *
      * @param checkpoint current M22.8 campaign envelope
      * @return independent restored authority
@@ -71,10 +72,10 @@ public final class Stage228CampaignAuthority {
     }
 
     /**
-     * Adopts an accepted Stage-21I checkpoint into M22.8 without granting small craft.
+     * Adopts an accepted Stage-21I checkpoint into M22.8 without granting craft or occupancy.
      *
      * @param checkpoint existing Stage-21I checkpoint
-     * @return restored authority with an empty small-craft registry
+     * @return restored authority with empty small-craft and hangar registries
      */
     public static Stage228CampaignAuthority restoreStage21(
             Stage21IGeneratedWorldRuntimePersistentState checkpoint) {
@@ -83,7 +84,7 @@ public final class Stage228CampaignAuthority {
     }
 
     /**
-     * Captures the accepted Stage-21 state and exact M22.8A small-craft sidecar atomically at the caller boundary.
+     * Captures accepted Stage-21 state plus exact craft and hangar sidecars at the caller boundary.
      *
      * @return current versioned M22.8 campaign checkpoint
      */
