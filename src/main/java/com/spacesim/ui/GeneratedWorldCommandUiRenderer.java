@@ -322,11 +322,11 @@ public final class GeneratedWorldCommandUiRenderer {
     }
 
     /**
-     * Centers one current-system stable object without mutating its physical coordinates.
+     * Centers one current-system stable object and keeps the presentation camera following it.
      *
      * @param snapshot current immutable UI projection
      * @param stableId stable local-object presentation identity
-     * @return whether the requested object was present and focused
+     * @return whether the requested object was present and follow mode was engaged
      */
     public boolean focusLocalObject(GeneratedWorldUiSnapshot snapshot, String stableId) {
         Objects.requireNonNull(snapshot, "snapshot");
@@ -418,7 +418,7 @@ public final class GeneratedWorldCommandUiRenderer {
         fonts.small().setColor(ImperialUiPalette.IVORY);
         fonts.small().draw(batch,
                 status == null || status.isBlank()
-                        ? "F1–F5 вкладки  •  колесо зум  •  СКМ панорама  •  двойной клик: слежение  •  Home: обзор"
+                        ? "F1–F5 вкладки  •  колесо зум  •  СКМ панорама  •  двойной клик: слежение  •  Home: обзор  •  F8/F9 save/load"
                         : status,
                 metrics.outerMargin(), statusHeight * 0.68f,
                 width - metrics.outerMargin() * 2f, Align.left, false);
