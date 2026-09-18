@@ -3,6 +3,8 @@ package com.spacesim.persistence;
 import com.spacesim.campaign.GeneratedCampaignCoordinator;
 import com.spacesim.world.ProductionSmallCraftFixture;
 import com.spacesim.world.SmallCraftFitAuthority;
+import com.spacesim.world.SmallCraftHangarCapacity.HostKind;
+import com.spacesim.world.SmallCraftHangarCapacity.OccupancyState;
 import com.spacesim.world.SmallCraftId;
 import com.spacesim.world.SmallCraftRegistry;
 import com.spacesim.world.SmallCraftState;
@@ -13,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -74,6 +77,9 @@ class Stage228GeneratedCampaignPersistenceCodecTest {
         assertTrue(adopted.smallCraft().craft().isEmpty());
         assertEquals(1L, adopted.smallCraft().nextCraftId());
         assertTrue(adopted.hangars().assignments().isEmpty());
+        assertTrue(adopted.flightDeck().profiles().isEmpty());
+        assertTrue(adopted.flightDeck().queued().isEmpty());
+        assertTrue(adopted.flightDeck().active().isEmpty());
     }
 
     @Test
@@ -94,6 +100,44 @@ class Stage228GeneratedCampaignPersistenceCodecTest {
 
         assertEquals(smallCraft, migrated.smallCraft());
         assertTrue(migrated.hangars().assignments().isEmpty());
+        assertTrue(migrated.flightDeck().queued().isEmpty());
+        assertTrue(migrated.flightDeck().active().isEmpty());
+        assertEquals(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
+                migrated.schemaVersion());
+    }
+
+    @Test
+    void nativeM22_8BBytesMigrateWithoutInventingFlightDeckOperations() throws IOException {
+        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        SmallCraftFitAuthority fitAuthority = ProductionSmallCraftFixture.fitAuthority();
+        SmallCraftRegistry registry = SmallCraftRegistry.empty(fitAuthority);
+        SmallCraftId id = registry.reserveIdentityForCompletedProduction();
+        registry.registerProducedCraft(ProductionSmallCraftFixture.craft(
+                id, 6L, 60d, 300d, 1d, 20d));
+        Stage228SmallCraftPersistentState smallCraft =
+                Stage228SmallCraftPersistenceMapper.capture(registry);
+        Stage228HangarPersistentState hangars = new Stage228HangarPersistentState(
+                Stage228HangarPersistentState.CURRENT_VERSION,
+                Stage228HangarPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228HangarPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                List.of(new Stage228HangarPersistentState.AssignmentState(
+                        id,
+                        "carrier:legacy-b",
+                        "mission_primary",
+                        HostKind.SHIP,
+                        OccupancyState.READY)));
+
+        byte[] m22_8b = encodeLegacyM22_8B(
+                coordinator.captureState(), smallCraft, hangars);
+        Stage228GeneratedCampaignPersistentState migrated =
+                Stage228GeneratedCampaignPersistenceCodec.decode(m22_8b);
+
+        assertEquals(smallCraft, migrated.smallCraft());
+        assertEquals(hangars, migrated.hangars());
+        assertTrue(migrated.flightDeck().profiles().isEmpty());
+        assertTrue(migrated.flightDeck().queued().isEmpty());
+        assertTrue(migrated.flightDeck().active().isEmpty());
         assertEquals(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 migrated.schemaVersion());
     }
@@ -115,6 +159,29 @@ class Stage228GeneratedCampaignPersistenceCodecTest {
         assertThrows(IllegalArgumentException.class,
                 () -> Stage228GeneratedCampaignPersistenceCodec.decode(truncated));
     }
+    private static byte[] encodeLegacyM22_8B(
+            Stage21IGeneratedWorldRuntimePersistentState stage21,
+            Stage228SmallCraftPersistentState smallCraft,
+            Stage228HangarPersistentState hangars) throws IOException {
+        byte[] stage21Bytes = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(stage21);
+        byte[] craftBytes = Stage228SmallCraftPersistenceCodec.encode(smallCraft);
+        byte[] hangarBytes = Stage228HangarPersistenceCodec.encode(hangars);
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try (DataOutputStream out = new DataOutputStream(buffer)) {
+            out.writeInt(0x53323843);
+            out.writeInt(2);
+            out.writeInt(2);
+            out.writeUTF("m22.8.generated-campaign.v2");
+            out.writeInt(stage21Bytes.length);
+            out.write(stage21Bytes);
+            out.writeInt(craftBytes.length);
+            out.write(craftBytes);
+            out.writeInt(hangarBytes.length);
+            out.write(hangarBytes);
+        }
+        return buffer.toByteArray();
+    }
+
     private static byte[] encodeLegacyM22_8A(
             Stage21IGeneratedWorldRuntimePersistentState stage21,
             Stage228SmallCraftPersistentState smallCraft) throws IOException {
