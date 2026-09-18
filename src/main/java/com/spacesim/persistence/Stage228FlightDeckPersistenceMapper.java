@@ -48,6 +48,7 @@ public final class Stage228FlightDeckPersistenceMapper {
                 Stage228FlightDeckPersistentState.CURRENT_VERSION,
                 Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
                 Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                checked.lastProcessedTick(),
                 profiles,
                 queued,
                 active);
@@ -82,7 +83,11 @@ public final class Stage228FlightDeckPersistenceMapper {
                         value.failureKind()))
                 .toList();
         return SmallCraftFlightDeckOperations.restore(
-                checkedHangars, profiles, queued, active);
+                checkedHangars,
+                profiles,
+                queued,
+                active,
+                checked.lastProcessedTick());
     }
 
     private static Stage228FlightDeckPersistentState.RequestState captureRequest(
