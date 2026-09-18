@@ -88,7 +88,6 @@ public final class SmallCraftHangarRegistry {
         if (assignmentByCraft.containsKey(checkedId)) {
             throw new IllegalArgumentException("Craft already occupies a bay: " + checkedId);
         }
-        requireHostKindCompatible(checkedBay);
         CraftFootprint footprint = craftRegistry.physicalFootprint(checkedId);
         Usage current = usage(checkedBay.id());
         if (!SmallCraftHangarCapacity.canAccept(checkedBay, current, footprint)) {
@@ -176,6 +175,7 @@ public final class SmallCraftHangarRegistry {
         SmallCraftId checkedId = Objects.requireNonNull(craftId, "craftId");
         BayDefinition checkedBay = Objects.requireNonNull(bay, "bay");
         requireCraftExists(checkedId);
+        requireHostKindCompatible(checkedBay);
         if (assignmentByCraft.containsKey(checkedId)) {
             return false;
         }
