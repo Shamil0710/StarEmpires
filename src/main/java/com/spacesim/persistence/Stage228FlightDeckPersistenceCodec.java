@@ -47,6 +47,7 @@ public final class Stage228FlightDeckPersistenceCodec {
                 out.writeInt(checked.schemaVersion());
                 writeString(out, checked.runtimeVersion());
                 writeString(out, checked.semanticContract());
+                out.writeLong(checked.lastProcessedTick());
 
                 out.writeInt(checked.profiles().size());
                 for (var profile : checked.profiles()) {
@@ -104,6 +105,7 @@ public final class Stage228FlightDeckPersistenceCodec {
             int schemaVersion = in.readInt();
             String runtimeVersion = readString(in);
             String semanticContract = readString(in);
+            long lastProcessedTick = in.readLong();
 
             int profileCount = readCount(in, MAX_PROFILES, "profile");
             ArrayList<Stage228FlightDeckPersistentState.DeckProfileState> profiles =
@@ -150,6 +152,7 @@ public final class Stage228FlightDeckPersistenceCodec {
                     schemaVersion,
                     runtimeVersion,
                     semanticContract,
+                    lastProcessedTick,
                     List.copyOf(profiles),
                     List.copyOf(queued),
                     List.copyOf(active));
