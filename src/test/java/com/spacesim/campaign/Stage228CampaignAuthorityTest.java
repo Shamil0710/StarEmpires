@@ -48,7 +48,6 @@ class Stage228CampaignAuthorityTest {
         original.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
                 id, 8L, 80d, 4_000d, 1d, 100d));
         Stage228GeneratedCampaignPersistentState base = original.captureState();
-        long currentTick = original.coordinator().runtime().world().getAuthoritativeWorldTick();
         Stage228HangarPersistentState occupied = new Stage228HangarPersistentState(
                 Stage228HangarPersistentState.CURRENT_VERSION,
                 Stage228HangarPersistentState.CURRENT_RUNTIME_VERSION,
@@ -79,6 +78,7 @@ class Stage228CampaignAuthorityTest {
         original.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
                 id, 8L, 80d, 4_000d, 1d, 100d));
         Stage228GeneratedCampaignPersistentState base = original.captureState();
+        long currentTick = original.coordinator().runtime().world().getAuthoritativeWorldTick();
         Stage228HangarPersistentState occupied = new Stage228HangarPersistentState(
                 Stage228HangarPersistentState.CURRENT_VERSION,
                 Stage228HangarPersistentState.CURRENT_RUNTIME_VERSION,
