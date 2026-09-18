@@ -29,6 +29,7 @@ class Stage228FlightDeckPersistenceTest {
                 Stage228FlightDeckPersistentState.CURRENT_VERSION,
                 Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
                 Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                43L,
                 List.of(new Stage228FlightDeckPersistentState.DeckProfileState(
                         "carrier:persist", "mission_primary", 3d, 4d)),
                 List.of(new Stage228FlightDeckPersistentState.RequestState(
@@ -149,6 +150,33 @@ class Stage228FlightDeckPersistenceTest {
     }
 
     @Test
+    void persistentStateRejectsActiveOperationFromFutureOfWatermark() {
+        SmallCraftId craft = new SmallCraftId(1L);
+        var request = new Stage228FlightDeckPersistentState.RequestState(
+                craft,
+                "carrier:persist",
+                "mission_primary",
+                OperationKind.LAUNCH,
+                11L);
+        var active = new Stage228FlightDeckPersistentState.ActiveState(
+                request,
+                OperationPhase.CYCLING,
+                2d,
+                null);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                new Stage228FlightDeckPersistentState(
+                        Stage228FlightDeckPersistentState.CURRENT_VERSION,
+                        Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
+                        Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                        10L,
+                        List.of(new Stage228FlightDeckPersistentState.DeckProfileState(
+                                "carrier:persist", "mission_primary", 3d, 4d)),
+                        List.of(),
+                        List.of(active)));
+    }
+
+    @Test
     void mapperRejectsActiveLaunchWhenPersistedOccupancyIsNotLaunching() {
         Fixture fixture = fixtureWithLaunchState(OccupancyState.READY);
         SmallCraftId craft = fixture.ids().get(0);
@@ -156,6 +184,7 @@ class Stage228FlightDeckPersistenceTest {
                 Stage228FlightDeckPersistentState.CURRENT_VERSION,
                 Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
                 Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                10L,
                 List.of(new Stage228FlightDeckPersistentState.DeckProfileState(
                         "carrier:persist", "mission_primary", 3d, 4d)),
                 List.of(),
