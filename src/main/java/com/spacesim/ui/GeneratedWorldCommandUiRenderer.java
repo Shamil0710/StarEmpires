@@ -480,8 +480,11 @@ public final class GeneratedWorldCommandUiRenderer {
             if (followed == null) {
                 followedLocalObjectId = "";
             } else {
-                systemMapCamera.smoothFocus(
-                        followed.x(), followed.y(), mapCenterX, mapCenterY, frameDeltaSeconds);
+                // The followed craft is already presentation-smoothed above. Centering the camera on
+                // that exact same point avoids a second easing filter, which otherwise makes the
+                // camera lag behind the sprite and visibly tug/jitter at high inspection zoom.
+                systemMapCamera.focus(
+                        followed.x(), followed.y(), mapCenterX, mapCenterY);
             }
         }
 
