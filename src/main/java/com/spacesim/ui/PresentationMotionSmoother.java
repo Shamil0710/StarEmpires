@@ -55,6 +55,16 @@ final class PresentationMotionSmoother {
     }
 
     /**
+     * Returns the current displayed point without advancing interpolation.
+     *
+     * @param stableId stable presentation identity
+     * @return current displayed point, or {@code null} when no history exists
+     */
+    Point current(String stableId) {
+        return positions.get(stableId);
+    }
+
+    /**
      * Removes presentation state for objects no longer present in the active local view.
      *
      * @param stableIds currently visible stable identities
