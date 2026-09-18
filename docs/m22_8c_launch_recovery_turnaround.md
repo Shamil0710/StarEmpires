@@ -28,7 +28,9 @@ Queue order is deterministic:
 3. operation kind, with `RECOVERY` before `LAUNCH` at the same tick/bay;
 4. stable `SmallCraftId`.
 
-Runtime and persistence use the same ordering contract.
+Runtime and persistence use the same ordering contract. The sequencer also persists
+`lastProcessedTick`; a repeated or older authoritative tick is rejected, so save/load or caller
+replay cannot perform the same handling work twice.
 
 Current physical bay integrity directly affects work throughput:
 
@@ -129,7 +131,8 @@ Persisted C state includes:
 - queued requests and authoritative request ticks;
 - active operation phase;
 - remaining handling work;
-- recovery failure classification.
+- recovery failure classification;
+- last authoritative tick already consumed by deck operations.
 
 Restore validates queue/active state against restored physical hangar occupancy:
 
@@ -169,7 +172,7 @@ Automated tests cover:
 - repair/maintenance through ordinary shipyard plans and settlements;
 - post-service bay-mass rejection without craft mutation;
 - deterministic flight-deck sidecar round-trip;
-- preserved recovery priority after save/load;
+- preserved recovery priority and tick watermark after save/load;
 - fail-closed malformed active states;
 - campaign save/load preserving `AWAITING_HANDOFF`;
 - non-granting native M22.8B → v3 migration.
