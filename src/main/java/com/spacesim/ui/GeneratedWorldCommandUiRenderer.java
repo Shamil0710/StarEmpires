@@ -341,6 +341,9 @@ public final class GeneratedWorldCommandUiRenderer {
         LocalObjectView object = snapshot.localObjects().stream()
                 .filter(value -> value.stableId().equals(id)).findFirst().orElseThrow();
         systemMapCamera.inspect(projection.inspectionZoom(object, content.width(), content.height()));
+        systemMapCamera.focus(point.x(), point.y(),
+                layout.map().x() + layout.map().width() * 0.5f,
+                layout.map().y() + layout.map().height() * 0.5f);
         followedLocalObjectId = id;
         return true;
     }
