@@ -103,6 +103,22 @@ class SmallCraftHangarRegistryTest {
     }
 
     @Test
+    void restoreRejectsOneBayIdentityWithConflictingHostFamilies() {
+        SmallCraftRegistry craft = twoCraftRegistry();
+        SmallCraftId first = craft.snapshot().get(0).id();
+        SmallCraftId second = craft.snapshot().get(1).id();
+        BayId bay = new BayId("shared:host", "bay:a");
+
+        assertThrows(IllegalArgumentException.class, () -> SmallCraftHangarRegistry.restore(
+                craft,
+                List.of(
+                        new SmallCraftHangarRegistry.Assignment(
+                                first, bay, HostKind.SHIP, OccupancyState.PARKED),
+                        new SmallCraftHangarRegistry.Assignment(
+                                second, bay, HostKind.STATION, OccupancyState.PARKED))));
+    }
+
+    @Test
     void currentBayProjectionCannotSilentlyChangePersistedHostFamily() {
         SmallCraftRegistry craft = twoCraftRegistry();
         SmallCraftId first = craft.snapshot().get(0).id();
