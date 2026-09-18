@@ -23,10 +23,12 @@ import com.spacesim.world.StarSystemId;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Commercial-style scalable renderer and hit-test surface for the generated-world command UI. */
 @SuppressWarnings("doclint:missing")
@@ -51,6 +53,7 @@ public final class GeneratedWorldCommandUiRenderer {
     private final ArrayList<HitTarget> hitTargets = new ArrayList<>();
     private final MapCameraState systemMapCamera = new MapCameraState();
     private final MapCameraState galaxyMapCamera = new MapCameraState(12f);
+    private final PresentationMotionSmoother localObjectMotion = new PresentationMotionSmoother();
 
     private GeneratedWorldUiFonts fonts;
     private ResponsiveUiMetrics metrics;
@@ -59,6 +62,11 @@ public final class GeneratedWorldCommandUiRenderer {
     private Rect inspectorRect = Rect.empty();
     private Rect listRect = Rect.empty();
     private Rect mapRect = Rect.empty();
+    private PhysicalMapProjection systemProjection;
+    private StarSystemId systemProjectionSystemId;
+    private Rect systemProjectionRect = Rect.empty();
+    private boolean systemProjectionRefit = true;
+    private String followedLocalObjectId = "";
     private boolean disposed;
 
     /** Top-level production UI surfaces. */
@@ -174,6 +182,7 @@ public final class GeneratedWorldCommandUiRenderer {
         metrics = resolved;
         width = viewportWidth;
         height = viewportHeight;
+        systemProjectionRefit = true;
         camera.setToOrtho(false, viewportWidth, viewportHeight);
         camera.update();
     }
@@ -294,13 +303,22 @@ public final class GeneratedWorldCommandUiRenderer {
         if (tab != Tab.SYSTEM && tab != Tab.GALAXY) {
             return false;
         }
+        boolean moved = deltaX != 0f || deltaY != 0f;
+        if (tab == Tab.SYSTEM && moved) {
+            followedLocalObjectId = "";
+        }
         (tab == Tab.SYSTEM ? systemMapCamera : galaxyMapCamera).pan(deltaX, deltaY);
-        return deltaX != 0f || deltaY != 0f;
+        return moved;
     }
 
-    /** Resets the fitted current-system overview before changing inspected systems. */
+    /**
+     * Restores a freshly fitted current-system overview and cancels local-object following.
+     */
     public void resetSystemMapCamera() {
         systemMapCamera.reset();
+        followedLocalObjectId = "";
+        systemProjectionRefit = true;
+        localObjectMotion.reset();
     }
 
     /**
@@ -315,7 +333,7 @@ public final class GeneratedWorldCommandUiRenderer {
         String id = Objects.requireNonNull(stableId, "stableId");
         Layout layout = splitMapAndInspector();
         Rect content = inset(layout.map(), 28f * metrics.scale());
-        PhysicalMapProjection projection = localProjection(snapshot.localObjects(), content);
+        PhysicalMapProjection projection = resolveSystemProjection(snapshot, content);
         PhysicalMapProjection.Point point = projection.point(id);
         if (point == null) {
             return false;
@@ -323,9 +341,7 @@ public final class GeneratedWorldCommandUiRenderer {
         LocalObjectView object = snapshot.localObjects().stream()
                 .filter(value -> value.stableId().equals(id)).findFirst().orElseThrow();
         systemMapCamera.inspect(projection.inspectionZoom(object, content.width(), content.height()));
-        systemMapCamera.focus(point.x(), point.y(),
-                layout.map().x() + layout.map().width() * 0.5f,
-                layout.map().y() + layout.map().height() * 0.5f);
+        followedLocalObjectId = id;
         return true;
     }
 
@@ -399,7 +415,7 @@ public final class GeneratedWorldCommandUiRenderer {
         fonts.small().setColor(ImperialUiPalette.IVORY);
         fonts.small().draw(batch,
                 status == null || status.isBlank()
-                        ? "F1–F5 вкладки  •  колесо зум  •  СКМ панорама  •  двойной клик к кораблю  •  F8/F9 save/load"
+                        ? "F1–F5 вкладки  •  колесо зум  •  СКМ панорама  •  двойной клик: слежение  •  Home: обзор"
                         : status,
                 metrics.outerMargin(), statusHeight * 0.68f,
                 width - metrics.outerMargin() * 2f, Align.left, false);
@@ -422,15 +438,48 @@ public final class GeneratedWorldCommandUiRenderer {
         batch.end();
         drawGrid(layout.map());
 
-        PhysicalMapProjection projection = localProjection(snapshot.localObjects(),
-                inset(layout.map(), 28f * metrics.scale()));
+        Rect projectionRect = inset(layout.map(), 28f * metrics.scale());
+        PhysicalMapProjection projection = resolveSystemProjection(snapshot, projectionRect);
         double pixelsPerMetre = projection.pixelsPerMetre() * systemMapCamera.zoom();
-        Map<String, Point> points = new HashMap<>();
+        float frameDeltaSeconds = Gdx.graphics.getDeltaTime();
+        if (!Float.isFinite(frameDeltaSeconds) || frameDeltaSeconds < 0f) {
+            frameDeltaSeconds = 0f;
+        } else {
+            frameDeltaSeconds = Math.min(0.1f, frameDeltaSeconds);
+        }
+
+        Map<String, PresentationMotionSmoother.Point> smoothedBasePoints = new HashMap<>();
+        Set<String> liveIds = new HashSet<>();
         for (LocalObjectView object : snapshot.localObjects()) {
             var base = projection.point(object.stableId());
-            points.put(object.stableId(), new Point(
-                    systemMapCamera.transformX(base.x(), layout.map().x() + layout.map().width() / 2f),
-                    systemMapCamera.transformY(base.y(), layout.map().y() + layout.map().height() / 2f)));
+            if (base == null) {
+                continue;
+            }
+            liveIds.add(object.stableId());
+            smoothedBasePoints.put(object.stableId(), localObjectMotion.update(
+                    object.stableId(), base.x(), base.y(), frameDeltaSeconds));
+        }
+        localObjectMotion.retain(liveIds);
+
+        float mapCenterX = layout.map().x() + layout.map().width() * 0.5f;
+        float mapCenterY = layout.map().y() + layout.map().height() * 0.5f;
+        if (!followedLocalObjectId.isEmpty()) {
+            PresentationMotionSmoother.Point followed = smoothedBasePoints.get(followedLocalObjectId);
+            if (followed == null) {
+                followedLocalObjectId = "";
+            } else {
+                systemMapCamera.smoothFocus(
+                        followed.x(), followed.y(), mapCenterX, mapCenterY, frameDeltaSeconds);
+            }
+        }
+
+        Map<String, Point> points = new HashMap<>();
+        for (Map.Entry<String, PresentationMotionSmoother.Point> entry
+                : smoothedBasePoints.entrySet()) {
+            var base = entry.getValue();
+            points.put(entry.getKey(), new Point(
+                    systemMapCamera.transformX(base.x(), mapCenterX),
+                    systemMapCamera.transformY(base.y(), mapCenterY)));
         }
         // Scissor oversized hulls against the map, including on HiDPI displays.
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
@@ -496,7 +545,9 @@ public final class GeneratedWorldCommandUiRenderer {
                 layout.map().top() - 16f * metrics.scale());
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
         fonts.small().draw(batch,
-                snapshot.localObjects().size() + " объектов  •  единый масштаб в метрах  •  двойной клик: крупный план  •  Home: обзор",
+                snapshot.localObjects().size()
+                        + " объектов  •  единый масштаб в метрах  •  двойной клик: сопровождение"
+                        + "  •  СКМ/Home: отмена",
                 layout.map().x() + 18f * metrics.scale(), layout.map().top() - 46f * metrics.scale());
         batch.end();
 
@@ -1088,8 +1139,24 @@ public final class GeneratedWorldCommandUiRenderer {
         batch.end();
     }
 
-    private static PhysicalMapProjection localProjection(List<LocalObjectView> objects, Rect rect) {
-        return new PhysicalMapProjection(objects, rect.x(), rect.y(), rect.width(), rect.height());
+    private PhysicalMapProjection resolveSystemProjection(
+            GeneratedWorldUiSnapshot snapshot,
+            Rect rect) {
+        boolean needsRefit = systemProjection == null
+                || systemProjectionRefit
+                || !snapshot.activeSystemId().equals(systemProjectionSystemId)
+                || !rect.equals(systemProjectionRect);
+        if (needsRefit) {
+            systemProjection = new PhysicalMapProjection(
+                    snapshot.localObjects(), rect.x(), rect.y(), rect.width(), rect.height());
+            systemProjectionSystemId = snapshot.activeSystemId();
+            systemProjectionRect = rect;
+            systemProjectionRefit = false;
+            localObjectMotion.reset();
+        } else {
+            systemProjection.update(snapshot.localObjects());
+        }
+        return systemProjection;
     }
 
     private static Map<StarSystemId, Point> projectSystems(
