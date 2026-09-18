@@ -149,6 +149,60 @@ class Stage228CampaignAuthorityTest {
     }
 
     @Test
+    void compatibilityAdvanceRefusesToSkipQueuedFlightDeckWork() {
+        long rootSeed = Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED;
+        Stage228CampaignAuthority baseAuthority = Stage228CampaignAuthority.create(rootSeed);
+        SmallCraftId id = baseAuthority.smallCraft().reserveIdentityForCompletedProduction();
+        baseAuthority.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
+                id, 8L, 80d, 4_000d, 1d, 100d));
+        var footprint = baseAuthority.smallCraft().physicalFootprint(id);
+        var bay = new com.spacesim.world.SmallCraftHangarCapacity.BayDefinition(
+                new com.spacesim.world.SmallCraftHangarCapacity.BayId(
+                        "carrier:compat", "mission_primary"),
+                com.spacesim.world.SmallCraftHangarCapacity.HostKind.SHIP,
+                new com.spacesim.content.ship.ShipEngineeringCatalog.Dimensions3d(
+                        1_000d, 1_000d, 1_000d),
+                footprint.envelopeVolumeM3() * 2d,
+                footprint.currentMassKg() * 2d,
+                1d);
+        Stage228GeneratedCampaignPersistentState base = baseAuthority.captureState();
+        Stage228HangarPersistentState occupied = new Stage228HangarPersistentState(
+                Stage228HangarPersistentState.CURRENT_VERSION,
+                Stage228HangarPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228HangarPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                java.util.List.of(new Stage228HangarPersistentState.AssignmentState(
+                        id,
+                        bay.id().hostStableId(),
+                        bay.id().bayStableId(),
+                        bay.hostKind(),
+                        com.spacesim.world.SmallCraftHangarCapacity.OccupancyState.READY)));
+        long requestTick = baseAuthority.coordinator().runtime().world()
+                .getAuthoritativeWorldTick();
+        Stage228FlightDeckPersistentState flightDeck = new Stage228FlightDeckPersistentState(
+                Stage228FlightDeckPersistentState.CURRENT_VERSION,
+                Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                -1L,
+                java.util.List.of(new Stage228FlightDeckPersistentState.DeckProfileState(
+                        bay.id().hostStableId(), bay.id().bayStableId(), 10d, 10d)),
+                java.util.List.of(new Stage228FlightDeckPersistentState.RequestState(
+                        id,
+                        bay.id().hostStableId(),
+                        bay.id().bayStableId(),
+                        OperationKind.LAUNCH,
+                        requestTick)),
+                java.util.List.of());
+        Stage228CampaignAuthority authority = Stage228CampaignAuthority.restore(
+                Stage228GeneratedCampaignPersistentState.compose(
+                        base.stage21Runtime(), base.smallCraft(), occupied, flightDeck));
+
+        assertThrows(IllegalStateException.class, () -> authority.advanceFrame(1f));
+        assertEquals(requestTick,
+                authority.coordinator().runtime().world().getAuthoritativeWorldTick());
+        assertEquals(1, authority.flightDeck().queued().size());
+    }
+
+    @Test
     void flightDeckAdvancesOnlyOnExistingCampaignFixedTick() {
         Stage228CampaignAuthority seed = Stage228CampaignAuthority.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
