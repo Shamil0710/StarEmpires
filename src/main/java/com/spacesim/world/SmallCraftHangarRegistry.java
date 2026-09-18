@@ -143,6 +143,16 @@ public final class SmallCraftHangarRegistry {
     }
 
     /**
+     * Resolves one known craft's current physical footprint for authorized world-layer operations.
+     *
+     * @param craftId existing individual craft identity
+     * @return current fitted mass and authored hull envelope
+     */
+    CraftFootprint craftFootprint(SmallCraftId craftId) {
+        return craftRegistry.physicalFootprint(Objects.requireNonNull(craftId, "craftId"));
+    }
+
+    /**
      * Calculates current real mass/envelope usage for one bay.
      *
      * @param bayId stable physical bay identity
