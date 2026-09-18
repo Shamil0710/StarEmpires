@@ -86,7 +86,7 @@ public final class SmallCraftHangarRegistry {
      * @param bay current physical bay capacity
      * @param state initial finite occupancy state
      */
-    public void assign(SmallCraftId craftId, BayDefinition bay, OccupancyState state) {
+    void assign(SmallCraftId craftId, BayDefinition bay, OccupancyState state) {
         SmallCraftId checkedId = Objects.requireNonNull(craftId, "craftId");
         BayDefinition checkedBay = Objects.requireNonNull(bay, "bay");
         Objects.requireNonNull(state, "state");
@@ -113,7 +113,7 @@ public final class SmallCraftHangarRegistry {
      * @param craftId assigned craft identity
      * @param state new finite occupancy state
      */
-    public void transition(SmallCraftId craftId, OccupancyState state) {
+    void transition(SmallCraftId craftId, OccupancyState state) {
         SmallCraftId checkedId = Objects.requireNonNull(craftId, "craftId");
         Assignment current = requireAssignment(checkedId);
         assignmentByCraft.put(
@@ -134,7 +134,7 @@ public final class SmallCraftHangarRegistry {
      * @param craftId assigned craft identity
      * @return released assignment
      */
-    public Assignment release(SmallCraftId craftId) {
+    Assignment release(SmallCraftId craftId) {
         Assignment removed = assignmentByCraft.remove(Objects.requireNonNull(craftId, "craftId"));
         if (removed == null) {
             throw new IllegalArgumentException("Craft is not assigned to a bay: " + craftId);
