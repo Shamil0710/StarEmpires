@@ -169,6 +169,10 @@ public final class Stage228CampaignAuthority {
      * @return ordinary campaign advance diagnostics
      */
     public GeneratedCampaignSession.AdvanceReport advanceFrame(float realDeltaSeconds) {
+        if (!flightDeck.queued().isEmpty() || !flightDeck.active().isEmpty()) {
+            throw new IllegalStateException(
+                    "Active flight-deck work requires per-tick physical bay projection");
+        }
         return coordinator.advanceFrame(realDeltaSeconds);
     }
 
