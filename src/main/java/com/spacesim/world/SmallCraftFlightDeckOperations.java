@@ -615,6 +615,11 @@ public final class SmallCraftFlightDeckOperations {
     }
 
     private void enqueueUnique(Request request) {
+        if (request.requestedTick() < lastProcessedTick) {
+            throw new IllegalArgumentException(
+                    "New flight-deck request cannot be backdated before processed tick "
+                            + lastProcessedTick);
+        }
         boolean duplicate = queue.stream().anyMatch(value -> value.craftId().equals(request.craftId()))
                 || activeByBay.values().stream()
                         .anyMatch(value -> value.request().craftId().equals(request.craftId()));
