@@ -163,6 +163,17 @@ public final class SmallCraftRegistry {
     }
 
     /**
+     * Resolves current physical bay footprint for one registered craft through the same production
+     * content/fitting authority used at admission.
+     *
+     * @param id stable craft identity
+     * @return current loaded mass and authored hull envelope
+     */
+    public SmallCraftHangarCapacity.CraftFootprint physicalFootprint(SmallCraftId id) {
+        return fitAuthority.physicalFootprint(requireExisting(id));
+    }
+
+    /**
      * @param id stable craft identity
      * @return current individual craft state when present
      */

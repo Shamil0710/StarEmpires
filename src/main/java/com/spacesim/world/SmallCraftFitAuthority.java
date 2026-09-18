@@ -3,6 +3,8 @@ package com.spacesim.world;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.DemonstratorFitDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
+import com.spacesim.ship.DerivedShipCalculator;
+import com.spacesim.world.SmallCraftHangarCapacity.CraftFootprint;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipEngineeringState.ValidationSeverity;
 import com.spacesim.ship.ShipFittingValidator;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 public final class SmallCraftFitAuthority {
     private final ShipEngineeringCatalog catalog;
     private final ShipFittingValidator validator;
+    private final DerivedShipCalculator calculator;
 
     /**
      * Creates a small-craft fitting boundary over one immutable production engineering catalog.
@@ -31,6 +34,7 @@ public final class SmallCraftFitAuthority {
     public SmallCraftFitAuthority(ShipEngineeringCatalog catalog) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.validator = new ShipFittingValidator(catalog);
+        this.calculator = new DerivedShipCalculator(catalog);
     }
 
     /**
@@ -73,6 +77,28 @@ public final class SmallCraftFitAuthority {
             throw new IllegalArgumentException(
                     "Small-craft fit violates Stage-17.5 fitting authority: " + diagnostics);
         }
+    }
+
+    /**
+     * Resolves one craft into the real current mass and hull envelope used by M22.8B bay accounting.
+     *
+     * @param state individual craft physical state
+     * @return current mass plus authored hull bounding dimensions
+     */
+    public CraftFootprint physicalFootprint(SmallCraftState state) {
+        SmallCraftState checked = Objects.requireNonNull(state, "state");
+        requireValid(checked);
+        HullDefinition hull = catalog.findHull(checked.fit().hullId());
+        if (hull == null) {
+            throw new IllegalStateException("Validated craft hull disappeared from catalog: "
+                    + checked.fit().hullId());
+        }
+        var derived = calculator.derive(
+                hull,
+                checked.fit(),
+                checked.runtimeState().consumables(),
+                checked.instanceState().damage().moduleDamage());
+        return new CraftFootprint(checked.id(), hull.boundingDimensionsM(), derived.totalMassKg());
     }
 
     /** @return semantic fingerprint of the production engineering catalog used for validation */
