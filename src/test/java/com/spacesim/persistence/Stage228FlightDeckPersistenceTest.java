@@ -67,6 +67,57 @@ class Stage228FlightDeckPersistenceTest {
     }
 
     @Test
+    void persistedQueueKeepsRecoveryPriorityAtEqualTickAndBay() {
+        Fixture fixture = fixtureWithLaunchState(OccupancyState.READY);
+        SmallCraftId launch = fixture.ids().get(0);
+        SmallCraftId recovery = fixture.ids().get(1);
+        Stage228FlightDeckPersistentState state = new Stage228FlightDeckPersistentState(
+                Stage228FlightDeckPersistentState.CURRENT_VERSION,
+                Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                List.of(new Stage228FlightDeckPersistentState.DeckProfileState(
+                        "carrier:persist", "mission_primary", 3d, 4d)),
+                List.of(
+                        new Stage228FlightDeckPersistentState.RequestState(
+                                launch,
+                                "carrier:persist",
+                                "mission_primary",
+                                OperationKind.LAUNCH,
+                                50L),
+                        new Stage228FlightDeckPersistentState.RequestState(
+                                recovery,
+                                "carrier:persist",
+                                "mission_primary",
+                                OperationKind.RECOVERY,
+                                50L)),
+                List.of());
+
+        assertEquals(OperationKind.RECOVERY, state.queued().get(0).kind());
+        SmallCraftFlightDeckOperations restored =
+                Stage228FlightDeckPersistenceMapper.restore(state, fixture.hangars());
+        assertEquals(OperationKind.RECOVERY, restored.queued().get(0).kind());
+        assertEquals(OperationKind.LAUNCH, restored.queued().get(1).kind());
+    }
+
+    @Test
+    void persistentStateRejectsQueuedPhaseInsideActiveOperation() {
+        SmallCraftId craft = new SmallCraftId(1L);
+        var request = new Stage228FlightDeckPersistentState.RequestState(
+                craft,
+                "carrier:persist",
+                "mission_primary",
+                OperationKind.LAUNCH,
+                1L);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new Stage228FlightDeckPersistentState.ActiveState(
+                        request,
+                        OperationPhase.QUEUED,
+                        1d,
+                        null));
+    }
+
+    @Test
     void mapperRejectsActiveLaunchWhenPersistedOccupancyIsNotLaunching() {
         Fixture fixture = fixtureWithLaunchState(OccupancyState.READY);
         SmallCraftId craft = fixture.ids().get(0);
