@@ -15,12 +15,14 @@ class Stage228CampaignAuthorityTest {
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         assertEquals(0, created.smallCraft().size());
         assertEquals(1L, created.smallCraft().nextIdValue());
+        assertEquals(0, created.hangars().size());
 
         Stage228CampaignAuthority adopted = Stage228CampaignAuthority.restoreStage21(
                 created.coordinator().captureState());
         assertEquals(0, adopted.smallCraft().size());
         assertEquals(1L, adopted.smallCraft().nextIdValue());
         assertTrue(adopted.captureState().smallCraft().craft().isEmpty());
+        assertTrue(adopted.captureState().hangars().assignments().isEmpty());
     }
 
     @Test
@@ -33,5 +35,6 @@ class Stage228CampaignAuthorityTest {
         assertEquals(saved, restored.captureState());
         assertEquals(original.coordinator().rootSeed(), restored.coordinator().rootSeed());
         assertEquals(0, restored.smallCraft().size());
+        assertEquals(0, restored.hangars().size());
     }
 }
