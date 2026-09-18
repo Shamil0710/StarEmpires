@@ -1,10 +1,8 @@
 package com.spacesim.campaign;
 
-import com.spacesim.content.ship.ShipEngineeringCatalog.Dimensions3d;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
+import com.spacesim.persistence.Stage228HangarPersistentState;
 import com.spacesim.world.ProductionSmallCraftFixture;
-import com.spacesim.world.SmallCraftHangarCapacity.BayDefinition;
-import com.spacesim.world.SmallCraftHangarCapacity.BayId;
 import com.spacesim.world.SmallCraftHangarCapacity.HostKind;
 import com.spacesim.world.SmallCraftHangarCapacity.OccupancyState;
 import com.spacesim.world.SmallCraftId;
@@ -39,17 +37,21 @@ class Stage228CampaignAuthorityTest {
         SmallCraftId id = original.smallCraft().reserveIdentityForCompletedProduction();
         original.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
                 id, 8L, 80d, 4_000d, 1d, 100d));
-        var footprint = original.smallCraft().physicalFootprint(id);
-        BayDefinition bay = new BayDefinition(
-                new BayId("carrier:authority-test", "mission_primary"),
-                HostKind.SHIP,
-                new Dimensions3d(1_000d, 1_000d, 1_000d),
-                footprint.envelopeVolumeM3() * 2d,
-                footprint.currentMassKg() * 2d,
-                1d);
-        original.hangars().assign(id, bay, OccupancyState.SERVICING);
+        Stage228GeneratedCampaignPersistentState base = original.captureState();
+        Stage228HangarPersistentState occupied = new Stage228HangarPersistentState(
+                Stage228HangarPersistentState.CURRENT_VERSION,
+                Stage228HangarPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228HangarPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                java.util.List.of(new Stage228HangarPersistentState.AssignmentState(
+                        id,
+                        "carrier:authority-test",
+                        "mission_primary",
+                        HostKind.SHIP,
+                        OccupancyState.SERVICING)));
+        Stage228GeneratedCampaignPersistentState saved =
+                Stage228GeneratedCampaignPersistentState.compose(
+                        base.stage21Runtime(), base.smallCraft(), occupied);
 
-        Stage228GeneratedCampaignPersistentState saved = original.captureState();
         Stage228CampaignAuthority restored = Stage228CampaignAuthority.restore(saved);
 
         assertEquals(saved, restored.captureState());
