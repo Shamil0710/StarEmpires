@@ -44,6 +44,27 @@ class PresentationMotionSmootherTest {
     }
 
     @Test
+    void followCameraLocksToTheSameSmoothedPresentationPointWithoutSecondaryLag() {
+        PresentationMotionSmoother smoother = new PresentationMotionSmoother();
+        MapCameraState camera = new MapCameraState();
+        camera.inspect(8d);
+        float centerX = 640f;
+        float centerY = 360f;
+
+        smoother.update("fleet:1", 100d, 200d, 0f);
+        for (int frame = 0; frame < 90; frame++) {
+            double targetX = frame < 30 ? 100d : frame < 60 ? 700d : 1_100d;
+            double targetY = frame < 45 ? 200d : 650d;
+            var displayed = smoother.update("fleet:1", targetX, targetY, 1f / 60f);
+
+            camera.focus(displayed.x(), displayed.y(), centerX, centerY);
+
+            assertEquals(centerX, camera.transformX(displayed.x(), centerX), 1e-4f);
+            assertEquals(centerY, camera.transformY(displayed.y(), centerY), 1e-4f);
+        }
+    }
+
+    @Test
     void removedObjectDoesNotCarryOldPresentationPositionWhenIdentityReturns() {
         PresentationMotionSmoother smoother = new PresentationMotionSmoother();
         smoother.update("fleet:1", 0d, 0d, 0f);
