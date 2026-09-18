@@ -153,6 +153,27 @@ public final class SmallCraftHangarRegistry {
     }
 
     /**
+     * Calculates current bay usage excluding one assigned craft, for identity-preserving service
+     * preflight before that craft's mass changes.
+     *
+     * @param bayId stable bay identity
+     * @param excludedCraftId currently assigned craft to exclude
+     * @return physical usage of every other assigned craft
+     */
+    Usage usageExcluding(BayId bayId, SmallCraftId excludedCraftId) {
+        BayId checkedBayId = Objects.requireNonNull(bayId, "bayId");
+        SmallCraftId excluded = Objects.requireNonNull(excludedCraftId, "excludedCraftId");
+        Usage usage = Usage.empty();
+        for (Assignment assignment : assignmentByCraft.values()) {
+            if (assignment.bayId().equals(checkedBayId)
+                    && !assignment.craftId().equals(excluded)) {
+                usage = usage.plus(craftRegistry.physicalFootprint(assignment.craftId()));
+            }
+        }
+        return usage;
+    }
+
+    /**
      * Calculates current real mass/envelope usage for one bay.
      *
      * @param bayId stable physical bay identity
