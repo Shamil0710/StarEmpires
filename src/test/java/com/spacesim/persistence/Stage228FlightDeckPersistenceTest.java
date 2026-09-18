@@ -118,6 +118,37 @@ class Stage228FlightDeckPersistenceTest {
     }
 
     @Test
+    void mapperAndCodecPreserveAuthoritativeTickWatermark() {
+        Fixture fixture = fixtureWithLaunchState(OccupancyState.READY);
+        SmallCraftId launch = fixture.ids().get(0);
+        Stage228FlightDeckPersistentState state = new Stage228FlightDeckPersistentState(
+                Stage228FlightDeckPersistentState.CURRENT_VERSION,
+                Stage228FlightDeckPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228FlightDeckPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                77L,
+                List.of(new Stage228FlightDeckPersistentState.DeckProfileState(
+                        "carrier:persist", "mission_primary", 3d, 4d)),
+                List.of(new Stage228FlightDeckPersistentState.RequestState(
+                        launch,
+                        "carrier:persist",
+                        "mission_primary",
+                        OperationKind.LAUNCH,
+                        78L)),
+                List.of());
+
+        byte[] encoded = Stage228FlightDeckPersistenceCodec.encode(state);
+        Stage228FlightDeckPersistentState decoded =
+                Stage228FlightDeckPersistenceCodec.decode(encoded);
+        SmallCraftFlightDeckOperations restored =
+                Stage228FlightDeckPersistenceMapper.restore(decoded, fixture.hangars());
+
+        assertEquals(77L, decoded.lastProcessedTick());
+        assertEquals(77L, restored.lastProcessedTick());
+        assertThrows(IllegalArgumentException.class,
+                () -> restored.advanceFixedTick(77L, 1d, java.util.Map.of()));
+    }
+
+    @Test
     void mapperRejectsActiveLaunchWhenPersistedOccupancyIsNotLaunching() {
         Fixture fixture = fixtureWithLaunchState(OccupancyState.READY);
         SmallCraftId craft = fixture.ids().get(0);
