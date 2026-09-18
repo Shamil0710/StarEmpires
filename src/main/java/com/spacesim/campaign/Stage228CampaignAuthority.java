@@ -93,6 +93,13 @@ public final class Stage228CampaignAuthority {
             Stage228GeneratedCampaignPersistentState checkpoint) {
         Stage228GeneratedCampaignPersistentState saved =
                 Objects.requireNonNull(checkpoint, "checkpoint");
+        GeneratedCampaignCoordinator coordinator =
+                GeneratedCampaignCoordinator.restore(saved.stage21Runtime());
+        long authoritativeTick = coordinator.runtime().world().getAuthoritativeWorldTick();
+        if (saved.flightDeck().lastProcessedTick() > authoritativeTick) {
+            throw new IllegalArgumentException(
+                    "Flight-deck watermark cannot exceed restored authoritative world tick");
+        }
         SmallCraftFitAuthority fitAuthority = productionFitAuthority();
         SmallCraftRegistry smallCraft =
                 Stage228SmallCraftPersistenceMapper.restore(saved.smallCraft(), fitAuthority);
@@ -101,7 +108,7 @@ public final class Stage228CampaignAuthority {
         SmallCraftFlightDeckOperations flightDeck =
                 Stage228FlightDeckPersistenceMapper.restore(saved.flightDeck(), hangars);
         return new Stage228CampaignAuthority(
-                GeneratedCampaignCoordinator.restore(saved.stage21Runtime()),
+                coordinator,
                 smallCraft,
                 hangars,
                 flightDeck);
