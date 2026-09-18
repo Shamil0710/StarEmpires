@@ -153,6 +153,23 @@ class SmallCraftFlightDeckOperationsTest {
     }
 
     @Test
+    void liveRequestCannotBackdateAheadOfAlreadyProcessedAuthoritativeTicks() {
+        Fixture fixture = fixture(1);
+        SmallCraftId craft = fixture.ids().get(0);
+        fixture.hangars().assign(craft, fixture.bay(), OccupancyState.READY);
+        SmallCraftFlightDeckOperations operations = operations(fixture, 2d, 3d);
+        operations.advanceFixedTick(
+                10L,
+                1d,
+                Map.of(fixture.bay().id(), fixture.bay()));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> operations.requestLaunch(craft, fixture.bay().id(), 9L));
+        operations.requestLaunch(craft, fixture.bay().id(), 10L);
+        assertEquals(1, operations.queued().size());
+    }
+
+    @Test
     void restoreRejectsQueuedRecoveryForUnknownCraftImmediately() {
         Fixture fixture = fixture(1);
         BayId bayId = fixture.bay().id();
