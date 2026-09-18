@@ -268,9 +268,14 @@ public final class SmallCraftFlightDeckOperations {
             throw new IllegalArgumentException(
                     "Recovery craft is already embarked: " + checkedCraft);
         }
-        if (!hangars.canAccept(checkedCraft, checkedBay)) {
+        var footprint = hangars.craftFootprint(checkedCraft);
+        boolean everCompatible = checkedBay.acceptsEnvelope(footprint.envelopeM())
+                && footprint.currentMassKg() <= checkedBay.pristineSupportedMassKg() + EPSILON
+                && footprint.envelopeVolumeM3() <= checkedBay.pristineUsableVolumeM3() + EPSILON;
+        if (!everCompatible) {
             throw new IllegalArgumentException(
-                    "Recovery craft cannot fit current bay capacity: " + checkedCraft);
+                    "Recovery craft cannot physically fit this bay even at pristine capacity: "
+                            + checkedCraft);
         }
         enqueueUnique(new Request(
                 checkedCraft, checkedBay.id(), OperationKind.RECOVERY, requestedTick));
@@ -300,7 +305,8 @@ public final class SmallCraftFlightDeckOperations {
             }
             ActiveOperation active = activeByBay.get(profile.bayId());
             if (active == null) {
-                Request next = nextRequest(profile.bayId(), authoritativeTick);
+                Request next = nextStartableRequest(
+                        profile.bayId(), authoritativeTick, bay);
                 if (next == null || bay.conditionFraction() <= EPSILON) {
                     continue;
                 }
@@ -418,9 +424,6 @@ public final class SmallCraftFlightDeckOperations {
             }
             hangars.transition(request.craftId(), OccupancyState.LAUNCHING);
         } else {
-            if (!hangars.canAccept(request.craftId(), bay)) {
-                return;
-            }
             hangars.assign(request.craftId(), bay, OccupancyState.RECOVERING);
         }
         queue.remove(request);
@@ -442,11 +445,23 @@ public final class SmallCraftFlightDeckOperations {
         }
     }
 
-    private Request nextRequest(BayId bayId, long authoritativeTick) {
-        return queue.stream()
-                .filter(value -> value.bayId().equals(bayId)
-                        && value.requestedTick() <= authoritativeTick)
-                .findFirst().orElse(null);
+    private Request nextStartableRequest(
+            BayId bayId,
+            long authoritativeTick,
+            BayDefinition bay) {
+        for (Request request : queue) {
+            if (!request.bayId().equals(bayId)
+                    || request.requestedTick() > authoritativeTick) {
+                continue;
+            }
+            if (request.kind() == OperationKind.LAUNCH) {
+                return request;
+            }
+            if (hangars.canAccept(request.craftId(), bay)) {
+                return request;
+            }
+        }
+        return null;
     }
 
     private void enqueueUnique(Request request) {
