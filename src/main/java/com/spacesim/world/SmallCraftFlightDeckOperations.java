@@ -233,6 +233,19 @@ public final class SmallCraftFlightDeckOperations {
             Objects.requireNonNull(request, "request");
             Objects.requireNonNull(phase, "phase");
             requireNonNegative(remainingWorkSeconds, "remainingWorkSeconds");
+            if (phase == OperationPhase.QUEUED) {
+                throw new IllegalArgumentException(
+                        "Active operation cannot use QUEUED phase");
+            }
+            if (phase == OperationPhase.CYCLING && remainingWorkSeconds <= EPSILON) {
+                throw new IllegalArgumentException(
+                        "CYCLING operation must retain positive work");
+            }
+            if (phase == OperationPhase.AWAITING_HANDOFF
+                    && remainingWorkSeconds > EPSILON) {
+                throw new IllegalArgumentException(
+                        "AWAITING_HANDOFF launch cannot retain handling work");
+            }
             if ((phase == OperationPhase.FAILED_BLOCKED) != (failureKind != null)) {
                 throw new IllegalArgumentException(
                         "failureKind presence must match FAILED_BLOCKED phase");
