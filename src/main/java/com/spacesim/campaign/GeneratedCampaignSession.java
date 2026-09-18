@@ -137,6 +137,11 @@ public final class GeneratedCampaignSession {
         forEachClock(clock -> clock.setTimeScale(scale));
     }
 
+    /** @return exact authoritative fixed-step duration in simulation seconds */
+    float fixedStepSeconds() {
+        return activeClock().getFixedStepSeconds();
+    }
+
     /**
      * Advances the existing authoritative runtime from one presentation-frame delta.
      *
