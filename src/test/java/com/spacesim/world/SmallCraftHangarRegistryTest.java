@@ -85,19 +85,50 @@ class SmallCraftHangarRegistryTest {
         var restored = SmallCraftHangarRegistry.restore(
                 craft,
                 List.of(new SmallCraftHangarRegistry.Assignment(
-                        first, bay, OccupancyState.SERVICING)));
+                        first, bay, HostKind.STATION, OccupancyState.SERVICING)));
 
         assertEquals(OccupancyState.SERVICING,
                 restored.find(first).orElseThrow().state());
         assertThrows(IllegalArgumentException.class, () -> SmallCraftHangarRegistry.restore(
                 craft,
                 List.of(
-                        new SmallCraftHangarRegistry.Assignment(first, bay, OccupancyState.PARKED),
-                        new SmallCraftHangarRegistry.Assignment(first, bay, OccupancyState.READY))));
+                        new SmallCraftHangarRegistry.Assignment(
+                                first, bay, HostKind.STATION, OccupancyState.PARKED),
+                        new SmallCraftHangarRegistry.Assignment(
+                                first, bay, HostKind.STATION, OccupancyState.READY))));
         assertThrows(IllegalArgumentException.class, () -> SmallCraftHangarRegistry.restore(
                 craft,
                 List.of(new SmallCraftHangarRegistry.Assignment(
-                        new SmallCraftId(999L), bay, OccupancyState.PARKED))));
+                        new SmallCraftId(999L), bay, HostKind.STATION, OccupancyState.PARKED))));
+    }
+
+    @Test
+    void currentBayProjectionCannotSilentlyChangePersistedHostFamily() {
+        SmallCraftRegistry craft = twoCraftRegistry();
+        SmallCraftId first = craft.snapshot().get(0).id();
+        BayId id = new BayId("shared:host", "bay:a");
+        var footprint = craft.physicalFootprint(first);
+        BayDefinition shipBay = new BayDefinition(
+                id,
+                HostKind.SHIP,
+                new Dimensions3d(1_000d, 1_000d, 1_000d),
+                footprint.envelopeVolumeM3() * 2d,
+                footprint.currentMassKg() * 2d,
+                1d);
+        SmallCraftHangarRegistry hangar = SmallCraftHangarRegistry.empty(craft);
+        hangar.assign(first, shipBay, OccupancyState.PARKED);
+        BayDefinition conflictingStationBay = new BayDefinition(
+                id,
+                HostKind.STATION,
+                shipBay.singleCraftEnvelopeM(),
+                shipBay.pristineUsableVolumeM3(),
+                shipBay.pristineSupportedMassKg(),
+                1d);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> hangar.capacityStatus(conflictingStationBay));
+        assertThrows(IllegalArgumentException.class,
+                () -> hangar.canAccept(craft.snapshot().get(1).id(), conflictingStationBay));
     }
 
     private static SmallCraftRegistry twoCraftRegistry() {
