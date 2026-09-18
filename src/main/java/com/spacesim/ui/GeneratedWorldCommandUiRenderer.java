@@ -198,6 +198,7 @@ public final class GeneratedWorldCommandUiRenderer {
      * @param listScrollRows number of faction/logistics rows skipped from the top
      * @param paused whether all world clocks are paused
      * @param timeScale current common simulation time scale
+     * @param interpolationAlpha active fixed-clock fraction accumulated toward the next tick
      * @param status transient user-facing operation result
      */
     public void render(
@@ -208,9 +209,14 @@ public final class GeneratedWorldCommandUiRenderer {
             int listScrollRows,
             boolean paused,
             double timeScale,
+            double interpolationAlpha,
             String status) {
         if (disposed || snapshot == null || tab == null || selection == null) {
             return;
+        }
+        if (!Double.isFinite(interpolationAlpha)
+                || interpolationAlpha < 0d || interpolationAlpha > 1d) {
+            throw new IllegalArgumentException("interpolationAlpha must be finite and in [0,1]");
         }
         hitTargets.clear();
         listRect = Rect.empty();
@@ -222,7 +228,7 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         previousRenderedTab = tab;
         switch (tab) {
-            case SYSTEM -> drawSystem(snapshot, selection, detailScrollRows);
+            case SYSTEM -> drawSystem(snapshot, selection, detailScrollRows, interpolationAlpha);
             case GALAXY -> drawGalaxy(snapshot, selection, detailScrollRows);
             case FACTIONS -> drawFactions(snapshot, selection, detailScrollRows, listScrollRows);
             case MILITARY -> drawMilitary(snapshot, selection, detailScrollRows, listScrollRows);
@@ -291,8 +297,11 @@ public final class GeneratedWorldCommandUiRenderer {
             return false;
         }
         MapCameraState state = tab == Tab.SYSTEM ? systemMapCamera : galaxyMapCamera;
-        state.zoomAt(amountY, x, y, mapRect.x() + mapRect.width() * 0.5f,
-                mapRect.y() + mapRect.height() * 0.5f);
+        float cameraCenterX = tab == Tab.SYSTEM
+                ? width * 0.5f : mapRect.x() + mapRect.width() * 0.5f;
+        float cameraCenterY = tab == Tab.SYSTEM
+                ? height * 0.5f : mapRect.y() + mapRect.height() * 0.5f;
+        state.zoomAt(amountY, x, y, cameraCenterX, cameraCenterY);
         return amountY != 0f;
     }
 
@@ -350,9 +359,10 @@ public final class GeneratedWorldCommandUiRenderer {
                 ? localObjectMotion.current(id) : null;
         double focusX = displayed == null ? point.x() : displayed.x();
         double focusY = displayed == null ? point.y() : displayed.y();
-        systemMapCamera.focus(focusX, focusY,
-                layout.map().x() + layout.map().width() * 0.5f,
-                layout.map().y() + layout.map().height() * 0.5f);
+        // System-map transforms use the whole application screen as their stable origin. This
+        // guarantees that follow mode places the selected ship at the actual player-screen center,
+        // not merely at the center of the map panel left of the inspector.
+        systemMapCamera.focus(focusX, focusY, width * 0.5f, height * 0.5f);
         followedLocalObjectId = id;
         return true;
     }
@@ -437,7 +447,8 @@ public final class GeneratedWorldCommandUiRenderer {
     private void drawSystem(
             GeneratedWorldUiSnapshot snapshot,
             UiSelection selection,
-            int detailScrollRows) {
+            int detailScrollRows,
+            double interpolationAlpha) {
         Layout layout = splitMapAndInspector();
         inspectorRect = layout.inspector();
         mapRect = layout.map();
@@ -453,12 +464,6 @@ public final class GeneratedWorldCommandUiRenderer {
         Rect projectionRect = inset(layout.map(), 28f * metrics.scale());
         PhysicalMapProjection projection = resolveSystemProjection(snapshot, projectionRect);
         double pixelsPerMetre = projection.pixelsPerMetre() * systemMapCamera.zoom();
-        float frameDeltaSeconds = Gdx.graphics.getDeltaTime();
-        if (!Float.isFinite(frameDeltaSeconds) || frameDeltaSeconds < 0f) {
-            frameDeltaSeconds = 0f;
-        } else {
-            frameDeltaSeconds = Math.min(0.1f, frameDeltaSeconds);
-        }
 
         Map<String, PresentationMotionSmoother.Point> smoothedBasePoints = new HashMap<>();
         Set<String> liveIds = new HashSet<>();
@@ -469,22 +474,26 @@ public final class GeneratedWorldCommandUiRenderer {
             }
             liveIds.add(object.stableId());
             smoothedBasePoints.put(object.stableId(), localObjectMotion.update(
-                    object.stableId(), base.x(), base.y(), frameDeltaSeconds));
+                    object.stableId(), snapshot.worldTick(), interpolationAlpha,
+                    base.x(), base.y()));
         }
         localObjectMotion.retain(liveIds);
 
-        float mapCenterX = layout.map().x() + layout.map().width() * 0.5f;
-        float mapCenterY = layout.map().y() + layout.map().height() * 0.5f;
+        // At zoom 1, using the whole-screen origin is algebraically identical to the fitted
+        // overview because pan is zero. At inspection zoom the same stable origin lets follow mode
+        // pin one object to the literal center of the player's screen.
+        float cameraCenterX = width * 0.5f;
+        float cameraCenterY = height * 0.5f;
         if (!followedLocalObjectId.isEmpty()) {
             PresentationMotionSmoother.Point followed = smoothedBasePoints.get(followedLocalObjectId);
             if (followed == null) {
                 followedLocalObjectId = "";
             } else {
-                // The followed craft is already presentation-smoothed above. Centering the camera on
-                // that exact same point avoids a second easing filter, which otherwise makes the
-                // camera lag behind the sprite and visibly tug/jitter at high inspection zoom.
+                // Ship and camera consume the exact same fixed-clock-interpolated point. There is
+                // no secondary camera easing, so the followed object is locked to screen center on
+                // every presentation frame.
                 systemMapCamera.focus(
-                        followed.x(), followed.y(), mapCenterX, mapCenterY);
+                        followed.x(), followed.y(), cameraCenterX, cameraCenterY);
             }
         }
 
@@ -493,8 +502,8 @@ public final class GeneratedWorldCommandUiRenderer {
                 : smoothedBasePoints.entrySet()) {
             var base = entry.getValue();
             points.put(entry.getKey(), new Point(
-                    systemMapCamera.transformX(base.x(), mapCenterX),
-                    systemMapCamera.transformY(base.y(), mapCenterY)));
+                    systemMapCamera.transformX(base.x(), cameraCenterX),
+                    systemMapCamera.transformY(base.y(), cameraCenterY)));
         }
         // Scissor oversized hulls against the map, including on HiDPI displays.
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
