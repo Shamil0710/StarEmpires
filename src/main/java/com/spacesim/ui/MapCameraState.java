@@ -12,6 +12,7 @@ public final class MapCameraState {
     /** Maximum inspection zoom. */
     public static final float MAX_ZOOM = 1.0e12f;
     private static final float WHEEL_FACTOR = 1.18f;
+    private static final double FOLLOW_RESPONSE_PER_SECOND = 12d;
 
     private final float maximumZoom;
     private float zoom = 1f;
@@ -103,6 +104,44 @@ public final class MapCameraState {
         requireFinite(pointY, "pointY");
         panX = -(pointX - centerX) * zoom;
         panY = -(pointY - centerY) * zoom;
+    }
+
+    /**
+     * Smoothly converges the camera toward one fitted base-projection point.
+     *
+     * <p>The exponential response is presentation-only and nearly frame-rate independent. It keeps
+     * the followed object near the viewport center without snapping the camera between fixed
+     * simulation ticks.</p>
+     *
+     * @param pointX base-projection point X
+     * @param pointY base-projection point Y
+     * @param centerX viewport center X
+     * @param centerY viewport center Y
+     * @param deltaSeconds presentation-frame delta
+     */
+    public void smoothFocus(
+            double pointX,
+            double pointY,
+            float centerX,
+            float centerY,
+            float deltaSeconds) {
+        requireFinite(pointX, "pointX");
+        requireFinite(pointY, "pointY");
+        requireFinite(centerX, "centerX");
+        requireFinite(centerY, "centerY");
+        requireFinite(deltaSeconds, "deltaSeconds");
+        if (deltaSeconds < 0f) {
+            throw new IllegalArgumentException("deltaSeconds cannot be negative");
+        }
+        if (deltaSeconds == 0f) {
+            return;
+        }
+
+        double desiredPanX = -(pointX - centerX) * zoom;
+        double desiredPanY = -(pointY - centerY) * zoom;
+        double alpha = 1d - Math.exp(-FOLLOW_RESPONSE_PER_SECOND * deltaSeconds);
+        panX += (desiredPanX - panX) * alpha;
+        panY += (desiredPanY - panY) * alpha;
     }
 
     /**

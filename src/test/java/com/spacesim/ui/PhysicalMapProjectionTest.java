@@ -40,6 +40,25 @@ class PhysicalMapProjectionTest {
     }
 
     @Test
+    void movingObjectsDoNotRefitOrRecenterTheOverviewFrame() {
+        var stationary = object("station", 0, 0, 100, 20);
+        var ship = object("ship", 1000, 0, 100, 20);
+        var projection = new PhysicalMapProjection(
+                List.of(stationary, ship), 0, 0, 1000, 600);
+        double initialScale = projection.pixelsPerMetre();
+        double stationX = projection.point("station").x();
+        double shipX = projection.point("ship").x();
+
+        var movedShip = object("ship", 1200, 0, 100, 20);
+        projection.update(List.of(stationary, movedShip));
+
+        assertEquals(initialScale, projection.pixelsPerMetre(), 1e-12);
+        assertEquals(stationX, projection.point("station").x(), 1e-9);
+        assertEquals(200d * initialScale,
+                projection.point("ship").x() - shipX, 1e-9);
+    }
+
+    @Test
     void systemOverviewCanInspectHundredMetreHullWithoutFloatQuantization() {
         var small = object("a", 0, 0, 100, 20);
         var nearby = object("b", 200, 0, 100, 20);

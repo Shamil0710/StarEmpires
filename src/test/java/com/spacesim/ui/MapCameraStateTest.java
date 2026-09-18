@@ -44,4 +44,27 @@ class MapCameraStateTest {
         assertEquals(0f, camera.panX());
         assertEquals(0f, camera.panY());
     }
+    @Test
+    void smoothFocusConvergesWithoutFrameRateDependentSnap() {
+        MapCameraState thirtyFps = new MapCameraState();
+        MapCameraState sixtyFps = new MapCameraState();
+        thirtyFps.inspect(4d);
+        sixtyFps.inspect(4d);
+
+        thirtyFps.smoothFocus(900d, 650d, 500f, 300f, 1f / 30f);
+        sixtyFps.smoothFocus(900d, 650d, 500f, 300f, 1f / 60f);
+        sixtyFps.smoothFocus(900d, 650d, 500f, 300f, 1f / 60f);
+
+        assertEquals(thirtyFps.panX(), sixtyFps.panX(), 0.001f);
+        assertEquals(thirtyFps.panY(), sixtyFps.panY(), 0.001f);
+        assertTrue(Math.abs(thirtyFps.transformX(900d, 500f) - 500f) < 1600f);
+        assertTrue(Math.abs(thirtyFps.transformY(650d, 300f) - 300f) < 1400f);
+
+        for (int frame = 0; frame < 120; frame++) {
+            thirtyFps.smoothFocus(900d, 650d, 500f, 300f, 1f / 60f);
+        }
+        assertEquals(500f, thirtyFps.transformX(900d, 500f), 0.001f);
+        assertEquals(300f, thirtyFps.transformY(650d, 300f), 0.001f);
+    }
+
 }
