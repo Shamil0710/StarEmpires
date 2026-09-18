@@ -87,6 +87,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     case Input.Keys.F5 -> switchTab(Tab.LOGISTICS);
                     case Input.Keys.HOME -> {
                         renderer.resetSystemMapCamera();
+                        status = "Камера: обзор системы; сопровождение отключено.";
                         yield true;
                     }
                     case Input.Keys.SPACE -> togglePause();
@@ -145,7 +146,11 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     snapshot = model.capture();
                 }
                 if (hit.kind() == HitKind.LOCAL_OBJECT && isDoubleClick(hit)) {
-                    return renderer.focusLocalObject(snapshot, hit.id());
+                    boolean following = renderer.focusLocalObject(snapshot, hit.id());
+                    if (following) {
+                        status = "Камера сопровождает выбранный объект. СКМ или Home — отмена.";
+                    }
+                    return following;
                 }
                 if ((hit.kind() == HitKind.FREIGHT || hit.kind() == HitKind.MILITARY)
                         && isDoubleClick(hit)) {
@@ -164,7 +169,11 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 float deltaY = uiY - previousDragY;
                 previousDragX = screenX;
                 previousDragY = uiY;
-                return renderer.panMap(tab, deltaX, deltaY);
+                boolean panned = renderer.panMap(tab, deltaX, deltaY);
+                if (panned && tab == Tab.SYSTEM) {
+                    status = "Ручная панорама; сопровождение камеры отключено.";
+                }
+                return panned;
             }
 
             @Override
@@ -234,7 +243,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         listScrollRows = 0;
         snapshot = model.capture();
         if (renderer.focusLocalObject(snapshot, selection.stableId())) {
-            status = "Камера переведена к кораблю #" + fleetIdValue + ".";
+            status = "Камера сопровождает корабль #" + fleetIdValue
+                    + ". СКМ или Home — отмена.";
         } else {
             status = "Корабль #" + fleetIdValue + " не имеет локальной визуализации.";
         }

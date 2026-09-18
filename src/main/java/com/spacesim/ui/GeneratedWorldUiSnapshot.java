@@ -4,6 +4,7 @@ import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.Resol
 import com.spacesim.presentation.asset.Stage20MinimumPlayableSpriteCatalog.SpriteBinding;
 import com.spacesim.presentation.asset.Stage22ProductionShipSpriteAdapter;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
+import com.spacesim.presentation.asset.Stage22RuntimeSpriteEffects;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.StarSystemId;
 
@@ -72,6 +73,7 @@ public record GeneratedWorldUiSnapshot(
      * @param physicalLengthM physical or nominal length in metres
      * @param physicalWidthM physical or nominal width in metres
      * @param headingRad presentation heading in radians; zero points along +X
+     * @param propulsionFraction normalized authoritative propulsion activity in [0,1]
      */
     public record LocalObjectView(
             String stableId,
@@ -86,41 +88,43 @@ public record GeneratedWorldUiSnapshot(
             List<InfoSection> sections,
             double physicalLengthM,
             double physicalWidthM,
-            double headingRad) implements Comparable<LocalObjectView> {
+            double headingRad,
+            double propulsionFraction) implements Comparable<LocalObjectView> {
         /**
          * Compatibility projection for objects with nominal artwork dimensions only.
-         * @param stableId persistent object identity
-         * @param kind object family
-         * @param name display name
-         * @param subtitle role or state label
+         *
+         * @param stableId persistent or canonical identity
+         * @param kind presentation object family
+         * @param name player-facing primary label
+         * @param subtitle concise role/state label
          * @param systemId owning system
-         * @param position authoritative physical position
-         * @param factionId owner identifier
-         * @param factionName owner display name
-         * @param sprite optional artwork binding
-         * @param sections inspector content
+         * @param position authoritative local physical position
+         * @param factionId stable owner/controller ID, or empty when unknown/unowned
+         * @param factionName player-facing owner/controller label
+         * @param sprite optional sprite binding
+         * @param sections structured inspector content
          */
         public LocalObjectView(String stableId, ObjectKind kind, String name, String subtitle,
                 StarSystemId systemId, LocalPhysicalPosition position, String factionId,
                 String factionName, SpriteBinding sprite, List<InfoSection> sections) {
             this(stableId, kind, name, subtitle, systemId, position, factionId, factionName,
                     sprite, sections, sprite == null ? 0d : sprite.nominalLengthM(),
-                    sprite == null ? 0d : sprite.nominalWidthM(), 0d);
+                    sprite == null ? 0d : sprite.nominalWidthM(), 0d, 0d);
         }
 
         /**
          * Compatibility projection preserving the historical physical-dimension constructor.
          *
-         * @param stableId persistent object identity
-         * @param kind object family
-         * @param name display name
-         * @param subtitle role or state label
+         * @param stableId persistent or canonical identity
+         * @param kind presentation object family
+         * @param name player-facing primary label
+         * @param subtitle concise role/state label
          * @param systemId owning system
-         * @param position authoritative physical position
-         * @param factionId owner identifier
-         * @param factionName owner display name
-         * @param sprite optional artwork binding
-         * @param sections inspector content
+         * @param position authoritative local physical position
+         * @param factionId stable owner/controller ID, or empty when unknown/unowned
+         * @param factionName player-facing owner/controller label
+         * @param sprite optional sprite binding
+         * @param sections structured inspector content
          * @param physicalLengthM physical or nominal length in metres
          * @param physicalWidthM physical or nominal width in metres
          */
@@ -129,39 +133,80 @@ public record GeneratedWorldUiSnapshot(
                 String factionName, SpriteBinding sprite, List<InfoSection> sections,
                 double physicalLengthM, double physicalWidthM) {
             this(stableId, kind, name, subtitle, systemId, position, factionId, factionName,
-                    sprite, sections, physicalLengthM, physicalWidthM, 0d);
+                    sprite, sections, physicalLengthM, physicalWidthM, 0d, 0d);
         }
 
         /**
-         * Preserves simulation-authoritative dimensions while passing artwork into the UI. Governed
-         * core-faction compatibility ship projections are upgraded to exact Stage-22 production artwork
-         * here only for explicitly mapped roles, after physical scale has already been resolved by the
-         * current runtime authority.
+         * Compatibility projection preserving the historical explicit-heading constructor.
          *
-         * @param resolved artwork with resolved physical dimensions
-         * @return projection retaining physical scale, heading and, when governed, production faction artwork
+         * @param stableId persistent or canonical identity
+         * @param kind presentation object family
+         * @param name player-facing primary label
+         * @param subtitle concise role/state label
+         * @param systemId owning system
+         * @param position authoritative local physical position
+         * @param factionId stable owner/controller ID, or empty when unknown/unowned
+         * @param factionName player-facing owner/controller label
+         * @param sprite optional sprite binding
+         * @param sections structured inspector content
+         * @param physicalLengthM physical or nominal length in metres
+         * @param physicalWidthM physical or nominal width in metres
+         * @param headingRad presentation heading in radians
+         */
+        public LocalObjectView(String stableId, ObjectKind kind, String name, String subtitle,
+                StarSystemId systemId, LocalPhysicalPosition position, String factionId,
+                String factionName, SpriteBinding sprite, List<InfoSection> sections,
+                double physicalLengthM, double physicalWidthM, double headingRad) {
+            this(stableId, kind, name, subtitle, systemId, position, factionId, factionName,
+                    sprite, sections, physicalLengthM, physicalWidthM, headingRad, 0d);
+        }
+
+        /**
+         * Preserves simulation-authoritative dimensions while passing artwork into the UI.
+         * Production artwork receives the same runtime propulsion state as the projection, and the
+         * final binding carries the same normalized value as presentation-only effect metadata.
+         *
+         * @param resolved resolved production or fallback sprite
+         * @return immutable projection with resolved dimensions and runtime-effect metadata
          */
         public LocalObjectView withScale(ResolvedSprite resolved) {
+            RuntimeVisualState runtimeState = propulsionFraction > 0d
+                    ? RuntimeVisualState.THRUSTING : RuntimeVisualState.IDLE;
             ResolvedSprite selected = Stage22ProductionShipSpriteAdapter.upgradeCoreProjection(
                     stableId,
                     factionId,
                     Objects.requireNonNull(resolved, "resolved"),
-                    RuntimeVisualState.IDLE);
+                    runtimeState);
+            SpriteBinding runtimeBinding = Stage22RuntimeSpriteEffects.withPropulsion(
+                    selected.binding(), propulsionFraction);
             return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
-                    factionId, factionName, selected.binding(), sections,
-                    selected.worldLengthM(), selected.worldWidthM(), headingRad);
+                    factionId, factionName, runtimeBinding, sections,
+                    selected.worldLengthM(), selected.worldWidthM(), headingRad, propulsionFraction);
         }
 
         /**
          * Returns the same immutable projection with a presentation-only ship heading.
          *
-         * @param resolvedHeadingRad finite counter-clockwise heading in radians from +X
-         * @return projection retaining identity, physical position, dimensions and artwork
+         * @param resolvedHeadingRad presentation heading in radians
+         * @return immutable projection with the supplied heading
          */
         public LocalObjectView withHeadingRad(double resolvedHeadingRad) {
             return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
                     factionId, factionName, sprite, sections,
-                    physicalLengthM, physicalWidthM, resolvedHeadingRad);
+                    physicalLengthM, physicalWidthM, resolvedHeadingRad, propulsionFraction);
+        }
+
+        /**
+         * Returns the same immutable projection with simulation-authoritative normalized propulsion activity.
+         * This value is never inferred from speed or heading.
+         *
+         * @param resolvedPropulsionFraction normalized propulsion activity in [0,1]
+         * @return immutable projection with the supplied propulsion activity
+         */
+        public LocalObjectView withPropulsionFraction(double resolvedPropulsionFraction) {
+            return new LocalObjectView(stableId, kind, name, subtitle, systemId, position,
+                    factionId, factionName, sprite, sections,
+                    physicalLengthM, physicalWidthM, headingRad, resolvedPropulsionFraction);
         }
 
         /**
@@ -175,11 +220,12 @@ public record GeneratedWorldUiSnapshot(
          * @param position authoritative local physical position
          * @param factionId stable owner/controller ID, or empty when unknown/unowned
          * @param factionName player-facing owner/controller label
-         * @param sprite optional minimum-pack or validated Stage-22 production sprite binding
+         * @param sprite optional sprite binding
          * @param sections structured inspector content
-         * @param physicalLengthM physical or nominal length in metres; zero for point markers
-         * @param physicalWidthM physical or nominal width in metres; zero for point markers
-         * @param headingRad presentation-only counter-clockwise heading in radians from +X
+         * @param physicalLengthM physical or nominal length in metres
+         * @param physicalWidthM physical or nominal width in metres
+         * @param headingRad presentation heading in radians
+         * @param propulsionFraction normalized propulsion activity in [0,1]
          */
         public LocalObjectView {
             if (!Double.isFinite(physicalLengthM) || !Double.isFinite(physicalWidthM)
@@ -189,6 +235,10 @@ public record GeneratedWorldUiSnapshot(
             }
             if (!Double.isFinite(headingRad)) {
                 throw new IllegalArgumentException("headingRad must be finite");
+            }
+            if (!Double.isFinite(propulsionFraction)
+                    || propulsionFraction < 0d || propulsionFraction > 1d) {
+                throw new IllegalArgumentException("propulsionFraction must be finite and in [0,1]");
             }
             stableId = requireText(stableId, "stableId");
             Objects.requireNonNull(kind, "kind");
@@ -230,25 +280,25 @@ public record GeneratedWorldUiSnapshot(
             long delayedDeliveryCount,
             List<InfoSection> sections) implements Comparable<FreightView> {
         /**
-         * Validates one deterministic logistics projection.
+         * Validates and freezes one freight projection.
          *
          * @param fleetId persistent fleet identity
-         * @param name player-facing fleet label
-         * @param factionId stable owner identity
-         * @param factionName player-facing owner label
-         * @param phase authoritative freight lifecycle phase
-         * @param hullId canonical hull identity
-         * @param fitId canonical fitted-role identity
-         * @param cargoMassKg current conserved cargo mass
-         * @param cargoCapacityKg physical hold capacity
-         * @param commodityId active cargo commodity, or an em dash
-         * @param sourceName source endpoint label
-         * @param destinationName destination endpoint label
-         * @param route ordered neighbor-only route
+         * @param name player-facing fleet name
+         * @param factionId stable faction identity
+         * @param factionName player-facing faction name
+         * @param phase current freight phase
+         * @param hullId installed hull definition
+         * @param fitId installed fit identity
+         * @param cargoMassKg current cargo mass in kilograms
+         * @param cargoCapacityKg cargo capacity in kilograms
+         * @param commodityId carried commodity identity
+         * @param sourceName player-facing source label
+         * @param destinationName player-facing destination label
+         * @param route ordered route systems
          * @param routeIndex current route index
-         * @param deliveredMassKg conserved delivered order mass
-         * @param deliveryDeadlineSeconds physical delivery deadline
-         * @param delayedDeliveryCount recorded delayed deliveries
+         * @param deliveredMassKg delivered order mass in kilograms
+         * @param deliveryDeadlineSeconds order deadline in seconds
+         * @param delayedDeliveryCount number of delayed deliveries
          * @param sections structured inspector content
          */
         public FreightView {
@@ -291,18 +341,18 @@ public record GeneratedWorldUiSnapshot(
             String fitId,
             List<InfoSection> sections) implements Comparable<MilitaryView> {
         /**
-         * Validates one immutable military presentation projection.
+         * Validates and freezes one military-fleet projection.
          *
-         * @param fleetId ordinary persistent fleet identity
-         * @param name display name
-         * @param factionId stable owning-faction identity
-         * @param factionName owning-faction display name
-         * @param status localized current status
-         * @param systemId current or destination system identity
-         * @param inSystem whether the fleet is locally materialized
-         * @param hullId fitted engineering hull identity
-         * @param fitId fitted provisional demonstrator identity
-         * @param sections inspector sections
+         * @param fleetId persistent fleet identity
+         * @param name player-facing fleet name
+         * @param factionId stable faction identity
+         * @param factionName player-facing faction name
+         * @param status current fleet status
+         * @param systemId displayed system identity
+         * @param inSystem whether the fleet is physically materialized in-system
+         * @param hullId installed hull definition
+         * @param fitId installed fit identity
+         * @param sections structured inspector content
          */
         public MilitaryView {
             if (fleetId <= 0L) {
@@ -327,10 +377,10 @@ public record GeneratedWorldUiSnapshot(
     /** Inspector section containing compact labelled values. */
     public record InfoSection(String title, List<InfoLine> lines) {
         /**
-         * Validates one non-empty inspector section.
+         * Validates and freezes one inspector section.
          *
-         * @param title section heading
-         * @param lines immutable label/value rows
+         * @param title player-facing section title
+         * @param lines labelled values shown in the section
          */
         public InfoSection {
             title = requireText(title, "title");
@@ -343,9 +393,9 @@ public record GeneratedWorldUiSnapshot(
         /**
          * Creates a section from alternating label/value strings.
          *
-         * @param title section heading
-         * @param labelValues alternating label/value strings
-         * @return validated immutable inspector section
+         * @param title player-facing section title
+         * @param labelValues alternating label/value pairs
+         * @return immutable inspector section
          */
         public static InfoSection of(String title, String... labelValues) {
             Objects.requireNonNull(labelValues, "labelValues");
@@ -363,10 +413,10 @@ public record GeneratedWorldUiSnapshot(
     /** One labelled inspector value. */
     public record InfoLine(String label, String value) {
         /**
-         * Validates a complete label/value pair.
+         * Normalizes one labelled inspector value.
          *
-         * @param label optional compact value label
-         * @param value player-facing value
+         * @param label player-facing value label
+         * @param value player-facing value text
          */
         public InfoLine {
             label = label == null ? "" : label.strip();

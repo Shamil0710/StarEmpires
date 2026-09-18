@@ -2,6 +2,7 @@ package com.spacesim.ui;
 
 import com.spacesim.campaign.GeneratedCampaignSession;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
+import com.spacesim.presentation.asset.Stage22RuntimeSpriteEffects;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.LocalObjectView;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.StarSystemId;
@@ -28,7 +29,7 @@ class MovementAlignedHeadingTest {
     }
 
     @Test
-    void movingFreighterProjectsHeadingFromExactLivePhysicalVelocity() {
+    void movingFreighterProjectsHeadingAndAuthoritativePropulsionSeparately() {
         GeneratedCampaignSession campaign = GeneratedCampaignSession.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         var runtime = campaign.runtime();
@@ -41,6 +42,15 @@ class MovementAlignedHeadingTest {
         StarSystemId origin = freight.currentSystemId();
         StarSystemId destination = nextNeighbor(freight, route);
         runtime.world().activateSystem(origin);
+
+        GeneratedWorldUiModel model = new GeneratedWorldUiModel(
+                campaign.rootSeed(), runtime, campaign.content());
+        LocalObjectView beforeCommand = model.capture().localObjects().stream()
+                .filter(value -> value.stableId().equals("fleet:" + freight.fleetId().value()))
+                .findFirst().orElseThrow();
+        assertEquals(0d, beforeCommand.propulsionFraction(), EPSILON);
+        assertEquals(0d, Stage22RuntimeSpriteEffects.propulsionFraction(beforeCommand.sprite()), EPSILON);
+
         runtime.world().requestFleetJump(freight.fleetId(), destination);
         campaign.advanceFrame(0.1f);
 
@@ -51,8 +61,6 @@ class MovementAlignedHeadingTest {
         assertTrue(Math.hypot(kinematics.velocityXMps(), kinematics.velocityYMps()) > 1.0e-6d,
                 "acceptance freighter must actually be moving during the approach");
 
-        GeneratedWorldUiModel model = new GeneratedWorldUiModel(
-                campaign.rootSeed(), runtime, campaign.content());
         LocalObjectView projected = model.capture().localObjects().stream()
                 .filter(value -> value.stableId().equals("fleet:" + freight.fleetId().value()))
                 .findFirst().orElseThrow();
@@ -62,6 +70,10 @@ class MovementAlignedHeadingTest {
                         kinematics.velocityXMps(), kinematics.velocityYMps()),
                 projected.headingRad(),
                 EPSILON);
+        assertEquals(1d, projected.propulsionFraction(), EPSILON,
+                "MOVING_TO_JUMP must expose commanded propulsion independently of speed");
+        assertEquals(1d, Stage22RuntimeSpriteEffects.propulsionFraction(projected.sprite()), EPSILON,
+                "renderer binding must carry the same authoritative propulsion activity");
     }
 
     private static StarSystemId nextNeighbor(FreighterState freight, List<StarSystemId> route) {
