@@ -528,9 +528,12 @@ public final class SmallCraftFlightDeckOperations {
                 throw new IllegalArgumentException(
                         "Persisted queued launch must reference READY craft in its bay");
             }
-        } else if (hangars.find(request.craftId()).isPresent()) {
-            throw new IllegalArgumentException(
-                    "Persisted queued recovery craft must remain outside bay occupancy");
+        } else {
+            if (hangars.find(request.craftId()).isPresent()) {
+                throw new IllegalArgumentException(
+                        "Persisted queued recovery craft must remain outside bay occupancy");
+            }
+            hangars.craftFootprint(request.craftId());
         }
     }
 
