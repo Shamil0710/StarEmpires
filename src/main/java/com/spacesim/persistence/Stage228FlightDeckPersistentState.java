@@ -135,6 +135,25 @@ public record Stage228FlightDeckPersistentState(
                 throw new IllegalArgumentException(
                         "Active flight-deck operation cannot use QUEUED phase");
             }
+            if (phase == OperationPhase.CYCLING && remainingWorkSeconds <= 1e-9d) {
+                throw new IllegalArgumentException(
+                        "Persisted CYCLING operation must retain positive work");
+            }
+            if (phase == OperationPhase.AWAITING_HANDOFF) {
+                if (request.kind() != OperationKind.LAUNCH) {
+                    throw new IllegalArgumentException(
+                            "Only persisted launch may await physical handoff");
+                }
+                if (remainingWorkSeconds > 1e-9d) {
+                    throw new IllegalArgumentException(
+                            "Persisted handoff-ready launch cannot retain deck work");
+                }
+            }
+            if (phase == OperationPhase.FAILED_BLOCKED
+                    && request.kind() != OperationKind.RECOVERY) {
+                throw new IllegalArgumentException(
+                        "Only persisted recovery may block after failure");
+            }
             if ((phase == OperationPhase.FAILED_BLOCKED) != (failureKind != null)) {
                 throw new IllegalArgumentException(
                         "failureKind presence must match FAILED_BLOCKED");
