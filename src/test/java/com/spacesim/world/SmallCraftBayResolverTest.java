@@ -37,6 +37,26 @@ class SmallCraftBayResolverTest {
     }
 
     @Test
+    void productionUnionCarrierUsesTheSamePhysicalBayContract() {
+        var catalog = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        var resolver = new SmallCraftBayResolver(catalog);
+        InstalledFit carrier = InstalledFit.fromDemonstrator(
+                catalog.findDemonstratorFit("fit.industrial_union.carrier.series_v1"));
+
+        var bays = resolver.resolveShipBays(
+                "fleet:union-carrier",
+                carrier,
+                ShipInstanceRuntimeState.legacyNeutral());
+
+        assertEquals(1, bays.size());
+        var bay = bays.get(0);
+        assertEquals("mission_primary", bay.id().bayStableId());
+        assertEquals(9_000d, bay.pristineUsableVolumeM3(), 1e-9);
+        assertEquals(13_000_000d, bay.pristineSupportedMassKg(), 1e-9);
+        assertEquals(SmallCraftHangarCapacity.HostKind.SHIP, bay.hostKind());
+    }
+
+    @Test
     void realModuleDamageReducesEffectiveBayCapacity() {
         var catalog = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         var resolver = new SmallCraftBayResolver(catalog);
