@@ -3,8 +3,10 @@ package com.spacesim.campaign;
 import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
+import com.spacesim.persistence.Stage228HangarPersistenceMapper;
 import com.spacesim.persistence.Stage228SmallCraftPersistenceMapper;
 import com.spacesim.world.SmallCraftFitAuthority;
+import com.spacesim.world.SmallCraftHangarRegistry;
 import com.spacesim.world.SmallCraftRegistry;
 
 import java.util.Objects;
@@ -13,20 +15,23 @@ import java.util.Objects;
  * M22.8 extension seam over the accepted {@link GeneratedCampaignCoordinator}.
  *
  * <p>This class does not create a parallel campaign simulation. Stage-20/21 progression remains
- * owned by the embedded coordinator; M22.8A adds only the individual small-craft identity registry
- * and a versioned persistence envelope around the accepted Stage-21 checkpoint. Small-craft fit
+ * owned by the embedded coordinator; M22.8 adds adjacent individual-craft and physical-hangar
+ * sidecars around the accepted Stage-21 checkpoint. Small-craft fit
  * admission reuses the accepted Stage-22 core-pair production engineering catalog and ordinary
  * Stage-17.5 fitting authority.</p>
  */
 public final class Stage228CampaignAuthority {
     private final GeneratedCampaignCoordinator coordinator;
     private final SmallCraftRegistry smallCraft;
+    private final SmallCraftHangarRegistry hangars;
 
     private Stage228CampaignAuthority(
             GeneratedCampaignCoordinator coordinator,
-            SmallCraftRegistry smallCraft) {
+            SmallCraftRegistry smallCraft,
+            SmallCraftHangarRegistry hangars) {
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.smallCraft = Objects.requireNonNull(smallCraft, "smallCraft");
+        this.hangars = Objects.requireNonNull(hangars, "hangars");
     }
 
     /**
@@ -37,9 +42,11 @@ public final class Stage228CampaignAuthority {
      */
     public static Stage228CampaignAuthority create(long rootSeed) {
         SmallCraftFitAuthority fitAuthority = productionFitAuthority();
+        SmallCraftRegistry smallCraft = SmallCraftRegistry.empty(fitAuthority);
         return new Stage228CampaignAuthority(
                 GeneratedCampaignCoordinator.create(rootSeed),
-                SmallCraftRegistry.empty(fitAuthority));
+                smallCraft,
+                SmallCraftHangarRegistry.empty(smallCraft));
     }
 
     /**
@@ -55,9 +62,12 @@ public final class Stage228CampaignAuthority {
     public static Stage228CampaignAuthority restore(Stage228GeneratedCampaignPersistentState checkpoint) {
         Stage228GeneratedCampaignPersistentState saved = Objects.requireNonNull(checkpoint, "checkpoint");
         SmallCraftFitAuthority fitAuthority = productionFitAuthority();
+        SmallCraftRegistry smallCraft =
+                Stage228SmallCraftPersistenceMapper.restore(saved.smallCraft(), fitAuthority);
         return new Stage228CampaignAuthority(
                 GeneratedCampaignCoordinator.restore(saved.stage21Runtime()),
-                Stage228SmallCraftPersistenceMapper.restore(saved.smallCraft(), fitAuthority));
+                smallCraft,
+                Stage228HangarPersistenceMapper.restore(saved.hangars(), smallCraft));
     }
 
     /**
@@ -80,7 +90,8 @@ public final class Stage228CampaignAuthority {
     public Stage228GeneratedCampaignPersistentState captureState() {
         return Stage228GeneratedCampaignPersistentState.compose(
                 coordinator.captureState(),
-                Stage228SmallCraftPersistenceMapper.capture(smallCraft));
+                Stage228SmallCraftPersistenceMapper.capture(smallCraft),
+                Stage228HangarPersistenceMapper.capture(hangars));
     }
 
     /** @return accepted Stage-20/21 campaign composition root */
@@ -91,6 +102,11 @@ public final class Stage228CampaignAuthority {
     /** @return individual physical small-craft identity registry */
     public SmallCraftRegistry smallCraft() {
         return smallCraft;
+    }
+
+    /** @return exact individual physical hangar occupancy registry */
+    public SmallCraftHangarRegistry hangars() {
+        return hangars;
     }
 
     /**
