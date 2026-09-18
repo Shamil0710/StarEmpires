@@ -263,6 +263,11 @@ public record Stage228FlightDeckPersistentState(
         activeCopy.sort(Comparator.naturalOrder());
         TreeSet<String> activeBays = new TreeSet<>();
         for (ActiveState operation : activeCopy) {
+            if (lastProcessedTick < 0L
+                    || operation.request().requestedTick() > lastProcessedTick) {
+                throw new IllegalArgumentException(
+                        "Active flight-deck operation cannot originate after processed watermark");
+            }
             if (!operationCraft.add(operation.request().craftId())) {
                 throw new IllegalArgumentException(
                         "Craft appears in queued and active flight-deck state: "
