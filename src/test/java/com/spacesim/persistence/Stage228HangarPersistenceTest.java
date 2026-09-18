@@ -1,10 +1,7 @@
 package com.spacesim.persistence;
 
-import com.spacesim.content.ship.ShipEngineeringCatalog.Dimensions3d;
 import com.spacesim.world.ProductionSmallCraftFixture;
 import com.spacesim.world.SmallCraftFitAuthority;
-import com.spacesim.world.SmallCraftHangarCapacity.BayDefinition;
-import com.spacesim.world.SmallCraftHangarCapacity.BayId;
 import com.spacesim.world.SmallCraftHangarCapacity.HostKind;
 import com.spacesim.world.SmallCraftHangarCapacity.OccupancyState;
 import com.spacesim.world.SmallCraftHangarRegistry;
@@ -24,16 +21,18 @@ class Stage228HangarPersistenceTest {
     void sidecarRoundTripPreservesIndividualBayAndHandlingStateDeterministically() {
         SmallCraftRegistry craft = oneCraftRegistry();
         SmallCraftId id = craft.snapshot().get(0).id();
-        var footprint = craft.physicalFootprint(id);
-        BayDefinition bay = new BayDefinition(
-                new BayId("carrier:7", "mission_primary"),
-                HostKind.SHIP,
-                new Dimensions3d(1_000d, 1_000d, 1_000d),
-                footprint.envelopeVolumeM3() * 2d,
-                footprint.currentMassKg() * 2d,
-                1d);
-        SmallCraftHangarRegistry hangar = SmallCraftHangarRegistry.empty(craft);
-        hangar.assign(id, bay, OccupancyState.SERVICING);
+        Stage228HangarPersistentState source = new Stage228HangarPersistentState(
+                Stage228HangarPersistentState.CURRENT_VERSION,
+                Stage228HangarPersistentState.CURRENT_RUNTIME_VERSION,
+                Stage228HangarPersistentState.CURRENT_SEMANTIC_CONTRACT,
+                List.of(new Stage228HangarPersistentState.AssignmentState(
+                        id,
+                        "carrier:7",
+                        "mission_primary",
+                        HostKind.SHIP,
+                        OccupancyState.SERVICING)));
+        SmallCraftHangarRegistry hangar =
+                Stage228HangarPersistenceMapper.restore(source, craft);
 
         Stage228HangarPersistentState captured =
                 Stage228HangarPersistenceMapper.capture(hangar);
