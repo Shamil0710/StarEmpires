@@ -107,7 +107,7 @@ public record Stage228FlightDeckPersistentState(
             if (bay != 0) {
                 return bay;
             }
-            int kindOrder = kind.name().compareTo(checked.kind.name());
+            int kindOrder = Integer.compare(kind.ordinal(), checked.kind.ordinal());
             if (kindOrder != 0) {
                 return kindOrder;
             }
@@ -131,6 +131,10 @@ public record Stage228FlightDeckPersistentState(
             Objects.requireNonNull(request, "request");
             Objects.requireNonNull(phase, "phase");
             requireNonNegative(remainingWorkSeconds, "remainingWorkSeconds");
+            if (phase == OperationPhase.QUEUED) {
+                throw new IllegalArgumentException(
+                        "Active flight-deck operation cannot use QUEUED phase");
+            }
             if ((phase == OperationPhase.FAILED_BLOCKED) != (failureKind != null)) {
                 throw new IllegalArgumentException(
                         "failureKind presence must match FAILED_BLOCKED");
