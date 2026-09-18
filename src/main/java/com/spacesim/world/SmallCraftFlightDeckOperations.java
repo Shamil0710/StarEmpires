@@ -41,6 +41,14 @@ public final class SmallCraftFlightDeckOperations {
     public SmallCraftFlightDeckOperations(
             SmallCraftHangarRegistry hangars,
             Collection<DeckProfile> profiles) {
+        this(hangars, profiles, List.of(), List.of());
+    }
+
+    private SmallCraftFlightDeckOperations(
+            SmallCraftHangarRegistry hangars,
+            Collection<DeckProfile> profiles,
+            Collection<Request> queued,
+            Collection<ActiveOperation> active) {
         this.hangars = Objects.requireNonNull(hangars, "hangars");
         Objects.requireNonNull(profiles, "profiles");
         for (DeckProfile profile : profiles) {
@@ -50,6 +58,50 @@ public final class SmallCraftFlightDeckOperations {
                         "Duplicate flight-deck profile for " + checked.bayId());
             }
         }
+        Objects.requireNonNull(queued, "queued");
+        Objects.requireNonNull(active, "active");
+        TreeSet<SmallCraftId> operationCraft = new TreeSet<>();
+        for (Request request : queued) {
+            Request checked = Objects.requireNonNull(request, "queued request");
+            requireProfile(checked.bayId());
+            validateRestoredQueuedRequest(checked);
+            if (!operationCraft.add(checked.craftId()) || !queue.add(checked)) {
+                throw new IllegalArgumentException(
+                        "Duplicate persisted flight-deck request for " + checked.craftId());
+            }
+        }
+        for (ActiveOperation operation : active) {
+            ActiveOperation checked = Objects.requireNonNull(operation, "active operation");
+            requireProfile(checked.request().bayId());
+            validateRestoredActiveOperation(checked);
+            if (!operationCraft.add(checked.request().craftId())) {
+                throw new IllegalArgumentException(
+                        "Craft has both queued and active persisted operation: "
+                                + checked.request().craftId());
+            }
+            if (activeByBay.putIfAbsent(checked.request().bayId(), checked) != null) {
+                throw new IllegalArgumentException(
+                        "Multiple persisted active operations for bay "
+                                + checked.request().bayId());
+            }
+        }
+    }
+
+    /**
+     * Restores exact deterministic launch/recovery state without advancing or synthesizing work.
+     *
+     * @param hangars restored physical occupancy authority
+     * @param profiles persisted physical deck profiles
+     * @param queued exact queued requests
+     * @param active exact active operations
+     * @return independent restored sequencer
+     */
+    public static SmallCraftFlightDeckOperations restore(
+            SmallCraftHangarRegistry hangars,
+            Collection<DeckProfile> profiles,
+            Collection<Request> queued,
+            Collection<ActiveOperation> active) {
+        return new SmallCraftFlightDeckOperations(hangars, profiles, queued, active);
     }
 
     /** Physical operation kind sharing one safe bay sequence. */
@@ -330,6 +382,11 @@ public final class SmallCraftFlightDeckOperations {
         }
     }
 
+    /** @return deterministic immutable physical deck profiles ordered by bay ID */
+    public List<DeckProfile> profiles() {
+        return List.copyOf(profiles.values());
+    }
+
     /**
      * @return deterministic immutable queued operations
      */
@@ -410,6 +467,47 @@ public final class SmallCraftFlightDeckOperations {
         }
         hangars.release(active.request().craftId());
         activeByBay.remove(active.request().bayId());
+    }
+
+    private void validateRestoredQueuedRequest(Request request) {
+        if (request.kind() == OperationKind.LAUNCH) {
+            var assignment = hangars.find(request.craftId()).orElseThrow(
+                    () -> new IllegalArgumentException(
+                            "Persisted queued launch craft is not embarked: " + request.craftId()));
+            if (!assignment.bayId().equals(request.bayId())
+                    || assignment.state() != OccupancyState.READY) {
+                throw new IllegalArgumentException(
+                        "Persisted queued launch must reference READY craft in its bay");
+            }
+        } else if (hangars.find(request.craftId()).isPresent()) {
+            throw new IllegalArgumentException(
+                    "Persisted queued recovery craft must remain outside bay occupancy");
+        }
+    }
+
+    private void validateRestoredActiveOperation(ActiveOperation operation) {
+        Request request = operation.request();
+        var assignment = hangars.find(request.craftId()).orElseThrow(
+                () -> new IllegalArgumentException(
+                        "Persisted active operation craft is not in physical bay occupancy: "
+                                + request.craftId()));
+        if (!assignment.bayId().equals(request.bayId())) {
+            throw new IllegalArgumentException(
+                    "Persisted active operation bay disagrees with craft occupancy");
+        }
+        if (request.kind() == OperationKind.LAUNCH) {
+            if (assignment.state() != OccupancyState.LAUNCHING
+                    || operation.phase() == OperationPhase.FAILED_BLOCKED) {
+                throw new IllegalArgumentException(
+                        "Persisted launch operation must retain LAUNCHING occupancy");
+            }
+        } else {
+            if (assignment.state() != OccupancyState.RECOVERING
+                    || operation.phase() == OperationPhase.AWAITING_HANDOFF) {
+                throw new IllegalArgumentException(
+                        "Persisted recovery operation must retain RECOVERING occupancy");
+            }
+        }
     }
 
     private void start(Request request, BayDefinition bay, DeckProfile profile) {
