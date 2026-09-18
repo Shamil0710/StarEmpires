@@ -153,6 +153,25 @@ class SmallCraftFlightDeckOperationsTest {
     }
 
     @Test
+    void restoreRejectsQueuedRecoveryForUnknownCraftImmediately() {
+        Fixture fixture = fixture(1);
+        BayId bayId = fixture.bay().id();
+        var request = new SmallCraftFlightDeckOperations.Request(
+                new SmallCraftId(999L),
+                bayId,
+                SmallCraftFlightDeckOperations.OperationKind.RECOVERY,
+                1L);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                SmallCraftFlightDeckOperations.restore(
+                        fixture.hangars(),
+                        List.of(new DeckProfile(bayId, 1d, 1d)),
+                        List.of(request),
+                        List.of(),
+                        -1L));
+    }
+
+    @Test
     void commandPathRejectsDuplicateOrWrongStateLaunches() {
         Fixture fixture = fixture(1);
         SmallCraftId craft = fixture.ids().get(0);
