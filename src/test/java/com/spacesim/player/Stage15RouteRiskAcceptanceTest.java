@@ -81,7 +81,7 @@ class Stage15RouteRiskAcceptanceTest {
     }
 
     @Test
-    void fittedGeneratedFleetDoesNotExposeRouteWhenFinitePropellantCannotCompleteIt() {
+    void fittedGeneratedFleetCanExposeRouteWhenRealOriginRefuelMakesItSafe() {
         var live = Stage20PlayableGeneratedWorldFactory.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
         var freighter = live.freight().capture().freighters().stream()
@@ -132,11 +132,18 @@ class Stage15RouteRiskAcceptanceTest {
         PlayerRuntime playerRuntime = PlayerRuntime.create(
                 live.world(), ContentCatalogLoader.loadDefault(), player);
 
-        assertTrue(new PlayerFleetRoutePlanner(playerRuntime).plan(
-                freighter.fleetId(),
-                placement.systemId(),
-                order.orderedSystems().get(order.orderedSystems().size() - 1)).isEmpty(),
-                "planner must not expose a first hop for a fitted route that cannot finish safely");
+        StarSystemId destination =
+                order.orderedSystems().get(order.orderedSystems().size() - 1);
+        var planned = new PlayerFleetRoutePlanner(playerRuntime).plan(
+                freighter.fleetId(), placement.systemId(), destination);
+        assertTrue(planned.isPresent(),
+                "real accessible origin propellant may recover an otherwise empty fitted tank");
+        var physical = live.world().planFleetPropellantJourney(
+                freighter.fleetId(), planned.orElseThrow().path());
+        assertTrue(physical.feasible());
+        assertTrue(physical.refuelStops().stream()
+                        .anyMatch(stop -> stop.systemId().equals(placement.systemId())),
+                "player planner may expose the route only because an explicit finite origin refuel is planned");
     }
 
     @Test
