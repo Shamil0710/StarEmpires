@@ -57,9 +57,11 @@ A new campaign starts these already-owned ships with explicit finite authored st
 That is campaign initial state, not a refuel operation. Runtime refueling must still pass through the
 existing Stage-18 servicing/logistics authority. Core Empire and Industrial Union main-drive
 `propellant_feed` interfaces are bound to finite
-`commodity.material.purified_water` station stock. Historical local freighters restored from saves that
-predate finite propulsion receive the same one-time migration projection; it is not repeated after the
-engineering state exists.
+`commodity.material.purified_water` station stock through a Stage-22 servicing overlay. The original
+Stage-18 default binding resource is unchanged because it participates in the persisted industrial
+content fingerprint; adding the later production drives therefore does not invalidate historical
+Stage-18 saves. Historical local freighters restored from saves that predate finite propulsion receive
+the same one-time migration projection; it is not repeated after the engineering state exists.
 
 ## Exact local FTL approach
 
