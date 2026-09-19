@@ -35,7 +35,9 @@ public final class ProductionEngineeringRuntimeResolver {
 
     private final List<CatalogRuntime> catalogs;
 
-    /** Creates the production resolver over every currently admitted fitted-ship catalog. */
+    /**
+     * Creates the production resolver over every currently admitted fitted-ship catalog.
+     */
     public ProductionEngineeringRuntimeResolver() {
         this(List.of(
                 ShipEngineeringCatalogLoader.loadDefault(),
@@ -43,7 +45,11 @@ public final class ProductionEngineeringRuntimeResolver {
                 Stage22FreightStrategicEngineeringCatalogLoader.loadDefault()));
     }
 
-    /** Creates an explicit resolver, primarily for deterministic acceptance fixtures. */
+    /**
+     * Creates an explicit resolver, primarily for deterministic acceptance fixtures.
+     *
+     * @param catalogs non-empty engineering catalogs admitted by this resolver
+     */
     public ProductionEngineeringRuntimeResolver(List<ShipEngineeringCatalog> catalogs) {
         Objects.requireNonNull(catalogs, "catalogs");
         if (catalogs.isEmpty()) {
@@ -90,7 +96,12 @@ public final class ProductionEngineeringRuntimeResolver {
         return result;
     }
 
-    /** Plans a fitted FTL jump through the same resolved engineering runtime. */
+    /**
+     * Plans a fitted FTL jump through the same resolved engineering runtime.
+     *
+     * @param component authoritative fitted engineering component
+     * @return current physical FTL plan
+     */
     public JumpPlan planJump(EngineeringComponent component) {
         EngineeringComponent checked = requireComplete(component);
         CatalogRuntime selected = resolve(checked.fit);
@@ -100,7 +111,13 @@ public final class ProductionEngineeringRuntimeResolver {
                 checked.instanceState.damage().moduleDamage());
     }
 
-    /** Commits an already planned fitted FTL jump. */
+    /**
+     * Commits an already planned fitted FTL jump.
+     *
+     * @param component authoritative fitted engineering component
+     * @param plan previously validated FTL plan
+     * @return committed next engineering runtime state
+     */
     public RuntimeState commitJump(EngineeringComponent component, JumpPlan plan) {
         EngineeringComponent checked = requireComplete(component);
         CatalogRuntime selected = resolve(checked.fit);
@@ -109,7 +126,13 @@ public final class ProductionEngineeringRuntimeResolver {
                 Objects.requireNonNull(plan, "plan"));
     }
 
-    /** Advances fitted engineering with propulsion idle. */
+    /**
+     * Advances fitted engineering with propulsion idle.
+     *
+     * @param component authoritative fitted engineering component
+     * @param deltaSeconds positive authoritative simulation interval
+     * @return next idle engineering runtime state
+     */
     public RuntimeState advanceIdle(EngineeringComponent component, double deltaSeconds) {
         EngineeringComponent checked = requireComplete(component);
         CatalogRuntime selected = resolve(checked.fit);
@@ -121,7 +144,12 @@ public final class ProductionEngineeringRuntimeResolver {
                 deltaSeconds).state();
     }
 
-    /** Returns the current damage-aware derived ship state without mutation. */
+    /**
+     * Returns the current damage-aware derived ship state without mutation.
+     *
+     * @param component authoritative fitted engineering component
+     * @return current derived physical ship state
+     */
     public DerivedShipState derive(EngineeringComponent component) {
         EngineeringComponent checked = requireComplete(component);
         CatalogRuntime selected = resolve(checked.fit);
@@ -199,7 +227,12 @@ public final class ProductionEngineeringRuntimeResolver {
         return new ManeuverPlan(feasible, requiredDeltaVMps, delivered, elapsed, state);
     }
 
-    /** Applies a previously previewed maneuver result exactly once. */
+    /**
+     * Applies a previously previewed maneuver result exactly once.
+     *
+     * @param component authoritative fitted engineering component
+     * @param plan feasible immutable maneuver preview
+     */
     public void commitManeuver(EngineeringComponent component, ManeuverPlan plan) {
         EngineeringComponent checked = requireComplete(component);
         ManeuverPlan accepted = Objects.requireNonNull(plan, "plan");
@@ -275,13 +308,30 @@ public final class ProductionEngineeringRuntimeResolver {
         return checked;
     }
 
-    /** Immutable preview of a propulsion maneuver. */
+    /**
+     * Immutable preview of a propulsion maneuver.
+     *
+     * @param feasible whether current engineering state can deliver the requested delta-v
+     * @param requiredDeltaVMps requested delta-v
+     * @param deliveredDeltaVMps physically deliverable delta-v reached by the preview
+     * @param burnSeconds authoritative burn duration represented by the preview
+     * @param resultingState immutable engineering state after the previewed burn
+     */
     public record ManeuverPlan(
             boolean feasible,
             double requiredDeltaVMps,
             double deliveredDeltaVMps,
             double burnSeconds,
             RuntimeState resultingState) {
+        /**
+         * Validates one immutable maneuver preview.
+         *
+         * @param feasible whether the requested maneuver is feasible
+         * @param requiredDeltaVMps requested delta-v
+         * @param deliveredDeltaVMps delivered preview delta-v
+         * @param burnSeconds preview burn duration
+         * @param resultingState immutable resulting engineering state
+         */
         public ManeuverPlan {
             if (!Double.isFinite(requiredDeltaVMps) || requiredDeltaVMps < 0d
                     || !Double.isFinite(deliveredDeltaVMps) || deliveredDeltaVMps < 0d
