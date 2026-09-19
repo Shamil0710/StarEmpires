@@ -35,10 +35,11 @@ import java.util.Set;
  * segments carry an explicit uncertainty premium rather than being assumed safe. Raw danger remains
  * an arbitrary exposure score, never a probability.</p>
  *
- * <p>For fitted fleets, a completed candidate route is also preflighted against the authoritative
- * finite-propellant route model before it can be returned. An unsafe path is therefore never exposed
- * to the order executor as a valid first hop. Historical non-fitted worlds retain their explicit
- * compatibility behavior.</p>
+ * <p>For fitted fleets, every candidate prefix is preflighted against the authoritative finite
+ * propellant logistics model. Generated worlds may therefore keep a longer route whose intermediate
+ * systems carry real accessible refueling stock, while rejecting any prefix that would strand the
+ * ship before reaching its next safe servicing opportunity. Historical non-fitted worlds retain
+ * their explicit compatibility behavior.</p>
  *
  * <p>The risk multiplier is actor-specific: current real cargo utilization, current damage and
  * shared inertial acceleration affect vulnerability. A real player-owned operational combat fleet
@@ -135,8 +136,8 @@ public final class PlayerFleetRoutePlanner {
                 EdgeCost edge = edgeCost(player, current.system(), neighbor, currentTick, vulnerability);
                 List<StarSystemId> path = new ArrayList<>(current.path());
                 path.add(neighbor);
-                var fuel = world.planFleetRouteFuel(actor, path);
-                if (fuel.supported() && !fuel.feasible()) {
+                var fuel = world.planFleetPropellantJourney(actor, path);
+                if (!fuel.feasible()) {
                     continue;
                 }
                 long travelTicks = Math.addExact(current.travelTicks(), edge.travelTicks());
@@ -156,7 +157,7 @@ public final class PlayerFleetRoutePlanner {
                         riskCost,
                         totalCost,
                         fuel.supported(),
-                        fuel.supported() ? fuel.requiredDeltaVMps() : 0d);
+                        fuel.requiredDeltaVMps());
                 RouteStateKey candidateKey = new RouteStateKey(neighbor, current.system());
                 List<Node> labels = best.computeIfAbsent(candidateKey, ignored -> new ArrayList<>());
                 if (fuel.supported()) {
