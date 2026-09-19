@@ -13,6 +13,7 @@ import com.spacesim.world.StarSystemId;
 import org.junit.jupiter.api.Test;
 
 import java.util.Comparator;
+import java.util.List;
 
 import static com.spacesim.world.GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,6 +38,13 @@ class Stage21EGeneratedMilitaryMobilityAcceptanceTest {
                 .sorted()
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("generated military origin has no topology neighbor"));
+        var routeFuel = runtime.world().planFleetRouteFuel(
+                fleetId, List.of(origin, destination));
+        assertTrue(routeFuel.supported(),
+                "generated military must use exact finite route-fuel planning");
+        assertTrue(routeFuel.feasible(),
+                () -> "starting military patrol must be able to complete one ordinary hop: " + routeFuel);
+
         EngineeringComponent beforeEngineering = engineering(runtime, beforePlacement);
         var beforeState = beforeEngineering.runtimeState;
         InstalledFit beforeFit = beforeEngineering.fit;
