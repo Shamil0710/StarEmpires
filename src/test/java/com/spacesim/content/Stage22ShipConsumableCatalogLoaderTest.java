@@ -26,5 +26,11 @@ class Stage22ShipConsumableCatalogLoaderTest {
                 "ship_consumable.reaction_mass.empire_longhaul_freight_water_v1"));
         assertNotNull(production.findBinding(
                 "ship_consumable.reaction_mass.industrial_union_longhaul_freight_water_v1"));
+        assertNotNull(production.findBinding(
+                "ship_consumable.reaction_mass.stage21_endurance_water_v1"));
+        assertNotNull(production.findBinding(
+                "ship_consumable.reaction_mass.stage21_combat_water_v1"));
+        assertEquals(6, production.getBindings().size(),
+                "Stage-22 overlay must cover core, freight and current generated-military drive feeds");
     }
 }
