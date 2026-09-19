@@ -100,14 +100,14 @@ public final class PlayerFleetRoutePlanner {
         PriorityQueue<Node> frontier = new PriorityQueue<>(Comparator
                 .comparingDouble(Node::totalCost)
                 .thenComparing(Node::path, PlayerFleetRoutePlanner::comparePaths));
-        Map<StarSystemId, List<Node>> best = new HashMap<>();
+        Map<RouteStateKey, List<Node>> best = new HashMap<>();
         Node start = new Node(from, List.of(from), 0L, 0d, 0d, 0d, 0d, 0d, false, 0d);
         frontier.add(start);
-        best.put(from, new ArrayList<>(List.of(start)));
+        best.put(new RouteStateKey(from, null), new ArrayList<>(List.of(start)));
 
         while (!frontier.isEmpty()) {
             Node current = frontier.poll();
-            List<Node> currentLabels = best.get(current.system());
+            List<Node> currentLabels = best.get(routeStateKey(current));
             if (currentLabels == null || !currentLabels.contains(current)) {
                 continue;
             }
@@ -157,7 +157,8 @@ public final class PlayerFleetRoutePlanner {
                         totalCost,
                         fuel.supported(),
                         fuel.supported() ? fuel.requiredDeltaVMps() : 0d);
-                List<Node> labels = best.computeIfAbsent(neighbor, ignored -> new ArrayList<>());
+                RouteStateKey candidateKey = new RouteStateKey(neighbor, current.system());
+                List<Node> labels = best.computeIfAbsent(candidateKey, ignored -> new ArrayList<>());
                 if (fuel.supported()) {
                     if (labels.stream().anyMatch(existing -> dominates(existing, candidate))) {
                         continue;
@@ -323,6 +324,12 @@ public final class PlayerFleetRoutePlanner {
         return ship == null ? 0f : ship.movementSpeed();
     }
 
+    private static RouteStateKey routeStateKey(Node node) {
+        List<StarSystemId> path = node.path();
+        StarSystemId previous = path.size() < 2 ? null : path.get(path.size() - 2);
+        return new RouteStateKey(node.system(), previous);
+    }
+
     private static boolean better(Node candidate, Node previous) {
         if (candidate.totalCost() + COST_EPSILON < previous.totalCost()) {
             return true;
@@ -356,6 +363,9 @@ public final class PlayerFleetRoutePlanner {
             }
         }
         return Integer.compare(first.size(), second.size());
+    }
+
+    private record RouteStateKey(StarSystemId system, StarSystemId previousSystem) {
     }
 
     private record EdgeCost(
