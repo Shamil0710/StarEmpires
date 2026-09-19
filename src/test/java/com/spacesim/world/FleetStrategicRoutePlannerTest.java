@@ -43,6 +43,24 @@ class FleetStrategicRoutePlannerTest {
     }
 
     @Test
+    void physicalConstraintCanRejectShortestPathAndSelectDeterministicRefuelAlternative() {
+        FleetStrategicRoutePlanner planner = new FleetStrategicRoutePlanner(topology(false));
+        FleetStrategicRoutePlanner.TransitAccessPolicy allowed =
+                (factionId, from, to, tick, destination) -> true;
+
+        var route = planner.planConstrained(
+                7,
+                ALPHA,
+                DELTA,
+                100L,
+                allowed,
+                candidate -> !candidate.systems().contains(BETA)).orElseThrow();
+
+        assertEquals(List.of(ALPHA, GAMMA, DELTA), route.systems());
+        assertEquals(2, route.hopCount());
+    }
+
+    @Test
     void deniedDestinationAndUnknownSystemsFailClosed() {
         FleetStrategicRoutePlanner planner = new FleetStrategicRoutePlanner(topology(false));
         FleetStrategicRoutePlanner.TransitAccessPolicy denyDestination =

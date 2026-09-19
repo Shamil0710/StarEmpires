@@ -2,6 +2,7 @@ package com.spacesim.player;
 
 import com.badlogic.ashley.core.Entity;
 import com.spacesim.DemoGalaxyFactory;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.InventoryComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TransformComponent;
@@ -15,6 +16,10 @@ import com.spacesim.world.JumpConnection;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.WorldSimulation;
 import com.spacesim.world.WorldState;
+import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
+import com.spacesim.ship.ShipEngineeringRuntime;
+import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
+import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -73,6 +78,72 @@ class Stage15RouteRiskAcceptanceTest {
                 .orElseThrow();
         assertEquals(List.of(DemoGalaxyFactory.ACTIVE_SYSTEM_ID, DemoGalaxyFactory.FRONTIER_SYSTEM_ID),
                 route.path(), "an unsafe intermediate system must affect the whole-route decision");
+    }
+
+    @Test
+    void fittedGeneratedFleetCanExposeRouteWhenRealOriginRefuelMakesItSafe() {
+        var live = Stage20PlayableGeneratedWorldFactory.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
+        var freighter = live.freight().capture().freighters().stream()
+                .filter(value -> !value.activeOrderId().isBlank())
+                .filter(value -> live.freight().findOrder(value.activeOrderId())
+                        .map(order -> order.orderedSystems().size() > 1)
+                        .orElse(false))
+                .findFirst().orElseThrow();
+        var order = live.freight().findOrder(freighter.activeOrderId()).orElseThrow();
+        FleetPlacementState placement = live.world().findFleet(freighter.fleetId()).orElseThrow();
+        Entity fittedEntity = live.world().findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().require(placement.localEntityId());
+        EngineeringComponent engineering = fittedEntity.getComponent(EngineeringComponent.class);
+        var state = engineering.runtimeState;
+        ConsumableState current = state.consumables();
+        List<ConsumableLoad> emptyLoads = current.interfaceLoads().stream()
+                .map(load -> new ConsumableLoad(
+                        load.mountId(),
+                        load.interfaceId(),
+                        load.kind(),
+                        0d,
+                        0d,
+                        load.itemCount()))
+                .toList();
+        engineering.setRuntimeState(new ShipEngineeringRuntime.RuntimeState(
+                new ConsumableState(
+                        current.cargoMassKg(),
+                        current.storesMassKg(),
+                        current.missionPayloadMassKg(),
+                        current.missionIntegrationVolumeM3(),
+                        emptyLoads),
+                state.sharedBusEnergyJ(),
+                state.shipHeatStoredJ(),
+                state.localHeatJByMount(),
+                state.thrustLimitNByMount(),
+                state.coolantBusCapacityW(),
+                state.ftlCooldownSecondsByMount()));
+
+        PlayerState player = new PlayerState(
+                10_000_000L,
+                null,
+                List.of(),
+                List.of(freighter.fleetId()),
+                freighter.fleetId(),
+                order.orderedSystems(),
+                List.of(),
+                placement.systemId());
+        PlayerRuntime playerRuntime = PlayerRuntime.create(
+                live.world(), ContentCatalogLoader.loadDefault(), player);
+
+        StarSystemId destination =
+                order.orderedSystems().get(order.orderedSystems().size() - 1);
+        var planned = new PlayerFleetRoutePlanner(playerRuntime).plan(
+                freighter.fleetId(), placement.systemId(), destination);
+        assertTrue(planned.isPresent(),
+                "real accessible origin propellant may recover an otherwise empty fitted tank");
+        var physical = live.world().planFleetPropellantJourney(
+                freighter.fleetId(), planned.orElseThrow().path());
+        assertTrue(physical.feasible());
+        assertTrue(physical.refuelStops().stream()
+                        .anyMatch(stop -> stop.systemId().equals(placement.systemId())),
+                "player planner may expose the route only because an explicit finite origin refuel is planned");
     }
 
     @Test

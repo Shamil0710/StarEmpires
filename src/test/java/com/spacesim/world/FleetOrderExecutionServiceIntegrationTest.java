@@ -128,6 +128,46 @@ class FleetOrderExecutionServiceIntegrationTest {
     }
 
     @Test
+    void completeRouteFuelFailureRejectsBeforeAnyStrategicHopStarts() {
+        WorldSimulation world = WorldSimulation.restore(initialWorld(), CONTENT, ALPHA, 10, 2);
+        FleetPlacementState source = fleetIn(world, ALPHA);
+        world.bindFleetArrivalAuthority(new FleetArrivalAuthority() {
+            @Override
+            public RouteFuelPlan planRouteFuel(FleetId fleetId, List<StarSystemId> orderedSystems) {
+                return new RouteFuelPlan(
+                        true, false, 12_000d, 900d, 100d,
+                        "acceptance fixture insufficient route propellant");
+            }
+
+            @Override
+            public ResolvedArrival resolve(StarSystemId origin, StarSystemId destination) {
+                throw new AssertionError("route must be rejected before arrival resolution");
+            }
+
+            @Override
+            public void onDeparted(FleetId fleetId, StarSystemId originSystemId, EntityId formerLocalEntityId) {
+                throw new AssertionError("rejected route must not depart");
+            }
+
+            @Override
+            public void onArrived(FleetId fleetId, ResolvedArrival arrival, EntityId destinationLocalEntityId) {
+                throw new AssertionError("rejected route must not arrive");
+            }
+        });
+        FleetOrderExecutionService service = new FleetOrderExecutionService(world.getTopology());
+        FleetCommandState state = movementState(source.id(), List.of(ALPHA, BETA));
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> service.dispatchMovementHop(
+                        world, state, forces(source, ALPHA), sourceOrderId()));
+
+        assertTrue(failure.getMessage().contains("safe finite-propellant plan"));
+        assertTrue(world.findFleetJump(source.id()).isEmpty());
+        assertEquals(ALPHA, world.findFleet(source.id()).orElseThrow().systemId());
+    }
+
+    @Test
     void persistedNonNeighborHopFailsClosedInsteadOfCreatingStrategicTeleport() {
         WorldSimulation world = WorldSimulation.restore(initialWorld(), CONTENT, ALPHA, 10, 2);
         FleetPlacementState source = fleetIn(world, ALPHA);

@@ -5,9 +5,11 @@ import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FlightCommandComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.flight.FlightDynamics;
+import com.spacesim.ship.ProductionEngineeringRuntimeResolver;
 
 import java.util.Objects;
 
@@ -19,6 +21,9 @@ import java.util.Objects;
  * those intent writers and is the sole normal-flight Transform integrator for autonomous ships.</p>
  */
 public final class AutonomousFlightSystem extends IteratingSystem {
+    private static final float THRUST_EPSILON = 1.0e-4f;
+    private final ProductionEngineeringRuntimeResolver engineering =
+            new ProductionEngineeringRuntimeResolver();
     /** Runs after default-priority AI/intent systems so the newest command is integrated this tick. */
     public static final int FLIGHT_INTEGRATION_PRIORITY = 100;
 
@@ -55,11 +60,50 @@ public final class AutonomousFlightSystem extends IteratingSystem {
                 || !Float.isFinite(deltaTime) || deltaTime <= 0f) {
             return;
         }
-        FlightDynamics.advance(
+        EngineeringComponent fitted = entity.getComponent(EngineeringComponent.class);
+        if (fitted == null) {
+            // Historical non-fitted entities remain an explicit migration compatibility seam.
+            FlightDynamics.advance(
+                    transform,
+                    FlightDynamics.profile(entity, command.speedCap),
+                    command.axisX,
+                    command.axisY,
+                    deltaTime);
+            return;
+        }
+
+        double requiredDeltaV = requiredDeltaV(
+                transform, command.axisX, command.axisY, command.speedCap);
+        double throttle = engineering.throttleForDeltaV(fitted, requiredDeltaV, deltaTime);
+        var result = engineering.advancePropulsion(fitted, throttle, deltaTime);
+        FlightDynamics.advancePhysical(
                 transform,
-                FlightDynamics.profile(entity, command.speedCap),
+                result.derivedState().totalMassKg(),
+                result.actualThrustN(),
+                command.speedCap,
                 command.axisX,
                 command.axisY,
                 deltaTime);
     }
+    private static double requiredDeltaV(
+            TransformComponent transform,
+            float axisX,
+            float axisY,
+            float speedCap) {
+        float lengthSquared = axisX * axisX + axisY * axisY;
+        float desiredX = axisX;
+        float desiredY = axisY;
+        if (lengthSquared > 1f) {
+            float inverseLength = 1f / (float) Math.sqrt(lengthSquared);
+            desiredX *= inverseLength;
+            desiredY *= inverseLength;
+        }
+        desiredX *= speedCap;
+        desiredY *= speedCap;
+        float dx = desiredX - transform.velocity.x;
+        float dy = desiredY - transform.velocity.y;
+        double deltaV = Math.hypot(dx, dy);
+        return deltaV <= THRUST_EPSILON ? 0d : deltaV;
+    }
+
 }

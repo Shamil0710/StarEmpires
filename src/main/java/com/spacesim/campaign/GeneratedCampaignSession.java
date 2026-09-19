@@ -119,6 +119,18 @@ public final class GeneratedCampaignSession {
     }
 
     /**
+     * Returns the active authoritative clock fraction already accumulated toward its next fixed tick.
+     *
+     * <p>This is read-only presentation timing. It does not advance, rewind or otherwise mutate the
+     * simulation clock.</p>
+     *
+     * @return interpolation fraction in [0, 1)
+     */
+    public double interpolationAlpha() {
+        return activeClock().getInterpolationAlpha();
+    }
+
+    /**
      * Applies one pause value to every existing system clock so changing the active system cannot
      * create a second time-control state.
      *

@@ -10,6 +10,7 @@ import com.spacesim.components.ShipComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.ShipEngineeringCatalog.HullDefinition;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.content.ship.ShipProtectionCatalog;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
 import com.spacesim.content.ship.Stage175ICombatTestProtectionPack;
@@ -22,6 +23,8 @@ import com.spacesim.ship.DerivedShipCalculator;
 import com.spacesim.ship.ShieldFieldRuntime;
 import com.spacesim.ship.ShipDamageRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime;
+import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
+import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.ShipEngineeringState.DerivedShipState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipInstanceRuntimeState;
@@ -163,7 +166,7 @@ public final class GeneratedFactionMilitaryBootstrap {
                 PROTECTION.findHullDamageLayout(hull.id());
         ShipDamageRuntime.Snapshot damage = ShipDamageRuntime.Snapshot.pristine(hull, layout);
         ShipEngineeringRuntime.RuntimeState operating = new ShipEngineeringRuntime(ENGINEERING)
-                .initialize(fit, doctrine.initialConsumables(), damage.moduleDamage());
+                .initialize(fit, bootstrapConsumables(doctrine, fit), damage.moduleDamage());
         DerivedShipState derived = new DerivedShipCalculator(ENGINEERING)
                 .derive(hull, fit, operating.consumables(), damage.moduleDamage());
         ShipShieldEngineeringAdapter adapter = new ShipShieldEngineeringAdapter();
@@ -179,6 +182,40 @@ public final class GeneratedFactionMilitaryBootstrap {
                 doctrine.weaponLoadout(),
                 WeaponMountRuntime.RuntimeState.empty());
         return new EngineeringComponent(fit, operating, instance);
+    }
+
+    private static ConsumableState bootstrapConsumables(Doctrine doctrine, InstalledFit fit) {
+        ArrayList<ConsumableLoad> loads = new ArrayList<>();
+        for (ConsumableLoad load : doctrine.initialConsumables().interfaceLoads()) {
+            if (load.kind() != InterfaceKind.REACTION_MASS) {
+                loads.add(load);
+                continue;
+            }
+            double capacity = fit.installedModules().stream()
+                    .filter(value -> value.mountId().equals(load.mountId()))
+                    .map(value -> ENGINEERING.findModule(value.moduleId()))
+                    .filter(Objects::nonNull)
+                    .flatMap(value -> value.interfaces().stream())
+                    .filter(value -> value.kind() == InterfaceKind.REACTION_MASS)
+                    .filter(value -> value.id().equals(load.interfaceId()))
+                    .mapToDouble(value -> value.capacity())
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException(
+                            "generated military reaction-mass load lacks fitted interface"));
+            loads.add(new ConsumableLoad(
+                    load.mountId(),
+                    load.interfaceId(),
+                    load.kind(),
+                    capacity,
+                    capacity,
+                    load.itemCount()));
+        }
+        return new ConsumableState(
+                doctrine.initialConsumables().cargoMassKg(),
+                doctrine.initialConsumables().storesMassKg(),
+                doctrine.initialConsumables().missionPayloadMassKg(),
+                doctrine.initialConsumables().missionIntegrationVolumeM3(),
+                loads);
     }
 
     private static Entity entity(

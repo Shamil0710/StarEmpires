@@ -73,6 +73,9 @@ public final class Stage20GeneratedWorldRuntimeBridge {
     public static final String CURRENT_VERSION = "stage20_5.generated-world-runtime-bridge.v1";
     private static final String INFRASTRUCTURE_DOMAIN = "INFRASTRUCTURE_PLACEMENT";
     private static final String ORBITAL_LOCATION_TAG = "location.orbital_station";
+    private static final String PROPELLANT_COMMODITY_ID = "commodity.material.purified_water";
+    private static final String LIQUID_STORAGE_CLASS_ID = "storage.liquid_tank";
+    private static final double MAX_INITIAL_PROPELLANT_RESERVE_KG = 24_000_000d;
 
     private Stage20GeneratedWorldRuntimeBridge() {
         throw new AssertionError("No instances");
@@ -126,7 +129,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                         Objects.requireNonNull(specialization, "specialization"),
                         productRegistry);
         InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(
-                saved, industry, productRegistry);
+                saved, industry, productRegistry, true);
         Stage20FreightPersistentState freightState = Stage20FreightRuntimeMaterializer.materializeBootstrap(
                 saved,
                 specialization,
@@ -174,7 +177,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         MaterializedGeneratedIndustrialRuntime industry =
                 Stage20GeneratedIndustrialRuntimeBridge.restore(saved.campaign(), productRegistry);
         InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(
-                saved.campaign(), industry, productRegistry);
+                saved.campaign(), industry, productRegistry, false);
         Stage20FreightRuntime freight = Stage20FreightRuntime.restore(
                 saved.campaign(),
                 saved.freight(),
@@ -240,7 +243,68 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 .add(new ArchetypeComponent(fleet.hullId()))
                 .add(transform)
                 .add(new ShipComponent(ShipType.MATERIAL_CARRIER))
-                .add(new FactionComponent(runtimeFactionId));
+                .add(new FactionComponent(runtimeFactionId))
+                .add(freightEngineering(fleet));
+    }
+
+    /**
+     * Projects the legacy Stage-20 freight ownership row onto its reviewed Stage-22 physical asset.
+     *
+     * <p>The freight sidecar keeps its historical compatibility hull/fit IDs for save compatibility,
+     * while the live ECS engineering authority uses the licensed core freight fit selected by the
+     * stable generated-faction identity. Initial reaction mass is explicit finite starting stock,
+     * not an infinite-flight fallback.</p>
+     */
+    private static com.spacesim.components.EngineeringComponent freightEngineering(FreighterState fleet) {
+        String fitId = switch (fleet.stableFactionId()) {
+            case "faction.alpha" ->
+                    com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
+                            .EMPIRE_FREIGHT_STRATEGIC_FIT;
+            case "faction.beta" ->
+                    com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
+                            .UNION_FREIGHT_STRATEGIC_FIT;
+            default -> throw new IllegalStateException(
+                    "generated freight has no reviewed physical engineering asset: "
+                            + fleet.stableFactionId());
+        };
+        var catalog = com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
+        var definition = catalog.findDemonstratorFit(fitId);
+        if (definition == null) {
+            throw new IllegalStateException("missing reviewed freight fit: " + fitId);
+        }
+        var fit = com.spacesim.ship.ShipEngineeringState.InstalledFit.fromDemonstrator(definition);
+        java.util.ArrayList<com.spacesim.ship.ShipEngineeringState.ConsumableLoad> loads =
+                new java.util.ArrayList<>();
+        for (var installed : fit.installedModules()) {
+            var module = catalog.findModule(installed.moduleId());
+            if (module == null) {
+                throw new IllegalStateException("reviewed freight fit references missing module");
+            }
+            for (var iface : module.interfaces()) {
+                if (iface.kind() == com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind.REACTION_MASS) {
+                    loads.add(new com.spacesim.ship.ShipEngineeringState.ConsumableLoad(
+                            installed.mountId(),
+                            iface.id(),
+                            iface.kind(),
+                            iface.capacity(),
+                            iface.capacity(),
+                            0L));
+                }
+            }
+        }
+        if (loads.isEmpty()) {
+            throw new IllegalStateException("reviewed freight fit has no reaction-mass interface: " + fitId);
+        }
+        var consumables = new com.spacesim.ship.ShipEngineeringState.ConsumableState(
+                fleet.cargoMassKg(), 0d, 0d, 0d, loads);
+        var operating = new com.spacesim.ship.ShipEngineeringRuntime(catalog).initialize(
+                fit,
+                consumables,
+                com.spacesim.ship.ShipEngineeringState.DamageState.pristine());
+        return new com.spacesim.components.EngineeringComponent(
+                fit,
+                operating,
+                com.spacesim.ship.ShipInstanceRuntimeState.legacyNeutral());
     }
 
     private static void rollbackCreatedFreight(
@@ -283,6 +347,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     .getEntityRegistry().require(placement.localEntityId());
             ArchetypeComponent archetype = entity.getComponent(ArchetypeComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
+            if (entity.getComponent(com.spacesim.components.EngineeringComponent.class) == null) {
+                // Explicit migration for historical generated-freight saves that predate finite propulsion.
+                entity.add(freightEngineering(fleet));
+            }
             Integer expectedFaction = world.findFactionRuntimeId(fleet.stableFactionId()).orElseThrow();
             if (archetype == null || !archetype.contentId.equals(fleet.hullId())
                     || faction == null || faction.factionId != expectedFaction) {
@@ -372,6 +440,9 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             this.logistics = new Stage18LogisticsRuntime(
                     Stage18ResourceOntologyLoader.loadDefault(),
                     Objects.requireNonNull(products, "products"));
+            this.world.bindFleetPropellantLogisticsAuthority(
+                    new Stage22GeneratedWorldPropellantLogisticsAuthority(
+                            this.world, this.infrastructure, this.industry));
         }
 
         /** @return ordinary multi-system simulation authority */
@@ -502,7 +573,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             TransportOrderState order = freight.findOrder(fleetState.activeOrderId()).orElseThrow();
             RuntimeEndpoint endpoint = infrastructure.endpoint(order.sourceEndpointId());
             HandlingCapability handling = holdHandling(fleetId, endpoint.handlingCapability());
-            return freight.loadCommodity(
+            Stage20FreightRuntime.CargoOperationResult result = freight.loadCommodity(
                     fleetId,
                     endpoint.storage(),
                     massKg,
@@ -510,6 +581,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     simulationSeconds,
                     handling,
                     handling.openInterval(durationSeconds));
+            if (result.transferred()) {
+                synchronizeFreightEngineeringCargo(fleetId);
+            }
+            return result;
         }
 
         /**
@@ -528,12 +603,46 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             TransportOrderState order = freight.findOrder(fleetState.activeOrderId()).orElseThrow();
             RuntimeEndpoint endpoint = infrastructure.endpoint(order.destinationEndpointId());
             HandlingCapability handling = holdHandling(fleetId, endpoint.handlingCapability());
-            return freight.unloadCommodity(
+            Stage20FreightRuntime.CargoOperationResult result = freight.unloadCommodity(
                     fleetId,
                     endpoint.storage(),
                     massKg,
                     handling,
                     handling.openInterval(durationSeconds));
+            if (result.transferred()) {
+                synchronizeFreightEngineeringCargo(fleetId);
+            }
+            return result;
+        }
+
+        private void synchronizeFreightEngineeringCargo(FleetId fleetId) {
+            FreighterState fleetState = freight.findFreighter(fleetId).orElseThrow();
+            FleetPlacementState placement = world.findFleet(fleetId).orElseThrow();
+            if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+                throw new IllegalStateException("freight cargo synchronization requires local placement");
+            }
+            Entity entity = world.findSession(placement.systemId()).orElseThrow()
+                    .getEntityRegistry().require(placement.localEntityId());
+            var engineering = entity.getComponent(com.spacesim.components.EngineeringComponent.class);
+            if (engineering == null) {
+                throw new IllegalStateException("physical freight entity lost EngineeringComponent");
+            }
+            var state = engineering.runtimeState;
+            var previous = state.consumables();
+            var nextConsumables = new com.spacesim.ship.ShipEngineeringState.ConsumableState(
+                    fleetState.cargoMassKg(),
+                    previous.storesMassKg(),
+                    previous.missionPayloadMassKg(),
+                    previous.missionIntegrationVolumeM3(),
+                    previous.interfaceLoads());
+            engineering.setRuntimeState(new com.spacesim.ship.ShipEngineeringRuntime.RuntimeState(
+                    nextConsumables,
+                    state.sharedBusEnergyJ(),
+                    state.shipHeatStoredJ(),
+                    state.localHeatJByMount(),
+                    state.thrustLimitNByMount(),
+                    state.coolantBusCapacityW(),
+                    state.ftlCooldownSecondsByMount()));
         }
 
         /**
@@ -546,21 +655,78 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             synchronizeCompletedHops();
             FreighterState fleetState = freight.findFreighter(fleetId).orElseThrow();
             TransportOrderState order = freight.findOrder(fleetState.activeOrderId()).orElseThrow();
-            int nextIndex = switch (fleetState.phase()) {
-                case OUTBOUND -> fleetState.routeIndex() + 1;
-                case RETURNING -> fleetState.routeIndex() - 1;
-                default -> throw new IllegalStateException(
+            if (fleetState.phase() != FreightPhase.OUTBOUND
+                    && fleetState.phase() != FreightPhase.RETURNING) {
+                throw new IllegalStateException(
                         "next route hop requires OUTBOUND or RETURNING freight phase");
-            };
-            if (nextIndex < 0 || nextIndex >= order.orderedSystems().size()) {
-                throw new IllegalStateException("freight route has no next hop");
             }
             FleetPlacementState placement = world.findFleet(fleetId).orElseThrow();
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
                     || !placement.systemId().equals(fleetState.currentSystemId())) {
                 throw new IllegalStateException("next freight hop requires matching local world placement");
             }
-            return world.requestFleetJump(fleetId, order.orderedSystems().get(nextIndex));
+
+            List<StarSystemId> remainingRoute = remainingFreightRoute(fleetState, order);
+            if (remainingRoute.size() < 2) {
+                throw new IllegalStateException("freight route has no next hop");
+            }
+            var preparation = world.prepareFleetPropellantDeparture(fleetId, remainingRoute);
+            if (!preparation.ready()) {
+                StarSystemId directionalDestination = fleetState.phase() == FreightPhase.OUTBOUND
+                        ? order.orderedSystems().get(order.orderedSystems().size() - 1)
+                        : order.orderedSystems().get(0);
+                String rerouteFactionId = fleetState.stableFactionId();
+                var alternate = new com.spacesim.world.FleetStrategicRoutePlanner(world.getTopology())
+                        .planConstrained(
+                                0,
+                                fleetState.currentSystemId(),
+                                directionalDestination,
+                                world.getAuthoritativeWorldTick(),
+                                (factionId, from, to, tick, destination) -> {
+                                    String controller = world.controllingFaction(to).orElse(null);
+                                    return controller == null
+                                            || world.evaluateFactionMarketAccess(
+                                                    controller, rerouteFactionId).allowed();
+                                },
+                                candidate -> world.planFleetPropellantJourney(
+                                        fleetId, candidate.systems()).feasible())
+                        .orElse(null);
+                if (alternate != null && alternate.systems().size() >= 2
+                        && !alternate.systems().equals(remainingRoute)) {
+                    order = freight.rerouteRemaining(fleetId, alternate.systems());
+                    fleetState = freight.findFreighter(fleetId).orElseThrow();
+                    remainingRoute = remainingFreightRoute(fleetState, order);
+                    preparation = world.prepareFleetPropellantDeparture(fleetId, remainingRoute);
+                }
+            }
+            if (!preparation.ready()) {
+                throw new IllegalStateException(
+                        "freighter cannot start remaining route without a safe finite-propellant plan: "
+                                + fleetId + " reason=" + preparation.reason()
+                                + " requiredDeltaVMps=" + preparation.journey().requiredDeltaVMps()
+                                + " projectedRemainingReactionMassKg="
+                                + preparation.journey().projectedRemainingReactionMassKg());
+            }
+            return world.requestFleetJump(fleetId, remainingRoute.get(1));
+        }
+
+        private static List<StarSystemId> remainingFreightRoute(
+                FreighterState fleetState,
+                TransportOrderState order) {
+            ArrayList<StarSystemId> remaining = new ArrayList<>();
+            if (fleetState.phase() == FreightPhase.OUTBOUND) {
+                for (int index = fleetState.routeIndex(); index < order.orderedSystems().size(); index++) {
+                    remaining.add(order.orderedSystems().get(index));
+                }
+            } else if (fleetState.phase() == FreightPhase.RETURNING) {
+                for (int index = fleetState.routeIndex(); index >= 0; index--) {
+                    remaining.add(order.orderedSystems().get(index));
+                }
+            } else {
+                throw new IllegalStateException(
+                        "remaining freight route requires OUTBOUND or RETURNING phase");
+            }
+            return List.copyOf(remaining);
         }
 
         /**
@@ -733,6 +899,13 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                         || placement.systemId().equals(fleetState.currentSystemId())) {
                     continue;
                 }
+                Entity arrivedEntity = world.findSession(placement.systemId()).orElseThrow()
+                        .getEntityRegistry().require(placement.localEntityId());
+                if (arrivedEntity.getComponent(com.spacesim.components.EngineeringComponent.class) == null) {
+                    // One-time migration for historical saves captured while generated freight was
+                    // already detached in transit before finite propulsion entered the world schema.
+                    arrivedEntity.add(freightEngineering(fleetState));
+                }
                 LocalPhysicalKinematics exact = arrival.materialization(placement.systemId())
                         .physicalState(placement.localEntityId()).orElseThrow(
                                 () -> new IllegalStateException(
@@ -836,7 +1009,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         private static InfrastructureRegistry materialize(
                 Stage20GeneratedCampaignPersistentState campaign,
                 MaterializedGeneratedIndustrialRuntime industry,
-                Stage18ManufacturingProductRegistry products) {
+                Stage18ManufacturingProductRegistry products,
+                boolean seedBootstrapPropellant) {
             Stage18ResourceOntologyCatalog ontology = Stage18ResourceOntologyLoader.loadDefault();
             Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
             Stage18StationInfrastructureCatalog infrastructure =
@@ -900,6 +1074,21 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                                 "canonical infrastructure storage differs from its archetype");
                     }
                     storage = Stage18StationStorage.restore(ontology, productRegistry, persisted);
+                } else if (seedBootstrapPropellant
+                        && archetype.storageCapacityByClassKg().containsKey(LIQUID_STORAGE_CLASS_ID)
+                        && archetype.transferStorageClassIds().contains(LIQUID_STORAGE_CLASS_ID)) {
+                    double reserveKg = Math.min(
+                            MAX_INITIAL_PROPELLANT_RESERVE_KG,
+                            archetype.storageCapacityByClassKg().get(LIQUID_STORAGE_CLASS_ID) * 0.5d);
+                    if (reserveKg > 0d) {
+                        storage = new Stage18StationStorage(
+                                ontology,
+                                productRegistry,
+                                stationId,
+                                archetype.storageCapacityByClassKg(),
+                                Map.of(PROPELLANT_COMMODITY_ID, reserveKg),
+                                Map.of());
+                    }
                 }
                 if (result.putIfAbsent(stationId, new RuntimeEndpoint(
                         systemId,

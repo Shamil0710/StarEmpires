@@ -421,6 +421,89 @@ public final class Stage20FreightRuntime {
     }
 
     /**
+     * Replaces only the not-yet-traversed part of an active freight route from the fleet's exact
+     * current system.
+     *
+     * <p>The operation preserves source/destination endpoint identity, cargo, provenance, delivered
+     * mass and deadlines. OUTBOUND keeps the already traversed producer-side prefix. RETURNING
+     * rewrites the producer-side prefix so the supplied current-to-source route becomes its exact
+     * reverse while retaining the untouched consumer-side tail. The caller must provide ordinary
+     * neighbor-only physical routing; this state layer owns no topology.</p>
+     *
+     * @param fleetId active physical freight fleet
+     * @param routeFromCurrent ordered route beginning at the fleet's current system and ending at
+     *                         the active directional endpoint
+     * @return replaced persistent transport order
+     */
+    public TransportOrderState rerouteRemaining(
+            FleetId fleetId,
+            List<StarSystemId> routeFromCurrent) {
+        FreighterState fleet = requireFreighter(fleetId);
+        TransportOrderState order = requireOrder(fleet);
+        List<StarSystemId> replacement = List.copyOf(Objects.requireNonNull(
+                routeFromCurrent, "routeFromCurrent"));
+        if (replacement.size() < 2
+                || !replacement.get(0).equals(fleet.currentSystemId())) {
+            throw new IllegalArgumentException(
+                    "replacement freight route must begin at current system and contain a next hop");
+        }
+
+        ArrayList<StarSystemId> route = new ArrayList<>();
+        int nextRouteIndex;
+        if (fleet.phase() == FreightPhase.OUTBOUND) {
+            StarSystemId destination = order.orderedSystems().get(order.orderedSystems().size() - 1);
+            if (!replacement.get(replacement.size() - 1).equals(destination)) {
+                throw new IllegalArgumentException(
+                        "outbound replacement route must preserve order destination");
+            }
+            route.addAll(order.orderedSystems().subList(0, fleet.routeIndex()));
+            route.addAll(replacement);
+            nextRouteIndex = fleet.routeIndex();
+        } else if (fleet.phase() == FreightPhase.RETURNING) {
+            StarSystemId source = order.orderedSystems().get(0);
+            if (!replacement.get(replacement.size() - 1).equals(source)) {
+                throw new IllegalArgumentException(
+                        "return replacement route must preserve order source");
+            }
+            ArrayList<StarSystemId> sourceToCurrent = new ArrayList<>(replacement);
+            java.util.Collections.reverse(sourceToCurrent);
+            route.addAll(sourceToCurrent);
+            route.addAll(order.orderedSystems().subList(
+                    fleet.routeIndex() + 1, order.orderedSystems().size()));
+            nextRouteIndex = sourceToCurrent.size() - 1;
+        } else {
+            throw new IllegalStateException(
+                    "freight reroute requires OUTBOUND or RETURNING phase");
+        }
+
+        TransportOrderState updatedOrder = new TransportOrderState(
+                order.orderId(),
+                order.fleetId(),
+                order.stableFactionId(),
+                order.assignmentKind(),
+                order.commodityId(),
+                order.sourceEndpointId(),
+                order.destinationEndpointId(),
+                order.sourceProvenanceId(),
+                List.copyOf(route),
+                order.oneWayDeliverySeconds(),
+                order.roundTripCycleSeconds(),
+                order.deliveryDeadlineSeconds(),
+                order.deliveredMassKg(),
+                order.delayedDeliveryCount());
+        FreighterState updatedFleet = copyFreighter(
+                fleet,
+                fleet.currentSystemId(),
+                fleet.physicalState(),
+                fleet.phase(),
+                nextRouteIndex,
+                requireHold(fleetId).snapshot());
+        orders.put(updatedOrder.orderId(), updatedOrder);
+        freighters.put(fleetId, updatedFleet);
+        return updatedOrder;
+    }
+
+    /**
      * Records every newly crossed physical delivery deadline exactly once.
      *
      * @param fleetId stable active fleet identity

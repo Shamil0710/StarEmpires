@@ -1,5 +1,6 @@
 package com.spacesim.campaign;
 
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +10,8 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeneratedCampaignProductionBootstrapRegressionTest {
     @Test
@@ -27,5 +30,23 @@ class GeneratedCampaignProductionBootstrapRegressionTest {
         assertEquals("Индустриальный Союз", names.get("faction.beta"));
         assertFalse(names.containsValue("Alpha"));
         assertFalse(names.containsValue("Beta"));
+
+        var runtime = campaign.runtime();
+        var freighter = runtime.freight().capture().freighters().stream()
+                .filter(value -> !value.activeOrderId().isBlank())
+                .findFirst().orElseThrow();
+        var placement = runtime.world().findFleet(freighter.fleetId()).orElseThrow();
+        var entity = runtime.world().findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().require(placement.localEntityId());
+        EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
+        assertNotNull(engineering, "generated freight must have finite fitted propulsion");
+        assertTrue(engineering.runtimeState.consumables().reactionMassKg() > 0d,
+                "generated freight must start with explicit finite reaction mass");
+
+        var order = runtime.freight().findOrder(freighter.activeOrderId()).orElseThrow();
+        var fuelPlan = runtime.world().planFleetRouteFuel(freighter.fleetId(), order.orderedSystems());
+        assertTrue(fuelPlan.supported(), "generated freight route must use physical fuel planning");
+        assertTrue(fuelPlan.feasible(),
+                () -> "bootstrap must not accept a route that strands its freighter: " + fuelPlan);
     }
 }

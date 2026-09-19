@@ -227,6 +227,11 @@ public final class GeneratedCampaignCoordinator {
         return session.timeScale();
     }
 
+    /** @return active fixed-clock interpolation fraction for read-only presentation */
+    public double interpolationAlpha() {
+        return session.interpolationAlpha();
+    }
+
     /**
      * Applies one pause value through the ordinary campaign clock authority.
      *
