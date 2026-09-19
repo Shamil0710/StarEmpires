@@ -26,7 +26,7 @@ public final class Stage22ShipConsumableCatalogLoader {
      * Loads Stage-22 production servicing bindings against the current resource ontology and
      * production engineering catalog.
      *
-     * @return immutable validated servicing catalog including legacy and Stage-22 drive bindings
+     * @return immutable validated servicing catalog for Stage-22 production drive bindings
      */
     public static Stage18ShipConsumableCatalog loadDefault() {
         ClassLoader loader = Stage22ShipConsumableCatalogLoader.class.getClassLoader();
