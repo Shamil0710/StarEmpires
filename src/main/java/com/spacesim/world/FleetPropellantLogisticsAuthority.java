@@ -47,7 +47,16 @@ public interface FleetPropellantLogisticsAuthority {
             String mountId,
             String commodityId,
             double massKg) {
-        /** Validates one projected refueling action. */
+        /**
+         * Validates one projected refueling action.
+         *
+         * @param systemId system containing the servicing endpoint
+         * @param stationId exact station endpoint identity
+         * @param bindingId authored commodity-to-interface binding
+         * @param mountId fitted receiving module mount
+         * @param commodityId finite station commodity consumed by servicing
+         * @param massKg projected positive physical mass loaded
+         */
         public RefuelStop {
             Objects.requireNonNull(systemId, "systemId");
             stationId = requireText(stationId, "stationId");
@@ -79,7 +88,17 @@ public interface FleetPropellantLogisticsAuthority {
             double requiredDeltaVMps,
             double projectedRemainingReactionMassKg,
             String reason) {
-        /** Validates and freezes one journey plan. */
+        /**
+         * Validates and freezes one journey plan.
+         *
+         * @param supported whether a physical refueling authority is bound
+         * @param feasible whether the route is physically/logistically feasible
+         * @param orderedSystems exact evaluated route
+         * @param refuelStops deterministic projected service actions
+         * @param requiredDeltaVMps total local maneuver delta-v
+         * @param projectedRemainingReactionMassKg projected final reaction mass
+         * @param reason stable diagnostic reason
+         */
         public JourneyPlan {
             orderedSystems = List.copyOf(Objects.requireNonNull(orderedSystems, "orderedSystems"));
             refuelStops = List.copyOf(Objects.requireNonNull(refuelStops, "refuelStops"));
@@ -136,7 +155,16 @@ public interface FleetPropellantLogisticsAuthority {
             List<String> stationIds,
             JourneyPlan journey,
             String reason) {
-        /** Validates and freezes one departure preparation. */
+        /**
+         * Validates and freezes one departure preparation.
+         *
+         * @param supported whether physical station servicing authority is bound
+         * @param ready whether the remaining route is safe after local servicing
+         * @param loadedMassKg physically loaded current-system propellant mass
+         * @param stationIds deterministic station IDs actually used
+         * @param journey revalidated post-service journey
+         * @param reason stable diagnostic reason
+         */
         public DeparturePreparation {
             if (!Double.isFinite(loadedMassKg) || loadedMassKg < 0d) {
                 throw new IllegalArgumentException("loadedMassKg must be finite and non-negative");
