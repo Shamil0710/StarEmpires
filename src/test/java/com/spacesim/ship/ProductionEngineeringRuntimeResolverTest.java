@@ -45,6 +45,33 @@ class ProductionEngineeringRuntimeResolverTest {
     }
 
     @Test
+    void smallTickDeltaVUsesPartialThrottleAndBurnsLessThanFullTick() {
+        Fixture partial = fixture(1_000_000d);
+        Fixture full = fixture(1_000_000d);
+        double deltaSeconds = 0.25d;
+        var derived = partial.resolver().derive(partial.component());
+        double fullTickDeltaV = derived.availableThrustN() / derived.totalMassKg() * deltaSeconds;
+        double requestedDeltaV = fullTickDeltaV * 0.2d;
+
+        double throttle = partial.resolver().throttleForDeltaV(
+                partial.component(), requestedDeltaV, deltaSeconds);
+        assertTrue(throttle > 0d && throttle < 1d);
+
+        double beforePartial = partial.component().runtimeState.consumables().reactionMassKg();
+        partial.resolver().advancePropulsion(partial.component(), throttle, deltaSeconds);
+        double partialBurn = beforePartial
+                - partial.component().runtimeState.consumables().reactionMassKg();
+
+        double beforeFull = full.component().runtimeState.consumables().reactionMassKg();
+        full.resolver().advancePropulsion(full.component(), 1d, deltaSeconds);
+        double fullBurn = beforeFull - full.component().runtimeState.consumables().reactionMassKg();
+
+        assertTrue(partialBurn > 0d);
+        assertTrue(partialBurn < fullBurn,
+                "a fractional final velocity tick must not burn a full-throttle tick of reaction mass");
+    }
+
+    @Test
     void deltaVPreviewDoesNotMutateAuthoritativeStateAndEmptyTankFailsClosed() {
         Fixture fueled = fixture(1_000_000d);
         double before = fueled.component().runtimeState.consumables().reactionMassKg();
