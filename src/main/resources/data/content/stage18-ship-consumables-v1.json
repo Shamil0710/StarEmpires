@@ -7,7 +7,23 @@
       "interfaceId": "propellant_feed",
       "interfaceKind": "REACTION_MASS",
       "commodityId": "commodity.material.purified_water",
-      "amountPerKg": 1.0
+      "amountPerKg": 1
+    },
+    {
+      "id": "ship_consumable.reaction_mass.empire_endurance_water_v1",
+      "moduleId": "module.empire_drive_endurance_v1",
+      "interfaceId": "propellant_feed",
+      "interfaceKind": "REACTION_MASS",
+      "commodityId": "commodity.material.purified_water",
+      "amountPerKg": 1
+    },
+    {
+      "id": "ship_consumable.reaction_mass.industrial_union_drive_bank_water_v1",
+      "moduleId": "module.industrial_union_drive_bank_v1",
+      "interfaceId": "propellant_feed",
+      "interfaceKind": "REACTION_MASS",
+      "commodityId": "commodity.material.purified_water",
+      "amountPerKg": 1
     }
   ]
 }
