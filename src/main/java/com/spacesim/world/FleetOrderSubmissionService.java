@@ -47,9 +47,11 @@ public final class FleetOrderSubmissionService {
      * <p>The same path is used for player and AI submissions. It verifies command-group ownership,
      * co-location, readiness, reserve/home-defense doctrine, lawful transit access, bounded route
      * risk and existing Stage-18 service capability before allocating the persistent order. When a
- * physical world is bound, route search also evaluates every command-group member through the same
- * finite-propellant journey authority, allowing a longer lawful route through real refueling nodes
- * instead of accepting an unsafe shortest path.</p>
+     * physical world is bound, current propellant readiness is not treated as an independent
+     * admission fact: route search evaluates every command-group member through the finite-propellant
+     * journey authority instead. This allows an empty fitted ship at a real accessible refueling node
+     * to accept a movement order, while still rejecting any route whose current/future finite station
+     * stock cannot make every hop safe.</p>
      *
      * @param state current persistent command state
      * @param forces current read-only reconstruction of ordinary fleets
@@ -108,7 +110,12 @@ public final class FleetOrderSubmissionService {
             if (!origin.equals(force.systemId())) {
                 throw new IllegalStateException("command group fleets must stage in one physical system before dispatch");
             }
-            validateReadiness(type, force.readiness(), fleetId, !origin.equals(targetSystemId));
+            validateReadiness(
+                    type,
+                    force.readiness(),
+                    fleetId,
+                    !origin.equals(targetSystemId),
+                    physicalWorld == null);
         }
         if (origin == null) throw new IllegalStateException("command group contains no fleets");
 
@@ -152,8 +159,14 @@ public final class FleetOrderSubmissionService {
         return new SubmissionResult(state.addOrder(order), order);
     }
 
-    private static void validateReadiness(OrderType type, FleetReadinessState readiness, FleetId fleetId, boolean movementRequired) {
-        if (movementRequired && readiness.propellantBps() < MOVEMENT_PROPELLANT_MIN_BPS) {
+    private static void validateReadiness(
+            OrderType type,
+            FleetReadinessState readiness,
+            FleetId fleetId,
+            boolean movementRequired,
+            boolean requireCurrentPropellant) {
+        if (movementRequired && requireCurrentPropellant
+                && readiness.propellantBps() < MOVEMENT_PROPELLANT_MIN_BPS) {
             throw new IllegalStateException("fleet lacks reaction mass for movement: " + fleetId);
         }
         if (readiness.crewBps() <= 0) throw new IllegalStateException("fleet has no observed crew availability: " + fleetId);
