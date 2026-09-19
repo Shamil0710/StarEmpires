@@ -206,6 +206,10 @@ public final class ProductionEngineeringRuntimeResolver {
      * <p>The preview repeatedly executes the real engineering runtime on local immutable state. It
      * therefore cannot promise a maneuver that current reaction mass, power, thermal condition or
      * drive damage cannot actually produce. The component itself is never mutated.</p>
+     *
+     * @param component authoritative fitted engineering component to preview without mutation
+     * @param requiredDeltaVMps requested non-negative velocity change in meters per second
+     * @return immutable feasible/infeasible maneuver preview and resulting simulated engineering state
      */
     public ManeuverPlan planDeltaV(EngineeringComponent component, double requiredDeltaVMps) {
         EngineeringComponent checked = requireComplete(component);
