@@ -1397,6 +1397,21 @@ public FactionEconomicDependenceDiagnostics analyzeEconomicDependence(
     }
 
     /**
+     * Preflights a complete remaining fleet route against exact finite propulsion resources.
+     *
+     * @param fleetId stable physical fleet identity
+     * @param orderedSystems route beginning at the fleet's current system
+     * @return physical route-fuel plan, or an explicit compatibility result when unavailable
+     */
+    public FleetArrivalAuthority.RouteFuelPlan planFleetRouteFuel(
+            FleetId fleetId,
+            List<StarSystemId> orderedSystems) {
+        return fleetJumpService.planRouteFuel(
+                Objects.requireNonNull(fleetId, "fleetId"),
+                List.copyOf(Objects.requireNonNull(orderedSystems, "orderedSystems")));
+    }
+
+    /**
      * Binds a persisted Stage-20 physical endpoint authority to the existing ordinary jump FSM.
      * Binding is one-shot and changes neither topology nor jump engineering constraints.
      *
