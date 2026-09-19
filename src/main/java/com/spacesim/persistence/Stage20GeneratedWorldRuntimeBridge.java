@@ -655,31 +655,44 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             synchronizeCompletedHops();
             FreighterState fleetState = freight.findFreighter(fleetId).orElseThrow();
             TransportOrderState order = freight.findOrder(fleetState.activeOrderId()).orElseThrow();
-            int nextIndex = switch (fleetState.phase()) {
-                case OUTBOUND -> fleetState.routeIndex() + 1;
-                case RETURNING -> fleetState.routeIndex() - 1;
-                default -> throw new IllegalStateException(
+            if (fleetState.phase() != FreightPhase.OUTBOUND
+                    && fleetState.phase() != FreightPhase.RETURNING) {
+                throw new IllegalStateException(
                         "next route hop requires OUTBOUND or RETURNING freight phase");
-            };
-            if (nextIndex < 0 || nextIndex >= order.orderedSystems().size()) {
-                throw new IllegalStateException("freight route has no next hop");
             }
             FleetPlacementState placement = world.findFleet(fleetId).orElseThrow();
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
                     || !placement.systemId().equals(fleetState.currentSystemId())) {
                 throw new IllegalStateException("next freight hop requires matching local world placement");
             }
-            java.util.ArrayList<StarSystemId> remainingRoute = new java.util.ArrayList<>();
-            if (fleetState.phase() == FreightPhase.OUTBOUND) {
-                for (int index = fleetState.routeIndex(); index < order.orderedSystems().size(); index++) {
-                    remainingRoute.add(order.orderedSystems().get(index));
-                }
-            } else {
-                for (int index = fleetState.routeIndex(); index >= 0; index--) {
-                    remainingRoute.add(order.orderedSystems().get(index));
-                }
+
+            List<StarSystemId> remainingRoute = remainingFreightRoute(fleetState, order);
+            if (remainingRoute.size() < 2) {
+                throw new IllegalStateException("freight route has no next hop");
             }
             var preparation = world.prepareFleetPropellantDeparture(fleetId, remainingRoute);
+            if (!preparation.ready()) {
+                StarSystemId directionalDestination = fleetState.phase() == FreightPhase.OUTBOUND
+                        ? order.orderedSystems().get(order.orderedSystems().size() - 1)
+                        : order.orderedSystems().get(0);
+                var alternate = new com.spacesim.world.FleetStrategicRoutePlanner(world.getTopology())
+                        .planConstrained(
+                                0,
+                                fleetState.currentSystemId(),
+                                directionalDestination,
+                                world.getAuthoritativeWorldTick(),
+                                (factionId, from, to, tick, destination) -> true,
+                                candidate -> world.planFleetPropellantJourney(
+                                        fleetId, candidate.systems()).feasible())
+                        .orElse(null);
+                if (alternate != null && alternate.systems().size() >= 2
+                        && !alternate.systems().equals(remainingRoute)) {
+                    order = freight.rerouteRemaining(fleetId, alternate.systems());
+                    fleetState = freight.findFreighter(fleetId).orElseThrow();
+                    remainingRoute = remainingFreightRoute(fleetState, order);
+                    preparation = world.prepareFleetPropellantDeparture(fleetId, remainingRoute);
+                }
+            }
             if (!preparation.ready()) {
                 throw new IllegalStateException(
                         "freighter cannot start remaining route without a safe finite-propellant plan: "
@@ -688,7 +701,26 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                                 + " projectedRemainingReactionMassKg="
                                 + preparation.journey().projectedRemainingReactionMassKg());
             }
-            return world.requestFleetJump(fleetId, order.orderedSystems().get(nextIndex));
+            return world.requestFleetJump(fleetId, remainingRoute.get(1));
+        }
+
+        private static List<StarSystemId> remainingFreightRoute(
+                FreighterState fleetState,
+                TransportOrderState order) {
+            ArrayList<StarSystemId> remaining = new ArrayList<>();
+            if (fleetState.phase() == FreightPhase.OUTBOUND) {
+                for (int index = fleetState.routeIndex(); index < order.orderedSystems().size(); index++) {
+                    remaining.add(order.orderedSystems().get(index));
+                }
+            } else if (fleetState.phase() == FreightPhase.RETURNING) {
+                for (int index = fleetState.routeIndex(); index >= 0; index--) {
+                    remaining.add(order.orderedSystems().get(index));
+                }
+            } else {
+                throw new IllegalStateException(
+                        "remaining freight route requires OUTBOUND or RETURNING phase");
+            }
+            return List.copyOf(remaining);
         }
 
         /**
