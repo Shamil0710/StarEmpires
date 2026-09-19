@@ -261,15 +261,17 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         double cruiseVelocityY = displacement.deltaYM() / durationSeconds;
         double requiredDeltaV = maneuverDeltaV(
                 current, cruiseVelocityX, cruiseVelocityY);
-        EngineeringComponent fitted = requireLocalEngineering(placement);
-        var maneuver = engineering.planDeltaV(fitted, requiredDeltaV);
-        if (!maneuver.feasible()) {
-            throw new IllegalStateException(
-                    "insufficient physical propulsion for FTL departure approach: " + fleetId
-                            + " requiredDeltaVMps=" + requiredDeltaV
-                            + " deliveredDeltaVMps=" + maneuver.deliveredDeltaVMps());
+        EngineeringComponent fitted = localEngineering(placement);
+        if (fitted != null) {
+            var maneuver = engineering.planDeltaV(fitted, requiredDeltaV);
+            if (!maneuver.feasible()) {
+                throw new IllegalStateException(
+                        "insufficient physical propulsion for FTL departure approach: " + fleetId
+                                + " requiredDeltaVMps=" + requiredDeltaV
+                                + " deliveredDeltaVMps=" + maneuver.deliveredDeltaVMps());
+            }
+            engineering.commitManeuver(fitted, maneuver);
         }
-        engineering.commitManeuver(fitted, maneuver);
         materialization(originSystemId).updatePhysicalState(
                 localEntityId,
                 new LocalPhysicalKinematics(
@@ -295,7 +297,10 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
                 || !route.get(0).equals(placement.systemId())) {
             throw new IllegalStateException("route fuel preflight must begin at the fleet's local system");
         }
-        EngineeringComponent live = requireLocalEngineering(placement);
+        EngineeringComponent live = localEngineering(placement);
+        if (live == null) {
+            return FleetArrivalAuthority.RouteFuelPlan.compatibility();
+        }
         EngineeringComponent preview = new EngineeringComponent(
                 live.fit, live.runtimeState, live.instanceState);
         double initialReactionMassKg = preview.runtimeState.consumables().reactionMassKg();
@@ -493,15 +498,10 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
                 exact.physicalState());
     }
 
-    private EngineeringComponent requireLocalEngineering(FleetPlacementState placement) {
+    private EngineeringComponent localEngineering(FleetPlacementState placement) {
         var session = boundWorld.findSession(placement.systemId()).orElseThrow();
         var entity = session.getEntityRegistry().require(placement.localEntityId());
-        EngineeringComponent component = entity.getComponent(EngineeringComponent.class);
-        if (component == null) {
-            throw new IllegalStateException(
-                    "generated-world moving fleet lacks finite EngineeringComponent: " + placement.id());
-        }
-        return component;
+        return entity.getComponent(EngineeringComponent.class);
     }
 
     private float requireSessionFixedStep(StarSystemId systemId) {
