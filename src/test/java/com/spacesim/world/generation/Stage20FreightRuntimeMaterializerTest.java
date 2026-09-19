@@ -20,6 +20,7 @@ import com.spacesim.world.LocalPhysicalKinematics;
 import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.Stage20DiscoveryKnowledgeState;
 import com.spacesim.world.Stage20SpecialLocationGenerator;
+import com.spacesim.world.StarSystemId;
 import com.spacesim.world.generation.Stage20OperationalIndustrialSpecializationProductionIntegrationTest
         .CadenceFixture;
 import org.junit.jupiter.api.Test;
@@ -141,6 +142,51 @@ class Stage20FreightRuntimeMaterializerTest {
         assertTrue(runtime.cargoLots().isEmpty());
         assertEquals(massKg,
                 runtime.findOrder(order.orderId()).orElseThrow().deliveredMassKg(), 0d);
+        assertEquals(runtime.capture(), Stage20FreightRuntime.restore(runtime.capture()).capture());
+    }
+
+    @Test
+    void activeOutboundRouteCanRerouteWithoutChangingFreightIdentityOrCreatingState() {
+        CadenceFixture fixture = fixture();
+        var freight = Stage20FreightRuntimeMaterializer.materializeBootstrap(
+                savedState(fixture), fixture.specialization(), 55_000L);
+        Stage20FreightRuntime runtime = Stage20FreightRuntime.restore(freight);
+        var original = freight.orders().get(0);
+        var fleetId = original.fleetId();
+        StarSystemId source = original.orderedSystems().get(0);
+        StarSystemId destination =
+                original.orderedSystems().get(original.orderedSystems().size() - 1);
+        StarSystemId inserted = new StarSystemId(9_999_001L);
+        runtime.dispatchOutbound(fleetId, 20d);
+
+        assertThrows(IllegalArgumentException.class, () -> runtime.rerouteRemaining(
+                fleetId, List.of(source, inserted, new StarSystemId(9_999_002L))));
+
+        var rerouted = runtime.rerouteRemaining(
+                fleetId, List.of(source, inserted, destination));
+
+        assertEquals(List.of(source, inserted, destination), rerouted.orderedSystems());
+        assertEquals(original.orderId(), rerouted.orderId());
+        assertEquals(original.fleetId(), rerouted.fleetId());
+        assertEquals(original.sourceEndpointId(), rerouted.sourceEndpointId());
+        assertEquals(original.destinationEndpointId(), rerouted.destinationEndpointId());
+        assertEquals(original.sourceProvenanceId(), rerouted.sourceProvenanceId());
+        assertEquals(original.deliveryDeadlineSeconds(), rerouted.deliveryDeadlineSeconds(), 0d);
+        assertEquals(source, runtime.findFreighter(fleetId).orElseThrow().currentSystemId());
+        assertEquals(0, runtime.findFreighter(fleetId).orElseThrow().routeIndex());
+
+        runtime.completeNextOutboundHop(
+                fleetId,
+                inserted,
+                new LocalPhysicalKinematics(
+                        new LocalPhysicalPosition(1L, 0L, 10d, 0d), 0d, 0d));
+        runtime.completeNextOutboundHop(
+                fleetId,
+                destination,
+                new LocalPhysicalKinematics(
+                        new LocalPhysicalPosition(2L, 0L, 20d, 0d), 0d, 0d));
+        assertEquals(FreightPhase.AT_DESTINATION,
+                runtime.findFreighter(fleetId).orElseThrow().phase());
         assertEquals(runtime.capture(), Stage20FreightRuntime.restore(runtime.capture()).capture());
     }
 
