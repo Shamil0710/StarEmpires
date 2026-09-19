@@ -25,17 +25,10 @@ class Stage22PlayerFinitePropellantRouteAcceptanceTest {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime live =
                 Stage20PlayableGeneratedWorldFactory.create(
                         Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
-        FleetPlacementState placement = live.world().getFleetPlacements().stream()
-                .filter(value -> value.locationKind() == FleetLocationKind.IN_SYSTEM)
-                .filter(value -> !live.world().getTopology().neighbors(value.systemId()).isEmpty())
-                .filter(value -> engineering(live, value) != null)
-                .findFirst()
-                .orElseThrow();
+        Candidate candidate = feasibleCandidate(live);
+        FleetPlacementState placement = candidate.placement();
         EngineeringComponent engineering = engineering(live, placement);
-        StarSystemId destination = live.world().getTopology().neighbors(placement.systemId()).stream()
-                .sorted()
-                .findFirst()
-                .orElseThrow();
+        StarSystemId destination = candidate.destination();
 
         List<StarSystemId> discovered = live.world().getTopology().systems().stream()
                 .map(value -> value.id())
@@ -62,12 +55,34 @@ class Stage22PlayerFinitePropellantRouteAcceptanceTest {
                 "player route planner must not expose any route once the fitted ship has no reaction mass");
     }
 
+    private static Candidate feasibleCandidate(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime) {
+        for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
+            if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                    || engineering(runtime, placement) == null) {
+                continue;
+            }
+            for (StarSystemId destination : runtime.world().getTopology().neighbors(placement.systemId()).stream()
+                    .sorted().toList()) {
+                var fuel = runtime.world().planFleetRouteFuel(
+                        placement.id(), List.of(placement.systemId(), destination));
+                if (fuel.supported() && fuel.feasible()) {
+                    return new Candidate(placement, destination);
+                }
+            }
+        }
+        throw new AssertionError("generated world lacks a fitted fleet with one fuel-safe neighboring hop");
+    }
+
     private static EngineeringComponent engineering(
             Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
             FleetPlacementState placement) {
         Entity entity = runtime.world().findSession(placement.systemId()).orElseThrow()
                 .getEntityRegistry().require(placement.localEntityId());
         return entity.getComponent(EngineeringComponent.class);
+    }
+
+    private record Candidate(FleetPlacementState placement, StarSystemId destination) {
     }
 
     private static ShipEngineeringRuntime.RuntimeState withoutReactionMass(
