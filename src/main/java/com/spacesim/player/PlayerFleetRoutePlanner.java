@@ -35,6 +35,11 @@ import java.util.Set;
  * segments carry an explicit uncertainty premium rather than being assumed safe. Raw danger remains
  * an arbitrary exposure score, never a probability.</p>
  *
+ * <p>For fitted fleets, a completed candidate route is also preflighted against the authoritative
+ * finite-propellant route model before it can be returned. An unsafe path is therefore never exposed
+ * to the order executor as a valid first hop. Historical non-fitted worlds retain their explicit
+ * compatibility behavior.</p>
+ *
  * <p>The risk multiplier is actor-specific: current real cargo utilization, current damage and
  * shared inertial acceleration affect vulnerability. A real player-owned operational combat fleet
  * under a persistent ESCORT order can mitigate expected actor loss only while physically
@@ -106,6 +111,10 @@ public final class PlayerFleetRoutePlanner {
                 continue;
             }
             if (current.system().equals(to)) {
+                var fuel = world.planFleetRouteFuel(actor, current.path());
+                if (fuel.supported() && !fuel.feasible()) {
+                    return Optional.empty();
+                }
                 double riskCost = (current.systemExposure()
                         + current.linkExposure()
                         + current.uncertaintyExposure()) * vulnerability * RISK_TO_TICKS;
