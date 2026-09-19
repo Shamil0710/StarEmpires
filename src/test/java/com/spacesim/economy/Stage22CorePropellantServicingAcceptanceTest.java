@@ -2,7 +2,7 @@ package com.spacesim.economy;
 
 import com.spacesim.content.Stage18ManufacturingProductRegistry;
 import com.spacesim.content.Stage18ResourceOntologyLoader;
-import com.spacesim.content.Stage18ShipConsumableCatalogLoader;
+import com.spacesim.content.Stage22ShipConsumableCatalogLoader;
 import com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader;
 import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
@@ -20,7 +20,7 @@ class Stage22CorePropellantServicingAcceptanceTest {
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
         var products = Stage18ManufacturingProductRegistry.loadDefault();
         var engineering = Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
-        var bindings = Stage18ShipConsumableCatalogLoader.loadDefault();
+        var bindings = Stage22ShipConsumableCatalogLoader.loadDefault();
 
         List<Case> cases = List.of(
                 new Case(
