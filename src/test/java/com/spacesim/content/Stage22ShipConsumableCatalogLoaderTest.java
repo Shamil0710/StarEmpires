@@ -17,7 +17,8 @@ class Stage22ShipConsumableCatalogLoaderTest {
         assertNotNull(legacy.findBinding("ship_consumable.reaction_mass.escort_water_v1"));
         assertNull(legacy.findBinding("ship_consumable.reaction_mass.empire_longhaul_freight_water_v1"));
 
-        assertNotNull(production.findBinding("ship_consumable.reaction_mass.escort_water_v1"));
+        assertNull(production.findBinding("ship_consumable.reaction_mass.escort_water_v1"),
+                "legacy escort servicing stays owned by the unchanged Stage-18 catalog");
         assertNotNull(production.findBinding("ship_consumable.reaction_mass.empire_endurance_water_v1"));
         assertNotNull(production.findBinding(
                 "ship_consumable.reaction_mass.industrial_union_drive_bank_water_v1"));
