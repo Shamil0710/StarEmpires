@@ -84,6 +84,10 @@ public interface FleetArrivalAuthority {
      *
      * <p>The default reports an unsupported compatibility seam. Exact generated-world authorities
      * override this to evaluate every origin-local approach before the first hop is committed.</p>
+     *
+     * @param fleetId stable physical fleet identity
+     * @param orderedSystems complete remaining neighbor route beginning at the current system
+     * @return immutable physical fuel-plan result
      */
     default RouteFuelPlan planRouteFuel(FleetId fleetId, List<StarSystemId> orderedSystems) {
         return RouteFuelPlan.compatibility();
@@ -135,7 +139,16 @@ public interface FleetArrivalAuthority {
             ResolvedArrival arrival,
             EntityId destinationLocalEntityId);
 
-    /** Immutable full-route reaction-mass preflight. */
+    /**
+     * Immutable full-route reaction-mass preflight.
+     *
+     * @param supported whether exact route-fuel authority is available for this world
+     * @param feasible whether the complete route fits inside the protected physical fuel budget
+     * @param requiredDeltaVMps total local-maneuver delta-v required by the remaining route
+     * @param consumedReactionMassKg estimated reaction mass consumed by that maneuver budget
+     * @param remainingReactionMassKg estimated reaction mass remaining after the route
+     * @param reason stable diagnostic reason for unsupported or infeasible plans
+     */
     record RouteFuelPlan(
             boolean supported,
             boolean feasible,
@@ -143,6 +156,16 @@ public interface FleetArrivalAuthority {
             double consumedReactionMassKg,
             double remainingReactionMassKg,
             String reason) {
+        /**
+         * Validates one immutable route-fuel plan.
+         *
+         * @param supported whether exact route-fuel authority is available
+         * @param feasible whether the route is physically feasible
+         * @param requiredDeltaVMps required local-maneuver delta-v
+         * @param consumedReactionMassKg estimated consumed reaction mass
+         * @param remainingReactionMassKg estimated remaining reaction mass
+         * @param reason diagnostic reason, normalized to empty text when absent
+         */
         public RouteFuelPlan {
             if (!Double.isFinite(requiredDeltaVMps) || requiredDeltaVMps < 0d
                     || !Double.isFinite(consumedReactionMassKg) || consumedReactionMassKg < 0d
@@ -152,7 +175,11 @@ public interface FleetArrivalAuthority {
             reason = reason == null ? "" : reason;
         }
 
-        /** Worlds without exact physical route geometry retain the historical compatibility seam. */
+        /**
+         * Returns the historical compatibility result for worlds without exact route geometry.
+         *
+         * @return supported=false compatibility plan that does not block legacy movement
+         */
         public static RouteFuelPlan compatibility() {
             return new RouteFuelPlan(false, true, 0d, 0d, 0d, "route fuel planning unsupported");
         }
