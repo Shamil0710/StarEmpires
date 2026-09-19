@@ -10,10 +10,49 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static com.spacesim.world.GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeneratedCampaignProductionBootstrapRegressionTest {
+    @Test
+    void legacyFreightAlreadyInTransitReceivesFiniteEngineeringExactlyOnArrival() {
+        GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        var runtime = campaign.runtime();
+        var freighter = runtime.freight().capture().freighters().stream()
+                .filter(value -> !value.activeOrderId().isBlank())
+                .findFirst().orElseThrow();
+        var order = runtime.freight().findOrder(freighter.activeOrderId()).orElseThrow();
+        int nextIndex = switch (freighter.phase()) {
+            case OUTBOUND -> freighter.routeIndex() + 1;
+            case RETURNING -> freighter.routeIndex() - 1;
+            default -> throw new AssertionError("active bootstrap freighter is not moving");
+        };
+        var destination = order.orderedSystems().get(nextIndex);
+        var placement = runtime.world().findFleet(freighter.fleetId()).orElseThrow();
+        var entity = runtime.world().findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().require(placement.localEntityId());
+        entity.remove(EngineeringComponent.class);
+        assertNull(entity.getComponent(EngineeringComponent.class));
+
+        placeAtOutgoingEndpoint(runtime, freighter.fleetId(), destination);
+        runtime.requestNextRouteHop(freighter.fleetId());
+        for (int attempt = 0;
+                attempt < 800 && runtime.world().findFleetJump(freighter.fleetId()).isPresent();
+                attempt++) {
+            runtime.advanceFrame(0.25f);
+        }
+
+        var arrived = runtime.world().findFleet(freighter.fleetId()).orElseThrow();
+        var arrivedEntity = runtime.world().findSession(arrived.systemId()).orElseThrow()
+                .getEntityRegistry().require(arrived.localEntityId());
+        EngineeringComponent migrated = arrivedEntity.getComponent(EngineeringComponent.class);
+        assertNotNull(migrated, "legacy detached freight must gain finite engineering on first arrival");
+        assertTrue(migrated.runtimeState.consumables().reactionMassKg() > 0d);
+    }
+
     @Test
     void ordinaryCampaignSurvivesFreightPlanningAndUsesCanonicalPublicFactionNames() {
         long seed = Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED;
