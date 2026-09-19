@@ -1,7 +1,7 @@
 package com.spacesim.content;
 
 import com.badlogic.ashley.core.Entity;
-import com.spacesim.components.CombatComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
@@ -324,8 +324,8 @@ class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
             Entity fleetEntity = entity(runtime, placement);
             EngineeringComponent engineering = fleetEntity.getComponent(EngineeringComponent.class);
             FactionComponent faction = fleetEntity.getComponent(FactionComponent.class);
-            CombatComponent combat = fleetEntity.getComponent(CombatComponent.class);
-            if (engineering == null || faction == null || combat == null) continue;
+            ShipComponent ship = fleetEntity.getComponent(ShipComponent.class);
+            if (engineering == null || faction == null || ship == null || ship.type == null || !ship.type.isCombat()) continue;
             String stableFaction = identities.stableId(faction.factionId).orElseThrow();
             result.add(new MilitaryFleet(placement.id(), faction.factionId, stableFaction, placement));
         }
