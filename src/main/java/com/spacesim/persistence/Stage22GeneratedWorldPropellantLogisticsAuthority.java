@@ -180,8 +180,19 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
         // Solve backwards for the minimum departure fuel at every route node. This is what makes
         // refueling anticipatory rather than merely reactive: if a later node is dry or has only a
         // small stock, an earlier station can load the extra mass that must be carried through it.
+        //
+        // The protected reserve belongs to the whole no-service stretch, not independently to every
+        // hop. Otherwise two dry hops could each retain 10% of that hop's departure fuel while the
+        // complete remaining route still ends below the direct-route 10% reserve authority. Reset
+        // the reserve horizon only at a node that has physically accessible finite propellant stock.
         double[] requiredDepartureFuelKg = new double[route.size()];
+        double reserveHorizonDeltaVMps = 0d;
         for (int index = segmentCount - 1; index >= 0; index--) {
+            if (availableStationStockKg[index + 1] > EPSILON) {
+                reserveHorizonDeltaVMps = segmentDeltaVMps[index];
+            } else {
+                reserveHorizonDeltaVMps += segmentDeltaVMps[index];
+            }
             double requiredAtNextDeparture = requiredDepartureFuelKg[index + 1];
             double requiredArrivalFuel = Math.max(
                     0d, requiredAtNextDeparture - availableStationStockKg[index + 1]);
@@ -189,6 +200,7 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
                     nonReactionMassKg,
                     exhaustVelocityMps,
                     segmentDeltaVMps[index],
+                    reserveHorizonDeltaVMps,
                     requiredArrivalFuel);
             if (!Double.isFinite(requiredDepartureFuel)
                     || requiredDepartureFuel > capacityKg + EPSILON) {
@@ -511,8 +523,9 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
             double nonReactionMassKg,
             double exhaustVelocityMps,
             double segmentDeltaVMps,
+            double reserveHorizonDeltaVMps,
             double requiredArrivalFuelKg) {
-        if (segmentDeltaVMps <= EPSILON) {
+        if (segmentDeltaVMps <= EPSILON && reserveHorizonDeltaVMps <= EPSILON) {
             return Math.max(0d, requiredArrivalFuelKg);
         }
         double retainedFraction = StrictMath.exp(-segmentDeltaVMps / exhaustVelocityMps);
@@ -522,11 +535,16 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
         }
         double futureRequirement = (Math.max(0d, requiredArrivalFuelKg)
                 + nonReactionMassKg * burnedFraction) / retainedFraction;
-        double reserveDenominator = retainedFraction - RESERVE_FRACTION;
+
+        double reserveRetainedFraction =
+                StrictMath.exp(-reserveHorizonDeltaVMps / exhaustVelocityMps);
+        double reserveBurnedFraction = 1d - reserveRetainedFraction;
+        double reserveDenominator = reserveRetainedFraction - RESERVE_FRACTION;
         if (!(reserveDenominator > EPSILON)) {
             return Double.POSITIVE_INFINITY;
         }
-        double reserveRequirement = nonReactionMassKg * burnedFraction / reserveDenominator;
+        double reserveRequirement =
+                nonReactionMassKg * reserveBurnedFraction / reserveDenominator;
         return Math.max(futureRequirement, reserveRequirement);
     }
 
