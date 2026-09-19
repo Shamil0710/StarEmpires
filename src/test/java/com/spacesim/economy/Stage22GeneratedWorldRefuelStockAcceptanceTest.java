@@ -9,6 +9,7 @@ import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetPlacementState;
 import com.spacesim.world.StarSystemId;
+import com.spacesim.world.GeneratedWorldFtlTestSupport;
 import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +57,108 @@ class Stage22GeneratedWorldRefuelStockAcceptanceTest {
         assertEquals(0d, preparation.loadedMassKg(), 0d);
         assertEquals(0d, reactionMassKg(engineering(live, candidate.placement())), 0d,
                 "failed preparation must not manufacture reaction mass");
+    }
+
+    @Test
+    void twoHopJourneyCanReachIntermediateFiniteRefuelNodeBeforeContinuing() {
+        Stage20GeneratedWorldRuntimeBridge.LiveRuntime live =
+                Stage20PlayableGeneratedWorldFactory.create(
+                        Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
+        TwoHopCandidate candidate = twoHopCandidate(live);
+        List<StarSystemId> route = List.of(
+                candidate.placement().systemId(), candidate.middle(), candidate.destination());
+
+        var direct = live.world().planFleetRouteFuel(candidate.placement().id(), route);
+        assertFalse(direct.feasible(),
+                "selected partial tank must be insufficient for the whole two-hop route without service");
+        var firstHop = live.world().planFleetRouteFuel(
+                candidate.placement().id(),
+                List.of(candidate.placement().systemId(), candidate.middle()));
+        assertTrue(firstHop.feasible(),
+                "selected partial tank must safely reach the intermediate service system");
+
+        var journey = live.world().planFleetPropellantJourney(candidate.placement().id(), route);
+        assertTrue(journey.feasible());
+        assertTrue(journey.refuelStops().stream()
+                        .anyMatch(stop -> stop.systemId().equals(candidate.middle())),
+                "journey must explicitly depend on the intermediate finite refuel node");
+
+        var departure = live.world().prepareFleetPropellantDeparture(candidate.placement().id(), route);
+        assertTrue(departure.ready());
+        assertEquals(0d, departure.loadedMassKg(), 1e-6d,
+                "the first safe hop must not pre-consume fuel from a future station");
+
+        double fuelBeforeFirstHop = reactionMassKg(engineering(live, candidate.placement()));
+        live.world().requestFleetJump(candidate.placement().id(), candidate.middle());
+        GeneratedWorldFtlTestSupport.advanceOrdinaryJumpToCompletion(
+                live, candidate.placement().id());
+        FleetPlacementState atMiddle = live.world().findFleet(candidate.placement().id()).orElseThrow();
+        assertEquals(candidate.middle(), atMiddle.systemId());
+        double fuelAfterFirstHop = reactionMassKg(engineering(live, atMiddle));
+        assertTrue(fuelAfterFirstHop < fuelBeforeFirstHop,
+                "ordinary physical first-hop approach must consume reaction mass");
+
+        double middleStockBefore = systemPropellant(live, candidate.middle());
+        var continuePreparation = live.world().prepareFleetPropellantDeparture(
+                candidate.placement().id(), List.of(candidate.middle(), candidate.destination()));
+        assertTrue(continuePreparation.ready());
+        assertTrue(continuePreparation.loadedMassKg() > 0d,
+                "arrival at the intermediate node must physically load station propellant");
+        assertEquals(middleStockBefore - continuePreparation.loadedMassKg(),
+                systemPropellant(live, candidate.middle()), 1e-6d);
+        assertTrue(live.world().planFleetRouteFuel(
+                        candidate.placement().id(),
+                        List.of(candidate.middle(), candidate.destination())).feasible(),
+                "after committed refueling the remaining direct hop must be physically safe");
+    }
+
+    private static TwoHopCandidate twoHopCandidate(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime) {
+        double[] fractions = {0.10d, 0.15d, 0.20d, 0.25d, 0.30d, 0.40d, 0.50d, 0.60d, 0.70d, 0.80d};
+        for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
+            if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+                continue;
+            }
+            EngineeringComponent fitted = engineering(runtime, placement);
+            if (fitted == null || reactionMassKg(fitted) <= 0d) {
+                continue;
+            }
+            ShipEngineeringRuntime.RuntimeState original = fitted.runtimeState;
+            for (StarSystemId middle : runtime.world().getTopology()
+                    .neighbors(placement.systemId()).stream().sorted().toList()) {
+                if (systemPropellant(runtime, middle) <= 0d) {
+                    continue;
+                }
+                for (StarSystemId destination : runtime.world().getTopology()
+                        .neighbors(middle).stream().sorted().toList()) {
+                    if (destination.equals(placement.systemId())) {
+                        continue;
+                    }
+                    for (double fraction : fractions) {
+                        fitted.setRuntimeState(scaleReactionMass(original, fraction));
+                        var first = runtime.world().planFleetRouteFuel(
+                                placement.id(), List.of(placement.systemId(), middle));
+                        var whole = runtime.world().planFleetRouteFuel(
+                                placement.id(), List.of(placement.systemId(), middle, destination));
+                        if (!first.supported() || !first.feasible() || whole.feasible()) {
+                            continue;
+                        }
+                        var journey = runtime.world().planFleetPropellantJourney(
+                                placement.id(), List.of(placement.systemId(), middle, destination));
+                        if (journey.feasible()
+                                && journey.refuelStops().stream()
+                                .anyMatch(stop -> stop.systemId().equals(middle))
+                                && journey.refuelStops().stream()
+                                .noneMatch(stop -> stop.systemId().equals(placement.systemId()))) {
+                            return new TwoHopCandidate(placement, middle, destination);
+                        }
+                    }
+                }
+            }
+            fitted.setRuntimeState(original);
+        }
+        throw new AssertionError(
+                "generated world lacks a two-hop partial-tank route recoverable at an intermediate station");
     }
 
     private static Candidate refuelCandidate(Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime) {
@@ -110,6 +213,41 @@ class Stage22GeneratedWorldRefuelStockAcceptanceTest {
                 .sum();
     }
 
+    private static ShipEngineeringRuntime.RuntimeState scaleReactionMass(
+            ShipEngineeringRuntime.RuntimeState current,
+            double fraction) {
+        ConsumableState consumables = current.consumables();
+        ArrayList<ConsumableLoad> loads = new ArrayList<>();
+        for (ConsumableLoad load : consumables.interfaceLoads()) {
+            if (load.kind()
+                    == com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind.REACTION_MASS) {
+                loads.add(new ConsumableLoad(
+                        load.mountId(),
+                        load.interfaceId(),
+                        load.kind(),
+                        load.amount() * fraction,
+                        load.massKg() * fraction,
+                        load.itemCount()));
+            } else {
+                loads.add(load);
+            }
+        }
+        ConsumableState scaled = new ConsumableState(
+                consumables.cargoMassKg(),
+                consumables.storesMassKg(),
+                consumables.missionPayloadMassKg(),
+                consumables.missionIntegrationVolumeM3(),
+                List.copyOf(loads));
+        return new ShipEngineeringRuntime.RuntimeState(
+                scaled,
+                current.sharedBusEnergyJ(),
+                current.shipHeatStoredJ(),
+                current.localHeatJByMount(),
+                current.thrustLimitNByMount(),
+                current.coolantBusCapacityW(),
+                current.ftlCooldownSecondsByMount());
+    }
+
     private static ShipEngineeringRuntime.RuntimeState withoutReactionMass(
             ShipEngineeringRuntime.RuntimeState current) {
         ConsumableState consumables = current.consumables();
@@ -140,5 +278,11 @@ class Stage22GeneratedWorldRefuelStockAcceptanceTest {
     }
 
     private record Candidate(FleetPlacementState placement, StarSystemId destination) {
+    }
+
+    private record TwoHopCandidate(
+            FleetPlacementState placement,
+            StarSystemId middle,
+            StarSystemId destination) {
     }
 }
