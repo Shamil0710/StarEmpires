@@ -297,14 +297,23 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
                 || !route.get(0).equals(placement.systemId())) {
             throw new IllegalStateException("route fuel preflight must begin at the fleet's local system");
         }
-        EngineeringComponent live = localEngineering(placement);
-        if (live == null) {
+        EngineeringComponent fitted = localEngineering(placement);
+        if (fitted == null) {
             return FleetArrivalAuthority.RouteFuelPlan.compatibility();
         }
-        EngineeringComponent preview = new EngineeringComponent(
-                live.fit, live.runtimeState, live.instanceState);
-        double initialReactionMassKg = preview.runtimeState.consumables().reactionMassKg();
+
+        var derived = engineering.derive(fitted);
+        double initialReactionMassKg = derived.reactionMassKg();
         double reserveKg = initialReactionMassKg * ROUTE_REACTION_MASS_RESERVE_FRACTION;
+        double exhaustVelocityMps = derived.effectiveExhaustVelocityMps();
+        if (initialReactionMassKg <= 0d
+                || derived.availableThrustN() <= 0d
+                || exhaustVelocityMps <= 0d) {
+            return new FleetArrivalAuthority.RouteFuelPlan(
+                    true, false, 0d, 0d, initialReactionMassKg,
+                    "no operational reaction-mass propulsion budget");
+        }
+
         double requiredDeltaV = 0d;
         boolean military = isCombatShip(placement);
         LocalPhysicalKinematics current = materialization(route.get(0))
@@ -328,32 +337,30 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
             var displacement = current.position().displacementTo(departure.position());
             double cruiseVelocityX = displacement.deltaXM() / durationSeconds;
             double cruiseVelocityY = displacement.deltaYM() / durationSeconds;
-            double legDeltaV = maneuverDeltaV(current, cruiseVelocityX, cruiseVelocityY);
-            requiredDeltaV += legDeltaV;
-
-            var maneuver = engineering.planDeltaV(preview, legDeltaV);
-            if (!maneuver.feasible()) {
-                double remaining = preview.runtimeState.consumables().reactionMassKg();
-                return new FleetArrivalAuthority.RouteFuelPlan(
-                        true, false, requiredDeltaV,
-                        Math.max(0d, initialReactionMassKg - remaining),
-                        remaining,
-                        "insufficient reaction mass/power/thermal capability before hop "
-                                + origin + " -> " + destination);
-            }
-            preview.setRuntimeState(maneuver.resultingState());
+            requiredDeltaV += maneuverDeltaV(current, cruiseVelocityX, cruiseVelocityY);
             current = resolve(origin, destination).physicalState();
         }
 
-        double remaining = preview.runtimeState.consumables().reactionMassKg();
-        boolean reserveSatisfied = remaining + 1.0e-6d >= reserveKg;
+        double maximumConsumableKg = Math.max(0d, initialReactionMassKg - reserveKg);
+        double finalMassAtReserveKg = derived.totalMassKg() - maximumConsumableKg;
+        double reserveProtectedDeltaVMps = maximumConsumableKg <= 0d
+                ? 0d
+                : exhaustVelocityMps * StrictMath.log(
+                        derived.totalMassKg() / finalMassAtReserveKg);
+        boolean feasible = requiredDeltaV <= reserveProtectedDeltaVMps + 1.0e-6d;
+        double requiredPropellantKg = requiredDeltaV <= 0d
+                ? 0d
+                : derived.totalMassKg()
+                        * (1d - StrictMath.exp(-requiredDeltaV / exhaustVelocityMps));
+        requiredPropellantKg = Math.min(initialReactionMassKg, Math.max(0d, requiredPropellantKg));
+        double remaining = Math.max(0d, initialReactionMassKg - requiredPropellantKg);
         return new FleetArrivalAuthority.RouteFuelPlan(
                 true,
-                reserveSatisfied,
+                feasible,
                 requiredDeltaV,
-                Math.max(0d, initialReactionMassKg - remaining),
+                requiredPropellantKg,
                 remaining,
-                reserveSatisfied ? "" : "route would violate 10% reaction-mass reserve");
+                feasible ? "" : "route would exceed reaction-mass budget with 10% reserve");
     }
 
     @Override
