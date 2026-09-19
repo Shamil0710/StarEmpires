@@ -854,6 +854,13 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                         || placement.systemId().equals(fleetState.currentSystemId())) {
                     continue;
                 }
+                Entity arrivedEntity = world.findSession(placement.systemId()).orElseThrow()
+                        .getEntityRegistry().require(placement.localEntityId());
+                if (arrivedEntity.getComponent(com.spacesim.components.EngineeringComponent.class) == null) {
+                    // One-time migration for historical saves captured while generated freight was
+                    // already detached in transit before finite propulsion entered the world schema.
+                    arrivedEntity.add(freightEngineering(fleetState));
+                }
                 LocalPhysicalKinematics exact = arrival.materialization(placement.systemId())
                         .physicalState(placement.localEntityId()).orElseThrow(
                                 () -> new IllegalStateException(
