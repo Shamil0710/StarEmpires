@@ -74,10 +74,13 @@ dv_brake = |v_cruise|
 dv_leg   = dv_accel + dv_brake
 ```
 
-Before the approach starts, that delta-v is previewed against the real engineering runtime. If current
-reaction mass, power, thermal condition or drive capability cannot produce it, the jump request fails
-while the ship is still in its current system. A successful preview is committed once and the existing
-deterministic Stage-20 approach kinematics remain the spatial authority.
+Before the approach starts, the complete acceleration-plus-braking delta-v is previewed against the
+real engineering runtime. If current reaction mass, power, thermal condition or drive capability cannot
+complete both impulses, the jump request fails while the ship is still in its current system and spends
+no propellant. Once accepted, only the acceleration impulse is committed at departure; the matching
+braking impulse is committed at the physical approach boundary before the ship is allowed to settle at
+the outgoing FTL endpoint. The existing deterministic Stage-20 approach kinematics remain the spatial
+authority.
 
 ## Complete-route preflight
 
