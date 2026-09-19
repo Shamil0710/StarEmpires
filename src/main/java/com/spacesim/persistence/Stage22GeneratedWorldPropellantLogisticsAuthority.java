@@ -46,6 +46,7 @@ import java.util.TreeMap;
 public final class Stage22GeneratedWorldPropellantLogisticsAuthority
         implements FleetPropellantLogisticsAuthority {
     private static final double EPSILON = 1.0e-6d;
+    private static final String LIQUID_STORAGE_CLASS_ID = "storage.liquid_tank";
     private static final double RESERVE_FRACTION = 0.10d;
     private static final int TOP_UP_SEARCH_STEPS = 64;
 
@@ -407,6 +408,8 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
             String participantFaction) {
         return infrastructure.endpoints().stream()
                 .filter(endpoint -> endpoint.systemId().equals(systemId))
+                .filter(endpoint -> endpoint.handlingCapability().supportedStorageClassIds()
+                        .contains(LIQUID_STORAGE_CLASS_ID))
                 .filter(endpoint -> marketAccess(endpoint, participantFaction))
                 .sorted(Comparator.comparing(RuntimeEndpoint::stationId))
                 .toList();
