@@ -1,7 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.badlogic.ashley.core.Entity;
-import com.spacesim.components.CombatComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
@@ -250,8 +250,8 @@ class Stage21EGeneratedWorldTrafficRuntimeAcceptanceTest {
                     .getEntityRegistry().require(placement.localEntityId());
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
-            CombatComponent combat = entity.getComponent(CombatComponent.class);
-            if (engineering != null && faction != null && combat != null) {
+            ShipComponent ship = entity.getComponent(ShipComponent.class);
+            if (engineering != null && faction != null && ship != null && ship.type != null && ship.type.isCombat()) {
                 result.add(new MilitaryFleet(placement.id(), faction.factionId, placement.systemId()));
             }
         }
