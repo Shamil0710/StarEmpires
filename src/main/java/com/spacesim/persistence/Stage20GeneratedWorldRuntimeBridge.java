@@ -437,6 +437,9 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             this.logistics = new Stage18LogisticsRuntime(
                     Stage18ResourceOntologyLoader.loadDefault(),
                     Objects.requireNonNull(products, "products"));
+            this.world.bindFleetPropellantLogisticsAuthority(
+                    new Stage22GeneratedWorldPropellantLogisticsAuthority(
+                            this.world, this.infrastructure, this.industry));
         }
 
         /** @return ordinary multi-system simulation authority */
@@ -673,13 +676,14 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     remainingRoute.add(order.orderedSystems().get(index));
                 }
             }
-            var fuel = world.planFleetRouteFuel(fleetId, remainingRoute);
-            if (fuel.supported() && !fuel.feasible()) {
+            var preparation = world.prepareFleetPropellantDeparture(fleetId, remainingRoute);
+            if (!preparation.ready()) {
                 throw new IllegalStateException(
-                        "freighter cannot start remaining route without risking propellant stranding: "
-                                + fleetId + " reason=" + fuel.reason()
-                                + " requiredDeltaVMps=" + fuel.requiredDeltaVMps()
-                                + " remainingReactionMassKg=" + fuel.remainingReactionMassKg());
+                        "freighter cannot start remaining route without a safe finite-propellant plan: "
+                                + fleetId + " reason=" + preparation.reason()
+                                + " requiredDeltaVMps=" + preparation.journey().requiredDeltaVMps()
+                                + " projectedRemainingReactionMassKg="
+                                + preparation.journey().projectedRemainingReactionMassKg());
             }
             return world.requestFleetJump(fleetId, order.orderedSystems().get(nextIndex));
         }
