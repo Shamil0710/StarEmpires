@@ -73,6 +73,91 @@ public final class FleetStrategicRoutePlanner {
         return Optional.empty();
     }
 
+    /**
+     * Finds the shortest lawful route whose every visited prefix is accepted by an additional
+     * physical/logistics constraint.
+     *
+     * <p>The search keeps complete simple paths rather than one predecessor per system because
+     * finite propellant feasibility can depend on the route history and on which servicing systems
+     * were crossed. Candidate neighbors are sorted, so equal-hop alternatives remain deterministic.</p>
+     *
+     * @param factionId faction requesting transit
+     * @param origin starting system
+     * @param destination target system
+     * @param tick simulation tick used for access evaluation
+     * @param accessPolicy legal transit policy
+     * @param routeConstraint additional pure prefix constraint, for example finite propellant logistics
+     * @return shortest deterministic lawful constrained route when reachable
+     */
+    public Optional<Route> planConstrained(
+            int factionId,
+            StarSystemId origin,
+            StarSystemId destination,
+            long tick,
+            TransitAccessPolicy accessPolicy,
+            RouteConstraint routeConstraint) {
+        Objects.requireNonNull(origin, "origin");
+        Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(accessPolicy, "accessPolicy");
+        Objects.requireNonNull(routeConstraint, "routeConstraint");
+        if (topology.findSystem(origin).isEmpty() || topology.findSystem(destination).isEmpty()) {
+            return Optional.empty();
+        }
+        Route start = new Route(List.of(origin));
+        if (!routeConstraint.allows(start)) {
+            return Optional.empty();
+        }
+        if (origin.equals(destination)) {
+            return Optional.of(start);
+        }
+
+        ArrayDeque<Route> queue = new ArrayDeque<>();
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            Route current = queue.removeFirst();
+            StarSystemId from = current.destination();
+            ArrayList<StarSystemId> neighbors = new ArrayList<>(topology.neighbors(from));
+            neighbors.sort(StarSystemId::compareTo);
+            for (StarSystemId neighbor : neighbors) {
+                if (current.systems().contains(neighbor)) {
+                    continue;
+                }
+                boolean isDestination = neighbor.equals(destination);
+                if (!accessPolicy.canEnter(factionId, from, neighbor, tick, isDestination)) {
+                    continue;
+                }
+                ArrayList<StarSystemId> systems = new ArrayList<>(current.systems());
+                systems.add(neighbor);
+                Route candidate = new Route(List.copyOf(systems));
+                if (!routeConstraint.allows(candidate)) {
+                    continue;
+                }
+                if (isDestination) {
+                    return Optional.of(candidate);
+                }
+                queue.addLast(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Pure additional route-prefix feasibility boundary.
+     *
+     * <p>Returning false means the fleet cannot physically reach the final node of that prefix, so
+     * extending it cannot make the rejected prefix safe.</p>
+     */
+    @FunctionalInterface
+    public interface RouteConstraint {
+        /**
+         * Evaluates one origin-to-current simple route prefix.
+         *
+         * @param route candidate route prefix
+         * @return true when the prefix remains physically/logistically admissible
+         */
+        boolean allows(Route route);
+    }
+
     private static Route reconstruct(
             Map<StarSystemId, StarSystemId> previous,
             StarSystemId origin,

@@ -5,6 +5,7 @@ import com.spacesim.content.ContentCatalogLoader;
 import com.spacesim.content.Stage18FacilityCatalog.FacilityDefinition;
 import com.spacesim.content.Stage18ShipyardCatalog.YardDefinition;
 import com.spacesim.content.Stage18ShipyardCatalogLoader;
+import com.spacesim.content.Stage18ResourceOntologyLoader;
 import com.spacesim.economy.Stage18FacilityRuntime.InstalledFacilityState;
 import com.spacesim.economy.Stage18ShipyardRuntime.InstalledYardState;
 import com.spacesim.economy.Stage18StationStorage.StationStorageSnapshot;
@@ -79,6 +80,9 @@ import java.util.TreeMap;
  */
 @SuppressWarnings("doclint:missing")
 public final class Stage20PlayableGeneratedWorldFactory {
+    private static final String PROPELLANT_COMMODITY_ID = "commodity.material.purified_water";
+    private static final String LIQUID_STORAGE_CLASS_ID = "storage.liquid_tank";
+    private static final double MAX_INITIAL_PROPELLANT_RESERVE_KG = 24_000_000d;
     /** Seed used by the first public generated-world viewer. */
     public static final long DEFAULT_WORLD_SEED = 1L;
 
@@ -321,12 +325,34 @@ public final class Stage20PlayableGeneratedWorldFactory {
                     operating.processes().get(0).process().facilityDefinitionId(),
                     operating.processes().get(0).process().processId(),
                     operating.processes().get(0).process().outputCommodityId()));
+            TreeMap<String, Double> initialCommodities = new TreeMap<>(
+                    requiredByStation.getOrDefault(station.station(), new TreeMap<>()));
+            double liquidCapacityKg = candidate.archetype().storageCapacityByClassKg()
+                    .getOrDefault(LIQUID_STORAGE_CLASS_ID, 0d);
+            if (liquidCapacityKg > 0d
+                    && candidate.archetype().transferStorageClassIds()
+                    .contains(LIQUID_STORAGE_CLASS_ID)) {
+                var ontology = Stage18ResourceOntologyLoader.loadDefault();
+                double usedLiquidKg = 0d;
+                for (var entry : initialCommodities.entrySet()) {
+                    var commodity = ontology.findCommodity(entry.getKey());
+                    if (commodity != null && LIQUID_STORAGE_CLASS_ID.equals(commodity.storageClassId())) {
+                        usedLiquidKg += entry.getValue();
+                    }
+                }
+                double freeLiquidKg = Math.max(0d, liquidCapacityKg - usedLiquidKg);
+                double reserveKg = Math.min(
+                        MAX_INITIAL_PROPELLANT_RESERVE_KG, freeLiquidKg * 0.5d);
+                if (reserveKg > 0d) {
+                    initialCommodities.merge(PROPELLANT_COMMODITY_ID, reserveKg, Double::sum);
+                }
+            }
             assignments.add(new StationInventoryAssignment(
                     station.station(),
                     new StationStorageSnapshot(
                             station.station().stationPlacementId(),
                             candidate.archetype().storageCapacityByClassKg(),
-                            requiredByStation.get(station.station()),
+                            Map.copyOf(initialCommodities),
                             Map.of())));
         }
         return new InitialInventoryAuthority(
