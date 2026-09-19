@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +98,35 @@ class Stage21EGeneratedWorldTrafficRuntimeAcceptanceTest {
                 "denied edge admission must not start the ordinary jump FSM");
         FleetPlacementState placement = runtime.world().findFleet(outbound.fleetId()).orElseThrow();
         assertEquals(from, placement.systemId());
+    }
+
+    @Test
+    void legacyFreightDetachedWithoutEngineeringMigratesOnceOnPhysicalArrival() {
+        Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime = newRuntime();
+        FreighterState source = assignedSourceFreighter(runtime);
+        prepareOutboundCargo(runtime, source);
+        FreighterState outbound = runtime.freight().findFreighter(source.fleetId()).orElseThrow();
+        TransportOrderState order = runtime.freight().findOrder(outbound.activeOrderId()).orElseThrow();
+        StarSystemId destination = order.orderedSystems().get(outbound.routeIndex() + 1);
+
+        FleetPlacementState placement = runtime.world().findFleet(outbound.fleetId()).orElseThrow();
+        Entity entity = runtime.world().findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().require(placement.localEntityId());
+        entity.remove(EngineeringComponent.class);
+        assertNull(entity.getComponent(EngineeringComponent.class));
+
+        GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(runtime, outbound.fleetId(), destination);
+        runtime.requestNextRouteHop(outbound.fleetId());
+        GeneratedWorldFtlTestSupport.advanceOrdinaryJumpToCompletion(runtime, outbound.fleetId());
+
+        FleetPlacementState arrived = runtime.world().findFleet(outbound.fleetId()).orElseThrow();
+        assertEquals(destination, arrived.systemId());
+        Entity arrivedEntity = runtime.world().findSession(destination).orElseThrow()
+                .getEntityRegistry().require(arrived.localEntityId());
+        EngineeringComponent migrated = arrivedEntity.getComponent(EngineeringComponent.class);
+        assertNotNull(migrated,
+                "historical freight detached before finite propulsion must migrate on first arrival");
+        assertTrue(migrated.runtimeState.consumables().reactionMassKg() > 0d);
     }
 
     @Test
