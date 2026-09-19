@@ -1,7 +1,7 @@
 package com.spacesim.world;
 
 import com.badlogic.ashley.core.Entity;
-import com.spacesim.components.CombatComponent;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.content.Stage22CorePairEvidenceArchive;
@@ -335,8 +335,8 @@ class Stage22CorePairPreparedDefenseGeneratedWorldPersistenceAcceptanceTest {
             Entity entity = entity(runtime, placement.id());
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
-            CombatComponent combat = entity.getComponent(CombatComponent.class);
-            if (engineering == null || faction == null || combat == null) continue;
+            ShipComponent ship = entity.getComponent(ShipComponent.class);
+            if (engineering == null || faction == null || ship == null || ship.type == null || !ship.type.isCombat()) continue;
             byFaction.computeIfAbsent(faction.factionId, ignored -> new ArrayList<>())
                     .add(new MilitaryFleet(placement.id(), placement.systemId()));
         }
