@@ -681,7 +681,12 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                                 fleetState.currentSystemId(),
                                 directionalDestination,
                                 world.getAuthoritativeWorldTick(),
-                                (factionId, from, to, tick, destination) -> true,
+                                (factionId, from, to, tick, destination) -> {
+                                    String controller = world.controllingFaction(to).orElse(null);
+                                    return controller == null
+                                            || world.evaluateFactionMarketAccess(
+                                                    controller, fleetState.stableFactionId()).allowed();
+                                },
                                 candidate -> world.planFleetPropellantJourney(
                                         fleetId, candidate.systems()).feasible())
                         .orElse(null);
