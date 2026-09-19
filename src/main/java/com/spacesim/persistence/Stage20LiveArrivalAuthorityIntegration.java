@@ -259,18 +259,27 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         var displacement = current.position().displacementTo(departure.position());
         double cruiseVelocityX = displacement.deltaXM() / durationSeconds;
         double cruiseVelocityY = displacement.deltaYM() / durationSeconds;
-        double requiredDeltaV = accelerationDeltaV(
+        double accelerationDeltaV = accelerationDeltaV(
                 current, cruiseVelocityX, cruiseVelocityY);
+        double completeLegDeltaV = accelerationDeltaV
+                + Math.hypot(cruiseVelocityX, cruiseVelocityY);
         EngineeringComponent fitted = localEngineering(placement);
         if (fitted != null) {
-            var maneuver = engineering.planDeltaV(fitted, requiredDeltaV);
-            if (!maneuver.feasible()) {
+            // Fail before any propellant is spent unless the same current engineering state can
+            // both accelerate onto this leg and brake to the required stationary FTL endpoint.
+            var completeLeg = engineering.planDeltaV(fitted, completeLegDeltaV);
+            if (!completeLeg.feasible()) {
                 throw new IllegalStateException(
-                        "insufficient physical propulsion for FTL departure approach: " + fleetId
-                                + " requiredDeltaVMps=" + requiredDeltaV
-                                + " deliveredDeltaVMps=" + maneuver.deliveredDeltaVMps());
+                        "insufficient physical propulsion for complete FTL departure approach: " + fleetId
+                                + " requiredDeltaVMps=" + completeLegDeltaV
+                                + " deliveredDeltaVMps=" + completeLeg.deliveredDeltaVMps());
             }
-            engineering.commitManeuver(fitted, maneuver);
+            var acceleration = engineering.planDeltaV(fitted, accelerationDeltaV);
+            if (!acceleration.feasible()) {
+                throw new IllegalStateException(
+                        "complete departure plan became inconsistent before acceleration: " + fleetId);
+            }
+            engineering.commitManeuver(fitted, acceleration);
         }
         materialization(originSystemId).updatePhysicalState(
                 localEntityId,
