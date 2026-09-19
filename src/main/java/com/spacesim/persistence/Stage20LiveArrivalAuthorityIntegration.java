@@ -315,13 +315,6 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         double initialReactionMassKg = derived.reactionMassKg();
         double reserveKg = initialReactionMassKg * ROUTE_REACTION_MASS_RESERVE_FRACTION;
         double exhaustVelocityMps = derived.effectiveExhaustVelocityMps();
-        if (initialReactionMassKg <= 0d
-                || derived.availableThrustN() <= 0d
-                || exhaustVelocityMps <= 0d) {
-            return new FleetArrivalAuthority.RouteFuelPlan(
-                    true, false, 0d, 0d, initialReactionMassKg,
-                    "no operational reaction-mass propulsion budget");
-        }
 
         double requiredDeltaV = 0d;
         boolean military = isCombatShip(placement);
@@ -348,6 +341,14 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
             double cruiseVelocityY = displacement.deltaYM() / durationSeconds;
             requiredDeltaV += maneuverDeltaV(current, cruiseVelocityX, cruiseVelocityY);
             current = resolve(origin, destination).physicalState();
+        }
+
+        if (initialReactionMassKg <= 0d
+                || derived.availableThrustN() <= 0d
+                || exhaustVelocityMps <= 0d) {
+            return new FleetArrivalAuthority.RouteFuelPlan(
+                    true, false, requiredDeltaV, 0d, initialReactionMassKg,
+                    "no operational reaction-mass propulsion budget");
         }
 
         double maximumConsumableKg = Math.max(0d, initialReactionMassKg - reserveKg);
