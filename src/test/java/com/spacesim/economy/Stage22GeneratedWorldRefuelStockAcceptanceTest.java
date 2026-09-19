@@ -60,6 +60,28 @@ class Stage22GeneratedWorldRefuelStockAcceptanceTest {
     }
 
     @Test
+    void spentBootstrapPropellantSurvivesSaveRestoreWithoutFreeReplenishment() {
+        Stage20GeneratedWorldRuntimeBridge.LiveRuntime live =
+                Stage20PlayableGeneratedWorldFactory.create(
+                        Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
+        var endpoint = live.infrastructure().endpoints().stream()
+                .filter(value -> value.storage().commodityMassKg(PROPELLANT) > 1d)
+                .findFirst().orElseThrow();
+        double before = endpoint.storage().commodityMassKg(PROPELLANT);
+        double spent = Math.min(1_000d, before * 0.25d);
+        endpoint.storage().removeCommodity(PROPELLANT, spent);
+        double expected = before - spent;
+
+        var restored = Stage20GeneratedWorldRuntimeBridge.restore(live.captureState());
+
+        assertEquals(expected,
+                restored.infrastructure().endpoint(endpoint.stationId())
+                        .storage().commodityMassKg(PROPELLANT),
+                1e-6d,
+                "save/load must preserve spent station propellant instead of reseeding bootstrap stock");
+    }
+
+    @Test
     void twoHopJourneyCanReachIntermediateFiniteRefuelNodeBeforeContinuing() {
         Stage20GeneratedWorldRuntimeBridge.LiveRuntime live =
                 Stage20PlayableGeneratedWorldFactory.create(
