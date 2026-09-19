@@ -103,8 +103,9 @@ The route preflight:
 
 The 10% value is an operational route-planning reserve, not extra fuel and not a propulsion multiplier.
 
-A route failure does not auto-refuel, teleport or invent an alternate edge. The fleet remains safely in
-the current system so the existing service/order layer can refuel it or issue another route.
+The direct complete-route preflight itself never refuels, teleports or invents an alternate edge.
+The later refuel-aware logistics layer may satisfy that shortfall only from canonical finite station
+stock and then must re-run the same physical route safety checks before movement begins.
 
 ## Acceptance requirements
 
@@ -133,8 +134,16 @@ the following are true:
 - a canonical station endpoint exists in that system;
 - the endpoint has compatible `storage.liquid_tank` capacity and handling;
 - current diplomacy/market access permits that fleet to use the endpoint;
-- the station contains enough finite `commodity.material.purified_water` to make the next segment
-  safe while retaining the same 10% protected reaction-mass reserve.
+- the station contains enough finite `commodity.material.purified_water` for the planner's
+  backward-calculated minimum departure fuel requirement, which may intentionally carry extra fuel
+  across later dry or understocked systems while retaining the same 10% protected reserve on every
+  segment.
+
+For a fixed route, the planner first derives every local segment delta-v, then works backward from
+the destination. At each node it calculates the minimum fuel that must arrive before any local service
+and the minimum departure fuel required after service. This avoids the naive failure mode where a ship
+leaves the last well-supplied station with only enough fuel for the next hop and later discovers that a
+downstream system is dry.
 
 Planning never mutates or reserves station stock. Execution is deliberately receding-horizon:
 immediately before each new hop, only refueling in the fleet's current system is physically committed
