@@ -228,6 +228,13 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
 
         while (runtime.freight().findFreighter(freighter.fleetId()).orElseThrow().phase() == FreightPhase.OUTBOUND) {
             FreighterState beforeHop = runtime.freight().findFreighter(freighter.fleetId()).orElseThrow();
+            TransportOrderState liveOrder = runtime.freight().findOrder(beforeHop.activeOrderId()).orElseThrow();
+            StarSystemId nextHop = liveOrder.orderedSystems().get(beforeHop.routeIndex() + 1);
+            // This evidence is about interdiction -> freight -> production causality, not local
+            // approach timing. The shared helper waits only real fitted cooldown/heat/charge recovery
+            // and moves to the exact persisted direct-edge spool boundary; it never refuels the ship.
+            GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(
+                    runtime, freighter.fleetId(), nextHop);
             traffic.requestNextRouteHop(operations, freighter.fleetId());
             assertTrue(runtime.world().findFleetJump(freighter.fleetId()).isPresent());
             awaitJump(runtime, freighter.fleetId());
