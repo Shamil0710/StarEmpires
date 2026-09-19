@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static com.spacesim.world.GeneratedWorldFtlTestSupport.advanceOrdinaryJumpToCompletion;
 import static com.spacesim.world.GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -39,11 +40,7 @@ class GeneratedCampaignProductionBootstrapRegressionTest {
 
         placeAtOutgoingEndpoint(runtime, freighter.fleetId(), destination);
         runtime.requestNextRouteHop(freighter.fleetId());
-        for (int attempt = 0;
-                attempt < 800 && runtime.world().findFleetJump(freighter.fleetId()).isPresent();
-                attempt++) {
-            runtime.advanceFrame(0.25f);
-        }
+        advanceOrdinaryJumpToCompletion(runtime, freighter.fleetId());
 
         var arrived = runtime.world().findFleet(freighter.fleetId()).orElseThrow();
         var arrivedEntity = runtime.world().findSession(arrived.systemId()).orElseThrow()
