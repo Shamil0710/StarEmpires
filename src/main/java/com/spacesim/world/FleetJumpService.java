@@ -208,6 +208,17 @@ final class FleetJumpService {
         return Optional.ofNullable(fleetId == null ? null : jumpsByFleetId.get(fleetId));
     }
 
+    FleetArrivalAuthority.RouteFuelPlan planRouteFuel(
+            FleetId fleetId,
+            List<StarSystemId> orderedSystems) {
+        Objects.requireNonNull(fleetId, "fleetId");
+        Objects.requireNonNull(orderedSystems, "orderedSystems");
+        if (arrivalAuthority == null) {
+            return FleetArrivalAuthority.RouteFuelPlan.compatibility();
+        }
+        return arrivalAuthority.planRouteFuel(fleetId, orderedSystems);
+    }
+
     void bindArrivalAuthority(FleetArrivalAuthority authority) {
         FleetArrivalAuthority checked = Objects.requireNonNull(authority, "arrivalAuthority");
         if (arrivalAuthority != null) {
