@@ -31,7 +31,11 @@ public final class Stage22FreightStrategicEngineeringCatalogLoader {
         throw new AssertionError("utility class");
     }
 
-    /** Loads the core engineering universe plus explicit physical strategic freight variants. */
+    /**
+     * Loads the core engineering universe plus explicit physical strategic freight variants.
+     *
+     * @return immutable core engineering catalog including both fitted strategic freight variants
+     */
     public static ShipEngineeringCatalog loadDefault() {
         ShipEngineeringCatalog base = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         ArrayList<DemonstratorFitDefinition> fits = new ArrayList<>(base.getDemonstratorFits());
