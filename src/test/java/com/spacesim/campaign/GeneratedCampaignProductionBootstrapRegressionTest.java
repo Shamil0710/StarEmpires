@@ -23,7 +23,10 @@ class GeneratedCampaignProductionBootstrapRegressionTest {
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
         var runtime = campaign.runtime();
         var freighter = runtime.freight().capture().freighters().stream()
-                .filter(value -> !value.activeOrderId().isBlank())
+                .filter(value -> value.phase()
+                        == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.OUTBOUND
+                        || value.phase()
+                        == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.RETURNING)
                 .findFirst().orElseThrow();
         var order = runtime.freight().findOrder(freighter.activeOrderId()).orElseThrow();
         int nextIndex = switch (freighter.phase()) {
