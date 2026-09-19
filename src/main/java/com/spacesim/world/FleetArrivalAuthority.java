@@ -2,6 +2,7 @@ package com.spacesim.world;
 
 import com.spacesim.persistence.EntityId;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -79,6 +80,16 @@ public interface FleetArrivalAuthority {
     }
 
     /**
+     * Preflights the complete remaining route against finite local-propulsion resources.
+     *
+     * <p>The default reports an unsupported compatibility seam. Exact generated-world authorities
+     * override this to evaluate every origin-local approach before the first hop is committed.</p>
+     */
+    default RouteFuelPlan planRouteFuel(FleetId fleetId, List<StarSystemId> orderedSystems) {
+        return RouteFuelPlan.compatibility();
+    }
+
+    /**
      * Fails closed unless the fleet has physically reached the exact outgoing endpoint.
      *
      * <p>The ordinary jump FSM invokes this immediately before FTL consequences are committed and
@@ -123,6 +134,29 @@ public interface FleetArrivalAuthority {
             FleetId fleetId,
             ResolvedArrival arrival,
             EntityId destinationLocalEntityId);
+
+    /** Immutable full-route reaction-mass preflight. */
+    record RouteFuelPlan(
+            boolean supported,
+            boolean feasible,
+            double requiredDeltaVMps,
+            double consumedReactionMassKg,
+            double remainingReactionMassKg,
+            String reason) {
+        public RouteFuelPlan {
+            if (!Double.isFinite(requiredDeltaVMps) || requiredDeltaVMps < 0d
+                    || !Double.isFinite(consumedReactionMassKg) || consumedReactionMassKg < 0d
+                    || !Double.isFinite(remainingReactionMassKg) || remainingReactionMassKg < 0d) {
+                throw new IllegalArgumentException("route fuel scalars must be finite and non-negative");
+            }
+            reason = reason == null ? "" : reason;
+        }
+
+        /** Worlds without exact physical route geometry retain the historical compatibility seam. */
+        public static RouteFuelPlan compatibility() {
+            return new RouteFuelPlan(false, true, 0d, 0d, 0d, "route fuel planning unsupported");
+        }
+    }
 
     /**
      * Exact physical endpoint plus a compatibility projection for the legacy float transform.
