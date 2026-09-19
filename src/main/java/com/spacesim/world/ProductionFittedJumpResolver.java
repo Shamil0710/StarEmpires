@@ -1,10 +1,12 @@
 package com.spacesim.world;
 
 import com.spacesim.components.EngineeringComponent;
+import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.ship.ProductionEngineeringRuntimeResolver;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -19,6 +21,10 @@ final class ProductionFittedJumpResolver implements FleetJumpService.FittedJumpR
 
     ProductionFittedJumpResolver() {
         this(new ProductionEngineeringRuntimeResolver());
+    }
+
+    ProductionFittedJumpResolver(List<ShipEngineeringCatalog> catalogs) {
+        this(new ProductionEngineeringRuntimeResolver(catalogs));
     }
 
     ProductionFittedJumpResolver(ProductionEngineeringRuntimeResolver engineering) {
