@@ -58,8 +58,9 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
             return;
         }
 
-        double throttle = requiresThrust(
-                transform, control.axisX, control.axisY, control.movementSpeed) ? 1d : 0d;
+        double requiredDeltaV = requiredDeltaV(
+                transform, control.axisX, control.axisY, control.movementSpeed);
+        double throttle = engineering.throttleForDeltaV(fitted, requiredDeltaV, deltaTime);
         var result = engineering.advancePropulsion(fitted, throttle, deltaTime);
         FlightDynamics.advancePhysical(
                 transform,
@@ -70,7 +71,7 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
                 control.axisY,
                 deltaTime);
     }
-    private static boolean requiresThrust(
+    private static double requiredDeltaV(
             TransformComponent transform,
             float axisX,
             float axisY,
@@ -87,6 +88,7 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
         desiredY *= speedCap;
         float dx = desiredX - transform.velocity.x;
         float dy = desiredY - transform.velocity.y;
-        return dx * dx + dy * dy > THRUST_EPSILON * THRUST_EPSILON;
+        double deltaV = Math.hypot(dx, dy);
+        return deltaV <= THRUST_EPSILON ? 0d : deltaV;
     }
 }
