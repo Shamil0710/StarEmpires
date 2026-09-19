@@ -126,10 +126,11 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
                     direct.feasible() ? "" : "fitted propulsion has no authored station-servicing binding");
         }
         double exhaustVelocityMps = derived.effectiveExhaustVelocityMps();
-        if (!(exhaustVelocityMps > 0d) || !Double.isFinite(exhaustVelocityMps)) {
+        if (!(exhaustVelocityMps > 0d) || !Double.isFinite(exhaustVelocityMps)
+                || !(derived.availableThrustN() > 0d)) {
             return new JourneyPlan(
                     true, false, route, List.of(), 0d, derived.reactionMassKg(),
-                    "fitted propulsion has no usable exhaust velocity");
+                    "fitted propulsion has no operational thrust/exhaust authority");
         }
 
         double currentFuelKg = derived.reactionMassKg();
@@ -138,13 +139,17 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
         if (currentFuelKg > capacityKg + EPSILON) {
             throw new IllegalStateException("reaction mass exceeds authored serviceable tank capacity");
         }
+        if (route.stream().distinct().count() != route.size()) {
+            return new JourneyPlan(
+                    true, false, route, List.of(), 0d, currentFuelKg,
+                    "finite station projection requires a simple route without repeated systems");
+        }
 
         String participantFaction = fleetFaction(placement);
-        TreeMap<String, Double> projectedStationUseKg = new TreeMap<>();
-        ArrayList<RefuelStop> stops = new ArrayList<>();
+        int segmentCount = route.size() - 1;
+        double[] segmentDeltaVMps = new double[segmentCount];
         double previousCumulativeDeltaV = 0d;
         double totalDeltaV = 0d;
-
         for (int index = 1; index < route.size(); index++) {
             List<StarSystemId> prefix = route.subList(0, index + 1);
             var geometry = world.planFleetRouteFuel(id, prefix);
@@ -161,25 +166,58 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
             if (segmentDeltaV < -EPSILON) {
                 throw new IllegalStateException("route delta-v prefix regressed");
             }
-            segmentDeltaV = Math.max(0d, segmentDeltaV);
+            segmentDeltaVMps[index - 1] = Math.max(0d, segmentDeltaV);
+            previousCumulativeDeltaV = cumulativeDeltaV;
             totalDeltaV = cumulativeDeltaV;
+        }
 
-            if (!canCompleteSegment(
-                    currentFuelKg, nonReactionMassKg, exhaustVelocityMps, segmentDeltaV)) {
-                StarSystemId serviceSystem = route.get(index - 1);
-                double maximumTopUp = maximumProjectedTopUpKg(
-                        serviceSystem,
+        double[] availableStationStockKg = new double[route.size()];
+        for (int index = 0; index < route.size(); index++) {
+            availableStationStockKg[index] = projectedAvailableStockKg(
+                    route.get(index), participantFaction, port);
+        }
+
+        // Solve backwards for the minimum departure fuel at every route node. This is what makes
+        // refueling anticipatory rather than merely reactive: if a later node is dry or has only a
+        // small stock, an earlier station can load the extra mass that must be carried through it.
+        double[] requiredDepartureFuelKg = new double[route.size()];
+        for (int index = segmentCount - 1; index >= 0; index--) {
+            double requiredAtNextDeparture = requiredDepartureFuelKg[index + 1];
+            double requiredArrivalFuel = Math.max(
+                    0d, requiredAtNextDeparture - availableStationStockKg[index + 1]);
+            double requiredDepartureFuel = minimumDepartureFuelKg(
+                    nonReactionMassKg,
+                    exhaustVelocityMps,
+                    segmentDeltaVMps[index],
+                    requiredArrivalFuel);
+            if (!Double.isFinite(requiredDepartureFuel)
+                    || requiredDepartureFuel > capacityKg + EPSILON) {
+                return new JourneyPlan(
+                        true,
+                        false,
+                        route,
+                        List.of(),
+                        totalDeltaV,
+                        currentFuelKg,
+                        "tank capacity and accessible future station stock cannot make route fuel-safe");
+            }
+            requiredDepartureFuelKg[index] = Math.max(0d, requiredDepartureFuel);
+        }
+
+        TreeMap<String, Double> projectedStationUseKg = new TreeMap<>();
+        ArrayList<RefuelStop> stops = new ArrayList<>();
+        for (int index = 0; index < segmentCount; index++) {
+            double requiredDepartureFuel = requiredDepartureFuelKg[index];
+            if (currentFuelKg + EPSILON < requiredDepartureFuel) {
+                double requestedTopUpKg = requiredDepartureFuel - currentFuelKg;
+                double maximumTopUpKg = maximumProjectedTopUpKg(
+                        route.get(index),
                         participantFaction,
                         port,
                         currentFuelKg,
                         capacityKg,
                         projectedStationUseKg);
-                if (maximumTopUp <= EPSILON
-                        || !canCompleteSegment(
-                                currentFuelKg + maximumTopUp,
-                                nonReactionMassKg,
-                                exhaustVelocityMps,
-                                segmentDeltaV)) {
+                if (requestedTopUpKg > maximumTopUpKg + EPSILON) {
                     return new JourneyPlan(
                             true,
                             false,
@@ -187,19 +225,13 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
                             List.copyOf(stops),
                             totalDeltaV,
                             currentFuelKg,
-                            "no accessible station stock can make next route segment fuel-safe");
+                            "current/future accessible station stock cannot satisfy proactive route fuel");
                 }
-                double requiredTopUp = minimumTopUpKg(
-                        currentFuelKg,
-                        maximumTopUp,
-                        nonReactionMassKg,
-                        exhaustVelocityMps,
-                        segmentDeltaV);
                 List<RefuelStop> additions = allocateProjectedTopUp(
-                        serviceSystem,
+                        route.get(index),
                         participantFaction,
                         port,
-                        requiredTopUp,
+                        requestedTopUpKg,
                         currentFuelKg,
                         capacityKg,
                         projectedStationUseKg);
@@ -208,17 +240,22 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
                 stops.addAll(additions);
             }
 
+            double departureFuelKg = currentFuelKg;
             double consumed = requiredPropellantKg(
-                    nonReactionMassKg + currentFuelKg,
+                    nonReactionMassKg + departureFuelKg,
                     exhaustVelocityMps,
-                    segmentDeltaV);
-            if (consumed > currentFuelKg + EPSILON) {
+                    segmentDeltaVMps[index]);
+            if (consumed > departureFuelKg + EPSILON) {
                 return new JourneyPlan(
                         true, false, route, List.copyOf(stops), totalDeltaV, currentFuelKg,
                         "route segment exceeds physical reaction-mass supply");
             }
-            currentFuelKg = Math.max(0d, currentFuelKg - consumed);
-            previousCumulativeDeltaV = cumulativeDeltaV;
+            currentFuelKg = Math.max(0d, departureFuelKg - consumed);
+            if (currentFuelKg + EPSILON < departureFuelKg * RESERVE_FRACTION) {
+                return new JourneyPlan(
+                        true, false, route, List.copyOf(stops), totalDeltaV, currentFuelKg,
+                        "route segment would violate protected reaction-mass reserve");
+            }
         }
 
         return new JourneyPlan(
@@ -458,6 +495,39 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
             throw new IllegalArgumentException("unknown servicing engineering module: " + moduleId);
         }
         return result;
+    }
+
+    private double projectedAvailableStockKg(
+            StarSystemId systemId,
+            String participantFaction,
+            FuelPort port) {
+        return accessibleEndpoints(systemId, participantFaction).stream()
+                .mapToDouble(endpoint -> endpoint.storage().commodityMassKg(
+                        port.binding().commodityId()))
+                .sum();
+    }
+
+    private static double minimumDepartureFuelKg(
+            double nonReactionMassKg,
+            double exhaustVelocityMps,
+            double segmentDeltaVMps,
+            double requiredArrivalFuelKg) {
+        if (segmentDeltaVMps <= EPSILON) {
+            return Math.max(0d, requiredArrivalFuelKg);
+        }
+        double retainedFraction = StrictMath.exp(-segmentDeltaVMps / exhaustVelocityMps);
+        double burnedFraction = 1d - retainedFraction;
+        if (!(retainedFraction > 0d)) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double futureRequirement = (Math.max(0d, requiredArrivalFuelKg)
+                + nonReactionMassKg * burnedFraction) / retainedFraction;
+        double reserveDenominator = retainedFraction - RESERVE_FRACTION;
+        if (!(reserveDenominator > EPSILON)) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double reserveRequirement = nonReactionMassKg * burnedFraction / reserveDenominator;
+        return Math.max(futureRequirement, reserveRequirement);
     }
 
     private static double minimumTopUpKg(
