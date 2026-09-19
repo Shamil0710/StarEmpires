@@ -266,7 +266,10 @@ class Stage22CorePairOffensiveProjectionGeneratedWorldAcceptanceTest {
             FactionComponent faction = entity.getComponent(FactionComponent.class);
             ShipComponent ship = entity.getComponent(ShipComponent.class);
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
-            if (faction == null || engineering == null) continue;
+            if (faction == null || engineering == null
+                    || ship == null || ship.type == null || !ship.type.isCombat()) {
+                continue;
+            }
             byFaction.computeIfAbsent(faction.factionId, ignored -> new ArrayList<>()).add(placement.id());
         }
         ArrayList<FactionFleetGroup> result = new ArrayList<>();
