@@ -162,7 +162,7 @@ class FleetOrderExecutionServiceIntegrationTest {
                 () -> service.dispatchMovementHop(
                         world, state, forces(source, ALPHA), sourceOrderId()));
 
-        assertTrue(failure.getMessage().contains("propellant stranding"));
+        assertTrue(failure.getMessage().contains("safe finite-propellant plan"));
         assertTrue(world.findFleetJump(source.id()).isEmpty());
         assertEquals(ALPHA, world.findFleet(source.id()).orElseThrow().systemId());
     }
