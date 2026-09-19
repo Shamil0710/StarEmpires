@@ -156,7 +156,11 @@ class Stage20FreightRuntimeMaterializerTest {
         StarSystemId source = original.orderedSystems().get(0);
         StarSystemId destination =
                 original.orderedSystems().get(original.orderedSystems().size() - 1);
-        StarSystemId inserted = new StarSystemId(9_999_001L);
+        long syntheticSystemValue = original.orderedSystems().stream()
+                .mapToLong(StarSystemId::value)
+                .max().orElseThrow() + 1L;
+        StarSystemId inserted = new StarSystemId(syntheticSystemValue);
+        StarSystemId wrongDestination = new StarSystemId(syntheticSystemValue + 1L);
         double cargoKg = 1d;
         StoragePair storage = storagePair(
                 original.sourceEndpointId(),
@@ -175,7 +179,7 @@ class Stage20FreightRuntimeMaterializerTest {
         runtime.dispatchOutbound(fleetId, 20d);
 
         assertThrows(IllegalArgumentException.class, () -> runtime.rerouteRemaining(
-                fleetId, List.of(source, inserted, new StarSystemId(9_999_002L))));
+                fleetId, List.of(source, inserted, wrongDestination)));
 
         var rerouted = runtime.rerouteRemaining(
                 fleetId, List.of(source, inserted, destination));
