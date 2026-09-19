@@ -112,6 +112,86 @@ class Stage22GeneratedWorldRefuelStockAcceptanceTest {
                 "after committed refueling the remaining direct hop must be physically safe");
     }
 
+    @Test
+    void originCanProactivelyCarryFuelAcrossDryIntermediateSystem() {
+        Stage20GeneratedWorldRuntimeBridge.LiveRuntime live =
+                Stage20PlayableGeneratedWorldFactory.create(
+                        Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).runtime();
+        TwoHopCandidate candidate = dryIntermediateCandidate(live);
+        List<StarSystemId> route = List.of(
+                candidate.placement().systemId(), candidate.middle(), candidate.destination());
+
+        assertEquals(0d, systemPropellant(live, candidate.middle()), 0d,
+                "fixture requires a genuinely dry intermediate system");
+        assertFalse(live.world().planFleetRouteFuel(candidate.placement().id(), route).feasible(),
+                "selected partial tank must not already cover the full dry two-hop route");
+
+        var planned = live.world().planFleetPropellantJourney(candidate.placement().id(), route);
+        assertTrue(planned.feasible());
+        assertTrue(planned.refuelStops().stream()
+                        .anyMatch(stop -> stop.systemId().equals(candidate.placement().systemId())),
+                "planner must load extra propellant before leaving the last wet system");
+        assertFalse(planned.refuelStops().stream()
+                        .anyMatch(stop -> stop.systemId().equals(candidate.middle())),
+                "no projected service may be invented in the dry intermediate system");
+
+        double originStockBefore = systemPropellant(live, candidate.placement().systemId());
+        var prepared = live.world().prepareFleetPropellantDeparture(candidate.placement().id(), route);
+        assertTrue(prepared.ready());
+        assertTrue(prepared.loadedMassKg() > 0d);
+        assertEquals(originStockBefore - prepared.loadedMassKg(),
+                systemPropellant(live, candidate.placement().systemId()), 1e-6d);
+        assertTrue(live.world().planFleetRouteFuel(candidate.placement().id(), route).feasible(),
+                "proactive origin loading must make the complete route safe without future service");
+    }
+
+    private static TwoHopCandidate dryIntermediateCandidate(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime) {
+        double[] fractions = {0d, 0.05d, 0.10d, 0.15d, 0.20d, 0.30d, 0.40d, 0.50d};
+        for (FleetPlacementState placement : runtime.world().getFleetPlacements()) {
+            if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                    || systemPropellant(runtime, placement.systemId()) <= 0d) {
+                continue;
+            }
+            EngineeringComponent fitted = engineering(runtime, placement);
+            if (fitted == null || reactionMassKg(fitted) <= 0d) {
+                continue;
+            }
+            ShipEngineeringRuntime.RuntimeState original = fitted.runtimeState;
+            for (StarSystemId middle : runtime.world().getTopology()
+                    .neighbors(placement.systemId()).stream().sorted().toList()) {
+                if (systemPropellant(runtime, middle) > 0d) {
+                    continue;
+                }
+                for (StarSystemId destination : runtime.world().getTopology()
+                        .neighbors(middle).stream().sorted().toList()) {
+                    if (destination.equals(placement.systemId())) {
+                        continue;
+                    }
+                    for (double fraction : fractions) {
+                        fitted.setRuntimeState(scaleReactionMass(original, fraction));
+                        List<StarSystemId> route =
+                                List.of(placement.systemId(), middle, destination);
+                        if (runtime.world().planFleetRouteFuel(placement.id(), route).feasible()) {
+                            continue;
+                        }
+                        var journey = runtime.world().planFleetPropellantJourney(placement.id(), route);
+                        if (journey.feasible()
+                                && journey.refuelStops().stream()
+                                .anyMatch(stop -> stop.systemId().equals(placement.systemId()))
+                                && journey.refuelStops().stream()
+                                .noneMatch(stop -> stop.systemId().equals(middle))) {
+                            return new TwoHopCandidate(placement, middle, destination);
+                        }
+                    }
+                }
+            }
+            fitted.setRuntimeState(original);
+        }
+        throw new AssertionError(
+                "generated world lacks a dry-intermediate route recoverable by proactive origin fuel");
+    }
+
     private static TwoHopCandidate twoHopCandidate(
             Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime) {
         double[] fractions = {0.10d, 0.15d, 0.20d, 0.25d, 0.30d, 0.40d, 0.50d, 0.60d, 0.70d, 0.80d};
