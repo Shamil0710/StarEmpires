@@ -120,3 +120,35 @@ The implementation is accepted only when automated evidence proves:
 - strategic and freight dispatch reject a route whose remaining physical fuel budget is insufficient;
 - legacy non-fitted compatibility worlds still load and move through their explicit fallback;
 - the full Java 17 `clean verify` gate is green.
+
+
+## Refuel-aware route continuation
+
+Generated-world fitted fleets may now plan beyond their current protected reaction-mass range only
+through explicit physical refueling opportunities. The route planner projects each local maneuver
+segment against the existing finite-propellant geometry and may insert a refuel stop only when all of
+the following are true:
+
+- the fitted drive exposes an authored `REACTION_MASS` interface with a Stage-22 commodity binding;
+- a canonical station endpoint exists in that system;
+- the endpoint has compatible `storage.liquid_tank` capacity and handling;
+- current diplomacy/market access permits that fleet to use the endpoint;
+- the station contains enough finite `commodity.material.purified_water` to make the next segment
+  safe while retaining the same 10% protected reaction-mass reserve.
+
+Planning never mutates or reserves station stock. Execution is deliberately receding-horizon:
+immediately before each new hop, only refueling in the fleet's current system is physically committed
+through `Stage18ShipConsumableService`, station inventory is decremented, ship engineering state is
+updated, and the complete remaining route is recalculated. A projected downstream station may be
+emptied or become inaccessible before arrival; in that case the fleet stops at its current safe system
+instead of beginning a hop that could strand it.
+
+New generated campaigns receive a finite initial purified-water reserve only at station archetypes
+that physically support liquid storage and transfer. The reserve is capped at 24,000,000 kg and at
+50% of the otherwise free liquid-tank capacity. This is bootstrap inventory, not regeneration.
+Captured station stock is persisted normally, and restoring an existing campaign never replenishes
+spent propellant.
+
+The current Stage-21 generated military endurance/combat drives also receive explicit Stage-22 water
+servicing bindings. Stage-18's default servicing catalog remains unchanged so historical industrial
+content fingerprints and old saves are not silently rewritten.
