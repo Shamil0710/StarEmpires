@@ -329,7 +329,9 @@ public final class Stage20PlayableGeneratedWorldFactory {
                     requiredByStation.getOrDefault(station.station(), new TreeMap<>()));
             double liquidCapacityKg = candidate.archetype().storageCapacityByClassKg()
                     .getOrDefault(LIQUID_STORAGE_CLASS_ID, 0d);
-            if (liquidCapacityKg > 0d) {
+            if (liquidCapacityKg > 0d
+                    && candidate.archetype().transferStorageClassIds()
+                    .contains(LIQUID_STORAGE_CLASS_ID)) {
                 var ontology = Stage18ResourceOntologyLoader.loadDefault();
                 double usedLiquidKg = 0d;
                 for (var entry : initialCommodities.entrySet()) {
