@@ -267,7 +267,18 @@ class Stage21DGeneratedWorldRuntimePersistenceAcceptanceTest {
         assertEquals(expected.combat(), actual.combat(), "combat payload must survive transit");
         assertEquals(expected.asteroid(), actual.asteroid(), "asteroid payload must survive transit");
         assertEquals(expected.archetype(), actual.archetype(), "fitted hull/archetype must survive transit");
-        assertEquals(expected.engineering(), actual.engineering(), "engineering fit and damage must survive transit");
+        assertNotNull(expected.engineering(), "expected fitted engineering payload");
+        assertNotNull(actual.engineering(), "arrived fitted engineering payload");
+        assertEquals(expected.engineering().hullId(), actual.engineering().hullId(),
+                "engineering hull identity must survive transit");
+        assertEquals(expected.engineering().installedModules(), actual.engineering().installedModules(),
+                "installed fit must survive transit");
+        assertEquals(expected.engineering().consumables(), actual.engineering().consumables(),
+                "physical carried stores must survive transit");
+        assertEquals(expected.engineering().instanceState(), actual.engineering().instanceState(),
+                "damage/shield/maintenance identity must survive transit");
+        // FTL heat, bus energy and cooldown are live operating state and legitimately evolve while
+        // the fleet spends authoritative transit/arrival time; they are not immutable transfer payload.
         assertEquals(expected.sensorKnowledge(), actual.sensorKnowledge(), "sensor knowledge must survive transit");
     }
 
