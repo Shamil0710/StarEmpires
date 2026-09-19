@@ -36,7 +36,7 @@ class Stage22CorePropellantServicingAcceptanceTest {
             Stage18StationStorage storage = new Stage18StationStorage(
                     ontology,
                     products,
-                    "station.stage22.propellant." + value.bindingId().hashCode(),
+                    "station.stage22.propellant.test",
                     Map.of("storage.liquid_tank", 10_000d),
                     Map.of("commodity.material.purified_water", 5_000d),
                     Map.of());
