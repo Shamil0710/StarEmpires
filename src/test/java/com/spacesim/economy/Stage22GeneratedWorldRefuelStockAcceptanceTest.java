@@ -160,36 +160,69 @@ class Stage22GeneratedWorldRefuelStockAcceptanceTest {
             ShipEngineeringRuntime.RuntimeState original = fitted.runtimeState;
             for (StarSystemId middle : runtime.world().getTopology()
                     .neighbors(placement.systemId()).stream().sorted().toList()) {
-                if (systemPropellant(runtime, middle) > 0d) {
-                    continue;
-                }
-                for (StarSystemId destination : runtime.world().getTopology()
-                        .neighbors(middle).stream().sorted().toList()) {
-                    if (destination.equals(placement.systemId())) {
-                        continue;
-                    }
-                    for (double fraction : fractions) {
-                        fitted.setRuntimeState(scaleReactionMass(original, fraction));
-                        List<StarSystemId> route =
-                                List.of(placement.systemId(), middle, destination);
-                        if (runtime.world().planFleetRouteFuel(placement.id(), route).feasible()) {
+                List<StoredPropellant> drained = drainSystemPropellant(runtime, middle);
+                boolean selected = false;
+                try {
+                    for (StarSystemId destination : runtime.world().getTopology()
+                            .neighbors(middle).stream().sorted().toList()) {
+                        if (destination.equals(placement.systemId())) {
                             continue;
                         }
-                        var journey = runtime.world().planFleetPropellantJourney(placement.id(), route);
-                        if (journey.feasible()
-                                && journey.refuelStops().stream()
-                                .anyMatch(stop -> stop.systemId().equals(placement.systemId()))
-                                && journey.refuelStops().stream()
-                                .noneMatch(stop -> stop.systemId().equals(middle))) {
-                            return new TwoHopCandidate(placement, middle, destination);
+                        for (double fraction : fractions) {
+                            fitted.setRuntimeState(scaleReactionMass(original, fraction));
+                            List<StarSystemId> route =
+                                    List.of(placement.systemId(), middle, destination);
+                            if (runtime.world().planFleetRouteFuel(placement.id(), route).feasible()) {
+                                continue;
+                            }
+                            var journey = runtime.world().planFleetPropellantJourney(
+                                    placement.id(), route);
+                            if (journey.feasible()
+                                    && journey.refuelStops().stream()
+                                    .anyMatch(stop -> stop.systemId().equals(placement.systemId()))
+                                    && journey.refuelStops().stream()
+                                    .noneMatch(stop -> stop.systemId().equals(middle))) {
+                                selected = true;
+                                return new TwoHopCandidate(placement, middle, destination);
+                            }
                         }
+                    }
+                } finally {
+                    if (!selected) {
+                        restoreSystemPropellant(drained);
+                        fitted.setRuntimeState(original);
                     }
                 }
             }
             fitted.setRuntimeState(original);
         }
         throw new AssertionError(
-                "generated world lacks a dry-intermediate route recoverable by proactive origin fuel");
+                "generated world lacks a two-hop route recoverable by proactive origin fuel "
+                        + "after physically drying the intermediate system");
+    }
+
+    private static List<StoredPropellant> drainSystemPropellant(
+            Stage20GeneratedWorldRuntimeBridge.LiveRuntime runtime,
+            StarSystemId systemId) {
+        ArrayList<StoredPropellant> drained = new ArrayList<>();
+        for (var endpoint : runtime.infrastructure().endpoints()) {
+            if (!endpoint.systemId().equals(systemId)) {
+                continue;
+            }
+            double stored = endpoint.storage().commodityMassKg(PROPELLANT);
+            if (stored <= 0d) {
+                continue;
+            }
+            endpoint.storage().removeCommodity(PROPELLANT, stored);
+            drained.add(new StoredPropellant(endpoint.storage(), stored));
+        }
+        return List.copyOf(drained);
+    }
+
+    private static void restoreSystemPropellant(List<StoredPropellant> drained) {
+        for (StoredPropellant value : drained) {
+            value.storage().addCommodity(PROPELLANT, value.massKg());
+        }
     }
 
     private static TwoHopCandidate twoHopCandidate(
@@ -358,6 +391,9 @@ class Stage22GeneratedWorldRefuelStockAcceptanceTest {
     }
 
     private record Candidate(FleetPlacementState placement, StarSystemId destination) {
+    }
+
+    private record StoredPropellant(Stage18StationStorage storage, double massKg) {
     }
 
     private record TwoHopCandidate(
