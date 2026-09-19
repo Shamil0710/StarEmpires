@@ -75,7 +75,7 @@ public final class PlayerFleetRoutePlanner {
      * @param fleetId actor whose real cargo/damage/mobility determine vulnerability
      * @param origin discovered origin system
      * @param destination discovered destination system
-     * @return full route diagnostics, or empty when no discovered route exists
+     * @return full route diagnostics, or empty when no discovered fuel-safe route is available
      */
     public Optional<PlayerRouteRiskView> plan(
             FleetId fleetId,
