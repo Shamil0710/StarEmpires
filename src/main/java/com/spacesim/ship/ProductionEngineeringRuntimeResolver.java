@@ -67,6 +67,46 @@ public final class ProductionEngineeringRuntimeResolver {
     }
 
     /**
+     * Resolves the minimum commanded drive throttle needed to cover a requested velocity change
+     * within one fixed simulation interval.
+     *
+     * <p>The estimate uses the same current damage-aware fitted mass/thrust authority as the
+     * engineering runtime. Power or thermal limits may still reduce actually produced thrust, in
+     * which case the controller simply continues accelerating on a later tick. The method therefore
+     * avoids over-burning reaction mass when only a fraction of a full-thrust tick is needed without
+     * ever manufacturing more acceleration than the live engineering state can produce.</p>
+     *
+     * @param component authoritative fitted engineering component
+     * @param requiredDeltaVMps non-negative desired velocity change for this tick
+     * @param deltaSeconds positive fixed simulation interval
+     * @return commanded common drive throttle in [0,1]
+     */
+    public double throttleForDeltaV(
+            EngineeringComponent component,
+            double requiredDeltaVMps,
+            double deltaSeconds) {
+        EngineeringComponent checked = requireComplete(component);
+        if (!Double.isFinite(requiredDeltaVMps) || requiredDeltaVMps < 0d) {
+            throw new IllegalArgumentException("requiredDeltaVMps must be finite and non-negative");
+        }
+        if (!Double.isFinite(deltaSeconds) || deltaSeconds <= 0d) {
+            throw new IllegalArgumentException("deltaSeconds must be positive and finite");
+        }
+        if (requiredDeltaVMps <= EPSILON) {
+            return 0d;
+        }
+        DerivedShipState state = derive(checked);
+        if (state.availableThrustN() <= EPSILON || state.totalMassKg() <= EPSILON) {
+            return 0d;
+        }
+        double maximumDeltaV = state.availableThrustN() / state.totalMassKg() * deltaSeconds;
+        if (!Double.isFinite(maximumDeltaV) || maximumDeltaV <= EPSILON) {
+            return 0d;
+        }
+        return Math.min(1d, requiredDeltaVMps / maximumDeltaV);
+    }
+
+    /**
      * Advances one ordinary fitted propulsion tick and replaces the component runtime state.
      *
      * @param component authoritative fitted component
