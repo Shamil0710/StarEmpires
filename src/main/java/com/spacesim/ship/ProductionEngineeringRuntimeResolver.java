@@ -6,7 +6,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinitio
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
-import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringRuntime.OperatingCommand;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
@@ -40,7 +40,7 @@ public final class ProductionEngineeringRuntimeResolver {
         this(List.of(
                 ShipEngineeringCatalogLoader.loadDefault(),
                 Stage175ICombatTestContentPack.loadStage21StrategicDoctrines(),
-                Stage22CorePairEngineeringCatalogLoader.loadDefault()));
+                Stage22FreightStrategicEngineeringCatalogLoader.loadDefault()));
     }
 
     /** Creates an explicit resolver, primarily for deterministic acceptance fixtures. */
