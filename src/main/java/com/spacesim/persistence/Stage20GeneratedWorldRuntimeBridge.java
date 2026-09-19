@@ -340,6 +340,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     .getEntityRegistry().require(placement.localEntityId());
             ArchetypeComponent archetype = entity.getComponent(ArchetypeComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
+            if (entity.getComponent(com.spacesim.components.EngineeringComponent.class) == null) {
+                // Explicit migration for historical generated-freight saves that predate finite propulsion.
+                entity.add(freightEngineering(fleet));
+            }
             Integer expectedFaction = world.findFactionRuntimeId(fleet.stableFactionId()).orElseThrow();
             if (archetype == null || !archetype.contentId.equals(fleet.hullId())
                     || faction == null || faction.factionId != expectedFaction) {
