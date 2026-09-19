@@ -1,6 +1,6 @@
 # Finite propulsion and propellant-safe routing
 
-**Status:** implementation candidate in PR #389.
+**Status:** finite-propulsion foundation merged in PR #389; refuel-aware continuation is a closure candidate in PR #390.
 
 ## Purpose
 
@@ -119,6 +119,13 @@ The implementation is accepted only when automated evidence proves:
 - generated freight cargo and engineering cargo mass stay synchronized;
 - a complete generated route exposes physical fuel planning;
 - strategic and freight dispatch reject a route whose remaining physical fuel budget is insufficient;
+- refuel-aware planning is pure and cannot reserve or create station stock;
+- empty local tanks can become route-feasible only through real accessible finite station stock;
+- intermediate finite refueling is projected and committed only after physical arrival;
+- the last wet system can proactively load enough mass to cross a later dry stretch while preserving
+  the same complete-route 10% reserve invariant;
+- spent bootstrap station stock and loaded ship reaction mass survive save/load without replenishment;
+- player and Stage-21 strategic routing accept refuel-recoverable routes and reject physically unsafe ones;
 - legacy non-fitted compatibility worlds still load and move through their explicit fallback;
 - the full Java 17 `clean verify` gate is green.
 
@@ -136,8 +143,9 @@ the following are true:
 - current diplomacy/market access permits that fleet to use the endpoint;
 - the station contains enough finite `commodity.material.purified_water` for the planner's
   backward-calculated minimum departure fuel requirement, which may intentionally carry extra fuel
-  across later dry or understocked systems while retaining the same 10% protected reserve on every
-  segment.
+  across later dry or understocked systems. The same 10% operational reserve is protected across each
+  complete contiguous no-service stretch; the reserve horizon resets only at a system with physically
+  accessible finite propellant stock.
 
 For a fixed route, the planner first derives every local segment delta-v, then works backward from
 the destination. At each node it calculates the minimum fuel that must arrive before any local service
