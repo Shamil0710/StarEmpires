@@ -72,8 +72,9 @@ public final class AutonomousFlightSystem extends IteratingSystem {
             return;
         }
 
-        double throttle = requiresThrust(
-                transform, command.axisX, command.axisY, command.speedCap) ? 1d : 0d;
+        double requiredDeltaV = requiredDeltaV(
+                transform, command.axisX, command.axisY, command.speedCap);
+        double throttle = engineering.throttleForDeltaV(fitted, requiredDeltaV, deltaTime);
         var result = engineering.advancePropulsion(fitted, throttle, deltaTime);
         FlightDynamics.advancePhysical(
                 transform,
@@ -84,7 +85,7 @@ public final class AutonomousFlightSystem extends IteratingSystem {
                 command.axisY,
                 deltaTime);
     }
-    private static boolean requiresThrust(
+    private static double requiredDeltaV(
             TransformComponent transform,
             float axisX,
             float axisY,
@@ -101,7 +102,8 @@ public final class AutonomousFlightSystem extends IteratingSystem {
         desiredY *= speedCap;
         float dx = desiredX - transform.velocity.x;
         float dy = desiredY - transform.velocity.y;
-        return dx * dx + dy * dy > THRUST_EPSILON * THRUST_EPSILON;
+        double deltaV = Math.hypot(dx, dy);
+        return deltaV <= THRUST_EPSILON ? 0d : deltaV;
     }
 
 }
