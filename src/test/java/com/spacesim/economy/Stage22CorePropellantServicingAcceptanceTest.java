@@ -25,10 +25,10 @@ class Stage22CorePropellantServicingAcceptanceTest {
         List<Case> cases = List.of(
                 new Case(
                         Stage22FreightStrategicEngineeringCatalogLoader.EMPIRE_FREIGHT_STRATEGIC_FIT,
-                        "ship_consumable.reaction_mass.empire_endurance_water_v1"),
+                        "ship_consumable.reaction_mass.empire_longhaul_freight_water_v1"),
                 new Case(
                         Stage22FreightStrategicEngineeringCatalogLoader.UNION_FREIGHT_STRATEGIC_FIT,
-                        "ship_consumable.reaction_mass.industrial_union_drive_bank_water_v1"));
+                        "ship_consumable.reaction_mass.industrial_union_longhaul_freight_water_v1"));
 
         for (Case value : cases) {
             InstalledFit fit = InstalledFit.fromDemonstrator(
