@@ -100,21 +100,18 @@ public final class PlayerFleetRoutePlanner {
         PriorityQueue<Node> frontier = new PriorityQueue<>(Comparator
                 .comparingDouble(Node::totalCost)
                 .thenComparing(Node::path, PlayerFleetRoutePlanner::comparePaths));
-        Map<StarSystemId, Node> best = new HashMap<>();
-        Node start = new Node(from, List.of(from), 0L, 0d, 0d, 0d, 0d, 0d);
+        Map<StarSystemId, List<Node>> best = new HashMap<>();
+        Node start = new Node(from, List.of(from), 0L, 0d, 0d, 0d, 0d, 0d, false, 0d);
         frontier.add(start);
-        best.put(from, start);
+        best.put(from, new ArrayList<>(List.of(start)));
 
         while (!frontier.isEmpty()) {
             Node current = frontier.poll();
-            if (best.get(current.system()) != current) {
+            List<Node> currentLabels = best.get(current.system());
+            if (currentLabels == null || !currentLabels.contains(current)) {
                 continue;
             }
             if (current.system().equals(to)) {
-                var fuel = world.planFleetRouteFuel(actor, current.path());
-                if (fuel.supported() && !fuel.feasible()) {
-                    return Optional.empty();
-                }
                 double riskCost = (current.systemExposure()
                         + current.linkExposure()
                         + current.uncertaintyExposure()) * vulnerability * RISK_TO_TICKS;
@@ -132,12 +129,16 @@ public final class PlayerFleetRoutePlanner {
             List<StarSystemId> neighbors = new ArrayList<>(world.getTopology().neighbors(current.system()));
             neighbors.sort(Comparator.naturalOrder());
             for (StarSystemId neighbor : neighbors) {
-                if (!discovered.contains(neighbor)) {
+                if (!discovered.contains(neighbor) || current.path().contains(neighbor)) {
                     continue;
                 }
                 EdgeCost edge = edgeCost(player, current.system(), neighbor, currentTick, vulnerability);
                 List<StarSystemId> path = new ArrayList<>(current.path());
                 path.add(neighbor);
+                var fuel = world.planFleetRouteFuel(actor, path);
+                if (fuel.supported() && !fuel.feasible()) {
+                    continue;
+                }
                 long travelTicks = Math.addExact(current.travelTicks(), edge.travelTicks());
                 double systemExposure = current.systemExposure() + edge.systemExposure();
                 double linkExposure = current.linkExposure() + edge.linkExposure();
@@ -153,11 +154,24 @@ public final class PlayerFleetRoutePlanner {
                         linkExposure,
                         uncertainty,
                         riskCost,
-                        totalCost);
-                Node previous = best.get(neighbor);
-                if (previous == null || better(candidate, previous)) {
-                    best.put(neighbor, candidate);
+                        totalCost,
+                        fuel.supported(),
+                        fuel.supported() ? fuel.requiredDeltaVMps() : 0d);
+                List<Node> labels = best.computeIfAbsent(neighbor, ignored -> new ArrayList<>());
+                if (fuel.supported()) {
+                    if (labels.stream().anyMatch(existing -> dominates(existing, candidate))) {
+                        continue;
+                    }
+                    labels.removeIf(existing -> dominates(candidate, existing));
+                    labels.add(candidate);
                     frontier.add(candidate);
+                } else {
+                    Node previous = labels.isEmpty() ? null : labels.get(0);
+                    if (previous == null || better(candidate, previous)) {
+                        labels.clear();
+                        labels.add(candidate);
+                        frontier.add(candidate);
+                    }
                 }
             }
         }
@@ -317,6 +331,22 @@ public final class PlayerFleetRoutePlanner {
                 && comparePaths(candidate.path(), previous.path()) < 0;
     }
 
+    private static boolean dominates(Node first, Node second) {
+        if (!first.fuelSupported() || !second.fuelSupported()) {
+            return better(first, second)
+                    || (Math.abs(first.totalCost() - second.totalCost()) <= COST_EPSILON
+                    && comparePaths(first.path(), second.path()) <= 0);
+        }
+        boolean noWorseCost = first.totalCost() <= second.totalCost() + COST_EPSILON;
+        boolean noWorseFuel = first.requiredDeltaVMps() <= second.requiredDeltaVMps() + COST_EPSILON;
+        if (!noWorseCost || !noWorseFuel) {
+            return false;
+        }
+        boolean strictlyBetter = first.totalCost() + COST_EPSILON < second.totalCost()
+                || first.requiredDeltaVMps() + COST_EPSILON < second.requiredDeltaVMps();
+        return strictlyBetter || comparePaths(first.path(), second.path()) <= 0;
+    }
+
     private static int comparePaths(List<StarSystemId> first, List<StarSystemId> second) {
         int shared = Math.min(first.size(), second.size());
         for (int index = 0; index < shared; index++) {
@@ -343,6 +373,8 @@ public final class PlayerFleetRoutePlanner {
             double linkExposure,
             double uncertaintyExposure,
             double riskCost,
-            double totalCost) {
+            double totalCost,
+            boolean fuelSupported,
+            double requiredDeltaVMps) {
     }
 }
