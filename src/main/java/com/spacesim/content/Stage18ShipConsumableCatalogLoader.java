@@ -9,7 +9,6 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleDefinition;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
-import com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,18 +37,13 @@ public final class Stage18ShipConsumableCatalogLoader {
      */
     public static Stage18ShipConsumableCatalog loadDefault() {
         Stage18ResourceOntologyCatalog ontology = Stage18ResourceOntologyLoader.loadDefault();
-        List<ShipEngineeringCatalog> engineering = List.of(
-                ShipEngineeringCatalogLoader.loadDefault(),
-                Stage22FreightStrategicEngineeringCatalogLoader.loadDefault());
+        ShipEngineeringCatalog engineering = ShipEngineeringCatalogLoader.loadDefault();
         ClassLoader loader = Stage18ShipConsumableCatalogLoader.class.getClassLoader();
         try (InputStream stream = loader.getResourceAsStream(DEFAULT_RESOURCE)) {
             if (stream == null) {
                 throw new IllegalStateException("Missing Stage-18I ship-consumable catalog: " + DEFAULT_RESOURCE);
             }
-            return parseAgainstCatalogs(
-                    new String(stream.readAllBytes(), StandardCharsets.UTF_8),
-                    ontology,
-                    engineering);
+            return parse(new String(stream.readAllBytes(), StandardCharsets.UTF_8), ontology, engineering);
         } catch (IOException exception) {
             throw new IllegalStateException("Cannot read Stage-18I ship-consumable catalog", exception);
         }
@@ -70,20 +64,6 @@ public final class Stage18ShipConsumableCatalogLoader {
         Objects.requireNonNull(json, "json");
         Stage18ResourceOntologyCatalog checkedOntology = Objects.requireNonNull(ontology, "ontology");
         ShipEngineeringCatalog checkedEngineering = Objects.requireNonNull(engineering, "engineering");
-        return parseAgainstCatalogs(json, checkedOntology, List.of(checkedEngineering));
-    }
-
-    private static Stage18ShipConsumableCatalog parseAgainstCatalogs(
-            String json,
-            Stage18ResourceOntologyCatalog ontology,
-            List<ShipEngineeringCatalog> engineeringCatalogs) {
-        Objects.requireNonNull(json, "json");
-        Stage18ResourceOntologyCatalog checkedOntology = Objects.requireNonNull(ontology, "ontology");
-        List<ShipEngineeringCatalog> checkedEngineering = List.copyOf(
-                Objects.requireNonNull(engineeringCatalogs, "engineeringCatalogs"));
-        if (checkedEngineering.isEmpty() || checkedEngineering.stream().anyMatch(Objects::isNull)) {
-            throw new IllegalArgumentException("engineeringCatalogs must contain at least one catalog");
-        }
         if (json.isBlank()) {
             throw new IllegalArgumentException("Stage-18I ship-consumable JSON must not be blank");
         }
@@ -116,12 +96,10 @@ public final class Stage18ShipConsumableCatalogLoader {
                 throw new IllegalArgumentException("Duplicate ship-consumable binding: " + id);
             }
             String moduleId = requiredString(node, "moduleId");
-            ModuleDefinition module = checkedEngineering.stream()
-                    .map(catalog -> catalog.findModule(moduleId))
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "Unknown ship-consumable module: " + moduleId));
+            ModuleDefinition module = checkedEngineering.findModule(moduleId);
+            if (module == null) {
+                throw new IllegalArgumentException("Unknown ship-consumable module: " + moduleId);
+            }
             String interfaceId = requiredString(node, "interfaceId");
             InterfaceKind kind;
             try {
