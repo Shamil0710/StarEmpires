@@ -322,7 +322,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         }
         snapshot = model.capture();
         renderer.render(snapshot, tab, selection, detailScrollRows, listScrollRows,
-                campaign.coordinator().isPaused(), campaign.coordinator().timeScale(), status);
+                campaign.coordinator().isPaused(), campaign.coordinator().timeScale(),
+                campaign.coordinator().interpolationAlpha(), status);
         characterPortraitOverlay.render(snapshot, tab, selection);
     }
 
