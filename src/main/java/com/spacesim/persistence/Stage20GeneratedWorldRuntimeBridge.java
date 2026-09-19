@@ -675,6 +675,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 StarSystemId directionalDestination = fleetState.phase() == FreightPhase.OUTBOUND
                         ? order.orderedSystems().get(order.orderedSystems().size() - 1)
                         : order.orderedSystems().get(0);
+                String rerouteFactionId = fleetState.stableFactionId();
                 var alternate = new com.spacesim.world.FleetStrategicRoutePlanner(world.getTopology())
                         .planConstrained(
                                 0,
@@ -685,7 +686,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                                     String controller = world.controllingFaction(to).orElse(null);
                                     return controller == null
                                             || world.evaluateFactionMarketAccess(
-                                                    controller, fleetState.stableFactionId()).allowed();
+                                                    controller, rerouteFactionId).allowed();
                                 },
                                 candidate -> world.planFleetPropellantJourney(
                                         fleetId, candidate.systems()).feasible())
