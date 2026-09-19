@@ -1,10 +1,12 @@
 package com.spacesim.persistence;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.ShipComponent;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState.CanonicalRow;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistentState.OpenRuntimeBoundary;
 import com.spacesim.simulation.Stage20MaterializationService;
+import com.spacesim.ship.ProductionEngineeringRuntimeResolver;
 import com.spacesim.world.FleetArrivalAuthority;
 import com.spacesim.world.FleetId;
 import com.spacesim.world.FleetLocationKind;
@@ -61,7 +63,10 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
     private final Map<EdgeKey, PersistedEdge> edges;
     private final Map<ApproachKey, LocalApproachCalibration> approaches;
     private final Map<StarSystemId, Stage20MaterializationService> materializationBySystem;
+    private static final double ROUTE_REACTION_MASS_RESERVE_FRACTION = 0.10d;
     private final Set<FleetId> liveDepartures = new HashSet<>();
+    private final ProductionEngineeringRuntimeResolver engineering =
+            new ProductionEngineeringRuntimeResolver();
     private boolean bound;
     private WorldSimulation boundWorld;
 
@@ -252,13 +257,98 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         long ticks = travelSeconds <= 0d ? 1L : secondsToTicks(travelSeconds, fixedStepSeconds);
         double durationSeconds = ticks * (double) fixedStepSeconds;
         var displacement = current.position().displacementTo(departure.position());
+        double cruiseVelocityX = displacement.deltaXM() / durationSeconds;
+        double cruiseVelocityY = displacement.deltaYM() / durationSeconds;
+        double requiredDeltaV = maneuverDeltaV(
+                current, cruiseVelocityX, cruiseVelocityY);
+        EngineeringComponent fitted = requireLocalEngineering(placement);
+        var maneuver = engineering.planDeltaV(fitted, requiredDeltaV);
+        if (!maneuver.feasible()) {
+            throw new IllegalStateException(
+                    "insufficient physical propulsion for FTL departure approach: " + fleetId
+                            + " requiredDeltaVMps=" + requiredDeltaV
+                            + " deliveredDeltaVMps=" + maneuver.deliveredDeltaVMps());
+        }
+        engineering.commitManeuver(fitted, maneuver);
         materialization(originSystemId).updatePhysicalState(
                 localEntityId,
                 new LocalPhysicalKinematics(
                         current.position(),
-                        displacement.deltaXM() / durationSeconds,
-                        displacement.deltaYM() / durationSeconds));
+                        cruiseVelocityX,
+                        cruiseVelocityY));
         return ticks;
+    }
+
+    @Override
+    public FleetArrivalAuthority.RouteFuelPlan planRouteFuel(
+            FleetId fleetId,
+            List<StarSystemId> orderedSystems) {
+        FleetId id = Objects.requireNonNull(fleetId, "fleetId");
+        List<StarSystemId> route = List.copyOf(
+                Objects.requireNonNull(orderedSystems, "orderedSystems"));
+        if (route.size() < 2) {
+            throw new IllegalArgumentException("route fuel preflight requires at least one hop");
+        }
+        FleetPlacementState placement = boundWorld.findFleet(id).orElseThrow(
+                () -> new IllegalArgumentException("unknown FleetId: " + id));
+        if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                || !route.get(0).equals(placement.systemId())) {
+            throw new IllegalStateException("route fuel preflight must begin at the fleet's local system");
+        }
+        EngineeringComponent live = requireLocalEngineering(placement);
+        EngineeringComponent preview = new EngineeringComponent(
+                live.fit, live.runtimeState, live.instanceState);
+        double initialReactionMassKg = preview.runtimeState.consumables().reactionMassKg();
+        double reserveKg = initialReactionMassKg * ROUTE_REACTION_MASS_RESERVE_FRACTION;
+        double requiredDeltaV = 0d;
+        boolean military = isCombatShip(placement);
+        LocalPhysicalKinematics current = materialization(route.get(0))
+                .physicalState(placement.localEntityId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "fleet lacks exact local physical state for route fuel preflight: " + id));
+
+        for (int index = 1; index < route.size(); index++) {
+            StarSystemId origin = route.get(index - 1);
+            StarSystemId destination = route.get(index);
+            PersistedEndpoint departure = requireEdge(origin, destination).endpoint(origin);
+            LocalApproachCalibration calibration = requireApproach(departure);
+            double distanceM = current.position().distanceTo(departure.position());
+            double referenceSeconds = military
+                    ? calibration.militaryResponseTimeMaxS()
+                    : calibration.civilianRoutineTravelTimeMaxS();
+            double travelSeconds = referenceSeconds * distanceM / calibration.referenceDistanceM();
+            float fixedStepSeconds = requireSessionFixedStep(origin);
+            long ticks = travelSeconds <= 0d ? 1L : secondsToTicks(travelSeconds, fixedStepSeconds);
+            double durationSeconds = ticks * (double) fixedStepSeconds;
+            var displacement = current.position().displacementTo(departure.position());
+            double cruiseVelocityX = displacement.deltaXM() / durationSeconds;
+            double cruiseVelocityY = displacement.deltaYM() / durationSeconds;
+            double legDeltaV = maneuverDeltaV(current, cruiseVelocityX, cruiseVelocityY);
+            requiredDeltaV += legDeltaV;
+
+            var maneuver = engineering.planDeltaV(preview, legDeltaV);
+            if (!maneuver.feasible()) {
+                double remaining = preview.runtimeState.consumables().reactionMassKg();
+                return new FleetArrivalAuthority.RouteFuelPlan(
+                        true, false, requiredDeltaV,
+                        Math.max(0d, initialReactionMassKg - remaining),
+                        remaining,
+                        "insufficient reaction mass/power/thermal capability before hop "
+                                + origin + " -> " + destination);
+            }
+            preview.setRuntimeState(maneuver.resultingState());
+            current = resolve(origin, destination).physicalState();
+        }
+
+        double remaining = preview.runtimeState.consumables().reactionMassKg();
+        boolean reserveSatisfied = remaining + 1.0e-6d >= reserveKg;
+        return new FleetArrivalAuthority.RouteFuelPlan(
+                true,
+                reserveSatisfied,
+                requiredDeltaV,
+                Math.max(0d, initialReactionMassKg - remaining),
+                remaining,
+                reserveSatisfied ? "" : "route would violate 10% reaction-mass reserve");
     }
 
     @Override
@@ -401,6 +491,36 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         materialization(exact.destinationSystemId()).registerPhysicalState(
                 destinationLocalEntityId,
                 exact.physicalState());
+    }
+
+    private EngineeringComponent requireLocalEngineering(FleetPlacementState placement) {
+        var session = boundWorld.findSession(placement.systemId()).orElseThrow();
+        var entity = session.getEntityRegistry().require(placement.localEntityId());
+        EngineeringComponent component = entity.getComponent(EngineeringComponent.class);
+        if (component == null) {
+            throw new IllegalStateException(
+                    "generated-world moving fleet lacks finite EngineeringComponent: " + placement.id());
+        }
+        return component;
+    }
+
+    private float requireSessionFixedStep(StarSystemId systemId) {
+        var session = boundWorld.findSession(systemId).orElseThrow(
+                () -> new IllegalStateException("missing simulation session: " + systemId));
+        float step = session.getClock().getFixedStepSeconds();
+        requirePositiveFixedStep(step);
+        return step;
+    }
+
+    private static double maneuverDeltaV(
+            LocalPhysicalKinematics current,
+            double cruiseVelocityX,
+            double cruiseVelocityY) {
+        double accelerationDeltaV = Math.hypot(
+                cruiseVelocityX - current.velocityXMps(),
+                cruiseVelocityY - current.velocityYMps());
+        double brakingDeltaV = Math.hypot(cruiseVelocityX, cruiseVelocityY);
+        return accelerationDeltaV + brakingDeltaV;
     }
 
     private FleetPlacementState requireLocalPlacement(
