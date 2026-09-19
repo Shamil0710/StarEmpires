@@ -150,13 +150,15 @@ public final class FleetOrderExecutionService {
             if (waitingForFittedCooldown(force)) {
                 continue;
             }
-            var fuel = world.planFleetRouteFuel(movement.fleetId(), remainingRoute);
-            if (fuel.supported() && !fuel.feasible()) {
+            var preparation = world.prepareFleetPropellantDeparture(
+                    movement.fleetId(), remainingRoute);
+            if (!preparation.ready()) {
                 throw new IllegalStateException(
-                        "fleet cannot start route without risking propellant stranding: "
-                                + movement.fleetId() + " reason=" + fuel.reason()
-                                + " requiredDeltaVMps=" + fuel.requiredDeltaVMps()
-                                + " remainingReactionMassKg=" + fuel.remainingReactionMassKg());
+                        "fleet cannot start route without a safe finite-propellant plan: "
+                                + movement.fleetId() + " reason=" + preparation.reason()
+                                + " requiredDeltaVMps=" + preparation.journey().requiredDeltaVMps()
+                                + " projectedRemainingReactionMassKg="
+                                + preparation.journey().projectedRemainingReactionMassKg());
             }
             world.requestFleetJump(movement.fleetId(), movement.destinationSystemId(), 0f, 0f);
         }

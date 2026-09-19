@@ -73,6 +73,9 @@ public final class Stage20GeneratedWorldRuntimeBridge {
     public static final String CURRENT_VERSION = "stage20_5.generated-world-runtime-bridge.v1";
     private static final String INFRASTRUCTURE_DOMAIN = "INFRASTRUCTURE_PLACEMENT";
     private static final String ORBITAL_LOCATION_TAG = "location.orbital_station";
+    private static final String PROPELLANT_COMMODITY_ID = "commodity.material.purified_water";
+    private static final String LIQUID_STORAGE_CLASS_ID = "storage.liquid_tank";
+    private static final double MAX_INITIAL_PROPELLANT_RESERVE_KG = 24_000_000d;
 
     private Stage20GeneratedWorldRuntimeBridge() {
         throw new AssertionError("No instances");
@@ -126,7 +129,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                         Objects.requireNonNull(specialization, "specialization"),
                         productRegistry);
         InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(
-                saved, industry, productRegistry);
+                saved, industry, productRegistry, true);
         Stage20FreightPersistentState freightState = Stage20FreightRuntimeMaterializer.materializeBootstrap(
                 saved,
                 specialization,
@@ -174,7 +177,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         MaterializedGeneratedIndustrialRuntime industry =
                 Stage20GeneratedIndustrialRuntimeBridge.restore(saved.campaign(), productRegistry);
         InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(
-                saved.campaign(), industry, productRegistry);
+                saved.campaign(), industry, productRegistry, false);
         Stage20FreightRuntime freight = Stage20FreightRuntime.restore(
                 saved.campaign(),
                 saved.freight(),
@@ -437,6 +440,9 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             this.logistics = new Stage18LogisticsRuntime(
                     Stage18ResourceOntologyLoader.loadDefault(),
                     Objects.requireNonNull(products, "products"));
+            this.world.bindFleetPropellantLogisticsAuthority(
+                    new Stage22GeneratedWorldPropellantLogisticsAuthority(
+                            this.world, this.infrastructure, this.industry));
         }
 
         /** @return ordinary multi-system simulation authority */
@@ -649,39 +655,78 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             synchronizeCompletedHops();
             FreighterState fleetState = freight.findFreighter(fleetId).orElseThrow();
             TransportOrderState order = freight.findOrder(fleetState.activeOrderId()).orElseThrow();
-            int nextIndex = switch (fleetState.phase()) {
-                case OUTBOUND -> fleetState.routeIndex() + 1;
-                case RETURNING -> fleetState.routeIndex() - 1;
-                default -> throw new IllegalStateException(
+            if (fleetState.phase() != FreightPhase.OUTBOUND
+                    && fleetState.phase() != FreightPhase.RETURNING) {
+                throw new IllegalStateException(
                         "next route hop requires OUTBOUND or RETURNING freight phase");
-            };
-            if (nextIndex < 0 || nextIndex >= order.orderedSystems().size()) {
-                throw new IllegalStateException("freight route has no next hop");
             }
             FleetPlacementState placement = world.findFleet(fleetId).orElseThrow();
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
                     || !placement.systemId().equals(fleetState.currentSystemId())) {
                 throw new IllegalStateException("next freight hop requires matching local world placement");
             }
-            java.util.ArrayList<StarSystemId> remainingRoute = new java.util.ArrayList<>();
+
+            List<StarSystemId> remainingRoute = remainingFreightRoute(fleetState, order);
+            if (remainingRoute.size() < 2) {
+                throw new IllegalStateException("freight route has no next hop");
+            }
+            var preparation = world.prepareFleetPropellantDeparture(fleetId, remainingRoute);
+            if (!preparation.ready()) {
+                StarSystemId directionalDestination = fleetState.phase() == FreightPhase.OUTBOUND
+                        ? order.orderedSystems().get(order.orderedSystems().size() - 1)
+                        : order.orderedSystems().get(0);
+                String rerouteFactionId = fleetState.stableFactionId();
+                var alternate = new com.spacesim.world.FleetStrategicRoutePlanner(world.getTopology())
+                        .planConstrained(
+                                0,
+                                fleetState.currentSystemId(),
+                                directionalDestination,
+                                world.getAuthoritativeWorldTick(),
+                                (factionId, from, to, tick, destination) -> {
+                                    String controller = world.controllingFaction(to).orElse(null);
+                                    return controller == null
+                                            || world.evaluateFactionMarketAccess(
+                                                    controller, rerouteFactionId).allowed();
+                                },
+                                candidate -> world.planFleetPropellantJourney(
+                                        fleetId, candidate.systems()).feasible())
+                        .orElse(null);
+                if (alternate != null && alternate.systems().size() >= 2
+                        && !alternate.systems().equals(remainingRoute)) {
+                    order = freight.rerouteRemaining(fleetId, alternate.systems());
+                    fleetState = freight.findFreighter(fleetId).orElseThrow();
+                    remainingRoute = remainingFreightRoute(fleetState, order);
+                    preparation = world.prepareFleetPropellantDeparture(fleetId, remainingRoute);
+                }
+            }
+            if (!preparation.ready()) {
+                throw new IllegalStateException(
+                        "freighter cannot start remaining route without a safe finite-propellant plan: "
+                                + fleetId + " reason=" + preparation.reason()
+                                + " requiredDeltaVMps=" + preparation.journey().requiredDeltaVMps()
+                                + " projectedRemainingReactionMassKg="
+                                + preparation.journey().projectedRemainingReactionMassKg());
+            }
+            return world.requestFleetJump(fleetId, remainingRoute.get(1));
+        }
+
+        private static List<StarSystemId> remainingFreightRoute(
+                FreighterState fleetState,
+                TransportOrderState order) {
+            ArrayList<StarSystemId> remaining = new ArrayList<>();
             if (fleetState.phase() == FreightPhase.OUTBOUND) {
                 for (int index = fleetState.routeIndex(); index < order.orderedSystems().size(); index++) {
-                    remainingRoute.add(order.orderedSystems().get(index));
+                    remaining.add(order.orderedSystems().get(index));
+                }
+            } else if (fleetState.phase() == FreightPhase.RETURNING) {
+                for (int index = fleetState.routeIndex(); index >= 0; index--) {
+                    remaining.add(order.orderedSystems().get(index));
                 }
             } else {
-                for (int index = fleetState.routeIndex(); index >= 0; index--) {
-                    remainingRoute.add(order.orderedSystems().get(index));
-                }
-            }
-            var fuel = world.planFleetRouteFuel(fleetId, remainingRoute);
-            if (fuel.supported() && !fuel.feasible()) {
                 throw new IllegalStateException(
-                        "freighter cannot start remaining route without risking propellant stranding: "
-                                + fleetId + " reason=" + fuel.reason()
-                                + " requiredDeltaVMps=" + fuel.requiredDeltaVMps()
-                                + " remainingReactionMassKg=" + fuel.remainingReactionMassKg());
+                        "remaining freight route requires OUTBOUND or RETURNING phase");
             }
-            return world.requestFleetJump(fleetId, order.orderedSystems().get(nextIndex));
+            return List.copyOf(remaining);
         }
 
         /**
@@ -964,7 +1009,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         private static InfrastructureRegistry materialize(
                 Stage20GeneratedCampaignPersistentState campaign,
                 MaterializedGeneratedIndustrialRuntime industry,
-                Stage18ManufacturingProductRegistry products) {
+                Stage18ManufacturingProductRegistry products,
+                boolean seedBootstrapPropellant) {
             Stage18ResourceOntologyCatalog ontology = Stage18ResourceOntologyLoader.loadDefault();
             Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
             Stage18StationInfrastructureCatalog infrastructure =
@@ -1028,6 +1074,21 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                                 "canonical infrastructure storage differs from its archetype");
                     }
                     storage = Stage18StationStorage.restore(ontology, productRegistry, persisted);
+                } else if (seedBootstrapPropellant
+                        && archetype.storageCapacityByClassKg().containsKey(LIQUID_STORAGE_CLASS_ID)
+                        && archetype.transferStorageClassIds().contains(LIQUID_STORAGE_CLASS_ID)) {
+                    double reserveKg = Math.min(
+                            MAX_INITIAL_PROPELLANT_RESERVE_KG,
+                            archetype.storageCapacityByClassKg().get(LIQUID_STORAGE_CLASS_ID) * 0.5d);
+                    if (reserveKg > 0d) {
+                        storage = new Stage18StationStorage(
+                                ontology,
+                                productRegistry,
+                                stationId,
+                                archetype.storageCapacityByClassKg(),
+                                Map.of(PROPELLANT_COMMODITY_ID, reserveKg),
+                                Map.of());
+                    }
                 }
                 if (result.putIfAbsent(stationId, new RuntimeEndpoint(
                         systemId,

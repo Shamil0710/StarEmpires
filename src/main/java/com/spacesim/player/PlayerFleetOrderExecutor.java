@@ -50,7 +50,10 @@ import java.util.Set;
  * the ordinary MiningSystem through {@link MiningCommandComponent}. FOLLOW and ESCORT resolve the
  * live target FleetId on every decision and maintain a physical separation radius. PATROL cycles
  * its persistent system list, dwells physically at each waypoint, then uses the same cumulative
- * route-risk planner and Stage-10 jump FSM as other delegated movement.</p>
+ * route-risk planner and Stage-10 jump FSM as other delegated movement. Before each new inter-system
+ * hop the selected complete route is passed through the finite propellant logistics authority, so
+ * real current-system station stock is loaded when required and no refuel-aware preview can bypass
+ * physical servicing during execution.</p>
  *
  * <p>Stage-16 SUPPLY_PROJECT dynamically chooses a known physical supplier with
  * {@link PlayerSupplyProjectPlanner}, purchases only real remaining project demand through the
@@ -524,10 +527,14 @@ final class PlayerFleetOrderExecutor {
                     || world.findFleetJump(fleetId).isPresent()) {
                 return false;
             }
-            StarSystemId nextHop = nextRiskAwareHop(fleetId, placement.systemId(), targetSystem);
-            if (nextHop != null) {
-                entity.remove(FlightCommandComponent.class);
-                world.requestFleetJump(fleetId, nextHop, 0f, 0f);
+            PlayerRouteRiskView route = nextRiskAwareRoute(
+                    fleetId, placement.systemId(), targetSystem);
+            if (route != null && route.path().size() >= 2) {
+                var preparation = world.prepareFleetPropellantDeparture(fleetId, route.path());
+                if (preparation.ready()) {
+                    entity.remove(FlightCommandComponent.class);
+                    world.requestFleetJump(fleetId, route.path().get(1), 0f, 0f);
+                }
             }
             return false;
         }
@@ -555,9 +562,11 @@ final class PlayerFleetOrderExecutor {
         return false;
     }
 
-    private StarSystemId nextRiskAwareHop(FleetId fleetId, StarSystemId source, StarSystemId destination) {
-        PlayerRouteRiskView route = routePlanner.plan(fleetId, source, destination).orElse(null);
-        return route == null || route.path().size() < 2 ? null : route.path().get(1);
+    private PlayerRouteRiskView nextRiskAwareRoute(
+            FleetId fleetId,
+            StarSystemId source,
+            StarSystemId destination) {
+        return routePlanner.plan(fleetId, source, destination).orElse(null);
     }
 
     private void hold(Entity entity) {

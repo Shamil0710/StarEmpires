@@ -58,6 +58,7 @@ public final class WorldSimulation {
     private final FactionEconomicPressureTracker economicPressureTracker;
     private final FleetWorldService fleetWorldService;
     private final FleetJumpService fleetJumpService;
+    private FleetPropellantLogisticsAuthority fleetPropellantLogisticsAuthority;
     private StarSystemId activeSystemId;
     private final int strategicStepTicks;
     private final int remoteUpdateBudgetPerFrame;
@@ -1409,6 +1410,76 @@ public FactionEconomicDependenceDiagnostics analyzeEconomicDependence(
         return fleetJumpService.planRouteFuel(
                 Objects.requireNonNull(fleetId, "fleetId"),
                 List.copyOf(Objects.requireNonNull(orderedSystems, "orderedSystems")));
+    }
+
+    /**
+     * Plans an ordered route through the optional finite station-refueling authority.
+     *
+     * <p>Worlds without that later authority preserve the existing direct finite-fuel result as an
+     * explicit compatibility plan.</p>
+     *
+     * @param fleetId stable physical fleet identity
+     * @param orderedSystems route beginning at the fleet's current system
+     * @return immutable journey plan with projected refueling stops when supported
+     */
+    public FleetPropellantLogisticsAuthority.JourneyPlan planFleetPropellantJourney(
+            FleetId fleetId,
+            List<StarSystemId> orderedSystems) {
+        FleetId id = Objects.requireNonNull(fleetId, "fleetId");
+        List<StarSystemId> route = List.copyOf(Objects.requireNonNull(orderedSystems, "orderedSystems"));
+        if (fleetPropellantLogisticsAuthority != null) {
+            return fleetPropellantLogisticsAuthority.planJourney(id, route);
+        }
+        FleetArrivalAuthority.RouteFuelPlan direct = planFleetRouteFuel(id, route);
+        return FleetPropellantLogisticsAuthority.JourneyPlan.compatibility(
+                route,
+                direct.feasible(),
+                direct.requiredDeltaVMps(),
+                direct.remainingReactionMassKg(),
+                direct.reason());
+    }
+
+    /**
+     * Physically loads any current-system propellant required by the remaining route and revalidates
+     * departure safety.
+     *
+     * <p>Without a bound station-refueling authority this method is a no-op compatibility boundary
+     * that preserves the existing direct finite-fuel preflight.</p>
+     *
+     * @param fleetId stable physical fleet identity
+     * @param orderedSystems remaining route beginning at the current system
+     * @return committed local servicing evidence and the post-service journey plan
+     */
+    public FleetPropellantLogisticsAuthority.DeparturePreparation prepareFleetPropellantDeparture(
+            FleetId fleetId,
+            List<StarSystemId> orderedSystems) {
+        FleetId id = Objects.requireNonNull(fleetId, "fleetId");
+        List<StarSystemId> route = List.copyOf(Objects.requireNonNull(orderedSystems, "orderedSystems"));
+        if (fleetPropellantLogisticsAuthority != null) {
+            return fleetPropellantLogisticsAuthority.prepareDeparture(id, route);
+        }
+        FleetPropellantLogisticsAuthority.JourneyPlan journey =
+                planFleetPropellantJourney(id, route);
+        return new FleetPropellantLogisticsAuthority.DeparturePreparation(
+                false,
+                journey.feasible(),
+                0d,
+                List.of(),
+                journey,
+                journey.reason());
+    }
+
+    /**
+     * Binds one generated-world finite station-refueling authority.
+     *
+     * @param authority physical propellant logistics authority
+     */
+    public void bindFleetPropellantLogisticsAuthority(FleetPropellantLogisticsAuthority authority) {
+        if (fleetPropellantLogisticsAuthority != null) {
+            throw new IllegalStateException("fleet propellant logistics authority is already bound");
+        }
+        fleetPropellantLogisticsAuthority = Objects.requireNonNull(
+                authority, "fleetPropellantLogisticsAuthority");
     }
 
     /**
