@@ -4,9 +4,11 @@ import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.PlayerControlledComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.flight.FlightDynamics;
+import com.spacesim.ship.ProductionEngineeringRuntimeResolver;
 
 /**
  * Fixed-tick physical movement executor for the directly controlled player ship.
@@ -17,6 +19,9 @@ import com.spacesim.flight.FlightDynamics;
  * velocity and produces finite counter-thrust braking rather than an instantaneous stop.</p>
  */
 public final class PlayerDirectControlSystem extends IteratingSystem {
+    private static final float THRUST_EPSILON = 1.0e-4f;
+    private final ProductionEngineeringRuntimeResolver engineering =
+            new ProductionEngineeringRuntimeResolver();
     private final ComponentMapper<PlayerControlledComponent> controlMapper =
             ComponentMapper.getFor(PlayerControlledComponent.class);
     private final ComponentMapper<TransformComponent> transformMapper =
@@ -41,11 +46,47 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
             return;
         }
 
-        FlightDynamics.advance(
+        EngineeringComponent fitted = entity.getComponent(EngineeringComponent.class);
+        if (fitted == null) {
+            // Historical non-fitted entities remain an explicit migration compatibility seam.
+            FlightDynamics.advance(
+                    transform,
+                    FlightDynamics.profile(entity, control.movementSpeed),
+                    control.axisX,
+                    control.axisY,
+                    deltaTime);
+            return;
+        }
+
+        double throttle = requiresThrust(
+                transform, control.axisX, control.axisY, control.movementSpeed) ? 1d : 0d;
+        var result = engineering.advancePropulsion(fitted, throttle, deltaTime);
+        FlightDynamics.advancePhysical(
                 transform,
-                FlightDynamics.profile(entity, control.movementSpeed),
+                result.derivedState().totalMassKg(),
+                result.actualThrustN(),
+                control.movementSpeed,
                 control.axisX,
                 control.axisY,
                 deltaTime);
+    }
+    private static boolean requiresThrust(
+            TransformComponent transform,
+            float axisX,
+            float axisY,
+            float speedCap) {
+        float lengthSquared = axisX * axisX + axisY * axisY;
+        float desiredX = axisX;
+        float desiredY = axisY;
+        if (lengthSquared > 1f) {
+            float inverseLength = 1f / (float) Math.sqrt(lengthSquared);
+            desiredX *= inverseLength;
+            desiredY *= inverseLength;
+        }
+        desiredX *= speedCap;
+        desiredY *= speedCap;
+        float dx = desiredX - transform.velocity.x;
+        float dy = desiredY - transform.velocity.y;
+        return dx * dx + dy * dy > THRUST_EPSILON * THRUST_EPSILON;
     }
 }
