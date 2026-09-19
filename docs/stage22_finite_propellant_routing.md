@@ -45,15 +45,19 @@ Stage-20 freight persistence retains its historical hull/fit compatibility IDs s
 remain readable. At live materialization the two accepted generated core identities are projected onto
 their reviewed Stage-22 freight engineering assets:
 
-- `faction.alpha` / Empire -> `fit.empire.freight.bulk_v1`;
-- `faction.beta` / Industrial Union -> `fit.industrial_union.freight.bulk_v1`.
+- `faction.alpha` / Empire -> `fit.empire.freight.strategic_v1`;
+- `faction.beta` / Industrial Union -> `fit.industrial_union.freight.strategic_v1`.
 
+Each strategic freight variant adds the already accepted common Stage-22 FTL module to the authored
+unused `utility_defense` slot, so inter-system freight no longer depends on legacy free jump timing.
 The live `EngineeringComponent` owns finite drive reaction mass. Freight cargo transfers update the
 same engineering consumable state so cargo mass continues to affect derived ship mass.
 
 A new campaign starts these already-owned ships with explicit finite authored starting reaction mass.
 That is campaign initial state, not a refuel operation. Runtime refueling must still pass through the
-existing Stage-18 servicing/logistics authority. Historical local freighters restored from saves that
+existing Stage-18 servicing/logistics authority. Core Empire and Industrial Union main-drive
+`propellant_feed` interfaces are bound to finite
+`commodity.material.purified_water` station stock. Historical local freighters restored from saves that
 predate finite propulsion receive the same one-time migration projection; it is not repeated after the
 engineering state exists.
 
