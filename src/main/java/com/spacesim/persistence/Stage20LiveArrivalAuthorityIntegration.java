@@ -259,7 +259,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         var displacement = current.position().displacementTo(departure.position());
         double cruiseVelocityX = displacement.deltaXM() / durationSeconds;
         double cruiseVelocityY = displacement.deltaYM() / durationSeconds;
-        double requiredDeltaV = maneuverDeltaV(
+        double requiredDeltaV = accelerationDeltaV(
                 current, cruiseVelocityX, cruiseVelocityY);
         EngineeringComponent fitted = localEngineering(placement);
         if (fitted != null) {
@@ -395,6 +395,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         }
         long remainingBefore = phaseEndsTick - fromTick;
         if (remainingBefore <= 0L) {
+            consumeBrakingIfFitted(fleetId, originSystemId, current);
             materialization(originSystemId).updatePhysicalState(
                     localEntityId, LocalPhysicalKinematics.stationary(departure.position()));
             return;
@@ -410,6 +411,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         long remainingAfter = phaseEndsTick - toTick;
         LocalPhysicalKinematics next;
         if (remainingAfter <= 0L) {
+            consumeBrakingIfFitted(fleetId, originSystemId, current);
             next = LocalPhysicalKinematics.stationary(departure.position());
         } else {
             var remaining = nextPosition.displacementTo(departure.position());
@@ -519,15 +521,47 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         return step;
     }
 
+    private void consumeBrakingIfFitted(
+            FleetId fleetId,
+            StarSystemId systemId,
+            LocalPhysicalKinematics current) {
+        double brakingDeltaV = Math.hypot(current.velocityXMps(), current.velocityYMps());
+        if (brakingDeltaV <= 1.0e-9d) {
+            return;
+        }
+        FleetPlacementState placement = boundWorld.findFleet(fleetId).orElseThrow();
+        if (!systemId.equals(placement.systemId())) {
+            throw new IllegalStateException("braking fleet moved systems before local approach completed");
+        }
+        EngineeringComponent fitted = localEngineering(placement);
+        if (fitted == null) {
+            return;
+        }
+        var braking = engineering.planDeltaV(fitted, brakingDeltaV);
+        if (!braking.feasible()) {
+            throw new IllegalStateException(
+                    "insufficient physical propulsion to brake at FTL departure anchor: " + fleetId
+                            + " requiredDeltaVMps=" + brakingDeltaV
+                            + " deliveredDeltaVMps=" + braking.deliveredDeltaVMps());
+        }
+        engineering.commitManeuver(fitted, braking);
+    }
+
+    private static double accelerationDeltaV(
+            LocalPhysicalKinematics current,
+            double cruiseVelocityX,
+            double cruiseVelocityY) {
+        return Math.hypot(
+                cruiseVelocityX - current.velocityXMps(),
+                cruiseVelocityY - current.velocityYMps());
+    }
+
     private static double maneuverDeltaV(
             LocalPhysicalKinematics current,
             double cruiseVelocityX,
             double cruiseVelocityY) {
-        double accelerationDeltaV = Math.hypot(
-                cruiseVelocityX - current.velocityXMps(),
-                cruiseVelocityY - current.velocityYMps());
-        double brakingDeltaV = Math.hypot(cruiseVelocityX, cruiseVelocityY);
-        return accelerationDeltaV + brakingDeltaV;
+        return accelerationDeltaV(current, cruiseVelocityX, cruiseVelocityY)
+                + Math.hypot(cruiseVelocityX, cruiseVelocityY);
     }
 
     private FleetPlacementState requireLocalPlacement(
