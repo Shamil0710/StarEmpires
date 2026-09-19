@@ -254,13 +254,17 @@ public final class Stage20GeneratedWorldRuntimeBridge {
      */
     private static com.spacesim.components.EngineeringComponent freightEngineering(FreighterState fleet) {
         String fitId = switch (fleet.stableFactionId()) {
-            case "faction.alpha" -> "fit.empire.freight.bulk_v1";
-            case "faction.beta" -> "fit.industrial_union.freight.bulk_v1";
+            case "faction.alpha" ->
+                    com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
+                            .EMPIRE_FREIGHT_STRATEGIC_FIT;
+            case "faction.beta" ->
+                    com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
+                            .UNION_FREIGHT_STRATEGIC_FIT;
             default -> throw new IllegalStateException(
                     "generated freight has no reviewed physical engineering asset: "
                             + fleet.stableFactionId());
         };
-        var catalog = com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        var catalog = com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
         var definition = catalog.findDemonstratorFit(fitId);
         if (definition == null) {
             throw new IllegalStateException("missing reviewed freight fit: " + fitId);
