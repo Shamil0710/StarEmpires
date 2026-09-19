@@ -1,6 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.CombatComponent;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.content.Stage18ExtractionCatalogLoader;
@@ -424,7 +425,8 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
             Entity entity = entity(runtime, placement);
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
-            if (engineering != null && faction != null) {
+            CombatComponent combat = entity.getComponent(CombatComponent.class);
+            if (engineering != null && faction != null && combat != null) {
                 result.add(new MilitaryFleet(placement.id(), faction.factionId, placement.systemId()));
             }
         }
