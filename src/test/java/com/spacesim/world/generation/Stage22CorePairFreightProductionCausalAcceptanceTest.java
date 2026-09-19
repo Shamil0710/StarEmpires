@@ -1,6 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.content.Stage18ExtractionCatalogLoader;
@@ -227,6 +228,13 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
 
         while (runtime.freight().findFreighter(freighter.fleetId()).orElseThrow().phase() == FreightPhase.OUTBOUND) {
             FreighterState beforeHop = runtime.freight().findFreighter(freighter.fleetId()).orElseThrow();
+            TransportOrderState liveOrder = runtime.freight().findOrder(beforeHop.activeOrderId()).orElseThrow();
+            StarSystemId nextHop = liveOrder.orderedSystems().get(beforeHop.routeIndex() + 1);
+            // This evidence is about interdiction -> freight -> production causality, not local
+            // approach timing. The shared helper waits only real fitted cooldown/heat/charge recovery
+            // and moves to the exact persisted direct-edge spool boundary; it never refuels the ship.
+            GeneratedWorldFtlTestSupport.placeAtOutgoingEndpoint(
+                    runtime, freighter.fleetId(), nextHop);
             traffic.requestNextRouteHop(operations, freighter.fleetId());
             assertTrue(runtime.world().findFleetJump(freighter.fleetId()).isPresent());
             awaitJump(runtime, freighter.fleetId());
@@ -424,7 +432,8 @@ class Stage22CorePairFreightProductionCausalAcceptanceTest {
             Entity entity = entity(runtime, placement);
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
-            if (engineering != null && faction != null) {
+            ShipComponent ship = entity.getComponent(ShipComponent.class);
+            if (engineering != null && faction != null && ship != null && ship.type != null && ship.type.isCombat()) {
                 result.add(new MilitaryFleet(placement.id(), faction.factionId, placement.systemId()));
             }
         }

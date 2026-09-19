@@ -1,6 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
@@ -263,8 +264,12 @@ class Stage22CorePairOffensiveProjectionGeneratedWorldAcceptanceTest {
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) continue;
             Entity entity = entity(runtime, placement);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
+            ShipComponent ship = entity.getComponent(ShipComponent.class);
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
-            if (faction == null || engineering == null) continue;
+            if (faction == null || engineering == null
+                    || ship == null || ship.type == null || !ship.type.isCombat()) {
+                continue;
+            }
             byFaction.computeIfAbsent(faction.factionId, ignored -> new ArrayList<>()).add(placement.id());
         }
         ArrayList<FactionFleetGroup> result = new ArrayList<>();

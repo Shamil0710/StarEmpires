@@ -1,6 +1,7 @@
 package com.spacesim.world.generation;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.ShipComponent;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.FactionComponent;
 import com.spacesim.content.Stage22CorePairExperimentProtocol.Permutation;
@@ -338,7 +339,8 @@ class Stage22CorePairEscortInterdictionIntegrationAcceptanceTest {
             Entity entity = entity(runtime, placement);
             EngineeringComponent engineering = entity.getComponent(EngineeringComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
-            if (engineering != null && faction != null) {
+            ShipComponent ship = entity.getComponent(ShipComponent.class);
+            if (engineering != null && faction != null && ship != null && ship.type != null && ship.type.isCombat()) {
                 result.add(new MilitaryFleet(placement.id(), faction.factionId));
             }
         }

@@ -240,7 +240,68 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 .add(new ArchetypeComponent(fleet.hullId()))
                 .add(transform)
                 .add(new ShipComponent(ShipType.MATERIAL_CARRIER))
-                .add(new FactionComponent(runtimeFactionId));
+                .add(new FactionComponent(runtimeFactionId))
+                .add(freightEngineering(fleet));
+    }
+
+    /**
+     * Projects the legacy Stage-20 freight ownership row onto its reviewed Stage-22 physical asset.
+     *
+     * <p>The freight sidecar keeps its historical compatibility hull/fit IDs for save compatibility,
+     * while the live ECS engineering authority uses the licensed core freight fit selected by the
+     * stable generated-faction identity. Initial reaction mass is explicit finite starting stock,
+     * not an infinite-flight fallback.</p>
+     */
+    private static com.spacesim.components.EngineeringComponent freightEngineering(FreighterState fleet) {
+        String fitId = switch (fleet.stableFactionId()) {
+            case "faction.alpha" ->
+                    com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
+                            .EMPIRE_FREIGHT_STRATEGIC_FIT;
+            case "faction.beta" ->
+                    com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
+                            .UNION_FREIGHT_STRATEGIC_FIT;
+            default -> throw new IllegalStateException(
+                    "generated freight has no reviewed physical engineering asset: "
+                            + fleet.stableFactionId());
+        };
+        var catalog = com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
+        var definition = catalog.findDemonstratorFit(fitId);
+        if (definition == null) {
+            throw new IllegalStateException("missing reviewed freight fit: " + fitId);
+        }
+        var fit = com.spacesim.ship.ShipEngineeringState.InstalledFit.fromDemonstrator(definition);
+        java.util.ArrayList<com.spacesim.ship.ShipEngineeringState.ConsumableLoad> loads =
+                new java.util.ArrayList<>();
+        for (var installed : fit.installedModules()) {
+            var module = catalog.findModule(installed.moduleId());
+            if (module == null) {
+                throw new IllegalStateException("reviewed freight fit references missing module");
+            }
+            for (var iface : module.interfaces()) {
+                if (iface.kind() == com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind.REACTION_MASS) {
+                    loads.add(new com.spacesim.ship.ShipEngineeringState.ConsumableLoad(
+                            installed.mountId(),
+                            iface.id(),
+                            iface.kind(),
+                            iface.capacity(),
+                            iface.capacity(),
+                            0L));
+                }
+            }
+        }
+        if (loads.isEmpty()) {
+            throw new IllegalStateException("reviewed freight fit has no reaction-mass interface: " + fitId);
+        }
+        var consumables = new com.spacesim.ship.ShipEngineeringState.ConsumableState(
+                fleet.cargoMassKg(), 0d, 0d, 0d, loads);
+        var operating = new com.spacesim.ship.ShipEngineeringRuntime(catalog).initialize(
+                fit,
+                consumables,
+                com.spacesim.ship.ShipEngineeringState.DamageState.pristine());
+        return new com.spacesim.components.EngineeringComponent(
+                fit,
+                operating,
+                com.spacesim.ship.ShipInstanceRuntimeState.legacyNeutral());
     }
 
     private static void rollbackCreatedFreight(
@@ -283,6 +344,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     .getEntityRegistry().require(placement.localEntityId());
             ArchetypeComponent archetype = entity.getComponent(ArchetypeComponent.class);
             FactionComponent faction = entity.getComponent(FactionComponent.class);
+            if (entity.getComponent(com.spacesim.components.EngineeringComponent.class) == null) {
+                // Explicit migration for historical generated-freight saves that predate finite propulsion.
+                entity.add(freightEngineering(fleet));
+            }
             Integer expectedFaction = world.findFactionRuntimeId(fleet.stableFactionId()).orElseThrow();
             if (archetype == null || !archetype.contentId.equals(fleet.hullId())
                     || faction == null || faction.factionId != expectedFaction) {
@@ -502,7 +567,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             TransportOrderState order = freight.findOrder(fleetState.activeOrderId()).orElseThrow();
             RuntimeEndpoint endpoint = infrastructure.endpoint(order.sourceEndpointId());
             HandlingCapability handling = holdHandling(fleetId, endpoint.handlingCapability());
-            return freight.loadCommodity(
+            Stage20FreightRuntime.CargoOperationResult result = freight.loadCommodity(
                     fleetId,
                     endpoint.storage(),
                     massKg,
@@ -510,6 +575,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     simulationSeconds,
                     handling,
                     handling.openInterval(durationSeconds));
+            if (result.transferred()) {
+                synchronizeFreightEngineeringCargo(fleetId);
+            }
+            return result;
         }
 
         /**
@@ -528,12 +597,46 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             TransportOrderState order = freight.findOrder(fleetState.activeOrderId()).orElseThrow();
             RuntimeEndpoint endpoint = infrastructure.endpoint(order.destinationEndpointId());
             HandlingCapability handling = holdHandling(fleetId, endpoint.handlingCapability());
-            return freight.unloadCommodity(
+            Stage20FreightRuntime.CargoOperationResult result = freight.unloadCommodity(
                     fleetId,
                     endpoint.storage(),
                     massKg,
                     handling,
                     handling.openInterval(durationSeconds));
+            if (result.transferred()) {
+                synchronizeFreightEngineeringCargo(fleetId);
+            }
+            return result;
+        }
+
+        private void synchronizeFreightEngineeringCargo(FleetId fleetId) {
+            FreighterState fleetState = freight.findFreighter(fleetId).orElseThrow();
+            FleetPlacementState placement = world.findFleet(fleetId).orElseThrow();
+            if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+                throw new IllegalStateException("freight cargo synchronization requires local placement");
+            }
+            Entity entity = world.findSession(placement.systemId()).orElseThrow()
+                    .getEntityRegistry().require(placement.localEntityId());
+            var engineering = entity.getComponent(com.spacesim.components.EngineeringComponent.class);
+            if (engineering == null) {
+                throw new IllegalStateException("physical freight entity lost EngineeringComponent");
+            }
+            var state = engineering.runtimeState;
+            var previous = state.consumables();
+            var nextConsumables = new com.spacesim.ship.ShipEngineeringState.ConsumableState(
+                    fleetState.cargoMassKg(),
+                    previous.storesMassKg(),
+                    previous.missionPayloadMassKg(),
+                    previous.missionIntegrationVolumeM3(),
+                    previous.interfaceLoads());
+            engineering.setRuntimeState(new com.spacesim.ship.ShipEngineeringRuntime.RuntimeState(
+                    nextConsumables,
+                    state.sharedBusEnergyJ(),
+                    state.shipHeatStoredJ(),
+                    state.localHeatJByMount(),
+                    state.thrustLimitNByMount(),
+                    state.coolantBusCapacityW(),
+                    state.ftlCooldownSecondsByMount()));
         }
 
         /**
@@ -559,6 +662,24 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
                     || !placement.systemId().equals(fleetState.currentSystemId())) {
                 throw new IllegalStateException("next freight hop requires matching local world placement");
+            }
+            java.util.ArrayList<StarSystemId> remainingRoute = new java.util.ArrayList<>();
+            if (fleetState.phase() == FreightPhase.OUTBOUND) {
+                for (int index = fleetState.routeIndex(); index < order.orderedSystems().size(); index++) {
+                    remainingRoute.add(order.orderedSystems().get(index));
+                }
+            } else {
+                for (int index = fleetState.routeIndex(); index >= 0; index--) {
+                    remainingRoute.add(order.orderedSystems().get(index));
+                }
+            }
+            var fuel = world.planFleetRouteFuel(fleetId, remainingRoute);
+            if (fuel.supported() && !fuel.feasible()) {
+                throw new IllegalStateException(
+                        "freighter cannot start remaining route without risking propellant stranding: "
+                                + fleetId + " reason=" + fuel.reason()
+                                + " requiredDeltaVMps=" + fuel.requiredDeltaVMps()
+                                + " remainingReactionMassKg=" + fuel.remainingReactionMassKg());
             }
             return world.requestFleetJump(fleetId, order.orderedSystems().get(nextIndex));
         }
@@ -732,6 +853,13 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 if (placement.locationKind() != FleetLocationKind.IN_SYSTEM
                         || placement.systemId().equals(fleetState.currentSystemId())) {
                     continue;
+                }
+                Entity arrivedEntity = world.findSession(placement.systemId()).orElseThrow()
+                        .getEntityRegistry().require(placement.localEntityId());
+                if (arrivedEntity.getComponent(com.spacesim.components.EngineeringComponent.class) == null) {
+                    // One-time migration for historical saves captured while generated freight was
+                    // already detached in transit before finite propulsion entered the world schema.
+                    arrivedEntity.add(freightEngineering(fleetState));
                 }
                 LocalPhysicalKinematics exact = arrival.materialization(placement.systemId())
                         .physicalState(placement.localEntityId()).orElseThrow(

@@ -35,6 +35,11 @@ import java.util.Set;
  * segments carry an explicit uncertainty premium rather than being assumed safe. Raw danger remains
  * an arbitrary exposure score, never a probability.</p>
  *
+ * <p>For fitted fleets, a completed candidate route is also preflighted against the authoritative
+ * finite-propellant route model before it can be returned. An unsafe path is therefore never exposed
+ * to the order executor as a valid first hop. Historical non-fitted worlds retain their explicit
+ * compatibility behavior.</p>
+ *
  * <p>The risk multiplier is actor-specific: current real cargo utilization, current damage and
  * shared inertial acceleration affect vulnerability. A real player-owned operational combat fleet
  * under a persistent ESCORT order can mitigate expected actor loss only while physically
@@ -70,7 +75,7 @@ public final class PlayerFleetRoutePlanner {
      * @param fleetId actor whose real cargo/damage/mobility determine vulnerability
      * @param origin discovered origin system
      * @param destination discovered destination system
-     * @return full route diagnostics, or empty when no discovered route exists
+     * @return full route diagnostics, or empty when no discovered fuel-safe route is available
      */
     public Optional<PlayerRouteRiskView> plan(
             FleetId fleetId,
@@ -95,14 +100,15 @@ public final class PlayerFleetRoutePlanner {
         PriorityQueue<Node> frontier = new PriorityQueue<>(Comparator
                 .comparingDouble(Node::totalCost)
                 .thenComparing(Node::path, PlayerFleetRoutePlanner::comparePaths));
-        Map<StarSystemId, Node> best = new HashMap<>();
-        Node start = new Node(from, List.of(from), 0L, 0d, 0d, 0d, 0d, 0d);
+        Map<RouteStateKey, List<Node>> best = new HashMap<>();
+        Node start = new Node(from, List.of(from), 0L, 0d, 0d, 0d, 0d, 0d, false, 0d);
         frontier.add(start);
-        best.put(from, start);
+        best.put(new RouteStateKey(from, null), new ArrayList<>(List.of(start)));
 
         while (!frontier.isEmpty()) {
             Node current = frontier.poll();
-            if (best.get(current.system()) != current) {
+            List<Node> currentLabels = best.get(routeStateKey(current));
+            if (currentLabels == null || !currentLabels.contains(current)) {
                 continue;
             }
             if (current.system().equals(to)) {
@@ -123,12 +129,16 @@ public final class PlayerFleetRoutePlanner {
             List<StarSystemId> neighbors = new ArrayList<>(world.getTopology().neighbors(current.system()));
             neighbors.sort(Comparator.naturalOrder());
             for (StarSystemId neighbor : neighbors) {
-                if (!discovered.contains(neighbor)) {
+                if (!discovered.contains(neighbor) || current.path().contains(neighbor)) {
                     continue;
                 }
                 EdgeCost edge = edgeCost(player, current.system(), neighbor, currentTick, vulnerability);
                 List<StarSystemId> path = new ArrayList<>(current.path());
                 path.add(neighbor);
+                var fuel = world.planFleetRouteFuel(actor, path);
+                if (fuel.supported() && !fuel.feasible()) {
+                    continue;
+                }
                 long travelTicks = Math.addExact(current.travelTicks(), edge.travelTicks());
                 double systemExposure = current.systemExposure() + edge.systemExposure();
                 double linkExposure = current.linkExposure() + edge.linkExposure();
@@ -144,11 +154,25 @@ public final class PlayerFleetRoutePlanner {
                         linkExposure,
                         uncertainty,
                         riskCost,
-                        totalCost);
-                Node previous = best.get(neighbor);
-                if (previous == null || better(candidate, previous)) {
-                    best.put(neighbor, candidate);
+                        totalCost,
+                        fuel.supported(),
+                        fuel.supported() ? fuel.requiredDeltaVMps() : 0d);
+                RouteStateKey candidateKey = new RouteStateKey(neighbor, current.system());
+                List<Node> labels = best.computeIfAbsent(candidateKey, ignored -> new ArrayList<>());
+                if (fuel.supported()) {
+                    if (labels.stream().anyMatch(existing -> dominates(existing, candidate))) {
+                        continue;
+                    }
+                    labels.removeIf(existing -> dominates(candidate, existing));
+                    labels.add(candidate);
                     frontier.add(candidate);
+                } else {
+                    Node previous = labels.isEmpty() ? null : labels.get(0);
+                    if (previous == null || better(candidate, previous)) {
+                        labels.clear();
+                        labels.add(candidate);
+                        frontier.add(candidate);
+                    }
                 }
             }
         }
@@ -300,12 +324,34 @@ public final class PlayerFleetRoutePlanner {
         return ship == null ? 0f : ship.movementSpeed();
     }
 
+    private static RouteStateKey routeStateKey(Node node) {
+        List<StarSystemId> path = node.path();
+        StarSystemId previous = path.size() < 2 ? null : path.get(path.size() - 2);
+        return new RouteStateKey(node.system(), previous);
+    }
+
     private static boolean better(Node candidate, Node previous) {
         if (candidate.totalCost() + COST_EPSILON < previous.totalCost()) {
             return true;
         }
         return Math.abs(candidate.totalCost() - previous.totalCost()) <= COST_EPSILON
                 && comparePaths(candidate.path(), previous.path()) < 0;
+    }
+
+    private static boolean dominates(Node first, Node second) {
+        if (!first.fuelSupported() || !second.fuelSupported()) {
+            return better(first, second)
+                    || (Math.abs(first.totalCost() - second.totalCost()) <= COST_EPSILON
+                    && comparePaths(first.path(), second.path()) <= 0);
+        }
+        boolean noWorseCost = first.totalCost() <= second.totalCost() + COST_EPSILON;
+        boolean noWorseFuel = first.requiredDeltaVMps() <= second.requiredDeltaVMps() + COST_EPSILON;
+        if (!noWorseCost || !noWorseFuel) {
+            return false;
+        }
+        boolean strictlyBetter = first.totalCost() + COST_EPSILON < second.totalCost()
+                || first.requiredDeltaVMps() + COST_EPSILON < second.requiredDeltaVMps();
+        return strictlyBetter || comparePaths(first.path(), second.path()) <= 0;
     }
 
     private static int comparePaths(List<StarSystemId> first, List<StarSystemId> second) {
@@ -317,6 +363,9 @@ public final class PlayerFleetRoutePlanner {
             }
         }
         return Integer.compare(first.size(), second.size());
+    }
+
+    private record RouteStateKey(StarSystemId system, StarSystemId previousSystem) {
     }
 
     private record EdgeCost(
@@ -334,6 +383,8 @@ public final class PlayerFleetRoutePlanner {
             double linkExposure,
             double uncertaintyExposure,
             double riskCost,
-            double totalCost) {
+            double totalCost,
+            boolean fuelSupported,
+            double requiredDeltaVMps) {
     }
 }

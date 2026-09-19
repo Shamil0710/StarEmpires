@@ -141,15 +141,25 @@ public final class FleetOrderExecutionService {
                         "fleet already has a different active jump: " + movement.fleetId());
             }
         }
+        FleetOrderState order = commandState.requireOrder(orderId);
+        List<StarSystemId> remainingRoute = order.route().subList(
+                order.routeCursor(), order.route().size());
         for (MovementOperation movement : pending) {
             FleetForceRegistry.Entry force = forces.find(movement.fleetId())
                     .orElseThrow(() -> new IllegalStateException("missing FleetId: " + movement.fleetId()));
             if (waitingForFittedCooldown(force)) {
                 continue;
             }
+            var fuel = world.planFleetRouteFuel(movement.fleetId(), remainingRoute);
+            if (fuel.supported() && !fuel.feasible()) {
+                throw new IllegalStateException(
+                        "fleet cannot start route without risking propellant stranding: "
+                                + movement.fleetId() + " reason=" + fuel.reason()
+                                + " requiredDeltaVMps=" + fuel.requiredDeltaVMps()
+                                + " remainingReactionMassKg=" + fuel.remainingReactionMassKg());
+            }
             world.requestFleetJump(movement.fleetId(), movement.destinationSystemId(), 0f, 0f);
         }
-        FleetOrderState order = commandState.requireOrder(orderId);
         return commandState.replaceOrder(order.withStatus(OrderStatus.ACTIVE));
     }
 

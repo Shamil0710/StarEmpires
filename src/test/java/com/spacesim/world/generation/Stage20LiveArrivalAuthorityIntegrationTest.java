@@ -1,9 +1,13 @@
 package com.spacesim.world.generation;
 
 import com.badlogic.ashley.core.Entity;
+import com.spacesim.components.EngineeringComponent;
 import com.spacesim.components.TransformComponent;
 import com.spacesim.content.ContentCatalog;
 import com.spacesim.content.ContentCatalogLoader;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
+import com.spacesim.content.ship.Stage22CorePairStrategicMobilityProjection;
+import com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader;
 import com.spacesim.persistence.EntityId;
 import com.spacesim.persistence.Stage18IndustrialState;
 import com.spacesim.persistence.Stage20GeneratedCampaignPersistence;
@@ -13,6 +17,12 @@ import com.spacesim.persistence.Stage20MaterializationPersistence;
 import com.spacesim.persistence.Stage20MaterializationPersistentState;
 import com.spacesim.simulation.SimulationSession;
 import com.spacesim.simulation.Stage20MaterializationService;
+import com.spacesim.ship.ProductionEngineeringRuntimeResolver;
+import com.spacesim.ship.ShipEngineeringRuntime;
+import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
+import com.spacesim.ship.ShipEngineeringState.ConsumableState;
+import com.spacesim.ship.ShipEngineeringState.DamageState;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.FleetJumpPhase;
 import com.spacesim.world.FleetPlacementState;
@@ -151,6 +161,67 @@ class Stage20LiveArrivalAuthorityIntegrationTest {
     }
 
     @Test
+    void directJumpRejectsBeforeSpendingWhenFuelCanAccelerateButCannotBrake() {
+        CadenceFixture fixture = fixture();
+        Stage20GeneratedCampaignPersistentState campaign = savedState(fixture);
+        WorldSimulation world = world(fixture);
+        Stage20LiveArrivalAuthorityIntegration integration =
+                Stage20LiveArrivalAuthorityIntegration.restoreAndBind(campaign, world);
+        FleetPlacementState source = sourceFleetWithNeighbor(world);
+        StarSystemId origin = source.systemId();
+        StarSystemId destination = world.getTopology().neighbors(origin).get(0);
+        var outgoing = integration.resolve(destination, origin);
+        integration.materialization(origin).registerPhysicalState(
+                source.localEntityId(),
+                LocalPhysicalKinematics.stationary(
+                        outgoing.physicalState().position().translated(5_000_000d, 0d)));
+
+        Entity entity = world.findSession(origin).orElseThrow()
+                .getEntityRegistry().require(source.localEntityId());
+        EngineeringComponent full = strategicEngineering(Double.MAX_VALUE);
+        entity.add(full);
+
+        var fullLeg = world.planFleetRouteFuel(source.id(), List.of(origin, destination));
+        assertTrue(fullLeg.supported());
+        assertTrue(fullLeg.feasible());
+        assertTrue(fullLeg.requiredDeltaVMps() > 0d);
+
+        double maximumReactionMass = full.runtimeState.consumables().reactionMassKg();
+        double accelerationOnlyBudget = fullLeg.requiredDeltaVMps() * 0.75d;
+        ProductionEngineeringRuntimeResolver resolver = new ProductionEngineeringRuntimeResolver();
+        double low = 0d;
+        double high = maximumReactionMass;
+        for (int attempt = 0; attempt < 60; attempt++) {
+            double candidate = (low + high) * 0.5d;
+            if (resolver.planDeltaV(
+                    strategicEngineering(candidate), accelerationOnlyBudget).feasible()) {
+                high = candidate;
+            } else {
+                low = candidate;
+            }
+        }
+        double limitedMass = Math.min(maximumReactionMass, high * 1.001d + 1.0e-6d);
+        EngineeringComponent limited = strategicEngineering(limitedMass);
+        assertTrue(resolver.planDeltaV(limited, accelerationOnlyBudget).feasible(),
+                "fixture must retain enough propellant for the initial acceleration");
+        assertFalse(resolver.planDeltaV(limited, fullLeg.requiredDeltaVMps()).feasible(),
+                "fixture must be unable to complete acceleration plus braking");
+        entity.add(limited);
+        double before = limited.runtimeState.consumables().reactionMassKg();
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> world.requestFleetJump(source.id(), destination));
+
+        assertTrue(failure.getMessage().contains("complete FTL departure approach"));
+        assertEquals(before, limited.runtimeState.consumables().reactionMassKg(), 1.0e-9d,
+                "failed complete-leg preflight must spend no reaction mass");
+        assertTrue(world.findFleetJump(source.id()).isEmpty(),
+                "infeasible direct hop must not create an active jump");
+        assertEquals(origin, world.findFleet(source.id()).orElseThrow().systemId());
+    }
+
+    @Test
     void departureReadinessRejectsFleetAwayFromOutgoingFtlPoint() {
         CadenceFixture fixture = fixture();
         Stage20GeneratedCampaignPersistentState campaign = savedState(fixture);
@@ -260,6 +331,31 @@ class Stage20LiveArrivalAuthorityIntegrationTest {
             world.advanceFrame(0.25f);
         }
         throw new AssertionError("ordinary jump did not reach phase " + phase);
+    }
+
+    private static EngineeringComponent strategicEngineering(double requestedReactionMassKg) {
+        var catalog = Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
+        var definition = catalog.findDemonstratorFit(
+                Stage22CorePairStrategicMobilityProjection.EMPIRE_DESTROYER_STRATEGIC_FIT);
+        InstalledFit fit = InstalledFit.fromDemonstrator(definition);
+        double remaining = requestedReactionMassKg;
+        ArrayList<ConsumableLoad> loads = new ArrayList<>();
+        for (var installed : fit.installedModules()) {
+            var module = catalog.findModule(installed.moduleId());
+            for (var iface : module.interfaces()) {
+                if (iface.kind() != InterfaceKind.REACTION_MASS) {
+                    continue;
+                }
+                double amount = Math.min(iface.capacity(), Math.max(0d, remaining));
+                loads.add(new ConsumableLoad(
+                        installed.mountId(), iface.id(), iface.kind(), amount, amount, 0L));
+                remaining = Math.max(0d, remaining - amount);
+            }
+        }
+        ConsumableState consumables = new ConsumableState(0d, 0d, 0d, 0d, loads);
+        ShipEngineeringRuntime runtime = new ShipEngineeringRuntime(catalog);
+        var state = runtime.initialize(fit, consumables, DamageState.pristine());
+        return new EngineeringComponent(fit, state);
     }
 
     private static RouteFixture routeFixture(WorldSimulation world) {
