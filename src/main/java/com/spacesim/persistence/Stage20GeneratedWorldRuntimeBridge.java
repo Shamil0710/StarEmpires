@@ -659,6 +659,24 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     || !placement.systemId().equals(fleetState.currentSystemId())) {
                 throw new IllegalStateException("next freight hop requires matching local world placement");
             }
+            java.util.ArrayList<StarSystemId> remainingRoute = new java.util.ArrayList<>();
+            if (fleetState.phase() == FreightPhase.OUTBOUND) {
+                for (int index = fleetState.routeIndex(); index < order.orderedSystems().size(); index++) {
+                    remainingRoute.add(order.orderedSystems().get(index));
+                }
+            } else {
+                for (int index = fleetState.routeIndex(); index >= 0; index--) {
+                    remainingRoute.add(order.orderedSystems().get(index));
+                }
+            }
+            var fuel = world.planFleetRouteFuel(fleetId, remainingRoute);
+            if (fuel.supported() && !fuel.feasible()) {
+                throw new IllegalStateException(
+                        "freighter cannot start remaining route without risking propellant stranding: "
+                                + fleetId + " reason=" + fuel.reason()
+                                + " requiredDeltaVMps=" + fuel.requiredDeltaVMps()
+                                + " remainingReactionMassKg=" + fuel.remainingReactionMassKg());
+            }
             return world.requestFleetJump(fleetId, order.orderedSystems().get(nextIndex));
         }
 
