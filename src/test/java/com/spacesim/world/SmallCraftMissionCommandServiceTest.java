@@ -83,12 +83,12 @@ final class SmallCraftMissionCommandServiceTest {
 
     @Test
     void physicallyInfeasibleMissionDeltaVIsRejectedBeforeLaunchMutation() {
-        Fixture fixture = fixture();
+        Fixture fixture = fixture(0d);
 
         assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
                 SmallCraftMissionState.empty(),
                 command(fixture.craftId, OrderSource.AI, MissionType.CAP, TargetKind.AREA, "area.alpha"),
-                context(40L, DeploymentState.EMBARKED, 1_000d, 20_000d, true, 1_000_000_000d, 40L)));
+                context(40L, DeploymentState.EMBARKED, 1_000d, 20_000d, true, 10d, 40L)));
 
         assertTrue(fixture.deck.queued().isEmpty());
         assertEquals(OccupancyState.READY, fixture.hangars.find(fixture.craftId).orElseThrow().state());
@@ -150,6 +150,10 @@ final class SmallCraftMissionCommandServiceTest {
     }
 
     private static Fixture fixture() {
+        return fixture(200_000d);
+    }
+
+    private static Fixture fixture(double reactionMassKg) {
         SmallCraftRegistry craft = SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId id = craft.reserveIdentityForCompletedProduction();
         craft.registerProducedCraft(ProductionSmallCraftFixture.craft(
