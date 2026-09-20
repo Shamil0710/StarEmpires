@@ -63,8 +63,10 @@ public record Stage20BootstrapServiceCadenceCalibrationProfile(
         String stationInfrastructureFingerprint,
         boolean stage22ReviewRequired) {
 
-    /** Current corrected Stage-20E bootstrap supplier-service cadence authority. */
-    public static final String CURRENT_VERSION = "stage20e.bootstrap-service-cadence.v1";
+    /** Historical Stage-20E supplier-service cadence retained for frozen freight sizing. */
+    public static final String LEGACY_STAGE20_VERSION = "stage20e.bootstrap-service-cadence.v1";
+    /** Current Stage-22-reviewed bootstrap supplier-service cadence authority. */
+    public static final String CURRENT_VERSION = "stage20e.bootstrap-service-cadence.v2";
     /** Same representative freight role already used by the representative production probe. */
     public static final String FREIGHT_REFERENCE_CLASS = "EARLY_CIVILIAN_FREIGHTER";
     /** Same representative major-hub archetype already used by the representative production probe. */
@@ -127,8 +129,25 @@ public record Stage20BootstrapServiceCadenceCalibrationProfile(
      * @return deterministic current service-cadence profile
      */
     public static Stage20BootstrapServiceCadenceCalibrationProfile deriveCurrent() {
-        Stage20LocalRouteSemanticCalibrationProfile local =
-                Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent();
+        return derive(
+                Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent(),
+                CURRENT_VERSION);
+    }
+
+    /**
+     * Reconstructs the historical Stage-20 service cadence for frozen freight-capacity authority.
+     *
+     * @return deterministic historical Stage-20 service cadence
+     */
+    public static Stage20BootstrapServiceCadenceCalibrationProfile deriveLegacyStage20() {
+        return derive(
+                Stage20LocalRouteSemanticCalibrationProfile.deriveLegacyStage20(),
+                LEGACY_STAGE20_VERSION);
+    }
+
+    private static Stage20BootstrapServiceCadenceCalibrationProfile derive(
+            Stage20LocalRouteSemanticCalibrationProfile local,
+            String version) {
         Stage20IntersystemCadenceCalibrationProfile intersystem =
                 Stage20IntersystemCadenceCalibrationProfile.deriveCurrent();
         Stage20RepresentativePropulsionCatalog propulsion =
@@ -163,7 +182,7 @@ public record Stage20BootstrapServiceCadenceCalibrationProfile(
                 + regionalFreight.arrivalTimeS();
 
         return new Stage20BootstrapServiceCadenceCalibrationProfile(
-                CURRENT_VERSION,
+                version,
                 FREIGHT_REFERENCE_CLASS,
                 HUB_STATION_ARCHETYPE_ID,
                 REGIONAL_HOP_COUNT,
