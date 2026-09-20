@@ -32,8 +32,10 @@ import java.util.TreeMap;
  * the frozen v1 rejection baseline.</p>
  */
 public final class Stage20BootstrapRequirementCalibrationProfileV2 {
-    /** Candidate corrected bootstrap requirement authority version. */
-    public static final String CURRENT_VERSION = "stage20e.bootstrap-requirements.v2";
+    /** Historical Stage-20 corrected bootstrap authority retained for frozen probe evidence. */
+    public static final String LEGACY_STAGE20_VERSION = "stage20e.bootstrap-requirements.v2";
+    /** Current Stage-22-reviewed corrected bootstrap authority. */
+    public static final String CURRENT_VERSION = "stage20e.bootstrap-requirements.v3";
 
     private Stage20BootstrapRequirementCalibrationProfileV2() {
         throw new AssertionError("No instances");
@@ -107,10 +109,29 @@ public final class Stage20BootstrapRequirementCalibrationProfileV2 {
      * @return deterministic corrected Stage-20E candidate profile
      */
     public static DerivedProfile deriveCurrent() {
+        return derive(
+                Stage20BootstrapServiceCadenceCalibrationProfile.deriveCurrent(),
+                CURRENT_VERSION);
+    }
+
+    /**
+     * Reconstructs the historical Stage-20 v2 bootstrap authority for frozen generated-world evidence.
+     *
+     * @return deterministic historical Stage-20 bootstrap requirement profile
+     */
+    public static DerivedProfile deriveLegacyStage20() {
+        return derive(
+                Stage20BootstrapServiceCadenceCalibrationProfile.deriveLegacyStage20(),
+                LEGACY_STAGE20_VERSION);
+    }
+
+    private static DerivedProfile derive(
+            Stage20BootstrapServiceCadenceCalibrationProfile serviceCadenceAuthority,
+            String version) {
         Stage20BootstrapRequirementCalibrationProfile.DerivedProfile demandAuthority =
                 Stage20BootstrapRequirementCalibrationProfile.deriveCurrent();
         Stage20BootstrapServiceCadenceCalibrationProfile serviceCadence =
-                Stage20BootstrapServiceCadenceCalibrationProfile.deriveCurrent();
+                Objects.requireNonNull(serviceCadenceAuthority, "serviceCadenceAuthority");
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
         var stations = Stage18StationInfrastructureCatalogLoader.loadDefault();
         StationArchetypeDefinition referenceStation = stations.findArchetype(
@@ -171,7 +192,7 @@ public final class Stage20BootstrapRequirementCalibrationProfileV2 {
                 demandAuthority.bootstrapRequirements().minIntermediateInputThroughputKgPerSecond(),
                 economicRequirements);
         return new DerivedProfile(
-                CURRENT_VERSION,
+                version,
                 demandAuthority.version(),
                 serviceCadence,
                 bootstrap,
