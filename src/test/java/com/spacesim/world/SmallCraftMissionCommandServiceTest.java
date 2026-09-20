@@ -150,6 +150,67 @@ final class SmallCraftMissionCommandServiceTest {
     }
 
     @Test
+    void emptyPhysicalMagazineCannotAuthorizeCombatMission() {
+        Fixture fixture = fixture(200_000d, 1d, 0L);
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.AI, MissionType.INTERCEPTION, TargetKind.TRACK, "track.empty"),
+                contextFor(
+                        53L,
+                        DeploymentState.EMBARKED,
+                        0d,
+                        20_000d,
+                        true,
+                        0d,
+                        "track.empty",
+                        53L)));
+
+        assertTrue(fixture.deck.queued().isEmpty());
+    }
+
+    @Test
+    void sensorOnlyFitCannotClaimEwSupportMission() {
+        Fixture fixture = fixture();
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.AI, MissionType.EW_SUPPORT, TargetKind.AREA, "area.ew"),
+                contextFor(
+                        53L,
+                        DeploymentState.EMBARKED,
+                        0d,
+                        20_000d,
+                        true,
+                        0d,
+                        "area.ew",
+                        53L)));
+
+        assertTrue(fixture.deck.queued().isEmpty());
+    }
+
+    @Test
+    void operationalSensorFitCanAuthorizeReconnaissance() {
+        Fixture fixture = fixture();
+
+        var accepted = fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.AI, MissionType.RECONNAISSANCE, TargetKind.AREA, "area.recon"),
+                contextFor(
+                        53L,
+                        DeploymentState.EMBARKED,
+                        0d,
+                        20_000d,
+                        true,
+                        0d,
+                        "area.recon",
+                        53L));
+
+        assertEquals(MissionStatus.LAUNCH_QUEUED, accepted.mission().status());
+        assertEquals(1, fixture.deck.queued().size());
+    }
+
+    @Test
     void destroyedWeaponCannotAuthorizeCombatMission() {
         Fixture fixture = fixture(200_000d, 0d);
 
@@ -194,18 +255,30 @@ final class SmallCraftMissionCommandServiceTest {
     }
 
     private static Fixture fixture() {
-        return fixture(200_000d, 1d);
+        return fixture(200_000d, 1d, 20L);
     }
 
     private static Fixture fixture(double reactionMassKg) {
-        return fixture(reactionMassKg, 1d);
+        return fixture(reactionMassKg, 1d, 20L);
     }
 
     private static Fixture fixture(double reactionMassKg, double weaponIntegrity) {
+        return fixture(reactionMassKg, weaponIntegrity, 20L);
+    }
+
+    private static Fixture fixture(
+            double reactionMassKg,
+            double weaponIntegrity,
+            long ammunitionCount) {
         SmallCraftRegistry craft = SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId id = craft.reserveIdentityForCompletedProduction();
         craft.registerProducedCraft(ProductionSmallCraftFixture.craft(
-                id, 20L, 2_000d, reactionMassKg, weaponIntegrity, 0d));
+                id,
+                ammunitionCount,
+                ammunitionCount * 100d,
+                reactionMassKg,
+                weaponIntegrity,
+                0d));
 
         SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.empty(craft);
         BayId bayId = new BayId("carrier.alpha", "bay.1");
