@@ -153,9 +153,14 @@ public record SmallCraftMissionState(long nextMissionId, List<MissionOrder> miss
                     || this == ANTI_SHIP_STRIKE;
         }
 
-        /** @return whether an authored sensor/EW family is required */
-        public boolean requiresSensorEw() {
+        /** @return whether an operational authored sensor family is required */
+        public boolean requiresSensor() {
             return this == RECONNAISSANCE || this == EW_SUPPORT;
+        }
+
+        /** @return whether actual authored jammer capability is required */
+        public boolean requiresEw() {
+            return this == EW_SUPPORT;
         }
     }
 
