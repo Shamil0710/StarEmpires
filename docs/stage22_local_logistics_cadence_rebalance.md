@@ -28,12 +28,12 @@ denser:
 
 | Semantic route | v2 |
 | --- | ---: |
-| station → station | **2,000–30,000 km** |
+| station → station | **4,000–30,000 km** |
 | station → resource field | **10,000–150,000 km** |
 | jump arrival → major hub | **40,000–200,000 km** |
 | inner → outer system | **1,000,000–10,000,000 km unchanged** |
 
-The jump-to-hub minimum remains independently guarded by the existing
+The station minimum remains above the current maximum closed station stand-off, and the jump-to-hub minimum remains independently guarded by the existing
 `jumpToHubMinimumRemainsBeyondEveryClosedStationStandOff` regression. The Stage-20 physical
 stand-off authority is not weakened.
 
@@ -51,7 +51,8 @@ This deliberately produces dense economic clusters while retaining a bounded lon
 Station collision/traffic/defensive envelopes still raise the effective minimum where necessary.
 
 The wide `INNER_TO_OUTER_SYSTEM` band is unchanged because it describes meaningful outer-system
-space rather than routine hub logistics.
+space rather than routine hub logistics. ACTIVE_LOCAL materialization also retains that 1 Gm inner/outer
+threshold instead of inheriting the newly compact routine-infrastructure maximum.
 
 ## Faction anti-sprawl policy
 
