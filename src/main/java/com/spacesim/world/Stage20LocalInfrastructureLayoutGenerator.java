@@ -256,7 +256,8 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
             StatefulRandom random) {
         BandDefinition stationBand = requireBand(routeBands, BandId.STATION_TO_STATION);
         for (int attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS; attempt++) {
-            double distanceM = samplePlacementDistance(\n                    request.kind(), random.nextLong(), minimumDistanceM, maximumDistanceM);
+            double distanceM = samplePlacementDistance(
+                    request.kind(), random.nextLong(), minimumDistanceM, maximumDistanceM);
             double angleRad = unitInterval(random.nextLong()) * Math.PI * 2d;
             LocalPhysicalPosition candidatePosition = hubPosition.translated(
                     Math.cos(angleRad) * distanceM,
