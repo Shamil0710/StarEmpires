@@ -126,7 +126,7 @@ public final class Stage20CoordinatedFreightCorpusDiagnostics {
     public static Report evaluateCurrent() {
         var profile = Stage20RepresentativeGeneratedWorldProbeProfileV2.deriveCurrent();
         Stage20BootstrapFreightCapacityRequirementProfile capacity =
-                Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent();
+                Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
         if (!capacity.bootstrapRequirementVersion().equals(profile.bootstrapRequirementVersion())) {
             throw new IllegalStateException("freight-capacity authority and v2 candidate use different bootstrap requirements");
         }

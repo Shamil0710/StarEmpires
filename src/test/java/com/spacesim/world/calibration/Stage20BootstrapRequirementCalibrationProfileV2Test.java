@@ -44,6 +44,26 @@ class Stage20BootstrapRequirementCalibrationProfileV2Test {
     }
 
     @Test
+    void historicalV2AndReviewedV3RemainVersionCoherent() {
+        var historical = Stage20BootstrapRequirementCalibrationProfileV2.deriveLegacyStage20();
+        var reviewed = Stage20BootstrapRequirementCalibrationProfileV2.deriveCurrent();
+
+        assertEquals(Stage20BootstrapRequirementCalibrationProfileV2.LEGACY_STAGE20_VERSION,
+                historical.version());
+        assertEquals(historical.version(), historical.bootstrapRequirements().version());
+        assertEquals(Stage20BootstrapServiceCadenceCalibrationProfile.LEGACY_STAGE20_VERSION,
+                historical.serviceCadence().version());
+
+        assertEquals(Stage20BootstrapRequirementCalibrationProfileV2.CURRENT_VERSION,
+                reviewed.version());
+        assertEquals(reviewed.version(), reviewed.bootstrapRequirements().version());
+        assertEquals(Stage20BootstrapServiceCadenceCalibrationProfile.CURRENT_VERSION,
+                reviewed.serviceCadence().version());
+        assertNotEquals(historical.serviceCadence().maximumSupplierDeliveryTimeSeconds(),
+                reviewed.serviceCadence().maximumSupplierDeliveryTimeSeconds());
+    }
+
+    @Test
     void dependencyProjectionUsesCorrectedServiceTimeAndExactPreservedRates() {
         var v2 = Stage20BootstrapRequirementCalibrationProfileV2.deriveCurrent();
         Map<String, CommodityRequirement> economic = v2.bootstrapRequirements().essentialCommodities().stream()

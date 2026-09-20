@@ -47,7 +47,7 @@ public record Stage20MaterializationLodClosureProfile(
         boolean renderBoundary,
         boolean worldBoundary) {
     /** Current superseding Stage-20A materialization/LOD closure profile version. */
-    public static final String CURRENT_VERSION = "stage20a.materialization-lod-closure.v1";
+    public static final String CURRENT_VERSION = "stage20a.materialization-lod-closure.v2";
 
     /**
      * Creates one immutable deterministic closure profile.
@@ -100,7 +100,9 @@ public record Stage20MaterializationLodClosureProfile(
         Stage20StationDefensiveSensorGeometryProfile stationDefensive =
                 Stage20StationDefensiveSensorGeometryProfile.deriveCurrent();
 
-        double activeLocalEnvelopeM = infrastructure.maximumMajorInfrastructureExtentM();
+        double activeLocalEnvelopeM = Math.max(
+                infrastructure.maximumMajorInfrastructureExtentM(),
+                infrastructure.innerToOuterSystemMinDistanceM());
         double maximumStationOperationalRadiusM = stationPhysical.placementEnvelopes().stream()
                 .mapToDouble(StationPlacementEnvelope::operationalRadiusM)
                 .max()
@@ -117,7 +119,8 @@ public record Stage20MaterializationLodClosureProfile(
                         DistanceBandAuthority.EXPLICIT_PHYSICAL_INPUT,
                         java.util.OptionalDouble.of(activeLocalEnvelopeM),
                         "Stage20MajorInfrastructureExtentCalibrationProfile:" + infrastructure.version()
-                                + ":maximumMajorInfrastructureExtentM;relevance_first=true;not_world_boundary"),
+                                + ":max(maximumMajorInfrastructureExtentM,innerToOuterSystemMinDistanceM)"
+                                + ";relevance_first=true;not_world_boundary"),
                 new DistanceBandClosure(
                         RepresentationLevel.TACTICAL,
                         DistanceBandAuthority.EXPLICIT_PHYSICAL_INPUT,

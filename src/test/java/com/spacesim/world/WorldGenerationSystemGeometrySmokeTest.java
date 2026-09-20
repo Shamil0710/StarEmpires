@@ -4,6 +4,8 @@ import com.spacesim.world.WorldGenerationPlacementNormalizer.FailureReason;
 import com.spacesim.world.WorldGenerationPlacementNormalizer.NormalizationResult;
 import com.spacesim.world.WorldGenerationPlacementNormalizer.Status;
 import com.spacesim.world.calibration.Stage20LocalRouteSemanticBandCatalog.BandId;
+import com.spacesim.world.calibration.Stage20LocalRouteSemanticCalibrationProfile;
+import com.spacesim.world.calibration.Stage20MajorInfrastructureExtentCalibrationProfile;
 import org.junit.jupiter.api.Test;
 
 import java.util.OptionalDouble;
@@ -31,8 +33,8 @@ class WorldGenerationSystemGeometrySmokeTest {
         assertTrue(first.operationalEnvelope().radiusM() <= 10_000_000_000d);
         assertFalse(first.operationalEnvelope().hardBoundary());
         assertFalse(first.operationalEnvelope().clampAllowed());
-        assertTrue(first.provenance().contains("stage20a.local-route-semantic-bands.v1"));
-        assertTrue(first.provenance().contains("stage20a.major-infrastructure-extents.v1"));
+        assertTrue(first.provenance().contains(Stage20LocalRouteSemanticCalibrationProfile.CURRENT_VERSION));
+        assertTrue(first.provenance().contains(Stage20MajorInfrastructureExtentCalibrationProfile.CURRENT_VERSION));
     }
 
     @Test

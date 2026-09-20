@@ -13,7 +13,7 @@ class Stage20WholePlacementCapacityCorpusDiagnosticsTest {
     @Test
     void fixedCorpusMeasuresFiniteStartPortfoliosBeforeSharedProducerReservation() {
         var report = Stage20WholePlacementCapacityCorpusDiagnostics.evaluateCurrent();
-        var capacity = Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent();
+        var capacity = Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
 
         assertEquals(Stage20WholePlacementCapacityCorpusDiagnostics.CURRENT_VERSION, report.version());
         assertEquals(Stage20RepresentativeGeneratedWorldProbeProfileV2.CURRENT_VERSION,

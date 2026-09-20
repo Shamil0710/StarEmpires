@@ -76,7 +76,7 @@ public record Stage20CoordinatedFreightAcceptanceProfile(
      */
     public static Stage20CoordinatedFreightAcceptanceProfile deriveCurrent() {
         Stage20BootstrapFreightCapacityRequirementProfile capacity =
-                Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent();
+                Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
         return new Stage20CoordinatedFreightAcceptanceProfile(
                 CURRENT_VERSION,
                 capacity,

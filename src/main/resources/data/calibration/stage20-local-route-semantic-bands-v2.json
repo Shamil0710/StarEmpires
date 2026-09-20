@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "version": "stage20a.local-route-semantic-bands.v2",
+  "status": "PROVISIONAL_ACCEPTED_REFERENCE",
+  "stage22ReviewRequired": true,
+  "policyEvidence": "Stage-22 gameplay-cadence review of the accepted Stage-20 physical scale: routine economic infrastructure is clustered more tightly while the wider physical system remains available for exceptional, strategic and outer-system content. Distances remain operational content-distribution seeds, not walls, hard system radii or screen-space units.",
+  "bands": [
+    {
+      "id": "STATION_TO_STATION",
+      "minDistanceM": 4000000.0,
+      "maxDistanceM": 30000000.0,
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/STATION_TO_STATION|stage22_review=docs/stage22_local_logistics_cadence_rebalance.md:station-cluster"
+    },
+    {
+      "id": "STATION_TO_RESOURCE_FIELD",
+      "minDistanceM": 10000000.0,
+      "maxDistanceM": 150000000.0,
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/STATION_TO_RESOURCE_FIELD|stage22_review=docs/stage22_local_logistics_cadence_rebalance.md:resource-cluster"
+    },
+    {
+      "id": "JUMP_ARRIVAL_TO_MAJOR_HUB",
+      "minDistanceM": 40000000.0,
+      "maxDistanceM": 200000000.0,
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/JUMP_ARRIVAL_TO_MAJOR_HUB|stage22_review=docs/stage22_local_logistics_cadence_rebalance.md:jump-hub-cadence"
+    },
+    {
+      "id": "INNER_TO_OUTER_SYSTEM",
+      "minDistanceM": 1000000000.0,
+      "maxDistanceM": 10000000000.0,
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/INNER_TO_OUTER_SYSTEM"
+    }
+  ]
+}

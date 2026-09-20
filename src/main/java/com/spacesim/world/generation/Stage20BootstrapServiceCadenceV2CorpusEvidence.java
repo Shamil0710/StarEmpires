@@ -180,7 +180,7 @@ public final class Stage20BootstrapServiceCadenceV2CorpusEvidence {
         Stage20RepresentativeGeneratedWorldProbeProfileV2.DerivedProfile candidate =
                 Stage20RepresentativeGeneratedWorldProbeProfileV2.deriveCurrent();
         Stage20BootstrapRequirementCalibrationProfileV2.DerivedProfile bootstrap =
-                Stage20BootstrapRequirementCalibrationProfileV2.deriveCurrent();
+                Stage20BootstrapRequirementCalibrationProfileV2.deriveLegacyStage20();
         ArrayList<SeedEvidence> seeds = new ArrayList<>();
         EnumMap<ViolationType, Integer> violations = new EnumMap<>(ViolationType.class);
         EnumMap<FailureReason, Integer> wholeFailures = new EnumMap<>(FailureReason.class);

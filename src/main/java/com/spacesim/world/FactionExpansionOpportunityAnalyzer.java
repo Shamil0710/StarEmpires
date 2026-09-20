@@ -18,7 +18,9 @@ import java.util.Objects;
  * Pure-decision Stage-11A analyzer that ranks spatial expansion opportunities from live world data.
  *
  * <p>The analyzer does not create projects, move fleets or change territory. It only measures the
- * current world and returns explainable candidates for the future persistent Stage-11B plan.</p>
+ * current world and returns explainable candidates for the future persistent Stage-11B plan.
+ * The Stage-22 default policy treats adjacent growth as routine and requires progressively stronger
+ * measured utility before a faction skips over that local frontier.</p>
  */
 public final class FactionExpansionOpportunityAnalyzer {
     private static final int NORMALIZED_SCALE = 10_000;
@@ -84,9 +86,22 @@ public final class FactionExpansionOpportunityAnalyzer {
         }
 
         MetricsMaxima maxima = maxima(raw);
-        List<ExpansionOpportunity> ranked = new ArrayList<>(raw.size());
+        List<ScoredCandidate> scored = new ArrayList<>(raw.size());
+        long bestRoutineScore = -1L;
         for (RawCandidate candidate : raw) {
             long score = score(candidate, maxima, checkedPolicy);
+            scored.add(new ScoredCandidate(candidate, score));
+            if (candidate.path().jumpCount() <= checkedPolicy.routineMaxJumpHops()) {
+                bestRoutineScore = Math.max(bestRoutineScore, score);
+            }
+        }
+
+        List<ExpansionOpportunity> ranked = new ArrayList<>(scored.size());
+        for (ScoredCandidate value : scored) {
+            RawCandidate candidate = value.candidate();
+            if (!passesDistanceDiscipline(candidate, value.score(), bestRoutineScore, checkedPolicy)) {
+                continue;
+            }
             ranked.add(new ExpansionOpportunity(
                     factionId,
                     candidate.sourceSystemId(),
@@ -99,7 +114,7 @@ public final class FactionExpansionOpportunityAnalyzer {
                     candidate.metrics().unmetDemandUnits(),
                     candidate.metrics().marketCount(),
                     candidate.hostileNeighborPressure(),
-                    score));
+                    value.score()));
         }
         ranked.sort(Comparator
                 .comparingLong(ExpansionOpportunity::utilityScore).reversed()
@@ -254,6 +269,21 @@ public final class FactionExpansionOpportunityAnalyzer {
         return score;
     }
 
+    private static boolean passesDistanceDiscipline(
+            RawCandidate candidate,
+            long score,
+            long bestRoutineScore,
+            ExpansionOpportunityPolicy policy) {
+        int jumpCount = candidate.path().jumpCount();
+        if (jumpCount <= policy.routineMaxJumpHops() || bestRoutineScore < 0L) {
+            return true;
+        }
+        int extraHops = jumpCount - policy.routineMaxJumpHops();
+        long requiredBasisPoints = 10_000L
+                + (long) extraHops * policy.distantAdvantagePerExtraHopBasisPoints();
+        return score * 10_000L >= bestRoutineScore * requiredBasisPoints;
+    }
+
     private static int normalized(long value, long maximum) {
         if (value <= 0L || maximum <= 0L) {
             return 0;
@@ -281,6 +311,9 @@ public final class FactionExpansionOpportunityAnalyzer {
             .comparingLong((SourcePath value) -> value.path().totalJumpTicks())
             .thenComparingInt(value -> value.path().jumpCount())
             .thenComparing(SourcePath::sourceSystemId);
+
+    private record ScoredCandidate(RawCandidate candidate, long score) {
+    }
 
     private record Anchor(String archetypeContentId, long fundingMilliCredits, boolean nativeFaction) {
     }

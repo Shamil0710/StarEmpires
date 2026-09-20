@@ -44,8 +44,10 @@ import java.util.TreeMap;
  * request another resource, station, topology edge or root seed through this wrapper.</p>
  */
 public final class Stage20ResolvedGeneratedWorldProductionProbe {
-    /** Stable resolved production-probe version. */
+    /** Historical resolved Stage-20 production-probe version retained for exact evidence replay. */
     public static final String CURRENT_VERSION = "stage20e.resolved-production-seed-probe.v2";
+    /** Stage-22 cadence-reviewed resolved probe version used by current playable generation. */
+    public static final String CADENCE_REVIEWED_VERSION = "stage22.resolved-production-seed-probe.v3";
 
     private Stage20ResolvedGeneratedWorldProductionProbe() {
         throw new AssertionError("No instances");
@@ -130,14 +132,24 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
      * @return immutable resolved production result
      */
     public static ResolvedProbeResult run(long rootSeed, DerivedProfile profile) {
+        return runInternal(rootSeed, profile, false);
+    }
+
+    private static ResolvedProbeResult runInternal(
+            long rootSeed,
+            DerivedProfile profile,
+            boolean cadenceReviewed) {
         DerivedProfile authority = Objects.requireNonNull(profile, "profile");
-        ProbeResult sourceGeneration = Stage20GeneratedWorldProductionProbe.run(rootSeed, authority.inputs());
+        String resolvedVersion = cadenceReviewed ? CADENCE_REVIEWED_VERSION : CURRENT_VERSION;
+        ProbeResult sourceGeneration = cadenceReviewed
+                ? Stage20GeneratedWorldProductionProbe.runCadenceReviewed(rootSeed, authority.inputs())
+                : Stage20GeneratedWorldProductionProbe.run(rootSeed, authority.inputs());
         if (sourceGeneration.topology().status() == Stage20JumpTopologyGenerationResult.Status.REJECTED_SEED) {
             Stage20GeneratedWorldSeedAcceptance.SeedResult seedAcceptance =
                     Stage20GeneratedWorldSeedAcceptance.composeResolvedFreight(
                             sourceGeneration.topology(), Optional.empty(), Optional.empty());
             return new ResolvedProbeResult(
-                    CURRENT_VERSION,
+                    resolvedVersion,
                     rootSeed,
                     sourceGeneration.version(),
                     authority.version(),
@@ -146,7 +158,7 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
                     seedAcceptance);
         }
 
-        ProbeResult generation = withDirectionalJumpAnchors(sourceGeneration);
+        ProbeResult generation = withDirectionalJumpAnchors(sourceGeneration, cadenceReviewed);
         PlacementResult placement = generation.placement().orElseThrow();
         Optional<Stage20ResolvedFreightAcceptance.AcceptanceReport> freight = Optional.empty();
         if (placement.status() == PlacementStatus.ACCEPTED) {
@@ -175,7 +187,7 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
                 Stage20GeneratedWorldSeedAcceptance.composeResolvedFreight(
                         generation.topology(), freight, Optional.of(placement));
         return new ResolvedProbeResult(
-                CURRENT_VERSION,
+                resolvedVersion,
                 rootSeed,
                 generation.version(),
                 authority.version(),
@@ -191,10 +203,15 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
      * @return resolved production result under the current representative v3 profile
      */
     public static ResolvedProbeResult runCurrent(long rootSeed) {
-        return run(rootSeed, Stage20RepresentativeGeneratedWorldProbeProfileV3.deriveCurrent());
+        return runInternal(
+                rootSeed,
+                Stage20RepresentativeGeneratedWorldProbeProfileV3.deriveCurrent(),
+                true);
     }
 
-    private static ProbeResult withDirectionalJumpAnchors(ProbeResult source) {
+    private static ProbeResult withDirectionalJumpAnchors(
+            ProbeResult source,
+            boolean cadenceReviewed) {
         GalaxyTopology topology = source.topology().requireAcceptedTopology();
         List<Stage20LocalInfrastructureLayout> layouts = Stage20DirectionalJumpAnchorLayout.alignAll(
                 topology, source.localLayouts().orElseThrow());
@@ -202,8 +219,9 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
         for (Stage20LocalInfrastructureLayout layout : layouts) {
             bySystem.put(layout.systemId(), layout);
         }
-        Stage20JumpEdgeCatalog jumpEdges = Stage20JumpEdgeStateMaterializer.materializeCurrent(
-                topology, bySystem);
+        Stage20JumpEdgeCatalog jumpEdges = cadenceReviewed
+                ? Stage20JumpEdgeStateMaterializer.materializeCurrent(topology, bySystem)
+                : Stage20JumpEdgeStateMaterializer.materializeLegacyStage20(topology, bySystem);
         return new ProbeResult(
                 source.version(),
                 source.rootSeed(),

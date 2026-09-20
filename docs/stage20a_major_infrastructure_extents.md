@@ -8,30 +8,31 @@
 
 Close `MAJOR_INFRASTRUCTURE_EXTENT_BANDS` without inventing another spatial scale.
 
-The profile derives three descriptive infrastructure extents directly from the already accepted local-route semantic bands:
+The historical v1 profile derived all three extents directly from the accepted Stage-20 route bands. Stage-22 cadence review now keeps the compact core/resource route extents but deliberately preserves the broad 1 Gm major-hub/system reach as a separate physical coverage authority:
 
 ```text
 CORE_STATION_CLUSTER
-  ← STATION_TO_STATION
-  10 Mm .. 100 Mm
+  ← STATION_TO_STATION v2
+  4 Mm .. 30 Mm
 
 INDUSTRIAL_RESOURCE_NETWORK
-  ← STATION_TO_RESOURCE_FIELD
-  50 Mm .. 500 Mm
+  ← STATION_TO_RESOURCE_FIELD v2
+  10 Mm .. 150 Mm
 
 MAJOR_HUB_REACH
-  ← JUMP_ARRIVAL_TO_MAJOR_HUB
-  100 Mm .. 1 Gm
+  ← JUMP_ARRIVAL_TO_MAJOR_HUB v2 minimum
+  → retained INNER_TO_OUTER_SYSTEM transition
+  40 Mm .. 1 Gm
 ```
 
-No new physical distance constant is authored by this slice.
+The retained 1 Gm maximum is not a new constant: it is the unchanged `INNER_TO_OUTER_SYSTEM.minDistanceM` transition. This explicitly decouples broad active-local/system coverage from the much shorter routine traffic routes.
 
 ## Authority boundary
 
 The current profile is:
 
 ```text
-stage20a.major-infrastructure-extents.v1
+stage20a.major-infrastructure-extents.v2
 PROVISIONAL_ACCEPTED_REFERENCE
 stage22ReviewRequired = true
 ```
@@ -61,8 +62,8 @@ The profile additionally proves:
 1. `CORE_STATION_CLUSTER.minExtentM` is farther than the largest accepted station jump-arrival stand-off;
 2. the industrial extent is not smaller than the dense station-cluster extent;
 3. the major-hub reach is not smaller than the industrial extent;
-4. `MAJOR_HUB_REACH.maxExtentM <= INNER_TO_OUTER_SYSTEM.minDistanceM`;
-5. all three bands retain exact route-band provenance.
+4. `MAJOR_HUB_REACH.maxExtentM == INNER_TO_OUTER_SYSTEM.minDistanceM`;
+5. compact route provenance and the retained inner/outer transition provenance remain explicit.
 
 This ensures a generated major-infrastructure distribution cannot silently overlap station arrival exclusion geometry or grow beyond the accepted transition into the inner→outer-system scale.
 

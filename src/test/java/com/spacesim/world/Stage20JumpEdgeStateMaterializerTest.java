@@ -61,6 +61,28 @@ class Stage20JumpEdgeStateMaterializerTest {
     }
 
     @Test
+    void legacyLayoutsRequireExplicitLegacyMaterializationPath() {
+        GalaxyTopology topology = diamondTopology();
+        LinkedHashMap<StarSystemId, Stage20LocalInfrastructureLayout> legacy = new LinkedHashMap<>();
+        for (StarSystemNode system : topology.systems()) {
+            legacy.put(
+                    system.id(),
+                    layout(
+                            system.id(),
+                            topology.neighbors(system.id()).size(),
+                            Stage20LocalRouteSemanticCalibrationProfile.deriveLegacyStage20()));
+        }
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> Stage20JumpEdgeStateMaterializer.materializeCurrent(topology, legacy));
+
+        Stage20JumpEdgeCatalog catalog =
+                Stage20JumpEdgeStateMaterializer.materializeLegacyStage20(topology, legacy);
+        assertEquals(topology.connections().size(), catalog.edges().size());
+    }
+
+    @Test
     void insufficientArrivalAnchorsRejectsInsteadOfFallingBackToLegacyCoordinates() {
         GalaxyTopology topology = diamondTopology();
         Map<StarSystemId, Stage20LocalInfrastructureLayout> source = new LinkedHashMap<>(layouts(topology, false));
@@ -159,7 +181,16 @@ class Stage20JumpEdgeStateMaterializerTest {
     }
 
     private static Stage20LocalInfrastructureLayout layout(StarSystemId systemId, int arrivalCount) {
-        Stage20LocalRouteSemanticCalibrationProfile routes = Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent();
+        return layout(
+                systemId,
+                arrivalCount,
+                Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent());
+    }
+
+    private static Stage20LocalInfrastructureLayout layout(
+            StarSystemId systemId,
+            int arrivalCount,
+            Stage20LocalRouteSemanticCalibrationProfile routes) {
         BandDefinition arrivalBand = routes.bands().stream()
                 .filter(value -> value.id() == BandId.JUMP_ARRIVAL_TO_MAJOR_HUB)
                 .findFirst()

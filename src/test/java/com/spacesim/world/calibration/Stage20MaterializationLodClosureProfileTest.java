@@ -61,7 +61,9 @@ class Stage20MaterializationLodClosureProfileTest {
         double expectedTactical = Math.max(expectedStationOperational, expectedDefensive);
 
         assertEquals(
-                infrastructure.maximumMajorInfrastructureExtentM(),
+                Math.max(
+                        infrastructure.maximumMajorInfrastructureExtentM(),
+                        infrastructure.innerToOuterSystemMinDistanceM()),
                 closure.activationDistanceM(RepresentationLevel.ACTIVE_LOCAL),
                 0d);
         assertEquals(

@@ -22,7 +22,7 @@ class Stage20CommodityFrontierCorpusDiagnosticsTest {
                 report.frontierGeneratorVersion());
         assertEquals(Stage20CommodityFrontierCorpusDiagnostics.FRONTIER_SEARCH_NODE_BUDGET_PER_COMMODITY,
                 report.frontierSearchNodeBudgetPerCommodity());
-        assertEquals(Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent()
+        assertEquals(Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20()
                         .requiredFreighterCountPerFactionStart(),
                 report.perStartFreighterBudget());
         assertEquals(Stage20RepresentativeSeedCorpus.seeds().size(), report.fixedSeedCount());

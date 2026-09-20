@@ -36,6 +36,10 @@ import java.util.stream.Collectors;
  * turn already carries representative civilian routine-travel and military response consequences,
  * so labels never become an independent strategic-distance system.</p>
  *
+ * <p>Routine economic targets use a deterministic 60/30/10 near/mid/far distribution inside their
+ * semantic band so ordinary traffic and jump approaches cluster around useful hubs while a bounded
+ * minority remains remote. Safety/exclusion rules still raise the effective minimum when required.</p>
+ *
  * <p>Independent stations additionally respect accepted station operational/defensive geometry and
  * the lower {@link BandId#STATION_TO_STATION} logistics separation against every already generated
  * independent station. This prevents default generation from accidentally creating unavoidable
@@ -138,22 +142,72 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
             String majorHubId,
             String majorHubStationArchetypeId,
             List<PlacementRequest> requests) {
+        return generateWithRouteProfile(
+                systemGeometry,
+                majorHubPosition,
+                majorHubId,
+                majorHubStationArchetypeId,
+                requests,
+                Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent(),
+                true);
+    }
+
+    /**
+     * Replays the historical Stage-20 v1 local geometry for frozen generation evidence.
+     *
+     * <p>This path is intentionally not used by current playable generation. It preserves both the
+     * original v1 distance bands and the original uniform distance sampler so historical Stage-20
+     * corpus evidence remains reproducible after the Stage-22 cadence review.</p>
+     *
+     * @param systemGeometry accepted Stage-20B system geometry
+     * @param majorHubPosition authoritative physical hub position
+     * @param majorHubId stable major-hub identity
+     * @param majorHubStationArchetypeId accepted station archetype of the hub
+     * @param requests semantic targets to place relative to the hub
+     * @return deterministic historical Stage-20 layout
+     */
+    public static Stage20LocalInfrastructureLayout generateLegacyStage20(
+            Stage20SystemGeometry systemGeometry,
+            LocalPhysicalPosition majorHubPosition,
+            String majorHubId,
+            String majorHubStationArchetypeId,
+            List<PlacementRequest> requests) {
+        return generateWithRouteProfile(
+                systemGeometry,
+                majorHubPosition,
+                majorHubId,
+                majorHubStationArchetypeId,
+                requests,
+                Stage20LocalRouteSemanticCalibrationProfile.deriveLegacyStage20(),
+                false);
+    }
+
+    private static Stage20LocalInfrastructureLayout generateWithRouteProfile(
+            Stage20SystemGeometry systemGeometry,
+            LocalPhysicalPosition majorHubPosition,
+            String majorHubId,
+            String majorHubStationArchetypeId,
+            List<PlacementRequest> requests,
+            Stage20LocalRouteSemanticCalibrationProfile routes,
+            boolean clusteredPlacement) {
         Stage20SystemGeometry geometry = Objects.requireNonNull(systemGeometry, "systemGeometry");
         LocalPhysicalPosition hubPosition = Objects.requireNonNull(majorHubPosition, "majorHubPosition");
         requireText(majorHubId, "majorHubId");
         requireText(majorHubStationArchetypeId, "majorHubStationArchetypeId");
         Objects.requireNonNull(requests, "requests");
+        Objects.requireNonNull(routes, "routes");
         if (!Stage20SystemGeometry.CURRENT_VERSION.equals(geometry.version())) {
             throw new IllegalArgumentException("Stage-20C requires current Stage-20B system geometry");
         }
 
-        Stage20LocalRouteSemanticCalibrationProfile routes =
-                Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent();
+        String expectedRouteVersion = clusteredPlacement
+                ? Stage20LocalRouteSemanticCalibrationProfile.CURRENT_VERSION
+                : Stage20LocalRouteSemanticCalibrationProfile.LEGACY_STAGE20_VERSION;
         Stage20StationPhysicalGeometryProfile stationGeometry =
                 Stage20StationPhysicalGeometryProfile.deriveCurrent();
         Stage20StationDefensiveSensorGeometryProfile stationDefense =
                 Stage20StationDefensiveSensorGeometryProfile.deriveCurrent();
-        if (!routes.closesStage20BEntryCoverage()
+        if (!routes.closesEntryCoverageForVersion(expectedRouteVersion)
                 || !stationGeometry.closesStage20BEntryCoverage()
                 || !stationDefense.closesStage20BEntryCoverage()) {
             throw new IllegalStateException("Stage-20C requires closed Stage-20A route/station geometry");
@@ -207,7 +261,8 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
                     band.maxDistanceM(),
                     routeBands,
                     generatedStations,
-                    random);
+                    random,
+                    clusteredPlacement);
             placements.add(resolved);
             if (resolved.isStation()) {
                 generatedStations.add(resolved);
@@ -253,10 +308,13 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
             double maximumDistanceM,
             Map<BandId, BandDefinition> routeBands,
             List<InfrastructurePlacement> generatedStations,
-            StatefulRandom random) {
+            StatefulRandom random,
+            boolean clusteredPlacement) {
         BandDefinition stationBand = requireBand(routeBands, BandId.STATION_TO_STATION);
         for (int attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS; attempt++) {
-            double distanceM = sampleRange(random.nextLong(), minimumDistanceM, maximumDistanceM);
+            double distanceM = clusteredPlacement
+                    ? samplePlacementDistance(random.nextLong(), minimumDistanceM, maximumDistanceM)
+                    : sampleRange(random.nextLong(), minimumDistanceM, maximumDistanceM);
             double angleRad = unitInterval(random.nextLong()) * Math.PI * 2d;
             LocalPhysicalPosition candidatePosition = hubPosition.translated(
                     Math.cos(angleRad) * distanceM,
@@ -451,6 +509,25 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
 
     private static String streamName(Stage20SystemGeometry geometry, String hubId, String targetId) {
         return RNG_STREAM_PREFIX + geometry.systemId().value() + ".hub." + hubId + ".target." + targetId;
+    }
+
+    private static double samplePlacementDistance(
+            long bits,
+            double min,
+            double max) {
+        if (min == max) {
+            return min;
+        }
+
+        double unit = unitInterval(bits);
+        double span = max - min;
+        if (unit < 0.60d) {
+            return Math.fma(span * 0.25d, unit / 0.60d, min);
+        }
+        if (unit < 0.90d) {
+            return Math.fma(span * 0.35d, (unit - 0.60d) / 0.30d, min + span * 0.25d);
+        }
+        return Math.fma(span * 0.40d, (unit - 0.90d) / 0.10d, min + span * 0.60d);
     }
 
     private static double sampleRange(long bits, double min, double max) {

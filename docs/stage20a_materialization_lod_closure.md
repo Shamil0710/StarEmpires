@@ -18,7 +18,7 @@ TACTICAL     = UNRESOLVED
 The new superseding profile is:
 
 ```text
-stage20a.materialization-lod-closure.v1
+stage20a.materialization-lod-closure.v2
 ```
 
 It closes the numeric promotion bands only after later Stage-20A work supplied accepted physical interaction/distribution geometry.
@@ -50,11 +50,14 @@ Therefore no guessed distance padding is required for wake latency.
 `ACTIVE_LOCAL` uses the already accepted descriptive major-infrastructure reach:
 
 ```text
-Stage20MajorInfrastructureExtentCalibrationProfile.maximumMajorInfrastructureExtentM()
+max(
+  Stage20MajorInfrastructureExtentCalibrationProfile.maximumMajorInfrastructureExtentM(),
+  Stage20MajorInfrastructureExtentCalibrationProfile.innerToOuterSystemMinDistanceM()
+)
 = 1 Gm
 ```
 
-This is a proactive reduced-local-simulation distribution window, not a movement/render/world boundary.
+This preserves the accepted 1 Gm active-local physical coverage even when Stage-22 gameplay tuning makes routine infrastructure much denser. It is a proactive reduced-local-simulation distribution window, not a movement/render/world boundary.
 
 ## TACTICAL activation
 

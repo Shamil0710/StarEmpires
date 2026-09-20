@@ -66,8 +66,12 @@ public record Stage20BootstrapFreightCapacityRequirementProfile(
         List<String> evidenceIds,
         boolean stage22ReviewRequired) {
 
-    /** Current deterministic Stage-20E freight-capacity requirement authority. */
-    public static final String CURRENT_VERSION = "stage20e.bootstrap-freight-capacity-requirement.v1";
+    /** Historical Stage-20E freight-capacity authority retained by coordinated-freight v1. */
+    public static final String LEGACY_STAGE20_VERSION =
+            "stage20e.bootstrap-freight-capacity-requirement.v1";
+    /** Current Stage-22-reviewed freight-capacity diagnostic authority. */
+    public static final String CURRENT_VERSION =
+            "stage20e.bootstrap-freight-capacity-requirement.v2";
 
     /**
      * Validates one immutable freight-capacity requirement profile.
@@ -145,9 +149,30 @@ public record Stage20BootstrapFreightCapacityRequirementProfile(
      * @return deterministic current freight-capacity requirement
      */
     public static Stage20BootstrapFreightCapacityRequirementProfile deriveCurrent() {
-        Stage20BootstrapRequirementCalibrationProfileV2.DerivedProfile bootstrap =
-                Stage20BootstrapRequirementCalibrationProfileV2.deriveCurrent();
-        Stage20BootstrapServiceCadenceCalibrationProfile service = bootstrap.serviceCadence();
+        return derive(
+                Stage20BootstrapRequirementCalibrationProfileV2.deriveCurrent(),
+                Stage20BootstrapServiceCadenceCalibrationProfile.deriveCurrent(),
+                CURRENT_VERSION);
+    }
+
+    /**
+     * Reconstructs the historical Stage-20 freight-capacity authority used by coordinated-freight v1.
+     *
+     * @return deterministic historical Stage-20 freight-capacity requirement
+     */
+    public static Stage20BootstrapFreightCapacityRequirementProfile deriveLegacyStage20() {
+        return derive(
+                Stage20BootstrapRequirementCalibrationProfileV2.deriveLegacyStage20(),
+                Stage20BootstrapServiceCadenceCalibrationProfile.deriveLegacyStage20(),
+                LEGACY_STAGE20_VERSION);
+    }
+
+    private static Stage20BootstrapFreightCapacityRequirementProfile derive(
+            Stage20BootstrapRequirementCalibrationProfileV2.DerivedProfile bootstrap,
+            Stage20BootstrapServiceCadenceCalibrationProfile service,
+            String version) {
+        Objects.requireNonNull(bootstrap, "bootstrap");
+        Objects.requireNonNull(service, "service");
         Stage20IntersystemCadenceCalibrationProfile intersystem =
                 Stage20IntersystemCadenceCalibrationProfile.deriveCurrent();
         HopCadenceSample regional = intersystem.samples().stream()
@@ -173,7 +198,7 @@ public record Stage20BootstrapFreightCapacityRequirementProfile(
         int requiredFreighters = checkedCeil(totalDemand / oneFreighterThroughput);
 
         return new Stage20BootstrapFreightCapacityRequirementProfile(
-                CURRENT_VERSION,
+                version,
                 bootstrap.version(),
                 service.version(),
                 intersystem.version(),
