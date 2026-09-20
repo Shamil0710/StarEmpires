@@ -82,7 +82,7 @@ public final class Stage20RepresentativeGeneratedWorldProbeProfileV2 {
         Stage20RepresentativeGeneratedWorldProbeProfile.DerivedProfile v1 =
                 Stage20RepresentativeGeneratedWorldProbeProfile.deriveCurrent();
         Stage20BootstrapRequirementCalibrationProfileV2.DerivedProfile bootstrap =
-                Stage20BootstrapRequirementCalibrationProfileV2.deriveCurrent();
+                Stage20BootstrapRequirementCalibrationProfileV2.deriveLegacyStage20();
 
         AcceptanceAuthority v1Acceptance = v1.inputs().acceptance();
         AcceptanceAuthority correctedAcceptance = new AcceptanceAuthority(
