@@ -2,6 +2,7 @@ package com.spacesim.world;
 
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import com.spacesim.ship.ProductionEngineeringRuntimeResolver;
 import com.spacesim.world.FactionActorObservationSnapshot.ObservationEvidence;
@@ -415,8 +416,9 @@ public final class SmallCraftMissionCommandService {
     }
 
     private void validateCapability(SmallCraftState craft, MissionType type) {
-        boolean weapon = false;
-        boolean sensorEw = false;
+        boolean armed = false;
+        boolean sensor = false;
+        boolean ew = false;
         for (var installed : craft.fit().installedModules()) {
             var module = catalog.findModule(installed.moduleId());
             if (module == null) {
@@ -428,21 +430,45 @@ public final class SmallCraftMissionCommandService {
             if (integrity <= EPSILON) {
                 continue;
             }
-            if (module.family() == ModuleFamily.WEAPON_AMMUNITION) {
-                weapon = true;
+            if (module.family() == ModuleFamily.WEAPON_AMMUNITION
+                    && weaponHasPhysicalSupply(craft, installed.mountId(), module)) {
+                armed = true;
             }
             if (module.family() == ModuleFamily.SENSOR_EW_FIRE_CONTROL) {
-                sensorEw = true;
+                sensor = true;
+                ew |= module.signatureContributions().getOrDefault("jammer_w", 0d) > EPSILON;
             }
         }
-        if (type.requiresWeapons() && !weapon) {
+        if (type.requiresWeapons() && !armed) {
             throw new IllegalArgumentException(
-                    "mission requires an authored weapon-capable fit: " + type);
+                    "mission requires an operational, physically supplied weapon fit: " + type);
         }
-        if (type.requiresSensorEw() && !sensorEw) {
+        if (type.requiresSensor() && !sensor) {
             throw new IllegalArgumentException(
-                    "mission requires an authored sensor/EW-capable fit: " + type);
+                    "mission requires an operational authored sensor fit: " + type);
         }
+        if (type.requiresEw() && !ew) {
+            throw new IllegalArgumentException(
+                    "EW mission requires positive authored jammer capability");
+        }
+    }
+
+    private static boolean weaponHasPhysicalSupply(
+            SmallCraftState craft,
+            String mountId,
+            ShipEngineeringCatalog.ModuleDefinition module) {
+        var ammunitionInterfaces = module.interfaces().stream()
+                .filter(value -> value.kind() == InterfaceKind.AMMUNITION)
+                .toList();
+        if (ammunitionInterfaces.isEmpty()) {
+            return true;
+        }
+        return ammunitionInterfaces.stream().anyMatch(iface ->
+                craft.runtimeState().consumables().interfaceLoads().stream()
+                        .anyMatch(load -> load.mountId().equals(mountId)
+                                && load.interfaceId().equals(iface.id())
+                                && load.kind() == InterfaceKind.AMMUNITION
+                                && load.amount() > EPSILON));
     }
 
     private void validateEndurance(
