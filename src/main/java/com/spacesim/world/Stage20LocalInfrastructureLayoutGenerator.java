@@ -36,7 +36,11 @@ import java.util.stream.Collectors;
  * turn already carries representative civilian routine-travel and military response consequences,
  * so labels never become an independent strategic-distance system.</p>
  *
- * <p>Routine economic targets use a deterministic 60/30/10 near/mid/far distribution inside their\n * semantic band so ordinary traffic clusters around useful hubs while a bounded minority remains remote.\n * Jump-arrival anchors keep the full uniform safety/arrival distribution.\n *\n * <p>Independent stations additionally respect accepted station operational/defensive geometry and
+ * <p>Routine economic targets use a deterministic 60/30/10 near/mid/far distribution inside their
+ * semantic band so ordinary traffic and jump approaches cluster around useful hubs while a bounded
+ * minority remains remote. Safety/exclusion rules still raise the effective minimum when required.</p>
+ *
+ * <p>Independent stations additionally respect accepted station operational/defensive geometry and
  * the lower {@link BandId#STATION_TO_STATION} logistics separation against every already generated
  * independent station. This prevents default generation from accidentally creating unavoidable
  * mutual point-blank station geometry. Special fortified overlaps require a later explicit design
