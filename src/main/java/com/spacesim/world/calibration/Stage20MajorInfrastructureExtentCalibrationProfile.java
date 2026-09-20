@@ -41,7 +41,7 @@ public record Stage20MajorInfrastructureExtentCalibrationProfile(
         double maxClosedStationStandOffM,
         double innerToOuterSystemMinDistanceM) {
     /** Current Stage-20A major-infrastructure extent profile version. */
-    public static final String CURRENT_VERSION = "stage20a.major-infrastructure-extents.v1";
+    public static final String CURRENT_VERSION = "stage20a.major-infrastructure-extents.v2";
 
     /** Stable descriptive extent meanings. */
     public enum ExtentBandId {
@@ -144,7 +144,18 @@ public record Stage20MajorInfrastructureExtentCalibrationProfile(
         List<ExtentBand> extents = List.of(
                 fromRoute(ExtentBandId.CORE_STATION_CLUSTER, stationToStation),
                 fromRoute(ExtentBandId.INDUSTRIAL_RESOURCE_NETWORK, stationToResource),
-                fromRoute(ExtentBandId.MAJOR_HUB_REACH, jumpToHub));
+                new ExtentBand(
+                        ExtentBandId.MAJOR_HUB_REACH,
+                        jumpToHub.id(),
+                        jumpToHub.minDistanceM(),
+                        innerToOuter.minDistanceM(),
+                        jumpToHub.sourceEvidenceId()
+                                + "|stage22_retained_system_reach="
+                                + innerToOuter.sourceEvidenceId()
+                                + "|derived_by="
+                                + CURRENT_VERSION,
+                        false,
+                        false));
 
         return new Stage20MajorInfrastructureExtentCalibrationProfile(
                 CURRENT_VERSION,
@@ -160,7 +171,7 @@ public record Stage20MajorInfrastructureExtentCalibrationProfile(
     /**
      * Returns whether the current profile is sufficient for Stage-20B entry.
      *
-     * @return true when all required descriptive extents exactly inherit accepted route geometry
+     * @return true when compact route-derived extents and retained physical system reach are consistent
      */
     public boolean closesStage20BEntryCoverage() {
         if (!CURRENT_VERSION.equals(version)
@@ -195,7 +206,7 @@ public record Stage20MajorInfrastructureExtentCalibrationProfile(
                 || hub.maxExtentM() < industrial.maxExtentM()) {
             return false;
         }
-        return hub.maxExtentM() <= innerToOuterSystemMinDistanceM;
+        return hub.maxExtentM() == innerToOuterSystemMinDistanceM;
     }
 
     /**
