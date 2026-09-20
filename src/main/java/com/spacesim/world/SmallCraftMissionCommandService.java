@@ -103,6 +103,7 @@ public final class SmallCraftMissionCommandService {
      * @param commandRangeM current physical command/datalink range
      * @param commandLinkAvailable whether a lawful command link currently exists
      * @param requiredMissionDeltaVMps physical maneuver budget required by the planned mission
+     * @param evidencedTargetReferenceId actor-known target identity supported by the supplied evidence
      * @param targetEvidence provenance/freshness of the target knowledge
      */
     public record MissionContext(
@@ -113,6 +114,7 @@ public final class SmallCraftMissionCommandService {
             double commandRangeM,
             boolean commandLinkAvailable,
             double requiredMissionDeltaVMps,
+            String evidencedTargetReferenceId,
             ObservationEvidence targetEvidence) {
         /** Validates one bounded command context.
          * @param issuingFactionId stable issuing faction
@@ -122,6 +124,7 @@ public final class SmallCraftMissionCommandService {
          * @param commandRangeM current command-link range
          * @param commandLinkAvailable current link availability
          * @param requiredMissionDeltaVMps required physical maneuver delta-v
+         * @param evidencedTargetReferenceId target identity supported by the evidence
          * @param targetEvidence actor-known evidence
          */
         public MissionContext {
@@ -133,6 +136,8 @@ public final class SmallCraftMissionCommandService {
             requireNonNegative(targetDistanceM, "targetDistanceM");
             requireNonNegative(commandRangeM, "commandRangeM");
             requireNonNegative(requiredMissionDeltaVMps, "requiredMissionDeltaVMps");
+            evidencedTargetReferenceId = requireText(
+                    evidencedTargetReferenceId, "evidencedTargetReferenceId");
             Objects.requireNonNull(targetEvidence, "targetEvidence");
         }
     }
@@ -364,6 +369,10 @@ public final class SmallCraftMissionCommandService {
         if (!kindAllowed) {
             throw new IllegalArgumentException(
                     "mission target kind is invalid for " + type + ": " + target.kind());
+        }
+        if (!target.referenceId().equals(context.evidencedTargetReferenceId())) {
+            throw new IllegalArgumentException(
+                    "mission target is not supported by supplied actor-known evidence");
         }
         if (!context.targetEvidence().currentAt(context.authoritativeTick())) {
             throw new IllegalArgumentException("mission target evidence is stale or future-dated");
