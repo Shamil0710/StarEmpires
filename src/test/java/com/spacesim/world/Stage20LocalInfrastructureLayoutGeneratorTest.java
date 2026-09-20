@@ -81,6 +81,28 @@ class Stage20LocalInfrastructureLayoutGeneratorTest {
     }
 
     @Test
+    void legacyReplayPreservesV1BandsAndUniformSamplerAuthority() {
+        Stage20SystemGeometry geometry =
+                Stage20SystemGeometryGenerator.generate(0x20E1L, new StarSystemId(2_001L));
+        Stage20LocalInfrastructureLayout legacy = Stage20LocalInfrastructureLayoutGenerator.generateLegacyStage20(
+                geometry,
+                geometry.centralReference(),
+                "hub",
+                HUB_ARCHETYPE,
+                List.of(
+                        PlacementRequest.resourceFieldAnchor("resource"),
+                        PlacementRequest.jumpArrivalAnchor("jump")));
+
+        assertEquals(
+                Stage20LocalRouteSemanticCalibrationProfile.LEGACY_STAGE20_VERSION,
+                legacy.routeCalibrationVersion());
+        CalibratedConnection resource = connection(legacy, BandId.STATION_TO_RESOURCE_FIELD);
+        CalibratedConnection jump = connection(legacy, BandId.JUMP_ARRIVAL_TO_MAJOR_HUB);
+        assertTrue(resource.distanceM() >= 50_000_000d && resource.distanceM() <= 500_000_000d);
+        assertTrue(jump.distanceM() >= 100_000_000d && jump.distanceM() <= 1_000_000_000d);
+    }
+
+    @Test
     void routineEconomicPlacementStronglyPrefersCompactLogisticsZones() {
         int nearCount = 0;
         int farCount = 0;
