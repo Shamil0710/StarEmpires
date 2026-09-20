@@ -4,6 +4,8 @@ import com.spacesim.world.WorldGenerationPlacementNormalizer.FailureReason;
 import com.spacesim.world.WorldGenerationPlacementNormalizer.NormalizationResult;
 import com.spacesim.world.WorldGenerationPlacementNormalizer.Status;
 import com.spacesim.world.calibration.Stage20LocalRouteSemanticBandCatalog.BandId;
+import com.spacesim.world.calibration.Stage20LocalRouteSemanticCalibrationProfile;
+import com.spacesim.world.calibration.Stage20MajorInfrastructureExtentCalibrationProfile;
 import org.junit.jupiter.api.Test;
 
 import java.util.OptionalDouble;
