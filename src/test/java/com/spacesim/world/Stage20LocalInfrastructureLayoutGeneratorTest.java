@@ -75,9 +75,37 @@ class Stage20LocalInfrastructureLayoutGeneratorTest {
         assertConnectionMatchesPositions(layout, station);
         assertConnectionMatchesPositions(layout, resource);
         assertConnectionMatchesPositions(layout, jump);
-        assertTrue(station.distanceM() >= 10_000_000d && station.distanceM() <= 100_000_000d);
-        assertTrue(resource.distanceM() >= 50_000_000d && resource.distanceM() <= 500_000_000d);
+        assertTrue(station.distanceM() >= 2_000_000d && station.distanceM() <= 30_000_000d);
+        assertTrue(resource.distanceM() >= 10_000_000d && resource.distanceM() <= 150_000_000d);
         assertTrue(jump.distanceM() >= 100_000_000d && jump.distanceM() <= 1_000_000_000d);
+    }
+
+    @Test
+    void routineEconomicPlacementStronglyPrefersCompactLogisticsZones() {
+        int nearCount = 0;
+        int farCount = 0;
+        for (long seed = 1L; seed <= 120L; seed++) {
+            Stage20SystemGeometry geometry =
+                    Stage20SystemGeometryGenerator.generate(seed, new StarSystemId(1_000L + seed));
+            Stage20LocalInfrastructureLayout layout = Stage20LocalInfrastructureLayoutGenerator.generate(
+                    geometry,
+                    geometry.centralReference(),
+                    "hub",
+                    HUB_ARCHETYPE,
+                    List.of(PlacementRequest.resourceFieldAnchor("resource")));
+
+            double distanceM = connection(layout, BandId.STATION_TO_RESOURCE_FIELD).distanceM();
+            double normalized = (distanceM - 10_000_000d) / 140_000_000d;
+            if (normalized <= 0.25d) {
+                nearCount++;
+            }
+            if (normalized >= 0.60d) {
+                farCount++;
+            }
+        }
+
+        assertTrue(nearCount >= 50, "Expected most routine resource routes in the near logistics zone");
+        assertTrue(farCount <= 25, "Expected only a bounded minority of routine resource routes in the far zone");
     }
 
     @Test
@@ -106,7 +134,7 @@ class Stage20LocalInfrastructureLayoutGeneratorTest {
                 InfrastructurePlacement first = stations.get(left);
                 InfrastructurePlacement second = stations.get(right);
                 double separationM = first.position().distanceTo(second.position());
-                assertTrue(separationM >= 10_000_000d);
+                assertTrue(separationM >= 2_000_000d);
                 assertTrue(separationM >= first.operationalRadiusM() + second.operationalRadiusM());
                 assertTrue(separationM >= first.defensiveExclusionReferenceM());
                 assertTrue(separationM >= second.defensiveExclusionReferenceM());
