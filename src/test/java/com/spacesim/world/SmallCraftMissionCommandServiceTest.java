@@ -59,7 +59,7 @@ final class SmallCraftMissionCommandServiceTest {
         assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
                 SmallCraftMissionState.empty(),
                 command(fixture.craftId, OrderSource.AI, MissionType.INTERCEPTION, TargetKind.TRACK, "track.42"),
-                context(20L, DeploymentState.EMBARKED, 2_000d, 20_000d, true, 0d, 5L)));
+                context(20L, DeploymentState.EMBARKED, 2_000d, 20_000d, true, 0d, 19L)));
 
         assertTrue(fixture.deck.queued().isEmpty());
         assertEquals(OccupancyState.READY, fixture.hangars.find(fixture.craftId).orElseThrow().state());
@@ -153,7 +153,7 @@ final class SmallCraftMissionCommandServiceTest {
         SmallCraftRegistry craft = SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId id = craft.reserveIdentityForCompletedProduction();
         craft.registerProducedCraft(ProductionSmallCraftFixture.craft(
-                id, 20L, 2_000d, 200_000d, 1d, 0d));
+                id, 20L, 2_000d, reactionMassKg, 1d, 0d));
 
         SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.empty(craft);
         BayId bayId = new BayId("carrier.alpha", "bay.1");
