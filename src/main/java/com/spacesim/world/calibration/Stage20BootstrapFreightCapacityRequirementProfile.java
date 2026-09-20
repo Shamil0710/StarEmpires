@@ -150,6 +150,7 @@ public record Stage20BootstrapFreightCapacityRequirementProfile(
      */
     public static Stage20BootstrapFreightCapacityRequirementProfile deriveCurrent() {
         return derive(
+                Stage20BootstrapRequirementCalibrationProfileV2.deriveCurrent(),
                 Stage20BootstrapServiceCadenceCalibrationProfile.deriveCurrent(),
                 CURRENT_VERSION);
     }
@@ -161,15 +162,17 @@ public record Stage20BootstrapFreightCapacityRequirementProfile(
      */
     public static Stage20BootstrapFreightCapacityRequirementProfile deriveLegacyStage20() {
         return derive(
+                Stage20BootstrapRequirementCalibrationProfileV2.deriveLegacyStage20(),
                 Stage20BootstrapServiceCadenceCalibrationProfile.deriveLegacyStage20(),
                 LEGACY_STAGE20_VERSION);
     }
 
     private static Stage20BootstrapFreightCapacityRequirementProfile derive(
+            Stage20BootstrapRequirementCalibrationProfileV2.DerivedProfile bootstrap,
             Stage20BootstrapServiceCadenceCalibrationProfile service,
             String version) {
-        Stage20BootstrapRequirementCalibrationProfileV2.DerivedProfile bootstrap =
-                Stage20BootstrapRequirementCalibrationProfileV2.deriveCurrent();
+        Objects.requireNonNull(bootstrap, "bootstrap");
+        Objects.requireNonNull(service, "service");
         Stage20IntersystemCadenceCalibrationProfile intersystem =
                 Stage20IntersystemCadenceCalibrationProfile.deriveCurrent();
         HopCadenceSample regional = intersystem.samples().stream()
