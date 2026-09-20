@@ -41,7 +41,7 @@ public record Stage20LocalRouteSemanticCalibrationProfile(
         List<SemanticRouteSample> samples,
         double maxClosedStationStandOffM) {
     /** Current Stage-20A local-route semantic calibration version. */
-    public static final String CURRENT_VERSION = "stage20a.local-route-semantic-bands.v1";
+    public static final String CURRENT_VERSION = "stage20a.local-route-semantic-bands.v2";
 
     private static final Set<String> CIVILIAN_LOGISTICS = Set.of(
             "EARLY_CIVILIAN_FREIGHTER",
