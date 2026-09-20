@@ -112,9 +112,13 @@ to:
 
 `stage20a.local-route-semantic-bands.v2`
 
-The old v1 resource remains in the repository as historical generation evidence. New generation uses
-v2. Existing persisted physical positions are not silently moved; this is a generation/balance change
-for newly generated placements and future expansion decisions.
+The old v1 resource remains in the repository as historical generation evidence. Frozen Stage-20
+probe/corpus replay explicitly uses v1 together with the original uniform distance sampler. Current
+playable generation uses v2 together with the 60/30/10 clustered sampler. This split prevents a
+Stage-22 balance correction from rewriting accepted historical evidence.
+
+Existing persisted physical positions are not silently moved; this is a generation/balance change for
+newly generated placements and future expansion decisions.
 
 ## Regression evidence
 
