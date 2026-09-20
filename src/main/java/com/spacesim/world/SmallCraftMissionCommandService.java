@@ -99,7 +99,7 @@ public final class SmallCraftMissionCommandService {
      * @param issuingFactionId stable faction issuing the command
      * @param authoritativeTick exact submission tick
      * @param deploymentState current physical embarked/deployed projection
-     * @param targetDistanceM actor-known distance used only for command-link range validation
+     * @param commandNodeDistanceM actor-known distance used only for command-link range validation
      * @param commandRangeM current physical command/datalink range
      * @param commandLinkAvailable whether a lawful command link currently exists
      * @param requiredMissionDeltaVMps physical maneuver budget required by the planned mission
@@ -110,7 +110,7 @@ public final class SmallCraftMissionCommandService {
             String issuingFactionId,
             long authoritativeTick,
             DeploymentState deploymentState,
-            double targetDistanceM,
+            double commandNodeDistanceM,
             double commandRangeM,
             boolean commandLinkAvailable,
             double requiredMissionDeltaVMps,
@@ -120,7 +120,7 @@ public final class SmallCraftMissionCommandService {
          * @param issuingFactionId stable issuing faction
          * @param authoritativeTick exact current tick
          * @param deploymentState physical deployment state
-         * @param targetDistanceM actor-known target distance
+         * @param commandNodeDistanceM actor-known target distance
          * @param commandRangeM current command-link range
          * @param commandLinkAvailable current link availability
          * @param requiredMissionDeltaVMps required physical maneuver delta-v
@@ -133,7 +133,7 @@ public final class SmallCraftMissionCommandService {
                 throw new IllegalArgumentException("authoritativeTick cannot be negative");
             }
             Objects.requireNonNull(deploymentState, "deploymentState");
-            requireNonNegative(targetDistanceM, "targetDistanceM");
+            requireNonNegative(commandNodeDistanceM, "commandNodeDistanceM");
             requireNonNegative(commandRangeM, "commandRangeM");
             requireNonNegative(requiredMissionDeltaVMps, "requiredMissionDeltaVMps");
             evidencedTargetReferenceId = requireText(
@@ -383,6 +383,14 @@ public final class SmallCraftMissionCommandService {
             MissionCommand command,
             MissionContext context) {
         var assignment = hangars.find(command.craftId());
+        if (!context.commandLinkAvailable()) {
+            throw new IllegalArgumentException(
+                    "small-craft command requires lawful command/datalink connectivity");
+        }
+        if (context.commandNodeDistanceM() > context.commandRangeM() + EPSILON) {
+            throw new IllegalArgumentException(
+                    "small craft is outside current command/datalink range");
+        }
         if (context.deploymentState() == DeploymentState.EMBARKED) {
             if (assignment.isEmpty()) {
                 throw new IllegalArgumentException(
@@ -403,14 +411,7 @@ public final class SmallCraftMissionCommandService {
             throw new IllegalArgumentException(
                     "deployed mission context cannot reference embarked craft");
         }
-        if (!context.commandLinkAvailable()) {
-            throw new IllegalArgumentException(
-                    "deployed craft retask requires lawful command/datalink connectivity");
-        }
-        if (context.targetDistanceM() > context.commandRangeM() + EPSILON) {
-            throw new IllegalArgumentException(
-                    "deployed craft target is outside current command/datalink range");
-        }
+
     }
 
     private void validateCapability(SmallCraftState craft, MissionType type) {
