@@ -272,7 +272,7 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
     public static Report evaluateCurrent() {
         var profile = Stage20RepresentativeGeneratedWorldProbeProfileV2.deriveCurrent();
         Stage20BootstrapFreightCapacityRequirementProfile capacity =
-                Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent();
+                Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
         if (!capacity.bootstrapRequirementVersion().equals(profile.bootstrapRequirementVersion())) {
             throw new IllegalStateException("freight-capacity authority and candidate profile disagree on bootstrap requirements");
         }
