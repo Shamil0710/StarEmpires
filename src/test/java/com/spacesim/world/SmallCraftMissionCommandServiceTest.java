@@ -138,6 +138,26 @@ final class SmallCraftMissionCommandServiceTest {
     }
 
     @Test
+    void evidenceForAnotherTargetCannotAuthorizeMission() {
+        Fixture fixture = fixture();
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.AI, MissionType.INTERCEPTION, TargetKind.TRACK, "track.42"),
+                contextFor(
+                        55L,
+                        DeploymentState.EMBARKED,
+                        1_000d,
+                        20_000d,
+                        true,
+                        0d,
+                        "track.99",
+                        55L)));
+
+        assertTrue(fixture.deck.queued().isEmpty());
+    }
+
+    @Test
     void wrongTargetFamilyFailsBeforeAnyDeckMutation() {
         Fixture fixture = fixture();
 
