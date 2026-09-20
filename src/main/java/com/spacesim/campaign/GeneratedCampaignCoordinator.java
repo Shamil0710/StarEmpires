@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.LongConsumer;
 
 /**
  * Ordinary production composition root for one generated campaign.
@@ -261,7 +262,29 @@ public final class GeneratedCampaignCoordinator {
      * @return deterministic ordinary-session advance diagnostics
      */
     public GeneratedCampaignSession.AdvanceReport advanceFrame(float realDeltaSeconds) {
-        return session.advanceFrame(realDeltaSeconds, this::reviewActorsAtTick);
+        return advanceFrame(realDeltaSeconds, ignored -> { });
+    }
+
+    /**
+     * Advances the ordinary campaign and invokes one additional observer after each accepted fixed
+     * tick, after the existing Stage-21 actor review path has consumed that same tick.
+     *
+     * <p>This is an extension seam for later accepted authorities such as M22.8. The observer never
+     * owns a clock and cannot advance the Stage-20 runtime; it receives only exact completed tick
+     * numbers from the existing {@link GeneratedCampaignSession} fixed-step authority.</p>
+     *
+     * @param realDeltaSeconds finite non-negative presentation delta
+     * @param afterFixedTick additional observer invoked once after each completed authoritative tick
+     * @return deterministic ordinary-session advance diagnostics
+     */
+    GeneratedCampaignSession.AdvanceReport advanceFrame(
+            float realDeltaSeconds,
+            LongConsumer afterFixedTick) {
+        LongConsumer observer = Objects.requireNonNull(afterFixedTick, "afterFixedTick");
+        return session.advanceFrame(realDeltaSeconds, tick -> {
+            reviewActorsAtTick(tick);
+            observer.accept(tick);
+        });
     }
 
     private void reviewActorsAtTick(long authoritativeTick) {

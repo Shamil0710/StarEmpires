@@ -15,30 +15,32 @@ import java.util.Objects;
 /**
  * Deterministic bounded file codec for the evolving M22.8 campaign envelope.
  *
- * <p>Version 2 embeds the accepted Stage-21I checkpoint bytes unchanged plus independently versioned
- * small-craft and physical-hangar sidecars. Native M22.8A version-1 files migrate by preserving every
- * individual craft and adding an empty hangar sidecar. Supported Stage-20.5/21A-I files still migrate
- * through the accepted Stage-21I chain and receive empty non-granting M22.8 sidecars.</p>
+ * <p>Version 3 embeds the accepted Stage-21I checkpoint unchanged plus independently versioned
+ * small-craft, hangar and flight-deck sidecars. Native v1(A) and v2(B) files migrate explicitly
+ * without synthesizing later state. Supported Stage-20.5/21A-I files still migrate through the
+ * accepted Stage-21I chain and receive empty non-granting M22.8 sidecars.</p>
  */
 public final class Stage228GeneratedCampaignPersistenceCodec {
     private static final int MAGIC = 0x53323843; // S28C
-    private static final int FILE_VERSION = 2;
+    private static final int FILE_VERSION = 3;
     private static final int M22_8A_FILE_VERSION = 1;
     private static final int M22_8A_SCHEMA_VERSION = 1;
     private static final String M22_8A_RUNTIME_VERSION = "m22.8.generated-campaign.v1";
+    private static final int M22_8B_FILE_VERSION = 2;
+    private static final int M22_8B_SCHEMA_VERSION = 2;
+    private static final String M22_8B_RUNTIME_VERSION = "m22.8.generated-campaign.v2";
     private static final int MAX_BYTES = 1_900 * 1024 * 1024;
     private static final int MAX_STAGE21_PAYLOAD_BYTES = 1_500 * 1024 * 1024;
     private static final int MAX_SMALL_CRAFT_PAYLOAD_BYTES = 256 * 1024 * 1024;
     private static final int MAX_HANGAR_PAYLOAD_BYTES = 64 * 1024 * 1024;
+    private static final int MAX_FLIGHT_DECK_PAYLOAD_BYTES = 64 * 1024 * 1024;
 
     private Stage228GeneratedCampaignPersistenceCodec() {
         throw new AssertionError("No instances");
     }
 
-    /**
-     * Encodes one complete current M22.8 campaign checkpoint.
-     *
-     * @param state complete current M22.8 campaign envelope
+    /** Encodes one complete current M22.8 campaign checkpoint.
+     * @param state complete current M22.8 envelope
      * @return deterministic bounded bytes
      */
     public static byte[] encode(Stage228GeneratedCampaignPersistentState state) {
@@ -46,9 +48,11 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         byte[] stage21 = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(checked.stage21Runtime());
         byte[] smallCraft = Stage228SmallCraftPersistenceCodec.encode(checked.smallCraft());
         byte[] hangars = Stage228HangarPersistenceCodec.encode(checked.hangars());
+        byte[] flightDeck = Stage228FlightDeckPersistenceCodec.encode(checked.flightDeck());
         requirePayload(stage21, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime");
         requirePayload(smallCraft, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft");
         requirePayload(hangars, MAX_HANGAR_PAYLOAD_BYTES, "M22.8B hangars");
+        requirePayload(flightDeck, MAX_FLIGHT_DECK_PAYLOAD_BYTES, "M22.8C flight deck");
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             try (DataOutputStream out = new DataOutputStream(buffer)) {
@@ -59,6 +63,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 writePayload(out, stage21);
                 writePayload(out, smallCraft);
                 writePayload(out, hangars);
+                writePayload(out, flightDeck);
             }
             byte[] result = buffer.toByteArray();
             if (result.length <= 0 || result.length > MAX_BYTES) {
@@ -66,15 +71,14 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
             }
             return result;
         } catch (IOException exception) {
-            throw new IllegalStateException("Unexpected in-memory M22.8 encoding failure", exception);
+            throw new IllegalStateException(
+                    "Unexpected in-memory M22.8 encoding failure", exception);
         }
     }
 
-    /**
-     * Decodes a native M22.8A/B campaign checkpoint and migrates A to the current B envelope.
-     *
+    /** Decodes native M22.8A/B/C and migrates older native layouts to current v3.
      * @param bytes native M22.8 checkpoint bytes
-     * @return validated current M22.8 campaign envelope
+     * @return validated current v3 envelope
      */
     public static Stage228GeneratedCampaignPersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
@@ -88,6 +92,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
             int fileVersion = in.readInt();
             return switch (fileVersion) {
                 case M22_8A_FILE_VERSION -> decodeM22_8A(in);
+                case M22_8B_FILE_VERSION -> decodeM22_8B(in);
                 case FILE_VERSION -> decodeCurrent(in);
                 default -> throw new IllegalArgumentException(
                         "Unsupported M22.8 file version: " + fileVersion);
@@ -102,11 +107,9 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         }
     }
 
-    /**
-     * Decodes native M22.8 or adopts any source supported by the final Stage-21 migration chain.
-     *
+    /** Decodes native M22.8 or adopts any source supported by final Stage-21 migration.
      * @param bytes native M22.8 or supported Stage-20.5/21A-I bytes
-     * @return current M22.8 envelope; older sources never gain craft or occupancy
+     * @return current v3 envelope
      */
     public static Stage228GeneratedCampaignPersistentState decodeOrMigrate(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
@@ -118,11 +121,9 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         return Stage228GeneratedCampaignPersistentState.adoptStage21(stage21);
     }
 
-    /**
-     * Atomically writes a current M22.8 campaign checkpoint when supported by the filesystem.
-     *
-     * @param path destination checkpoint path
-     * @param state complete current M22.8 campaign envelope
+    /** Atomically writes current M22.8 checkpoint when supported by filesystem.
+     * @param path destination path
+     * @param state complete current envelope
      * @throws IOException when persistence fails
      */
     public static void write(Path path, Stage228GeneratedCampaignPersistentState state)
@@ -154,11 +155,9 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         }
     }
 
-    /**
-     * Reads a bounded native M22.8A/B file into the current envelope.
-     *
+    /** Reads bounded native M22.8A/B/C file into current envelope.
      * @param path native M22.8 checkpoint path
-     * @return validated current M22.8 checkpoint
+     * @return validated current checkpoint
      * @throws IOException when bytes cannot be read
      */
     public static Stage228GeneratedCampaignPersistentState read(Path path) throws IOException {
@@ -170,11 +169,9 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         return decode(Files.readAllBytes(source));
     }
 
-    /**
-     * Reads native M22.8 or adopts any source supported by the final Stage-21 migration chain.
-     *
-     * @param path native or supported legacy checkpoint path
-     * @return current M22.8 checkpoint
+    /** Reads native M22.8 or adopts any source supported by final Stage-21 migration.
+     * @param path native or supported legacy checkpoint
+     * @return current v3 checkpoint
      * @throws IOException when bytes cannot be read
      */
     public static Stage228GeneratedCampaignPersistentState readOrMigrate(Path path)
@@ -206,6 +203,28 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         return Stage228GeneratedCampaignPersistentState.adoptM22_8A(stage21, smallCraft);
     }
 
+    private static Stage228GeneratedCampaignPersistentState decodeM22_8B(DataInputStream in)
+            throws IOException {
+        int schemaVersion = in.readInt();
+        String runtimeVersion = in.readUTF();
+        if (schemaVersion != M22_8B_SCHEMA_VERSION
+                || !M22_8B_RUNTIME_VERSION.equals(runtimeVersion)) {
+            throw new IllegalArgumentException(
+                    "Unsupported native M22.8B envelope identity: "
+                            + schemaVersion + "/" + runtimeVersion);
+        }
+        Stage21IGeneratedWorldRuntimePersistentState stage21 =
+                Stage21IGeneratedWorldRuntimePersistenceCodec.decode(
+                        readPayload(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime"));
+        Stage228SmallCraftPersistentState smallCraft = Stage228SmallCraftPersistenceCodec.decode(
+                readPayload(in, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft"));
+        Stage228HangarPersistentState hangars = Stage228HangarPersistenceCodec.decode(
+                readPayload(in, MAX_HANGAR_PAYLOAD_BYTES, "M22.8B hangars"));
+        requireEnd(in);
+        return Stage228GeneratedCampaignPersistentState.adoptM22_8B(
+                stage21, smallCraft, hangars);
+    }
+
     private static Stage228GeneratedCampaignPersistentState decodeCurrent(DataInputStream in)
             throws IOException {
         int schemaVersion = in.readInt();
@@ -224,8 +243,11 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 readPayload(in, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft"));
         Stage228HangarPersistentState hangars = Stage228HangarPersistenceCodec.decode(
                 readPayload(in, MAX_HANGAR_PAYLOAD_BYTES, "M22.8B hangars"));
+        Stage228FlightDeckPersistentState flightDeck = Stage228FlightDeckPersistenceCodec.decode(
+                readPayload(in, MAX_FLIGHT_DECK_PAYLOAD_BYTES, "M22.8C flight deck"));
         requireEnd(in);
-        return Stage228GeneratedCampaignPersistentState.compose(stage21, smallCraft, hangars);
+        return Stage228GeneratedCampaignPersistentState.compose(
+                stage21, smallCraft, hangars, flightDeck);
     }
 
     private static void requireEnd(DataInputStream in) throws IOException {
