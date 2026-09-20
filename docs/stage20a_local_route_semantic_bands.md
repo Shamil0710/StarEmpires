@@ -1,4 +1,4 @@
-# Stage 20A — Local Route Semantic Bands v1
+# Stage 20A — Local Route Semantic Bands v1\n\n> **Superseded for new generation by Stage-22 cadence profile v2.** Historical Stage-20 acceptance evidence remains valid; current authoring is documented in `docs/stage22_local_logistics_cadence_rebalance.md`.
 
 **Status:** PROVISIONAL ACCEPTED REFERENCE — exact-head CI required before merge  
 **Requirement:** `LOCAL_ROUTE_SEMANTIC_BANDS`  
