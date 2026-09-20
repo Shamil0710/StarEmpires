@@ -158,7 +158,7 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
                     seedAcceptance);
         }
 
-        ProbeResult generation = withDirectionalJumpAnchors(sourceGeneration);
+        ProbeResult generation = withDirectionalJumpAnchors(sourceGeneration, cadenceReviewed);
         PlacementResult placement = generation.placement().orElseThrow();
         Optional<Stage20ResolvedFreightAcceptance.AcceptanceReport> freight = Optional.empty();
         if (placement.status() == PlacementStatus.ACCEPTED) {
@@ -209,7 +209,9 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
                 true);
     }
 
-    private static ProbeResult withDirectionalJumpAnchors(ProbeResult source) {
+    private static ProbeResult withDirectionalJumpAnchors(
+            ProbeResult source,
+            boolean cadenceReviewed) {
         GalaxyTopology topology = source.topology().requireAcceptedTopology();
         List<Stage20LocalInfrastructureLayout> layouts = Stage20DirectionalJumpAnchorLayout.alignAll(
                 topology, source.localLayouts().orElseThrow());
@@ -217,8 +219,9 @@ public final class Stage20ResolvedGeneratedWorldProductionProbe {
         for (Stage20LocalInfrastructureLayout layout : layouts) {
             bySystem.put(layout.systemId(), layout);
         }
-        Stage20JumpEdgeCatalog jumpEdges = Stage20JumpEdgeStateMaterializer.materializeCurrent(
-                topology, bySystem);
+        Stage20JumpEdgeCatalog jumpEdges = cadenceReviewed
+                ? Stage20JumpEdgeStateMaterializer.materializeCurrent(topology, bySystem)
+                : Stage20JumpEdgeStateMaterializer.materializeLegacyStage20(topology, bySystem);
         return new ProbeResult(
                 source.version(),
                 source.rootSeed(),
