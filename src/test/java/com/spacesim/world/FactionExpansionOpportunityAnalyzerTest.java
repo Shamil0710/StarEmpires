@@ -54,14 +54,14 @@ class FactionExpansionOpportunityAnalyzerTest {
     }
 
     @Test
-    void resourceWeightedPolicyCanPreferRicherTwoHopFrontier() {
+    void exceptionalResourceValueCanJustifyRicherTwoHopFrontier() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldSimulation world = DemoGalaxyFactory.create(0x11A2L);
         materializeRemoteAsteroids(world);
         setRemainingAsteroidResource(world, DemoGalaxyFactory.INNER_SYSTEM_ID, 1L);
         setRemainingAsteroidResource(world, DemoGalaxyFactory.FRONTIER_SYSTEM_ID, 1_000_000L);
         ExpansionOpportunityPolicy resourceOnly = new ExpansionOpportunityPolicy(
-                2, 16, 100, 0, 0, 0, 0, 0, 0);
+                2, 16, 100, 0, 0, 0, 0, 0, 0, 1, 3_000);
 
         List<ExpansionOpportunity> opportunities =
                 FactionExpansionOpportunityAnalyzer.analyze(world, content, TRADE_LEAGUE, resourceOnly);
@@ -71,6 +71,21 @@ class FactionExpansionOpportunityAnalyzerTest {
         assertEquals(2, opportunities.get(0).path().jumpCount());
         assertTrue(opportunities.get(0).remainingMineableUnits()
                 > opportunities.get(1).remainingMineableUnits());
+    }
+
+    @Test
+    void distanceDisciplineSuppressesUnjustifiedTwoHopSprawl() {
+        ContentCatalog content = ContentCatalogLoader.loadDefault();
+        WorldSimulation world = DemoGalaxyFactory.create(0x11A4L);
+        ExpansionOpportunityPolicy proximityOnly = new ExpansionOpportunityPolicy(
+                2, 16, 0, 0, 0, 100, 0, 0, 0, 1, 3_000);
+
+        List<ExpansionOpportunity> opportunities =
+                FactionExpansionOpportunityAnalyzer.analyze(world, content, TRADE_LEAGUE, proximityOnly);
+
+        assertEquals(1, opportunities.size());
+        assertEquals(DemoGalaxyFactory.INNER_SYSTEM_ID, opportunities.get(0).targetSystemId());
+        assertEquals(1, opportunities.get(0).path().jumpCount());
     }
 
     @Test
