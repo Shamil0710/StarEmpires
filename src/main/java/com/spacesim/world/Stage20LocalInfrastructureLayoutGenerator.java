@@ -459,8 +459,8 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
             long bits,
             double min,
             double max) {
-        if (kind == TargetKind.JUMP_ARRIVAL_ANCHOR || min == max) {
-            return sampleRange(bits, min, max);
+        if (min == max) {
+            return min;
         }
 
         double unit = unitInterval(bits);
