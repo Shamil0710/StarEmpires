@@ -78,8 +78,10 @@ import java.util.TreeMap;
  * therefore cannot request another deposit, station or topology edge as hidden rescue.</p>
  */
 public final class Stage20GeneratedWorldProductionProbe {
-    /** Current immutable production-probe implementation version. */
+    /** Historical Stage-20 production-probe version retained for frozen corpus replay. */
     public static final String CURRENT_VERSION = "stage20e.production-seed-probe.v1";
+    /** Stage-22 cadence-reviewed production-probe version used by current playable generation. */
+    public static final String CADENCE_REVIEWED_VERSION = "stage22.production-seed-probe.v2";
     private static final GalaxyId GENERATED_GALAXY_ID = new GalaxyId(20L);
 
     private Stage20GeneratedWorldProductionProbe() {
@@ -350,7 +352,26 @@ public final class Stage20GeneratedWorldProductionProbe {
      * @return complete deterministic probe evidence
      */
     public static ProbeResult run(long rootSeed, ProbeInputs inputs) {
+        return runInternal(rootSeed, inputs, false);
+    }
+
+    /**
+     * Runs the same production pipeline with the Stage-22 cadence-reviewed local-distance authoring.
+     *
+     * @param rootSeed exact root seed to measure
+     * @param inputs explicit generation, acceptance and physical transport authority
+     * @return complete deterministic cadence-reviewed probe evidence
+     */
+    public static ProbeResult runCadenceReviewed(long rootSeed, ProbeInputs inputs) {
+        return runInternal(rootSeed, inputs, true);
+    }
+
+    private static ProbeResult runInternal(
+            long rootSeed,
+            ProbeInputs inputs,
+            boolean cadenceReviewed) {
         ProbeInputs authority = Objects.requireNonNull(inputs, "inputs");
+        String probeVersion = cadenceReviewed ? CADENCE_REVIEWED_VERSION : CURRENT_VERSION;
         Stage20MacroGalaxyGeometryGenerator.MacroGeometryResult macro =
                 Stage20MacroGalaxyGeometryGenerator.generate(rootSeed, authority.macroRequest());
         Stage20JumpTopologyGenerationResult topologyResult = Stage20JumpTopologyGenerator.generate(
@@ -365,7 +386,7 @@ public final class Stage20GeneratedWorldProductionProbe {
                     Optional.empty(),
                     Optional.empty());
             return new ProbeResult(
-                    CURRENT_VERSION,
+                    probeVersion,
                     rootSeed,
                     macro,
                     topologyResult,
@@ -385,7 +406,7 @@ public final class Stage20GeneratedWorldProductionProbe {
         Catalogs catalogs = loadCatalogs();
         validateInfrastructureProfile(authority.infrastructure(), catalogs.stations());
         List<Stage20LocalInfrastructureLayout> layouts = generateLocalLayouts(
-                rootSeed, topology, authority.infrastructure());
+                rootSeed, topology, authority.infrastructure(), cadenceReviewed);
         TreeMap<StarSystemId, Stage20LocalInfrastructureLayout> layoutsBySystem = new TreeMap<>();
         for (Stage20LocalInfrastructureLayout layout : layouts) {
             layoutsBySystem.put(layout.systemId(), layout);
@@ -424,7 +445,7 @@ public final class Stage20GeneratedWorldProductionProbe {
         Stage20PhysicalFreightRouteEvaluator routes = physicalRoutes(
                 topology, jumpEdges, layouts, catalogs.stations(), authority.transport());
         AnalysisProfile analysisProfile = new AnalysisProfile(
-                CURRENT_VERSION + ".supply-analysis",
+                probeVersion + ".supply-analysis",
                 authority.acceptance().bootstrapRequirements().maxIntermediateInputRouteTimeS());
         SupplyThroughputReport supply = Stage20TheoreticalSupplyThroughputAnalyzer.analyze(
                 topology,
@@ -475,7 +496,7 @@ public final class Stage20GeneratedWorldProductionProbe {
                 Optional.of(placement));
 
         return new ProbeResult(
-                CURRENT_VERSION,
+                probeVersion,
                 rootSeed,
                 macro,
                 topologyResult,
@@ -515,7 +536,8 @@ public final class Stage20GeneratedWorldProductionProbe {
     private static List<Stage20LocalInfrastructureLayout> generateLocalLayouts(
             long rootSeed,
             GalaxyTopology topology,
-            InitialInfrastructureProfile profile) {
+            InitialInfrastructureProfile profile,
+            boolean cadenceReviewed) {
         ArrayList<Stage20LocalInfrastructureLayout> layouts = new ArrayList<>();
         for (StarSystemId systemId : orderedSystems(topology)) {
             Stage20SystemGeometry geometry = Stage20SystemGeometryGenerator.generate(rootSeed, systemId);
@@ -532,12 +554,20 @@ public final class Stage20GeneratedWorldProductionProbe {
             String industrialArchetype = selectedIndustrialArchetype(rootSeed, systemId, profile);
             requests.add(PlacementRequest.independentStation(
                     "industry." + systemId.value(), industrialArchetype));
-            layouts.add(Stage20LocalInfrastructureLayoutGenerator.generate(
-                    geometry,
-                    geometry.centralReference(),
-                    "hub." + systemId.value(),
-                    profile.majorHubArchetypeId(),
-                    requests));
+            Stage20LocalInfrastructureLayout layout = cadenceReviewed
+                    ? Stage20LocalInfrastructureLayoutGenerator.generate(
+                            geometry,
+                            geometry.centralReference(),
+                            "hub." + systemId.value(),
+                            profile.majorHubArchetypeId(),
+                            requests)
+                    : Stage20LocalInfrastructureLayoutGenerator.generateLegacyStage20(
+                            geometry,
+                            geometry.centralReference(),
+                            "hub." + systemId.value(),
+                            profile.majorHubArchetypeId(),
+                            requests);
+            layouts.add(layout);
         }
         layouts.sort(Comparator.comparing(Stage20LocalInfrastructureLayout::systemId));
         return List.copyOf(layouts);
