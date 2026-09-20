@@ -411,8 +411,9 @@ public final class Stage20GeneratedWorldProductionProbe {
         for (Stage20LocalInfrastructureLayout layout : layouts) {
             layoutsBySystem.put(layout.systemId(), layout);
         }
-        Stage20JumpEdgeCatalog jumpEdges = Stage20JumpEdgeStateMaterializer.materializeCurrent(
-                topology, layoutsBySystem);
+        Stage20JumpEdgeCatalog jumpEdges = cadenceReviewed
+                ? Stage20JumpEdgeStateMaterializer.materializeCurrent(topology, layoutsBySystem)
+                : Stage20JumpEdgeStateMaterializer.materializeLegacyStage20(topology, layoutsBySystem);
 
         Stage20LocalPhysicalResourceHostGenerator.GenerationResult hosts =
                 Stage20LocalPhysicalResourceHostGenerator.generate(
