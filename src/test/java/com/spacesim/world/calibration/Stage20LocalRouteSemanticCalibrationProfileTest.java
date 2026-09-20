@@ -35,7 +35,7 @@ class Stage20LocalRouteSemanticCalibrationProfileTest {
 
         Map<BandId, Stage20LocalRouteSemanticBandCatalog.BandDefinition> byId = catalog.bands().stream()
                 .collect(Collectors.toMap(value -> value.id(), Function.identity()));
-        assertEquals(2_000_000d, byId.get(BandId.STATION_TO_STATION).minDistanceM(), 0d);
+        assertEquals(4_000_000d, byId.get(BandId.STATION_TO_STATION).minDistanceM(), 0d);
         assertEquals(30_000_000d, byId.get(BandId.STATION_TO_STATION).maxDistanceM(), 0d);
         assertEquals(10_000_000d, byId.get(BandId.STATION_TO_RESOURCE_FIELD).minDistanceM(), 0d);
         assertEquals(150_000_000d, byId.get(BandId.STATION_TO_RESOURCE_FIELD).maxDistanceM(), 0d);
