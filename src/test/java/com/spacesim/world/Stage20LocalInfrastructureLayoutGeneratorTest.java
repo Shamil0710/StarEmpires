@@ -75,7 +75,7 @@ class Stage20LocalInfrastructureLayoutGeneratorTest {
         assertConnectionMatchesPositions(layout, station);
         assertConnectionMatchesPositions(layout, resource);
         assertConnectionMatchesPositions(layout, jump);
-        assertTrue(station.distanceM() >= 2_000_000d && station.distanceM() <= 30_000_000d);
+        assertTrue(station.distanceM() >= 4_000_000d && station.distanceM() <= 30_000_000d);
         assertTrue(resource.distanceM() >= 10_000_000d && resource.distanceM() <= 150_000_000d);
         assertTrue(jump.distanceM() >= 40_000_000d && jump.distanceM() <= 200_000_000d);
     }
@@ -134,7 +134,7 @@ class Stage20LocalInfrastructureLayoutGeneratorTest {
                 InfrastructurePlacement first = stations.get(left);
                 InfrastructurePlacement second = stations.get(right);
                 double separationM = first.position().distanceTo(second.position());
-                assertTrue(separationM >= 2_000_000d);
+                assertTrue(separationM >= 4_000_000d);
                 assertTrue(separationM >= first.operationalRadiusM() + second.operationalRadiusM());
                 assertTrue(separationM >= first.defensiveExclusionReferenceM());
                 assertTrue(separationM >= second.defensiveExclusionReferenceM());
