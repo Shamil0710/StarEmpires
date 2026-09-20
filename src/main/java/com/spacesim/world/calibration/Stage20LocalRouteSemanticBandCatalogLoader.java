@@ -20,8 +20,12 @@ import java.util.Set;
 public final class Stage20LocalRouteSemanticBandCatalogLoader {
     /** Current supported schema. */
     public static final int CURRENT_SCHEMA_VERSION = 1;
-    /** Packaged semantic-band resource. */
-    public static final String DEFAULT_RESOURCE = "data/calibration/stage20-local-route-semantic-bands-v2.json";
+    /** Historical Stage-20 semantic-band resource retained for frozen evidence replay. */
+    public static final String LEGACY_STAGE20_RESOURCE =
+            "data/calibration/stage20-local-route-semantic-bands-v1.json";
+    /** Current Stage-22-reviewed semantic-band resource used by playable generation. */
+    public static final String DEFAULT_RESOURCE =
+            "data/calibration/stage20-local-route-semantic-bands-v2.json";
 
     private Stage20LocalRouteSemanticBandCatalogLoader() {
         throw new AssertionError("No instances");
@@ -33,10 +37,23 @@ public final class Stage20LocalRouteSemanticBandCatalogLoader {
      * @return immutable validated local-route semantic-band catalog
      */
     public static Stage20LocalRouteSemanticBandCatalog loadDefault() {
+        return loadResource(DEFAULT_RESOURCE);
+    }
+
+    /**
+     * Loads the historical Stage-20 v1 policy for deterministic replay of frozen acceptance evidence.
+     *
+     * @return immutable validated legacy semantic-band catalog
+     */
+    public static Stage20LocalRouteSemanticBandCatalog loadLegacyStage20() {
+        return loadResource(LEGACY_STAGE20_RESOURCE);
+    }
+
+    private static Stage20LocalRouteSemanticBandCatalog loadResource(String resource) {
         ClassLoader classLoader = Stage20LocalRouteSemanticBandCatalogLoader.class.getClassLoader();
-        try (InputStream stream = classLoader.getResourceAsStream(DEFAULT_RESOURCE)) {
+        try (InputStream stream = classLoader.getResourceAsStream(resource)) {
             if (stream == null) {
-                throw new IllegalStateException("Missing Stage-20 local route resource: " + DEFAULT_RESOURCE);
+                throw new IllegalStateException("Missing Stage-20 local route resource: " + resource);
             }
             Stage20LocalRouteSemanticBandCatalog catalog = parse(
                     new String(stream.readAllBytes(), StandardCharsets.UTF_8));
@@ -48,7 +65,7 @@ public final class Stage20LocalRouteSemanticBandCatalogLoader {
             }
             return catalog;
         } catch (IOException exception) {
-            throw new IllegalStateException("Cannot read Stage-20 local route resource", exception);
+            throw new IllegalStateException("Cannot read Stage-20 local route resource: " + resource, exception);
         }
     }
 
