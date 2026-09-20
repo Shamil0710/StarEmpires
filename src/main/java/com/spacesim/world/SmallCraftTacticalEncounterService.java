@@ -127,7 +127,7 @@ public final class SmallCraftTacticalEncounterService {
                 throw new IllegalStateException(
                         "small-craft tactical materialization requires ACTIVE or RETURNING mission");
             }
-            String key = "craft:" + String.format("%020d", checked.craftId().value());
+            String key = "craft:" + checked.craftId().value();
             canonical.put(key, BoundParticipant.smallCraft(checked, before, mission));
         }
 
