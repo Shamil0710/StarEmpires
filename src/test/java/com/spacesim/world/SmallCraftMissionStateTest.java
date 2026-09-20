@@ -16,6 +16,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 final class SmallCraftMissionStateTest {
 
     @Test
+    void requiredMissionVocabularyIsCompleteAndStable() {
+        assertEquals(
+                List.of(
+                        MissionType.CAP,
+                        MissionType.QRA,
+                        MissionType.INTERCEPTION,
+                        MissionType.ESCORT,
+                        MissionType.ANTI_SHIP_STRIKE,
+                        MissionType.RECONNAISSANCE,
+                        MissionType.EW_SUPPORT,
+                        MissionType.RETURN,
+                        MissionType.RECOVER,
+                        MissionType.DIVERT),
+                List.of(MissionType.values()));
+    }
+
+    @Test
     void rejectsMultipleActiveMissionsForOnePhysicalCraft() {
         SmallCraftId craft = new SmallCraftId(1L);
         MissionOrder first = mission(1L, craft, MissionStatus.ACTIVE);
