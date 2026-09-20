@@ -59,7 +59,7 @@ final class SmallCraftMissionCommandServiceTest {
         assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
                 SmallCraftMissionState.empty(),
                 command(fixture.craftId, OrderSource.AI, MissionType.INTERCEPTION, TargetKind.TRACK, "track.42"),
-                context(20L, DeploymentState.EMBARKED, 2_000d, 20_000d, true, 0d, 19L)));
+                contextFor(20L, DeploymentState.EMBARKED, 2_000d, 20_000d, true, 0d, "track.42", 19L)));
 
         assertTrue(fixture.deck.queued().isEmpty());
         assertEquals(OccupancyState.READY, fixture.hangars.find(fixture.craftId).orElseThrow().state());
@@ -73,12 +73,12 @@ final class SmallCraftMissionCommandServiceTest {
         assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
                 SmallCraftMissionState.empty(),
                 command(fixture.craftId, OrderSource.PLAYER, MissionType.RECONNAISSANCE, TargetKind.AREA, "area.outer"),
-                context(30L, DeploymentState.DEPLOYED, 10_000d, 20_000d, false, 0d, 30L)));
+                contextFor(30L, DeploymentState.DEPLOYED, 10_000d, 20_000d, false, 0d, "area.outer", 30L)));
 
         assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
                 SmallCraftMissionState.empty(),
                 command(fixture.craftId, OrderSource.PLAYER, MissionType.RECONNAISSANCE, TargetKind.AREA, "area.outer"),
-                context(30L, DeploymentState.DEPLOYED, 30_000d, 20_000d, true, 0d, 30L)));
+                contextFor(30L, DeploymentState.DEPLOYED, 30_000d, 20_000d, true, 0d, "area.outer", 30L)));
     }
 
     @Test
@@ -118,7 +118,7 @@ final class SmallCraftMissionCommandServiceTest {
         var recover = fixture.service.submit(
                 state,
                 command(fixture.craftId, OrderSource.PLAYER, MissionType.RECOVER, TargetKind.HOST, "carrier.alpha"),
-                context(51L, DeploymentState.DEPLOYED, 1_000d, 20_000d, true, 0d, 51L));
+                contextFor(51L, DeploymentState.DEPLOYED, 1_000d, 20_000d, true, 0d, "carrier.alpha", 51L));
         state = recover.state();
         assertEquals(launch.mission().id(), recover.supersededMissionId());
         assertEquals(MissionStatus.RETURNING, recover.mission().status());
@@ -201,6 +201,26 @@ final class SmallCraftMissionCommandServiceTest {
             boolean link,
             double deltaV,
             long freshUntilTick) {
+        return contextFor(
+                tick,
+                deployment,
+                targetDistanceM,
+                commandRangeM,
+                link,
+                deltaV,
+                "area.alpha",
+                freshUntilTick);
+    }
+
+    private static MissionContext contextFor(
+            long tick,
+            DeploymentState deployment,
+            double targetDistanceM,
+            double commandRangeM,
+            boolean link,
+            double deltaV,
+            String evidencedTargetReferenceId,
+            long freshUntilTick) {
         return new MissionContext(
                 "faction.empire",
                 tick,
@@ -209,6 +229,7 @@ final class SmallCraftMissionCommandServiceTest {
                 commandRangeM,
                 link,
                 deltaV,
+                evidencedTargetReferenceId,
                 new ObservationEvidence(
                         ObservationChannel.OWNED_ASSET_REPORT,
                         "report." + tick,
