@@ -66,6 +66,74 @@ final class SmallCraftMissionCommandServiceTest {
     }
 
     @Test
+    void futureDatedKnowledgeFailsClosedWithoutQueuingPhysicalLaunch() {
+        Fixture fixture = fixture();
+        MissionContext futureEvidence = new MissionContext(
+                "faction.empire",
+                21L,
+                DeploymentState.EMBARKED,
+                2_000d,
+                20_000d,
+                true,
+                0d,
+                "track.42",
+                new ObservationEvidence(
+                        ObservationChannel.LOCAL_SENSOR_REPORT,
+                        "scan.future",
+                        22L,
+                        30L));
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.AI, MissionType.INTERCEPTION, TargetKind.TRACK, "track.42"),
+                futureEvidence));
+
+        assertTrue(fixture.deck.queued().isEmpty());
+        assertEquals(OccupancyState.READY, fixture.hangars.find(fixture.craftId).orElseThrow().state());
+    }
+
+    @Test
+    void foreignFactionCannotCommandCraftOrMutateDeck() {
+        Fixture fixture = fixture();
+        MissionContext foreign = new MissionContext(
+                "faction.industrial_union",
+                22L,
+                DeploymentState.EMBARKED,
+                1_000d,
+                20_000d,
+                true,
+                0d,
+                "area.alpha",
+                new ObservationEvidence(
+                        ObservationChannel.OWNED_ASSET_REPORT,
+                        "report.foreign",
+                        22L,
+                        22L));
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.PLAYER, MissionType.CAP, TargetKind.AREA, "area.alpha"),
+                foreign));
+
+        assertTrue(fixture.deck.queued().isEmpty());
+        assertEquals(OccupancyState.READY, fixture.hangars.find(fixture.craftId).orElseThrow().state());
+    }
+
+    @Test
+    void embarkedCraftMustBePhysicallyReadyBeforeLaunchCommand() {
+        Fixture fixture = fixture();
+        fixture.hangars.transition(fixture.craftId, OccupancyState.SERVICING);
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.AI, MissionType.CAP, TargetKind.AREA, "area.alpha"),
+                context(23L, DeploymentState.EMBARKED, 1_000d, 20_000d, true, 0d, 23L)));
+
+        assertTrue(fixture.deck.queued().isEmpty());
+        assertEquals(OccupancyState.SERVICING, fixture.hangars.find(fixture.craftId).orElseThrow().state());
+    }
+
+    @Test
     void embarkedLaunchAlsoRequiresLawfulCommandLink() {
         Fixture fixture = fixture();
 
