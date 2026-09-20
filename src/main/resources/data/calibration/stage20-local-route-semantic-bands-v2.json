@@ -19,9 +19,9 @@
     },
     {
       "id": "JUMP_ARRIVAL_TO_MAJOR_HUB",
-      "minDistanceM": 100000000.0,
-      "maxDistanceM": 1000000000.0,
-      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/JUMP_ARRIVAL_TO_MAJOR_HUB"
+      "minDistanceM": 40000000.0,
+      "maxDistanceM": 200000000.0,
+      "sourceEvidenceId": "docs/stage22_local_logistics_cadence_rebalance.md:jump-hub-cadence"
     },
     {
       "id": "INNER_TO_OUTER_SYSTEM",
