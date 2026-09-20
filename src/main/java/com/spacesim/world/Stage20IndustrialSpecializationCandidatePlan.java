@@ -322,10 +322,18 @@ public final class Stage20IndustrialSpecializationCandidatePlan {
             throw new IllegalArgumentException(
                     "industrial specialization candidates require an accepted resolved seed");
         }
-        if (!Stage20ResolvedGeneratedWorldProductionProbe.CURRENT_VERSION.equals(accepted.version())
-                || !Stage20GeneratedWorldProductionProbe.CURRENT_VERSION.equals(
-                accepted.generation().version())) {
-            throw new IllegalArgumentException("v1 candidate plan requires current production-probe evidence");
+        boolean historicalProbePair =
+                Stage20ResolvedGeneratedWorldProductionProbe.CURRENT_VERSION.equals(accepted.version())
+                        && Stage20GeneratedWorldProductionProbe.CURRENT_VERSION.equals(
+                        accepted.generation().version());
+        boolean cadenceReviewedProbePair =
+                Stage20ResolvedGeneratedWorldProductionProbe.CADENCE_REVIEWED_VERSION.equals(
+                        accepted.version())
+                        && Stage20GeneratedWorldProductionProbe.CADENCE_REVIEWED_VERSION.equals(
+                        accepted.generation().version());
+        if (!historicalProbePair && !cadenceReviewedProbePair) {
+            throw new IllegalArgumentException(
+                    "candidate plan requires a coherent historical or cadence-reviewed production-probe pair");
         }
 
         var generation = accepted.generation();
