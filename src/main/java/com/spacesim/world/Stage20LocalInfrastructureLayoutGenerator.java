@@ -257,7 +257,7 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
         BandDefinition stationBand = requireBand(routeBands, BandId.STATION_TO_STATION);
         for (int attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS; attempt++) {
             double distanceM = samplePlacementDistance(
-                    request.kind(), random.nextLong(), minimumDistanceM, maximumDistanceM);
+                    random.nextLong(), minimumDistanceM, maximumDistanceM);
             double angleRad = unitInterval(random.nextLong()) * Math.PI * 2d;
             LocalPhysicalPosition candidatePosition = hubPosition.translated(
                     Math.cos(angleRad) * distanceM,
@@ -455,7 +455,6 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
     }
 
     private static double samplePlacementDistance(
-            TargetKind kind,
             long bits,
             double min,
             double max) {
@@ -472,13 +471,6 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
             return Math.fma(span * 0.35d, (unit - 0.60d) / 0.30d, min + span * 0.25d);
         }
         return Math.fma(span * 0.40d, (unit - 0.90d) / 0.10d, min + span * 0.60d);
-    }
-
-    private static double sampleRange(long bits, double min, double max) {
-        if (min == max) {
-            return min;
-        }
-        return Math.fma(max - min, unitInterval(bits), min);
     }
 
     private static double unitInterval(long bits) {
