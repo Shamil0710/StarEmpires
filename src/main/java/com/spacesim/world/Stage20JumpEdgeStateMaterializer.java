@@ -62,14 +62,47 @@ public final class Stage20JumpEdgeStateMaterializer {
     public static Stage20JumpEdgeCatalog materializeCurrent(
             GalaxyTopology topology,
             Map<StarSystemId, Stage20LocalInfrastructureLayout> layoutsBySystem) {
+        return materialize(
+                topology,
+                layoutsBySystem,
+                Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent(),
+                Stage20LocalRouteSemanticCalibrationProfile.CURRENT_VERSION);
+    }
+
+    /**
+     * Replays Stage-20D edge materialization against the historical v1 local-route authority.
+     *
+     * <p>This entry point exists only for frozen Stage-20 generated-world evidence. Current playable
+     * generation must use {@link #materializeCurrent(GalaxyTopology, Map)}.</p>
+     *
+     * @param topology accepted ordinary jump topology
+     * @param layoutsBySystem historical Stage-20C v1 local layouts
+     * @return deterministic historical exact-coverage physical edge catalog
+     */
+    public static Stage20JumpEdgeCatalog materializeLegacyStage20(
+            GalaxyTopology topology,
+            Map<StarSystemId, Stage20LocalInfrastructureLayout> layoutsBySystem) {
+        return materialize(
+                topology,
+                layoutsBySystem,
+                Stage20LocalRouteSemanticCalibrationProfile.deriveLegacyStage20(),
+                Stage20LocalRouteSemanticCalibrationProfile.LEGACY_STAGE20_VERSION);
+    }
+
+    private static Stage20JumpEdgeCatalog materialize(
+            GalaxyTopology topology,
+            Map<StarSystemId, Stage20LocalInfrastructureLayout> layoutsBySystem,
+            Stage20LocalRouteSemanticCalibrationProfile localRoutes,
+            String expectedRouteVersion) {
         GalaxyTopology checkedTopology = Objects.requireNonNull(topology, "topology");
         Objects.requireNonNull(layoutsBySystem, "layoutsBySystem");
+        Objects.requireNonNull(localRoutes, "localRoutes");
 
         Stage20TopologyQualityCalibrationProfile quality = Stage20TopologyQualityCalibrationProfile.deriveCurrent();
         Stage20IntersystemCadenceCalibrationProfile cadence = Stage20IntersystemCadenceCalibrationProfile.deriveCurrent();
-        Stage20LocalRouteSemanticCalibrationProfile localRoutes = Stage20LocalRouteSemanticCalibrationProfile.deriveCurrent();
         Stage20JumpArrivalSpatialCalibrationProfile arrival = Stage20JumpArrivalSpatialCalibrationCalculator.calibrate();
-        if (!quality.closesStage20BEntryCoverage() || !localRoutes.closesStage20BEntryCoverage()) {
+        if (!quality.closesStage20BEntryCoverage()
+                || !localRoutes.closesEntryCoverageForVersion(expectedRouteVersion)) {
             throw new IllegalStateException("Stage-20D edge materialization requires closed Stage-20A topology/local-route calibration");
         }
         if (!Stage20JumpArrivalSpatialCalibrationProfile.CURRENT_VERSION.equals(arrival.version())
