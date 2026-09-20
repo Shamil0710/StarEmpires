@@ -422,6 +422,11 @@ public final class SmallCraftMissionCommandService {
                 throw new IllegalStateException(
                         "validated craft references missing module: " + installed.moduleId());
             }
+            double integrity = craft.instanceState().damage().moduleDamage()
+                    .moduleIntegrityByMount().getOrDefault(installed.mountId(), 1d);
+            if (integrity <= EPSILON) {
+                continue;
+            }
             if (module.family() == ModuleFamily.WEAPON_AMMUNITION) {
                 weapon = true;
             }
