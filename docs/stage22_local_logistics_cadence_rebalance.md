@@ -1,8 +1,11 @@
 # Stage 22 — Local Logistics Cadence / Expansion Discipline Rebalance
 
-**Status:** IMPLEMENTED / PENDING EXACT-HEAD CI  
+**Status:** MERGED / EXACT-HEAD ACCEPTED  
 **Date:** 2026-09-20  
 **Scope:** cross-cutting Stage-22 balance correction; does not replace or expand M22.8 carrier authority.
+
+**Acceptance evidence:** PR #391 / accepted head `996ddb7954cf9c20dc741412bcda28c4cd8d87c3` /
+CI #7363 and #7364 both `success` / merge `2254ace90e38ce6e661fd16383da536c229816bc`.
 
 ## Problem
 
