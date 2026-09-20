@@ -79,6 +79,18 @@ public record ExpansionOpportunityPolicy(
 
     /**
      * Validates bounded search, non-negative scoring weights and the explicit anti-sprawl gate.
+     *
+     * @param maxJumpHops maximum path horizon
+     * @param maxCandidates maximum returned candidates
+     * @param resourceWeight resource benefit weight
+     * @param demandWeight demand benefit weight
+     * @param marketNetworkWeight market-network benefit weight
+     * @param proximityWeight proximity benefit weight
+     * @param constructionCostWeight construction-cost benefit weight
+     * @param threatPenaltyWeight hostile-pressure penalty weight
+     * @param foreignControlPenaltyBasisPoints foreign-control penalty in basis points
+     * @param routineMaxJumpHops routine expansion horizon
+     * @param distantAdvantagePerExtraHopBasisPoints required utility advantage per extra hop in basis points
      */
     public ExpansionOpportunityPolicy {
         if (maxJumpHops <= 0 || maxCandidates <= 0) {
