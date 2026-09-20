@@ -138,6 +138,18 @@ final class SmallCraftMissionCommandServiceTest {
     }
 
     @Test
+    void destroyedWeaponCannotAuthorizeCombatMission() {
+        Fixture fixture = fixture(200_000d, 0d);
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.AI, MissionType.CAP, TargetKind.AREA, "area.alpha"),
+                context(54L, DeploymentState.EMBARKED, 1_000d, 20_000d, true, 0d, 54L)));
+
+        assertTrue(fixture.deck.queued().isEmpty());
+    }
+
+    @Test
     void evidenceForAnotherTargetCannotAuthorizeMission() {
         Fixture fixture = fixture();
 
@@ -170,14 +182,18 @@ final class SmallCraftMissionCommandServiceTest {
     }
 
     private static Fixture fixture() {
-        return fixture(200_000d);
+        return fixture(200_000d, 1d);
     }
 
     private static Fixture fixture(double reactionMassKg) {
+        return fixture(reactionMassKg, 1d);
+    }
+
+    private static Fixture fixture(double reactionMassKg, double weaponIntegrity) {
         SmallCraftRegistry craft = SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId id = craft.reserveIdentityForCompletedProduction();
         craft.registerProducedCraft(ProductionSmallCraftFixture.craft(
-                id, 20L, 2_000d, reactionMassKg, 1d, 0d));
+                id, 20L, 2_000d, reactionMassKg, weaponIntegrity, 0d));
 
         SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.empty(craft);
         BayId bayId = new BayId("carrier.alpha", "bay.1");
