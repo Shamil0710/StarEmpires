@@ -7,21 +7,21 @@
   "bands": [
     {
       "id": "STATION_TO_STATION",
-      "minDistanceM": 2000000.0,
+      "minDistanceM": 4000000.0,
       "maxDistanceM": 30000000.0,
-      "sourceEvidenceId": "docs/stage22_local_logistics_cadence_rebalance.md:station-cluster"
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/STATION_TO_STATION|stage22_review=docs/stage22_local_logistics_cadence_rebalance.md:station-cluster"
     },
     {
       "id": "STATION_TO_RESOURCE_FIELD",
       "minDistanceM": 10000000.0,
       "maxDistanceM": 150000000.0,
-      "sourceEvidenceId": "docs/stage22_local_logistics_cadence_rebalance.md:resource-cluster"
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/STATION_TO_RESOURCE_FIELD|stage22_review=docs/stage22_local_logistics_cadence_rebalance.md:resource-cluster"
     },
     {
       "id": "JUMP_ARRIVAL_TO_MAJOR_HUB",
       "minDistanceM": 40000000.0,
       "maxDistanceM": 200000000.0,
-      "sourceEvidenceId": "docs/stage22_local_logistics_cadence_rebalance.md:jump-hub-cadence"
+      "sourceEvidenceId": "docs/stage20a_local_route_semantic_bands.md:world_authoring/JUMP_ARRIVAL_TO_MAJOR_HUB|stage22_review=docs/stage22_local_logistics_cadence_rebalance.md:jump-hub-cadence"
     },
     {
       "id": "INNER_TO_OUTER_SYSTEM",
