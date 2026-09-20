@@ -14,11 +14,14 @@ class Stage20CoordinatedFreightAcceptanceProfileTest {
         Stage20CoordinatedFreightAcceptanceProfile profile =
                 Stage20CoordinatedFreightAcceptanceProfile.deriveCurrent();
         Stage20BootstrapFreightCapacityRequirementProfile capacity =
-                Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent();
+                Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
 
         assertEquals(Stage20CoordinatedFreightAcceptanceProfile.CURRENT_VERSION, profile.version());
         assertEquals(capacity, profile.freightCapacityRequirement());
         assertEquals(13, profile.requiredFreighterCountPerFactionStart());
+        assertTrue(Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent()
+                .requiredFreighterCountPerFactionStart()
+                < profile.requiredFreighterCountPerFactionStart());
         assertEquals(2_000, profile.searchNodeBudgetPerCommodity());
         assertTrue(profile.stage22ReviewRequired());
         assertTrue(profile.evidenceIds().stream().anyMatch(value -> value.contains("budget-2000:unresolved-0")));
