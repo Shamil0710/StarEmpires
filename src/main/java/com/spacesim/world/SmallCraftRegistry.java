@@ -163,6 +163,24 @@ public final class SmallCraftRegistry {
     }
 
     /**
+     * Resolves a candidate physical footprint through the bound production fitting authority without
+     * mutating the registered craft.
+     *
+     * @param state candidate physical state carrying an existing craft identity
+     * @return candidate current mass and authored hull envelope
+     */
+    SmallCraftHangarCapacity.CraftFootprint candidatePhysicalFootprint(SmallCraftState state) {
+        SmallCraftState checked = Objects.requireNonNull(state, "state");
+        SmallCraftState current = requireExisting(checked.id());
+        if (!current.stableFactionId().equals(checked.stableFactionId())
+                || !current.designId().equals(checked.designId())) {
+            throw new IllegalArgumentException(
+                    "Candidate footprint cannot rewrite craft identity metadata");
+        }
+        return fitAuthority.physicalFootprint(checked);
+    }
+
+    /**
      * Resolves current physical bay footprint for one registered craft through the same production
      * content/fitting authority used at admission.
      *
