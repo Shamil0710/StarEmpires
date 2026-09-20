@@ -28,7 +28,7 @@ class Stage20Seed8WaterSharedProducerBoundDiagnosticsTest {
     void measuresProducerAwareRelaxationAcrossSeed8WaterCapVectorsWithoutAcceptanceTarget() {
         var profile = Stage20RepresentativeGeneratedWorldProbeProfileV2.deriveCurrent();
         Stage20BootstrapFreightCapacityRequirementProfile capacity =
-                Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent();
+                Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
         var probe = Stage20GeneratedWorldProductionProbe.run(ROOT_SEED, profile.inputs());
         var placement = probe.placement().orElseThrow();
         assertEquals(PlacementStatus.ACCEPTED, placement.status());
