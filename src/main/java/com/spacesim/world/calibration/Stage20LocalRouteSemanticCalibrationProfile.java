@@ -40,7 +40,9 @@ public record Stage20LocalRouteSemanticCalibrationProfile(
         List<BandDefinition> bands,
         List<SemanticRouteSample> samples,
         double maxClosedStationStandOffM) {
-    /** Current Stage-20A local-route semantic calibration version. */
+    /** Historical Stage-20 calibration version retained for frozen evidence replay. */
+    public static final String LEGACY_STAGE20_VERSION = "stage20a.local-route-semantic-bands.v1";
+    /** Current Stage-22-reviewed local-route semantic calibration version. */
     public static final String CURRENT_VERSION = "stage20a.local-route-semantic-bands.v2";
 
     private static final Set<String> CIVILIAN_LOGISTICS = Set.of(
@@ -107,8 +109,25 @@ public record Stage20LocalRouteSemanticCalibrationProfile(
      * @return deterministic current Stage-20A local-route semantic calibration profile
      */
     public static Stage20LocalRouteSemanticCalibrationProfile deriveCurrent() {
-        Stage20LocalRouteSemanticBandCatalog distanceCatalog =
-                Stage20LocalRouteSemanticBandCatalogLoader.loadDefault();
+        return derive(
+                Stage20LocalRouteSemanticBandCatalogLoader.loadDefault(),
+                CURRENT_VERSION);
+    }
+
+    /**
+     * Reconstructs the historical Stage-20 v1 route profile for frozen acceptance evidence only.
+     *
+     * @return deterministic historical v1 route profile
+     */
+    public static Stage20LocalRouteSemanticCalibrationProfile deriveLegacyStage20() {
+        return derive(
+                Stage20LocalRouteSemanticBandCatalogLoader.loadLegacyStage20(),
+                LEGACY_STAGE20_VERSION);
+    }
+
+    private static Stage20LocalRouteSemanticCalibrationProfile derive(
+            Stage20LocalRouteSemanticBandCatalog distanceCatalog,
+            String version) {
         Stage20ScaleCalibrationProfile scale = Stage20ScaleCalibrationProfile.deriveCurrent();
         Stage20RepresentativeEnduranceProfile endurance = Stage20RepresentativeEnduranceProfile.deriveCurrent();
         Map<String, EnduranceSample> enduranceById = endurance.samples().stream()
@@ -144,7 +163,7 @@ public record Stage20LocalRouteSemanticCalibrationProfile(
             }
         }
         return new Stage20LocalRouteSemanticCalibrationProfile(
-                CURRENT_VERSION,
+                version,
                 distanceCatalog.status(),
                 distanceCatalog.stage22ReviewRequired(),
                 distanceCatalog.bands(),
@@ -158,9 +177,20 @@ public record Stage20LocalRouteSemanticCalibrationProfile(
      * @return true when all four meanings, all nine representatives and both physical thrust policies are closed
      */
     public boolean closesStage20BEntryCoverage() {
+        return closesEntryCoverageForVersion(CURRENT_VERSION);
+    }
+
+    /**
+     * Validates a complete route matrix against one explicit version.
+     *
+     * @param expectedVersion route-profile version expected by the caller
+     * @return true when all physical route evidence is closed for that exact version
+     */
+    public boolean closesEntryCoverageForVersion(String expectedVersion) {
+        requireNonBlank(expectedVersion, "expectedVersion");
         if (distanceAuthority != CalibrationAuthority.PROVISIONAL_ACCEPTED_REFERENCE
                 || !stage22ReviewRequired
-                || !CURRENT_VERSION.equals(version)) {
+                || !expectedVersion.equals(version)) {
             return false;
         }
         Set<BandId> bandIds = bands.stream().map(BandDefinition::id).collect(Collectors.toSet());
