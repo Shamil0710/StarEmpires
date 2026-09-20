@@ -61,4 +61,20 @@ class Stage20BootstrapFreightCapacityRequirementProfileTest {
                 + profile.requiredFreighterCountPerFactionStart());
         System.out.println("STAGE20E_BOOTSTRAP_FREIGHT_CAPACITY_REQUIREMENT_END");
     }
+
+    @Test
+    void historicalStage20SizingRemainsStableAfterCadenceReview() {
+        var historical = Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
+        var reviewed = Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent();
+
+        assertEquals(
+                Stage20BootstrapFreightCapacityRequirementProfile.LEGACY_STAGE20_VERSION,
+                historical.version());
+        assertEquals(
+                Stage20BootstrapServiceCadenceCalibrationProfile.LEGACY_STAGE20_VERSION,
+                historical.serviceCadenceVersion());
+        assertEquals(13, historical.requiredFreighterCountPerFactionStart());
+        assertTrue(reviewed.requiredFreighterCountPerFactionStart()
+                < historical.requiredFreighterCountPerFactionStart());
+    }
 }
