@@ -18,7 +18,9 @@ import java.util.Objects;
  * Pure-decision Stage-11A analyzer that ranks spatial expansion opportunities from live world data.
  *
  * <p>The analyzer does not create projects, move fleets or change territory. It only measures the
- * current world and returns explainable candidates for the future persistent Stage-11B plan.\n * The Stage-22 default policy treats adjacent growth as routine and requires progressively stronger\n * measured utility before a faction skips over that local frontier.</p>
+ * current world and returns explainable candidates for the future persistent Stage-11B plan.
+ * The Stage-22 default policy treats adjacent growth as routine and requires progressively stronger
+ * measured utility before a faction skips over that local frontier.</p>
  */
 public final class FactionExpansionOpportunityAnalyzer {
     private static final int NORMALIZED_SCALE = 10_000;
