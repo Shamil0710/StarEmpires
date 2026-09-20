@@ -77,7 +77,7 @@ class Stage20LocalInfrastructureLayoutGeneratorTest {
         assertConnectionMatchesPositions(layout, jump);
         assertTrue(station.distanceM() >= 2_000_000d && station.distanceM() <= 30_000_000d);
         assertTrue(resource.distanceM() >= 10_000_000d && resource.distanceM() <= 150_000_000d);
-        assertTrue(jump.distanceM() >= 100_000_000d && jump.distanceM() <= 1_000_000_000d);
+        assertTrue(jump.distanceM() >= 40_000_000d && jump.distanceM() <= 200_000_000d);
     }
 
     @Test
