@@ -21,7 +21,7 @@ public final class Stage20LocalRouteSemanticBandCatalogLoader {
     /** Current supported schema. */
     public static final int CURRENT_SCHEMA_VERSION = 1;
     /** Packaged semantic-band resource. */
-    public static final String DEFAULT_RESOURCE = "data/calibration/stage20-local-route-semantic-bands-v1.json";
+    public static final String DEFAULT_RESOURCE = "data/calibration/stage20-local-route-semantic-bands-v2.json";
 
     private Stage20LocalRouteSemanticBandCatalogLoader() {
         throw new AssertionError("No instances");
