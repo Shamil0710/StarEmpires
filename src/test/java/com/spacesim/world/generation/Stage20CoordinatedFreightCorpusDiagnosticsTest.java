@@ -21,7 +21,7 @@ class Stage20CoordinatedFreightCorpusDiagnosticsTest {
         assertEquals(Stage20CoordinatedWholePlacementFreightPlanner.CURRENT_VERSION, report.plannerVersion());
         assertEquals(Stage20CoordinatedFreightCorpusDiagnostics.SEARCH_NODE_BUDGET_PER_SEED,
                 report.searchNodeBudgetPerSeed());
-        assertEquals(Stage20BootstrapFreightCapacityRequirementProfile.deriveCurrent()
+        assertEquals(Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20()
                         .requiredFreighterCountPerFactionStart(),
                 report.perStartFreighterBudget());
         assertEquals(Stage20RepresentativeSeedCorpus.seeds().size(), report.fixedSeedCount());
