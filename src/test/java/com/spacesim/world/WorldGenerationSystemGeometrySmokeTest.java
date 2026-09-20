@@ -31,8 +31,8 @@ class WorldGenerationSystemGeometrySmokeTest {
         assertTrue(first.operationalEnvelope().radiusM() <= 10_000_000_000d);
         assertFalse(first.operationalEnvelope().hardBoundary());
         assertFalse(first.operationalEnvelope().clampAllowed());
-        assertTrue(first.provenance().contains("stage20a.local-route-semantic-bands.v1"));
-        assertTrue(first.provenance().contains("stage20a.major-infrastructure-extents.v1"));
+        assertTrue(first.provenance().contains(Stage20LocalRouteSemanticCalibrationProfile.CURRENT_VERSION));
+        assertTrue(first.provenance().contains(Stage20MajorInfrastructureExtentCalibrationProfile.CURRENT_VERSION));
     }
 
     @Test
