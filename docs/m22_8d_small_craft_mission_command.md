@@ -47,11 +47,12 @@ A submission fails closed when:
 - the issuing faction does not own the craft;
 - the supplied target kind is invalid for the mission family;
 - target evidence is stale or future-dated;
+- the evidence context names a different actor-known target reference than the mission target;
 - an embarked craft is not physically `READY`;
 - a deployed craft is still present in bay occupancy;
 - a deployed retask lacks a lawful command/datalink link;
 - the actor-known target lies beyond the currently supplied command-link range;
-- the fitted craft lacks a required authored weapon or sensor/EW module family;
+- the fitted craft lacks a required authored weapon or sensor/EW module family, or that required subsystem is physically destroyed;
 - the ordinary Stage-17.5 engineering runtime cannot satisfy the supplied physical mission delta-v;
 - a second embarked active mission would double-commit the same craft.
 
@@ -107,9 +108,9 @@ must persist this exact state rather than reconstructing missions from UI or tac
 Automated coverage proves:
 
 - PLAYER and AI use the same ready-craft launch validation path;
-- stale actor knowledge is rejected before flight-deck mutation;
+- stale actor knowledge and evidence for a different target are rejected before flight-deck mutation;
 - deployed retask requires lawful datalink availability and range;
-- infeasible physical delta-v is rejected before launch mutation;
+- infeasible physical delta-v and physically destroyed required subsystems are rejected before launch mutation;
 - target-family mismatch fails closed;
 - completed launch handling retains bay occupancy until explicit physical handoff;
 - deployed recovery remains outside the bay until C starts physical recovery;
