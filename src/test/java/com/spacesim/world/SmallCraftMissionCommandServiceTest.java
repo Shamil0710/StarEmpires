@@ -66,6 +66,18 @@ final class SmallCraftMissionCommandServiceTest {
     }
 
     @Test
+    void embarkedLaunchAlsoRequiresLawfulCommandLink() {
+        Fixture fixture = fixture();
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                SmallCraftMissionState.empty(),
+                command(fixture.craftId, OrderSource.PLAYER, MissionType.CAP, TargetKind.AREA, "area.alpha"),
+                context(25L, DeploymentState.EMBARKED, 0d, 20_000d, false, 0d, 25L)));
+
+        assertTrue(fixture.deck.queued().isEmpty());
+    }
+
+    @Test
     void deployedRetaskRequiresLawfulCommandLinkAndRange() {
         Fixture fixture = fixture();
         fixture.hangars.release(fixture.craftId);
@@ -232,7 +244,7 @@ final class SmallCraftMissionCommandServiceTest {
     private static MissionContext context(
             long tick,
             DeploymentState deployment,
-            double targetDistanceM,
+            double commandNodeDistanceM,
             double commandRangeM,
             boolean link,
             double deltaV,
@@ -240,7 +252,7 @@ final class SmallCraftMissionCommandServiceTest {
         return contextFor(
                 tick,
                 deployment,
-                targetDistanceM,
+                commandNodeDistanceM,
                 commandRangeM,
                 link,
                 deltaV,
@@ -251,7 +263,7 @@ final class SmallCraftMissionCommandServiceTest {
     private static MissionContext contextFor(
             long tick,
             DeploymentState deployment,
-            double targetDistanceM,
+            double commandNodeDistanceM,
             double commandRangeM,
             boolean link,
             double deltaV,
@@ -261,7 +273,7 @@ final class SmallCraftMissionCommandServiceTest {
                 "faction.empire",
                 tick,
                 deployment,
-                targetDistanceM,
+                commandNodeDistanceM,
                 commandRangeM,
                 link,
                 deltaV,
