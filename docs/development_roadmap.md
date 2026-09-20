@@ -688,7 +688,9 @@ M22.4 completion evidence: `docs/stage22_4_completion_record.md`.
 M22.5 completion evidence: `docs/stage22_5_completion_record.md`.  
 M22.6 merged acceptance: PR #355 / main `9693ede2653c1fd187a904c406cc9750919a4496`.  
 M22.7 integrated handoff evidence: PR #360 / accepted head `327870db987408781d323457a07d6a870e82a872` / CI #6703 / merge `22015454773a1e430c50a8743149addfe8947b6f` / acceptance issue #368 / `docs/stage22_completion_record.md`.  
-M22.8 current required contract: `docs/m22_8_carrier_small_craft_operations.md` — **NOT YET ACCEPTED**.\n\nStage-22 cross-cutting cadence correction: routine local logistics density and autonomous expansion distance discipline are versioned in `docs/stage22_local_logistics_cadence_rebalance.md`. This correction does not change the M22.8 authority boundary or Stage-22 completion status.
+M22.8 current required contract: `docs/m22_8_carrier_small_craft_operations.md` — **NOT YET ACCEPTED**.
+
+Stage-22 cross-cutting cadence correction: routine local logistics density and autonomous expansion distance discipline are versioned in `docs/stage22_local_logistics_cadence_rebalance.md`. This correction does not change the M22.8 authority boundary or Stage-22 completion status.
 
 Cross-media production plan for faction packages, ships, stations, NPCs, missions, locations,
 characters, UI art, VFX, audio, localization, manifests, alpha floors and cut rules:
