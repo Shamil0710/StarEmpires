@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  * turn already carries representative civilian routine-travel and military response consequences,
  * so labels never become an independent strategic-distance system.</p>
  *
- * <p>Independent stations additionally respect accepted station operational/defensive geometry and
+ * <p>Routine economic targets use a deterministic 60/30/10 near/mid/far distribution inside their\n * semantic band so ordinary traffic clusters around useful hubs while a bounded minority remains remote.\n * Jump-arrival anchors keep the full uniform safety/arrival distribution.\n *\n * <p>Independent stations additionally respect accepted station operational/defensive geometry and
  * the lower {@link BandId#STATION_TO_STATION} logistics separation against every already generated
  * independent station. This prevents default generation from accidentally creating unavoidable
  * mutual point-blank station geometry. Special fortified overlaps require a later explicit design
@@ -256,7 +256,7 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
             StatefulRandom random) {
         BandDefinition stationBand = requireBand(routeBands, BandId.STATION_TO_STATION);
         for (int attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS; attempt++) {
-            double distanceM = sampleRange(random.nextLong(), minimumDistanceM, maximumDistanceM);
+            double distanceM = samplePlacementDistance(\n                    request.kind(), random.nextLong(), minimumDistanceM, maximumDistanceM);
             double angleRad = unitInterval(random.nextLong()) * Math.PI * 2d;
             LocalPhysicalPosition candidatePosition = hubPosition.translated(
                     Math.cos(angleRad) * distanceM,
@@ -451,6 +451,26 @@ public final class Stage20LocalInfrastructureLayoutGenerator {
 
     private static String streamName(Stage20SystemGeometry geometry, String hubId, String targetId) {
         return RNG_STREAM_PREFIX + geometry.systemId().value() + ".hub." + hubId + ".target." + targetId;
+    }
+
+    private static double samplePlacementDistance(
+            TargetKind kind,
+            long bits,
+            double min,
+            double max) {
+        if (kind == TargetKind.JUMP_ARRIVAL_ANCHOR || min == max) {
+            return sampleRange(bits, min, max);
+        }
+
+        double unit = unitInterval(bits);
+        double span = max - min;
+        if (unit < 0.60d) {
+            return Math.fma(span * 0.25d, unit / 0.60d, min);
+        }
+        if (unit < 0.90d) {
+            return Math.fma(span * 0.35d, (unit - 0.60d) / 0.30d, min + span * 0.25d);
+        }
+        return Math.fma(span * 0.40d, (unit - 0.90d) / 0.10d, min + span * 0.60d);
     }
 
     private static double sampleRange(long bits, double min, double max) {
