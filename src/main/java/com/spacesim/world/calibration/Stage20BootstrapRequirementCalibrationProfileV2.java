@@ -187,7 +187,7 @@ public final class Stage20BootstrapRequirementCalibrationProfileV2 {
         dependencyRequirements.sort(java.util.Comparator.comparing(Requirement::commodityId));
 
         BootstrapRequirementProfile bootstrap = new BootstrapRequirementProfile(
-                CURRENT_VERSION,
+                version,
                 serviceCadence.maximumSupplierDeliveryTimeSeconds(),
                 demandAuthority.bootstrapRequirements().minIntermediateInputThroughputKgPerSecond(),
                 economicRequirements);
