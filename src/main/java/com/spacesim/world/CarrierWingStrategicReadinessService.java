@@ -87,18 +87,21 @@ public final class CarrierWingStrategicReadinessService {
             }
 
             int readyOrActive = 0;
-            int structuralBps = FleetReadinessState.FULL;
-            int ammunitionBps = FleetReadinessState.FULL;
-            int propellantBps = FleetReadinessState.FULL;
-            int maintenanceBps = FleetReadinessState.FULL;
+            int lostCraft = 0;
+            long structuralTotal = 0L;
+            long ammunitionTotal = 0L;
+            long propellantTotal = 0L;
+            long maintenanceTotal = 0L;
             for (SmallCraftId craftId : checked.craftIds()) {
                 if (!globallyBoundCraft.add(craftId)) {
                     throw new IllegalArgumentException(
                             "small craft is assigned to multiple strategic carrier wings: " + craftId);
                 }
-                SmallCraftState state = craft.find(craftId)
-                        .orElseThrow(() -> new IllegalArgumentException(
-                                "strategic wing references missing physical craft: " + craftId));
+                SmallCraftState state = craft.find(craftId).orElse(null);
+                if (state == null) {
+                    lostCraft++;
+                    continue;
+                }
                 if (!checked.stableFactionId().equals(state.stableFactionId())) {
                     throw new IllegalArgumentException(
                             "strategic wing contains craft owned by another faction: " + craftId);
@@ -127,20 +130,21 @@ public final class CarrierWingStrategicReadinessService {
                     }
                 }
 
-                structuralBps = Math.min(structuralBps, structuralReadinessBps(state));
-                ammunitionBps = Math.min(ammunitionBps, interfaceReadinessBps(state, InterfaceKind.AMMUNITION));
-                propellantBps = Math.min(propellantBps, interfaceReadinessBps(state, InterfaceKind.REACTION_MASS));
-                maintenanceBps = Math.min(maintenanceBps, maintenanceReadinessBps(state));
+                structuralTotal += structuralReadinessBps(state);
+                ammunitionTotal += interfaceReadinessBps(state, InterfaceKind.AMMUNITION);
+                propellantTotal += interfaceReadinessBps(state, InterfaceKind.REACTION_MASS);
+                maintenanceTotal += maintenanceReadinessBps(state);
             }
 
-            int availabilityBps = ratioBps(readyOrActive, checked.craftIds().size());
+            int wingSize = checked.craftIds().size();
+            int availabilityBps = ratioBps(readyOrActive, wingSize);
             FleetReadinessState wingReadiness = new FleetReadinessState(
-                    structuralBps,
-                    ammunitionBps,
-                    propellantBps,
+                    averageBps(structuralTotal, wingSize),
+                    averageBps(ammunitionTotal, wingSize),
+                    averageBps(propellantTotal, wingSize),
                     FleetReadinessState.FULL,
                     FleetReadinessState.FULL,
-                    Math.min(maintenanceBps, availabilityBps),
+                    Math.min(averageBps(maintenanceTotal, wingSize), availabilityBps),
                     FleetReadinessState.FULL);
             FleetReadinessState projectedCarrier = combine(carrier.readiness(), wingReadiness);
             projections.put(checked.carrierFleetId(), new WingProjection(
@@ -149,6 +153,7 @@ public final class CarrierWingStrategicReadinessService {
                     checked.stableFactionId(),
                     checked.craftIds(),
                     readyOrActive,
+                    lostCraft,
                     availabilityBps,
                     wingReadiness,
                     projectedCarrier));
@@ -253,6 +258,14 @@ public final class CarrierWingStrategicReadinessService {
         return (int) (((long) numerator * FleetReadinessState.FULL) / denominator);
     }
 
+    private static int averageBps(long totalBps, int denominator) {
+        if (denominator <= 0 || totalBps < 0L
+                || totalBps > (long) denominator * FleetReadinessState.FULL) {
+            throw new IllegalArgumentException("invalid strategic wing readiness aggregate");
+        }
+        return (int) (totalBps / denominator);
+    }
+
     private static int fractionBps(double fraction) {
         if (!Double.isFinite(fraction) || fraction < 0d || fraction > 1d) {
             throw new IllegalArgumentException("readiness fraction must be finite and in [0,1]");
@@ -302,6 +315,7 @@ public final class CarrierWingStrategicReadinessService {
             String stableFactionId,
             List<SmallCraftId> craftIds,
             int readyOrActiveCraft,
+            int lostCraft,
             int availabilityBps,
             FleetReadinessState wingReadiness,
             FleetReadinessState projectedCarrierReadiness) {
@@ -311,7 +325,10 @@ public final class CarrierWingStrategicReadinessService {
             hostStableId = requireText(hostStableId, "hostStableId");
             stableFactionId = requireText(stableFactionId, "stableFactionId");
             craftIds = List.copyOf(Objects.requireNonNull(craftIds, "craftIds"));
-            if (craftIds.isEmpty() || readyOrActiveCraft < 0 || readyOrActiveCraft > craftIds.size()) {
+            if (craftIds.isEmpty()
+                    || readyOrActiveCraft < 0
+                    || lostCraft < 0
+                    || readyOrActiveCraft + lostCraft > craftIds.size()) {
                 throw new IllegalArgumentException("invalid strategic wing counts");
             }
             if (availabilityBps < 0 || availabilityBps > FleetReadinessState.FULL) {
