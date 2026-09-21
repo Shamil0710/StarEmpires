@@ -112,7 +112,9 @@ final class CarrierStrategicOperationServiceTest {
                     fixture.identities,
                     List.of(fixture.assignment));
             FleetCommandState commands = commands(orderType);
-            SupplyPolicy supply = new SupplyPolicy(5_000, 0, 100L);
+            // This test proves Stage-21 operation-family routing, not a high-readiness gate.
+            // The fixture deliberately carries only 66 bps physical ammunition readiness.
+            SupplyPolicy supply = new SupplyPolicy(50, 0, 100L);
 
             StrategicOperationState state = new CarrierStrategicOperationService().beginCarrierOperation(
                     StrategicOperationState.empty(),
