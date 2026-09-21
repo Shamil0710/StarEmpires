@@ -25,6 +25,7 @@ import com.spacesim.world.SmallCraftState;
 import com.spacesim.world.FleetReadinessState;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -327,7 +328,7 @@ public final class CarrierOperationsUiProjection {
             }
             result.put(id, bay);
         }
-        return Map.copyOf(result);
+        return Collections.unmodifiableMap(result);
     }
 
     private static int fractionBps(double fraction) {
