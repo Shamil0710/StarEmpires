@@ -20,6 +20,7 @@ import com.spacesim.economy.Stage18FacilityRuntime.FacilityCapabilitySnapshot;
 import com.spacesim.economy.Stage18FacilityRuntime.InstalledFacilityState;
 import com.spacesim.economy.Stage18ShipyardRuntime;
 import com.spacesim.economy.Stage18StationIndustrialNode;
+import com.spacesim.economy.Stage18StationStorage;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipyardEngineeringService;
 import com.spacesim.world.SmallCraftHangarCapacity.BayDefinition;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -50,7 +52,7 @@ final class CarrierPostBattleRecoveryServiceTest {
                 fixture.station.stationId(),
                 fixture.fit,
                 fixture.yard);
-        loadBuildInputs(fixture);
+        Stage18StationStorage stock = stockedBuildStorage(fixture);
         var budget = fixture.yard.openInterval(
                 plan.workPlan().requirements().totalWorkSeconds()
                         / fixture.yard.plannerCapability().workRate() + 5d);
@@ -68,7 +70,7 @@ final class CarrierPostBattleRecoveryServiceTest {
                 12_000L,
                 LogisticsState.empty(),
                 plan,
-                fixture.station.storage(),
+                stock,
                 budget);
 
         assertTrue(funded.treasuryFunded());
@@ -100,8 +102,8 @@ final class CarrierPostBattleRecoveryServiceTest {
                 fixture.station.stationId(),
                 fixture.fit,
                 fixture.yard);
-        loadBuildInputs(fixture);
-        var storageBefore = fixture.station.storage().snapshot();
+        Stage18StationStorage stock = stockedBuildStorage(fixture);
+        var storageBefore = stock.snapshot();
         long allocatorBefore = fixture.registry.nextIdValue();
         var budget = fixture.yard.openInterval(
                 plan.workPlan().requirements().totalWorkSeconds()
@@ -118,12 +120,12 @@ final class CarrierPostBattleRecoveryServiceTest {
                 12_000L,
                 LogisticsState.empty(),
                 plan,
-                fixture.station.storage(),
+                stock,
                 budget);
 
         assertFalse(denied.treasuryFunded());
         assertFalse(denied.replacementProduced());
-        assertEquals(storageBefore, fixture.station.storage().snapshot());
+        assertEquals(storageBefore, stock.snapshot());
         assertEquals(allocatorBefore, fixture.registry.nextIdValue());
         assertEquals(workBefore, budget.remainingWorkSeconds(), 0d);
         assertTrue(denied.logisticsState().pendingDeliveries().isEmpty());
@@ -221,17 +223,27 @@ final class CarrierPostBattleRecoveryServiceTest {
                         tick,
                         true));
         return new Fixture(
-                registry, hangars, logistics, physicalShipyard, station, yard, fit);
+                registry, hangars, logistics, ontology, products,
+                physicalShipyard, station, yard, fit);
     }
 
-    private static void loadBuildInputs(Fixture fixture) {
+    private static Stage18StationStorage stockedBuildStorage(Fixture fixture) {
+        Map<String, Double> materials = new TreeMap<>();
         Stage18ShipyardCatalog.HullPhysicalProfile hull =
                 fixture.physicalShipyard.findHullProfile(fixture.fit.hullId());
         hull.buildInputsKg().forEach(input ->
-                fixture.station.storage().addCommodity(input.commodityId(), input.massKg()));
+                materials.merge(input.commodityId(), input.massKg(), Double::sum));
+        Map<String, Integer> modules = new TreeMap<>();
         for (InstalledModuleDefinition installed : fixture.fit.installedModules()) {
-            fixture.station.storage().addProduct(installed.moduleId(), 1);
+            modules.merge(installed.moduleId(), 1, Integer::sum);
         }
+        return new Stage18StationStorage(
+                fixture.ontology,
+                fixture.products,
+                fixture.station.stationId(),
+                fixture.station.storage().snapshotCapacityByStorageClassKg(),
+                materials,
+                modules);
     }
 
     private static BayDefinition deliveryBay() {
@@ -248,6 +260,8 @@ final class CarrierPostBattleRecoveryServiceTest {
             SmallCraftRegistry registry,
             SmallCraftHangarRegistry hangars,
             SmallCraftPhysicalLogisticsService logistics,
+            Stage18ResourceOntologyCatalog ontology,
+            Stage18ManufacturingProductRegistry products,
             Stage18ShipyardCatalog physicalShipyard,
             Stage18StationIndustrialNode station,
             Stage18ShipyardRuntime.YardCapabilitySnapshot yard,
