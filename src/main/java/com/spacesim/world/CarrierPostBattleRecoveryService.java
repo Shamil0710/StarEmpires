@@ -153,7 +153,14 @@ public final class CarrierPostBattleRecoveryService {
             long fundedMilliCredits,
             LogisticsState logisticsState,
             BuildResult build) {
-        /** Validates one immutable recovery result. */
+        /**
+         * Validates one immutable recovery result.
+         *
+         * @param treasuryFunded whether conserved faction treasury funding was transferred
+         * @param fundedMilliCredits exact transferred funding in milli-credits
+         * @param logisticsState resulting physical small-craft logistics state
+         * @param build ordinary Stage-18/G physical build result, or null when unfunded
+         */
         public FundedBuildResult {
             Objects.requireNonNull(logisticsState, "logisticsState");
             if (fundedMilliCredits < 0L) {
