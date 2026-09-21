@@ -3,9 +3,13 @@ package com.spacesim.world;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipEngineeringCatalog.Dimensions3d;
 import com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind;
+import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage22CorePairProtectionCatalogLoader;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.ImportedCombatantState;
 import com.spacesim.ship.LiveTacticalBattleScenario.Side;
+import com.spacesim.ship.ShipDamageRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
+import com.spacesim.ship.ShipInstanceRuntimeState;
 import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
 import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.Stage19ExactTacticalEncounterResolver.CombatantResult;
@@ -123,22 +127,15 @@ final class SmallCraftTacticalEncounterServiceTest {
     void productionBridgeUsesRealStage19ResolverForSmallCraftAndExternalCombatant() {
         SmallCraftRegistry registry = SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId id = registry.reserveIdentityForCompletedProduction();
-        SmallCraftState state = ProductionSmallCraftFixture.craft(
-                id, 20L, 2_000d, 200_000d, 1d, 0d);
+        SmallCraftState state = stage19CompatibleCraft(
+                id, "faction.empire");
         registry.registerProducedCraft(state);
         SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.empty(registry);
         SmallCraftMissionState missions = SmallCraftMissionState.empty().add(activeMission(1L, id));
 
         SmallCraftId externalId = new SmallCraftId(900L);
-        SmallCraftState externalState = ProductionSmallCraftFixture.craft(
-                externalId, 20L, 2_000d, 200_000d, 1d, 0d);
-        externalState = new SmallCraftState(
-                externalState.id(),
-                "faction.industrial_union",
-                externalState.designId(),
-                externalState.fit(),
-                externalState.runtimeState(),
-                externalState.instanceState());
+        SmallCraftState externalState = stage19CompatibleCraft(
+                externalId, "faction.industrial_union");
         ExternalCombatant external = new ExternalCombatant(
                 "carrier.external",
                 Side.BETA,
@@ -162,6 +159,32 @@ final class SmallCraftTacticalEncounterServiceTest {
         assertTrue(
                 result.smallCraft().get(0).destroyed() || registry.find(id).isPresent(),
                 "survivor must remain the same registry identity; physical destruction may remove it");
+    }
+
+    private static SmallCraftState stage19CompatibleCraft(
+            SmallCraftId id,
+            String stableFactionId) {
+        SmallCraftState base = ProductionSmallCraftFixture.craft(
+                id, 20L, 2_000d, 200_000d, 1d, 0d);
+        var engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        var hull = engineering.findHull(base.fit().hullId());
+        var protection = Stage22CorePairProtectionCatalogLoader.project(engineering);
+        var damage = ShipDamageRuntime.Snapshot.pristine(
+                hull,
+                protection.findHullDamageLayout(hull.id()));
+        ShipInstanceRuntimeState instance = new ShipInstanceRuntimeState(
+                damage,
+                base.instanceState().shieldStatesByMount(),
+                base.instanceState().maintenance(),
+                base.instanceState().weaponLoadout(),
+                base.instanceState().weaponMountRuntime());
+        return new SmallCraftState(
+                id,
+                stableFactionId,
+                base.designId(),
+                base.fit(),
+                base.runtimeState(),
+                instance);
     }
 
     private static Result deterministicOutcome(
