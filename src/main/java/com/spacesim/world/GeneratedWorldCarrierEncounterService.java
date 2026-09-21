@@ -141,7 +141,7 @@ public final class GeneratedWorldCarrierEncounterService {
         LocalPhysicalPosition anchor = ordinary.anchor();
         ArrayList<SmallCraftParticipant> craftParticipants =
                 bindSmallCraftParticipants(assignment, deployedCraft, ordinary.systemId(), anchor);
-        ArrayList<ExternalCombatant> external = ordinary.externalCombatants();
+        List<ExternalCombatant> external = ordinary.externalCombatants();
 
         TacticalEncounterState encounter = new TacticalEncounterState(
                 encounterId,
