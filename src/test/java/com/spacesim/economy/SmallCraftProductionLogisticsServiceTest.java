@@ -7,9 +7,11 @@ import com.spacesim.content.Stage18ShipyardCatalog;
 import com.spacesim.content.Stage18StationInfrastructureCatalogLoader;
 import com.spacesim.content.Stage22EmpireProductionCatalogs;
 import com.spacesim.content.Stage22EmpireShipyardCatalogLoader;
+import com.spacesim.content.Stage22ShipConsumableCatalogLoader;
 import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22CorePairProtectionCatalogLoader;
 import com.spacesim.content.ship.Stage22CorePairShipyardIndustrialCatalogLoader;
+import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipyardEngineeringService;
 import com.spacesim.ship.ShipyardEngineeringService.ShipyardCapability;
@@ -22,6 +24,8 @@ import com.spacesim.world.SmallCraftHangarRegistry;
 import com.spacesim.world.SmallCraftProductionLogisticsService;
 import com.spacesim.world.SmallCraftProductionLogisticsService.BuildStatus;
 import com.spacesim.world.SmallCraftRegistry;
+import com.spacesim.world.SmallCraftStationSupplyService;
+import com.spacesim.world.SmallCraftStationSupplyService.SupplyStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -72,6 +76,133 @@ final class SmallCraftProductionLogisticsServiceTest {
                 assertEquals(0, fixture.station.storage().productCount(module.moduleId())));
         fixture.shipyards.findHullProfile(fixture.fit.hullId()).buildInputsKg().forEach(input ->
                 assertEquals(0d, fixture.station.storage().commodityMassKg(input.commodityId()), 1e-9d));
+    }
+
+    @Test
+    void stationSupplyConsumesPhysicalWaterAndManufacturedRoundsIntoSameCraftIdentity() {
+        Fixture fixture = fixture();
+        loadBuildInputs(fixture);
+        var built = fixture.service.buildAtStation(
+                FACTION,
+                DESIGN,
+                fixture.station,
+                fixture.bay,
+                fixture.yard,
+                fixture.yard.openInterval(2_000_000d));
+        var craftId = built.craftId();
+
+        fixture.station.storage().addCommodity("commodity.material.purified_water", 2_000d);
+        fixture.station.storage().addProduct("ammo.empire_axial_dart_150kg_v1", 5);
+
+        var propellant = fixture.supply.loadCommodityAtStation(
+                craftId,
+                fixture.station,
+                fixture.bay,
+                "ship_consumable.reaction_mass.empire_endurance_water_v1",
+                "core_drive",
+                1_000d);
+        assertEquals(SupplyStatus.LOADED, propellant.status());
+        assertEquals(1_000d, propellant.loadedMassKg(), 0d);
+        assertEquals(1_000d, fixture.station.storage()
+                .commodityMassKg("commodity.material.purified_water"), 0d);
+
+        var ammunition = fixture.supply.loadAmmunitionAtStation(
+                craftId,
+                fixture.station,
+                fixture.bay,
+                "ammo.empire_axial_dart_150kg_v1",
+                "weapon_primary",
+                3);
+        assertEquals(SupplyStatus.LOADED, ammunition.status());
+        assertEquals(3, ammunition.loadedRounds());
+        assertEquals(450d, ammunition.loadedMassKg(), 0d);
+        assertEquals(2, fixture.station.storage()
+                .productCount("ammo.empire_axial_dart_150kg_v1"));
+
+        var supplied = fixture.registry.find(craftId).orElseThrow();
+        assertEquals(1_000d, supplied.runtimeState().consumables().reactionMassKg(), 0d);
+        assertEquals(3L, supplied.runtimeState().consumables().ammunitionCount());
+        assertEquals(
+                "ammo.empire_axial_dart_150kg_v1",
+                supplied.instanceState().weaponLoadout()
+                        .ammunitionContentId("weapon_primary", "kinetic_feed")
+                        .orElseThrow());
+        assertEquals(craftId, supplied.id());
+    }
+
+    @Test
+    void supplyInterruptionDoesNotCreatePropellantOrAmmunition() {
+        Fixture fixture = fixture();
+        loadBuildInputs(fixture);
+        var built = fixture.service.buildAtStation(
+                FACTION,
+                DESIGN,
+                fixture.station,
+                fixture.bay,
+                fixture.yard,
+                fixture.yard.openInterval(2_000_000d));
+        var before = fixture.registry.find(built.craftId()).orElseThrow();
+
+        var propellant = fixture.supply.loadCommodityAtStation(
+                built.craftId(),
+                fixture.station,
+                fixture.bay,
+                "ship_consumable.reaction_mass.empire_endurance_water_v1",
+                "core_drive",
+                1_000d);
+        var ammunition = fixture.supply.loadAmmunitionAtStation(
+                built.craftId(),
+                fixture.station,
+                fixture.bay,
+                "ammo.empire_axial_dart_150kg_v1",
+                "weapon_primary",
+                2);
+
+        assertEquals(SupplyStatus.PHYSICAL_STOCK_OR_INTERFACE_REJECTED, propellant.status());
+        assertEquals(SupplyStatus.PHYSICAL_STOCK_OR_INTERFACE_REJECTED, ammunition.status());
+        assertEquals(before, fixture.registry.find(built.craftId()).orElseThrow());
+        assertEquals(0d, fixture.station.storage()
+                .commodityMassKg("commodity.material.purified_water"), 0d);
+        assertEquals(0, fixture.station.storage()
+                .productCount("ammo.empire_axial_dart_150kg_v1"));
+    }
+
+    @Test
+    void stationSupplyPreflightsHullAndBayMassBeforeTouchingStock() {
+        Fixture fixture = fixture();
+        loadBuildInputs(fixture);
+        var built = fixture.service.buildAtStation(
+                FACTION,
+                DESIGN,
+                fixture.station,
+                fixture.bay,
+                fixture.yard,
+                fixture.yard.openInterval(2_000_000d));
+        fixture.station.storage().addCommodity("commodity.material.purified_water", 20_000_000d);
+        double stockBefore = fixture.station.storage()
+                .commodityMassKg("commodity.material.purified_water");
+
+        BayDefinition constrained = new BayDefinition(
+                fixture.bay.id(),
+                HostKind.STATION,
+                fixture.bay.singleCraftEnvelopeM(),
+                fixture.bay.pristineUsableVolumeM3(),
+                fixture.registry.physicalFootprint(built.craftId()).currentMassKg() + 100d,
+                1d);
+
+        var result = fixture.supply.loadCommodityAtStation(
+                built.craftId(),
+                fixture.station,
+                constrained,
+                "ship_consumable.reaction_mass.empire_endurance_water_v1",
+                "core_drive",
+                1_000d);
+
+        assertEquals(SupplyStatus.BAY_MASS_LIMIT, result.status());
+        assertEquals(stockBefore, fixture.station.storage()
+                .commodityMassKg("commodity.material.purified_water"), 0d);
+        assertEquals(0d, fixture.registry.find(built.craftId()).orElseThrow()
+                .runtimeState().consumables().reactionMassKg(), 0d);
     }
 
     @Test
@@ -163,8 +294,12 @@ final class SmallCraftProductionLogisticsServiceTest {
     private static Fixture fixture() {
         var engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         var fit = InstalledFit.fromDemonstrator(engineering.findDemonstratorFit(DESIGN));
+        var weaponContent = Stage22CorePairWeaponRuntimeCatalogLoader.loadCombined();
         var products = Stage18ManufacturingProductRegistry.loadDefault()
-                .withEngineeringCatalog(engineering, Provenance.STAGE22_AUTHORED);
+                .withEngineeringCatalog(engineering, Provenance.STAGE22_AUTHORED)
+                .withAmmunitionCatalog(
+                        weaponContent.ammunition(),
+                        Provenance.STAGE22_AUTHORED);
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
         Stage18ShipyardCatalog shipyards = Stage22EmpireShipyardCatalogLoader.loadDefault();
 
@@ -219,8 +354,18 @@ final class SmallCraftProductionLogisticsServiceTest {
                 Stage22CorePairProtectionCatalogLoader.project(engineering),
                 engineeringService,
                 runtime);
+        var supply = new SmallCraftStationSupplyService(
+                registry,
+                hangars,
+                engineering,
+                new Stage18ShipConsumableService(
+                        Stage22ShipConsumableCatalogLoader.loadDefault(),
+                        engineering),
+                products,
+                weaponContent.launchers(),
+                weaponContent.ammunition());
         return new Fixture(
-                service, registry, hangars, station, yard, bay, shipyards, fit);
+                service, supply, registry, hangars, station, yard, bay, shipyards, fit);
     }
 
     private static void loadBuildInputs(Fixture fixture) {
@@ -232,6 +377,7 @@ final class SmallCraftProductionLogisticsServiceTest {
 
     private record Fixture(
             SmallCraftProductionLogisticsService service,
+            SmallCraftStationSupplyService supply,
             SmallCraftRegistry registry,
             SmallCraftHangarRegistry hangars,
             Stage18StationIndustrialNode station,
