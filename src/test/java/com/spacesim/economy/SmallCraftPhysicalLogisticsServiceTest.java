@@ -204,6 +204,39 @@ final class SmallCraftPhysicalLogisticsServiceTest {
     }
 
     @Test
+    void destinationCapacityIsPreflightedBeforePhysicalDeliveryAuthorityCanCommit() {
+        java.util.concurrent.atomic.AtomicBoolean invoked =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        Fixture fixture = fixture((pending, bay, tick) -> {
+            invoked.set(true);
+            return new DeliveryReceipt(
+                    pending.craftId(),
+                    pending.sourceStationId(),
+                    bay.id().hostStableId(),
+                    "transport.must-not-run",
+                    tick,
+                    true);
+        });
+        var built = buildOne(fixture);
+        SmallCraftId craft = built.logisticsState().pendingDeliveries().get(0).craftId();
+        BayDefinition tooSmall = new BayDefinition(
+                new BayId("carrier.alpha", "bay.blocked"),
+                HostKind.SHIP,
+                new Dimensions3d(1d, 1d, 1d),
+                1d,
+                1d,
+                1d);
+
+        assertThrows(IllegalStateException.class, () -> fixture.service.confirmDelivery(
+                built.logisticsState(), craft, tooSmall, 250L));
+
+        assertFalse(invoked.get(),
+                "delivery authority must not commit transport before destination capacity preflight");
+        assertTrue(fixture.hangars.find(craft).isEmpty());
+        assertEquals(1, built.logisticsState().pendingDeliveries().size());
+    }
+
+    @Test
     void turnaroundDemandPreservesExactFiniteTransfersAndOrdinaryWorkPlans() {
         Fixture fixture = fixture((pending, bay, tick) -> new DeliveryReceipt(
                 pending.craftId(),
