@@ -75,6 +75,29 @@ public final class SmallCraftRegistry {
     }
 
     /**
+     * Preflights the exact next produced craft without reserving identity or mutating the registry.
+     *
+     * <p>M22.8G uses this seam to prove that a completed hull will fit the physically co-located
+     * station bay before Stage-18 settlement consumes materials/work. The candidate must use the
+     * current next allocator value; callers therefore cannot preview an arbitrary or recycled ID.</p>
+     *
+     * @param candidate prospective completed physical craft using the current next ID
+     * @return validated current mass and authored hull envelope
+     */
+    SmallCraftHangarCapacity.CraftFootprint previewCompletedProduction(SmallCraftState candidate) {
+        SmallCraftState checked = Objects.requireNonNull(candidate, "candidate");
+        if (checked.id().value() != allocator.nextValue()) {
+            throw new IllegalArgumentException(
+                    "production preview must use the current next small-craft ID");
+        }
+        if (craftById.containsKey(checked.id())) {
+            throw new IllegalArgumentException(
+                    "production preview ID already exists: " + checked.id());
+        }
+        return fitAuthority.physicalFootprint(checked);
+    }
+
+    /**
      * Reserves one stable identity after an external physical-production authority has completed a craft.
      *
      * <p>This method creates no craft state and grants no material. The returned ID must be paired with
