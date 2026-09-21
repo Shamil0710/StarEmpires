@@ -86,6 +86,32 @@ world authority. Individual craft outcomes use the already accepted M22.8E seman
 commit consumables/damage to the same identity; catastrophic losses permanently remove that
 identity and fail its mission. Unrelated hangar occupancy is not touched.
 
+## Generated-world combined commit-back
+
+`GeneratedWorldCarrierEncounterService` closes the production generated-world seam that remains
+outside the detached M22.8E API.
+
+For one `CONTACT_CONFIRMED` Stage-21E operation it:
+
+- revalidates every ordinary operation `FleetId` and the confirmed target against the live generated
+  world, including exact system co-location, faction allegiance, persisted engineering and Stage-20
+  physical kinematics;
+- converts ordinary fleets and explicitly deployed `SmallCraftId` participants into one shared
+  encounter-local coordinate frame;
+- executes one M22.8E / Stage-19 tactical exchange rather than resolving the wing and surface ships
+  in separate combat systems;
+- commits surviving ordinary-fleet engineering and kinematics back to the same ordinary entities;
+- removes catastrophically destroyed ordinary fleets through the existing world destruction and
+  Stage-20 physical-sidecar authorities;
+- retains the Stage-21 operation's encounter reference as synchronously resolved, so save/load does
+  not depend on hidden in-memory battle state.
+
+If the declared carrier host itself is physically destroyed, every craft still physically embarked
+in that exact host is removed with the host and any active mission for those craft is marked FAILED.
+This prevents orphaned bay occupancy or free survival of craft that never completed a physical
+launch handoff. Deployed craft are not included in that host-loss cascade; their outcome remains the
+exact Stage-19 result.
+
 ## Post-battle recovery and replacement
 
 `CarrierPostBattleRecoveryService` composes three existing authorities rather than creating a
@@ -116,6 +142,10 @@ The H tests cover the following failure-closed boundaries:
 - tactical participants outside the explicit carrier-wing association are rejected before Stage 19;
 - exact tactical loss commits to the individual craft registry while unrelated bay state and detached
   carrier engineering remain untouched;
+- a combined generated-world encounter commits ordinary FleetId survivor/destruction consequences and
+  individual craft consequences from one Stage-19 result, with no duplicate tactical authority;
+- physical carrier destruction clears still-embarked craft on that exact host instead of leaving
+  orphan occupancy or implicitly surviving hangar contents;
 - denied treasury funding consumes no Stage-18 stock/work and allocates no replacement;
 - successful production funding uses the ordinary world treasury, finite Stage-18 settlement, a fresh
   persistent craft identity and physical delivery before SERVICING occupancy.
