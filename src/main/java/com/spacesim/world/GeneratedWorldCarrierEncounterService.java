@@ -553,13 +553,13 @@ public final class GeneratedWorldCarrierEncounterService {
             StarSystemId systemId,
             LocalPhysicalPosition anchor,
             List<BoundOrdinaryFleet> fleets,
-            ArrayList<ExternalCombatant> externalCombatants) {
+            List<ExternalCombatant> externalCombatants) {
         private OrdinaryBindingSet {
             Objects.requireNonNull(systemId, "systemId");
             Objects.requireNonNull(anchor, "anchor");
             fleets = List.copyOf(Objects.requireNonNull(fleets, "fleets"));
             externalCombatants =
-                    new ArrayList<>(Objects.requireNonNull(externalCombatants, "externalCombatants"));
+                    List.copyOf(Objects.requireNonNull(externalCombatants, "externalCombatants"));
         }
     }
 }
