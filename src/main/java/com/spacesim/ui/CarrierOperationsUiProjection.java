@@ -148,6 +148,10 @@ public final class CarrierOperationsUiProjection {
                     id,
                     state.designId(),
                     state.fit().hullId(),
+                    state.fit().installedModules().stream()
+                            .map(value -> value.mountId() + "=" + value.moduleId())
+                            .sorted()
+                            .toList(),
                     state.stableFactionId(),
                     operationalState(occupancy, mission, queued, active, repairRequired),
                     occupancy.map(value -> value.state().name()).orElse(""),
@@ -485,6 +489,7 @@ public final class CarrierOperationsUiProjection {
             SmallCraftId craftId,
             String designId,
             String hullId,
+            List<String> installedModules,
             String stableFactionId,
             OperationalState operationalState,
             String occupancyState,
@@ -507,6 +512,7 @@ public final class CarrierOperationsUiProjection {
          * @param craftId persistent individual craft identity
          * @param designId physical design identity
          * @param hullId installed hull definition
+         * @param installedModules exact installed mount-to-module fit rows
          * @param stableFactionId stable owning faction identity
          * @param operationalState derived finite player-facing lifecycle
          * @param occupancyState physical hangar occupancy state, or empty
@@ -528,6 +534,8 @@ public final class CarrierOperationsUiProjection {
             Objects.requireNonNull(craftId, "craftId");
             designId = requireText(designId, "designId");
             hullId = requireText(hullId, "hullId");
+            installedModules = List.copyOf(
+                    Objects.requireNonNull(installedModules, "installedModules"));
             stableFactionId = requireText(stableFactionId, "stableFactionId");
             Objects.requireNonNull(operationalState, "operationalState");
             occupancyState = normalizeOptional(occupancyState);
