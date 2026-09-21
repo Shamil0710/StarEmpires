@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -71,6 +72,7 @@ public final class GeneratedWorldUiModel {
     private final long worldSeed;
     private final LiveRuntime runtime;
     private final ContentCatalog content;
+    private final CarrierUiSource carrierUiSource;
     private final Stage20GeneratedCampaignPersistentState campaign;
     private final Stage20StationPhysicalGeometryProfile stationGeometry;
 
@@ -82,9 +84,30 @@ public final class GeneratedWorldUiModel {
      * @param content installed content catalogue
      */
     public GeneratedWorldUiModel(long worldSeed, LiveRuntime runtime, ContentCatalog content) {
+        this(worldSeed, runtime, content, CarrierUiSource.none());
+    }
+
+    /**
+     * Creates a live read model with an optional read-only M22.8 carrier projection source.
+     *
+     * <p>The source is queried only while building UI snapshots and cannot mutate the world through
+     * this model. Fresh campaigns before M22.8J normally use the compatibility constructor and
+     * therefore expose no synthetic carrier state.</p>
+     *
+     * @param worldSeed exact campaign seed
+     * @param runtime live Stage-20.5 runtime
+     * @param content installed content catalogue
+     * @param carrierUiSource optional M22.8 carrier read model
+     */
+    public GeneratedWorldUiModel(
+            long worldSeed,
+            LiveRuntime runtime,
+            ContentCatalog content,
+            CarrierUiSource carrierUiSource) {
         this.worldSeed = worldSeed;
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.content = Objects.requireNonNull(content, "content");
+        this.carrierUiSource = Objects.requireNonNull(carrierUiSource, "carrierUiSource");
         this.campaign = runtime.captureState().campaign();
         this.stationGeometry = Stage20StationPhysicalGeometryProfile.deriveCurrent();
     }
@@ -498,13 +521,73 @@ public final class GeneratedWorldUiModel {
                     "Куда направляется", placement.locationKind() == FleetLocationKind.IN_SYSTEM
                             ? "Локальный патруль" : systemName(placement.transitState().destinationSystemId(), galaxy),
                     "Контент", "Временный Stage 17.5/19; замена доктрин в Stage 22"));
+            var carrierOperations = carrierUiSource.find(placement.id()).orElse(null);
+            if (carrierOperations != null) {
+                sections.add(carrierSummarySection(carrierOperations));
+            }
             result.add(new MilitaryView(
                     placement.id().value(), identity.name, ownerId, ownerName, status, displayedSystem,
                     placement.locationKind() == FleetLocationKind.IN_SYSTEM,
-                    engineering.fit.hullId(), fitId, sections));
+                    engineering.fit.hullId(), fitId, sections, carrierOperations));
         }
         result.sort(Comparator.naturalOrder());
         return List.copyOf(result);
+    }
+
+    private static InfoSection carrierSummarySection(
+            CarrierOperationsUiProjection.CarrierView carrier) {
+        long ready = carrier.craft().stream()
+                .filter(value -> value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.READY)
+                .count();
+        long servicing = carrier.craft().stream()
+                .filter(value -> value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.SERVICING
+                        || value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.REPAIR_REQUIRED)
+                .count();
+        long deployed = carrier.craft().stream()
+                .filter(value -> value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.MISSION
+                        || value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.RETURNING
+                        || value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.DEPLOYED_UNASSIGNED)
+                .count();
+        long deckQueue = carrier.bays().stream()
+                .mapToLong(CarrierOperationsUiProjection.BayView::queuedOperations)
+                .sum();
+        String bayHealth = carrier.bays().isEmpty()
+                ? "Нет физического bay projection"
+                : carrier.bays().stream()
+                        .map(value -> value.id().bayStableId() + ": " + value.capacityStatus().name())
+                        .collect(java.util.stream.Collectors.joining("; "));
+        return InfoSection.of(
+                "Авиагруппа / малые аппараты",
+                "Физически существуют", Integer.toString(carrier.craft().size()),
+                "Готовы", Long.toString(ready),
+                "На обслуживании/ремонте", Long.toString(servicing),
+                "На заданиях", Long.toString(deployed),
+                "Потеряны из roster", Integer.toString(carrier.lostCraftIds().size()),
+                "Очередь палубы", Long.toString(deckQueue),
+                "Ангары", bayHealth);
+    }
+
+    /**
+     * Read-only carrier projection source used by the generated-world presentation model.
+     */
+    @FunctionalInterface
+    public interface CarrierUiSource {
+        /**
+         * @param fleetId ordinary persistent military fleet identity
+         * @return current carrier operations projection when that FleetId is a bound carrier
+         */
+        Optional<CarrierOperationsUiProjection.CarrierView> find(FleetId fleetId);
+
+        /** @return empty fail-closed source for campaigns without M22.8J carrier bindings */
+        static CarrierUiSource none() {
+            return ignored -> Optional.empty();
+        }
     }
 
     private static String provisionalFitId(InstalledFit fit) {
