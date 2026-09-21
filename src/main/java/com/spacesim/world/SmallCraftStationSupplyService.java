@@ -50,6 +50,17 @@ public final class SmallCraftStationSupplyService {
     private final WeaponLauncherCatalog launchers;
     private final WeaponAmmunitionCatalog ammunition;
 
+    /**
+     * Creates the station-local M22.8G physical supply boundary.
+     *
+     * @param craftRegistry authoritative persistent individual-craft registry
+     * @param hangars authoritative physical bay occupancy registry
+     * @param engineering accepted Stage-17.5 engineering catalog
+     * @param consumableService accepted Stage-18 commodity-to-interface loader
+     * @param products accepted Stage-18 manufactured-product registry
+     * @param launchers accepted Stage-19 launcher catalog
+     * @param ammunition accepted Stage-19 physical ammunition catalog
+     */
     public SmallCraftStationSupplyService(
             SmallCraftRegistry craftRegistry,
             SmallCraftHangarRegistry hangars,
@@ -74,6 +85,14 @@ public final class SmallCraftStationSupplyService {
 
     /**
      * Loads physical reaction mass or another authored Stage-18 bound commodity.
+     *
+     * @param craftId persistent craft receiving the commodity
+     * @param station canonical Stage-18 station whose storage supplies the commodity
+     * @param stationBay exact station bay currently occupied by the craft
+     * @param bindingId authored Stage-18 commodity/interface binding
+     * @param mountId installed module mount receiving the commodity
+     * @param requestedMassKg positive physical mass requested
+     * @return immutable load result; rejected results leave craft and station stock unchanged
      */
     public CommodityLoadResult loadCommodityAtStation(
             SmallCraftId craftId,
@@ -123,6 +142,14 @@ public final class SmallCraftStationSupplyService {
 
     /**
      * Loads manufactured ammunition and binds the physical feed to that exact ammunition content ID.
+     *
+     * @param craftId persistent craft receiving ammunition
+     * @param station canonical Stage-18 station whose storage supplies the rounds
+     * @param stationBay exact station bay currently occupied by the craft
+     * @param productId manufactured ammunition content/product identity
+     * @param mountId installed weapon mount receiving the ammunition
+     * @param requestedRounds positive physical round count requested
+     * @return immutable load result; rejected results leave craft and station stock unchanged
      */
     public AmmunitionLoadResult loadAmmunitionAtStation(
             SmallCraftId craftId,
@@ -390,21 +417,38 @@ public final class SmallCraftStationSupplyService {
         return Math.abs(first - second) <= scale * 1e-9d;
     }
 
+    /** Stable outcome of one station-local physical supply attempt. */
     public enum SupplyStatus {
+        /** Physical station stock was consumed and committed to the same craft identity. */
         LOADED,
+        /** Request arguments were invalid. */
         INVALID_REQUEST,
+        /** Requested load would exceed the authored hull operational-mass limit. */
         HULL_MASS_LIMIT,
+        /** Requested load would exceed the current physical bay mass capacity. */
         BAY_MASS_LIMIT,
+        /** Requested ammunition does not match the installed launcher/feed envelope. */
         AMMUNITION_INCOMPATIBLE,
+        /** Existing rounds in the feed carry a different ammunition content identity. */
         AMMUNITION_IDENTITY_CONFLICT,
+        /** Canonical stock, binding or physical interface rejected the otherwise valid request. */
         PHYSICAL_STOCK_OR_INTERFACE_REJECTED
     }
 
+    /**
+     * Immutable result of one physical commodity load attempt.
+     *
+     * @param status stable supply outcome
+     * @param craftId persistent craft identity
+     * @param physicalResult underlying Stage-18 result when physical loading was attempted
+     * @param loadedMassKg physical mass committed to the craft
+     */
     public record CommodityLoadResult(
             SupplyStatus status,
             SmallCraftId craftId,
             Stage18ShipConsumableService.LoadResult physicalResult,
             double loadedMassKg) {
+        /** Validates one immutable commodity load result. */
         public CommodityLoadResult {
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(craftId, "craftId");
@@ -425,6 +469,16 @@ public final class SmallCraftStationSupplyService {
         }
     }
 
+    /**
+     * Immutable result of one manufactured-ammunition load attempt.
+     *
+     * @param status stable supply outcome
+     * @param craftId persistent craft identity
+     * @param productId attempted physical ammunition product/content identity
+     * @param physicalResult underlying Stage-19 warfare-supply result when attempted
+     * @param loadedRounds physical round count committed to the craft
+     * @param loadedMassKg physical ammunition mass committed to the craft
+     */
     public record AmmunitionLoadResult(
             SupplyStatus status,
             SmallCraftId craftId,
@@ -432,6 +486,7 @@ public final class SmallCraftStationSupplyService {
             Stage19WarfareSupplyService.AmmunitionLoadResult physicalResult,
             int loadedRounds,
             double loadedMassKg) {
+        /** Validates one immutable ammunition load result. */
         public AmmunitionLoadResult {
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(craftId, "craftId");
