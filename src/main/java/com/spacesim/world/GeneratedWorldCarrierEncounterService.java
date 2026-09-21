@@ -501,7 +501,15 @@ public final class GeneratedWorldCarrierEncounterService {
             LocalPhysicalPosition position,
             double velocityXMps,
             double velocityYMps) {
-        /** Validates one exact deployed physical state. */
+        /**
+         * Validates one exact deployed physical state.
+         *
+         * @param craftId persistent individual craft identity
+         * @param systemId exact ordinary system containing the craft
+         * @param position hierarchical local physical position
+         * @param velocityXMps local X velocity in metres per second
+         * @param velocityYMps local Y velocity in metres per second
+         */
         public DeployedCraftPhysicalState {
             Objects.requireNonNull(craftId, "craftId");
             Objects.requireNonNull(systemId, "systemId");
@@ -519,7 +527,14 @@ public final class GeneratedWorldCarrierEncounterService {
             EncounterResult tacticalResult,
             StarSystemId systemId,
             long encounterId) {
-        /** Validates one complete exact carrier encounter result. */
+        /**
+         * Validates one complete exact carrier encounter result.
+         *
+         * @param strategicState resulting ordinary Stage-21 strategic-operation state
+         * @param tacticalResult exact tactical result committed to both identity families
+         * @param systemId system in which the encounter resolved
+         * @param encounterId persistent Stage-19 encounter identity
+         */
         public StrategicEncounterResult {
             Objects.requireNonNull(strategicState, "strategicState");
             Objects.requireNonNull(tacticalResult, "tacticalResult");
