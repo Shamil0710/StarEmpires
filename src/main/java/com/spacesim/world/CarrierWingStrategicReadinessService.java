@@ -289,7 +289,14 @@ public final class CarrierWingStrategicReadinessService {
             String hostStableId,
             String stableFactionId,
             List<SmallCraftId> craftIds) {
-        /** Validates and canonicalizes one strategic association. */
+        /**
+         * Validates and canonicalizes one strategic association.
+         *
+         * @param carrierFleetId ordinary Stage-21 carrier FleetId
+         * @param hostStableId stable physical hangar host identity
+         * @param stableFactionId stable owning faction identity
+         * @param craftIds persistent individual craft associated with the carrier
+         */
         public CarrierWingAssignment {
             Objects.requireNonNull(carrierFleetId, "carrierFleetId");
             hostStableId = requireText(hostStableId, "hostStableId");
@@ -319,7 +326,19 @@ public final class CarrierWingStrategicReadinessService {
             int availabilityBps,
             FleetReadinessState wingReadiness,
             FleetReadinessState projectedCarrierReadiness) {
-        /** Validates immutable diagnostics. */
+        /**
+         * Validates immutable diagnostics.
+         *
+         * @param carrierFleetId ordinary Stage-21 carrier FleetId
+         * @param hostStableId stable physical hangar host identity
+         * @param stableFactionId stable owning faction identity
+         * @param craftIds persistent carrier-wing roster
+         * @param readyOrActiveCraft physically ready or lawfully active craft count
+         * @param lostCraft roster craft no longer present in the physical registry
+         * @param availabilityBps surviving availability in basis points
+         * @param wingReadiness readiness derived only from persistent small-craft state
+         * @param projectedCarrierReadiness ordinary carrier readiness with wing constraint applied
+         */
         public WingProjection {
             Objects.requireNonNull(carrierFleetId, "carrierFleetId");
             hostStableId = requireText(hostStableId, "hostStableId");
@@ -343,13 +362,23 @@ public final class CarrierWingStrategicReadinessService {
     public record ProjectionResult(
             FleetForceRegistry forces,
             List<WingProjection> wings) {
-        /** Validates and freezes the result. */
+        /**
+         * Validates and freezes the result.
+         *
+         * @param forces ordinary fleet-force registry with projected carrier readiness
+         * @param wings immutable derived carrier-wing diagnostics
+         */
         public ProjectionResult {
             Objects.requireNonNull(forces, "forces");
             wings = List.copyOf(Objects.requireNonNull(wings, "wings"));
         }
 
-        /** Resolves the wing projected for one ordinary carrier fleet. */
+        /**
+         * Resolves the wing projected for one ordinary carrier fleet.
+         *
+         * @param carrierFleetId ordinary carrier FleetId
+         * @return derived wing projection when the carrier has an explicit association
+         */
         public Optional<WingProjection> wing(FleetId carrierFleetId) {
             FleetId checked = Objects.requireNonNull(carrierFleetId, "carrierFleetId");
             return wings.stream().filter(value -> value.carrierFleetId().equals(checked)).findFirst();
