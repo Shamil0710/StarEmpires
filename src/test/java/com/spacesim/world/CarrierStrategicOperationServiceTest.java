@@ -134,6 +134,49 @@ final class CarrierStrategicOperationServiceTest {
     }
 
     @Test
+    void activeOperationUsesOrdinaryStage21WithdrawalAfterPhysicalWingLoss() {
+        Fixture fixture = fixture();
+        CarrierStrategicOperationService service = new CarrierStrategicOperationService();
+        var healthy = fixture.readiness.project(
+                fixture.forces,
+                fixture.registry,
+                fixture.hangars,
+                SmallCraftMissionState.empty(),
+                fixture.identities,
+                List.of(fixture.assignment));
+        SupplyPolicy supply = new SupplyPolicy(50, 0, 0L);
+        StrategicOperationState active = service.beginCarrierOperation(
+                StrategicOperationState.empty(),
+                commands(OrderType.INTERCEPT),
+                healthy,
+                1L,
+                CARRIER,
+                50L,
+                RulesOfEngagement.IDENTIFIED_HOSTILES,
+                supply,
+                new WithdrawalPolicy(SYSTEM, 40, true, true));
+
+        fixture.hangars.release(fixture.beta);
+        fixture.registry.removeDestroyedCraft(fixture.beta);
+        var degraded = fixture.readiness.project(
+                fixture.forces,
+                fixture.registry,
+                fixture.hangars,
+                SmallCraftMissionState.empty(),
+                fixture.identities,
+                List.of(fixture.assignment));
+
+        var review = service.reviewSupplyAndReadiness(active, 1L, degraded, 51L);
+
+        assertEquals(
+                StrategicOperationService.SupplyDecision.SUBMIT_ORDINARY_WITHDRAW_ORDER,
+                review.decision());
+        assertEquals(
+                StrategicOperationState.OperationStatus.WITHDRAWING,
+                review.state().requireOperation(1L).status());
+    }
+
+    @Test
     void degradedWingFailsCarrierAdmissionAndUnsupportedOrderCannotBypassStage21() {
         Fixture fixture = fixture();
         fixture.hangars.release(fixture.beta);
