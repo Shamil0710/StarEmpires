@@ -101,6 +101,10 @@ public final class SmallCraftProductionLogisticsService {
                     BuildStatus.DESIGN_NOT_FOUND, design, craftRegistry.nextIdValue());
         }
         InstalledFit fit = InstalledFit.fromDemonstrator(authored);
+        if (!checkedYard.active() || checkedYard.plannerCapability() == null) {
+            return BuildResult.rejected(
+                    BuildStatus.PLAN_INFEASIBLE, design, craftRegistry.nextIdValue());
+        }
         var plan = engineeringService.planBuild(fit, checkedYard.plannerCapability());
         if (!plan.feasibility().feasible()) {
             return BuildResult.rejected(
@@ -144,11 +148,11 @@ public final class SmallCraftProductionLogisticsService {
             throw new IllegalStateException("shipyard completion changed the authored production fit");
         }
 
-        // Sequential simulation authority means capacity cannot change inside this call, but recheck
-        // before final registration so any accidental intervening mutation fails visibly.
+        // Sequential simulation authority means no other bay mutation may occur inside this call.
+        // Recheck against the already validated immutable candidate footprint without consulting the
+        // now-advanced allocator watermark.
         SmallCraftState built = pristineUnsuppliedCraft(id, faction, design, completed.fit());
-        var finalFootprint = craftRegistry.previewCompletedProduction(built);
-        if (!SmallCraftHangarCapacity.canAccept(bay, hangars.usage(bay.id()), finalFootprint)) {
+        if (!SmallCraftHangarCapacity.canAccept(bay, hangars.usage(bay.id()), footprint)) {
             throw new IllegalStateException(
                     "station bay capacity changed after physical settlement; cannot hide built craft");
         }
@@ -241,9 +245,11 @@ public final class SmallCraftProductionLogisticsService {
                 throw new IllegalArgumentException(
                         "craftId must exist exactly for completed production");
             }
-            if (status == BuildStatus.STAGE18_SETTLEMENT_REJECTED && settlement == null) {
+            if ((status == BuildStatus.COMPLETED_AT_STATION
+                    || status == BuildStatus.STAGE18_SETTLEMENT_REJECTED)
+                    && settlement == null) {
                 throw new IllegalArgumentException(
-                        "Stage-18 rejection requires settlement diagnostics");
+                        "completed or Stage-18-rejected production requires settlement evidence");
             }
         }
 
