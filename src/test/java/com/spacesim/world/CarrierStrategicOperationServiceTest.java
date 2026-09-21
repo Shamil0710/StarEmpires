@@ -51,7 +51,8 @@ final class CarrierStrategicOperationServiceTest {
         assertEquals(0, wing.lostCraft());
         assertEquals(10_000, wing.availabilityBps());
         assertEquals(7_900, wing.wingReadiness().structuralBps());
-        assertEquals(7_900, wing.projectedCarrierReadiness().overallBps());
+        assertEquals(66, wing.wingReadiness().ammunitionBps());
+        assertEquals(66, wing.projectedCarrierReadiness().overallBps());
         assertEquals(fixture.carrierEntity, projection.forces().find(CARRIER).orElseThrow().entityState());
         assertEquals(List.of(fixture.alpha, fixture.beta), wing.craftIds());
 
@@ -186,9 +187,9 @@ final class CarrierStrategicOperationServiceTest {
         SmallCraftId alpha = registry.reserveIdentityForCompletedProduction();
         SmallCraftId beta = registry.reserveIdentityForCompletedProduction();
         registry.registerProducedCraft(withFaction(ProductionSmallCraftFixture.craft(
-                alpha, 150_000L, 150_000d, 2_600_000d, 1d, 0d), faction.id()));
+                alpha, 1_000L, 1_000d, 500_000d, 1d, 0d), faction.id()));
         registry.registerProducedCraft(withFaction(ProductionSmallCraftFixture.craft(
-                beta, 150_000L, 150_000d, 2_600_000d, 1d, 0d), faction.id()));
+                beta, 1_000L, 1_000d, 500_000d, 1d, 0d), faction.id()));
 
         SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.empty(registry);
         BayDefinition bay = new BayDefinition(
