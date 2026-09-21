@@ -89,7 +89,11 @@ The receipt must match:
 - destination host;
 - authoritative arrival tick.
 
-Rejected or mismatched delivery leaves the craft pending and outside bay occupancy.
+Destination bay capacity is preflighted before the injected physical-delivery authority is invoked,
+so a transport cannot be committed into an already impossible destination and then fail during bay
+assignment.
+
+Rejected, capacity-blocked or mismatched delivery leaves the craft pending and outside bay occupancy.
 
 A successful arrival assigns the exact craft to the destination bay in **SERVICING**, never READY.
 Bay mass/envelope capacity is therefore rechecked by the existing M22.8B authority at the real
@@ -175,6 +179,7 @@ It proves:
 - an unarrived transport receipt leaves the craft pending and unassigned;
 - a matching arrived receipt assigns the exact craft as SERVICING, not READY;
 - a mismatched delivery receipt fails closed;
+- an over-capacity destination fails before the physical-delivery authority is invoked;
 - C turnaround demand is projected exactly without synthetic supply;
 - station-local refuel drains canonical Stage-18 commodity stock into the same persistent craft;
 - station-local rearm drains manufactured Stage-18 ammunition products, preserves physical feed identity
