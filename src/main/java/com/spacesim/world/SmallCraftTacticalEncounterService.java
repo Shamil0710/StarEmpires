@@ -273,6 +273,11 @@ public final class SmallCraftTacticalEncounterService {
 
     /**
      * Resolves with the accepted bounded Stage-19 default horizon.
+     *
+     * @param missionState current immutable small-craft mission authority
+     * @param smallCraft deployed persistent small-craft participants
+     * @param externalCombatants exact non-small-craft participants committed by another authority
+     * @return updated mission state plus canonical exact encounter outcomes
      */
     public EncounterResult resolve(
             SmallCraftMissionState missionState,
@@ -308,6 +313,14 @@ public final class SmallCraftTacticalEncounterService {
             double yM,
             double velocityXMps,
             double velocityYMps) {
+        /**
+         * Validates finite encounter-local position and velocity.
+         *
+         * @param xM local x position in meters
+         * @param yM local y position in meters
+         * @param velocityXMps local x velocity in meters per second
+         * @param velocityYMps local y velocity in meters per second
+         */
         public LocalFlightState {
             if (!Double.isFinite(xM)
                     || !Double.isFinite(yM)
@@ -323,6 +336,13 @@ public final class SmallCraftTacticalEncounterService {
             SmallCraftId craftId,
             Side side,
             LocalFlightState flight) {
+        /**
+         * Validates one persistent small-craft encounter participant.
+         *
+         * @param craftId persistent craft identity
+         * @param side exact Stage-19 combat side
+         * @param flight exact encounter-local kinematics
+         */
         public SmallCraftParticipant {
             Objects.requireNonNull(craftId, "craftId");
             Objects.requireNonNull(side, "side");
@@ -342,6 +362,15 @@ public final class SmallCraftTacticalEncounterService {
             String stableFactionId,
             EngineeringComponent engineering,
             LocalFlightState flight) {
+        /**
+         * Validates one exact external Stage-19 participant.
+         *
+         * @param referenceId caller-owned stable participant reference
+         * @param side exact Stage-19 combat side
+         * @param stableFactionId stable owning faction identity
+         * @param engineering detached exact engineering state
+         * @param flight exact encounter-local kinematics
+         */
         public ExternalCombatant {
             referenceId = requireText(referenceId, "referenceId");
             Objects.requireNonNull(side, "side");
@@ -360,6 +389,14 @@ public final class SmallCraftTacticalEncounterService {
             long missionId,
             boolean destroyed,
             LocalFlightState finalFlight) {
+        /**
+         * Validates one committed persistent small-craft outcome.
+         *
+         * @param craftId persistent craft identity
+         * @param missionId owning mission identity
+         * @param destroyed whether exact Stage-19 resolution destroyed the craft
+         * @param finalFlight final encounter-local kinematics
+         */
         public SmallCraftOutcome {
             Objects.requireNonNull(craftId, "craftId");
             if (missionId <= 0L) {
@@ -375,6 +412,14 @@ public final class SmallCraftTacticalEncounterService {
             boolean destroyed,
             EngineeringComponent engineering,
             LocalFlightState finalFlight) {
+        /**
+         * Validates one detached external-combatant outcome.
+         *
+         * @param referenceId caller-owned stable participant reference
+         * @param destroyed whether exact Stage-19 resolution destroyed the participant
+         * @param engineering final detached exact engineering state
+         * @param finalFlight final encounter-local kinematics
+         */
         public ExternalOutcome {
             referenceId = requireText(referenceId, "referenceId");
             Objects.requireNonNull(engineering, "engineering");
@@ -389,6 +434,15 @@ public final class SmallCraftTacticalEncounterService {
             Termination termination,
             List<SmallCraftOutcome> smallCraft,
             List<ExternalOutcome> externalCombatants) {
+        /**
+         * Validates and freezes one complete tactical commit result.
+         *
+         * @param missionState updated persistent mission state
+         * @param ticksExecuted exact Stage-19 ticks executed
+         * @param termination bounded encounter termination reason
+         * @param smallCraft committed small-craft outcomes
+         * @param externalCombatants detached external-combatant outcomes
+         */
         public EncounterResult {
             Objects.requireNonNull(missionState, "missionState");
             if (ticksExecuted < 0L) {
