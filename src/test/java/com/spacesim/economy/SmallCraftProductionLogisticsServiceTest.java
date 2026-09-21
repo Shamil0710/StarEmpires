@@ -304,7 +304,7 @@ final class SmallCraftProductionLogisticsServiceTest {
         Stage18ShipyardCatalog shipyards = Stage22EmpireShipyardCatalogLoader.loadDefault();
 
         var infrastructure = Stage18StationInfrastructureCatalogLoader.loadDefault()
-                .findArchetype("station.infrastructure.industrial_station");
+                .findArchetype("station.infrastructure.frontier_multipurpose");
         var station = Stage18StationIndustrialNode.instantiate(
                 STATION_ID,
                 "location.orbital_station",
