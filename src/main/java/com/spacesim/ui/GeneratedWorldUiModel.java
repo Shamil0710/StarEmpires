@@ -523,7 +523,7 @@ public final class GeneratedWorldUiModel {
                     "Контент", "Временный Stage 17.5/19; замена доктрин в Stage 22"));
             var carrierOperations = carrierUiSource.find(placement.id()).orElse(null);
             if (carrierOperations != null) {
-                sections.add(carrierSummarySection(carrierOperations));
+                sections.addAll(carrierSections(carrierOperations));
             }
             result.add(new MilitaryView(
                     placement.id().value(), identity.name, ownerId, ownerName, status, displayedSystem,
@@ -534,8 +534,9 @@ public final class GeneratedWorldUiModel {
         return List.copyOf(result);
     }
 
-    private static InfoSection carrierSummarySection(
+    private static List<InfoSection> carrierSections(
             CarrierOperationsUiProjection.CarrierView carrier) {
+        ArrayList<InfoSection> sections = new ArrayList<>();
         long ready = carrier.craft().stream()
                 .filter(value -> value.operationalState()
                         == CarrierOperationsUiProjection.OperationalState.READY)
@@ -557,12 +558,7 @@ public final class GeneratedWorldUiModel {
         long deckQueue = carrier.bays().stream()
                 .mapToLong(CarrierOperationsUiProjection.BayView::queuedOperations)
                 .sum();
-        String bayHealth = carrier.bays().isEmpty()
-                ? "Нет физического bay projection"
-                : carrier.bays().stream()
-                        .map(value -> value.id().bayStableId() + ": " + value.capacityStatus().name())
-                        .collect(java.util.stream.Collectors.joining("; "));
-        return InfoSection.of(
+        sections.add(InfoSection.of(
                 "Авиагруппа / малые аппараты",
                 "Физически существуют", Integer.toString(carrier.craft().size()),
                 "Готовы", Long.toString(ready),
@@ -570,7 +566,76 @@ public final class GeneratedWorldUiModel {
                 "На заданиях", Long.toString(deployed),
                 "Потеряны из roster", Integer.toString(carrier.lostCraftIds().size()),
                 "Очередь палубы", Long.toString(deckQueue),
-                "Ангары", bayHealth);
+                "Host ID", carrier.hostStableId()));
+
+        for (CarrierOperationsUiProjection.BayView bay : carrier.bays()) {
+            sections.add(InfoSection.of(
+                    "Ангар " + bay.id().bayStableId(),
+                    "Состояние", bay.capacityStatus().name(),
+                    "Целостность", percent(bay.conditionFraction()),
+                    "Аппаратов", Integer.toString(bay.craftCount()),
+                    "Масса", mass(bay.occupiedMassKg()) + " / " + mass(bay.supportedMassKg()),
+                    "Объём", format(bay.occupiedVolumeM3()) + " / "
+                            + format(bay.usableVolumeM3()) + " м³",
+                    "Очередь", Integer.toString(bay.queuedOperations()),
+                    "Активная операция", bay.activeOperationKind().isEmpty()
+                            ? "—" : bay.activeOperationKind(),
+                    "Фаза", bay.activeOperationPhase().isEmpty()
+                            ? "—" : bay.activeOperationPhase(),
+                    "Осталось работы", duration(bay.activeRemainingWorkSeconds()),
+                    "Блокировка", bay.activeFailure().isEmpty()
+                            ? "Нет" : bay.activeFailure()));
+        }
+
+        for (CarrierOperationsUiProjection.CraftView craft : carrier.craft()) {
+            var mission = craft.mission();
+            String target = mission == null
+                    ? "—"
+                    : mission.targetVisible()
+                            ? mission.targetKind() + " / " + mission.targetReferenceId()
+                            : mission.targetKind() + " / скрыто";
+            String missionState = mission == null
+                    ? "—"
+                    : mission.type() + " / " + mission.status();
+            String deck = !craft.activeDeckOperation().isEmpty()
+                    ? craft.activeDeckOperation() + " / " + craft.activeDeckPhase()
+                            + " / " + duration(craft.activeDeckRemainingWorkSeconds())
+                    : !craft.queuedDeckOperation().isEmpty()
+                            ? craft.queuedDeckOperation() + " / QUEUED"
+                            : "—";
+            sections.add(InfoSection.of(
+                    "Малый аппарат #" + craft.craftId().value(),
+                    "Состояние", craft.operationalState().name(),
+                    "Design / fit", craft.designId(),
+                    "Корпус", craft.hullId(),
+                    "Ангар", craft.bayStableId().isEmpty() ? "—" : craft.bayStableId(),
+                    "Bay state", craft.occupancyState().isEmpty() ? "—" : craft.occupancyState(),
+                    "Структура", readiness(craft.structuralReadinessBps()),
+                    "Боеприпасы", resource(craft.ammunition()),
+                    "Реактивная масса", resource(craft.propellant()),
+                    "Обслуживание", readiness(craft.maintenanceReadinessBps()),
+                    "Требует ремонта", craft.repairRequired() ? "Да" : "Нет",
+                    "Требует сервиса", craft.serviceRequired() ? "Да" : "Нет",
+                    "Миссия", missionState,
+                    "Цель", target,
+                    "Палубная операция", deck,
+                    "Блокировка", craft.deckFailure().isEmpty() ? "Нет" : craft.deckFailure()));
+        }
+        return List.copyOf(sections);
+    }
+
+    private static String readiness(int basisPoints) {
+        return format(basisPoints / 100d) + "%";
+    }
+
+    private static String resource(
+            CarrierOperationsUiProjection.ResourceReadiness resource) {
+        if (!resource.applicable()) {
+            return "Не требуется";
+        }
+        String count = resource.itemCount() > 0L
+                ? resource.itemCount() + " ед.; " : "";
+        return count + mass(resource.massKg()) + "; " + readiness(resource.readinessBps());
     }
 
     /**
