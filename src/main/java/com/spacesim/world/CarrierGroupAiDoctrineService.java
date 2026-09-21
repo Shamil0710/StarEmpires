@@ -383,11 +383,15 @@ public final class CarrierGroupAiDoctrineService {
     private static boolean needsRecovery(
             SmallCraftState craft,
             DoctrinePolicy policy) {
+        boolean ammunitionDependent = craft.runtimeState().consumables().interfaceLoads().stream()
+                .anyMatch(load -> load.kind() == InterfaceKind.AMMUNITION);
         long ammunition = craft.runtimeState().consumables().interfaceLoads().stream()
                 .filter(load -> load.kind() == InterfaceKind.AMMUNITION)
                 .mapToLong(load -> load.itemCount())
                 .sum();
-        if (policy.recoverWhenOutOfAmmunition() && ammunition <= 0L) {
+        if (policy.recoverWhenOutOfAmmunition()
+                && ammunitionDependent
+                && ammunition <= 0L) {
             return true;
         }
         if (craft.runtimeState().consumables().reactionMassKg()
