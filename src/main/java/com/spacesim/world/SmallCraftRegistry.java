@@ -163,6 +163,26 @@ public final class SmallCraftRegistry {
     }
 
     /**
+     * Permanently removes one physically destroyed craft without rewinding identity allocation.
+     *
+     * <p>This operation creates no replacement and grants no resources. Callers must establish the
+     * physical destruction boundary (for example exact Stage-19 tactical resolution) before invoking
+     * it. The allocator watermark is intentionally unchanged, so a destroyed identity can never be
+     * reused by later production.</p>
+     *
+     * @param id physically destroyed craft identity
+     * @return removed final physical state for diagnostics/provenance
+     */
+    SmallCraftState removeDestroyedCraft(SmallCraftId id) {
+        SmallCraftId checked = Objects.requireNonNull(id, "id");
+        SmallCraftState removed = craftById.remove(checked);
+        if (removed == null) {
+            throw new IllegalArgumentException("Unknown small-craft ID: " + checked);
+        }
+        return removed;
+    }
+
+    /**
      * Resolves a candidate physical footprint through the bound production fitting authority without
      * mutating the registered craft.
      *
