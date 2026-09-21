@@ -55,6 +55,7 @@ final class CarrierStrategicOperationServiceTest {
         assertEquals(fixture.carrierEntity, projection.forces().find(CARRIER).orElseThrow().entityState());
         assertEquals(List.of(fixture.alpha, fixture.beta), wing.craftIds());
 
+        fixture.hangars.release(fixture.beta);
         fixture.registry.removeDestroyedCraft(fixture.beta);
         var afterLoss = fixture.readiness.project(
                 fixture.forces,
@@ -134,6 +135,7 @@ final class CarrierStrategicOperationServiceTest {
     @Test
     void degradedWingFailsCarrierAdmissionAndUnsupportedOrderCannotBypassStage21() {
         Fixture fixture = fixture();
+        fixture.hangars.release(fixture.beta);
         fixture.registry.removeDestroyedCraft(fixture.beta);
         var projected = fixture.readiness.project(
                 fixture.forces,
