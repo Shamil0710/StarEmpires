@@ -23,6 +23,8 @@ import com.spacesim.economy.Stage18StationIndustrialNode;
 import com.spacesim.economy.Stage18StationStorage;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipyardEngineeringService;
+import com.spacesim.player.PlayableTestWorldFactory;
+import com.spacesim.player.PlayerFactionTreasuryRuntimeService;
 import com.spacesim.world.SmallCraftHangarCapacity.BayDefinition;
 import com.spacesim.world.SmallCraftHangarCapacity.BayId;
 import com.spacesim.world.SmallCraftHangarCapacity.HostKind;
@@ -46,8 +48,14 @@ final class CarrierPostBattleRecoveryServiceTest {
     @Test
     void fundedRecoveryStillRequiresFiniteIndustryAndPhysicalDelivery() {
         Fixture fixture = fixture();
+        var scenario = PlayableTestWorldFactory.create(22_808_001L);
+        var treasuryService = new PlayerFactionTreasuryRuntimeService(scenario.runtime());
+        String factionId = scenario.runtime().player().factionContentId();
+        assertTrue(treasuryService.capitalize(50_000L));
+        long treasuryBefore = treasuryService.view().orElseThrow().factionTreasuryMilliCredits();
+
         var plan = fixture.logistics.planBuild(
-                "faction.empire",
+                factionId,
                 ProductionSmallCraftFixture.DESIGN_ID,
                 fixture.station.stationId(),
                 fixture.fit,
@@ -57,14 +65,13 @@ final class CarrierPostBattleRecoveryServiceTest {
                 plan.workPlan().requirements().totalWorkSeconds()
                         / fixture.yard.plannerCapability().workRate() + 5d);
 
-        WalletComponent treasury = new WalletComponent(50_000L);
         WalletComponent procurement = new WalletComponent();
-        CarrierPostBattleRecoveryService recovery = new CarrierPostBattleRecoveryService(
-                fixture.logistics,
-                (faction, destination, ledger, amount) -> treasury.transferTo(destination, amount));
+        CarrierPostBattleRecoveryService recovery = CarrierPostBattleRecoveryService.production(
+                scenario.runtime().world(),
+                fixture.logistics);
 
         var funded = recovery.fundAndSettleBuild(
-                "faction.empire",
+                factionId,
                 procurement,
                 "station:carrier-yard:procurement",
                 12_000L,
@@ -75,7 +82,8 @@ final class CarrierPostBattleRecoveryServiceTest {
 
         assertTrue(funded.treasuryFunded());
         assertTrue(funded.replacementProduced());
-        assertEquals(38_000L, treasury.getBalanceMilliCredits());
+        assertEquals(treasuryBefore - 12_000L,
+                treasuryService.view().orElseThrow().factionTreasuryMilliCredits());
         assertEquals(12_000L, procurement.getBalanceMilliCredits());
         var craft = funded.build().producedCraftOptional().orElseThrow();
         assertTrue(fixture.hangars.find(craft.id()).isEmpty(),
