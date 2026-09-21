@@ -118,6 +118,30 @@ The actual physical supply authorities already exist:
 
 G does not duplicate those inventories or manufacture outputs.
 
+## Physical station servicing
+
+After a produced craft has physically arrived at a station bay, `SmallCraftStationSupplyService`
+closes the real Stage-18/19 servicing boundary for propellant and manufactured ammunition.
+
+The service requires the same persistent craft to be physically `PARKED` or `SERVICING` in the
+exact station bay whose host ID matches the canonical `Stage18StationIndustrialNode`. Before stock
+mutation it preflights the resulting loaded mass against both the hull operational-mass limit and the
+current (possibly degraded) bay capacity.
+
+Physical mutation remains delegated:
+
+- `Stage18ShipConsumableService` removes authored bulk commodity stock and loads the matching fitted
+  interface (for the current Empire endurance drive, purified-water reaction mass);
+- `Stage19WarfareSupplyService` removes finished ammunition products and loads the matching physical
+  launcher feed;
+- the exact ammunition content identity is bound into `WeaponLoadoutState`, so Stage-19 combat consumes
+  the same physical ammunition body that Stage-18 supplied;
+- only after successful physical stock mutation is the resulting consumable/loadout state committed
+  back to the same `SmallCraftId`.
+
+Rejected stock, interface, ammunition-compatibility, hull-mass or bay-capacity checks leave both
+canonical station storage and persistent craft state unchanged.
+
 ## Supply interruption and readiness
 
 Because new/recovered craft remain SERVICING until C receives complete finite settlements, carrier
@@ -151,7 +175,13 @@ It proves:
 - an unarrived transport receipt leaves the craft pending and unassigned;
 - a matching arrived receipt assigns the exact craft as SERVICING, not READY;
 - a mismatched delivery receipt fails closed;
-- C turnaround demand is projected exactly without synthetic supply.
+- C turnaround demand is projected exactly without synthetic supply;
+- station-local refuel drains canonical Stage-18 commodity stock into the same persistent craft;
+- station-local rearm drains manufactured Stage-18 ammunition products, preserves physical feed identity
+  and commits the matching weapon-loadout binding;
+- supply interruption or degraded bay mass capacity rejects before persistent craft/storage mutation;
+- an already destroyed craft cannot be recreated or resupplied by the G supply path and its allocator
+  watermark does not rewind.
 
 ## Deferred intentionally
 
