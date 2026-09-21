@@ -235,6 +235,50 @@ final class CarrierGroupAiDoctrineServiceTest {
     }
 
     @Test
+    void strikeOutsideCurrentWingEnduranceIsNotScheduled() {
+        Fixture fixture = fixture(1);
+        ThreatObservation beyondWingReach = threat(
+                "track.hostile", 8_000d, 1_000d, 7_000d, 7_000, TICK);
+
+        var result = fixture.doctrine.advance(
+                fixture.commandState,
+                SmallCraftMissionState.empty(),
+                observation(fixture, fullReadiness(), fullReadiness(), beyondWingReach),
+                List.of(opportunity(
+                        fixture.craftIds.get(0),
+                        MissionType.ANTI_SHIP_STRIKE,
+                        TargetKind.TRACK,
+                        "track.hostile",
+                        DeploymentState.EMBARKED,
+                        "axis.strike",
+                        10_000)),
+                policy(0, 10_000, 1_000, 0));
+
+        assertEquals(CarrierDisposition.HOLD, result.decision().carrierDisposition());
+        assertTrue(result.decision().selectedMissionOptional().isEmpty());
+        assertEquals(0, fixture.deck.queued().size(),
+                "actor-known target outside current physical wing reach cannot receive a strike");
+    }
+
+    @Test
+    void degradedEscortReadinessForcesCarrierGroupWithdrawal() {
+        Fixture fixture = fixture(1);
+        FleetReadinessState degradedEscorts =
+                new FleetReadinessState(2_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000);
+
+        var result = fixture.doctrine.advance(
+                fixture.commandState,
+                SmallCraftMissionState.empty(),
+                observation(fixture, fullReadiness(), degradedEscorts, null),
+                List.of(),
+                DoctrinePolicy.standard());
+
+        assertEquals(CarrierDisposition.WITHDRAW, result.decision().carrierDisposition());
+        assertEquals(DecisionReason.ESCORT_READINESS, result.decision().reason());
+        assertEquals(EscortDirective.COVER_WITHDRAWAL, result.decision().escortDirective());
+    }
+
+    @Test
     void freshThreatInsideStandoffEnvelopeRequestsSeparationWithoutOffensiveLaunch() {
         Fixture fixture = fixture(1);
         ThreatObservation fresh = threat(
