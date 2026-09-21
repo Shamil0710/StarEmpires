@@ -78,6 +78,8 @@ final class CarrierOperationsUiProjectionTest {
                 .filter(value -> value.craftId().equals(fixture.alpha))
                 .findFirst().orElseThrow();
         assertEquals(OperationalState.LAUNCH_QUEUED, alpha.operationalState());
+        assertFalse(alpha.installedModules().isEmpty());
+        assertTrue(alpha.installedModules().stream().allMatch(value -> value.contains("=")));
         assertTrue(alpha.ammunition().applicable());
         assertTrue(alpha.propellant().applicable());
         assertTrue(alpha.repairRequired());
@@ -186,6 +188,71 @@ final class CarrierOperationsUiProjectionTest {
         assertTrue(fixture.deck.queued().isEmpty());
         assertEquals(OccupancyState.READY,
                 fixture.hangars.find(fixture.alpha).orElseThrow().state());
+    }
+
+    @Test
+    void invalidRecoveryAttemptReturnsMeaningfulDiagnosticWithoutMutatingPhysicalState() {
+        Fixture fixture = fixture();
+        CarrierPlayerCommandAdapter adapter =
+                new CarrierPlayerCommandAdapter(fixture.commands);
+        SmallCraftMissionState before = SmallCraftMissionState.empty();
+
+        var rejected = adapter.submitMission(
+                before,
+                fixture.alpha,
+                MissionType.RECOVER,
+                new MissionTarget(TargetKind.HOST, HOST),
+                context(
+                        45L,
+                        DeploymentState.EMBARKED,
+                        HOST,
+                        "faction.empire",
+                        45L));
+
+        assertFalse(rejected.accepted());
+        assertEquals(before, rejected.state());
+        assertEquals(DiagnosticCode.INVALID_MISSION, rejected.diagnosticCode());
+        assertTrue(rejected.diagnosticDetail().contains("require physically deployed craft"));
+        assertTrue(fixture.deck.queued().isEmpty());
+        assertEquals(OccupancyState.READY,
+                fixture.hangars.find(fixture.alpha).orElseThrow().state());
+    }
+
+    @Test
+    void launchCancellationAfterPhysicalHandoffBoundaryIsRejectedWithoutMissionRewrite() {
+        Fixture fixture = fixture();
+        CarrierPlayerCommandAdapter adapter =
+                new CarrierPlayerCommandAdapter(fixture.commands);
+        var accepted = adapter.submitMission(
+                SmallCraftMissionState.empty(),
+                fixture.alpha,
+                MissionType.CAP,
+                new MissionTarget(TargetKind.AREA, "area.cap"),
+                context(
+                        50L,
+                        DeploymentState.EMBARKED,
+                        "area.cap",
+                        "faction.empire",
+                        50L));
+        fixture.deck.advanceFixedTick(
+                50L,
+                1d,
+                Map.of(fixture.bay.id(), fixture.bay));
+
+        var rejected = adapter.cancelQueuedLaunch(
+                accepted.state(),
+                accepted.missionId());
+
+        assertFalse(rejected.accepted());
+        assertEquals(accepted.state(), rejected.state());
+        assertEquals(DiagnosticCode.CANCELLATION_BLOCKED, rejected.diagnosticCode());
+        assertTrue(rejected.diagnosticDetail().contains("cancellable boundary"));
+        assertEquals(
+                SmallCraftFlightDeckOperations.OperationPhase.AWAITING_HANDOFF,
+                fixture.deck.activeFor(fixture.alpha).orElseThrow().phase());
+        assertEquals(
+                MissionStatus.LAUNCH_QUEUED,
+                accepted.state().requireMission(accepted.missionId()).status());
     }
 
     private static Fixture fixture() {
