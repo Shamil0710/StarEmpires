@@ -219,6 +219,10 @@ public final class SmallCraftPhysicalLogisticsService {
         if (hangars.find(checkedCraft).isPresent()) {
             throw new IllegalStateException("pending delivery craft is already assigned to a bay");
         }
+        if (!hangars.canAccept(checkedCraft, checkedBay)) {
+            throw new IllegalStateException(
+                    "pending delivery craft does not fit current destination bay capacity");
+        }
 
         DeliveryReceipt receipt = Objects.requireNonNull(
                 deliveryAuthority.confirmArrival(pending, checkedBay, authoritativeTick),
