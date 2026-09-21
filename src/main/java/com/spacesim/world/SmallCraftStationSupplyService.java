@@ -448,7 +448,14 @@ public final class SmallCraftStationSupplyService {
             SmallCraftId craftId,
             Stage18ShipConsumableService.LoadResult physicalResult,
             double loadedMassKg) {
-        /** Validates one immutable commodity load result. */
+        /**
+         * Validates one immutable commodity load result.
+         *
+         * @param status stable supply outcome
+         * @param craftId persistent craft identity
+         * @param physicalResult underlying Stage-18 load result when attempted
+         * @param loadedMassKg physical mass committed to the craft
+         */
         public CommodityLoadResult {
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(craftId, "craftId");
@@ -486,7 +493,16 @@ public final class SmallCraftStationSupplyService {
             Stage19WarfareSupplyService.AmmunitionLoadResult physicalResult,
             int loadedRounds,
             double loadedMassKg) {
-        /** Validates one immutable ammunition load result. */
+        /**
+         * Validates one immutable ammunition load result.
+         *
+         * @param status stable supply outcome
+         * @param craftId persistent craft identity
+         * @param productId attempted ammunition content/product identity
+         * @param physicalResult underlying Stage-19 warfare-supply result when attempted
+         * @param loadedRounds physical round count committed to the craft
+         * @param loadedMassKg physical ammunition mass committed to the craft
+         */
         public AmmunitionLoadResult {
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(craftId, "craftId");
