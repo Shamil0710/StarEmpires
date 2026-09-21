@@ -45,6 +45,10 @@ public final class CarrierGroupAiDoctrineService {
 
     /**
      * Creates the doctrine scheduler over existing A/B/C/D authorities.
+     *
+     * @param craftRegistry persistent individual small-craft authority
+     * @param hangars physical embarked occupancy authority
+     * @param missionCommands shared PLAYER/AI mission-command boundary
      */
     public CarrierGroupAiDoctrineService(
             SmallCraftRegistry craftRegistry,
@@ -505,6 +509,16 @@ public final class CarrierGroupAiDoctrineService {
             double wingStrikeReachM,
             int severityBps,
             ObservationEvidence evidence) {
+        /**
+         * Validates one actor-known hostile projection.
+         *
+         * @param referenceId actor-visible hostile reference
+         * @param distanceM observed current separation in meters
+         * @param effectiveThreatRangeM observed effective hostile range in meters
+         * @param wingStrikeReachM actor-known current wing strike reach in meters
+         * @param severityBps actor-known threat severity in basis points
+         * @param evidence bounded observation provenance/freshness
+         */
         public ThreatObservation {
             referenceId = requireText(referenceId, "referenceId");
             requireNonNegative(distanceM, "distanceM");
@@ -527,6 +541,18 @@ public final class CarrierGroupAiDoctrineService {
             FleetReadinessState carrierReadiness,
             FleetReadinessState escortReadiness,
             ThreatObservation threat) {
+        /**
+         * Validates one carrier-group doctrine snapshot.
+         *
+         * @param authoritativeTick exact doctrine-evaluation tick
+         * @param commandGroupId existing Stage-21 command-group identity
+         * @param carrierFleetId carrier fleet identity
+         * @param escortFleetIds ordinary escort fleet identities
+         * @param wingCraftIds persistent small-craft wing roster
+         * @param carrierReadiness current carrier readiness projection
+         * @param escortReadiness current escort readiness projection
+         * @param threat current actor-known hostile projection, or {@code null}
+         */
         public CarrierGroupObservation {
             if (authoritativeTick < 0L) {
                 throw new IllegalArgumentException("authoritativeTick must be non-negative");
@@ -554,6 +580,16 @@ public final class CarrierGroupAiDoctrineService {
             MissionContext context,
             String axisId,
             int priorityBps) {
+        /**
+         * Validates one lawful AI mission opportunity.
+         *
+         * @param craftId persistent craft candidate
+         * @param type requested mission family
+         * @param target actor-known mission target
+         * @param context shared D validation context
+         * @param axisId actor-authored scheduling/approach axis identity
+         * @param priorityBps deterministic authored opportunity priority
+         */
         public MissionOpportunity {
             Objects.requireNonNull(craftId, "craftId");
             Objects.requireNonNull(type, "type");
@@ -582,6 +618,24 @@ public final class CarrierGroupAiDoctrineService {
             double minimumRecoveryReactionMassKg,
             double minimumRecoveryStructureFraction,
             double minimumRecoveryModuleFraction) {
+        /**
+         * Validates authored doctrine thresholds.
+         *
+         * @param carrierWithdrawReadinessBps carrier withdrawal readiness threshold
+         * @param escortWithdrawReadinessBps escort withdrawal readiness threshold
+         * @param wingWithdrawReadinessBps wing withdrawal readiness threshold
+         * @param minimumCapCraft minimum desired active CAP craft
+         * @param maxActiveInterceptCraft maximum simultaneous QRA/intercept craft
+         * @param maxActiveStrikeCraft maximum simultaneous anti-ship strike craft
+         * @param interceptThreatSeverityBps minimum threat severity for interception
+         * @param strikeThreatSeverityBps minimum threat severity for anti-ship strike
+         * @param severeThreatWithdrawBps severe-threat withdrawal threshold
+         * @param standoffRangeMultiplier multiplier applied only to observed threat range for doctrine
+         * @param recoverWhenOutOfAmmunition whether ammunition-dependent depleted craft should return
+         * @param minimumRecoveryReactionMassKg reaction-mass reserve that triggers recovery
+         * @param minimumRecoveryStructureFraction mean structure threshold that triggers recovery
+         * @param minimumRecoveryModuleFraction minimum subsystem-integrity threshold that triggers recovery
+         */
         public DoctrinePolicy {
             requireBps(carrierWithdrawReadinessBps, "carrierWithdrawReadinessBps");
             requireBps(escortWithdrawReadinessBps, "escortWithdrawReadinessBps");
@@ -609,7 +663,11 @@ public final class CarrierGroupAiDoctrineService {
                     "minimumRecoveryModuleFraction");
         }
 
-        /** Conservative production baseline; values are policy only, not stat bonuses. */
+        /**
+         * Returns the conservative production doctrine baseline.
+         *
+         * @return authored policy values that alter decisions only, never physical capability
+         */
         public static DoctrinePolicy standard() {
             return new DoctrinePolicy(
                     3_500,
@@ -635,6 +693,14 @@ public final class CarrierGroupAiDoctrineService {
             int readyCraft,
             int depletedCraft,
             int readyBps) {
+        /**
+         * Validates one derived wing-readiness projection.
+         *
+         * @param operationalCraft persistent roster members that still physically exist
+         * @param readyCraft craft currently counted as doctrine-ready
+         * @param depletedCraft craft whose current physical state requests recovery
+         * @param readyBps ready fraction in basis points over the supplied wing roster
+         */
         public WingReadiness {
             if (operationalCraft < 0 || readyCraft < 0 || depletedCraft < 0) {
                 throw new IllegalArgumentException("wing readiness counts must be non-negative");
@@ -650,6 +716,15 @@ public final class CarrierGroupAiDoctrineService {
             DecisionReason reason,
             int wingReadyBps,
             MissionOpportunity selectedMission) {
+        /**
+         * Validates one doctrine decision.
+         *
+         * @param carrierDisposition carrier positioning intent
+         * @param escortDirective escort-group intent
+         * @param reason stable doctrine reason
+         * @param wingReadyBps derived wing readiness in basis points
+         * @param selectedMission selected next mission, or {@code null}
+         */
         public DoctrineDecision {
             Objects.requireNonNull(carrierDisposition, "carrierDisposition");
             Objects.requireNonNull(escortDirective, "escortDirective");
@@ -657,6 +732,11 @@ public final class CarrierGroupAiDoctrineService {
             requireBps(wingReadyBps, "wingReadyBps");
         }
 
+        /**
+         * Returns the selected next small-craft mission when one was accepted for submission.
+         *
+         * @return selected mission opportunity, or empty when doctrine issued no small-craft mission
+         */
         public Optional<MissionOpportunity> selectedMissionOptional() {
             return Optional.ofNullable(selectedMission);
         }
@@ -668,6 +748,14 @@ public final class CarrierGroupAiDoctrineService {
             DoctrineDecision decision,
             long acceptedMissionId,
             long supersededMissionId) {
+        /**
+         * Validates one completed doctrine step.
+         *
+         * @param missionState mission state after the optional shared-path AI submission
+         * @param decision carrier/escort doctrine decision
+         * @param acceptedMissionId newly accepted mission ID, or zero
+         * @param supersededMissionId deployed mission superseded by retask, or zero
+         */
         public DecisionResult {
             Objects.requireNonNull(missionState, "missionState");
             Objects.requireNonNull(decision, "decision");
