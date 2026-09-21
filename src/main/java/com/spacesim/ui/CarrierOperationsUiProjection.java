@@ -340,17 +340,17 @@ public final class CarrierOperationsUiProjection {
 
     /** Player-facing finite small-craft lifecycle derived from physical authorities. */
     public enum OperationalState {
-        PARKED,
-        SERVICING,
-        REPAIR_REQUIRED,
-        READY,
-        LAUNCH_QUEUED,
-        LAUNCHING,
-        MISSION,
-        RETURNING,
-        RECOVERY_QUEUED,
-        RECOVERING,
-        DEPLOYED_UNASSIGNED
+        /** Embarked and inactive. */ PARKED,
+        /** Embarked and undergoing ordinary service. */ SERVICING,
+        /** Embarked service state with physical damage requiring repair work. */ REPAIR_REQUIRED,
+        /** Embarked and physically ready for a validated launch request. */ READY,
+        /** Launch request is queued in the finite deck sequencer. */ LAUNCH_QUEUED,
+        /** Physical launch handling is actively cycling. */ LAUNCHING,
+        /** Craft is physically deployed on an active mission. */ MISSION,
+        /** Craft is physically deployed and returning or diverting. */ RETURNING,
+        /** Recovery request is pending or queued at the physical deck boundary. */ RECOVERY_QUEUED,
+        /** Physical recovery handling is actively cycling. */ RECOVERING,
+        /** Craft exists outside bay occupancy without an active mission projection. */ DEPLOYED_UNASSIGNED
     }
 
     /** Current finite physical resource readiness for one interface family. */
@@ -361,7 +361,16 @@ public final class CarrierOperationsUiProjection {
             double massKg,
             long itemCount,
             int readinessBps) {
-        /** Validates immutable resource readiness. */
+        /**
+         * Validates immutable resource readiness.
+         *
+         * @param applicable whether the craft has this physical interface family
+         * @param amount current interface-native loaded amount
+         * @param capacity total interface-native capacity
+         * @param massKg current loaded physical mass in kilograms
+         * @param itemCount current discrete item count when applicable
+         * @param readinessBps current finite readiness in basis points
+         */
         public ResourceReadiness {
             if (!Double.isFinite(amount) || amount < 0d
                     || !Double.isFinite(capacity) || capacity < 0d
@@ -383,7 +392,18 @@ public final class CarrierOperationsUiProjection {
             String targetReferenceId,
             boolean targetVisible,
             long submittedTick) {
-        /** Validates one immutable mission view. */
+        /**
+         * Validates one immutable mission view.
+         *
+         * @param missionId persistent mission identity
+         * @param type mission family
+         * @param status current mission lifecycle state
+         * @param source PLAYER or AI submission source
+         * @param targetKind actor-visible target family
+         * @param targetReferenceId target reference when lawful to reveal, otherwise empty
+         * @param targetVisible whether the target reference may be rendered to this actor
+         * @param submittedTick authoritative mission submission tick
+         */
         public MissionView {
             if (missionId <= 0L || submittedTick < 0L) {
                 throw new IllegalArgumentException("invalid carrier UI mission identity/tick");
@@ -420,7 +440,24 @@ public final class CarrierOperationsUiProjection {
             String activeOperationPhase,
             double activeRemainingWorkSeconds,
             String activeFailure) {
-        /** Validates one immutable bay view. */
+        /**
+         * Validates one immutable bay view.
+         *
+         * @param id stable physical bay identity
+         * @param hostKind physical host family
+         * @param conditionFraction current bay integrity fraction
+         * @param craftCount currently embarked individual craft count
+         * @param occupiedMassKg current embarked-craft mass
+         * @param supportedMassKg current damaged supported mass
+         * @param occupiedVolumeM3 current embarked envelope volume
+         * @param usableVolumeM3 current damaged usable volume
+         * @param capacityStatus current physical capacity classification
+         * @param queuedOperations number of queued deck operations
+         * @param activeOperationKind active launch/recovery kind, or empty
+         * @param activeOperationPhase active finite phase, or empty
+         * @param activeRemainingWorkSeconds remaining physical handling work
+         * @param activeFailure active recovery failure diagnostic, or empty
+         */
         public BayView {
             Objects.requireNonNull(id, "id");
             hostKind = requireText(hostKind, "hostKind");
@@ -464,7 +501,29 @@ public final class CarrierOperationsUiProjection {
             String activeDeckPhase,
             double activeDeckRemainingWorkSeconds,
             String deckFailure) {
-        /** Validates one immutable craft view. */
+        /**
+         * Validates one immutable craft view.
+         *
+         * @param craftId persistent individual craft identity
+         * @param designId physical design identity
+         * @param hullId installed hull definition
+         * @param stableFactionId stable owning faction identity
+         * @param operationalState derived finite player-facing lifecycle
+         * @param occupancyState physical hangar occupancy state, or empty
+         * @param bayStableId current physical bay identity, or empty
+         * @param structuralReadinessBps current structure/subsystem readiness
+         * @param ammunition current physical ammunition readiness
+         * @param propellant current physical reaction-mass readiness
+         * @param maintenanceReadinessBps current maintenance readiness
+         * @param repairRequired whether current damage requires repair
+         * @param serviceRequired whether current maintenance age requires service
+         * @param mission current active mission, or null
+         * @param queuedDeckOperation queued deck operation kind, or empty
+         * @param activeDeckOperation active deck operation kind, or empty
+         * @param activeDeckPhase active deck operation phase, or empty
+         * @param activeDeckRemainingWorkSeconds remaining physical deck work
+         * @param deckFailure active deck failure diagnostic, or empty
+         */
         public CraftView {
             Objects.requireNonNull(craftId, "craftId");
             designId = requireText(designId, "designId");
@@ -497,7 +556,16 @@ public final class CarrierOperationsUiProjection {
             List<BayView> bays,
             List<CraftView> craft,
             List<SmallCraftId> lostCraftIds) {
-        /** Validates and freezes one carrier view. */
+        /**
+         * Validates and freezes one carrier view.
+         *
+         * @param carrierFleetId ordinary persistent carrier FleetId
+         * @param hostStableId stable physical carrier host identity
+         * @param stableFactionId stable owning faction identity
+         * @param bays current physical bay projections
+         * @param craft current surviving individual craft projections
+         * @param lostCraftIds roster identities no longer present in the physical registry
+         */
         public CarrierView {
             Objects.requireNonNull(carrierFleetId, "carrierFleetId");
             hostStableId = requireText(hostStableId, "hostStableId");
