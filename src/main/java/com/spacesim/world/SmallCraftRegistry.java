@@ -173,7 +173,7 @@ public final class SmallCraftRegistry {
      * @param id physically destroyed craft identity
      * @return removed final physical state for diagnostics/provenance
      */
-    public SmallCraftState removeDestroyedCraft(SmallCraftId id) {
+    SmallCraftState removeDestroyedCraft(SmallCraftId id) {
         SmallCraftId checked = Objects.requireNonNull(id, "id");
         SmallCraftState removed = craftById.remove(checked);
         if (removed == null) {
