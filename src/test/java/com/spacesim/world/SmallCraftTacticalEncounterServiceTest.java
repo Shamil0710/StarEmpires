@@ -10,6 +10,8 @@ import com.spacesim.ship.LiveTacticalBattleScenario.Side;
 import com.spacesim.ship.ShipDamageRuntime;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
 import com.spacesim.ship.ShipInstanceRuntimeState;
+import com.spacesim.ship.WeaponLoadoutState;
+import com.spacesim.ship.WeaponLoadoutState.FeedBinding;
 import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
 import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.Stage19ExactTacticalEncounterResolver.CombatantResult;
@@ -176,7 +178,10 @@ final class SmallCraftTacticalEncounterServiceTest {
                 damage,
                 base.instanceState().shieldStatesByMount(),
                 base.instanceState().maintenance(),
-                base.instanceState().weaponLoadout(),
+                new WeaponLoadoutState(List.of(new FeedBinding(
+                        "weapon_primary",
+                        "kinetic_feed",
+                        "ammo.empire_axial_dart_150kg_v1"))),
                 base.instanceState().weaponMountRuntime());
         return new SmallCraftState(
                 id,
