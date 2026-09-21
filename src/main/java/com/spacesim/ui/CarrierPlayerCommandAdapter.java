@@ -133,7 +133,16 @@ public final class CarrierPlayerCommandAdapter {
             long supersededMissionId,
             DiagnosticCode diagnosticCode,
             String diagnosticDetail) {
-        /** Validates one adapter result. */
+        /**
+         * Validates one adapter result.
+         *
+         * @param accepted whether the shared mission validator accepted the command
+         * @param state resulting mission state; unchanged on rejection
+         * @param missionId accepted/current mission identity, or zero on rejection
+         * @param supersededMissionId prior mission replaced by a lawful retask, or zero
+         * @param diagnosticCode stable rejection family, or NONE on success
+         * @param diagnosticDetail player-facing validator detail, empty on success
+         */
         public CommandResult {
             Objects.requireNonNull(state, "state");
             Objects.requireNonNull(diagnosticCode, "diagnosticCode");
