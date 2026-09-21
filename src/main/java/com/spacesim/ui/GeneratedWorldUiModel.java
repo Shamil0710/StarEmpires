@@ -606,8 +606,10 @@ public final class GeneratedWorldUiModel {
             sections.add(InfoSection.of(
                     "Малый аппарат #" + craft.craftId().value(),
                     "Состояние", craft.operationalState().name(),
-                    "Design / fit", craft.designId(),
+                    "Design", craft.designId(),
                     "Корпус", craft.hullId(),
+                    "Фит", craft.installedModules().isEmpty()
+                            ? "Пустой" : String.join("; ", craft.installedModules()),
                     "Ангар", craft.bayStableId().isEmpty() ? "—" : craft.bayStableId(),
                     "Bay state", craft.occupancyState().isEmpty() ? "—" : craft.occupancyState(),
                     "Структура", readiness(craft.structuralReadinessBps()),
