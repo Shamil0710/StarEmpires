@@ -737,6 +737,11 @@ public final class CarrierGroupAiDoctrineService {
          *
          * @return selected mission opportunity, or empty when doctrine issued no small-craft mission
          */
+        /**
+         * Returns the selected next mission when one was accepted for submission.
+         *
+         * @return optional selected mission
+         */
         public Optional<MissionOpportunity> selectedMissionOptional() {
             return Optional.ofNullable(selectedMission);
         }
