@@ -235,6 +235,33 @@ final class CarrierGroupAiDoctrineServiceTest {
     }
 
     @Test
+    void freshThreatInsideStandoffEnvelopeRequestsSeparationWithoutOffensiveLaunch() {
+        Fixture fixture = fixture(1);
+        ThreatObservation fresh = threat(
+                "track.hostile", 2_200d, 2_000d, 10_000d, 9_000, TICK);
+
+        var result = fixture.doctrine.advance(
+                fixture.commandState,
+                SmallCraftMissionState.empty(),
+                observation(fixture, fullReadiness(), fullReadiness(), fresh),
+                List.of(opportunity(
+                        fixture.craftIds.get(0),
+                        MissionType.ANTI_SHIP_STRIKE,
+                        TargetKind.TRACK,
+                        "track.hostile",
+                        DeploymentState.EMBARKED,
+                        "axis.strike",
+                        10_000)),
+                policy(0, 10_000, 1_000, 0));
+
+        assertEquals(CarrierDisposition.STANDOFF, result.decision().carrierDisposition());
+        assertEquals(DecisionReason.THREAT_INSIDE_STANDOFF, result.decision().reason());
+        assertEquals(EscortDirective.SCREEN_CARRIER, result.decision().escortDirective());
+        assertTrue(result.decision().selectedMissionOptional().isEmpty());
+        assertEquals(0, fixture.deck.queued().size());
+    }
+
+    @Test
     void carrierAndEscortsMustRemainOrdinaryMembersOfStage21CommandGroup() {
         Fixture fixture = fixture(1);
         CarrierGroupObservation invalid = new CarrierGroupObservation(
