@@ -3,7 +3,7 @@ package com.spacesim.presentation.asset;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
 import com.spacesim.content.ship.Stage228SmallCraftProductionProjection;
 import com.spacesim.content.ship.Stage228SmallCraftProductionProjection.DesignBinding;
-import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage228SmallCraftEngineeringCatalogLoader;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,7 +25,7 @@ public final class Stage228SmallCraftVisualResolver {
     public static final double MINIMUM_MARKER_PIXELS = 3d;
 
     private static final ShipEngineeringCatalog ENGINEERING =
-            Stage22CorePairEngineeringCatalogLoader.loadDefault();
+            Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
     private static final Map<String, VisualBinding> BINDINGS = loadBindings();
 
     private Stage228SmallCraftVisualResolver() {
@@ -164,7 +164,7 @@ public final class Stage228SmallCraftVisualResolver {
             };
             String palette = switch (design.stableFactionId()) {
                 case "faction.imperial_directorate" -> "palette.empire.graphite_ivory_burgundy";
-                case "faction.industrial_union" -> "palette.industrial_union.graphite_steel_ochre";
+                case "faction.industrial_combine" -> "palette.industrial_union.graphite_steel_ochre";
                 default -> throw new IllegalStateException(
                         "unsupported M22.8J core faction: " + design.stableFactionId());
             };
