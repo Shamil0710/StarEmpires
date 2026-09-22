@@ -67,6 +67,18 @@ public final class CarrierWingStrategicReadinessService {
         FactionIdentityResolver factionIdentities = Objects.requireNonNull(identities, "identities");
         Objects.requireNonNull(assignments, "assignments");
 
+        TreeMap<SmallCraftId, MissionOrder> activeMissionByCraft = new TreeMap<>();
+        for (MissionOrder mission : missionState.missions()) {
+            if (!mission.status().active()) {
+                continue;
+            }
+            if (activeMissionByCraft.putIfAbsent(mission.craftId(), mission) != null) {
+                throw new IllegalStateException(
+                        "duplicate active mission in strategic readiness snapshot: "
+                                + mission.craftId());
+            }
+        }
+
         TreeMap<FleetId, WingProjection> projections = new TreeMap<>();
         Set<SmallCraftId> globallyBoundCraft = new HashSet<>();
         for (CarrierWingAssignment assignment : assignments) {
@@ -107,7 +119,8 @@ public final class CarrierWingStrategicReadinessService {
                             "strategic wing contains craft owned by another faction: " + craftId);
                 }
                 Optional<SmallCraftHangarRegistry.Assignment> occupancy = bays.find(craftId);
-                Optional<MissionOrder> mission = missionState.activeMissionFor(craftId);
+                Optional<MissionOrder> mission =
+                        Optional.ofNullable(activeMissionByCraft.get(craftId));
                 if (occupancy.isPresent()) {
                     SmallCraftHangarRegistry.Assignment embarked = occupancy.orElseThrow();
                     if (!checked.hostStableId().equals(embarked.bayId().hostStableId())) {

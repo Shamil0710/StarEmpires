@@ -14,6 +14,7 @@ import com.spacesim.world.SmallCraftFlightDeckOperations.Request;
 import com.spacesim.world.SmallCraftHangarCapacity.BayDefinition;
 import com.spacesim.world.SmallCraftHangarCapacity.BayId;
 import com.spacesim.world.SmallCraftHangarCapacity.CapacityStatus;
+import com.spacesim.world.SmallCraftHangarCapacity;
 import com.spacesim.world.SmallCraftHangarCapacity.OccupancyState;
 import com.spacesim.world.SmallCraftHangarCapacity.Usage;
 import com.spacesim.world.SmallCraftHangarRegistry;
@@ -81,19 +82,18 @@ public final class CarrierOperationsUiProjection {
                 canonicalBays(Objects.requireNonNull(bayDefinitions, "bayDefinitions"));
         MissionTargetVisibility visibility =
                 Objects.requireNonNull(targetVisibility, "targetVisibility");
+        ProjectionIndexes indexes =
+                ProjectionIndexes.capture(craft, bays, deck, missionState);
 
         ArrayList<BayView> bayViews = new ArrayList<>();
         for (BayDefinition bay : physicalBays.values()) {
             if (!bay.id().hostStableId().equals(wing.hostStableId())) {
                 continue;
             }
-            Usage usage = bays.usage(bay.id());
-            int queued = (int) deck.queued().stream()
-                    .filter(value -> value.bayId().equals(bay.id()))
-                    .count();
-            Optional<ActiveOperation> active = deck.active().stream()
-                    .filter(value -> value.request().bayId().equals(bay.id()))
-                    .findFirst();
+            Usage usage = indexes.usageByBay().getOrDefault(bay.id(), Usage.empty());
+            int queued = indexes.queuedCountByBay().getOrDefault(bay.id(), 0);
+            Optional<ActiveOperation> active =
+                    Optional.ofNullable(indexes.activeByBay().get(bay.id()));
             bayViews.add(new BayView(
                     bay.id(),
                     bay.hostKind().name(),
@@ -103,7 +103,7 @@ public final class CarrierOperationsUiProjection {
                     bay.effectiveSupportedMassKg(),
                     usage.occupiedEnvelopeVolumeM3(),
                     bay.effectiveUsableVolumeM3(),
-                    bays.capacityStatus(bay),
+                    SmallCraftHangarCapacity.status(bay, usage),
                     queued,
                     active.map(value -> value.request().kind().name()).orElse(""),
                     active.map(value -> value.phase().name()).orElse(""),
@@ -124,18 +124,20 @@ public final class CarrierOperationsUiProjection {
                 throw new IllegalArgumentException(
                         "carrier UI wing contains craft owned by another faction: " + id);
             }
-            Optional<SmallCraftHangarRegistry.Assignment> occupancy = bays.find(id);
+            Optional<SmallCraftHangarRegistry.Assignment> occupancy =
+                    Optional.ofNullable(indexes.occupancyByCraft().get(id));
             occupancy.ifPresent(value -> {
                 if (!value.bayId().hostStableId().equals(wing.hostStableId())) {
                     throw new IllegalArgumentException(
                             "carrier UI wing craft occupies another physical host: " + id);
                 }
             });
-            Optional<MissionOrder> mission = missionState.activeMissionFor(id);
-            Optional<Request> queued = deck.queued().stream()
-                    .filter(value -> value.craftId().equals(id))
-                    .findFirst();
-            Optional<ActiveOperation> active = deck.activeFor(id);
+            Optional<MissionOrder> mission =
+                    Optional.ofNullable(indexes.activeMissionByCraft().get(id));
+            Optional<Request> queued =
+                    Optional.ofNullable(indexes.queuedByCraft().get(id));
+            Optional<ActiveOperation> active =
+                    Optional.ofNullable(indexes.activeByCraft().get(id));
 
             int structure = structuralReadinessBps(state);
             ResourceReadiness ammunition = resourceReadiness(state, InterfaceKind.AMMUNITION);
@@ -178,6 +180,87 @@ public final class CarrierOperationsUiProjection {
                 List.copyOf(bayViews),
                 List.copyOf(craftViews),
                 List.copyOf(lost));
+    }
+
+    /**
+     * One capture-local read index built in linear passes over mission, hangar and deck snapshots.
+     *
+     * <p>The index is presentation-only and never survives the capture call. It avoids repeated
+     * full-list scans for dense wings while preserving exact persistent identities and physical
+     * state. No dormant craft is advanced or tactically materialized by building the index.</p>
+     */
+    private record ProjectionIndexes(
+            Map<SmallCraftId, SmallCraftHangarRegistry.Assignment> occupancyByCraft,
+            Map<BayId, Usage> usageByBay,
+            Map<SmallCraftId, MissionOrder> activeMissionByCraft,
+            Map<SmallCraftId, Request> queuedByCraft,
+            Map<BayId, Integer> queuedCountByBay,
+            Map<SmallCraftId, ActiveOperation> activeByCraft,
+            Map<BayId, ActiveOperation> activeByBay) {
+
+        private static ProjectionIndexes capture(
+                SmallCraftRegistry craftRegistry,
+                SmallCraftHangarRegistry hangars,
+                SmallCraftFlightDeckOperations flightDeck,
+                SmallCraftMissionState missions) {
+            TreeMap<SmallCraftId, SmallCraftHangarRegistry.Assignment> occupancyByCraft =
+                    new TreeMap<>();
+            TreeMap<BayId, Usage> usageByBay = new TreeMap<>();
+            for (SmallCraftHangarRegistry.Assignment assignment : hangars.snapshot()) {
+                if (occupancyByCraft.putIfAbsent(assignment.craftId(), assignment) != null) {
+                    throw new IllegalStateException(
+                            "duplicate hangar assignment in UI snapshot: " + assignment.craftId());
+                }
+                Usage usage = usageByBay.getOrDefault(assignment.bayId(), Usage.empty());
+                usageByBay.put(
+                        assignment.bayId(),
+                        usage.plus(craftRegistry.physicalFootprint(assignment.craftId())));
+            }
+
+            TreeMap<SmallCraftId, MissionOrder> activeMissionByCraft = new TreeMap<>();
+            for (MissionOrder mission : missions.missions()) {
+                if (!mission.status().active()) {
+                    continue;
+                }
+                if (activeMissionByCraft.putIfAbsent(mission.craftId(), mission) != null) {
+                    throw new IllegalStateException(
+                            "duplicate active mission in UI snapshot: " + mission.craftId());
+                }
+            }
+
+            TreeMap<SmallCraftId, Request> queuedByCraft = new TreeMap<>();
+            TreeMap<BayId, Integer> queuedCountByBay = new TreeMap<>();
+            for (Request request : flightDeck.queued()) {
+                if (queuedByCraft.putIfAbsent(request.craftId(), request) != null) {
+                    throw new IllegalStateException(
+                            "duplicate queued deck request in UI snapshot: " + request.craftId());
+                }
+                queuedCountByBay.merge(request.bayId(), 1, Math::addExact);
+            }
+
+            TreeMap<SmallCraftId, ActiveOperation> activeByCraft = new TreeMap<>();
+            TreeMap<BayId, ActiveOperation> activeByBay = new TreeMap<>();
+            for (ActiveOperation operation : flightDeck.active()) {
+                Request request = operation.request();
+                if (activeByCraft.putIfAbsent(request.craftId(), operation) != null) {
+                    throw new IllegalStateException(
+                            "duplicate active deck operation in UI snapshot: " + request.craftId());
+                }
+                if (activeByBay.putIfAbsent(request.bayId(), operation) != null) {
+                    throw new IllegalStateException(
+                            "duplicate active deck operation for bay in UI snapshot: " + request.bayId());
+                }
+            }
+
+            return new ProjectionIndexes(
+                    Collections.unmodifiableMap(occupancyByCraft),
+                    Collections.unmodifiableMap(usageByBay),
+                    Collections.unmodifiableMap(activeMissionByCraft),
+                    Collections.unmodifiableMap(queuedByCraft),
+                    Collections.unmodifiableMap(queuedCountByBay),
+                    Collections.unmodifiableMap(activeByCraft),
+                    Collections.unmodifiableMap(activeByBay));
+        }
     }
 
     private MissionView missionView(
