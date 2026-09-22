@@ -337,7 +337,7 @@ final class Stage228CarrierCheckpointHardeningTest {
                 List.of(new DeckProfile(bayId, 12d, 14d)),
                 List.of(),
                 List.of(),
-                40L);
+                -1L);
         SmallCraftMissionState missions = new SmallCraftMissionState(
                 2L,
                 List.of(mission(
