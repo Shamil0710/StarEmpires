@@ -73,12 +73,19 @@ final class Stage228CarrierCheckpointHardeningTest {
                 bay(parkedBayId), bay(readyBayId), bay(serviceBayId),
                 bay(repairBayId), bay(launchBayId), bay(recoveryBayId));
 
-        SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.empty(registry);
-        hangars.assign(parked, definitions.get(0), OccupancyState.PARKED);
-        hangars.assign(ready, definitions.get(1), OccupancyState.READY);
-        hangars.assign(servicing, definitions.get(2), OccupancyState.SERVICING);
-        hangars.assign(damaged, definitions.get(3), OccupancyState.SERVICING);
-        hangars.assign(launchQueued, definitions.get(4), OccupancyState.READY);
+        SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.restore(
+                registry,
+                List.of(
+                        new SmallCraftHangarRegistry.Assignment(
+                                parked, parkedBayId, HostKind.SHIP, OccupancyState.PARKED),
+                        new SmallCraftHangarRegistry.Assignment(
+                                ready, readyBayId, HostKind.SHIP, OccupancyState.READY),
+                        new SmallCraftHangarRegistry.Assignment(
+                                servicing, serviceBayId, HostKind.SHIP, OccupancyState.SERVICING),
+                        new SmallCraftHangarRegistry.Assignment(
+                                damaged, repairBayId, HostKind.SHIP, OccupancyState.SERVICING),
+                        new SmallCraftHangarRegistry.Assignment(
+                                launchQueued, launchBayId, HostKind.SHIP, OccupancyState.READY)));
 
         SmallCraftFlightDeckOperations deck = SmallCraftFlightDeckOperations.restore(
                 hangars,
