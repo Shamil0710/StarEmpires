@@ -11,6 +11,8 @@ import com.spacesim.ship.ShipEngineeringState.ConsumableState;
 import com.spacesim.ship.ShipEngineeringState.DamageState;
 import com.spacesim.ship.ShipEngineeringState.InstalledFit;
 import com.spacesim.ship.ShipFittingValidator;
+import com.spacesim.ship.ShipyardEngineeringService;
+import com.spacesim.ship.ShipyardEngineeringService.ShipyardCapability;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -145,6 +147,32 @@ final class Stage228SmallCraftProductionContentTest {
     }
 
     @Test
+    void everyProductionRoleCanBePlannedByAnOrdinaryFactionShipyard() {
+        ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        ShipyardIndustrialCatalog empireIndustrial =
+                Stage22CorePairShipyardIndustrialCatalogLoader.loadEmpireDefault();
+        ShipyardIndustrialCatalog unionIndustrial =
+                Stage22CorePairShipyardIndustrialCatalogLoader.loadIndustrialUnionDefault();
+        Stage18ShipyardCatalog empirePhysical =
+                Stage228SmallCraftShipyardCatalogLoader.loadEmpireDefault();
+        Stage18ShipyardCatalog unionPhysical =
+                Stage228SmallCraftShipyardCatalogLoader.loadIndustrialUnionDefault();
+
+        for (String fitId : List.of(
+                Stage228SmallCraftProductionProjection.EMPIRE_INTERCEPTOR_FIT_ID,
+                Stage228SmallCraftProductionProjection.EMPIRE_DEFENCE_FIT_ID,
+                Stage228SmallCraftProductionProjection.EMPIRE_STRIKE_FIT_ID)) {
+            assertFeasibleBuild(engineering, empireIndustrial, empirePhysical, fitId);
+        }
+        for (String fitId : List.of(
+                Stage228SmallCraftProductionProjection.UNION_INTERCEPTOR_FIT_ID,
+                Stage228SmallCraftProductionProjection.UNION_DEFENCE_FIT_ID,
+                Stage228SmallCraftProductionProjection.UNION_STRIKE_FIT_ID)) {
+            assertFeasibleBuild(engineering, unionIndustrial, unionPhysical, fitId);
+        }
+    }
+
+    @Test
     void visualBindingUsesStableFitIdentityExactPhysicalScaleAndFailClosedFallback() {
         var empireCarrier = Stage22ProductionShipVisualResolver.resolveRole(
                 "fleet.carrier.empire",
@@ -177,6 +205,33 @@ final class Stage228SmallCraftProductionContentTest {
                 IllegalArgumentException.class,
                 () -> Stage228SmallCraftVisualResolver.resolve(
                         "craft:missing", "fit.missing.small_craft_v1"));
+    }
+
+    private static void assertFeasibleBuild(
+            ShipEngineeringCatalog engineering,
+            ShipyardIndustrialCatalog industrial,
+            Stage18ShipyardCatalog physical,
+            String fitId) {
+        var yard = physical.getYards().get(0);
+        ShipyardCapability capability = new ShipyardCapability(
+                yard.id(),
+                yard.berthDimensionsM(),
+                yard.maxServiceMassKg(),
+                yard.stage175FabricationCapabilities(),
+                yard.stage175HandledRequirementIds(),
+                yard.toolingTags(),
+                yard.precisionCapability(),
+                yard.ratedEngineeringWorkRate(),
+                yard.laborCapacity(),
+                yard.automationCapacity(),
+                yard.ratedIntegrationPowerW());
+        var authored = engineering.findDemonstratorFit(fitId);
+        assertNotNull(authored);
+        var plan = new ShipyardEngineeringService(engineering, industrial)
+                .planBuild(InstalledFit.fromDemonstrator(authored), capability);
+        assertTrue(plan.feasibility().feasible(), fitId + " -> " + plan.feasibility().issues());
+        assertTrue(plan.requirements().totalWorkSeconds() > 0d);
+        assertTrue(plan.requirements().serviceMassKg() > 0d);
     }
 
     private static boolean hasModule(
