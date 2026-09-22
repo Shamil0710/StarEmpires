@@ -300,7 +300,7 @@ final class Stage228CarrierCheckpointHardeningTest {
         Stage228CampaignAuthority restoredV1 = Stage228CampaignAuthority.restore(migratedV1);
 
         assertEquals(1, restoredV1.smallCraft().size());
-        assertTrue(restoredV1.hangars().assignments().isEmpty());
+        assertTrue(restoredV1.hangars().snapshot().isEmpty());
         assertTrue(restoredV1.flightDeck().queued().isEmpty());
         assertTrue(restoredV1.flightDeck().active().isEmpty());
         assertTrue(restoredV1.missions().missions().isEmpty());
