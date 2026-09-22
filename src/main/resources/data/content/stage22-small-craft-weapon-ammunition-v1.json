@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "kineticAmmunition": [
+    {
+      "id": "ammo.empire_smallcraft_interceptor_dart_v1",
+      "materialId": "material.smallcraft_frame_v1",
+      "shape": "DART",
+      "lengthM": 0.62,
+      "diameterM": 0.045,
+      "massKg": 8
+    },
+    {
+      "id": "ammo.empire_smallcraft_strike_dart_v1",
+      "materialId": "material.smallcraft_frame_v1",
+      "shape": "DART",
+      "lengthM": 1,
+      "diameterM": 0.075,
+      "massKg": 20
+    },
+    {
+      "id": "ammo.industrial_union_smallcraft_interceptor_dart_v1",
+      "materialId": "material.smallcraft_frame_v1",
+      "shape": "DART",
+      "lengthM": 0.58,
+      "diameterM": 0.043,
+      "massKg": 7
+    },
+    {
+      "id": "ammo.industrial_union_smallcraft_strike_dart_v1",
+      "materialId": "material.smallcraft_frame_v1",
+      "shape": "DART",
+      "lengthM": 0.95,
+      "diameterM": 0.072,
+      "massKg": 18
+    }
+  ],
+  "guidedAmmunition": []
+}
