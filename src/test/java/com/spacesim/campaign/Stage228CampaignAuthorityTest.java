@@ -1,6 +1,12 @@
 package com.spacesim.campaign;
 
 import com.spacesim.content.ship.ShipEngineeringCatalog.Dimensions3d;
+import com.spacesim.content.ship.Stage228SmallCraftEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage228SmallCraftProductionProjection;
+import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
+import com.spacesim.ship.ShipEngineeringState.ConsumableState;
+import com.spacesim.ship.ShipEngineeringState.InstalledFit;
+import com.spacesim.ship.ShipInstanceRuntimeState;
 import com.spacesim.persistence.Stage228FlightDeckPersistentState;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
 import com.spacesim.persistence.Stage228HangarPersistentState;
@@ -16,6 +22,7 @@ import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,6 +45,40 @@ class Stage228CampaignAuthorityTest {
         assertTrue(adopted.captureState().flightDeck().profiles().isEmpty());
         assertTrue(adopted.captureState().flightDeck().queued().isEmpty());
         assertTrue(adopted.captureState().flightDeck().active().isEmpty());
+    }
+
+    @Test
+    void generatedCampaignAcceptsM228jProductionSmallCraftFitsWithoutSeedingAnyForFree() {
+        Stage228CampaignAuthority authority = Stage228CampaignAuthority.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        var engineering = Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
+
+        assertEquals(
+                engineering.getFingerprint(),
+                authority.smallCraft().engineeringCatalogFingerprint());
+        assertEquals(0, authority.smallCraft().size());
+
+        var authored = engineering.findDemonstratorFit(
+                Stage228SmallCraftProductionProjection.EMPIRE_INTERCEPTOR_FIT_ID);
+        assertNotNull(authored);
+        SmallCraftId id = authority.smallCraft().reserveIdentityForCompletedProduction();
+        authority.smallCraft().registerProducedCraft(new com.spacesim.world.SmallCraftState(
+                id,
+                "faction.empire",
+                authored.id(),
+                InstalledFit.fromDemonstrator(authored),
+                new RuntimeState(
+                        ConsumableState.empty(),
+                        0d,
+                        0d,
+                        java.util.Map.of(),
+                        java.util.Map.of(),
+                        0d,
+                        java.util.Map.of()),
+                ShipInstanceRuntimeState.legacyNeutral()));
+
+        assertEquals(1, authority.smallCraft().size());
+        assertEquals(authored.id(), authority.smallCraft().find(id).orElseThrow().designId());
     }
 
     @Test
