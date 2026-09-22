@@ -61,6 +61,7 @@ public final class Stage228CampaignAuthority {
         validateOperations(
                 this.smallCraft,
                 this.hangars,
+                this.flightDeck,
                 this.missions,
                 this.logistics,
                 this.carrierWings);
@@ -135,6 +136,7 @@ public final class Stage228CampaignAuthority {
         validateOperations(
                 smallCraft,
                 hangars,
+                flightDeck,
                 operations.missions(),
                 operations.logistics(),
                 operations.carrierWings());
@@ -217,7 +219,7 @@ public final class Stage228CampaignAuthority {
      */
     public void commitMissionState(SmallCraftMissionState next) {
         SmallCraftMissionState checked = Objects.requireNonNull(next, "next");
-        validateOperations(smallCraft, hangars, checked, logistics, carrierWings);
+        validateOperations(smallCraft, hangars, flightDeck, checked, logistics, carrierWings);
         missions = checked;
     }
 
@@ -228,7 +230,7 @@ public final class Stage228CampaignAuthority {
      */
     public void commitLogisticsState(LogisticsState next) {
         LogisticsState checked = Objects.requireNonNull(next, "next");
-        validateOperations(smallCraft, hangars, missions, checked, carrierWings);
+        validateOperations(smallCraft, hangars, flightDeck, missions, checked, carrierWings);
         logistics = checked;
     }
 
@@ -240,7 +242,7 @@ public final class Stage228CampaignAuthority {
     public void commitCarrierWings(Collection<CarrierWingAssignment> next) {
         List<CarrierWingAssignment> checked =
                 List.copyOf(Objects.requireNonNull(next, "next"));
-        validateOperations(smallCraft, hangars, missions, logistics, checked);
+        validateOperations(smallCraft, hangars, flightDeck, missions, logistics, checked);
         carrierWings = checked;
     }
 
@@ -288,11 +290,14 @@ public final class Stage228CampaignAuthority {
     private static void validateOperations(
             SmallCraftRegistry craft,
             SmallCraftHangarRegistry hangars,
+            SmallCraftFlightDeckOperations flightDeck,
             SmallCraftMissionState missions,
             LogisticsState logistics,
             Collection<CarrierWingAssignment> wings) {
         Objects.requireNonNull(craft, "craft");
         Objects.requireNonNull(hangars, "hangars");
+        SmallCraftFlightDeckOperations checkedDeck =
+                Objects.requireNonNull(flightDeck, "flightDeck");
         SmallCraftMissionState checkedMissions =
                 Objects.requireNonNull(missions, "missions");
         LogisticsState checkedLogistics = Objects.requireNonNull(logistics, "logistics");
@@ -323,12 +328,75 @@ public final class Stage228CampaignAuthority {
             pending.add(delivery.craftId());
         }
 
+        java.util.HashMap<com.spacesim.world.SmallCraftId,
+                SmallCraftFlightDeckOperations.OperationKind> deckOperationByCraft =
+                new java.util.HashMap<>();
+        for (var request : checkedDeck.queued()) {
+            deckOperationByCraft.put(request.craftId(), request.kind());
+        }
+        for (var active : checkedDeck.active()) {
+            deckOperationByCraft.put(active.request().craftId(), active.request().kind());
+        }
+
         for (var mission : checkedMissions.missions()) {
+            if (mission.craftId().value() >= craft.nextIdValue()) {
+                throw new IllegalArgumentException(
+                        "mission references never-issued small-craft identity: "
+                                + mission.craftId());
+            }
             if (mission.status().active()
                     && craft.find(mission.craftId()).isEmpty()) {
                 throw new IllegalArgumentException(
                         "active mission references lost/absent craft: "
                                 + mission.craftId());
+            }
+
+            var occupancy = hangars.find(mission.craftId());
+            var deckKind = deckOperationByCraft.get(mission.craftId());
+            switch (mission.status()) {
+                case LAUNCH_QUEUED -> {
+                    if (occupancy.isEmpty()
+                            || deckKind != SmallCraftFlightDeckOperations.OperationKind.LAUNCH) {
+                        throw new IllegalArgumentException(
+                                "launch-queued mission requires matching physical launch operation: "
+                                        + mission.craftId());
+                    }
+                    var state = occupancy.orElseThrow().state();
+                    if (state != com.spacesim.world.SmallCraftHangarCapacity.OccupancyState.READY
+                            && state
+                            != com.spacesim.world.SmallCraftHangarCapacity.OccupancyState.LAUNCHING) {
+                        throw new IllegalArgumentException(
+                                "launch-queued mission requires READY/LAUNCHING bay occupancy: "
+                                        + mission.craftId());
+                    }
+                }
+                case ACTIVE, RETURNING -> {
+                    if (occupancy.isPresent() || deckKind != null) {
+                        throw new IllegalArgumentException(
+                                "deployed mission cannot retain bay/deck occupancy: "
+                                        + mission.craftId());
+                    }
+                }
+                case RECOVERY_PENDING -> {
+                    if (deckKind != null
+                            && deckKind
+                            != SmallCraftFlightDeckOperations.OperationKind.RECOVERY) {
+                        throw new IllegalArgumentException(
+                                "recovery-pending mission cannot have a launch operation: "
+                                        + mission.craftId());
+                    }
+                    if (deckKind == null
+                            && (occupancy.isEmpty()
+                            || occupancy.orElseThrow().state()
+                            != com.spacesim.world.SmallCraftHangarCapacity.OccupancyState.SERVICING)) {
+                        throw new IllegalArgumentException(
+                                "recovery-pending mission must be recovering or physically serviced: "
+                                        + mission.craftId());
+                    }
+                }
+                case COMPLETE, CANCELLED, FAILED -> {
+                    // Terminal mission rows are provenance only; physical state is validated elsewhere.
+                }
             }
         }
 
@@ -346,6 +414,10 @@ public final class Stage228CampaignAuthority {
                 if (!wingCraft.add(id)) {
                     throw new IllegalArgumentException(
                             "craft belongs to multiple carrier wings: " + id);
+                }
+                if (id.value() >= craft.nextIdValue()) {
+                    throw new IllegalArgumentException(
+                            "carrier wing references never-issued small-craft identity: " + id);
                 }
                 if (pending.contains(id)) {
                     throw new IllegalArgumentException(
