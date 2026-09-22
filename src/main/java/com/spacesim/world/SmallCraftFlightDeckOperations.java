@@ -383,6 +383,13 @@ public final class SmallCraftFlightDeckOperations {
             long authoritativeTick,
             double fixedStepSeconds,
             Map<BayId, BayDefinition> bayDefinitions) {
+        advanceFixedTickMeasured(authoritativeTick, fixedStepSeconds, bayDefinitions);
+    }
+
+    SchedulingDiagnostics advanceFixedTickMeasured(
+            long authoritativeTick,
+            double fixedStepSeconds,
+            Map<BayId, BayDefinition> bayDefinitions) {
         if (authoritativeTick < 0L) {
             throw new IllegalArgumentException("authoritativeTick cannot be negative");
         }
@@ -393,19 +400,42 @@ public final class SmallCraftFlightDeckOperations {
         requirePositive(fixedStepSeconds, "fixedStepSeconds");
         Map<BayId, BayDefinition> checkedBays = immutableBayMap(bayDefinitions);
 
+        int queueScans = 0;
+        TreeMap<BayId, Request> firstStartableByBay = new TreeMap<>();
+        for (Request request : queue) {
+            queueScans++;
+            if (request.requestedTick() > authoritativeTick
+                    || activeByBay.containsKey(request.bayId())
+                    || firstStartableByBay.containsKey(request.bayId())) {
+                continue;
+            }
+            BayDefinition bay = checkedBays.get(request.bayId());
+            if (bay == null || bay.conditionFraction() <= EPSILON) {
+                continue;
+            }
+            if (request.kind() == OperationKind.LAUNCH
+                    || hangars.canAccept(request.craftId(), bay)) {
+                firstStartableByBay.put(request.bayId(), request);
+            }
+        }
+
+        int profilesVisited = 0;
+        int startedOperations = 0;
+        int activeOperationsAdvanced = 0;
         for (DeckProfile profile : profiles.values()) {
+            profilesVisited++;
             BayDefinition bay = checkedBays.get(profile.bayId());
             if (bay == null) {
                 continue;
             }
             ActiveOperation active = activeByBay.get(profile.bayId());
             if (active == null) {
-                Request next = nextStartableRequest(
-                        profile.bayId(), authoritativeTick, bay);
+                Request next = firstStartableByBay.get(profile.bayId());
                 if (next == null || bay.conditionFraction() <= EPSILON) {
                     continue;
                 }
                 start(next, bay, profile);
+                startedOperations++;
                 active = activeByBay.get(profile.bayId());
             }
             if (active == null
@@ -414,6 +444,7 @@ public final class SmallCraftFlightDeckOperations {
                     || bay.conditionFraction() <= EPSILON) {
                 continue;
             }
+            activeOperationsAdvanced++;
             double completedWork = fixedStepSeconds * bay.conditionFraction();
             double remaining = Math.max(0d, active.remainingWorkSeconds() - completedWork);
             if (remaining > EPSILON) {
@@ -424,6 +455,33 @@ public final class SmallCraftFlightDeckOperations {
             }
         }
         lastProcessedTick = authoritativeTick;
+        return new SchedulingDiagnostics(
+                profilesVisited,
+                queueScans,
+                firstStartableByBay.size(),
+                startedOperations,
+                activeOperationsAdvanced);
+    }
+
+    record SchedulingDiagnostics(
+            int profilesVisited,
+            int queuedRequestsScanned,
+            int startableCandidates,
+            int startedOperations,
+            int activeOperationsAdvanced) {
+        SchedulingDiagnostics {
+            if (profilesVisited < 0
+                    || queuedRequestsScanned < 0
+                    || startableCandidates < 0
+                    || startedOperations < 0
+                    || activeOperationsAdvanced < 0) {
+                throw new IllegalArgumentException("scheduling diagnostics cannot be negative");
+            }
+        }
+
+        int totalLinearWorkUnits() {
+            return profilesVisited + queuedRequestsScanned;
+        }
     }
 
     /** @return last authoritative tick consumed by this sequencer, or -1 before any tick */
@@ -593,25 +651,6 @@ public final class SmallCraftFlightDeckOperations {
             hangars.transition(request.craftId(), OccupancyState.SERVICING);
             activeByBay.remove(request.bayId());
         }
-    }
-
-    private Request nextStartableRequest(
-            BayId bayId,
-            long authoritativeTick,
-            BayDefinition bay) {
-        for (Request request : queue) {
-            if (!request.bayId().equals(bayId)
-                    || request.requestedTick() > authoritativeTick) {
-                continue;
-            }
-            if (request.kind() == OperationKind.LAUNCH) {
-                return request;
-            }
-            if (hangars.canAccept(request.craftId(), bay)) {
-                return request;
-            }
-        }
-        return null;
     }
 
     private void enqueueUnique(Request request) {
