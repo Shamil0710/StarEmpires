@@ -93,8 +93,8 @@ final class Stage228CarrierCheckpointHardeningTest {
                         .map(value -> new DeckProfile(value.id(), 12d, 14d))
                         .toList(),
                 List.of(
-                        new Request(launchQueued, launchBayId, OperationKind.LAUNCH, 40L),
-                        new Request(recoveryQueued, recoveryBayId, OperationKind.RECOVERY, 40L)),
+                        new Request(launchQueued, launchBayId, OperationKind.LAUNCH, 0L),
+                        new Request(recoveryQueued, recoveryBayId, OperationKind.RECOVERY, 0L)),
                 List.of(),
                 -1L);
 
@@ -249,6 +249,37 @@ final class Stage228CarrierCheckpointHardeningTest {
     }
 
     @Test
+    void futureDatedMissionFailsClosedAgainstAuthoritativeWorldTick() {
+        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        SmallCraftRegistry registry =
+                SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
+        SmallCraftId craft = register(registry, 4L, 16d, 80d, 1d, 0d);
+        SmallCraftMissionState missions = new SmallCraftMissionState(
+                2L,
+                List.of(new MissionOrder(
+                        1L,
+                        craft,
+                        OrderSource.AI,
+                        MissionType.INTERCEPTION,
+                        new MissionTarget(TargetKind.AREA, "area.future"),
+                        1L,
+                        MissionStatus.ACTIVE)));
+
+        Stage228GeneratedCampaignPersistentState checkpoint =
+                Stage228GeneratedCampaignPersistentState.compose(
+                        coordinator.captureState(),
+                        Stage228SmallCraftPersistenceMapper.capture(registry),
+                        Stage228HangarPersistentState.empty(),
+                        Stage228FlightDeckPersistentState.empty(),
+                        Stage228OperationsPersistenceMapper.capture(
+                                missions, LogisticsState.empty(), List.of()));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage228CampaignAuthority.restore(checkpoint));
+    }
+
+    @Test
     void launchQueuedMissionRequiresMatchingPhysicalDeckOperation() {
         GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
@@ -383,7 +414,7 @@ final class Stage228CarrierCheckpointHardeningTest {
         SmallCraftFlightDeckOperations deck = SmallCraftFlightDeckOperations.restore(
                 hangars,
                 List.of(new DeckProfile(bayId, 12d, 14d)),
-                List.of(new Request(craft, bayId, OperationKind.LAUNCH, 40L)),
+                List.of(new Request(craft, bayId, OperationKind.LAUNCH, 0L)),
                 List.of(),
                 -1L);
 
@@ -481,7 +512,7 @@ final class Stage228CarrierCheckpointHardeningTest {
                 OrderSource.AI,
                 type,
                 new MissionTarget(kind, type == MissionType.RECOVER ? HOST : "area.m22_8m"),
-                40L,
+                0L,
                 status);
     }
 
