@@ -3,7 +3,7 @@ package com.spacesim.content.ship;
 import com.spacesim.content.Stage228SmallCraftShipyardCatalogLoader;
 import com.spacesim.content.Stage18ShipyardCatalog;
 import com.spacesim.content.weapon.Stage228SmallCraftWeaponRuntimeProjection;
-import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader;
+import com.spacesim.content.weapon.Stage228SmallCraftWeaponRuntimeCatalogLoader;
 import com.spacesim.presentation.asset.Stage228SmallCraftVisualResolver;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver;
 import com.spacesim.presentation.asset.Stage22ProductionShipVisualResolver.RuntimeVisualState;
@@ -29,7 +29,7 @@ final class Stage228SmallCraftProductionContentTest {
 
     @Test
     void sixProductionFitsUseOrdinaryEngineeringAuthorityAndPhysicalRoleDifferences() {
-        ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        ShipEngineeringCatalog engineering = Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
         ShipFittingValidator validator = new ShipFittingValidator(engineering);
 
         List<Stage228SmallCraftProductionProjection.DesignBinding> designs =
@@ -75,7 +75,7 @@ final class Stage228SmallCraftProductionContentTest {
 
     @Test
     void strikeCraftUsesOrdinaryFiniteLauncherAndFactionMaterialAmmunition() {
-        var runtime = Stage22CorePairWeaponRuntimeCatalogLoader.loadCombined();
+        var runtime = Stage228SmallCraftWeaponRuntimeCatalogLoader.loadCombined();
         var profile = runtime.launchers().findByModuleId(
                 Stage228SmallCraftProductionProjection.KINETIC_ID);
         assertNotNull(profile);
@@ -98,9 +98,9 @@ final class Stage228SmallCraftProductionContentTest {
     @Test
     void smallCraftHasCompleteIndustrialAndStage18PhysicalProductionCoverage() {
         ShipyardIndustrialCatalog empireIndustrial =
-                Stage22CorePairShipyardIndustrialCatalogLoader.loadEmpireDefault();
+                Stage228SmallCraftShipyardIndustrialCatalogLoader.loadEmpireDefault();
         ShipyardIndustrialCatalog unionIndustrial =
-                Stage22CorePairShipyardIndustrialCatalogLoader.loadIndustrialUnionDefault();
+                Stage228SmallCraftShipyardIndustrialCatalogLoader.loadIndustrialUnionDefault();
         Stage18ShipyardCatalog empirePhysical =
                 Stage228SmallCraftShipyardCatalogLoader.loadEmpireDefault();
         Stage18ShipyardCatalog unionPhysical =
@@ -129,7 +129,7 @@ final class Stage228SmallCraftProductionContentTest {
             assertNotNull(unionPhysical.findModuleProfile(moduleId));
         }
 
-        var engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        var engineering = Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
         assertEquals(
                 engineering.findHull(Stage228SmallCraftProductionProjection.EMPIRE_HULL_ID)
                         .bareHullMassKg(),
@@ -148,11 +148,11 @@ final class Stage228SmallCraftProductionContentTest {
 
     @Test
     void everyProductionRoleCanBePlannedByAnOrdinaryFactionShipyard() {
-        ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        ShipEngineeringCatalog engineering = Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog empireIndustrial =
-                Stage22CorePairShipyardIndustrialCatalogLoader.loadEmpireDefault();
+                Stage228SmallCraftShipyardIndustrialCatalogLoader.loadEmpireDefault();
         ShipyardIndustrialCatalog unionIndustrial =
-                Stage22CorePairShipyardIndustrialCatalogLoader.loadIndustrialUnionDefault();
+                Stage228SmallCraftShipyardIndustrialCatalogLoader.loadIndustrialUnionDefault();
         Stage18ShipyardCatalog empirePhysical =
                 Stage228SmallCraftShipyardCatalogLoader.loadEmpireDefault();
         Stage18ShipyardCatalog unionPhysical =
@@ -181,7 +181,7 @@ final class Stage228SmallCraftProductionContentTest {
                 RuntimeVisualState.IDLE);
         var unionCarrier = Stage22ProductionShipVisualResolver.resolveRole(
                 "fleet.carrier.union",
-                "faction.industrial_union",
+                "faction.industrial_combine",
                 "role.military.carrier",
                 RuntimeVisualState.IDLE);
 
