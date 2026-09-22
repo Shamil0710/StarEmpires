@@ -134,9 +134,9 @@ public final class Stage228SmallCraftProductionProjection {
                 new DesignBinding(EMPIRE_INTERCEPTOR_FIT_ID, "faction.imperial_directorate", ROLE_INTERCEPTION),
                 new DesignBinding(EMPIRE_DEFENCE_FIT_ID, "faction.imperial_directorate", ROLE_DEFENCE),
                 new DesignBinding(EMPIRE_STRIKE_FIT_ID, "faction.imperial_directorate", ROLE_STRIKE),
-                new DesignBinding(UNION_INTERCEPTOR_FIT_ID, "faction.industrial_union", ROLE_INTERCEPTION),
-                new DesignBinding(UNION_DEFENCE_FIT_ID, "faction.industrial_union", ROLE_DEFENCE),
-                new DesignBinding(UNION_STRIKE_FIT_ID, "faction.industrial_union", ROLE_STRIKE));
+                new DesignBinding(UNION_INTERCEPTOR_FIT_ID, "faction.industrial_combine", ROLE_INTERCEPTION),
+                new DesignBinding(UNION_DEFENCE_FIT_ID, "faction.industrial_combine", ROLE_DEFENCE),
+                new DesignBinding(UNION_STRIKE_FIT_ID, "faction.industrial_combine", ROLE_STRIKE));
     }
 
     private static HullDefinition empireHull() {
