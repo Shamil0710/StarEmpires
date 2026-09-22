@@ -151,12 +151,14 @@ final class Stage228SmallCraftProductionSupplyIntegrationTest {
                                 "facility.fabrication.assembly"),
                         Map.of(
                                 "storage.dry_bulk", 200_000_000d,
+                                "storage.liquid_tank", 5_000d,
                                 "storage.general_container", 100_000_000d,
                                 "storage.hazardous_controlled", 50_000_000d,
                                 "storage.high_value_controlled", 100_000_000d,
                                 "storage.oversized", 100_000_000d),
                         Set.of(
                                 "storage.dry_bulk",
+                                "storage.liquid_tank",
                                 "storage.general_container",
                                 "storage.hazardous_controlled",
                                 "storage.high_value_controlled",
