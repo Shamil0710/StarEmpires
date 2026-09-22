@@ -64,7 +64,8 @@ public final class Stage228CampaignAuthority {
                 this.flightDeck,
                 this.missions,
                 this.logistics,
-                this.carrierWings);
+                this.carrierWings,
+                this.coordinator.runtime().world().getAuthoritativeWorldTick());
     }
 
     /**
@@ -139,7 +140,8 @@ public final class Stage228CampaignAuthority {
                 flightDeck,
                 operations.missions(),
                 operations.logistics(),
-                operations.carrierWings());
+                operations.carrierWings(),
+                authoritativeTick);
         return new Stage228CampaignAuthority(
                 coordinator,
                 smallCraft,
@@ -219,7 +221,9 @@ public final class Stage228CampaignAuthority {
      */
     public void commitMissionState(SmallCraftMissionState next) {
         SmallCraftMissionState checked = Objects.requireNonNull(next, "next");
-        validateOperations(smallCraft, hangars, flightDeck, checked, logistics, carrierWings);
+        validateOperations(
+                smallCraft, hangars, flightDeck, checked, logistics, carrierWings,
+                coordinator.runtime().world().getAuthoritativeWorldTick());
         missions = checked;
     }
 
@@ -230,7 +234,9 @@ public final class Stage228CampaignAuthority {
      */
     public void commitLogisticsState(LogisticsState next) {
         LogisticsState checked = Objects.requireNonNull(next, "next");
-        validateOperations(smallCraft, hangars, flightDeck, missions, checked, carrierWings);
+        validateOperations(
+                smallCraft, hangars, flightDeck, missions, checked, carrierWings,
+                coordinator.runtime().world().getAuthoritativeWorldTick());
         logistics = checked;
     }
 
@@ -242,7 +248,9 @@ public final class Stage228CampaignAuthority {
     public void commitCarrierWings(Collection<CarrierWingAssignment> next) {
         List<CarrierWingAssignment> checked =
                 List.copyOf(Objects.requireNonNull(next, "next"));
-        validateOperations(smallCraft, hangars, flightDeck, missions, logistics, checked);
+        validateOperations(
+                smallCraft, hangars, flightDeck, missions, logistics, checked,
+                coordinator.runtime().world().getAuthoritativeWorldTick());
         carrierWings = checked;
     }
 
@@ -293,7 +301,8 @@ public final class Stage228CampaignAuthority {
             SmallCraftFlightDeckOperations flightDeck,
             SmallCraftMissionState missions,
             LogisticsState logistics,
-            Collection<CarrierWingAssignment> wings) {
+            Collection<CarrierWingAssignment> wings,
+            long authoritativeTick) {
         Objects.requireNonNull(craft, "craft");
         Objects.requireNonNull(hangars, "hangars");
         SmallCraftFlightDeckOperations checkedDeck =
@@ -302,6 +311,22 @@ public final class Stage228CampaignAuthority {
                 Objects.requireNonNull(missions, "missions");
         LogisticsState checkedLogistics = Objects.requireNonNull(logistics, "logistics");
         Objects.requireNonNull(wings, "wings");
+        if (authoritativeTick < 0L) {
+            throw new IllegalArgumentException("authoritativeTick cannot be negative");
+        }
+        for (var request : checkedDeck.queued()) {
+            if (request.requestedTick() > authoritativeTick) {
+                throw new IllegalArgumentException(
+                        "queued flight-deck request is future-dated: " + request.craftId());
+            }
+        }
+        for (var active : checkedDeck.active()) {
+            if (active.request().requestedTick() > authoritativeTick) {
+                throw new IllegalArgumentException(
+                        "active flight-deck request is future-dated: "
+                                + active.request().craftId());
+            }
+        }
 
         java.util.HashSet<com.spacesim.world.SmallCraftId> pending =
                 new java.util.HashSet<>();
@@ -339,6 +364,11 @@ public final class Stage228CampaignAuthority {
         }
 
         for (var mission : checkedMissions.missions()) {
+            if (mission.submittedTick() > authoritativeTick) {
+                throw new IllegalArgumentException(
+                        "mission is future-dated relative to authoritative world tick: "
+                                + mission.id());
+            }
             if (mission.craftId().value() >= craft.nextIdValue()) {
                 throw new IllegalArgumentException(
                         "mission references never-issued small-craft identity: "
