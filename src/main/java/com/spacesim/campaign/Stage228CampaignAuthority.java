@@ -7,6 +7,7 @@ import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
 import com.spacesim.persistence.Stage228HangarPersistenceMapper;
 import com.spacesim.persistence.Stage228OperationsPersistenceMapper;
 import com.spacesim.persistence.Stage228SmallCraftPersistenceMapper;
+import com.spacesim.world.FleetId;
 import com.spacesim.world.SmallCraftFitAuthority;
 import com.spacesim.world.SmallCraftFlightDeckOperations;
 import com.spacesim.world.SmallCraftFlightDeckOperations.DeckProfile;
