@@ -3,8 +3,8 @@ package com.spacesim.world;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipProtectionCatalog;
 import com.spacesim.content.ship.Stage22CorePairProtectionCatalogLoader;
-import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader;
-import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader.RuntimeContent;
+import com.spacesim.content.weapon.Stage22CarrierWeaponRuntimeCatalogLoader;
+import com.spacesim.content.weapon.Stage22CarrierWeaponRuntimeCatalogLoader.RuntimeContent;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.ImportedCombatantState;
 import com.spacesim.ship.LiveTacticalBattleScenario.Side;
 import com.spacesim.ship.Stage19ExactTacticalEncounterResolver;
@@ -53,7 +53,7 @@ public final class SmallCraftTacticalEncounterService {
             SmallCraftRegistry craftRegistry,
             SmallCraftHangarRegistry hangars) {
         SmallCraftRegistry registry = Objects.requireNonNull(craftRegistry, "craftRegistry");
-        RuntimeContent content = Stage22CorePairWeaponRuntimeCatalogLoader.loadCombined();
+        RuntimeContent content = Stage22CarrierWeaponRuntimeCatalogLoader.loadCombined();
         if (!registry.engineeringCatalogFingerprint().equals(content.engineering().getFingerprint())) {
             throw new IllegalArgumentException(
                     "Small-craft registry and tactical runtime must use the same engineering catalog");
