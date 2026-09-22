@@ -344,6 +344,17 @@ public record GeneratedWorldUiSnapshot(
             implements Comparable<MilitaryView> {
         /**
          * Source-compatible constructor for ordinary military fleets without an M22.8 carrier view.
+         *
+         * @param fleetId persistent fleet identity
+         * @param name player-facing fleet name
+         * @param factionId stable faction identity
+         * @param factionName player-facing faction name
+         * @param status current fleet status
+         * @param systemId displayed system identity
+         * @param inSystem whether the fleet is physically materialized in-system
+         * @param hullId installed hull definition
+         * @param fitId installed fit identity
+         * @param sections structured inspector content
          */
         public MilitaryView(
                 long fleetId,
