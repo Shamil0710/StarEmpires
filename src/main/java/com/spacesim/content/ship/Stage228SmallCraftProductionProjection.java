@@ -143,7 +143,7 @@ public final class Stage228SmallCraftProductionProjection {
         return hull(
                 EMPIRE_HULL_ID,
                 "Imperial Embarked Combat Craft",
-                32d, 12d, 6d,
+                28d, 12d, 6d,
                 180_000d, 1_100d, 520_000d,
                 2, 4, 150d,
                 "protection.empire_citadel_v1");
@@ -153,7 +153,7 @@ public final class Stage228SmallCraftProductionProjection {
         return hull(
                 UNION_HULL_ID,
                 "Industrial Union Embarked Combat Craft",
-                35d, 14d, 6.5d,
+                29d, 14d, 6.5d,
                 200_000d, 1_300d, 560_000d,
                 2, 4, 175d,
                 "protection.industrial_union_sectional_v1");
