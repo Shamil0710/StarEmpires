@@ -1,8 +1,8 @@
 package com.spacesim.content;
 
 import com.spacesim.content.ship.ShipEngineeringCatalog;
-import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
-import com.spacesim.content.ship.Stage22CorePairShipyardIndustrialCatalogLoader;
+import com.spacesim.content.ship.Stage228SmallCraftEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage228SmallCraftShipyardIndustrialCatalogLoader;
 import com.spacesim.content.ship.ShipyardIndustrialCatalog;
 
 /**
@@ -20,9 +20,9 @@ public final class Stage228SmallCraftShipyardCatalogLoader {
 
     /** @return Empire Stage-18 catalog with M22.8J small-craft physical profiles */
     public static Stage18ShipyardCatalog loadEmpireDefault() {
-        ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        ShipEngineeringCatalog engineering = Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog industrial =
-                Stage22CorePairShipyardIndustrialCatalogLoader.loadEmpireDefault();
+                Stage228SmallCraftShipyardIndustrialCatalogLoader.loadEmpireDefault();
         Stage18ShipyardCatalog projected =
                 Stage228SmallCraftShipyardPhysicalProjection.applyEmpire(
                         Stage22EmpireShipyardCatalogLoader.loadDefault(),
@@ -34,9 +34,9 @@ public final class Stage228SmallCraftShipyardCatalogLoader {
 
     /** @return Industrial Union Stage-18 catalog with M22.8J small-craft physical profiles */
     public static Stage18ShipyardCatalog loadIndustrialUnionDefault() {
-        ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        ShipEngineeringCatalog engineering = Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog industrial =
-                Stage22CorePairShipyardIndustrialCatalogLoader.loadIndustrialUnionDefault();
+                Stage228SmallCraftShipyardIndustrialCatalogLoader.loadIndustrialUnionDefault();
         Stage18ShipyardCatalog projected =
                 Stage228SmallCraftShipyardPhysicalProjection.applyIndustrialUnion(
                         Stage22IndustrialUnionShipyardCatalogLoader.loadDefault(),
