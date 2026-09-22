@@ -80,6 +80,7 @@ Restore constructs independent state first and validates the composition before 
 
 Mandatory checks include:
 
+- mission submission ticks and queued/active flight-deck request ticks cannot be later than the restored authoritative world tick;
 - active missions reference issued, surviving craft;
 - a `LAUNCH_QUEUED` mission has a matching physical launch request/operation and READY/LAUNCHING
   occupancy;
@@ -117,6 +118,7 @@ composed lifecycle fixture and focused negative/migration cases:
 - Stage-21 migration without M22.8 grants;
 - v3 flight-deck work preserved without inventing a D mission;
 - unsupported/truncated operations sidecars fail closed;
+- future-dated mission/deck state fails closed against the restored authoritative world tick;
 - active mission / deck lifecycle mismatch fails closed;
 - never-issued wing identity fails closed;
 - post-recovery SERVICING seam remains restorable.
