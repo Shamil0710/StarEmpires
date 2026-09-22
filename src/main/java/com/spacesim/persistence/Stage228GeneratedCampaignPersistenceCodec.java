@@ -179,7 +179,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
 
     /** Reads native M22.8 or adopts any source supported by final Stage-21 migration.
      * @param path native or supported legacy checkpoint
-     * @return current v3 checkpoint
+     * @return current v4 checkpoint
      * @throws IOException when bytes cannot be read
      */
     public static Stage228GeneratedCampaignPersistentState readOrMigrate(Path path)
