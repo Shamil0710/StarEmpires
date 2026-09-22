@@ -27,6 +27,8 @@ final class Stage228CarrierCounterplayEvidenceTest {
         evidence.scenarios().forEach(row -> {
             assertFalse(row.counterplaySurfaces().isEmpty());
             assertFalse(row.commonAuthorities().isEmpty());
+            assertFalse(row.acceptanceFixtures().isEmpty(),
+                    "every K matchup must name concrete deterministic regression evidence");
             assertTrue(row.commonAuthorities().stream()
                     .noneMatch(value -> value.toLowerCase().contains("modifier")));
         });
