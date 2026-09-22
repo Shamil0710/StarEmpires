@@ -1,6 +1,6 @@
 package com.spacesim.campaign;
 
-import com.spacesim.content.ship.Stage22CorePairEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage228SmallCraftEngineeringCatalogLoader;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage228FlightDeckPersistenceMapper;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
@@ -202,6 +202,6 @@ public final class Stage228CampaignAuthority {
 
     private static SmallCraftFitAuthority productionFitAuthority() {
         return new SmallCraftFitAuthority(
-                Stage22CorePairEngineeringCatalogLoader.loadDefault());
+                Stage228SmallCraftEngineeringCatalogLoader.loadDefault());
     }
 }
