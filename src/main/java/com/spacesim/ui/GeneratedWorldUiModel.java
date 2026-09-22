@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -71,6 +72,7 @@ public final class GeneratedWorldUiModel {
     private final long worldSeed;
     private final LiveRuntime runtime;
     private final ContentCatalog content;
+    private final CarrierUiSource carrierUiSource;
     private final Stage20GeneratedCampaignPersistentState campaign;
     private final Stage20StationPhysicalGeometryProfile stationGeometry;
 
@@ -82,9 +84,30 @@ public final class GeneratedWorldUiModel {
      * @param content installed content catalogue
      */
     public GeneratedWorldUiModel(long worldSeed, LiveRuntime runtime, ContentCatalog content) {
+        this(worldSeed, runtime, content, CarrierUiSource.none());
+    }
+
+    /**
+     * Creates a live read model with an optional read-only M22.8 carrier projection source.
+     *
+     * <p>The source is queried only while building UI snapshots and cannot mutate the world through
+     * this model. Fresh campaigns before M22.8J normally use the compatibility constructor and
+     * therefore expose no synthetic carrier state.</p>
+     *
+     * @param worldSeed exact campaign seed
+     * @param runtime live Stage-20.5 runtime
+     * @param content installed content catalogue
+     * @param carrierUiSource optional M22.8 carrier read model
+     */
+    public GeneratedWorldUiModel(
+            long worldSeed,
+            LiveRuntime runtime,
+            ContentCatalog content,
+            CarrierUiSource carrierUiSource) {
         this.worldSeed = worldSeed;
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.content = Objects.requireNonNull(content, "content");
+        this.carrierUiSource = Objects.requireNonNull(carrierUiSource, "carrierUiSource");
         this.campaign = runtime.captureState().campaign();
         this.stationGeometry = Stage20StationPhysicalGeometryProfile.deriveCurrent();
     }
@@ -498,13 +521,140 @@ public final class GeneratedWorldUiModel {
                     "Куда направляется", placement.locationKind() == FleetLocationKind.IN_SYSTEM
                             ? "Локальный патруль" : systemName(placement.transitState().destinationSystemId(), galaxy),
                     "Контент", "Временный Stage 17.5/19; замена доктрин в Stage 22"));
+            var carrierOperations = carrierUiSource.find(placement.id()).orElse(null);
+            if (carrierOperations != null) {
+                sections.addAll(carrierSections(carrierOperations));
+            }
             result.add(new MilitaryView(
                     placement.id().value(), identity.name, ownerId, ownerName, status, displayedSystem,
                     placement.locationKind() == FleetLocationKind.IN_SYSTEM,
-                    engineering.fit.hullId(), fitId, sections));
+                    engineering.fit.hullId(), fitId, sections, carrierOperations));
         }
         result.sort(Comparator.naturalOrder());
         return List.copyOf(result);
+    }
+
+    private static List<InfoSection> carrierSections(
+            CarrierOperationsUiProjection.CarrierView carrier) {
+        ArrayList<InfoSection> sections = new ArrayList<>();
+        long ready = carrier.craft().stream()
+                .filter(value -> value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.READY)
+                .count();
+        long servicing = carrier.craft().stream()
+                .filter(value -> value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.SERVICING
+                        || value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.REPAIR_REQUIRED)
+                .count();
+        long deployed = carrier.craft().stream()
+                .filter(value -> value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.MISSION
+                        || value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.RETURNING
+                        || value.operationalState()
+                        == CarrierOperationsUiProjection.OperationalState.DEPLOYED_UNASSIGNED)
+                .count();
+        long deckQueue = carrier.bays().stream()
+                .mapToLong(CarrierOperationsUiProjection.BayView::queuedOperations)
+                .sum();
+        sections.add(InfoSection.of(
+                "Авиагруппа / малые аппараты",
+                "Физически существуют", Integer.toString(carrier.craft().size()),
+                "Готовы", Long.toString(ready),
+                "На обслуживании/ремонте", Long.toString(servicing),
+                "На заданиях", Long.toString(deployed),
+                "Потеряны из roster", Integer.toString(carrier.lostCraftIds().size()),
+                "Очередь палубы", Long.toString(deckQueue),
+                "Host ID", carrier.hostStableId()));
+
+        for (CarrierOperationsUiProjection.BayView bay : carrier.bays()) {
+            sections.add(InfoSection.of(
+                    "Ангар " + bay.id().bayStableId(),
+                    "Состояние", bay.capacityStatus().name(),
+                    "Целостность", percent(bay.conditionFraction()),
+                    "Аппаратов", Integer.toString(bay.craftCount()),
+                    "Масса", mass(bay.occupiedMassKg()) + " / " + mass(bay.supportedMassKg()),
+                    "Объём", format(bay.occupiedVolumeM3()) + " / "
+                            + format(bay.usableVolumeM3()) + " м³",
+                    "Очередь", Integer.toString(bay.queuedOperations()),
+                    "Активная операция", bay.activeOperationKind().isEmpty()
+                            ? "—" : bay.activeOperationKind(),
+                    "Фаза", bay.activeOperationPhase().isEmpty()
+                            ? "—" : bay.activeOperationPhase(),
+                    "Осталось работы", duration(bay.activeRemainingWorkSeconds()),
+                    "Блокировка", bay.activeFailure().isEmpty()
+                            ? "Нет" : bay.activeFailure()));
+        }
+
+        for (CarrierOperationsUiProjection.CraftView craft : carrier.craft()) {
+            var mission = craft.mission();
+            String target = mission == null
+                    ? "—"
+                    : mission.targetVisible()
+                            ? mission.targetKind() + " / " + mission.targetReferenceId()
+                            : mission.targetKind() + " / скрыто";
+            String missionState = mission == null
+                    ? "—"
+                    : mission.type() + " / " + mission.status();
+            String deck = !craft.activeDeckOperation().isEmpty()
+                    ? craft.activeDeckOperation() + " / " + craft.activeDeckPhase()
+                            + " / " + duration(craft.activeDeckRemainingWorkSeconds())
+                    : !craft.queuedDeckOperation().isEmpty()
+                            ? craft.queuedDeckOperation() + " / QUEUED"
+                            : "—";
+            sections.add(InfoSection.of(
+                    "Малый аппарат #" + craft.craftId().value(),
+                    "Состояние", craft.operationalState().name(),
+                    "Design", craft.designId(),
+                    "Корпус", craft.hullId(),
+                    "Фит", craft.installedModules().isEmpty()
+                            ? "Пустой" : String.join("; ", craft.installedModules()),
+                    "Ангар", craft.bayStableId().isEmpty() ? "—" : craft.bayStableId(),
+                    "Bay state", craft.occupancyState().isEmpty() ? "—" : craft.occupancyState(),
+                    "Структура", readiness(craft.structuralReadinessBps()),
+                    "Боеприпасы", resource(craft.ammunition()),
+                    "Реактивная масса", resource(craft.propellant()),
+                    "Обслуживание", readiness(craft.maintenanceReadinessBps()),
+                    "Требует ремонта", craft.repairRequired() ? "Да" : "Нет",
+                    "Требует сервиса", craft.serviceRequired() ? "Да" : "Нет",
+                    "Миссия", missionState,
+                    "Цель", target,
+                    "Палубная операция", deck,
+                    "Блокировка", craft.deckFailure().isEmpty() ? "Нет" : craft.deckFailure()));
+        }
+        return List.copyOf(sections);
+    }
+
+    private static String readiness(int basisPoints) {
+        return format(basisPoints / 100d) + "%";
+    }
+
+    private static String resource(
+            CarrierOperationsUiProjection.ResourceReadiness resource) {
+        if (!resource.applicable()) {
+            return "Не требуется";
+        }
+        String count = resource.itemCount() > 0L
+                ? resource.itemCount() + " ед.; " : "";
+        return count + mass(resource.massKg()) + "; " + readiness(resource.readinessBps());
+    }
+
+    /**
+     * Read-only carrier projection source used by the generated-world presentation model.
+     */
+    @FunctionalInterface
+    public interface CarrierUiSource {
+        /**
+         * @param fleetId ordinary persistent military fleet identity
+         * @return current carrier operations projection when that FleetId is a bound carrier
+         */
+        Optional<CarrierOperationsUiProjection.CarrierView> find(FleetId fleetId);
+
+        /** @return empty fail-closed source for campaigns without M22.8J carrier bindings */
+        static CarrierUiSource none() {
+            return ignored -> Optional.empty();
+        }
     }
 
     private static String provisionalFitId(InstalledFit fit) {

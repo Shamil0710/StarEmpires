@@ -339,7 +339,38 @@ public record GeneratedWorldUiSnapshot(
             boolean inSystem,
             String hullId,
             String fitId,
-            List<InfoSection> sections) implements Comparable<MilitaryView> {
+            List<InfoSection> sections,
+            CarrierOperationsUiProjection.CarrierView carrierOperations)
+            implements Comparable<MilitaryView> {
+        /**
+         * Source-compatible constructor for ordinary military fleets without an M22.8 carrier view.
+         *
+         * @param fleetId persistent fleet identity
+         * @param name player-facing fleet name
+         * @param factionId stable faction identity
+         * @param factionName player-facing faction name
+         * @param status current fleet status
+         * @param systemId displayed system identity
+         * @param inSystem whether the fleet is physically materialized in-system
+         * @param hullId installed hull definition
+         * @param fitId installed fit identity
+         * @param sections structured inspector content
+         */
+        public MilitaryView(
+                long fleetId,
+                String name,
+                String factionId,
+                String factionName,
+                String status,
+                StarSystemId systemId,
+                boolean inSystem,
+                String hullId,
+                String fitId,
+                List<InfoSection> sections) {
+            this(fleetId, name, factionId, factionName, status, systemId, inSystem,
+                    hullId, fitId, sections, null);
+        }
+
         /**
          * Validates and freezes one military-fleet projection.
          *
@@ -353,6 +384,7 @@ public record GeneratedWorldUiSnapshot(
          * @param hullId installed hull definition
          * @param fitId installed fit identity
          * @param sections structured inspector content
+         * @param carrierOperations optional read-only M22.8 carrier operations state
          */
         public MilitaryView {
             if (fleetId <= 0L) {
@@ -366,6 +398,16 @@ public record GeneratedWorldUiSnapshot(
             hullId = requireText(hullId, "hullId");
             fitId = requireText(fitId, "fitId");
             sections = List.copyOf(Objects.requireNonNull(sections, "sections"));
+            if (carrierOperations != null
+                    && carrierOperations.carrierFleetId().value() != fleetId) {
+                throw new IllegalArgumentException(
+                        "Carrier operations projection belongs to another FleetId");
+            }
+        }
+
+        /** @return whether this ordinary military fleet currently exposes carrier operations state */
+        public boolean carrier() {
+            return carrierOperations != null;
         }
 
         @Override
