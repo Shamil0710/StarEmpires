@@ -1,0 +1,1412 @@
+{
+  "schemaVersion": 1,
+  "migrationVersion": 1,
+  "responseSurfaces": [
+    {
+      "id": "response.smallcraft_service_v1",
+      "calibrationDomain": {
+        "minImpactVelocityMps": 1000,
+        "maxImpactVelocityMps": 20000,
+        "minProjectileMassKg": 1,
+        "maxProjectileMassKg": 1500,
+        "confidenceLabel": "m22_8j_smallcraft_common_bounded_projection"
+      }
+    }
+  ],
+  "materials": [
+    {
+      "id": "material.smallcraft_frame_v1",
+      "densityKgPerM3": 5200,
+      "tags": [
+        "structural",
+        "smallcraft",
+        "serviceable"
+      ],
+      "thermalConductivityWPerMK": 55,
+      "specificHeatJPerKgK": 620,
+      "emissivity": 0.58,
+      "radarReflectivity": 0.46,
+      "heavyImpactResponseSurfaceId": "response.smallcraft_service_v1",
+      "constructionMaterialFamilyId": "material_family.structural_metal",
+      "repairMaterialFamilyId": "material_family.structural_metal"
+    }
+  ],
+  "protectionStacks": [
+    {
+      "id": "protection.smallcraft_composite_v1",
+      "mountMassKg": 5000,
+      "layers": [
+        {
+          "materialId": "material.smallcraft_frame_v1",
+          "thicknessM": 0.03,
+          "spacingAfterM": 0.05,
+          "orientationRad": 0,
+          "coverageFraction": 1,
+          "responseSurfaceId": "response.smallcraft_service_v1"
+        },
+        {
+          "materialId": "material.smallcraft_frame_v1",
+          "thicknessM": 0.02,
+          "spacingAfterM": 0,
+          "orientationRad": 0,
+          "coverageFraction": 1,
+          "responseSurfaceId": "response.smallcraft_service_v1"
+        }
+      ]
+    }
+  ],
+  "hulls": [
+    {
+      "id": "hull.empire_smallcraft_v1",
+      "displayName": "Imperial Fleet Small Craft",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {
+        "lengthM": 28,
+        "widthM": 14,
+        "heightM": 6
+      },
+      "bareHullMassKg": 180000,
+      "internalVolumeM3": 550,
+      "slots": [
+        {
+          "id": "core_reactor",
+          "category": "CORE",
+          "maxDimensionsM": {
+            "lengthM": 6,
+            "widthM": 4,
+            "heightM": 3
+          },
+          "maxMassKg": 70000
+        },
+        {
+          "id": "core_drive",
+          "category": "CORE",
+          "maxDimensionsM": {
+            "lengthM": 9,
+            "widthM": 6,
+            "heightM": 4
+          },
+          "maxMassKg": 80000
+        },
+        {
+          "id": "utility_sensor",
+          "category": "UTILITY",
+          "maxDimensionsM": {
+            "lengthM": 4,
+            "widthM": 3,
+            "heightM": 2
+          },
+          "maxMassKg": 22000
+        },
+        {
+          "id": "utility_thermal",
+          "category": "UTILITY",
+          "maxDimensionsM": {
+            "lengthM": 5,
+            "widthM": 3,
+            "heightM": 2
+          },
+          "maxMassKg": 24000
+        }
+      ],
+      "hardpoints": [
+        {
+          "id": "weapon_primary",
+          "size": "SMALL",
+          "positionM": {
+            "xM": 0,
+            "yM": 7.840000000000001,
+            "zM": 0
+          },
+          "arc": {
+            "azimuthCenterRad": 1.5707963267948966,
+            "halfArcRad": 0.65
+          },
+          "maxModuleDimensionsM": {
+            "lengthM": 7,
+            "widthM": 3,
+            "heightM": 2.5
+          },
+          "maxModuleMassKg": 55000,
+          "maxRecoilImpulseNs": 160000,
+          "allowedModuleFamilies": [
+            "WEAPON_AMMUNITION"
+          ]
+        }
+      ],
+      "compartments": [
+        {
+          "id": "engineering",
+          "volumeM3": 209,
+          "centerM": {
+            "xM": 0,
+            "yM": -6.16,
+            "zM": 0
+          },
+          "protectionStackId": "protection.smallcraft_composite_v1",
+          "tags": [
+            "engineering",
+            "reactor",
+            "drive"
+          ]
+        },
+        {
+          "id": "operations",
+          "volumeM3": 148.5,
+          "centerM": {
+            "xM": 0,
+            "yM": 0,
+            "zM": 0
+          },
+          "protectionStackId": "protection.smallcraft_composite_v1",
+          "tags": [
+            "crew",
+            "sensor",
+            "command"
+          ]
+        },
+        {
+          "id": "weapons",
+          "volumeM3": 192.5,
+          "centerM": {
+            "xM": 0,
+            "yM": 6.16,
+            "zM": 0
+          },
+          "protectionStackId": "protection.smallcraft_composite_v1",
+          "tags": [
+            "weapon",
+            "magazine",
+            "military"
+          ]
+        }
+      ],
+      "crewBaseline": 2,
+      "lifeSupportCapacity": 4,
+      "baseSignatureGeometryAreaM2": 78.4,
+      "structuralProtectionStackId": "protection.smallcraft_composite_v1",
+      "maxOperationalMassKg": 520000,
+      "thrustMountCompatibility": [
+        "MAIN_DRIVE",
+        "MANEUVER_THRUSTERS"
+      ]
+    },
+    {
+      "id": "hull.industrial_union_smallcraft_v1",
+      "displayName": "Industrial Union Modular Small Craft",
+      "architecture": "FRAME",
+      "boundingDimensionsM": {
+        "lengthM": 25,
+        "widthM": 13,
+        "heightM": 5.5
+      },
+      "bareHullMassKg": 150000,
+      "internalVolumeM3": 500,
+      "slots": [
+        {
+          "id": "core_reactor",
+          "category": "CORE",
+          "maxDimensionsM": {
+            "lengthM": 6,
+            "widthM": 4,
+            "heightM": 3
+          },
+          "maxMassKg": 70000
+        },
+        {
+          "id": "core_drive",
+          "category": "CORE",
+          "maxDimensionsM": {
+            "lengthM": 9,
+            "widthM": 6,
+            "heightM": 4
+          },
+          "maxMassKg": 80000
+        },
+        {
+          "id": "utility_sensor",
+          "category": "UTILITY",
+          "maxDimensionsM": {
+            "lengthM": 4,
+            "widthM": 3,
+            "heightM": 2
+          },
+          "maxMassKg": 22000
+        },
+        {
+          "id": "utility_thermal",
+          "category": "UTILITY",
+          "maxDimensionsM": {
+            "lengthM": 5,
+            "widthM": 3,
+            "heightM": 2
+          },
+          "maxMassKg": 24000
+        }
+      ],
+      "hardpoints": [
+        {
+          "id": "weapon_primary",
+          "size": "SMALL",
+          "positionM": {
+            "xM": 0,
+            "yM": 7.000000000000001,
+            "zM": 0
+          },
+          "arc": {
+            "azimuthCenterRad": 1.5707963267948966,
+            "halfArcRad": 0.65
+          },
+          "maxModuleDimensionsM": {
+            "lengthM": 7,
+            "widthM": 3,
+            "heightM": 2.5
+          },
+          "maxModuleMassKg": 55000,
+          "maxRecoilImpulseNs": 160000,
+          "allowedModuleFamilies": [
+            "WEAPON_AMMUNITION"
+          ]
+        }
+      ],
+      "compartments": [
+        {
+          "id": "engineering",
+          "volumeM3": 190,
+          "centerM": {
+            "xM": 0,
+            "yM": -5.5,
+            "zM": 0
+          },
+          "protectionStackId": "protection.smallcraft_composite_v1",
+          "tags": [
+            "engineering",
+            "reactor",
+            "drive"
+          ]
+        },
+        {
+          "id": "operations",
+          "volumeM3": 135,
+          "centerM": {
+            "xM": 0,
+            "yM": 0,
+            "zM": 0
+          },
+          "protectionStackId": "protection.smallcraft_composite_v1",
+          "tags": [
+            "crew",
+            "sensor",
+            "command"
+          ]
+        },
+        {
+          "id": "weapons",
+          "volumeM3": 175,
+          "centerM": {
+            "xM": 0,
+            "yM": 5.5,
+            "zM": 0
+          },
+          "protectionStackId": "protection.smallcraft_composite_v1",
+          "tags": [
+            "weapon",
+            "magazine",
+            "military"
+          ]
+        }
+      ],
+      "crewBaseline": 1,
+      "lifeSupportCapacity": 3,
+      "baseSignatureGeometryAreaM2": 65,
+      "structuralProtectionStackId": "protection.smallcraft_composite_v1",
+      "maxOperationalMassKg": 460000,
+      "thrustMountCompatibility": [
+        "MAIN_DRIVE",
+        "MANEUVER_THRUSTERS"
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "id": "module.empire_smallcraft_reactor_v1",
+      "displayName": "Imperial small-craft reactor",
+      "family": "REACTOR_POWER",
+      "integrationCategories": [
+        "CORE"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 5,
+        "widthM": 3.5,
+        "heightM": 2.5
+      },
+      "massKg": 52000,
+      "occupiedVolumeM3": 75,
+      "requiredMountStrengthN": 1560000,
+      "continuousPowerSupplyW": 18000000,
+      "continuousPowerDemandW": 0,
+      "peakPowerDemandW": 0,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 1800000,
+      "localThermalCapacityJ": 5000000,
+      "coolantTransferDemandW": 1200000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 2,
+      "interfaces": [],
+      "signatureContributions": {
+        "thermal_w": 1800000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 20
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 35
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 25
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 172800,
+        "maintenanceWorkSeconds": 1800,
+        "repairComplexity": 0.48
+      },
+      "capabilityParameters": {}
+    },
+    {
+      "id": "module.empire_smallcraft_drive_interceptor_v1",
+      "displayName": "Imperial interceptor drive",
+      "family": "MAIN_DRIVE",
+      "integrationCategories": [
+        "CORE"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 8,
+        "widthM": 5,
+        "heightM": 3.5
+      },
+      "massKg": 62000,
+      "occupiedVolumeM3": 120,
+      "requiredMountStrengthN": 1860000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 6000000,
+      "peakPowerDemandW": 7000000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 1800000,
+      "localThermalCapacityJ": 6500000,
+      "coolantTransferDemandW": 1800000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 2,
+      "interfaces": [
+        {
+          "kind": "REACTION_MASS",
+          "id": "propellant_feed",
+          "capacity": 90000
+        }
+      ],
+      "signatureContributions": {
+        "thermal_w": 1800000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 30
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 25
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 18
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 86400,
+        "maintenanceWorkSeconds": 2200,
+        "repairComplexity": 0.58
+      },
+      "capabilityParameters": {
+        "thrust_n": 1800000,
+        "exhaust_velocity_mps": 52000,
+        "jet_power_w": 46800000000
+      }
+    },
+    {
+      "id": "module.empire_smallcraft_drive_endurance_v1",
+      "displayName": "Imperial endurance drive",
+      "family": "MAIN_DRIVE",
+      "integrationCategories": [
+        "CORE"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 8.5,
+        "widthM": 5.2,
+        "heightM": 3.6
+      },
+      "massKg": 65000,
+      "occupiedVolumeM3": 130,
+      "requiredMountStrengthN": 1950000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 4200000,
+      "peakPowerDemandW": 5000000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 1300000,
+      "localThermalCapacityJ": 6500000,
+      "coolantTransferDemandW": 1400000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 2,
+      "interfaces": [
+        {
+          "kind": "REACTION_MASS",
+          "id": "propellant_feed",
+          "capacity": 125000
+        }
+      ],
+      "signatureContributions": {
+        "thermal_w": 1300000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 32
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 22
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 16
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 129600,
+        "maintenanceWorkSeconds": 2100,
+        "repairComplexity": 0.52
+      },
+      "capabilityParameters": {
+        "thrust_n": 1150000,
+        "exhaust_velocity_mps": 82000,
+        "jet_power_w": 47150000000
+      }
+    },
+    {
+      "id": "module.empire_smallcraft_sensor_intercept_v1",
+      "displayName": "Imperial interception sensor",
+      "family": "SENSOR_EW_FIRE_CONTROL",
+      "integrationCategories": [
+        "UTILITY"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 3.5,
+        "widthM": 2.5,
+        "heightM": 1.8
+      },
+      "massKg": 14000,
+      "occupiedVolumeM3": 35,
+      "requiredMountStrengthN": 420000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 1400000,
+      "peakPowerDemandW": 1800000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 350000,
+      "localThermalCapacityJ": 2500000,
+      "coolantTransferDemandW": 350000,
+      "heatRejectionW": 0,
+      "crewRequirement": 1,
+      "automationRequirement": 2,
+      "interfaces": [],
+      "signatureContributions": {
+        "thermal_w": 350000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 2
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 12
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 18
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 129600,
+        "maintenanceWorkSeconds": 1200,
+        "repairComplexity": 0.44
+      },
+      "capabilityParameters": {
+        "aperture_area_m2": 5.2,
+        "processing_channels": 24
+      }
+    },
+    {
+      "id": "module.empire_smallcraft_sensor_strike_v1",
+      "displayName": "Imperial strike sensor",
+      "family": "SENSOR_EW_FIRE_CONTROL",
+      "integrationCategories": [
+        "UTILITY"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 3.7,
+        "widthM": 2.7,
+        "heightM": 1.9
+      },
+      "massKg": 15000,
+      "occupiedVolumeM3": 38,
+      "requiredMountStrengthN": 450000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 1200000,
+      "peakPowerDemandW": 1600000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 320000,
+      "localThermalCapacityJ": 2500000,
+      "coolantTransferDemandW": 320000,
+      "heatRejectionW": 0,
+      "crewRequirement": 1,
+      "automationRequirement": 2,
+      "interfaces": [],
+      "signatureContributions": {
+        "thermal_w": 320000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 2
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 11
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 16
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 129600,
+        "maintenanceWorkSeconds": 1200,
+        "repairComplexity": 0.44
+      },
+      "capabilityParameters": {
+        "aperture_area_m2": 4.16,
+        "processing_channels": 18
+      }
+    },
+    {
+      "id": "module.empire_smallcraft_thermal_v1",
+      "displayName": "Imperial small-craft thermal loop",
+      "family": "THERMAL_CONTROL",
+      "integrationCategories": [
+        "UTILITY"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 4.5,
+        "widthM": 2.8,
+        "heightM": 1.8
+      },
+      "massKg": 15000,
+      "occupiedVolumeM3": 45,
+      "requiredMountStrengthN": 450000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 180000,
+      "peakPowerDemandW": 250000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 90000,
+      "localThermalCapacityJ": 3000000,
+      "coolantTransferDemandW": 0,
+      "heatRejectionW": 8500000,
+      "crewRequirement": 0,
+      "automationRequirement": 1,
+      "interfaces": [],
+      "signatureContributions": {
+        "thermal_w": 90000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 5
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 8
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 3
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 172800,
+        "maintenanceWorkSeconds": 1000,
+        "repairComplexity": 0.38
+      },
+      "capabilityParameters": {
+        "coolant_bus_capacity_w": 6000000,
+        "ship_thermal_store_capacity_j": 12000000
+      }
+    },
+    {
+      "id": "module.empire_smallcraft_kinetic_light_v1",
+      "displayName": "Imperial interceptor kinetic mount",
+      "family": "WEAPON_AMMUNITION",
+      "integrationCategories": [
+        "WEAPON"
+      ],
+      "compatibleHardpointSizes": [
+        "SMALL"
+      ],
+      "physicalDimensionsM": {
+        "lengthM": 5.2,
+        "widthM": 2.1,
+        "heightM": 1.8
+      },
+      "massKg": 28000,
+      "occupiedVolumeM3": 55,
+      "requiredMountStrengthN": 840000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 950000,
+      "peakPowerDemandW": 3500000,
+      "storedEnergyCapacityJ": 18000000,
+      "wasteHeatW": 850000,
+      "localThermalCapacityJ": 3500000,
+      "coolantTransferDemandW": 850000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 1,
+      "interfaces": [
+        {
+          "kind": "AMMUNITION",
+          "id": "kinetic_feed",
+          "capacity": 48
+        }
+      ],
+      "signatureContributions": {
+        "thermal_w": 850000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 10
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 8
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 10
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 86400,
+        "maintenanceWorkSeconds": 1300,
+        "repairComplexity": 0.56
+      },
+      "capabilityParameters": {
+        "projectile_mass_kg": 8,
+        "muzzle_velocity_mps": 3500,
+        "recoil_impulse_ns": 28000
+      }
+    },
+    {
+      "id": "module.empire_smallcraft_kinetic_strike_v1",
+      "displayName": "Imperial strike kinetic mount",
+      "family": "WEAPON_AMMUNITION",
+      "integrationCategories": [
+        "WEAPON"
+      ],
+      "compatibleHardpointSizes": [
+        "SMALL"
+      ],
+      "physicalDimensionsM": {
+        "lengthM": 6.5,
+        "widthM": 2.6,
+        "heightM": 2.2
+      },
+      "massKg": 43000,
+      "occupiedVolumeM3": 75,
+      "requiredMountStrengthN": 1290000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 1800000,
+      "peakPowerDemandW": 5500000,
+      "storedEnergyCapacityJ": 30000000,
+      "wasteHeatW": 1400000,
+      "localThermalCapacityJ": 4500000,
+      "coolantTransferDemandW": 1400000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 1,
+      "interfaces": [
+        {
+          "kind": "AMMUNITION",
+          "id": "kinetic_feed",
+          "capacity": 18
+        }
+      ],
+      "signatureContributions": {
+        "thermal_w": 1400000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 15
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 10
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 12
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 86400,
+        "maintenanceWorkSeconds": 1600,
+        "repairComplexity": 0.66
+      },
+      "capabilityParameters": {
+        "projectile_mass_kg": 20,
+        "muzzle_velocity_mps": 5000,
+        "recoil_impulse_ns": 100000
+      }
+    },
+    {
+      "id": "module.industrial_union_smallcraft_reactor_v1",
+      "displayName": "Union small-craft reactor",
+      "family": "REACTOR_POWER",
+      "integrationCategories": [
+        "CORE"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 5,
+        "widthM": 3.5,
+        "heightM": 2.5
+      },
+      "massKg": 47000,
+      "occupiedVolumeM3": 75,
+      "requiredMountStrengthN": 1410000,
+      "continuousPowerSupplyW": 18000000,
+      "continuousPowerDemandW": 0,
+      "peakPowerDemandW": 0,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 1800000,
+      "localThermalCapacityJ": 5000000,
+      "coolantTransferDemandW": 1200000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 2,
+      "interfaces": [],
+      "signatureContributions": {
+        "thermal_w": 1800000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 20
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 35
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 25
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 172800,
+        "maintenanceWorkSeconds": 1800,
+        "repairComplexity": 0.48
+      },
+      "capabilityParameters": {}
+    },
+    {
+      "id": "module.industrial_union_smallcraft_drive_interceptor_v1",
+      "displayName": "Union interceptor drive",
+      "family": "MAIN_DRIVE",
+      "integrationCategories": [
+        "CORE"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 8,
+        "widthM": 5,
+        "heightM": 3.5
+      },
+      "massKg": 57000,
+      "occupiedVolumeM3": 120,
+      "requiredMountStrengthN": 1710000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 6000000,
+      "peakPowerDemandW": 7000000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 1800000,
+      "localThermalCapacityJ": 6500000,
+      "coolantTransferDemandW": 1800000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 2,
+      "interfaces": [
+        {
+          "kind": "REACTION_MASS",
+          "id": "propellant_feed",
+          "capacity": 90000
+        }
+      ],
+      "signatureContributions": {
+        "thermal_w": 1800000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 30
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 25
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 18
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 86400,
+        "maintenanceWorkSeconds": 2200,
+        "repairComplexity": 0.58
+      },
+      "capabilityParameters": {
+        "thrust_n": 2000000,
+        "exhaust_velocity_mps": 52000,
+        "jet_power_w": 52000000000
+      }
+    },
+    {
+      "id": "module.industrial_union_smallcraft_drive_endurance_v1",
+      "displayName": "Union endurance drive",
+      "family": "MAIN_DRIVE",
+      "integrationCategories": [
+        "CORE"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 8.5,
+        "widthM": 5.2,
+        "heightM": 3.6
+      },
+      "massKg": 60000,
+      "occupiedVolumeM3": 130,
+      "requiredMountStrengthN": 1800000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 4200000,
+      "peakPowerDemandW": 5000000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 1300000,
+      "localThermalCapacityJ": 6500000,
+      "coolantTransferDemandW": 1400000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 2,
+      "interfaces": [
+        {
+          "kind": "REACTION_MASS",
+          "id": "propellant_feed",
+          "capacity": 125000
+        }
+      ],
+      "signatureContributions": {
+        "thermal_w": 1300000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 32
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 22
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 16
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 129600,
+        "maintenanceWorkSeconds": 2100,
+        "repairComplexity": 0.52
+      },
+      "capabilityParameters": {
+        "thrust_n": 1250000,
+        "exhaust_velocity_mps": 82000,
+        "jet_power_w": 51250000000
+      }
+    },
+    {
+      "id": "module.industrial_union_smallcraft_sensor_intercept_v1",
+      "displayName": "Union interception sensor",
+      "family": "SENSOR_EW_FIRE_CONTROL",
+      "integrationCategories": [
+        "UTILITY"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 3.5,
+        "widthM": 2.5,
+        "heightM": 1.8
+      },
+      "massKg": 13000,
+      "occupiedVolumeM3": 35,
+      "requiredMountStrengthN": 390000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 1400000,
+      "peakPowerDemandW": 1800000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 350000,
+      "localThermalCapacityJ": 2500000,
+      "coolantTransferDemandW": 350000,
+      "heatRejectionW": 0,
+      "crewRequirement": 1,
+      "automationRequirement": 2,
+      "interfaces": [],
+      "signatureContributions": {
+        "thermal_w": 350000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 2
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 12
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 18
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 129600,
+        "maintenanceWorkSeconds": 1200,
+        "repairComplexity": 0.44
+      },
+      "capabilityParameters": {
+        "aperture_area_m2": 4.8,
+        "processing_channels": 24
+      }
+    },
+    {
+      "id": "module.industrial_union_smallcraft_sensor_strike_v1",
+      "displayName": "Union strike sensor",
+      "family": "SENSOR_EW_FIRE_CONTROL",
+      "integrationCategories": [
+        "UTILITY"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 3.7,
+        "widthM": 2.7,
+        "heightM": 1.9
+      },
+      "massKg": 14000,
+      "occupiedVolumeM3": 38,
+      "requiredMountStrengthN": 420000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 1200000,
+      "peakPowerDemandW": 1600000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 320000,
+      "localThermalCapacityJ": 2500000,
+      "coolantTransferDemandW": 320000,
+      "heatRejectionW": 0,
+      "crewRequirement": 1,
+      "automationRequirement": 2,
+      "interfaces": [],
+      "signatureContributions": {
+        "thermal_w": 320000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 2
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 11
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 16
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 129600,
+        "maintenanceWorkSeconds": 1200,
+        "repairComplexity": 0.44
+      },
+      "capabilityParameters": {
+        "aperture_area_m2": 3.84,
+        "processing_channels": 18
+      }
+    },
+    {
+      "id": "module.industrial_union_smallcraft_thermal_v1",
+      "displayName": "Union small-craft thermal loop",
+      "family": "THERMAL_CONTROL",
+      "integrationCategories": [
+        "UTILITY"
+      ],
+      "compatibleHardpointSizes": [],
+      "physicalDimensionsM": {
+        "lengthM": 4.5,
+        "widthM": 2.8,
+        "heightM": 1.8
+      },
+      "massKg": 14000,
+      "occupiedVolumeM3": 45,
+      "requiredMountStrengthN": 420000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 180000,
+      "peakPowerDemandW": 250000,
+      "storedEnergyCapacityJ": 0,
+      "wasteHeatW": 90000,
+      "localThermalCapacityJ": 3000000,
+      "coolantTransferDemandW": 0,
+      "heatRejectionW": 8500000,
+      "crewRequirement": 0,
+      "automationRequirement": 1,
+      "interfaces": [],
+      "signatureContributions": {
+        "thermal_w": 90000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 5
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 8
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 3
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 172800,
+        "maintenanceWorkSeconds": 1000,
+        "repairComplexity": 0.38
+      },
+      "capabilityParameters": {
+        "coolant_bus_capacity_w": 6000000,
+        "ship_thermal_store_capacity_j": 12000000
+      }
+    },
+    {
+      "id": "module.industrial_union_smallcraft_kinetic_light_v1",
+      "displayName": "Union interceptor kinetic mount",
+      "family": "WEAPON_AMMUNITION",
+      "integrationCategories": [
+        "WEAPON"
+      ],
+      "compatibleHardpointSizes": [
+        "SMALL"
+      ],
+      "physicalDimensionsM": {
+        "lengthM": 5.2,
+        "widthM": 2.1,
+        "heightM": 1.8
+      },
+      "massKg": 26000,
+      "occupiedVolumeM3": 55,
+      "requiredMountStrengthN": 780000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 950000,
+      "peakPowerDemandW": 3500000,
+      "storedEnergyCapacityJ": 18000000,
+      "wasteHeatW": 850000,
+      "localThermalCapacityJ": 3500000,
+      "coolantTransferDemandW": 850000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 1,
+      "interfaces": [
+        {
+          "kind": "AMMUNITION",
+          "id": "kinetic_feed",
+          "capacity": 48
+        }
+      ],
+      "signatureContributions": {
+        "thermal_w": 850000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 10
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 8
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 10
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 86400,
+        "maintenanceWorkSeconds": 1300,
+        "repairComplexity": 0.56
+      },
+      "capabilityParameters": {
+        "projectile_mass_kg": 7,
+        "muzzle_velocity_mps": 3700,
+        "recoil_impulse_ns": 25900
+      }
+    },
+    {
+      "id": "module.industrial_union_smallcraft_kinetic_strike_v1",
+      "displayName": "Union strike kinetic mount",
+      "family": "WEAPON_AMMUNITION",
+      "integrationCategories": [
+        "WEAPON"
+      ],
+      "compatibleHardpointSizes": [
+        "SMALL"
+      ],
+      "physicalDimensionsM": {
+        "lengthM": 6.5,
+        "widthM": 2.6,
+        "heightM": 2.2
+      },
+      "massKg": 40000,
+      "occupiedVolumeM3": 75,
+      "requiredMountStrengthN": 1200000,
+      "continuousPowerSupplyW": 0,
+      "continuousPowerDemandW": 1800000,
+      "peakPowerDemandW": 5500000,
+      "storedEnergyCapacityJ": 30000000,
+      "wasteHeatW": 1400000,
+      "localThermalCapacityJ": 4500000,
+      "coolantTransferDemandW": 1400000,
+      "heatRejectionW": 0,
+      "crewRequirement": 0,
+      "automationRequirement": 1,
+      "interfaces": [
+        {
+          "kind": "AMMUNITION",
+          "id": "kinetic_feed",
+          "capacity": 18
+        }
+      ],
+      "signatureContributions": {
+        "thermal_w": 1400000
+      },
+      "constructionInputs": [
+        {
+          "contentId": "component.heavy",
+          "amount": 15
+        },
+        {
+          "contentId": "component.electrical",
+          "amount": 10
+        },
+        {
+          "contentId": "component.precision",
+          "amount": 12
+        }
+      ],
+      "maintenance": {
+        "serviceIntervalSeconds": 86400,
+        "maintenanceWorkSeconds": 1600,
+        "repairComplexity": 0.66
+      },
+      "capabilityParameters": {
+        "projectile_mass_kg": 18,
+        "muzzle_velocity_mps": 5200,
+        "recoil_impulse_ns": 93600
+      }
+    }
+  ],
+  "demonstratorFits": [
+    {
+      "id": "fit.empire.smallcraft.interceptor_v1",
+      "hullId": "hull.empire_smallcraft_v1",
+      "installedModules": [
+        {
+          "mountId": "core_reactor",
+          "moduleId": "module.empire_smallcraft_reactor_v1"
+        },
+        {
+          "mountId": "core_drive",
+          "moduleId": "module.empire_smallcraft_drive_interceptor_v1"
+        },
+        {
+          "mountId": "utility_sensor",
+          "moduleId": "module.empire_smallcraft_sensor_intercept_v1"
+        },
+        {
+          "mountId": "utility_thermal",
+          "moduleId": "module.empire_smallcraft_thermal_v1"
+        },
+        {
+          "mountId": "weapon_primary",
+          "moduleId": "module.empire_smallcraft_kinetic_light_v1"
+        }
+      ]
+    },
+    {
+      "id": "fit.empire.smallcraft.defence_v1",
+      "hullId": "hull.empire_smallcraft_v1",
+      "installedModules": [
+        {
+          "mountId": "core_reactor",
+          "moduleId": "module.empire_smallcraft_reactor_v1"
+        },
+        {
+          "mountId": "core_drive",
+          "moduleId": "module.empire_smallcraft_drive_endurance_v1"
+        },
+        {
+          "mountId": "utility_sensor",
+          "moduleId": "module.empire_smallcraft_sensor_intercept_v1"
+        },
+        {
+          "mountId": "utility_thermal",
+          "moduleId": "module.empire_smallcraft_thermal_v1"
+        },
+        {
+          "mountId": "weapon_primary",
+          "moduleId": "module.empire_smallcraft_kinetic_light_v1"
+        }
+      ]
+    },
+    {
+      "id": "fit.empire.smallcraft.strike_v1",
+      "hullId": "hull.empire_smallcraft_v1",
+      "installedModules": [
+        {
+          "mountId": "core_reactor",
+          "moduleId": "module.empire_smallcraft_reactor_v1"
+        },
+        {
+          "mountId": "core_drive",
+          "moduleId": "module.empire_smallcraft_drive_endurance_v1"
+        },
+        {
+          "mountId": "utility_sensor",
+          "moduleId": "module.empire_smallcraft_sensor_strike_v1"
+        },
+        {
+          "mountId": "utility_thermal",
+          "moduleId": "module.empire_smallcraft_thermal_v1"
+        },
+        {
+          "mountId": "weapon_primary",
+          "moduleId": "module.empire_smallcraft_kinetic_strike_v1"
+        }
+      ]
+    },
+    {
+      "id": "fit.industrial_union.smallcraft.interceptor_v1",
+      "hullId": "hull.industrial_union_smallcraft_v1",
+      "installedModules": [
+        {
+          "mountId": "core_reactor",
+          "moduleId": "module.industrial_union_smallcraft_reactor_v1"
+        },
+        {
+          "mountId": "core_drive",
+          "moduleId": "module.industrial_union_smallcraft_drive_interceptor_v1"
+        },
+        {
+          "mountId": "utility_sensor",
+          "moduleId": "module.industrial_union_smallcraft_sensor_intercept_v1"
+        },
+        {
+          "mountId": "utility_thermal",
+          "moduleId": "module.industrial_union_smallcraft_thermal_v1"
+        },
+        {
+          "mountId": "weapon_primary",
+          "moduleId": "module.industrial_union_smallcraft_kinetic_light_v1"
+        }
+      ]
+    },
+    {
+      "id": "fit.industrial_union.smallcraft.defence_v1",
+      "hullId": "hull.industrial_union_smallcraft_v1",
+      "installedModules": [
+        {
+          "mountId": "core_reactor",
+          "moduleId": "module.industrial_union_smallcraft_reactor_v1"
+        },
+        {
+          "mountId": "core_drive",
+          "moduleId": "module.industrial_union_smallcraft_drive_endurance_v1"
+        },
+        {
+          "mountId": "utility_sensor",
+          "moduleId": "module.industrial_union_smallcraft_sensor_intercept_v1"
+        },
+        {
+          "mountId": "utility_thermal",
+          "moduleId": "module.industrial_union_smallcraft_thermal_v1"
+        },
+        {
+          "mountId": "weapon_primary",
+          "moduleId": "module.industrial_union_smallcraft_kinetic_light_v1"
+        }
+      ]
+    },
+    {
+      "id": "fit.industrial_union.smallcraft.strike_v1",
+      "hullId": "hull.industrial_union_smallcraft_v1",
+      "installedModules": [
+        {
+          "mountId": "core_reactor",
+          "moduleId": "module.industrial_union_smallcraft_reactor_v1"
+        },
+        {
+          "mountId": "core_drive",
+          "moduleId": "module.industrial_union_smallcraft_drive_endurance_v1"
+        },
+        {
+          "mountId": "utility_sensor",
+          "moduleId": "module.industrial_union_smallcraft_sensor_strike_v1"
+        },
+        {
+          "mountId": "utility_thermal",
+          "moduleId": "module.industrial_union_smallcraft_thermal_v1"
+        },
+        {
+          "mountId": "weapon_primary",
+          "moduleId": "module.industrial_union_smallcraft_kinetic_strike_v1"
+        }
+      ]
+    }
+  ]
+}
