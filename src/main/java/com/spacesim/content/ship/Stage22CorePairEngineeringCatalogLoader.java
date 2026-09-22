@@ -39,7 +39,16 @@ public final class Stage22CorePairEngineeringCatalogLoader {
                 concat(empire.getHulls(), union.getHulls()),
                 concat(empire.getModules(), union.getModules()),
                 concat(empire.getDemonstratorFits(), union.getDemonstratorFits()));
-        ShipEngineeringCatalog network = Stage22CorePairCommandNetworkProjection.apply(combined);
+
+        // M22.8J adds ordinary compact hull/module/fit definitions, then runs the same common
+        // sensor/shield/thermal completion used by every other core physical module.
+        ShipEngineeringCatalog smallCraft =
+                Stage228SmallCraftProductionProjection.apply(combined);
+        ShipEngineeringCatalog sensors = Stage22CorePairSensorModeProjection.apply(smallCraft);
+        ShipEngineeringCatalog shields = Stage22CorePairShieldModeProjection.apply(sensors);
+        ShipEngineeringCatalog thermal = Stage22CorePairThermalRuntimeProjection.apply(shields);
+
+        ShipEngineeringCatalog network = Stage22CorePairCommandNetworkProjection.apply(thermal);
         return Stage22CorePairStrategicMobilityProjection.apply(network);
     }
 
