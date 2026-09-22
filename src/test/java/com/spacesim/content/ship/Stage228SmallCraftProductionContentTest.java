@@ -2,6 +2,8 @@ package com.spacesim.content.ship;
 
 import com.spacesim.content.Stage228SmallCraftShipyardCatalogLoader;
 import com.spacesim.content.Stage18ShipyardCatalog;
+import com.spacesim.content.Stage22EmpirePackageLoader;
+import com.spacesim.content.Stage22IndustrialUnionPackageLoader;
 import com.spacesim.content.weapon.Stage228SmallCraftWeaponRuntimeProjection;
 import com.spacesim.content.weapon.Stage228SmallCraftWeaponRuntimeCatalogLoader;
 import com.spacesim.presentation.asset.Stage228SmallCraftVisualResolver;
@@ -173,6 +175,34 @@ final class Stage228SmallCraftProductionContentTest {
     }
 
     @Test
+    void everyProductionSmallCraftPhysicallyFitsItsAuthoredCarrierHangar() {
+        ShipEngineeringCatalog engineering =
+                Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
+        String empireCarrierFit = Stage22EmpirePackageLoader.loadDefault().shipFamilies().stream()
+                .filter(value -> value.roleId().equals("role.military.carrier"))
+                .findFirst().orElseThrow().primaryFitId();
+        String unionCarrierFit =
+                Stage22IndustrialUnionPackageLoader.loadDefault().shipFamilies().stream()
+                        .filter(value -> value.roleId().equals("role.military.carrier"))
+                        .findFirst().orElseThrow().primaryFitId();
+
+        assertEmbarkable(
+                engineering,
+                empireCarrierFit,
+                List.of(
+                        Stage228SmallCraftProductionProjection.EMPIRE_INTERCEPTOR_FIT_ID,
+                        Stage228SmallCraftProductionProjection.EMPIRE_DEFENCE_FIT_ID,
+                        Stage228SmallCraftProductionProjection.EMPIRE_STRIKE_FIT_ID));
+        assertEmbarkable(
+                engineering,
+                unionCarrierFit,
+                List.of(
+                        Stage228SmallCraftProductionProjection.UNION_INTERCEPTOR_FIT_ID,
+                        Stage228SmallCraftProductionProjection.UNION_DEFENCE_FIT_ID,
+                        Stage228SmallCraftProductionProjection.UNION_STRIKE_FIT_ID));
+    }
+
+    @Test
     void visualBindingUsesStableFitIdentityExactPhysicalScaleAndFailClosedFallback() {
         var empireCarrier = Stage22ProductionShipVisualResolver.resolveRole(
                 "fleet.carrier.empire",
@@ -195,8 +225,8 @@ final class Stage228SmallCraftProductionContentTest {
         assertEquals(
                 Stage228SmallCraftVisualResolver.ScaleAuthority.EXACT_PHYSICAL_CONTENT,
                 empireCraft.scaleAuthority());
-        assertEquals(32d, empireCraft.worldLengthM());
-        assertEquals(35d, unionCraft.worldLengthM());
+        assertEquals(28d, empireCraft.worldLengthM());
+        assertEquals(29d, unionCraft.worldLengthM());
         assertTrue(empireCraft.worldLengthM() < empireCarrier.worldLengthM() * 0.10d);
         assertTrue(unionCraft.worldLengthM() < unionCarrier.worldLengthM() * 0.10d);
         assertEquals(3d, empireCraft.minimumMarkerPixels());
@@ -205,6 +235,39 @@ final class Stage228SmallCraftProductionContentTest {
                 IllegalArgumentException.class,
                 () -> Stage228SmallCraftVisualResolver.resolve(
                         "craft:missing", "fit.missing.small_craft_v1"));
+    }
+
+    private static void assertEmbarkable(
+            ShipEngineeringCatalog engineering,
+            String carrierFitId,
+            List<String> smallCraftFitIds) {
+        var carrier = engineering.findDemonstratorFit(carrierFitId);
+        assertNotNull(carrier);
+        var bays = carrier.installedModules().stream()
+                .map(value -> engineering.findModule(value.moduleId()))
+                .filter(java.util.Objects::nonNull)
+                .filter(value -> value.family() == ShipEngineeringCatalog.ModuleFamily.HANGAR_SMALL_CRAFT)
+                .toList();
+        assertFalse(bays.isEmpty(), carrierFitId + " must install a physical small-craft hangar");
+
+        for (String fitId : smallCraftFitIds) {
+            var fit = engineering.findDemonstratorFit(fitId);
+            assertNotNull(fit);
+            var hull = engineering.findHull(fit.hullId());
+            assertNotNull(hull);
+            double fittedDryMassKg = hull.bareHullMassKg()
+                    + fit.installedModules().stream()
+                            .map(value -> engineering.findModule(value.moduleId()))
+                            .mapToDouble(ShipEngineeringCatalog.ModuleDefinition::massKg)
+                            .sum();
+            assertTrue(bays.stream().anyMatch(bay ->
+                            hull.boundingDimensionsM().lengthM() <= bay.physicalDimensionsM().lengthM()
+                                    && hull.boundingDimensionsM().widthM() <= bay.physicalDimensionsM().widthM()
+                                    && hull.boundingDimensionsM().heightM() <= bay.physicalDimensionsM().heightM()
+                                    && fittedDryMassKg <= bay.capabilityParameters()
+                                            .getOrDefault("supported_craft_mass_kg", 0d)),
+                    fitId + " must physically fit at least one installed carrier bay");
+        }
     }
 
     private static void assertFeasibleBuild(
