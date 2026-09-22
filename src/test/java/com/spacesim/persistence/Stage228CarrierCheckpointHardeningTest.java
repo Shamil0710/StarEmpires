@@ -219,6 +219,149 @@ final class Stage228CarrierCheckpointHardeningTest {
                 "failed restore validation must not mutate source live registry");
     }
 
+    @Test
+    void neverIssuedLostWingIdentityFailsClosedInsteadOfBecomingLossEvidence() {
+        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        SmallCraftRegistry registry =
+                SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
+
+        SmallCraftId neverIssued = new SmallCraftId(9999L);
+        Stage228GeneratedCampaignPersistentState checkpoint =
+                Stage228GeneratedCampaignPersistentState.compose(
+                        coordinator.captureState(),
+                        Stage228SmallCraftPersistenceMapper.capture(registry),
+                        Stage228HangarPersistentState.empty(),
+                        Stage228FlightDeckPersistentState.empty(),
+                        Stage228OperationsPersistenceMapper.capture(
+                                SmallCraftMissionState.empty(),
+                                LogisticsState.empty(),
+                                List.of(new CarrierWingAssignment(
+                                        new FleetId(100L),
+                                        HOST,
+                                        "faction.alpha",
+                                        List.of(neverIssued)))));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage228CampaignAuthority.restore(checkpoint));
+        assertEquals(1L, registry.nextIdValue(),
+                "failed restore must not advance the source allocator");
+    }
+
+    @Test
+    void launchQueuedMissionRequiresMatchingPhysicalDeckOperation() {
+        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        SmallCraftRegistry registry =
+                SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
+        SmallCraftId craft = register(registry, 8L, 32d, 160d, 1d, 0d);
+        BayId bayId = new BayId(HOST, "bay.launch-mismatch");
+        SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.restore(
+                registry,
+                List.of(new SmallCraftHangarRegistry.Assignment(
+                        craft, bayId, HostKind.SHIP, OccupancyState.READY)));
+        SmallCraftFlightDeckOperations deck = SmallCraftFlightDeckOperations.restore(
+                hangars,
+                List.of(new DeckProfile(bayId, 12d, 14d)),
+                List.of(),
+                List.of(),
+                -1L);
+        SmallCraftMissionState missions = new SmallCraftMissionState(
+                2L,
+                List.of(mission(
+                        1L, craft, MissionType.CAP, MissionStatus.LAUNCH_QUEUED)));
+
+        Stage228GeneratedCampaignPersistentState checkpoint =
+                Stage228GeneratedCampaignPersistentState.compose(
+                        coordinator.captureState(),
+                        Stage228SmallCraftPersistenceMapper.capture(registry),
+                        Stage228HangarPersistenceMapper.capture(hangars),
+                        Stage228FlightDeckPersistenceMapper.capture(deck),
+                        Stage228OperationsPersistenceMapper.capture(
+                                missions, LogisticsState.empty(), List.of()));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage228CampaignAuthority.restore(checkpoint));
+    }
+
+    @Test
+    void v3QueuedDeckMigrationPreservesPhysicalWorkWithoutSynthesizingMission() {
+        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        SmallCraftRegistry registry =
+                SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
+        SmallCraftId craft = register(registry, 8L, 32d, 160d, 1d, 0d);
+        BayId bayId = new BayId(HOST, "bay.legacy-v3");
+        SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.restore(
+                registry,
+                List.of(new SmallCraftHangarRegistry.Assignment(
+                        craft, bayId, HostKind.SHIP, OccupancyState.READY)));
+        SmallCraftFlightDeckOperations deck = SmallCraftFlightDeckOperations.restore(
+                hangars,
+                List.of(new DeckProfile(bayId, 12d, 14d)),
+                List.of(new Request(craft, bayId, OperationKind.LAUNCH, 40L)),
+                List.of(),
+                -1L);
+
+        byte[] legacyV3 = encodeLegacyV3(
+                coordinator.captureState(),
+                Stage228SmallCraftPersistenceMapper.capture(registry),
+                Stage228HangarPersistenceMapper.capture(hangars),
+                Stage228FlightDeckPersistenceMapper.capture(deck));
+
+        Stage228GeneratedCampaignPersistentState migrated =
+                Stage228GeneratedCampaignPersistenceCodec.decode(legacyV3);
+        Stage228CampaignAuthority restored = Stage228CampaignAuthority.restore(migrated);
+
+        assertTrue(migrated.operations().missions().isEmpty());
+        assertTrue(migrated.operations().pendingDeliveries().isEmpty());
+        assertTrue(migrated.operations().carrierWings().isEmpty());
+        assertEquals(craft, restored.flightDeck().queued().get(0).craftId());
+        assertEquals(OperationKind.LAUNCH, restored.flightDeck().queued().get(0).kind());
+    }
+
+    @Test
+    void recoveryPendingPostCycleServicingSeamRemainsRestorable() {
+        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        SmallCraftRegistry registry =
+                SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
+        SmallCraftId craft = register(registry, 3L, 12d, 80d, 0.75d, 300d);
+        BayId bayId = new BayId(HOST, "bay.post-recovery");
+        SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.restore(
+                registry,
+                List.of(new SmallCraftHangarRegistry.Assignment(
+                        craft, bayId, HostKind.SHIP, OccupancyState.SERVICING)));
+        SmallCraftFlightDeckOperations deck = SmallCraftFlightDeckOperations.restore(
+                hangars,
+                List.of(new DeckProfile(bayId, 12d, 14d)),
+                List.of(),
+                List.of(),
+                40L);
+        SmallCraftMissionState missions = new SmallCraftMissionState(
+                2L,
+                List.of(mission(
+                        1L, craft, MissionType.RECOVER, MissionStatus.RECOVERY_PENDING)));
+
+        Stage228GeneratedCampaignPersistentState checkpoint =
+                Stage228GeneratedCampaignPersistentState.compose(
+                        coordinator.captureState(),
+                        Stage228SmallCraftPersistenceMapper.capture(registry),
+                        Stage228HangarPersistenceMapper.capture(hangars),
+                        Stage228FlightDeckPersistenceMapper.capture(deck),
+                        Stage228OperationsPersistenceMapper.capture(
+                                missions, LogisticsState.empty(), List.of()));
+
+        Stage228CampaignAuthority restored = Stage228CampaignAuthority.restore(checkpoint);
+
+        assertEquals(MissionStatus.RECOVERY_PENDING,
+                restored.missions().activeMissionFor(craft).orElseThrow().status());
+        assertEquals(OccupancyState.SERVICING,
+                restored.hangars().find(craft).orElseThrow().state());
+        assertTrue(restored.flightDeck().queued().isEmpty());
+        assertTrue(restored.flightDeck().active().isEmpty());
+    }
+
     private static SmallCraftId register(
             SmallCraftRegistry registry,
             long ammoCount,
