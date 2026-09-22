@@ -5,13 +5,18 @@ import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage228FlightDeckPersistenceMapper;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
 import com.spacesim.persistence.Stage228HangarPersistenceMapper;
+import com.spacesim.persistence.Stage228OperationsPersistenceMapper;
 import com.spacesim.persistence.Stage228SmallCraftPersistenceMapper;
+import com.spacesim.world.FleetId;
 import com.spacesim.world.SmallCraftFitAuthority;
 import com.spacesim.world.SmallCraftFlightDeckOperations;
 import com.spacesim.world.SmallCraftFlightDeckOperations.DeckProfile;
 import com.spacesim.world.SmallCraftHangarCapacity.BayDefinition;
 import com.spacesim.world.SmallCraftHangarCapacity.BayId;
+import com.spacesim.world.CarrierWingStrategicReadinessService.CarrierWingAssignment;
 import com.spacesim.world.SmallCraftHangarRegistry;
+import com.spacesim.world.SmallCraftMissionState;
+import com.spacesim.world.SmallCraftPhysicalLogisticsService.LogisticsState;
 import com.spacesim.world.SmallCraftRegistry;
 
 import java.util.Collection;
@@ -34,16 +39,31 @@ public final class Stage228CampaignAuthority {
     private final SmallCraftRegistry smallCraft;
     private final SmallCraftHangarRegistry hangars;
     private final SmallCraftFlightDeckOperations flightDeck;
+    private SmallCraftMissionState missions;
+    private LogisticsState logistics;
+    private List<CarrierWingAssignment> carrierWings;
 
     private Stage228CampaignAuthority(
             GeneratedCampaignCoordinator coordinator,
             SmallCraftRegistry smallCraft,
             SmallCraftHangarRegistry hangars,
-            SmallCraftFlightDeckOperations flightDeck) {
+            SmallCraftFlightDeckOperations flightDeck,
+            SmallCraftMissionState missions,
+            LogisticsState logistics,
+            Collection<CarrierWingAssignment> carrierWings) {
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.smallCraft = Objects.requireNonNull(smallCraft, "smallCraft");
         this.hangars = Objects.requireNonNull(hangars, "hangars");
         this.flightDeck = Objects.requireNonNull(flightDeck, "flightDeck");
+        this.missions = Objects.requireNonNull(missions, "missions");
+        this.logistics = Objects.requireNonNull(logistics, "logistics");
+        this.carrierWings = List.copyOf(Objects.requireNonNull(carrierWings, "carrierWings"));
+        validateOperations(
+                this.smallCraft,
+                this.hangars,
+                this.missions,
+                this.logistics,
+                this.carrierWings);
     }
 
     /**
@@ -77,7 +97,10 @@ public final class Stage228CampaignAuthority {
                 hangars,
                 new SmallCraftFlightDeckOperations(
                         hangars,
-                        Objects.requireNonNull(flightDeckProfiles, "flightDeckProfiles")));
+                        Objects.requireNonNull(flightDeckProfiles, "flightDeckProfiles")),
+                SmallCraftMissionState.empty(),
+                LogisticsState.empty(),
+                List.of());
     }
 
     /**
@@ -107,11 +130,22 @@ public final class Stage228CampaignAuthority {
                 Stage228HangarPersistenceMapper.restore(saved.hangars(), smallCraft);
         SmallCraftFlightDeckOperations flightDeck =
                 Stage228FlightDeckPersistenceMapper.restore(saved.flightDeck(), hangars);
+        Stage228OperationsPersistenceMapper.RuntimeState operations =
+                Stage228OperationsPersistenceMapper.restore(saved.operations());
+        validateOperations(
+                smallCraft,
+                hangars,
+                operations.missions(),
+                operations.logistics(),
+                operations.carrierWings());
         return new Stage228CampaignAuthority(
                 coordinator,
                 smallCraft,
                 hangars,
-                flightDeck);
+                flightDeck,
+                operations.missions(),
+                operations.logistics(),
+                operations.carrierWings());
     }
 
     /**
@@ -127,7 +161,7 @@ public final class Stage228CampaignAuthority {
     }
 
     /**
-     * Captures accepted Stage-21 state plus exact A/B/C sidecars.
+     * Captures accepted Stage-21 state plus exact A/B/C and D/G/H operations sidecars.
      *
      * @return current versioned M22.8 campaign checkpoint
      */
@@ -136,7 +170,9 @@ public final class Stage228CampaignAuthority {
                 coordinator.captureState(),
                 Stage228SmallCraftPersistenceMapper.capture(smallCraft),
                 Stage228HangarPersistenceMapper.capture(hangars),
-                Stage228FlightDeckPersistenceMapper.capture(flightDeck));
+                Stage228FlightDeckPersistenceMapper.capture(flightDeck),
+                Stage228OperationsPersistenceMapper.capture(
+                        missions, logistics, carrierWings));
     }
 
     /** @return accepted Stage-20/21 campaign composition root */
@@ -157,6 +193,55 @@ public final class Stage228CampaignAuthority {
     /** @return deterministic M22.8C launch/recovery authority */
     public SmallCraftFlightDeckOperations flightDeck() {
         return flightDeck;
+    }
+
+    /** @return current immutable M22.8D mission state */
+    public SmallCraftMissionState missions() {
+        return missions;
+    }
+
+    /** @return current immutable M22.8G pending-delivery state */
+    public LogisticsState logistics() {
+        return logistics;
+    }
+
+    /** @return current immutable M22.8H carrier-wing associations */
+    public List<CarrierWingAssignment> carrierWings() {
+        return carrierWings;
+    }
+
+    /**
+     * Commits a validated D mission-state transition into the campaign composition root.
+     *
+     * @param next validated immutable mission state returned by the shared D command authority
+     */
+    public void commitMissionState(SmallCraftMissionState next) {
+        SmallCraftMissionState checked = Objects.requireNonNull(next, "next");
+        validateOperations(smallCraft, hangars, checked, logistics, carrierWings);
+        missions = checked;
+    }
+
+    /**
+     * Commits a validated G logistics-state transition without granting delivery or inventory.
+     *
+     * @param next immutable pending-delivery state returned by the G physical logistics authority
+     */
+    public void commitLogisticsState(LogisticsState next) {
+        LogisticsState checked = Objects.requireNonNull(next, "next");
+        validateOperations(smallCraft, hangars, missions, checked, carrierWings);
+        logistics = checked;
+    }
+
+    /**
+     * Commits explicit H carrier-wing associations after cross-link validation.
+     *
+     * @param next current strategic associations
+     */
+    public void commitCarrierWings(Collection<CarrierWingAssignment> next) {
+        List<CarrierWingAssignment> checked =
+                List.copyOf(Objects.requireNonNull(next, "next"));
+        validateOperations(smallCraft, hangars, missions, logistics, checked);
+        carrierWings = checked;
     }
 
     /**
@@ -198,6 +283,97 @@ public final class Stage228CampaignAuthority {
                     Objects.requireNonNull(provider.apply(tick), "bay projection");
             flightDeck.advanceFixedTick(tick, fixedStepSeconds, bays);
         });
+    }
+
+    private static void validateOperations(
+            SmallCraftRegistry craft,
+            SmallCraftHangarRegistry hangars,
+            SmallCraftMissionState missions,
+            LogisticsState logistics,
+            Collection<CarrierWingAssignment> wings) {
+        Objects.requireNonNull(craft, "craft");
+        Objects.requireNonNull(hangars, "hangars");
+        SmallCraftMissionState checkedMissions =
+                Objects.requireNonNull(missions, "missions");
+        LogisticsState checkedLogistics = Objects.requireNonNull(logistics, "logistics");
+        Objects.requireNonNull(wings, "wings");
+
+        java.util.HashSet<com.spacesim.world.SmallCraftId> pending =
+                new java.util.HashSet<>();
+        for (var delivery : checkedLogistics.pendingDeliveries()) {
+            var state = craft.find(delivery.craftId()).orElseThrow(
+                    () -> new IllegalArgumentException(
+                            "pending delivery references absent produced craft: "
+                                    + delivery.craftId()));
+            if (!state.designId().equals(delivery.designId())) {
+                throw new IllegalArgumentException(
+                        "pending delivery design differs from produced craft: "
+                                + delivery.craftId());
+            }
+            if (hangars.find(delivery.craftId()).isPresent()) {
+                throw new IllegalArgumentException(
+                        "pending-delivery craft cannot already occupy a bay: "
+                                + delivery.craftId());
+            }
+            if (checkedMissions.activeMissionFor(delivery.craftId()).isPresent()) {
+                throw new IllegalArgumentException(
+                        "pending-delivery craft cannot have an active mission: "
+                                + delivery.craftId());
+            }
+            pending.add(delivery.craftId());
+        }
+
+        for (var mission : checkedMissions.missions()) {
+            if (mission.status().active()
+                    && craft.find(mission.craftId()).isEmpty()) {
+                throw new IllegalArgumentException(
+                        "active mission references lost/absent craft: "
+                                + mission.craftId());
+            }
+        }
+
+        java.util.HashSet<FleetId> carrierIds = new java.util.HashSet<>();
+        java.util.HashSet<com.spacesim.world.SmallCraftId> wingCraft =
+                new java.util.HashSet<>();
+        for (CarrierWingAssignment wing :
+                List.copyOf(wings)) {
+            CarrierWingAssignment checked = Objects.requireNonNull(wing, "carrierWing");
+            if (!carrierIds.add(checked.carrierFleetId())) {
+                throw new IllegalArgumentException(
+                        "duplicate carrier wing FleetId: " + checked.carrierFleetId());
+            }
+            for (var id : checked.craftIds()) {
+                if (!wingCraft.add(id)) {
+                    throw new IllegalArgumentException(
+                            "craft belongs to multiple carrier wings: " + id);
+                }
+                if (pending.contains(id)) {
+                    throw new IllegalArgumentException(
+                            "pending-delivery craft cannot belong to a carrier wing: " + id);
+                }
+                var state = craft.find(id);
+                if (state.isEmpty()) {
+                    continue; // retained lost identity; never synthesize it.
+                }
+                if (!state.orElseThrow().stableFactionId()
+                        .equals(checked.stableFactionId())) {
+                    throw new IllegalArgumentException(
+                            "carrier wing craft ownership differs from carrier faction: " + id);
+                }
+                var assignment = hangars.find(id);
+                if (assignment.isPresent()) {
+                    if (!assignment.orElseThrow().bayId().hostStableId()
+                            .equals(checked.hostStableId())) {
+                        throw new IllegalArgumentException(
+                                "carrier wing craft occupies another physical host: " + id);
+                    }
+                } else if (checkedMissions.activeMissionFor(id).isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "surviving carrier-wing craft must be embarked or on an active mission: "
+                                    + id);
+                }
+            }
+        }
     }
 
     private static SmallCraftFitAuthority productionFitAuthority() {
