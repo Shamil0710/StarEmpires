@@ -191,25 +191,26 @@ public final class Stage228CarrierCounterplayEvidence {
         }
 
         LinkedHashMap<String, Integer> boundedCapacityByRole = new LinkedHashMap<>();
-        roleVectors.stream()
+        List<RoleVector> factionRoles = roleVectors.stream()
                 .filter(value -> value.stableFactionId().equals(stableFactionId))
                 .sorted(Comparator.comparing(RoleVector::roleId))
-                .forEach(value -> {
-                    var fit = requireFit(engineering, value.fitId());
-                    var hull = Objects.requireNonNull(engineering.findHull(fit.hullId()), fit.hullId());
-                    boolean envelopeFits =
-                            hull.boundingDimensionsM().lengthM() <= maxEnvelopeLengthM
-                                    && hull.boundingDimensionsM().widthM() <= maxEnvelopeWidthM
-                                    && hull.boundingDimensionsM().heightM() <= maxEnvelopeHeightM;
-                    double craftVolumeM3 = hull.boundingDimensionsM().lengthM()
-                            * hull.boundingDimensionsM().widthM()
-                            * hull.boundingDimensionsM().heightM();
-                    int byMass = (int) Math.floor(totalSupportedMassKg / value.fittedDryMassKg());
-                    int byVolume = (int) Math.floor(totalUsableVolumeM3 / craftVolumeM3);
-                    boundedCapacityByRole.put(
-                            value.roleId(),
-                            envelopeFits ? Math.max(0, Math.min(byMass, byVolume)) : 0);
-                });
+                .toList();
+        for (RoleVector value : factionRoles) {
+            var fit = requireFit(engineering, value.fitId());
+            var hull = Objects.requireNonNull(engineering.findHull(fit.hullId()), fit.hullId());
+            boolean envelopeFits =
+                    hull.boundingDimensionsM().lengthM() <= maxEnvelopeLengthM
+                            && hull.boundingDimensionsM().widthM() <= maxEnvelopeWidthM
+                            && hull.boundingDimensionsM().heightM() <= maxEnvelopeHeightM;
+            double craftVolumeM3 = hull.boundingDimensionsM().lengthM()
+                    * hull.boundingDimensionsM().widthM()
+                    * hull.boundingDimensionsM().heightM();
+            int byMass = (int) Math.floor(totalSupportedMassKg / value.fittedDryMassKg());
+            int byVolume = (int) Math.floor(totalUsableVolumeM3 / craftVolumeM3);
+            boundedCapacityByRole.put(
+                    value.roleId(),
+                    envelopeFits ? Math.max(0, Math.min(byMass, byVolume)) : 0);
+        }
 
         return new CarrierBayVector(
                 stableFactionId,
