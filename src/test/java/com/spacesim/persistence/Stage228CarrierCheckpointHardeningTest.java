@@ -285,6 +285,44 @@ final class Stage228CarrierCheckpointHardeningTest {
     }
 
     @Test
+    void unsupportedAndTruncatedOperationsSidecarsFailClosed() {
+        byte[] encoded = Stage228OperationsPersistenceCodec.encode(
+                Stage228OperationsPersistentState.empty());
+
+        byte[] unsupported = encoded.clone();
+        unsupported[4] = 0;
+        unsupported[5] = 0;
+        unsupported[6] = 0;
+        unsupported[7] = 2;
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage228OperationsPersistenceCodec.decode(unsupported));
+
+        byte[] truncated = java.util.Arrays.copyOf(encoded, encoded.length - 1);
+        assertThrows(IllegalArgumentException.class,
+                () -> Stage228OperationsPersistenceCodec.decode(truncated));
+    }
+
+    @Test
+    void stage21MigrationAddsNoCarrierCraftSupplyOrOperationState() {
+        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        byte[] stage21 = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(
+                coordinator.captureState());
+
+        Stage228GeneratedCampaignPersistentState migrated =
+                Stage228GeneratedCampaignPersistenceCodec.decodeOrMigrate(stage21);
+        Stage228CampaignAuthority restored = Stage228CampaignAuthority.restore(migrated);
+
+        assertEquals(0, restored.smallCraft().size());
+        assertTrue(restored.hangars().snapshot().isEmpty());
+        assertTrue(restored.flightDeck().queued().isEmpty());
+        assertTrue(restored.flightDeck().active().isEmpty());
+        assertTrue(restored.missions().missions().isEmpty());
+        assertTrue(restored.logistics().pendingDeliveries().isEmpty());
+        assertTrue(restored.carrierWings().isEmpty());
+    }
+
+    @Test
     void nativeV1AndV2MigrationPreservesEarlierPhysicalStateWithoutLaterGrants() {
         GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
