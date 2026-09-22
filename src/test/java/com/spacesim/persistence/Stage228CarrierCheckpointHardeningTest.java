@@ -285,6 +285,52 @@ final class Stage228CarrierCheckpointHardeningTest {
     }
 
     @Test
+    void nativeV1AndV2MigrationPreservesEarlierPhysicalStateWithoutLaterGrants() {
+        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
+                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        SmallCraftRegistry registry =
+                SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
+        SmallCraftId craft = register(registry, 5L, 20d, 100d, 0.95d, 50d);
+        Stage228SmallCraftPersistentState craftState =
+                Stage228SmallCraftPersistenceMapper.capture(registry);
+
+        Stage228GeneratedCampaignPersistentState migratedV1 =
+                Stage228GeneratedCampaignPersistenceCodec.decode(
+                        encodeLegacyV1(coordinator.captureState(), craftState));
+        Stage228CampaignAuthority restoredV1 = Stage228CampaignAuthority.restore(migratedV1);
+
+        assertEquals(1, restoredV1.smallCraft().size());
+        assertTrue(restoredV1.hangars().assignments().isEmpty());
+        assertTrue(restoredV1.flightDeck().queued().isEmpty());
+        assertTrue(restoredV1.flightDeck().active().isEmpty());
+        assertTrue(restoredV1.missions().missions().isEmpty());
+        assertTrue(restoredV1.logistics().pendingDeliveries().isEmpty());
+        assertTrue(restoredV1.carrierWings().isEmpty());
+
+        BayId bayId = new BayId(HOST, "bay.legacy-v2");
+        SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.restore(
+                registry,
+                List.of(new SmallCraftHangarRegistry.Assignment(
+                        craft, bayId, HostKind.SHIP, OccupancyState.PARKED)));
+        Stage228GeneratedCampaignPersistentState migratedV2 =
+                Stage228GeneratedCampaignPersistenceCodec.decode(
+                        encodeLegacyV2(
+                                coordinator.captureState(),
+                                craftState,
+                                Stage228HangarPersistenceMapper.capture(hangars)));
+        Stage228CampaignAuthority restoredV2 = Stage228CampaignAuthority.restore(migratedV2);
+
+        assertEquals(1, restoredV2.smallCraft().size());
+        assertEquals(OccupancyState.PARKED,
+                restoredV2.hangars().find(craft).orElseThrow().state());
+        assertTrue(restoredV2.flightDeck().queued().isEmpty());
+        assertTrue(restoredV2.flightDeck().active().isEmpty());
+        assertTrue(restoredV2.missions().missions().isEmpty());
+        assertTrue(restoredV2.logistics().pendingDeliveries().isEmpty());
+        assertTrue(restoredV2.carrierWings().isEmpty());
+    }
+
+    @Test
     void v3QueuedDeckMigrationPreservesPhysicalWorkWithoutSynthesizingMission() {
         GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
@@ -399,6 +445,51 @@ final class Stage228CarrierCheckpointHardeningTest {
                 new MissionTarget(kind, type == MissionType.RECOVER ? HOST : "area.m22_8m"),
                 40L,
                 status);
+    }
+
+    private static byte[] encodeLegacyV1(
+            Stage21IGeneratedWorldRuntimePersistentState stage21,
+            Stage228SmallCraftPersistentState craft) {
+        try {
+            byte[] stage21Bytes = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(stage21);
+            byte[] craftBytes = Stage228SmallCraftPersistenceCodec.encode(craft);
+            java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+            try (java.io.DataOutputStream out = new java.io.DataOutputStream(buffer)) {
+                out.writeInt(0x53323843);
+                out.writeInt(1);
+                out.writeInt(1);
+                out.writeUTF("m22.8.generated-campaign.v1");
+                writePayload(out, stage21Bytes);
+                writePayload(out, craftBytes);
+            }
+            return buffer.toByteArray();
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private static byte[] encodeLegacyV2(
+            Stage21IGeneratedWorldRuntimePersistentState stage21,
+            Stage228SmallCraftPersistentState craft,
+            Stage228HangarPersistentState hangars) {
+        try {
+            byte[] stage21Bytes = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(stage21);
+            byte[] craftBytes = Stage228SmallCraftPersistenceCodec.encode(craft);
+            byte[] hangarBytes = Stage228HangarPersistenceCodec.encode(hangars);
+            java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+            try (java.io.DataOutputStream out = new java.io.DataOutputStream(buffer)) {
+                out.writeInt(0x53323843);
+                out.writeInt(2);
+                out.writeInt(2);
+                out.writeUTF("m22.8.generated-campaign.v2");
+                writePayload(out, stage21Bytes);
+                writePayload(out, craftBytes);
+                writePayload(out, hangarBytes);
+            }
+            return buffer.toByteArray();
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     private static byte[] encodeLegacyV3(
