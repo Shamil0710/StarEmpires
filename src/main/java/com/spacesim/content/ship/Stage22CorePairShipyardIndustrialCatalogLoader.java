@@ -24,7 +24,9 @@ public final class Stage22CorePairShipyardIndustrialCatalogLoader {
         ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog strategic =
                 Stage22CorePairStrategicMobilityIndustrialProjection.applyEmpire(base, engineering);
-        return Stage22CorePairCommandNetworkIndustrialProjection.applyEmpire(strategic, engineering);
+        ShipyardIndustrialCatalog network =
+                Stage22CorePairCommandNetworkIndustrialProjection.applyEmpire(strategic, engineering);
+        return Stage228SmallCraftIndustrialProjection.applyEmpire(network, engineering);
     }
 
     /**
@@ -37,6 +39,8 @@ public final class Stage22CorePairShipyardIndustrialCatalogLoader {
         ShipEngineeringCatalog engineering = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         ShipyardIndustrialCatalog strategic =
                 Stage22CorePairStrategicMobilityIndustrialProjection.applyIndustrialUnion(base, engineering);
-        return Stage22CorePairCommandNetworkIndustrialProjection.applyIndustrialUnion(strategic, engineering);
+        ShipyardIndustrialCatalog network =
+                Stage22CorePairCommandNetworkIndustrialProjection.applyIndustrialUnion(strategic, engineering);
+        return Stage228SmallCraftIndustrialProjection.applyIndustrialUnion(network, engineering);
     }
 }
