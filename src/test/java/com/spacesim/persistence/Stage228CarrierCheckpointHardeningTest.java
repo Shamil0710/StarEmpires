@@ -200,7 +200,7 @@ final class Stage228CarrierCheckpointHardeningTest {
                                 MissionType.CAP,
                                 TargetKind.AREA,
                                 "area.malformed",
-                                10L,
+                                0L,
                                 MissionStatus.ACTIVE)),
                         List.of(),
                         List.of());
@@ -261,7 +261,7 @@ final class Stage228CarrierCheckpointHardeningTest {
                         1L,
                         craft,
                         OrderSource.AI,
-                        MissionType.INTERCEPTION,
+                        MissionType.CAP,
                         new MissionTarget(TargetKind.AREA, "area.future"),
                         1L,
                         MissionStatus.ACTIVE)));
