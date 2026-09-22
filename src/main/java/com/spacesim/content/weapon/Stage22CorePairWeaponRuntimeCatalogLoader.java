@@ -89,13 +89,6 @@ public final class Stage22CorePairWeaponRuntimeCatalogLoader {
                 kinetic,
                 guided);
 
-        combinedLaunchers =
-                Stage228SmallCraftWeaponRuntimeProjection.applyLaunchers(
-                        combinedLaunchers, engineering);
-        combinedAmmunition =
-                Stage228SmallCraftWeaponRuntimeProjection.applyAmmunition(
-                        combinedAmmunition, engineering);
-
         for (WeaponLauncherCatalog.LauncherProfile profile : combinedLaunchers.getProfiles()) {
             if (engineering.findModule(profile.moduleId()) == null) {
                 throw new IllegalStateException("Combined launcher references absent core module: " + profile.moduleId());
