@@ -269,7 +269,10 @@ public final class Stage228CarrierCounterplayEvidence {
                         List.of(
                                 "ShipFittingValidator",
                                 "Stage19ExactTacticalEncounterResolver",
-                                "CarrierStrategicTacticalEncounterService")),
+                                "CarrierStrategicTacticalEncounterService"),
+                        List.of(
+                                "SmallCraftTacticalEncounterServiceTest.productionBridgeUsesRealStage19ResolverForSmallCraftAndExternalCombatant",
+                                "CarrierStrategicTacticalEncounterServiceTest.strategicHandoffCommitsIndividualLossAndLeavesDetachedCarrierAndBayStateUntouched")),
                 scenario(
                         ScenarioKind.MISSILE_HEAVY_FORCES,
                         EnumSet.of(
@@ -279,7 +282,10 @@ public final class Stage228CarrierCounterplayEvidence {
                         List.of(
                                 "WeaponAmmunitionCatalog",
                                 "LayeredDefenseScheduler",
-                                "ShipSensorRuntime")),
+                                "ShipSensorRuntime"),
+                        List.of(
+                                "Stage228CarrierCounterplayPhysicalSystemsTest.pointDefenseScreenIsEffectiveButFiniteInChannelsAmmoAndThermalDuty",
+                                "LiveTacticalBattleGuidedImpactAcceptanceTest")),
                 scenario(
                         ScenarioKind.STRONG_POINT_DEFENSE_OR_INTERCEPTOR_SCREEN,
                         EnumSet.of(
@@ -289,7 +295,10 @@ public final class Stage228CarrierCounterplayEvidence {
                         List.of(
                                 "LayeredDefenseScheduler",
                                 "SmallCraftTacticalEncounterService",
-                                "SmallCraftFlightDeckOperations")),
+                                "SmallCraftFlightDeckOperations"),
+                        List.of(
+                                "Stage228CarrierCounterplayPhysicalSystemsTest.pointDefenseScreenIsEffectiveButFiniteInChannelsAmmoAndThermalDuty",
+                                "SmallCraftFlightDeckOperationsTest")),
                 scenario(
                         ScenarioKind.EW_AND_DECEPTION_PRESSURE,
                         EnumSet.of(
@@ -299,7 +308,10 @@ public final class Stage228CarrierCounterplayEvidence {
                         List.of(
                                 "ShipSensorRuntime",
                                 "ShipElectronicWarfareEngineeringAdapter",
-                                "FactionActorObservationSnapshot")),
+                                "FactionActorObservationSnapshot"),
+                        List.of(
+                                "Stage228CarrierCounterplayPhysicalSystemsTest.electronicWarfareCanSuppressTrackingAndEccmRecoversAtExplicitPowerCost",
+                                "LiveTacticalOrdnanceElectronicWarfareTest")),
                 scenario(
                         ScenarioKind.DEGRADED_LOGISTICS_AND_REPLACEMENT,
                         EnumSet.of(
@@ -311,14 +323,23 @@ public final class Stage228CarrierCounterplayEvidence {
                                 "SmallCraftTurnaroundService",
                                 "SmallCraftFlightDeckOperations",
                                 "SmallCraftPhysicalLogisticsService",
-                                "Stage18ShipyardRuntime")));
+                                "Stage18ShipyardRuntime"),
+                        List.of(
+                                "SmallCraftTurnaroundServiceTest.finiteFuelAndAmmoRequireExactDeliveryAndHandlingWorkBeforeReady",
+                                "SmallCraftPhysicalLogisticsServiceTest",
+                                "CarrierPostBattleRecoveryServiceTest")));
     }
 
     private static ScenarioEvidence scenario(
             ScenarioKind kind,
             EnumSet<CounterplaySurface> surfaces,
-            List<String> authorities) {
-        return new ScenarioEvidence(kind, List.copyOf(surfaces), List.copyOf(authorities));
+            List<String> authorities,
+            List<String> acceptanceFixtures) {
+        return new ScenarioEvidence(
+                kind,
+                List.copyOf(surfaces),
+                List.copyOf(authorities),
+                List.copyOf(acceptanceFixtures));
     }
 
     private static DemonstratorFitDefinition requireFit(
@@ -451,11 +472,13 @@ public final class Stage228CarrierCounterplayEvidence {
      * @param kind matchup family
      * @param counterplaySurfaces physically actionable surfaces
      * @param commonAuthorities existing authorities that own those surfaces
+     * @param acceptanceFixtures concrete deterministic regression fixtures exercising the matchup surfaces
      */
     public record ScenarioEvidence(
             ScenarioKind kind,
             List<CounterplaySurface> counterplaySurfaces,
-            List<String> commonAuthorities) { }
+            List<String> commonAuthorities,
+            List<String> acceptanceFixtures) { }
 
     /**
      * Complete deterministic K evidence bundle.
