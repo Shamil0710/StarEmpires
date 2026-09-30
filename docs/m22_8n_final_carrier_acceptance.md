@@ -13,7 +13,7 @@ Canonical acceptance class:
 
 `src/test/java/com/spacesim/world/Stage228FinalCarrierAcceptanceTest.java`
 
-The corpus proves four complementary deterministic scenarios.
+The corpus proves five complementary deterministic scenarios.
 
 ### PLAYER physical lifecycle + checkpoint continuation
 
@@ -65,6 +65,14 @@ Proves:
 - replacement reaches the carrier only after an ordinary physical delivery receipt and enters
   `SERVICING`, never free `READY`;
 - save/load preserves both the missing destroyed identity and the fresh replacement identity.
+
+### Rejected relocation is atomic
+
+`rejectedStationToCarrierRelocationLeavesReadyCraftAtPhysicalSource`
+
+Proves a craft that cannot fit the destination remains `READY` in its original physical station
+bay and remains present under the same persistent identity. Failed relocation therefore cannot
+silently release, teleport, destroy or recreate the craft.
 
 ### Dense-wing deterministic long run
 
