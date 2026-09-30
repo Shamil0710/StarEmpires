@@ -1,6 +1,6 @@
 # M22.8N — Final carrier acceptance / soak
 
-Status: **IMPLEMENTED / EXACT-HEAD CI AND DEPENDENCY MERGE GATES PENDING**
+Status: **IMPLEMENTED / EXACT-HEAD CI + MERGE + POST-MERGE MAIN VERIFICATION PENDING**
 
 M22.8N is the final machine acceptance gate for the Stage-22 carrier / embarked-small-craft
 slice. It composes the already accepted Stage 17.5, Stage 18, Stage 19, Stage 21 and M22.8 A-M
@@ -144,14 +144,13 @@ M22.8N reuses:
 
 M22.8N and Stage 22 are **not COMPLETE** until all are true:
 
-1. M22.8M PR #405 is accepted on exact-head CI and merged.
-2. The rebased J/G reaction-mass binding PR #406 is accepted on exact-head CI and merged.
-3. The N branch is rebased/synchronized onto that resulting `main`.
-4. The final N corpus passes full Java-17 repository verification on the exact final head.
-5. No unresolved blocking review threads remain.
-6. The exact accepted N head is merged.
-7. Resulting `main` is verified.
-8. Only then are the M22.8 contract, Stage-22 completion record and canonical roadmap marked
+1. J/G reaction-mass integration #406 remains present in `main`.
+2. M22.8M rebased hardening #408 remains present in `main`.
+3. M22.8N PR #409 passes full Java-17 repository verification on its exact final head.
+4. No unresolved blocking review threads remain on #409.
+5. The exact accepted #409 head is merged.
+6. Resulting `main` is verified.
+7. Only then are the M22.8 contract, Stage-22 completion record and canonical roadmap marked
    COMPLETE, and Stage 23 becomes OPEN/NEXT.
 
 Until those gates are satisfied this document is implementation evidence, not a completion claim.
