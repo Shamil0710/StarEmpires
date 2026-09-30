@@ -48,9 +48,9 @@ No final acceptance evidence is allowed to rely on:
 
 ## Final machine evidence
 
-The M22.8M checkpoint hardening is tracked by PR #405.  
-The required production reaction-mass servicing integration is tracked by rebased PR #406.  
-The M22.8N final carrier acceptance corpus is tracked by PR #407.
+The production reaction-mass servicing integration is accepted through PR #406.  
+The rebased M22.8M checkpoint hardening is accepted through PR #408.  
+The M22.8N final carrier acceptance corpus is tracked by PR #409.
 
 The exact accepted N head, its full Java-17 `clean verify`, merge result and post-merge `main`
 verification are intentionally not predeclared here. GitHub PR/check metadata for the exact final
