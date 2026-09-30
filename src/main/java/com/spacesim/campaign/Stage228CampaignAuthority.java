@@ -314,12 +314,6 @@ public final class Stage228CampaignAuthority {
         if (authoritativeTick < 0L) {
             throw new IllegalArgumentException("authoritativeTick cannot be negative");
         }
-        for (var request : checkedDeck.queued()) {
-            if (request.requestedTick() > authoritativeTick) {
-                throw new IllegalArgumentException(
-                        "queued flight-deck request is future-dated: " + request.craftId());
-            }
-        }
         for (var active : checkedDeck.active()) {
             if (active.request().requestedTick() > authoritativeTick) {
                 throw new IllegalArgumentException(
