@@ -23,6 +23,7 @@ import com.spacesim.content.ship.Stage228SmallCraftShipyardIndustrialCatalogLoad
 import com.spacesim.content.ship.Stage22CorePairProtectionCatalogLoader;
 import com.spacesim.content.weapon.Stage228SmallCraftWeaponRuntimeCatalogLoader;
 import com.spacesim.economy.Stage18FacilityRuntime;
+import com.spacesim.economy.Stage228FinalCarrierEconomyAccess;
 import com.spacesim.economy.Stage18ShipConsumableService;
 import com.spacesim.economy.Stage18ShipyardRuntime;
 import com.spacesim.economy.Stage18StationIndustrialNode;
@@ -496,7 +497,8 @@ final class Stage228FinalCarrierAcceptanceTest {
 
         double water = production.station().storage().commodityMassKg(WATER_ID);
         if (water < 1_000d) {
-            production.station().storage().addCommodity(WATER_ID, 1_000d - water);
+            Stage228FinalCarrierEconomyAccess.addCommodity(
+                    production.station().storage(), WATER_ID, 1_000d - water);
         }
         var loaded = production.supply().loadCommodityAtStation(
                 craftId,
@@ -583,9 +585,8 @@ final class Stage228FinalCarrierAcceptanceTest {
     private static void advanceOneCampaignStep(
             Stage228CampaignAuthority authority,
             BayDefinition bay) {
-        float delta = (float) (authority.coordinator().session().fixedStepSeconds() * 1.5d);
         authority.advanceFrame(
-                delta,
+                1.0f,
                 tick -> Map.of(bay.id(), bay));
     }
 
@@ -853,14 +854,16 @@ final class Stage228FinalCarrierAcceptanceTest {
         hull.buildInputsKg().forEach(input ->
                 materials.merge(input.commodityId(), input.massKg(), Double::sum));
         materials.forEach((commodity, mass) ->
-                fixture.station().storage().addCommodity(commodity, mass));
+                Stage228FinalCarrierEconomyAccess.addCommodity(
+                        fixture.station().storage(), commodity, mass));
 
         Map<String, Integer> modules = new LinkedHashMap<>();
         for (InstalledModuleDefinition installed : fit.installedModules()) {
             modules.merge(installed.moduleId(), 1, Integer::sum);
         }
         modules.forEach((module, count) ->
-                fixture.station().storage().addProduct(module, count));
+                Stage228FinalCarrierEconomyAccess.addProduct(
+                        fixture.station().storage(), module, count));
     }
 
     private record ProductionFixture(
