@@ -271,10 +271,17 @@ public final class SmallCraftPhysicalLogisticsService {
             throw new IllegalStateException(
                     "station-to-carrier relocation requires READY craft in a station bay");
         }
+        if (checkedDestination.hostKind() != SmallCraftHangarCapacity.HostKind.SHIP) {
+            throw new IllegalArgumentException(
+                    "station-to-carrier relocation destination must be a ship bay");
+        }
         if (source.bayId().hostStableId().equals(checkedDestination.id().hostStableId())) {
             throw new IllegalArgumentException(
                     "relocation destination must be a different physical host");
         }
+        // Preserve B-layer BayId/HostKind consistency checks before the relocation-specific
+        // capacity preflight below.
+        hangars.capacityStatus(checkedDestination);
         /*
          * B-layer canAccept(craftId, bay) intentionally rejects any craft that already occupies a
          * bay, because it is an admission API. Relocation is different: the existing source
