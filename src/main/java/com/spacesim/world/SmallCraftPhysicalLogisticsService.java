@@ -237,6 +237,68 @@ public final class SmallCraftPhysicalLogisticsService {
     }
 
     /**
+     * Moves one already-serviced craft from a physical station bay to another physical host through
+     * the same ordinary delivery authority used for newly manufactured craft.
+     *
+     * <p>This seam exists for the post-service station → carrier leg required by the final M22.8
+     * causal chain. It does not create a second logistics model: the craft must already exist, be
+     * physically READY in a station bay, fit the destination at the time of transfer, and receive a
+     * matching arrival receipt from {@link PhysicalDeliveryAuthority}. Successful arrival enters
+     * {@link OccupancyState#SERVICING} at the destination so carrier-side inspection/turnaround
+     * remains finite; no consumable or damage state is reset.</p>
+     *
+     * @param craftId existing serviced craft
+     * @param destination physical destination bay
+     * @param authoritativeTick current authoritative world tick
+     * @return physical relocation result
+     */
+    public RelocationResult transferReadyCraft(
+            SmallCraftId craftId,
+            BayDefinition destination,
+            long authoritativeTick) {
+        SmallCraftId checkedCraft = Objects.requireNonNull(craftId, "craftId");
+        BayDefinition checkedDestination = Objects.requireNonNull(destination, "destination");
+        if (authoritativeTick < 0L) {
+            throw new IllegalArgumentException("authoritativeTick must be non-negative");
+        }
+        SmallCraftState state = craftRegistry.find(checkedCraft).orElseThrow(
+                () -> new IllegalArgumentException("unknown small craft: " + checkedCraft));
+        var source = hangars.find(checkedCraft).orElseThrow(
+                () -> new IllegalStateException(
+                        "small craft must occupy its physical source bay before relocation"));
+        if (source.hostKind() != SmallCraftHangarCapacity.HostKind.STATION
+                || source.state() != OccupancyState.READY) {
+            throw new IllegalStateException(
+                    "station-to-carrier relocation requires READY craft in a station bay");
+        }
+        if (source.bayId().hostStableId().equals(checkedDestination.id().hostStableId())) {
+            throw new IllegalArgumentException(
+                    "relocation destination must be a different physical host");
+        }
+        if (!hangars.canAccept(checkedCraft, checkedDestination)) {
+            throw new IllegalStateException(
+                    "small craft does not fit current relocation destination capacity");
+        }
+
+        PendingDelivery transfer = new PendingDelivery(
+                checkedCraft,
+                source.bayId().hostStableId(),
+                state.designId());
+        DeliveryReceipt receipt = Objects.requireNonNull(
+                deliveryAuthority.confirmArrival(
+                        transfer, checkedDestination, authoritativeTick),
+                "relocation delivery receipt");
+        receipt.requireMatches(transfer, checkedDestination, authoritativeTick);
+        if (!receipt.arrived()) {
+            return new RelocationResult(receipt, false);
+        }
+
+        hangars.release(checkedCraft);
+        hangars.assign(checkedCraft, checkedDestination, OccupancyState.SERVICING);
+        return new RelocationResult(receipt, true);
+    }
+
+    /**
      * Projects exact observable supply/service demand from an already-authoritative C turnaround plan.
      *
      * <p>The projection adds no resources and performs no settlement. Consumable transfers preserve
@@ -531,6 +593,28 @@ public final class SmallCraftPhysicalLogisticsService {
             if (assigned != receipt.arrived()) {
                 throw new IllegalArgumentException(
                         "bay assignment must agree with physical arrival");
+            }
+        }
+    }
+
+    /**
+     * Result of one physical station-to-host relocation.
+     *
+     * @param receipt ordinary physical arrival receipt
+     * @param assigned whether destination bay assignment occurred
+     */
+    public record RelocationResult(
+            DeliveryReceipt receipt,
+            boolean assigned) {
+        /** Validates one relocation result.
+         * @param receipt physical arrival receipt
+         * @param assigned whether destination assignment occurred
+         */
+        public RelocationResult {
+            Objects.requireNonNull(receipt, "receipt");
+            if (assigned != receipt.arrived()) {
+                throw new IllegalArgumentException(
+                        "relocation assignment must agree with physical arrival");
             }
         }
     }
