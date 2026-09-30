@@ -1,9 +1,9 @@
 # Star Empires — канонический roadmap разработки
 
-> **Последняя синхронизация: 2026-09-16 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 IN PROGRESS — M22.0–M22.7 accepted; M22.8 REQUIRED / PLANNED.**
+> **Последняя синхронизация: 2026-10-01 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 COMPLETE — M22.0–M22.8 accepted; Stage 23 OPEN / NEXT.**
 > Этот файл — authoritative status/dependency roadmap. Исторические snapshots находятся в `docs/archive/` и не являются текущим планом.
 
-> **Roadmap correction:** the 2026-09-16 closure after M22.7 was premature because the mandatory carrier / embarked-small-craft slice was omitted from the sequence. M22.7 evidence remains accepted; Stage 22 is reopened until M22.8 passes. Canonical contract: `docs/m22_8_carrier_small_craft_operations.md`.
+> **Roadmap correction resolved:** the 2026-09-16 M22.7-only closure was correctly reopened for the mandatory carrier / embarked-small-craft slice. M22.8 A-N is now accepted through PR #409 / CI #7710 / merge `0deb1973a0ddb1b766b6418f34bb2a1924f79055`; Stage 22 is re-closed and Stage 23 is OPEN / NEXT. Canonical final record: `docs/stage22_final_completion_record.md`.
 
 > Art maintenance: [Empire sprite refresh](empire_sprite_refresh.md) replaces the nine M22.3
 > ship texture sets against the M22.4 Union quality benchmark. Human-only aesthetic approval remains
@@ -74,8 +74,8 @@ Canonical faction contracts:
 | **v0.3 Playable Space Sandbox** | player ship/travel/trade/mining/combat/progression | 12–14 | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets/stations/player faction/combat depth/industry/warfare | 15–19 + 17.5 | **COMPLETE** |
 | **v0.5 RPG & Living World** | calibrated world generation/discovery/NPC/missions/reputation | 20–21 | **COMPLETE** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance + integrated campaign + carrier/small-craft operations | 22 | **IN PROGRESS — M22.8 REQUIRED** |
-| **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | **BLOCKED / NOT STARTED** |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + core-faction pair balance + integrated campaign + carrier/small-craft operations | 22 | **COMPLETE** |
+| **v0.7 Polish / RC** | UX/onboarding/performance/save hardening | 23 | **OPEN / NEXT** |
 
 Manual merge gate remains mandatory while `main` is unprotected:
 
@@ -688,7 +688,7 @@ M22.4 completion evidence: `docs/stage22_4_completion_record.md`.
 M22.5 completion evidence: `docs/stage22_5_completion_record.md`.  
 M22.6 merged acceptance: PR #355 / main `9693ede2653c1fd187a904c406cc9750919a4496`.  
 M22.7 integrated handoff evidence: PR #360 / accepted head `327870db987408781d323457a07d6a870e82a872` / CI #6703 / merge `22015454773a1e430c50a8743149addfe8947b6f` / acceptance issue #368 / `docs/stage22_completion_record.md`.  
-M22.8 current required contract: `docs/m22_8_carrier_small_craft_operations.md` — **NOT YET ACCEPTED**.
+M22.8 final accepted contract: `docs/m22_8_carrier_small_craft_operations.md` — PR #409 / exact head `227d90a3ba75168ec42e2e1abdbd289b63875b30` / CI #7710 SUCCESS / merge `0deb1973a0ddb1b766b6418f34bb2a1924f79055` / `docs/stage22_final_completion_record.md`.
 
 Stage-22 cross-cutting cadence correction accepted: PR #391 / head `996ddb7954cf9c20dc741412bcda28c4cd8d87c3` / CI #7363 + #7364 / merge `2254ace90e38ce6e661fd16383da536c229816bc` / `docs/stage22_local_logistics_cadence_rebalance.md`. This correction does not change the M22.8 authority boundary or Stage-22 completion status.
 
@@ -701,7 +701,7 @@ Faction design authority:
 
 ## 11. Stage 23 — Polish / Release Candidate
 
-**BLOCKED / NOT STARTED — requires M22.8 COMPLETE and a renewed final Stage-22 completion record.**
+**OPEN / NEXT — M22.8 COMPLETE and Stage 22 re-closed from exact accepted evidence.**
 
 UX/onboarding/accessibility/performance/content validation/save hardening after fundamental simulation/content architecture is stable.
 
@@ -760,9 +760,8 @@ Stage 17 COMPLETE
 → Stage 20 Physical World Generation / Discovery COMPLETE — 20A–20L
 → Stage 20.5 Runtime + Visual Integration COMPLETE — 20.5A–E + final acceptance
 → Stage 21 RPG / Living World COMPLETE — 21.0 + 21A + 21B + 21C + 21D + 21E + 21F + 21G + 21H + 21I
-→ Stage 22 Content / Balance Alpha IN PROGRESS — M22.0–M22.7 accepted
-   → M22.8 Carrier / Small-Craft Operations REQUIRED / PLANNED
-→ Stage 23 RC / final presentation replacement and polish — BLOCKED / NOT STARTED until M22.8 + Stage-22 re-closure
+→ Stage 22 Content / Balance Alpha COMPLETE — M22.0–M22.8 accepted
+→ Stage 23 RC / final presentation replacement and polish — OPEN / NEXT
 → Post-core horizon — Directorate / League / Frontier Confederation / Consortium / Nomad Fleet packages
 ```
 
@@ -770,7 +769,7 @@ Detailed faction/content execution, ID migration and post-core package sequencin
 `docs/factions/faction_implementation_roadmap.md`; evidence gates are defined in
 `docs/factions/faction_balance_validation_framework.md`. These documents refine the sequence without changing the live stage status in this roadmap.
 
-**Stage 22 is open.** M22.7 remains accepted (PR #360, exact-head CI #6703, acceptance #368), but the later closure record that treated M22.7 as the final Stage-22 gate is superseded by the required M22.8 carrier/small-craft contract. Stage 23 is not eligible to start until M22.8 is accepted on an exact green head, merged, post-merge verification is available, and a renewed final Stage-22 completion record is created. Open human visual debt #361 remains explicitly deferred and is not retroactive PASS evidence.
+**Stage 22 is complete.** M22.7 remains accepted historical integrated-campaign evidence, and the corrective M22.8 carrier/small-craft gate is now accepted through PR #409 / CI #7710 / merge `0deb1973a0ddb1b766b6418f34bb2a1924f79055`. The renewed final closure is `docs/stage22_final_completion_record.md`. Stage 23 is OPEN / NEXT. Open human visual debt #361 remains explicitly deferred and is not retroactive PASS evidence.
 
 The dated `docs/remaining_stages_execution_plan.md` remains a cross-stage planning/risk snapshot; this
 file plus `docs/m22_8_carrier_small_craft_operations.md` are authoritative for current implementation status. `docs/m22_7_integrated_campaign_handoff.md` and `docs/stage22_completion_record.md` remain accepted M22.7 evidence but their former immediate-Stage-23 / final-closure conclusions are superseded.

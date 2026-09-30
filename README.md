@@ -19,9 +19,9 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-09-15 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 — M22.7 FINAL ACCEPTANCE.**
+**Последняя синхронизация README: 2026-10-01 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 COMPLETE; Stage 23 OPEN / NEXT.**
 
-Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md). Точный контракт финального handoff Stage 22: [`docs/m22_7_integrated_campaign_handoff.md`](docs/m22_7_integrated_campaign_handoff.md).
+Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md). Финальный Stage-22 carrier gate: [`docs/m22_8_carrier_small_craft_operations.md`](docs/m22_8_carrier_small_craft_operations.md); closure evidence: [`docs/stage22_final_completion_record.md`](docs/stage22_final_completion_record.md).
 
 | Milestone | Цель | Статус |
 | --- | --- | --- |
@@ -30,8 +30,8 @@
 | **v0.3 Playable Space Sandbox** | player ship, travel, trade, mining, combat, progression | **COMPLETE** |
 | **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **COMPLETE** |
 | **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **COMPLETE — Stage 20–21** |
-| **v0.6 Content & Balance Alpha** | technology/content breadth + long-horizon balance + integrated campaign handoff | **FINAL ACCEPTANCE — M22.7** |
-| **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | PLANNED — Stage 23 |
+| **v0.6 Content & Balance Alpha** | technology/content breadth + integrated campaign + carrier/small-craft operations | **COMPLETE — Stage 22** |
+| **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | **OPEN / NEXT — Stage 23** |
 
 На текущем roadmap завершены Stages **0–21**, включая **Stage 20A–20L physical-world generation**,
 обязательный **Stage 20.5 runtime + visual integration gate** и полный **Stage 21 Living World**.
@@ -44,11 +44,12 @@ persistent NPCs/missions/reputation/discovery grounded in living-world state (21
 gate: read-only integrated UI projection, supported-save migration, representative cooperation/conflict
 corpus, core-pair doctrine acceptance, bounded workload evidence and non-vacuous long-run soak.
 
-**Stage 22 находится на финальном gate M22.7 Integrated Campaign Handoff.** Ветка PR #360 объединяет
-единый production campaign coordinator, финальный Stage-21I checkpoint, deterministic scheduling,
-causal first-hour freight/observation/decision proof, production-client smoke, 1x/8x throughput baseline
-и синхронизацию launcher/docs. Stage 23 не начинается до закрытия M22.7 acceptance issue #368 и merge
-точного зелёного PR head.
+**Stage 22 завершён.** M22.7 сохранил единый production campaign handoff, а M22.8
+закрыл carrier / embarked-small-craft operations как persistent physical assets: hangars,
+launch/recovery/turnaround, shared PLAYER/AI missions, exact Stage-19 combat, finite Stage-18 supply
+and replacement, strategic readiness, save/migration hardening и финальный integrated soak.
+M22.8N принят PR #409 (CI #7710, merge `0deb1973a0ddb1b766b6418f34bb2a1924f79055`).
+Следующая стадия — Stage 23 Polish / Release Candidate.
 
 ## Что уже реализовано
 
