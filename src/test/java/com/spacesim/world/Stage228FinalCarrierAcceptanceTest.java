@@ -394,6 +394,34 @@ final class Stage228FinalCarrierAcceptanceTest {
     }
 
     @Test
+    void rejectedStationToCarrierRelocationLeavesReadyCraftAtPhysicalSource() {
+        ContentCatalog.FactionDefinition faction =
+                ContentCatalogLoader.loadDefault().getFactions().get(0);
+        Stage228CampaignAuthority authority = campaign(CARRIER_BAY);
+        ProductionFixture production = productionFixture(authority);
+        SmallCraftId craftId = buildSupplyReadyAtStation(
+                authority, production, faction.id(), 0L);
+        BayDefinition impossible = new BayDefinition(
+                new BayId("carrier.m22_8n.too_small", "bay.flight"),
+                HostKind.SHIP,
+                new Dimensions3d(1d, 1d, 1d),
+                1d,
+                1d,
+                1d);
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalStateException.class,
+                () -> production.logistics().transferReadyCraft(
+                        craftId, impossible, authoritativeTick(authority)));
+
+        var source = authority.hangars().find(craftId).orElseThrow();
+        assertEquals(STATION_ID, source.bayId().hostStableId());
+        assertEquals(HostKind.STATION, source.hostKind());
+        assertEquals(OccupancyState.READY, source.state());
+        assertTrue(authority.smallCraft().find(craftId).isPresent());
+    }
+
+    @Test
     void denseWingLongRunDoesNotGrantCraftReuseIdsOrMaterializeDormantState() {
         ContentCatalog.FactionDefinition faction = ContentCatalogLoader.loadDefault().getFactions().get(0);
         BayDefinition denseBay = new BayDefinition(
@@ -472,6 +500,31 @@ final class Stage228FinalCarrierAcceptanceTest {
             String factionId,
             BayDefinition carrierBay,
             long tick) {
+        SmallCraftId craftId = buildSupplyReadyAtStation(
+                authority, production, factionId, tick);
+        SmallCraftTurnaroundService turnaround = new SmallCraftTurnaroundService(
+                authority.smallCraft(),
+                authority.hangars(),
+                production.engineering(),
+                production.engineeringService());
+
+        var relocated = production.logistics().transferReadyCraft(
+                craftId, carrierBay, tick);
+        assertTrue(relocated.assigned());
+        assertEquals(OccupancyState.SERVICING,
+                authority.hangars().find(craftId).orElseThrow().state());
+        completeInspection(
+                turnaround, craftId, carrierBay, production.yard().plannerCapability());
+        assertEquals(OccupancyState.READY,
+                authority.hangars().find(craftId).orElseThrow().state());
+        return craftId;
+    }
+
+    private static SmallCraftId buildSupplyReadyAtStation(
+            Stage228CampaignAuthority authority,
+            ProductionFixture production,
+            String factionId,
+            long tick) {
         InstalledFit fit = InstalledFit.fromDemonstrator(
                 production.engineering().findDemonstratorFit(DESIGN_ID));
         var plan = production.logistics().planBuild(
@@ -516,14 +569,6 @@ final class Stage228FinalCarrierAcceptanceTest {
                 production.engineeringService());
         completeInspection(
                 turnaround, craftId, stationBay, production.yard().plannerCapability());
-
-        var relocated = production.logistics().transferReadyCraft(
-                craftId, carrierBay, tick);
-        assertTrue(relocated.assigned());
-        assertEquals(OccupancyState.SERVICING,
-                authority.hangars().find(craftId).orElseThrow().state());
-        completeInspection(
-                turnaround, craftId, carrierBay, production.yard().plannerCapability());
         assertEquals(OccupancyState.READY,
                 authority.hangars().find(craftId).orElseThrow().state());
         return craftId;
