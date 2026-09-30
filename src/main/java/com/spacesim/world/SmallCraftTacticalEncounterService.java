@@ -3,6 +3,7 @@ package com.spacesim.world;
 import com.spacesim.components.EngineeringComponent;
 import com.spacesim.content.ship.ShipProtectionCatalog;
 import com.spacesim.content.ship.Stage22CorePairProtectionCatalogLoader;
+import com.spacesim.content.weapon.Stage228SmallCraftWeaponRuntimeCatalogLoader;
 import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader;
 import com.spacesim.content.weapon.Stage22CorePairWeaponRuntimeCatalogLoader.RuntimeContent;
 import com.spacesim.ship.LiveTacticalBattleRuntimeState.ImportedCombatantState;
@@ -53,10 +54,19 @@ public final class SmallCraftTacticalEncounterService {
             SmallCraftRegistry craftRegistry,
             SmallCraftHangarRegistry hangars) {
         SmallCraftRegistry registry = Objects.requireNonNull(craftRegistry, "craftRegistry");
-        RuntimeContent content = Stage22CorePairWeaponRuntimeCatalogLoader.loadCombined();
-        if (!registry.engineeringCatalogFingerprint().equals(content.engineering().getFingerprint())) {
-            throw new IllegalArgumentException(
-                    "Small-craft registry and tactical runtime must use the same engineering catalog");
+        RuntimeContent production = Stage228SmallCraftWeaponRuntimeCatalogLoader.loadCombined();
+        RuntimeContent content;
+        if (registry.engineeringCatalogFingerprint()
+                .equals(production.engineering().getFingerprint())) {
+            content = production;
+        } else {
+            RuntimeContent legacy = Stage22CorePairWeaponRuntimeCatalogLoader.loadCombined();
+            if (!registry.engineeringCatalogFingerprint()
+                    .equals(legacy.engineering().getFingerprint())) {
+                throw new IllegalArgumentException(
+                        "Small-craft registry and tactical runtime must use the same engineering catalog");
+            }
+            content = legacy;
         }
         ShipProtectionCatalog protection =
                 Stage22CorePairProtectionCatalogLoader.project(content.engineering());
