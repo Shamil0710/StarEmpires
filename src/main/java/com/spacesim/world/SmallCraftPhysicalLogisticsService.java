@@ -275,7 +275,17 @@ public final class SmallCraftPhysicalLogisticsService {
             throw new IllegalArgumentException(
                     "relocation destination must be a different physical host");
         }
-        if (!hangars.canAccept(checkedCraft, checkedDestination)) {
+        /*
+         * B-layer canAccept(craftId, bay) intentionally rejects any craft that already occupies a
+         * bay, because it is an admission API. Relocation is different: the existing source
+         * assignment must remain intact until ordinary transport confirms arrival. Preflight the
+         * destination against its real current usage and the same craft footprint without releasing
+         * the source early.
+         */
+        if (!SmallCraftHangarCapacity.canAccept(
+                checkedDestination,
+                hangars.usage(checkedDestination.id()),
+                hangars.craftFootprint(checkedCraft))) {
             throw new IllegalStateException(
                     "small craft does not fit current relocation destination capacity");
         }
