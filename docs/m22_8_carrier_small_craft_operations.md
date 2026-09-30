@@ -1,6 +1,6 @@
 # M22.8 — Carrier / Small-Craft Operations
 
-Status: **REQUIRED / PLANNED — Stage 22 remains open until this gate is accepted**  
+Status: **COMPLETE — M22.8 A-N accepted; final N PR #409 merged**  
 Added: 2026-09-16  
 Depends on: accepted M22.7 integrated campaign handoff plus Stage 17.5 combat/fitting, Stage 18 physical industry/logistics, Stage 19 tactical warfare and Stage 21 strategic operations.
 
@@ -201,9 +201,9 @@ M22.0–M22.7 remain accepted historical work. Their evidence is not invalidated
 
 However, the 2026-09-16 record that declared **Stage 22 COMPLETE after M22.7** was premature because the required carrier/small-craft gameplay slice had been omitted from the authoritative sequence. Therefore:
 
-- Stage 22 status becomes **IN PROGRESS — M22.0–M22.7 accepted; M22.8 REQUIRED / PLANNED**;
+- Stage 22 remained **IN PROGRESS** until M22.8 final acceptance; that gate is now accepted;
 - `docs/stage22_completion_record.md` is historical M22.7 closure evidence but no longer a valid final Stage-22 completion gate;
-- Stage 23 is **BLOCKED / NOT STARTED** until M22.8 final acceptance is merged and a new final Stage-22 completion record is created from exact accepted evidence;
+- Stage 23 is **OPEN / NEXT** after accepted M22.8 final acceptance and the renewed final Stage-22 completion record;
 - the existing `stage23a-release-governance` branch, if retained, is future work and must not be treated as an active Stage-23 implementation baseline.
 
 ## 5. M22.8 exit criteria
@@ -225,3 +225,16 @@ M22.8 may be marked COMPLETE only when all of the following are true:
 13. the exact accepted head is merged, post-merge verification is green/available, and only then is Stage 22 re-closed.
 
 Until these criteria are satisfied, any document or branch that describes Stage 23 as unblocked is superseded by this contract and the corrected authoritative roadmap.
+
+## 6. Completion evidence
+
+M22.8 is complete through the accepted A-N chain. Final hardening/acceptance evidence:
+
+- M22.8M: PR #408, head `e26338f40a57971fd861243669a9ce6cf4b85444`,
+  CI #7695 **SUCCESS**, merge `51264d63677848c6faff2487a78dbfb2b4178ef9`;
+- M22.8N: PR #409, head `227d90a3ba75168ec42e2e1abdbd289b63875b30`,
+  CI #7710 **SUCCESS**, merge `0deb1973a0ddb1b766b6418f34bb2a1924f79055`;
+- final closure record: `docs/stage22_final_completion_record.md`.
+
+The post-M22.7 correction is therefore resolved: Stage 22 / v0.6 is complete and Stage 23 is the
+next implementation stage.

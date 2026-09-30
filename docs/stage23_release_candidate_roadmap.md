@@ -1,11 +1,11 @@
 # Stage 23 — Polish / Release Candidate roadmap
 
-> Статус: **BLOCKED / NOT STARTED — requires M22.8 Carrier / Small-Craft Operations COMPLETE and Stage 22 re-closure**.
+> Статус: **OPEN / NEXT — M22.8 COMPLETE; Stage 22 re-closure accepted**.
 > Назначение: превратить принятую Content & Balance Alpha в воспроизводимый, понятный,
 > производительный и безопасно обновляемый release candidate без создания новой параллельной
 > симуляции.
 
-> **Dependency correction (2026-09-16):** the earlier Stage-22 closure after M22.7 was premature. The mandatory M22.8 carrier/small-craft gate is defined in `docs/m22_8_carrier_small_craft_operations.md`. Nothing in this roadmap authorizes Stage-23 implementation before that gate is accepted and Stage 22 is re-closed from exact evidence.
+> **Dependency correction resolved (2026-09-30):** the mandatory M22.8 carrier/small-craft gate is accepted through final PR #409 and the renewed Stage-22 completion record. Stage 23 is now the next implementation stage; no Stage-23 slice is implied complete by this status transition.
 
 ## 1. Граница стадии
 

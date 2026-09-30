@@ -1,6 +1,6 @@
 # Stage 22 — Final completion record
 
-Status: **PENDING M22.8N EXACT-HEAD ACCEPTANCE / MERGE**
+Status: **COMPLETE — M22.8 A-N accepted; Stage 22 / v0.6 Content & Balance Alpha closed**
 
 This record supersedes the former conclusion in `docs/stage22_completion_record.md` that M22.7
 was the final Stage-22 gate. The historical M22.7 evidence remains valid; the final Stage-22
@@ -49,22 +49,27 @@ No final acceptance evidence is allowed to rely on:
 ## Final machine evidence
 
 The production reaction-mass servicing integration is accepted through PR #406.  
-The rebased M22.8M checkpoint hardening is accepted through PR #408.  
-The M22.8N final carrier acceptance corpus is tracked by PR #409.
+The rebased M22.8M checkpoint hardening is accepted through PR #408: exact head
+`e26338f40a57971fd861243669a9ce6cf4b85444`, CI #7695 **SUCCESS**, merge
+`51264d63677848c6faff2487a78dbfb2b4178ef9`.  
+The M22.8N final carrier acceptance is accepted through PR #409: exact head
+`227d90a3ba75168ec42e2e1abdbd289b63875b30`, CI #7710 **SUCCESS**, merge
+`0deb1973a0ddb1b766b6418f34bb2a1924f79055`.
 
-The exact accepted N head, its full Java-17 `clean verify`, merge result and post-merge `main`
-verification are intentionally not predeclared here. GitHub PR/check metadata for the exact final
-head is the source of truth and must be verified before this record changes to COMPLETE.
+The final closeout branch is cut directly from that N merge and contains status/documentation
+changes only. Its exact-head full Java-17 CI is therefore the post-merge verification gate for the
+accepted runtime before this record is merged to `main`.
 
-## Required status transition
-
-Only after all final machine/merge gates succeed:
+## Final status transition
 
 ```text
 Stage 22 Content / Balance Alpha -> COMPLETE
 v0.6 Content & Balance Alpha     -> COMPLETE
 Stage 23 Polish / RC             -> OPEN / NEXT
 ```
+
+Stage 23 is now eligible to begin from its existing release-candidate roadmap. This closeout does
+not claim that any Stage-23 delivery slice is already implemented.
 
 Human-only visual/aesthetic debt already explicitly deferred to the existing tracking issues remains
 deferred; it is not silently converted into PASS evidence by this machine closure.

@@ -1,6 +1,6 @@
 # M22.8N — Final carrier acceptance / soak
 
-Status: **IMPLEMENTED / EXACT-HEAD CI + MERGE + POST-MERGE MAIN VERIFICATION PENDING**
+Status: **ACCEPTED — PR #409 / exact head `227d90a3ba75168ec42e2e1abdbd289b63875b30` / CI #7710 SUCCESS / merge `0deb1973a0ddb1b766b6418f34bb2a1924f79055`**
 
 M22.8N is the final machine acceptance gate for the Stage-22 carrier / embarked-small-craft
 slice. It composes the already accepted Stage 17.5, Stage 18, Stage 19, Stage 21 and M22.8 A-M
@@ -140,17 +140,22 @@ M22.8N reuses:
 - M22.8L: bounded dense-wing scale architecture;
 - M22.8M: unified mission/logistics/wing persistence and fail-closed migration.
 
-## 4. Merge/closure gates
+## 4. Accepted machine evidence
 
-M22.8N and Stage 22 are **not COMPLETE** until all are true:
+- production reaction-mass integration: PR #406 — merged before M;
+- M22.8M persistence/migration hardening: PR #408 — exact head
+  `e26338f40a57971fd861243669a9ce6cf4b85444`, CI #7695 **SUCCESS**, merge
+  `51264d63677848c6faff2487a78dbfb2b4178ef9`;
+- M22.8N final acceptance: PR #409 — exact head
+  `227d90a3ba75168ec42e2e1abdbd289b63875b30`, CI #7710 **SUCCESS**, merge
+  `0deb1973a0ddb1b766b6418f34bb2a1924f79055`;
+- PR #409 had no unresolved review threads at merge;
+- Stage 19J Long Soak was **SKIPPED** by its existing path/workflow contract and is not represented
+  as N acceptance evidence; N acceptance is the full Java-17 repository CI plus the dedicated N
+  deterministic corpus;
+- the final Stage-22 closeout branch is cut directly from the accepted N merge and changes
+  documentation/status only, so its exact-head full CI is the post-merge verification gate for the
+  merged runtime.
 
-1. J/G reaction-mass integration #406 remains present in `main`.
-2. M22.8M rebased hardening #408 remains present in `main`.
-3. M22.8N PR #409 passes full Java-17 repository verification on its exact final head.
-4. No unresolved blocking review threads remain on #409.
-5. The exact accepted #409 head is merged.
-6. Resulting `main` is verified.
-7. Only then are the M22.8 contract, Stage-22 completion record and canonical roadmap marked
-   COMPLETE, and Stage 23 becomes OPEN/NEXT.
-
-Until those gates are satisfied this document is implementation evidence, not a completion claim.
+The M22.8N implementation is accepted. Stage 22 becomes COMPLETE when the final closeout status
+synchronization itself passes exact-head CI and is merged.
