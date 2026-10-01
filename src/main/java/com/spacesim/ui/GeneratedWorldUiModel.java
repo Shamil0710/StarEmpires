@@ -486,7 +486,7 @@ public final class GeneratedWorldUiModel {
             StarSystemId displayedSystem = placement.locationKind() == FleetLocationKind.IN_SYSTEM
                     ? placement.systemId() : placement.transitState().destinationSystemId();
             String status = placement.locationKind() == FleetLocationKind.IN_SYSTEM
-                    ? "Патруль системы " + systemName(displayedSystem, galaxy)
+                    ? "В системе " + systemName(displayedSystem, galaxy)
                     : "Перелёт " + systemName(placement.transitState().originSystemId(), galaxy)
                             + " → " + systemName(placement.transitState().destinationSystemId(), galaxy);
             DerivedShipState derived = MILITARY_CALCULATOR.derive(

@@ -24,6 +24,10 @@ final class ProductionUiCampaignIntegrationTest {
         var world = model.capture();
         var projected = projector.capture(campaign, world);
         assertEquals(before, campaign.captureState(), "presentation cannot write authority");
+        for (var fleet : world.military()) {
+            if (fleet.inSystem()) assertTrue(fleet.status().startsWith("В системе"),
+                    "physical placement is not evidence of a patrol order");
+        }
         assertFalse(projected.rows(Tab.FACTIONS).isEmpty());
         assertFalse(projected.rows(Tab.LOGISTICS).isEmpty());
         assertFalse(projected.rows(Tab.SHIPS).isEmpty());
