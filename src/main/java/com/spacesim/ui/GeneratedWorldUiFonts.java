@@ -14,7 +14,7 @@ public final class GeneratedWorldUiFonts {
     private static final String CYRILLIC =
             "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
                     + "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
-                    + "→Δ²—№«»×₽";
+                    + "→Δ²—№«»×₽•…";
 
     private final BitmapFont title;
     private final BitmapFont body;

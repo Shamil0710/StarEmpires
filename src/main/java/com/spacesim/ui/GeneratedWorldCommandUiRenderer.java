@@ -495,14 +495,14 @@ public final class GeneratedWorldCommandUiRenderer {
     }
 
     private void drawWorkspaceBar() {
-        float y = height - metrics.topBarHeight() - 21f * metrics.scale();
+        float y = height - metrics.topBarHeight() - 10f * metrics.scale();
         batch.begin();
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
         fonts.small().draw(batch, workspace.breadcrumb(production), metrics.outerMargin(), y,
                 width - metrics.outerMargin() * 2f, Align.left, false);
         batch.end();
         float x = metrics.outerMargin();
-        y -= 34f * metrics.scale();
+        y = height - metrics.topBarHeight() - 55f * metrics.scale();
         String[] ids = {"back", "search", "sort", "filter", "density", "pause", "save", "load"};
         String[] labels = {"НАЗАД", workspace.searching() ? "ПОИСК: " + workspace.view().query() : "ПОИСК",
                 "СОРТ: " + switch (workspace.view().sort()) {

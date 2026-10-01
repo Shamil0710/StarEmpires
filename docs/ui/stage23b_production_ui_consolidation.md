@@ -69,8 +69,8 @@ order labels have been removed: the inspector directs users to real command-grou
   dispatch, and a stale accepted click is checked again by the application.
 - Pause/save/load are also mouse/keyboard-focus controls. Menu Exit is explicitly reachable.
 
-This describes implemented input paths. It is **not** a claim that an OpenGL graphical or B18
-human acceptance charter has passed.
+This describes implemented input paths. The software-OpenGL engineering smoke below exercises
+them; it does **not** constitute a passed B18 human acceptance charter.
 
 ## Accepted player-start decision
 
@@ -122,6 +122,28 @@ The seed-1 probe yielded two faction rows, three military rows, thirteen freight
 current-system industrial/resource rows, sixteen ship rows, four intelligence rows, zero contacts
 and zero timeline rows. These counts are diagnostic evidence for this seed, not content gates.
 
+### Software OpenGL engineering smoke
+
+On 2026-10-01 the real client rendered at 1280×720 on an EGL pbuffer with Mesa llvmpipe
+(LLVM 20.1.2, 256 bits). `tools/qa/Stage23BSoftwareGraphicsSmoke.java` exercises all eleven
+surfaces through Tab/Enter only, then through rendered mouse hit targets; it also exercises row
+selection, list/inspector scrolling, search capture, Back and native save/load. All assertions
+passed with no OpenGL errors. Captured frames were visually inspected. This exposed and corrected
+breadcrumb/toolbar overlap and missing bullet/ellipsis font glyphs.
+
+Reproduce on Linux with Mesa EGL and the ordinary packaged desktop JAR (this temporary probe uses
+reflection solely to attach the software graphics context and verify presentation state):
+
+```sh
+EGL_PLATFORM=surfaceless java -cp target/star-empires-1.0-SNAPSHOT-all.jar tools/qa/Stage23BSoftwareGraphicsSmoke.java
+```
+
+The probe directs save/load to a fresh temporary directory and does not overwrite the normal
+campaign save. Framebuffer PNGs are temporary engineering evidence and have the OpenGL lower-left
+origin. It does not simulate player commands or prove display-driver compatibility, localization,
+legibility at other resolutions, complete camera behavior, performance budgets or human causal
+comprehension. B18 remains open; a software smoke must not be promoted to its acceptance verdict.
+
 Mandatory gaps remain in **23B**, not deferred to a future feature stage:
 
 1. Durable generated-campaign `PlayerState` and explicit lawful starting ownership/funding; supported
@@ -135,7 +157,8 @@ Mandatory gaps remain in **23B**, not deferred to a future feature stage:
    context-action forms and irreversible-action confirmation where needed.
 5. Explicit loading/error/empty visual states and camera presets/return-to-player coverage across
    all surfaces; a status-bar error and local selected-object follow are not full acceptance.
-6. Actual graphical keyboard-only and mouse smoke, plus B18 human causal-comprehension evidence.
+6. Human keyboard-only/mouse campaign smoke and B18 causal-comprehension evidence. The software
+   OpenGL navigation smoke above covers only the implemented presentation foundation.
 7. All stage acceptance/exit criteria and exact-head CI before a **stage-completion** merge.
 
 A green foundation CI proves only this change's regression gate. It does not close 23B, waive #412
