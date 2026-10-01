@@ -191,7 +191,7 @@ class Stage23AReleaseGovernanceContractTest {
             String path,
             List<String> expectedHeader) throws IOException {
         List<String> lines = Files.readAllLines(ROOT.resolve(path)).stream()
-                .filter(line -> !line.isBlank() && !line.startsWith("#"))
+                .filter(line -> !line.isBlank())
                 .toList();
         assertFalse(lines.isEmpty(), "TSV must not be empty: " + path);
 
