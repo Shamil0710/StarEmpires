@@ -13,6 +13,16 @@ public class Stage23BSoftwareGraphicsSmoke {
  static long f(String n){return DynamicLinkLoader.dlsym(lib,n);}
  static Object fallback(Class<?> c){if(c==boolean.class)return false;if(c==int.class)return 0;if(c==float.class)return 0f;if(c==long.class)return 0L;return null;}
  static void click(com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget t){var b=t.bounds();processor.touchDown((int)(b.x()+b.width()/2),(int)(720-b.y()-b.height()/2),0,Input.Buttons.LEFT);}
+ static void keyboardAction(com.spacesim.ui.GeneratedWorldCommandUiRenderer renderer, com.spacesim.GeneratedWorldCommandGame game, String id){
+  int moves=0;do{processor.keyDown(Input.Keys.TAB);game.render();if(++moves>100)throw new AssertionError("Keyboard action unreachable "+id);}while(renderer.keyboardTarget()==null||!renderer.keyboardTarget().id().equals(id));
+  processor.keyDown(Input.Keys.ENTER);game.render();
+ }
+ static com.spacesim.campaign.Stage228CampaignAuthority campaign(com.spacesim.GeneratedWorldCommandGame game)throws Exception{
+  var field=game.getClass().getDeclaredField("campaign");field.setAccessible(true);return (com.spacesim.campaign.Stage228CampaignAuthority)field.get(game);
+ }
+ static void selectMission(com.spacesim.ui.ProductionUiWorkspace workspace,com.spacesim.GeneratedWorldCommandGame game){
+  processor.keyDown(Input.Keys.F6);game.render();int moves=0;while(!workspace.view().selection().stableId().startsWith("player-mission:")){processor.keyDown(Input.Keys.DOWN);game.render();if(++moves>50)throw new AssertionError("Personal mission unreachable");}
+ }
  public static void main(String[] args) throws Exception {
   lib=DynamicLinkLoader.dlopen("libEGL.so.1",2);
   try(MemoryStack s=MemoryStack.stackPush()){
@@ -60,6 +70,31 @@ public class Stage23BSoftwareGraphicsSmoke {
   }
   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
   var sf=game.getClass().getDeclaredField("status");sf.setAccessible(true);System.out.println("Save/load status: "+sf.get(game));if(!sf.get(game).toString().contains("загруж"))throw new AssertionError("Save/load failed");
+  if(args.length>0){
+   // Optional exact test checkpoint, copied before load. This is command-path engineering evidence,
+   // not proof of a newly generated player start, authored contracts, or B18 human acceptance.
+   var path=(java.nio.file.Path)save.get(game);
+   java.nio.file.Files.copy(java.nio.file.Path.of(args[0]),path,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   processor.keyDown(Input.Keys.F9);game.render();selectMission(workspace,game);
+   keyboardAction(renderer,game,"mission.accept");
+   if(campaign(game).coordinator().npcMissions().missions().get(0).status()!=com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED)throw new AssertionError("Preview mutated live mission");
+   com.badlogic.gdx.graphics.Pixmap px=ScreenUtils.getFrameBufferPixmap(0,0,1280,720);com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(System.getProperty("java.io.tmpdir")+"/stage23b-mission-preview.png"),px);px.dispose();
+   keyboardAction(renderer,game,"mission.confirm");
+   if(campaign(game).coordinator().npcMissions().missions().get(0).status()!=com.spacesim.world.Stage21HNpcMissionState.MissionStatus.ACCEPTED)throw new AssertionError("Keyboard acceptance failed");
+   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();selectMission(workspace,game);
+   if(campaign(game).coordinator().npcMissions().missions().get(0).status()!=com.spacesim.world.Stage21HNpcMissionState.MissionStatus.ACCEPTED)throw new AssertionError("Accepted contract not saved");
+   var targets=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(targets.stream().filter(h->h.id().equals("mission.cancel")).findFirst().orElseThrow());game.render();
+   targets=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(targets.stream().filter(h->h.id().equals("mission.confirm")).findFirst().orElseThrow());game.render();
+   if(campaign(game).coordinator().npcMissions().missions().get(0).status()!=com.spacesim.world.Stage21HNpcMissionState.MissionStatus.CANCELLED)throw new AssertionError("Mouse cancellation failed");
+   java.nio.file.Files.copy(java.nio.file.Path.of(args[0]),path,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   processor.keyDown(Input.Keys.F9);game.render();selectMission(workspace,game);
+   keyboardAction(renderer,game,"mission.reject");keyboardAction(renderer,game,"mission.confirm");
+   if(campaign(game).coordinator().npcMissions().missions().get(0).status()!=com.spacesim.world.Stage21HNpcMissionState.MissionStatus.REJECTED)throw new AssertionError("Keyboard rejection failed");
+   if(GL11.glGetError()!=0)throw new AssertionError("Mission GL error");
+   System.out.println("Personal mission keyboard preview/accept/save/load/reject and mouse preview/cancel passed");
+  }
   processor.keyDown(Input.Keys.F4);game.render();held.add(Input.Keys.CONTROL_LEFT);processor.keyDown(Input.Keys.F);held.clear();for(char c:"military".toCharArray())processor.keyTyped(c);processor.keyDown(Input.Keys.ENTER);game.render();
   for(int i=0;i<20;i++){processor.keyDown(Input.Keys.TAB);game.render();}
   processor.keyDown(Input.Keys.ESCAPE);game.render();game.dispose();System.out.println("Graphical probe passed");

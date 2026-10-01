@@ -339,3 +339,8 @@ Stage 17 COMPLETE
 ## Лицензия
 
 См. [`LICENSE`](LICENSE).
+
+23B NPC contract integration: already initialized campaign players can preview/confirm existing
+personal contracts in Contacts; expiry, escrow refund and participation-checked settlement use the
+ordinary campaign ticks and v5 checkpoint. Fresh independent-pilot start and the remaining physical
+player commands are still mandatory work in #412. This does not close 23B or B18.

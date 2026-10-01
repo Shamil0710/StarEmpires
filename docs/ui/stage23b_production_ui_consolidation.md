@@ -41,7 +41,7 @@ campaign; candidate restore and candidate projection both finish before replacin
 | Military | Existing physical military projections and viewer-owned Stage-21D groups/Stage-21E operations | Readiness retains existing fail-closed unobserved crew/service semantics; order submission is not bound |
 | Logistics | Existing Stage-20 physical freight/order projection for the viewer | Source/destination, cargo and routing are inspectable; player trade/dispatch is not bound |
 | Industry | Stage-18/20 current-system stations, extraction sources and storage; viewer Stage-21G replacement demands | Current open system is explicitly identified; construction/repair/service actions are not bound |
-| Contacts | Existing bounded Stage-21H NPC/mission rows and directed reputation | Empty authority produces an empty screen; no NPC or funded contract is synthesized by UI |
+| Contacts | Existing bounded Stage-21H NPC/mission rows, personal contract commands and directed reputation | Existing initialized PlayerState required for personal commands; fresh generated roster/start is still missing; no NPC or funded contract is synthesized by UI |
 | Ships | Existing viewer military/freight engineering/cargo sections and durable M22.8 craft/assignment/mission summaries | This is a faction-observation roster, not personal ownership; interactive fitting/carrier commands remain unbound |
 | Journal | Existing actor-filtered Stage-21 event projection | Searchable current authoritative history; no new durable notification archive or invented events |
 | Intelligence | Existing actor-filtered discovery/access/control/transition/operation overlays | Preserves source visibility; layout labels/localization are not final |
@@ -100,7 +100,7 @@ explicitly increments the composed file/schema to **v5 / `m22.8.generated-campai
 player payload delegates every field to the existing `PlayableWorldStateCodec` player format; it
 contains no duplicated world, cargo, economy or clock. The composition root restores and recaptures
 that immutable checkpoint data exactly. It exposes no arbitrary wallet/ownership mutation endpoint.
-This is a persistence handoff, **not** a playable-runtime or command binding.
+This supplies the durable player contract; the subsequent NPC mission slice binds existing contract commands and escrow settlement. Physical player movement/cargo/start and the other command domains are still unbound.
 
 Native v1–v4 and supported Stage-20.5/21 checkpoints migrate with `playerState == null`. Absence is
 distinct from an initialized player with a zero wallet. Migration does not generate a starter ship,
@@ -169,8 +169,9 @@ Mandatory gaps remain in **23B**, not deferred to a future feature stage:
    explicit lawful independent-pilot starting ownership/funding and live player services are still
    missing. Supported adoption remains non-granting. A stored player is not proof of executable loops.
 2. One runtime composition of player movement/docking/trade/mining/fitting/construction/fleet,
-   faction/NPC/carrier command services, validated preview/submit, domain commit and ongoing lifecycle.
-   Immutable sidecars exposed by the coordinator are not proof of live command execution.
+   faction/carrier command services, validated preview/submit, domain commit and ongoing lifecycle.
+   Existing NPC mission commands/settlement are now bound for initialized players; this does not
+   make the remaining immutable sidecars executable or supply a new-player start.
 3. A complete production path for NPC/mission/discovery/reputation and causal notification history,
    rather than an empty migrated sidecar or curated test-world alternative.
 4. Final route/overlay presentation, every displayed strategic value's human-readable glossary,
@@ -213,3 +214,86 @@ player-persistence and five existing native-codec methods against this combined 
 The real client passed the software-EGL keyboard/mouse/save/load smoke on all eleven surfaces using
 locally compiled combined production sources and the existing packaged dependency set. This is not
 an exact packaged-artifact test or B18 human acceptance. Both batches require full exact-head CI.
+
+
+### Ordinary NPC mission commands and settlement
+
+The coordinator now owns the existing `Stage21HNpcMissionService`, so its current immutable snapshot
+is the single Stage-21H sidecar captured by the accepted save envelope. After each completed campaign
+tick it expires at most eight overdue contracts in deadline/identity order. The deadline remains
+**inclusive**: expiry occurs at the first processed tick greater than the deadline, unlike the
+separate diplomatic response-deadline semantics. Escrow returns through the existing faction-treasury
+transfer. Accepted failure memory is recorded once. Empty/historical NPC sidecars, paused/fractional
+frames, capture and restore remain non-mutating. Expiry never requires inventing a player or wallet.
+
+For an already initialized player, `Stage228CampaignAuthority` composes existing ACCEPT/REJECT/CANCEL
+commands and reconciliation. A preview executes the exact submission path on an isolated checkpoint;
+it changes no live treasury, clock, escrow or player field. The non-forgeable token belongs to that
+specific live authority and guards the entire exact checkpoint. Foreign, rejected, repeated and stale
+submission fails before mutation; submission reuses the existing service again. Offered personal
+contracts require the player's own discovered issuer posting. Choosing the knowledge viewer never
+grants this permission. Already accepted contracts remain inspectable/cancellable after travel.
+
+Event/deadline-relevant mission work is reconciled at completed ticks under an eight-contract budget.
+A separate bounded sweep of active contracts every 60 ticks reads ordinary objective authorities
+when a physical service has emitted no mission-specific wakeup. Its bucket derives only from the
+campaign tick and canonical active IDs; no transient cursor or second clock is introduced. Shared
+Stage-21H objective and contractor-participation validators decide outcomes. Other actors' work
+refunds/fails rather than paying the human. A successful escrow transfer updates only the existing
+`PlayerState.walletMilliCredits`; the service's wallet adapter is transaction-local and is not
+another persisted balance. Ownership, affiliation, discovery, docking, orders and construction
+fields are retained. Mission status/escrow/reputation and player balance survive the same v5 save.
+No schema/generator version change or money source/sink is added by this lifecycle composition.
+
+The Contacts inspector displays personal contract reward, escrow, inclusive deadline, objective and
+participation condition independently of the faction knowledge viewer. Clicking ACCEPT/REJECT/CANCEL
+first pauses and previews. The displayed explanation precedes an explicit confirmation control,
+reachable by Tab/Enter and mouse. Changing selection or campaign clears the pending UI token; changed
+authority state rejects it on submit. The campaign stays paused after a command until ordinary resume.
+
+`GeneratedCampaignPlayerMissionIntegrationTest` covers inclusive expiry/refund/idempotence without a
+player, pure/shared preview, foreign/repeated/stale tokens, personal knowledge boundaries, real
+reject/cancel treasury transfers, accepted expiry memory, 8x save/load continuation, pause/fractional
+purity, bounded deterministic expiry, due pending observations, participating versus unrelated-player
+settlement, periodic no-wakeup settlement, and personal projection provenance. Delivered freight
+checkpoints in settlement tests are **fixtures**, not proof of physical player delivery from UI.
+
+The software-EGL smoke accepts an optional already initialized test checkpoint, copying it to the
+fresh temporary save path before load. It exercises keyboard preview/accept/confirm/save/load/reject
+and mouse preview/cancel/confirm in the real client. This optional fixture journey does not prove
+independent-pilot creation, production NPC roster/offer generation, all player loops or B18 human
+acceptance. The ordinary fresh seed still grants no player, ship, funds or synthetic contract.
+
+
+Lifecycle batch validation on 2026-10-01: the initial targeted Maven/JUnit run passed 39 tests
+(12 new integration methods plus 27 existing lifecycle/coordinator/carrier methods), zero failures
+and errors. Two additional capacity/budget methods and the final Russian projection assertions
+passed direct invocation against the final compiled source; the full exact-head JUnit gate remains
+mandatory. The final combined production sources passed software-EGL navigation/save/load on all
+11 surfaces and the optional personal mission keyboard/mouse journey above. Its frame was visually
+inspected. B18 tooling's eight Python tests passed; those are tooling regressions, not human review.
+The PR records the full exact-head verification result; all stage-level gaps listed above remain.
+
+
+Final reference audit: completed ticks also call the existing `PlayerRuntime` ownership/docking
+reconciliation rules through a new pure, externally-clocked API. The original playable runtime uses
+the same extracted rules. Missing/destroyed owned fleets and their orders are removed, completed
+owned projects become existing physical station references, absent stations are removed and invalid
+docking is cleared. No control systems, physical writes, system switch, starter assets or second
+clock are installed by this seam. Capture/restore remain non-mutating. The additional physical-loss
+regression destroys an actual freighter through the accepted Stage-20/world destruction authority,
+then proves failed-contract refund, no replacement grant and exact v5 save/load with surviving player
+references. This closes reference hygiene, not physical player movement/trade/start integration.
+
+The repository-wide JUnit run passed **2351 tests, zero failures/errors, one skip** before the final
+reference audit. Its local Javadoc launcher initially rejected Maven's `-J` proxy flags; correcting
+the environment launcher does not change repository production code. After sharing the player
+reference rules and adding the physical-loss case, the exact final-source targeted JUnit run passed
+**24 tests (15 new mission integration methods plus existing player regressions), zero failures/errors**.
+The new branch head still requires a full remote `clean verify`; successful earlier-head evidence
+must not be relabelled as its final exact-head gate.
+
+After correcting the local Javadoc launcher, strict Java-17 Javadoc, desktop packaging and the
+configured coverage checks passed. That continuation used accumulated execution data and reported
+an old/new nested PlayerRuntime-class mismatch, so it is not promoted to clean exact-head coverage
+evidence. The mandatory remote `clean verify` must rebuild and rerun the complete final source.

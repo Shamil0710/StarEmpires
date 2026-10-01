@@ -38,6 +38,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private GeneratedWorldUiSnapshot snapshot;
     private ProductionUiProjector projector;
     private ProductionUiSnapshot production;
+    private Stage228CampaignAuthority.MissionCommandPreview pendingMissionPreview;
     private float projectionAge;
     private String status = "Генерация мира…";
     private Path savePath;
@@ -228,9 +229,54 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "save" -> save();
             case "load" -> load();
             case "focus" -> focusSelection();
+            case "mission.accept" -> previewMission(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.ACCEPT);
+            case "mission.reject" -> previewMission(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.REJECT);
+            case "mission.cancel" -> previewMission(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.CANCEL);
+            case "mission.confirm" -> confirmMission();
             case "exit" -> { Gdx.app.exit(); yield true; }
             default -> false;
         };
+    }
+
+    private String selectedPersonalMissionId() {
+        var selected = workspace.view().selection();
+        String prefix = "player-mission:";
+        return workspace.tab() == Tab.CONTACTS && selected.kind() == SelectionKind.SURFACE_ROW
+                && selected.stableId().startsWith(prefix)
+                && production.find(Tab.CONTACTS, selected).isPresent()
+                ? selected.stableId().substring(prefix.length()) : null;
+    }
+
+    private boolean previewMission(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand command) {
+        String id = selectedPersonalMissionId();
+        pendingMissionPreview = null;
+        if (id == null) return false;
+        campaign.coordinator().setPaused(true);
+        pendingMissionPreview = campaign.previewMissionCommand(command, id);
+        status = pendingMissionPreview.allowed()
+                ? switch (command) {
+                    case ACCEPT -> "На паузе. Принять контракт? Награда выплачивается только после проверки результата и участия.";
+                    case REJECT -> "На паузе. Отклонить предложение? Эскроу вернётся выдавшей контракт фракции.";
+                    case CANCEL -> "На паузе. Отменить контракт? Эскроу вернётся выдавшей контракт фракции.";
+                }
+                : "Действие недоступно: проверьте срок, состояние контракта и личную доступность выдающего контакт.";
+        refreshProjection();
+        return true;
+    }
+
+    private boolean confirmMission() {
+        var preview = pendingMissionPreview;
+        pendingMissionPreview = null;
+        if (preview == null || !preview.missionId().equals(selectedPersonalMissionId())) return false;
+        try {
+            campaign.submitMissionCommand(preview);
+            status = "Контракт обновлён. Кампания на паузе; Пробел — продолжить.";
+        } catch (RuntimeException exception) {
+            status = "Действие не выполнено: состояние изменилось или команда недоступна. Проверьте действие снова.";
+        }
+        snapshot = model.capture();
+        refreshProjection();
+        return true;
     }
 
     private boolean moveSelection(int delta) {
@@ -317,6 +363,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     }
 
     private boolean switchTab(Tab target) {
+        pendingMissionPreview = null;
         workspace.navigate(target);
         renderer.clearKeyboardFocus();
         dragPointer = -1;
@@ -365,6 +412,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             var nextProjector = new ProductionUiProjector(coordinator.actors().capture().stream()
                     .map(actor -> actor.factionContentId()).sorted().findFirst().orElseThrow());
             var nextProjection = nextProjector.capture(candidate, nextSnapshot);
+            pendingMissionPreview = null;
             campaign = candidate; model = nextModel; snapshot = nextSnapshot;
             projector = nextProjector; production = nextProjection; projectionAge = 0;
             workspace.reset(); renderer.resetSystemMapCamera(); renderer.clearKeyboardFocus();
@@ -388,6 +436,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             campaign.coordinator().setPaused(true);
             status = "Сведения недоступны; симуляция на паузе: " + safeMessage(exception);
         }
+        String missionId = selectedPersonalMissionId();
+        if (pendingMissionPreview != null && !pendingMissionPreview.missionId().equals(missionId)) pendingMissionPreview = null;
+        renderer.bindMissionActions(missionId != null, pendingMissionPreview != null && pendingMissionPreview.allowed());
         renderer.bindWorkspace(production, workspace);
         renderer.render(snapshot, workspace.tab(), workspace.view().selection(), workspace.view().detailScroll(),
                 workspace.view().listScroll(), campaign.coordinator().isPaused(), campaign.coordinator().timeScale(),

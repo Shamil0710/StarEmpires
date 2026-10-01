@@ -513,7 +513,27 @@ public final class PlayerRuntime {
                 ? Optional.empty() : Optional.of(new ActiveShip(placement, session, entity, transform));
     }
 
+    /**
+     * Reconciles durable ownership and docking against an externally advanced ordinary world.
+     * This reuses the same reference rules as the playable runtime without installing input systems,
+     * changing physical positions, switching the active system or advancing another clock.
+     *
+     * @param world existing authoritative world after a completed tick
+     * @param state current immutable player state
+     * @return surviving fleet/project/station ownership and valid docking; no replacement assets
+     */
+    public static PlayerState reconcileAuthorityReferences(WorldSimulation world, PlayerState state) {
+        WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation not set");
+        PlayerState checked = Objects.requireNonNull(state, "PlayerState not set");
+        return reconcileDocking(checkedWorld, reconcileOwnedStations(checkedWorld,
+                reconcileOwnedFleets(checkedWorld, checked)));
+    }
+
     private void reconcileOwnedFleets() {
+        player = reconcileOwnedFleets(world, player);
+    }
+
+    private static PlayerState reconcileOwnedFleets(WorldSimulation world, PlayerState player) {
         List<FleetId> survivors = new ArrayList<>();
         for (FleetId fleetId : player.ownedFleetIds()) {
             if (world.findFleet(fleetId).isPresent()) {
@@ -521,17 +541,21 @@ public final class PlayerRuntime {
             }
         }
         if (survivors.size() == player.ownedFleetIds().size()) {
-            return;
+            return player;
         }
         FleetId active = player.activeFleetId();
         if (active != null && !survivors.contains(active)) {
             active = survivors.isEmpty() ? null : survivors.get(0);
         }
-        player = copyPlayer(player, player.walletMilliCredits(), survivors, active,
+        return copyPlayer(player, player.walletMilliCredits(), survivors, active,
                 player.discoveredSystemIds(), player.discoveredObjects(), null);
     }
 
     private void reconcileOwnedStations() {
+        player = reconcileOwnedStations(world, player);
+    }
+
+    private static PlayerState reconcileOwnedStations(WorldSimulation world, PlayerState player) {
         List<ConstructionProjectId> activeProjects = new ArrayList<>();
         List<OwnedStationRef> stationCandidates = new ArrayList<>(player.ownedStations());
         for (ConstructionProjectId projectId : player.ownedConstructionProjectIds()) {
@@ -563,14 +587,19 @@ public final class PlayerRuntime {
         }
         if (!activeProjects.equals(player.ownedConstructionProjectIds())
                 || !liveStations.equals(player.ownedStations())) {
-            player = copyWithConstructionOwnership(player, activeProjects, liveStations);
+            return copyWithConstructionOwnership(player, activeProjects, liveStations);
         }
+        return player;
     }
 
     private void reconcileDocking() {
+        player = reconcileDocking(world, player);
+    }
+
+    private static PlayerState reconcileDocking(WorldSimulation world, PlayerState player) {
         DiscoveredObjectRef docked = player.dockedAt();
         if (docked == null) {
-            return;
+            return player;
         }
         FleetPlacementState placement = player.activeFleetId() == null
                 ? null : world.findFleet(player.activeFleetId()).orElse(null);
@@ -581,9 +610,10 @@ public final class PlayerRuntime {
                 || !docked.systemId().equals(placement.systemId())
                 || station == null
                 || station.getComponent(MarketComponent.class) == null) {
-            player = copyPlayer(player, player.walletMilliCredits(), player.ownedFleetIds(),
+            return copyPlayer(player, player.walletMilliCredits(), player.ownedFleetIds(),
                     player.activeFleetId(), player.discoveredSystemIds(), player.discoveredObjects(), null);
         }
+        return player;
     }
 
     private void releaseRemovedOwnedFleets(PlayerState previous, PlayerState current) {

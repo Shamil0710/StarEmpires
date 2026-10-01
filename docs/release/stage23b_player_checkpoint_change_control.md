@@ -51,3 +51,21 @@ regression methods passed a lightweight assertion harness. Maven dependency reso
 locally by Maven Central DNS; the exact-head GitHub `clean verify` is the full acceptance evidence.
 
 No stage-completion merge or 23C implementation is authorized by this persistence slice.
+
+
+## Subsequent NPC lifecycle composition (same v5)
+
+The later 23B NPC batch binds existing-player contract preview/submit and escrow settlement to this
+same envelope. No field, schema identity, content or generator profile changes. Only the existing
+mission service can settle a reward; its exact transfer updates the existing player's personal
+balance, retaining every other field. Native/historical adoption remains absent and non-granting.
+Capture/restore never expires or pays a contract; only later authoritative ticks process deadline,
+event-relevant or bounded periodic mission work. Existing overdue offers expire/refund on resumed
+clock work. This closes an NPC lifecycle seam for already initialized players, not new-pilot
+ownership, generated NPC/offer creation, physical trade/control or the remaining player commands.
+Current contract and validation: `docs/ui/stage23b_production_ui_consolidation.md`. #412/#370 remain open.
+
+Player reference hygiene at completed ticks reuses the existing `PlayerRuntime` rules through a pure
+API shared with the original playable runtime. Destruction/project completion/invalid docking may
+therefore reconcile existing references without adding assets, rewriting migration input or
+advancing a second clock. The physical-loss save regression is part of the NPC integration suite.

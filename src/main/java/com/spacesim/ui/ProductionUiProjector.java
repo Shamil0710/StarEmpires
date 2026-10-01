@@ -84,6 +84,38 @@ public final class ProductionUiProjector {
                             "Подтверждённых событий", Integer.toString(reputation.events().size()))),
                     "Stage 21H: направленная репутация; события о текущем наблюдателе", null, 0, world.worldTick()));
         }
+        campaign.playerState().ifPresent(player -> {
+            var npcState = campaign.coordinator().npcMissions();
+            for (var mission : npcState.missions()) {
+                var issuer = npcState.npcs().stream()
+                        .filter(npc -> npc.npcId().equals(mission.issuerNpcId())).findFirst().orElseThrow();
+                if (mission.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED
+                        && !player.discoveredSystemIds().contains(issuer.locationSystemId())) continue;
+                contacts.add(row("player-mission:" + mission.missionId(), label(mission.template().name()),
+                        "Личные контракты", label(mission.status().name()),
+                        List.of(InfoSection.of("Контракт игрока", "Выдаёт", label(issuer.nameKey()),
+                                "Состояние", label(mission.status().name()),
+                                "Цель", missionObjectiveDescription(mission.objective()),
+                                "Срок включительно", mission.deadlineTick() + " такт",
+                                "Награда", credits(mission.rewardMilliCredits()),
+                                "Эскроу", credits(mission.escrowMilliCredits()),
+                                "Исход", mission.outcomeCode().isEmpty() ? "Нет" : label(mission.outcomeCode())),
+                                InfoSection.of("Участие", "Условие выплаты",
+                                        "Подтверждённая цель и участие игрока; чужая работа не оплачивается",
+                                        "Проверка действий", "Предпросмотр ставит кампанию на паузу; затем подтвердите действие")),
+                        "Stage 21H: существующий funded contract и PlayerState; награда переводится из эскроу, срок — общий simulation tick",
+                        null, 0, mission.statusUpdatedTick()));
+            }
+            for (var reputation : npcState.reputations()) {
+                if (!reputation.subjectActorId().equals(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)) continue;
+                contacts.add(row("player-reputation:" + reputation.ownerId(), "Личная репутация у «" + label(reputation.ownerId()) + "»",
+                        "Личная репутация", Integer.toString(reputation.derivedValue()),
+                        List.of(InfoSection.of("Отношение к игроку", "Значение", Integer.toString(reputation.derivedValue()),
+                                "Подтверждённых событий", Integer.toString(reputation.events().size()))),
+                        "Stage 21H: наблюдённые исходы контрактов actor.player; сумма ограничена от −100 до 100",
+                        null, 0, world.worldTick()));
+            }
+        });
         rows.put(Tab.CONTACTS, List.copyOf(contacts));
         for (Tab tab : List.of(Tab.LOGISTICS, Tab.MILITARY, Tab.SHIPS)) {
             rows.put(tab, rows.get(tab).stream().map(row -> {
@@ -212,7 +244,7 @@ public final class ProductionUiProjector {
         result.get(Tab.SETTINGS).add(row("diagnostics", "Сведения о кампании", "Диагностика", "Версия и воспроизводимость",
                 List.of(InfoSection.of("Кампания", "Seed", Long.toString(world.worldSeed()),
                         "Такт", Long.toString(world.worldTick()), "Текущая система", world.activeSystemName(),
-                        "Формат", "M22.8 campaign v4")),
+                        "Формат", "M22.8 campaign v5")),
                 "Текущая сохранённая authority; содержимое сохранений и пользовательские пути здесь не показываются",
                 null, 0, world.worldTick()));
         return result;
@@ -239,10 +271,45 @@ public final class ProductionUiProjector {
         return values.isEmpty() ? "Нет сведений" : String.join("; ", values.stream().map(ProductionUiProjector::label).toList());
     }
 
+    private static String missionObjectiveDescription(com.spacesim.world.Stage21HNpcMissionState.MissionObjective objective) {
+        String target = label(objective.kind().name());
+        return switch (objective.kind()) {
+            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> "Доставить по назначенному транспортному контракту не менее " + objective.threshold() + " кг";
+            case FLEET_REACTION_MASS_KG_AT_LEAST -> "Пополнить реакционную массу назначенного корабля до " + objective.threshold() + " кг";
+            case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST -> "Обнаружить назначенные обломки и извлечь не менее " + objective.threshold() + " кг";
+            case CONSTRUCTION_DELIVERED_UNITS_AT_LEAST -> "Доставить в назначенный строительный проект не менее " + objective.threshold() + " единиц";
+            case FACTION_TREASURY_AT_LEAST -> "Обеспечить казну назначенной фракции не менее " + credits(objective.threshold());
+            default -> target;
+        };
+    }
+
     /** Minimal display fallback; stable IDs remain internal selection keys. Full localization is 23C. */
     static String label(String value) {
         if (value == null || value.isBlank()) return "Нет сведений";
         return switch (value) {
+            case "OFFERED" -> "Предложен";
+            case "ACCEPTED" -> "Принят";
+            case "COMPLETED" -> "Выполнен";
+            case "FAILED" -> "Не выполнен";
+            case "EXPIRED" -> "Срок истёк";
+            case "CANCELLED" -> "Отменён";
+            case "REJECTED" -> "Отклонён";
+            case "EMERGENCY_SUPPLY_DELIVERY" -> "Срочная доставка снабжения";
+            case "ORDINARY_MARKET_PROCUREMENT" -> "Закупка на рынке";
+            case "CONVOY_ESCORT" -> "Сопровождение конвоя";
+            case "STRANDED_FLEET_RESCUE_REFUEL" -> "Спасение и дозаправка корабля";
+            case "SYSTEM_OBJECT_RECONNAISSANCE" -> "Разведка системы или объекта";
+            case "DERELICT_INVESTIGATION_RECOVERY" -> "Исследование и разбор обломков";
+            case "INTERCEPTION_DEFENSE" -> "Перехват и оборона";
+            case "CONSTRUCTION_REPAIR_INPUT_DELIVERY" -> "Доставка для строительства и ремонта";
+            case "IMPERIAL_ACCESS_NEGOTIATION" -> "Переговоры о доступе";
+            case "FLEET_PRESENT_IN_SYSTEM" -> "Назначенный корабль должен прибыть в целевую систему";
+            case "FLEET_ABSENT" -> "Назначенный корабль больше не должен существовать";
+            case "ESCORT_FLEETS_PRESENT_IN_SYSTEM" -> "Конвой и корабль сопровождения должны прибыть в целевую систему";
+            case "DISCOVERY_AT_LEAST" -> "Получить требуемые сведения о назначенном объекте";
+            case "CONSTRUCTION_COMPLETED" -> "Завершить назначенный строительный проект";
+            case "MARKET_ACCESS_ALLOWED" -> "Получить законный доступ к назначенному рынку";
+            case "OPERATION_STATUS" -> "Довести назначенную операцию до требуемого результата";
             case "SELF" -> "Своя фракция (наблюдение)";
             case "UNKNOWN", "UNOBSERVED_IN_STAGE21H_CHECKPOINT" -> "Нет подтверждённых сведений";
             case "PRIVATE" -> "Только своей фракции";

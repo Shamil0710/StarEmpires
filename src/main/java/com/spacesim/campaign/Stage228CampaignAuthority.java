@@ -20,6 +20,10 @@ import com.spacesim.world.SmallCraftPhysicalLogisticsService.LogisticsState;
 import com.spacesim.world.SmallCraftRegistry;
 
 import com.spacesim.player.PlayerState;
+import com.spacesim.components.WalletComponent;
+import com.spacesim.world.Stage21HNpcMissionService.PlayerCommand;
+import com.spacesim.world.Stage21HNpcMissionState.MissionContract;
+import com.spacesim.world.Stage21HPlayerMissionAuthority;
 
 import java.util.Collection;
 import java.util.List;
@@ -39,7 +43,7 @@ import java.util.function.LongFunction;
  */
 public final class Stage228CampaignAuthority {
     private final GeneratedCampaignCoordinator coordinator;
-    private final PlayerState playerState;
+    private PlayerState playerState;
     private final SmallCraftRegistry smallCraft;
     private final SmallCraftHangarRegistry hangars;
     private final SmallCraftFlightDeckOperations flightDeck;
@@ -191,8 +195,8 @@ public final class Stage228CampaignAuthority {
     /**
      * Returns exact durable player data without treating the knowledge viewer as ownership.
      *
-     * <p>This checkpoint handoff does not install legacy cargo/control services on generated physical
-     * fleets. Production command composition and explicit new-start funding remain required.</p>
+     * <p>Mission settlement may update the personal balance through the existing escrow service.
+     * This does not install legacy cargo/control services or grant independent-pilot starter assets.</p>
      *
      * @return existing player state, or empty for historical/uninitialized campaigns
      */
@@ -289,7 +293,7 @@ public final class Stage228CampaignAuthority {
             throw new IllegalStateException(
                     "Active flight-deck work requires per-tick physical bay projection");
         }
-        return coordinator.advanceFrame(realDeltaSeconds);
+        return coordinator.advanceFrame(realDeltaSeconds, this::reconcilePlayerMissionsAtTick);
     }
 
     /**
@@ -313,7 +317,152 @@ public final class Stage228CampaignAuthority {
             Map<BayId, BayDefinition> bays =
                     Objects.requireNonNull(provider.apply(tick), "bay projection");
             flightDeck.advanceFixedTick(tick, fixedStepSeconds, bays);
+            reconcilePlayerMissionsAtTick(tick);
         });
+    }
+
+    /**
+     * Immutable, non-forgeable preview issued by one live campaign authority.
+     * Its exact checkpoint is a stale-state guard, never a replacement live world.
+     */
+    public static final class MissionCommandPreview {
+        private final Stage228CampaignAuthority owner;
+        private final Stage228GeneratedCampaignPersistentState baseline;
+        private final PlayerCommand command;
+        private final String missionId;
+        private final boolean allowed;
+        private final String reasonCode;
+
+        private MissionCommandPreview(Stage228CampaignAuthority owner,
+                Stage228GeneratedCampaignPersistentState baseline, PlayerCommand command,
+                String missionId, boolean allowed, String reasonCode) {
+            this.owner = owner;
+            this.baseline = baseline;
+            this.command = command;
+            this.missionId = missionId;
+            this.allowed = allowed;
+            this.reasonCode = reasonCode;
+        }
+
+        /** @return whether the existing domain authority accepted the candidate command */
+        public boolean allowed() { return allowed; }
+        /** @return bounded rejection/explanation code, never an exception message */
+        public String reasonCode() { return reasonCode; }
+        /** @return requested lifecycle transition */
+        public PlayerCommand command() { return command; }
+        /** @return existing contract identity for internal routing */
+        public String missionId() { return missionId; }
+    }
+
+    /**
+     * Executes validation on an isolated exact checkpoint with the same submission path.
+     * No live treasury, escrow, player balance, knowledge or clock is changed by preview.
+     *
+     * @param command requested player transition
+     * @param missionId selected existing contract identity
+     * @return authority-bound preview with an exact stale-state guard
+     */
+    public MissionCommandPreview previewMissionCommand(PlayerCommand command, String missionId) {
+        Objects.requireNonNull(command, "command");
+        String id = Objects.requireNonNull(missionId, "missionId").strip();
+        if (id.isEmpty()) throw new IllegalArgumentException("missionId is empty");
+        Stage228GeneratedCampaignPersistentState baseline = captureState();
+        if (playerState == null) {
+            return new MissionCommandPreview(this, baseline, command, id, false, "player.uninitialized");
+        }
+        try {
+            // Reuse every domain validator, including escrow/treasury capacity, on a candidate.
+            // Candidate changes are discarded; live submission calls this same command function.
+            Stage228CampaignAuthority candidate = restore(baseline);
+            candidate.executePlayerMissionCommand(command, id);
+            return new MissionCommandPreview(this, baseline, command, id, true, "command.allowed");
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            return new MissionCommandPreview(this, baseline, command, id, false, "mission.unavailable");
+        }
+    }
+
+    /**
+     * Revalidates and submits one preview to the existing mission/treasury owners.
+     * Foreign, rejected and stale previews fail before any mutation. Repeated submission also fails.
+     *
+     * @param preview token returned by this live campaign
+     * @return resulting durable contract
+     */
+    public MissionContract submitMissionCommand(MissionCommandPreview preview) {
+        MissionCommandPreview checked = Objects.requireNonNull(preview, "preview");
+        if (checked.owner != this || !checked.allowed) {
+            throw new IllegalStateException("Mission preview is not authorized by this campaign");
+        }
+        if (!checked.baseline.equals(captureState())) {
+            throw new IllegalStateException("Mission preview is stale");
+        }
+        return executePlayerMissionCommand(checked.command, checked.missionId);
+    }
+
+    private MissionContract executePlayerMissionCommand(PlayerCommand command, String missionId) {
+        if (playerState == null) throw new IllegalStateException("Player is not initialized");
+        var service = coordinator.npcMissionService();
+        long tick = coordinator.runtime().world().getAuthoritativeWorldTick();
+        MissionContract current = service.validatePlayerCommand(command, missionId, tick);
+        var issuer = service.snapshot().npcs().stream()
+                .filter(npc -> npc.npcId().equals(current.issuerNpcId())).findFirst().orElseThrow();
+        // Existing accepted contracts belong to the single human contractor. New offers require
+        // that contractor's own discovered posting; the knowledge viewer never grants permission.
+        if (current.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED
+                && !playerState.discoveredSystemIds().contains(issuer.locationSystemId())) {
+            throw new IllegalStateException("Player has not discovered this mission issuer's posting");
+        }
+        return switch (command) {
+            case ACCEPT -> service.acceptMission(missionId, tick);
+            case REJECT -> service.rejectMission(coordinator.runtime().world(), missionId);
+            case CANCEL -> service.cancelMission(coordinator.runtime().world(), missionId);
+        };
+    }
+
+    private void reconcilePlayerMissionsAtTick(long tick) {
+        if (tick != coordinator.runtime().world().getAuthoritativeWorldTick()) {
+            throw new IllegalStateException("Player missions require the exact campaign tick");
+        }
+        if (playerState == null) return;
+        playerState = com.spacesim.player.PlayerRuntime.reconcileAuthorityReferences(
+                coordinator.runtime().world(), playerState);
+        var service = coordinator.npcMissionService();
+        var due = new java.util.ArrayList<>(service.dueMissionIds(tick, 8));
+        // Existing physical services need not emit a mission-specific event for every change.
+        // A bounded, stateless campaign-tick sweep closes that seam without inventing outcomes.
+        if (tick % 60L == 0L && due.size() < 8) {
+            var active = service.snapshot().missions().stream().filter(MissionContract::active)
+                    .sorted(java.util.Comparator.comparing(MissionContract::missionId)).toList();
+            if (!active.isEmpty()) {
+                long batches = (active.size() + 7L) / 8L;
+                int start = (int) (((tick / 60L - 1L) % batches) * 8L);
+                for (int i = start; i < Math.min(active.size(), start + 8) && due.size() < 8; i++) {
+                    String id = active.get(i).missionId();
+                    if (!due.contains(id)) due.add(id);
+                }
+            }
+        }
+        if (due.isEmpty()) return;
+        var runtimeCheckpoint = coordinator.runtime().captureState();
+        var discovery = runtimeCheckpoint.campaign().discoveryState();
+        for (String id : due) {
+            MissionContract mission = service.snapshot().missions().stream()
+                    .filter(value -> value.missionId().equals(id)).findFirst().orElseThrow();
+            // Transaction-local adapter to the existing service's exact escrow-transfer API.
+            // Only PlayerState survives the call; this is not an additional persistent wallet.
+            WalletComponent recipient = new WalletComponent(playerState.walletMilliCredits());
+            service.reconcilePlayerMission(coordinator.runtime().world(), runtimeCheckpoint.freight(),
+                    runtimeCheckpoint.campaign().industrialState(), discovery.knowledgeFor(mission.issuerFactionId()),
+                    discovery.knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID),
+                    coordinator.operations(), playerState, id, recipient);
+            if (recipient.getBalanceMilliCredits() != playerState.walletMilliCredits()) {
+                playerState = new PlayerState(recipient.getBalanceMilliCredits(), playerState.factionContentId(),
+                        playerState.reputations(), playerState.ownedFleetIds(), playerState.activeFleetId(),
+                        playerState.discoveredSystemIds(), playerState.discoveredObjects(), playerState.homeSystemId(),
+                        playerState.dockedAt(), playerState.fleetOrders(), playerState.threatIntel(),
+                        playerState.ownedConstructionProjectIds(), playerState.ownedStations());
+            }
+        }
     }
 
     private static void validateOperations(

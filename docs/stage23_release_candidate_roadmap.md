@@ -84,7 +84,7 @@ Exit criteria:
 
 ### 23B — Information architecture and production UI consolidation
 
-**Status: ACTIVE/PARTIAL.** Presentation/navigation foundation, versioned v5 player checkpoint storage with non-granting historical adoption, and ordinary diplomatic deadline reconciliation are implemented in `docs/ui/stage23b_production_ui_consolidation.md`; live generated-player/start/command integration remains a mandatory CRITICAL seam (#412), and graphical/B18 acceptance (#370) is open. No complete-stage claim or next-stage implementation is authorized by this status.
+**Status: ACTIVE/PARTIAL.** Presentation/navigation foundation, versioned v5 player checkpoint storage with non-granting historical adoption, ordinary diplomatic deadline reconciliation, and existing-player NPC contract commands/settlement are implemented in `docs/ui/stage23b_production_ui_consolidation.md`; live generated-player/start/command integration remains a mandatory CRITICAL seam (#412), and graphical/B18 acceptance (#370) is open. No complete-stage claim or next-stage implementation is authorized by this status.
 
 Цель: сделать весь принятый мир управляемым без чтения debug state.
 

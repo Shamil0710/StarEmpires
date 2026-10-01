@@ -16,6 +16,7 @@ import com.spacesim.world.FactionStrategicIntentState;
 import com.spacesim.world.FleetCommandState;
 import com.spacesim.world.SettlementRecoveryState;
 import com.spacesim.world.Stage21HNpcMissionState;
+import com.spacesim.world.Stage21HNpcMissionService;
 import com.spacesim.world.StrategicOperationState;
 import com.spacesim.world.TerritorialTransitionState;
 
@@ -50,7 +51,7 @@ public final class GeneratedCampaignCoordinator {
     private final StrategicOperationState operations;
     private final TerritorialTransitionState transitions;
     private final SettlementRecoveryState recovery;
-    private final Stage21HNpcMissionState npcMissions;
+    private final Stage21HNpcMissionService npcMissionService;
     private final MigrationProvenance migrationProvenance;
     private final TreeMap<String, DecisionTrace> latestDecisionTraceByFaction = new TreeMap<>();
 
@@ -70,7 +71,7 @@ public final class GeneratedCampaignCoordinator {
         this.operations = checked.operations();
         this.transitions = checked.transitions();
         this.recovery = checked.recovery();
-        this.npcMissions = checked.npcMissions();
+        this.npcMissionService = new Stage21HNpcMissionService(checked.npcMissions());
         this.migrationProvenance = Objects.requireNonNull(migrationProvenance, "migrationProvenance");
     }
 
@@ -128,7 +129,7 @@ public final class GeneratedCampaignCoordinator {
                 operations,
                 transitions,
                 recovery,
-                npcMissions);
+                npcMissions());
         return new Stage21IGeneratedWorldRuntimePersistentState(
                 Stage21IGeneratedWorldRuntimePersistentState.CURRENT_VERSION,
                 Stage21IGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION,
@@ -198,7 +199,12 @@ public final class GeneratedCampaignCoordinator {
 
     /** @return exact Stage-21H NPC/mission/reputation/story snapshot */
     public Stage21HNpcMissionState npcMissions() {
-        return npcMissions;
+        return npcMissionService.snapshot();
+    }
+
+    /** @return existing mission lifecycle owner for adjacent composed player commands */
+    Stage21HNpcMissionService npcMissionService() {
+        return npcMissionService;
     }
 
     /** @return final-format migration/adoption lineage metadata */
@@ -290,6 +296,7 @@ public final class GeneratedCampaignCoordinator {
         LongConsumer observer = Objects.requireNonNull(afterFixedTick, "afterFixedTick");
         return session.advanceFrame(realDeltaSeconds, tick -> {
             expireDiplomaticProposalsAtTick(tick);
+            npcMissionService.expireDueMissions(runtime().world(), 8);
             reviewActorsAtTick(tick);
             observer.accept(tick);
         });

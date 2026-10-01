@@ -564,12 +564,14 @@ public final class GeneratedWorldCommandUiRenderer {
             drawEmptyInspector(inspectorRect, "ВЫБЕРИТЕ ЗАПИСЬ", "Стрелки — выбор; Enter — открыть; Tab — перейти к действию.");
         } else {
             boolean navigable = selected.focusFleet() > 0 || selected.focusSystem() != null;
-            Rect details = workspace.tab() == Tab.FACTIONS
+            Rect details = missionActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 112f * metrics.scale(),
+                    inspectorRect.width(), inspectorRect.height() - 112f * metrics.scale()) : workspace.tab() == Tab.FACTIONS
                     ? new Rect(inspectorRect.x(), inspectorRect.y() + 115f * metrics.scale(), inspectorRect.width(),
                             inspectorRect.height() - 115f * metrics.scale()) : navigable ? new Rect(inspectorRect.x(), inspectorRect.y() + 58f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 58f * metrics.scale()) : inspectorRect;
             drawInspector(details, selected.name(), selected.category(), selected.summary(),
                     selected.explainedSections(), workspace.view().detailScroll());
+            if (missionActions) drawMissionActions();
             if (navigable) {
                 Rect focus = new Rect(inspectorRect.x() + 16f * metrics.scale(), inspectorRect.y() + 12f * metrics.scale(),
                         inspectorRect.width() - 32f * metrics.scale(), 36f * metrics.scale());
@@ -584,6 +586,38 @@ public final class GeneratedWorldCommandUiRenderer {
             button(exit, "ВЫЙТИ ИЗ ИГРЫ", true);
             hitTargets.add(new HitTarget(HitKind.ACTION, "exit", null, exit));
         }
+    }
+
+    private boolean missionActions;
+    private boolean missionConfirmation;
+
+    /**
+     * Binds presentation-only availability for the currently selected personal contract.
+     * The application owns preview tokens and revalidates every command before submission.
+     *
+     * @param selectedPersonalMission whether the selected row is a personal contract
+     * @param confirmationAvailable whether a permitted preview awaits explicit confirmation
+     */
+    public void bindMissionActions(boolean selectedPersonalMission, boolean confirmationAvailable) {
+        missionActions = selectedPersonalMission;
+        missionConfirmation = confirmationAvailable;
+    }
+
+    private void drawMissionActions() {
+        float scale = metrics.scale();
+        float width = (inspectorRect.width() - 40f * scale) / 3f;
+        String[] ids = {"mission.accept", "mission.reject", "mission.cancel"};
+        String[] labels = {"ПРИНЯТЬ", "ОТКЛОНИТЬ", "ОТМЕНИТЬ"};
+        for (int i = 0; i < ids.length; i++) {
+            Rect bounds = new Rect(inspectorRect.x() + 16f * scale + i * (width + 4f * scale),
+                    inspectorRect.y() + 58f * scale, width, 36f * scale);
+            button(bounds, labels[i], true);
+            hitTargets.add(new HitTarget(HitKind.ACTION, ids[i], null, bounds));
+        }
+        Rect confirm = new Rect(inspectorRect.x() + 16f * scale, inspectorRect.y() + 12f * scale,
+                inspectorRect.width() - 32f * scale, 36f * scale);
+        button(confirm, missionConfirmation ? "ПОДТВЕРДИТЬ ДЕЙСТВИЕ" : "СНАЧАЛА ПРОВЕРЬТЕ ДЕЙСТВИЕ", missionConfirmation);
+        if (missionConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "mission.confirm", null, confirm));
     }
 
     private void drawKeyboardFocus() {
@@ -1111,7 +1145,9 @@ public final class GeneratedWorldCommandUiRenderer {
         y -= contextLayout.height + 18f * metrics.scale();
         batch.end();
 
-        float bodyTop = y;
+        // FreeType section glyphs extend above their draw baseline. Include their cap height
+        // in the clipping viewport so the first section title is not cut in half.
+        float bodyTop = y + fonts.body().getCapHeight();
         float bodyBottom = rect.y() + 34f * metrics.scale();
         float contentHeight = inspectorContentHeight(sections, widthAvailable);
         float scrollPixels = Math.min(Math.max(0f, contentHeight - (bodyTop - bodyBottom)),
