@@ -34,6 +34,16 @@ Stage-23 entry baseline:
 A schema-affecting change increments the owning schema/file version and adds supported old-version
 fixtures. Failed migration must leave the original checkpoint unchanged.
 
+## 23B composed player checkpoint change
+
+The Stage-23 entry baseline above remains historical evidence. The current 23B checkpoint advances
+only the composed owner to `campaign=5` / `m22.8.generated-campaign.v5`. Core, content envelope and
+the embedded Stage-21/A/B/C/M formats retain their accepted identities. Native v1–v4 adopt without
+initializing a player. The independent-pilot new-start policy is not yet implemented by this change.
+
+Change control and migration evidence: `docs/release/stage23b_player_checkpoint_change_control.md`.
+A generator-profile change is not implied: no generated starter assets or new funding are added.
+
 ## Generator profile version
 
 RC governance profile:

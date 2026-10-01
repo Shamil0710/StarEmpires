@@ -95,11 +95,28 @@ The knowledge viewer is selected deterministically from existing actor identitie
 access only; it must never be interpreted as player affiliation, personal ownership or permission
 to command that faction. The UI never grants the observer all that faction's assets or wallet.
 
-The M22.8 v4 composed save remains unchanged. UI navigation/query/density are transient
-presentation preferences. All displayed durable domain values come from the existing checkpoint
-and compare identically after its native codec round trip. A new player sidecar is **not** smuggled
-into a presentation-only change. Its necessary schema/migration/start-ownership decision is part
-of the still-open 23B integration work, subject to the 23A change-control contract.
+The initial presentation batch preserved M22.8 v4. The subsequent **23B player checkpoint batch**
+explicitly increments the composed file/schema to **v5 / `m22.8.generated-campaign.v5`**. Its optional
+player payload delegates every field to the existing `PlayableWorldStateCodec` player format; it
+contains no duplicated world, cargo, economy or clock. The composition root restores and recaptures
+that immutable checkpoint data exactly. It exposes no arbitrary wallet/ownership mutation endpoint.
+This is a persistence handoff, **not** a playable-runtime or command binding.
+
+Native v1–v4 and supported Stage-20.5/21 checkpoints migrate with `playerState == null`. Absence is
+distinct from an initialized player with a zero wallet. Migration does not generate a starter ship,
+wallet, affiliation, discoveries or orders. Original bytes are untouched. The existing A/B/C/M and
+Stage-21 payloads remain unchanged. Current v5 requires its bounded player payload, exact native
+identity and EOF. Corrupt presence, versions, negative balances, future observations and absent
+fleet/system/project/order references are rejected before the live client changes campaign owners.
+Historical local discoveries may remain after an object moves or is destroyed; current docking
+requires a live market in the active fleet's current system.
+
+UI navigation/query/density remain transient presentation preferences. The independent-pilot new
+start and ongoing player lifecycle are still mandatory integration work. The existing player direct
+control writes float ECS transforms, while Stage-20 materialization owns exact hierarchical physical
+kinematics; it cannot be installed unmodified as proof of generated physical movement. A production
+binding must compose that exact position authority as well as the physical cargo and single-clock
+seams described above. See `docs/release/stage23b_player_checkpoint_change_control.md`.
 
 ## Acceptance evidence and remaining gaps
 
@@ -148,8 +165,9 @@ comprehension. B18 remains open; a software smoke must not be promoted to its ac
 
 Mandatory gaps remain in **23B**, not deferred to a future feature stage:
 
-1. Durable generated-campaign `PlayerState` and explicit lawful starting ownership/funding; supported
-   save adoption must not synthesize a player wallet/assets.
+1. **PARTIAL:** durable generated-campaign `PlayerState` storage/restore is implemented in v5;
+   explicit lawful independent-pilot starting ownership/funding and live player services are still
+   missing. Supported adoption remains non-granting. A stored player is not proof of executable loops.
 2. One runtime composition of player movement/docking/trade/mining/fitting/construction/fleet,
    faction/NPC/carrier command services, validated preview/submit, domain commit and ongoing lifecycle.
    Immutable sidecars exposed by the coordinator are not proof of live command execution.
@@ -165,3 +183,12 @@ Mandatory gaps remain in **23B**, not deferred to a future feature stage:
 
 A green foundation CI proves only this change's regression gate. It does not close 23B, waive #412
 or #370, or authorize implementation of 23C.
+
+### Player checkpoint batch validation
+
+`GeneratedCampaignPlayerPersistenceTest` covers every existing player field, absence versus a zero
+wallet, deterministic bytes, corrupt/truncated/future payloads, native v4 and Stage-21 adoption,
+unchanged original migration bytes, generated-world cross-reference rejection, exact authority
+recapture and deterministic campaign continuation with a nonzero existing wallet. Local Java-17
+production compilation and a lightweight assertion harness passed; that harness is not a Maven or
+JUnit-engine result. The full exact-head CI gate is required before accepting the batch.

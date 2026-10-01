@@ -174,6 +174,15 @@ class Stage23AReleaseGovernanceContractTest {
             assertTrue(versioning.contains(token), () -> "Missing version identity token: " + token);
         }
 
+        assertTrue(versioning.contains("campaign="
+                + com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_VERSION));
+        assertTrue(versioning.contains(
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION));
+        assertTrue(notes.contains("campaign="
+                + com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_VERSION));
+        assertTrue(notes.contains(
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION));
+
         for (String token : List.of(
                 "Application:",
                 "Source SHA:",

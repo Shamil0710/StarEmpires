@@ -19,10 +19,13 @@ import com.spacesim.world.SmallCraftMissionState;
 import com.spacesim.world.SmallCraftPhysicalLogisticsService.LogisticsState;
 import com.spacesim.world.SmallCraftRegistry;
 
+import com.spacesim.player.PlayerState;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.LongFunction;
 
 /**
@@ -36,6 +39,7 @@ import java.util.function.LongFunction;
  */
 public final class Stage228CampaignAuthority {
     private final GeneratedCampaignCoordinator coordinator;
+    private final PlayerState playerState;
     private final SmallCraftRegistry smallCraft;
     private final SmallCraftHangarRegistry hangars;
     private final SmallCraftFlightDeckOperations flightDeck;
@@ -50,8 +54,10 @@ public final class Stage228CampaignAuthority {
             SmallCraftFlightDeckOperations flightDeck,
             SmallCraftMissionState missions,
             LogisticsState logistics,
-            Collection<CarrierWingAssignment> carrierWings) {
+            Collection<CarrierWingAssignment> carrierWings,
+            PlayerState playerState) {
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
+        this.playerState = playerState;
         this.smallCraft = Objects.requireNonNull(smallCraft, "smallCraft");
         this.hangars = Objects.requireNonNull(hangars, "hangars");
         this.flightDeck = Objects.requireNonNull(flightDeck, "flightDeck");
@@ -102,7 +108,8 @@ public final class Stage228CampaignAuthority {
                         Objects.requireNonNull(flightDeckProfiles, "flightDeckProfiles")),
                 SmallCraftMissionState.empty(),
                 LogisticsState.empty(),
-                List.of());
+                List.of(),
+                null);
     }
 
     /**
@@ -149,7 +156,8 @@ public final class Stage228CampaignAuthority {
                 flightDeck,
                 operations.missions(),
                 operations.logistics(),
-                operations.carrierWings());
+                operations.carrierWings(),
+                saved.playerState());
     }
 
     /**
@@ -176,7 +184,20 @@ public final class Stage228CampaignAuthority {
                 Stage228HangarPersistenceMapper.capture(hangars),
                 Stage228FlightDeckPersistenceMapper.capture(flightDeck),
                 Stage228OperationsPersistenceMapper.capture(
-                        missions, logistics, carrierWings));
+                        missions, logistics, carrierWings),
+                playerState);
+    }
+
+    /**
+     * Returns exact durable player data without treating the knowledge viewer as ownership.
+     *
+     * <p>This checkpoint handoff does not install legacy cargo/control services on generated physical
+     * fleets. Production command composition and explicit new-start funding remain required.</p>
+     *
+     * @return existing player state, or empty for historical/uninitialized campaigns
+     */
+    public Optional<PlayerState> playerState() {
+        return Optional.ofNullable(playerState);
     }
 
     /** @return accepted Stage-20/21 campaign composition root */
