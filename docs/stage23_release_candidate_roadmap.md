@@ -1,6 +1,6 @@
 # Stage 23 — Polish / Release Candidate roadmap
 
-> Статус: **OPEN / NEXT — M22.8 COMPLETE; Stage 22 re-closure accepted**.
+> Статус: **IN PROGRESS — 23A COMPLETE; 23B NEXT**.
 > Назначение: превратить принятую Content & Balance Alpha в воспроизводимый, понятный,
 > производительный и безопасно обновляемый release candidate без создания новой параллельной
 > симуляции.
@@ -61,6 +61,8 @@ Stage 23 не имеет права скрывать дефект симуляц
 
 ### 23A — Scope lock, issue taxonomy and release governance
 
+**Status: COMPLETE.** Canonical artifacts: `docs/release/rc_governance_v1.md`, `docs/release/rc_feature_manifest_v1.tsv`, `docs/release/rc_known_issues_v1.tsv`, `docs/release/rc_versioning_v1.md`, `docs/release/release_notes_template.md`, `docs/release/stage23a_completion_record.md`. The contract is enforced by `Stage23AReleaseGovernanceContractTest`.
+
 Цель: заморозить продуктовую поверхность RC и отделить blocker от желательного улучшения.
 
 Deliverables:
@@ -81,6 +83,8 @@ Exit criteria:
 - новые feature requests не смешиваются с blocker fixes.
 
 ### 23B — Information architecture and production UI consolidation
+
+**Status: NEXT.**
 
 Цель: сделать весь принятый мир управляемым без чтения debug state.
 

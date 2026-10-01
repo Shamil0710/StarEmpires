@@ -19,9 +19,9 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-10-01 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 COMPLETE; Stage 23 OPEN / NEXT.**
+**Последняя синхронизация README: 2026-10-01 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 COMPLETE; Stage 23 IN PROGRESS — 23A COMPLETE / 23B NEXT.**
 
-Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md). Финальный Stage-22 carrier gate: [`docs/m22_8_carrier_small_craft_operations.md`](docs/m22_8_carrier_small_craft_operations.md); closure evidence: [`docs/stage22_final_completion_record.md`](docs/stage22_final_completion_record.md).
+Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md). Stage-23 RC governance: [`docs/release/rc_governance_v1.md`](docs/release/rc_governance_v1.md); 23A completion: [`docs/release/stage23a_completion_record.md`](docs/release/stage23a_completion_record.md). Финальный Stage-22 closure: [`docs/stage22_final_completion_record.md`](docs/stage22_final_completion_record.md).
 
 | Milestone | Цель | Статус |
 | --- | --- | --- |
@@ -31,7 +31,7 @@
 | **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **COMPLETE** |
 | **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **COMPLETE — Stage 20–21** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + integrated campaign + carrier/small-craft operations | **COMPLETE — Stage 22** |
-| **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | **OPEN / NEXT — Stage 23** |
+| **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | **IN PROGRESS — 23A COMPLETE / 23B NEXT** |
 
 На текущем roadmap завершены Stages **0–21**, включая **Stage 20A–20L physical-world generation**,
 обязательный **Stage 20.5 runtime + visual integration gate** и полный **Stage 21 Living World**.
@@ -49,7 +49,7 @@ corpus, core-pair doctrine acceptance, bounded workload evidence and non-vacuous
 launch/recovery/turnaround, shared PLAYER/AI missions, exact Stage-19 combat, finite Stage-18 supply
 and replacement, strategic readiness, save/migration hardening и финальный integrated soak.
 M22.8N принят PR #409 (CI #7710, merge `0deb1973a0ddb1b766b6418f34bb2a1924f79055`).
-Следующая стадия — Stage 23 Polish / Release Candidate.
+Stage 23 начат: 23A зафиксировал RC scope, severity/change-control, version identity, known-issue policy и provisional-content gate. Следующий delivery slice — 23B production information architecture / UI consolidation.
 
 ## Что уже реализовано
 
