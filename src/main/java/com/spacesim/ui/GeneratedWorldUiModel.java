@@ -507,6 +507,8 @@ public final class GeneratedWorldUiModel {
             sections.add(InfoSection.of("Корпус и фит",
                     "Корпус", engineering.fit.hullId(), "Фит", fitId, "Модули", modules,
                     "Масса", mass(derived.totalMassKg()),
+                    "Запас мощности", format(derived.continuousPowerMarginW()) + " Вт",
+                    "Тепловой запас", format(derived.continuousHeatMarginW()) + " Вт",
                     "Экипаж", derived.crewRequired() + " / " + derived.crewSupported()));
             sections.add(InfoSection.of("Боевая готовность",
                     "Структура", percent(structuralIntegrity),
@@ -516,11 +518,10 @@ public final class GeneratedWorldUiModel {
                     "Ускорение", format(derived.accelerationMps2()) + " м/с²",
                     "Delta-v", format(derived.deltaVMps()) + " м/с"));
             sections.add(InfoSection.of("Назначение",
-                    "Текущий приказ", placement.locationKind() == FleetLocationKind.IN_SYSTEM
-                            ? "Охрана стартовой системы" : "Межсистемный переход",
+                    "Текущий приказ", "См. командную группу в разделе военных сил",
                     "Куда направляется", placement.locationKind() == FleetLocationKind.IN_SYSTEM
-                            ? "Локальный патруль" : systemName(placement.transitState().destinationSystemId(), galaxy),
-                    "Контент", "Временный Stage 17.5/19; замена доктрин в Stage 22"));
+                            ? "Нет межсистемного перехода" : systemName(placement.transitState().destinationSystemId(), galaxy),
+                    "Контент", "Точный сохранённый инженерный фит"));
             var carrierOperations = carrierUiSource.find(placement.id()).orElse(null);
             if (carrierOperations != null) {
                 sections.addAll(carrierSections(carrierOperations));

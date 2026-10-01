@@ -14,30 +14,33 @@ import com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab;
 import com.spacesim.ui.GeneratedWorldCommandUiRenderer.UiSelection;
 import com.spacesim.ui.GeneratedWorldUiModel;
 import com.spacesim.ui.GeneratedWorldUiSnapshot;
+import com.spacesim.ui.ProductionUiProjector;
+import com.spacesim.ui.ProductionUiSnapshot;
+import com.spacesim.ui.ProductionUiWorkspace;
+import com.spacesim.world.FleetId;
+import com.spacesim.world.FleetLocationKind;
 import com.spacesim.world.StarSystemId;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Locale;
+import java.util.List;
 
-/** Player-facing command interface over the accepted generated campaign authority chain. */
+/** Production navigation over the accepted generated campaign; owns only presentation state. */
 public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private static final String SAVE_FILE = "saves/generated-world-runtime.s25";
-
+    private static final long DOUBLE_CLICK_NANOS = 450_000_000L;
     private final long initialSeed;
-
+    private final ProductionUiWorkspace workspace = new ProductionUiWorkspace();
     private Stage228CampaignAuthority campaign;
     private GeneratedWorldUiModel model;
     private GeneratedWorldCommandUiRenderer renderer;
-    private FactionCharacterPortraitOverlay characterPortraitOverlay;
+    private FactionCharacterPortraitOverlay portraits;
     private GeneratedWorldUiSnapshot snapshot;
-    private Tab tab = Tab.SYSTEM;
-    private UiSelection selection = UiSelection.none();
-    private int detailScrollRows;
-    private int listScrollRows;
-    private String status = "Генерация принятого мира…";
+    private ProductionUiProjector projector;
+    private ProductionUiSnapshot production;
+    private float projectionAge;
+    private String status = "Генерация мира…";
     private Path savePath;
-    private boolean middleDragging;
     private int dragPointer = -1;
     private float previousDragX;
     private float previousDragY;
@@ -45,51 +48,82 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private String previousClickId = "";
     private long previousClickNanos;
 
-    private static final long DOUBLE_CLICK_NANOS = 450_000_000L;
+    /** @param initialSeed exact deterministic campaign seed */
+    public GeneratedWorldCommandGame(long initialSeed) { this.initialSeed = initialSeed; }
 
-    /**
-     * Creates an application for a deterministic new-world seed.
-     *
-     * @param initialSeed generated campaign seed
-     */
-    public GeneratedWorldCommandGame(long initialSeed) {
-        this.initialSeed = initialSeed;
-    }
-
-    /** Generates the accepted world and binds the UI to the ordinary composed campaign lifecycle. */
+    /** Generates the campaign and binds all read-only surfaces to the same authority. */
     @Override
     public void create() {
         campaign = Stage228CampaignAuthority.create(initialSeed);
-        model = new GeneratedWorldUiModel(
-                campaign.coordinator().rootSeed(),
-                campaign.coordinator().runtime(),
-                campaign.coordinator().content());
+        bindCampaign();
         renderer = new GeneratedWorldCommandUiRenderer();
-        characterPortraitOverlay = new FactionCharacterPortraitOverlay();
+        portraits = new FactionCharacterPortraitOverlay();
         savePath = Gdx.files.local(SAVE_FILE).file().toPath();
-        snapshot = model.capture();
-        status = "Мир сгенерирован: " + snapshot.galaxy().systems().size()
-                + " систем, " + snapshot.localObjects().size() + " объектов в активной системе.";
         campaign.coordinator().setPaused(false);
         campaign.coordinator().setTimeScale(1d);
+        status = "Открыта кампания. Меню — F7; поиск — Ctrl+F; назад — Esc.";
         Gdx.input.setInputProcessor(input());
+    }
+
+    private void bindCampaign() {
+        var coordinator = campaign.coordinator();
+        model = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content());
+        snapshot = model.capture();
+        // A knowledge viewer is not player ownership. No ship, wallet or control is granted here.
+        String viewer = coordinator.actors().capture().stream()
+                .map(actor -> actor.factionContentId()).sorted().findFirst().orElseThrow();
+        projector = new ProductionUiProjector(viewer);
+        refreshProjection();
+    }
+
+    private void refreshProjection() {
+        production = projector.capture(campaign, snapshot);
+        projectionAge = 0f;
     }
 
     private InputAdapter input() {
         return new InputAdapter() {
             @Override
             public boolean keyDown(int keycode) {
+                if (workspace.searching()) {
+                    if (keycode == Input.Keys.ENTER || keycode == Input.Keys.ESCAPE) workspace.endSearch();
+                    return true; // Text editing never sends gameplay/time/save commands.
+                }
+                if (keycode == Input.Keys.F && controlHeld()) {
+                    if (workspace.tab() == Tab.SYSTEM || workspace.tab() == Tab.GALAXY) switchTab(Tab.INTELLIGENCE);
+                    workspace.beginSearch();
+                    return true;
+                }
                 return switch (keycode) {
                     case Input.Keys.F1 -> switchTab(Tab.SYSTEM);
                     case Input.Keys.F2 -> switchTab(Tab.GALAXY);
                     case Input.Keys.F3 -> switchTab(Tab.FACTIONS);
                     case Input.Keys.F4 -> switchTab(Tab.MILITARY);
                     case Input.Keys.F5 -> switchTab(Tab.LOGISTICS);
-                    case Input.Keys.HOME -> {
-                        renderer.resetSystemMapCamera();
-                        status = "Камера: обзор системы; сопровождение отключено.";
+                    case Input.Keys.F6 -> switchTab(Tab.CONTACTS);
+                    case Input.Keys.F7 -> switchTab(Tab.SETTINGS);
+                    case Input.Keys.TAB -> {
+                        renderer.moveKeyboardFocus(Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)
+                                || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT) ? -1 : 1);
                         yield true;
                     }
+                    case Input.Keys.ENTER -> renderer.keyboardTarget() == null
+                            ? focusSelection() : activate(renderer.keyboardTarget(), false);
+                    case Input.Keys.UP -> moveSelection(-1);
+                    case Input.Keys.DOWN -> moveSelection(1);
+                    case Input.Keys.PAGE_UP -> scroll(-5);
+                    case Input.Keys.PAGE_DOWN -> scroll(5);
+                    case Input.Keys.LEFT -> renderer.keyboardPan(workspace.tab(), 32f, 0f);
+                    case Input.Keys.RIGHT -> renderer.keyboardPan(workspace.tab(), -32f, 0f);
+                    case Input.Keys.PLUS, Input.Keys.EQUALS -> keyboardZoom(-1f);
+                    case Input.Keys.MINUS -> keyboardZoom(1f);
+                    case Input.Keys.HOME -> {
+                        renderer.resetSystemMapCamera();
+                        status = "Камера: обзор системы.";
+                        yield true;
+                    }
+                    case Input.Keys.C -> focusSelection();
+                    case Input.Keys.O -> switchTab(Tab.INTELLIGENCE);
                     case Input.Keys.SPACE -> togglePause();
                     case Input.Keys.NUM_1 -> setTimeScale(1d);
                     case Input.Keys.NUM_2 -> setTimeScale(2d);
@@ -97,167 +131,205 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                     case Input.Keys.NUM_4 -> setTimeScale(8d);
                     case Input.Keys.F8 -> save();
                     case Input.Keys.F9 -> load();
-                    case Input.Keys.ESCAPE -> exit();
+                    case Input.Keys.ESCAPE -> {
+                        if (!workspace.goBack()) workspace.navigate(Tab.SETTINGS);
+                        renderer.clearKeyboardFocus();
+                        yield true;
+                    }
                     default -> false;
                 };
             }
 
             @Override
-            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-                if (renderer == null) {
-                    return false;
-                }
-                float uiY = Gdx.graphics.getHeight() - screenY;
-                if (button == Input.Buttons.MIDDLE && renderer.isMapPoint(screenX, uiY)) {
-                    middleDragging = true;
-                    dragPointer = pointer;
-                    previousDragX = screenX;
-                    previousDragY = uiY;
-                    return true;
-                }
-                if (button != Input.Buttons.LEFT) {
-                    return false;
-                }
-                var hit = renderer.hitTest(screenX, uiY);
-                if (hit == null) {
-                    return false;
-                }
-                detailScrollRows = 0;
-                if (hit.kind() == HitKind.TAB) {
-                    return switchTab(hit.tab());
-                }
-                selection = switch (hit.kind()) {
-                    case LOCAL_OBJECT -> new UiSelection(SelectionKind.LOCAL_OBJECT, hit.id());
-                    case SYSTEM -> new UiSelection(SelectionKind.SYSTEM, hit.id());
-                    case FACTION -> new UiSelection(SelectionKind.FACTION, hit.id());
-                    case FREIGHT -> new UiSelection(SelectionKind.FREIGHT, hit.id());
-                    case MILITARY -> new UiSelection(SelectionKind.MILITARY, hit.id());
-                    case ACTIVATE_SYSTEM -> selection;
-                    case TAB -> throw new IllegalStateException("Tab hit handled above");
-                };
-                if (hit.kind() == HitKind.ACTIVATE_SYSTEM) {
-                    StarSystemId target = new StarSystemId(Long.parseLong(hit.id()));
-                    campaign.coordinator().runtime().world().activateSystem(target);
-                    renderer.resetSystemMapCamera();
-                    tab = Tab.SYSTEM;
-                    selection = UiSelection.none();
-                    status = "Активная область симуляции: система #" + target.value()
-                            + ". Флоты не телепортированы.";
-                    snapshot = model.capture();
-                }
-                if (hit.kind() == HitKind.LOCAL_OBJECT && isDoubleClick(hit)) {
-                    boolean following = renderer.focusLocalObject(snapshot, hit.id());
-                    if (following) {
-                        status = "Камера сопровождает выбранный объект. СКМ или Home — отмена.";
-                    }
-                    return following;
-                }
-                if ((hit.kind() == HitKind.FREIGHT || hit.kind() == HitKind.MILITARY)
-                        && isDoubleClick(hit)) {
-                    return focusFleet(Long.parseLong(hit.id()));
-                }
+            public boolean keyTyped(char character) {
+                if (!workspace.searching()) return false;
+                workspace.type(character);
                 return true;
             }
 
             @Override
-            public boolean touchDragged(int screenX, int screenY, int pointer) {
-                if (!middleDragging || pointer != dragPointer || renderer == null) {
-                    return false;
-                }
-                float uiY = Gdx.graphics.getHeight() - screenY;
-                float deltaX = screenX - previousDragX;
-                float deltaY = uiY - previousDragY;
-                previousDragX = screenX;
-                previousDragY = uiY;
-                boolean panned = renderer.panMap(tab, deltaX, deltaY);
-                if (panned && tab == Tab.SYSTEM) {
-                    status = "Ручная панорама; сопровождение камеры отключено.";
-                }
-                return panned;
-            }
-
-            @Override
-            public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-                if (button == Input.Buttons.MIDDLE && middleDragging && pointer == dragPointer) {
-                    middleDragging = false;
-                    dragPointer = -1;
+            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                float y = Gdx.graphics.getHeight() - screenY;
+                if (button == Input.Buttons.MIDDLE && renderer.isMapPoint(screenX, y)) {
+                    dragPointer = pointer;
+                    previousDragX = screenX;
+                    previousDragY = y;
                     return true;
                 }
-                return false;
+                if (button != Input.Buttons.LEFT) return false;
+                var hit = renderer.hitTest(screenX, y);
+                if (hit == null) return false;
+                renderer.clearKeyboardFocus();
+                return activate(hit, isDoubleClick(hit));
             }
 
             @Override
-            public boolean scrolled(float amountX, float amountY) {
+            public boolean touchDragged(int screenX, int screenY, int pointer) {
+                if (pointer != dragPointer) return false;
+                float y = Gdx.graphics.getHeight() - screenY;
+                boolean result = renderer.panMap(workspace.tab(), screenX - previousDragX, y - previousDragY);
+                previousDragX = screenX;
+                previousDragY = y;
+                return result;
+            }
+
+            @Override
+            public boolean touchUp(int x, int y, int pointer, int button) {
+                if (button != Input.Buttons.MIDDLE || pointer != dragPointer) return false;
+                dragPointer = -1;
+                return true;
+            }
+
+            @Override
+            public boolean scrolled(float xAmount, float yAmount) {
                 float x = Gdx.input.getX();
                 float y = Gdx.graphics.getHeight() - Gdx.input.getY();
-                if (renderer != null && renderer.zoomMap(tab, x, y, amountY)) {
-                    return true;
-                }
-                if (renderer == null || !renderer.isInspectorPoint(x, y)) {
-                    if (renderer == null || !renderer.isListPoint(x, y)) {
-                        return false;
-                    }
-                    int listDelta = amountY > 0f ? 1 : amountY < 0f ? -1 : 0;
-                    listScrollRows = Math.max(0, Math.min(10_000, listScrollRows + listDelta));
-                    return listDelta != 0;
-                }
-                int delta = amountY > 0f ? 3 : amountY < 0f ? -3 : 0;
-                detailScrollRows = Math.max(0, Math.min(200, detailScrollRows + delta));
+                if (renderer.zoomMap(workspace.tab(), x, y, yAmount)) return true;
+                int delta = yAmount > 0 ? 1 : yAmount < 0 ? -1 : 0;
+                if (renderer.isInspectorPoint(x, y)) workspace.scrollDetail(delta * 3);
+                else if (renderer.isListPoint(x, y)) workspace.scrollList(delta);
+                else return false;
                 return delta != 0;
             }
         };
     }
 
-    private boolean isDoubleClick(GeneratedWorldCommandUiRenderer.HitTarget hit) {
-        long now = System.nanoTime();
-        boolean result = hit.kind() == previousClickKind
-                && hit.id().equals(previousClickId)
-                && now - previousClickNanos <= DOUBLE_CLICK_NANOS;
-        previousClickKind = hit.kind();
-        previousClickId = hit.id();
-        previousClickNanos = now;
-        return result;
+    private boolean activate(GeneratedWorldCommandUiRenderer.HitTarget hit, boolean doubleClick) {
+        if (hit.kind() == HitKind.TAB) return switchTab(hit.tab());
+        if (hit.kind() == HitKind.ACTION) return action(hit.id());
+        if (hit.kind() == HitKind.ACTIVATE_SYSTEM) return openSystem(new StarSystemId(Long.parseLong(hit.id())));
+        UiSelection selected = switch (hit.kind()) {
+            case LOCAL_OBJECT -> new UiSelection(SelectionKind.LOCAL_OBJECT, hit.id());
+            case SYSTEM -> new UiSelection(SelectionKind.SYSTEM, hit.id());
+            case FACTION -> new UiSelection(SelectionKind.FACTION, hit.id());
+            case FREIGHT -> new UiSelection(SelectionKind.FREIGHT, hit.id());
+            case MILITARY -> new UiSelection(SelectionKind.MILITARY, hit.id());
+            case SURFACE_ROW -> production.rows(workspace.tab()).stream()
+                    .map(ProductionUiSnapshot.Row::selection).filter(value -> value.stableId().equals(hit.id()))
+                    .findFirst().orElse(UiSelection.none());
+            default -> UiSelection.none();
+        };
+        workspace.select(selected);
+        if (doubleClick) return focusSelection();
+        return true;
     }
 
-    private boolean focusFleet(long fleetIdValue) {
-        var runtime = campaign.coordinator().runtime();
-        var placement = runtime.world().findFleet(new com.spacesim.world.FleetId(fleetIdValue))
-                .orElse(null);
-        if (placement == null) {
-            status = "Корабль #" + fleetIdValue + " уже не существует.";
-            return true;
-        }
-        if (placement.locationKind() == com.spacesim.world.FleetLocationKind.IN_TRANSIT) {
-            status = "Корабль #" + fleetIdValue
-                    + " находится в межсистемном перелёте; локальной точки для камеры нет.";
-            return true;
-        }
-        boolean changedSystem = !runtime.world().getActiveSystemId().equals(placement.systemId());
-        runtime.world().activateSystem(placement.systemId());
-        if (changedSystem) {
-            renderer.resetSystemMapCamera();
-        }
-        tab = Tab.SYSTEM;
-        selection = new UiSelection(SelectionKind.LOCAL_OBJECT, "fleet:" + fleetIdValue);
-        detailScrollRows = 0;
-        listScrollRows = 0;
-        snapshot = model.capture();
-        if (renderer.focusLocalObject(snapshot, selection.stableId())) {
-            status = "Камера сопровождает корабль #" + fleetIdValue
-                    + ". СКМ или Home — отмена.";
+    private boolean action(String id) {
+        return switch (id) {
+            case "back" -> workspace.goBack();
+            case "search" -> {
+                if (workspace.tab() == Tab.SYSTEM || workspace.tab() == Tab.GALAXY) switchTab(Tab.INTELLIGENCE);
+                workspace.beginSearch(); yield true;
+            }
+            case "sort" -> { workspace.cycleSort(); yield true; }
+            case "filter" -> { workspace.cycleCategory(production); yield true; }
+            case "density" -> { workspace.cycleDensity(); yield true; }
+            case "pause" -> togglePause();
+            case "save" -> save();
+            case "load" -> load();
+            case "focus" -> focusSelection();
+            case "exit" -> { Gdx.app.exit(); yield true; }
+            default -> false;
+        };
+    }
+
+    private boolean moveSelection(int delta) {
+        if (workspace.tab() == Tab.SYSTEM) {
+            List<UiSelection> selections = snapshot.localObjects().stream()
+                    .map(value -> new UiSelection(SelectionKind.LOCAL_OBJECT, value.stableId())).toList();
+            selectMapNeighbor(selections, delta);
+        } else if (workspace.tab() == Tab.GALAXY) {
+            List<UiSelection> selections = snapshot.galaxy().systems().stream()
+                    .map(value -> new UiSelection(SelectionKind.SYSTEM, Long.toString(value.id().value()))).toList();
+            selectMapNeighbor(selections, delta);
         } else {
-            status = "Корабль #" + fleetIdValue + " не имеет локальной визуализации.";
+            workspace.moveSelection(production, delta, 5);
         }
+        renderer.clearKeyboardFocus();
+        return true;
+    }
+
+    private void selectMapNeighbor(List<UiSelection> selections, int delta) {
+        if (selections.isEmpty()) return;
+        int index = selections.indexOf(workspace.view().selection());
+        int next = index < 0 ? 0 : Math.floorMod(index + delta, selections.size());
+        workspace.select(selections.get(next));
+    }
+
+    private boolean scroll(int delta) {
+        if (controlHeld()) workspace.scrollDetail(delta);
+        else workspace.scrollList(delta);
+        return true;
+    }
+
+    private boolean keyboardZoom(float amount) {
+        return renderer.zoomMap(workspace.tab(), Gdx.graphics.getWidth() * 0.35f,
+                Gdx.graphics.getHeight() * 0.5f, amount);
+    }
+
+    private boolean focusSelection() {
+        UiSelection selected = workspace.view().selection();
+        if (selected.kind() == SelectionKind.FREIGHT || selected.kind() == SelectionKind.MILITARY) {
+            return focusFleet(Long.parseLong(selected.stableId()));
+        }
+        if (workspace.tab() == Tab.GALAXY && selected.kind() == SelectionKind.SYSTEM) {
+            return openSystem(new StarSystemId(Long.parseLong(selected.stableId())));
+        }
+        var row = production.find(workspace.tab(), selected).orElse(null);
+        if (row != null) {
+            if (row.focusFleet() > 0) return focusFleet(row.focusFleet());
+            if (row.focusSystem() != null) {
+                openSystem(row.focusSystem());
+                workspace.select(selected);
+                return renderer.focusLocalObject(snapshot, selected.stableId());
+            }
+        }
+        return selected.kind() == SelectionKind.LOCAL_OBJECT
+                && renderer.focusLocalObject(snapshot, selected.stableId());
+    }
+
+    private boolean focusFleet(long fleetId) {
+        var placement = campaign.coordinator().runtime().world().findFleet(new FleetId(fleetId)).orElse(null);
+        if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM) {
+            status = "Нельзя открыть корабль: нет текущей локальной позиции (перелёт или потеря).";
+            return true;
+        }
+        openSystem(placement.systemId());
+        workspace.select(new UiSelection(SelectionKind.LOCAL_OBJECT, "fleet:" + fleetId));
+        status = renderer.focusLocalObject(snapshot, workspace.view().selection().stableId())
+                ? "Камера сопровождает корабль. СКМ/Home — обзор." : "У корабля нет локальной визуализации.";
+        return true;
+    }
+
+    private boolean openSystem(StarSystemId system) {
+        var world = campaign.coordinator().runtime().world();
+        if (world.getTopology().findSystem(system).isEmpty()) {
+            status = "Система больше недоступна."; return true;
+        }
+        boolean changed = !world.getActiveSystemId().equals(system);
+        world.activateSystem(system);
+        if (changed) renderer.resetSystemMapCamera();
+        switchTab(Tab.SYSTEM);
+        snapshot = model.capture();
+        refreshProjection();
+        status = "Открыта система «" + snapshot.activeSystemName() + "».";
         return true;
     }
 
     private boolean switchTab(Tab target) {
-        tab = target;
-        selection = UiSelection.none();
-        detailScrollRows = 0;
-        listScrollRows = 0;
-        status = "Открыта вкладка «" + target.label().toLowerCase(Locale.ROOT) + "».";
+        workspace.navigate(target);
+        renderer.clearKeyboardFocus();
+        dragPointer = -1;
+        status = "Открыт раздел «" + target.label() + "».";
         return true;
+    }
+
+    private boolean isDoubleClick(GeneratedWorldCommandUiRenderer.HitTarget hit) {
+        long now = System.nanoTime();
+        boolean result = hit.kind() == previousClickKind && hit.id().equals(previousClickId)
+                && now - previousClickNanos <= DOUBLE_CLICK_NANOS;
+        previousClickKind = hit.kind(); previousClickId = hit.id(); previousClickNanos = now;
+        return result;
     }
 
     private boolean togglePause() {
@@ -269,14 +341,14 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private boolean setTimeScale(double scale) {
         campaign.coordinator().setTimeScale(scale);
-        status = String.format(Locale.ROOT, "Скорость симуляции ×%.0f.", scale);
+        status = "Скорость симуляции ×" + (int) scale;
         return true;
     }
 
     private boolean save() {
         try {
             Stage228GeneratedCampaignPersistenceCodec.write(savePath, campaign.captureState());
-            status = "Кампания сохранена: " + SAVE_FILE + ".";
+            status = "Кампания сохранена.";
         } catch (IOException | RuntimeException exception) {
             status = "Ошибка сохранения: " + safeMessage(exception);
         }
@@ -285,75 +357,68 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private boolean load() {
         try {
-            var checkpoint = Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(savePath);
-            Stage228CampaignAuthority candidate = Stage228CampaignAuthority.restore(checkpoint);
-            var candidateCoordinator = candidate.coordinator();
-            GeneratedWorldUiModel candidateModel = new GeneratedWorldUiModel(
-                    candidateCoordinator.rootSeed(), candidateCoordinator.runtime(), candidateCoordinator.content());
-            GeneratedWorldUiSnapshot candidateSnapshot = candidateModel.capture();
-
-            campaign = candidate;
-            model = candidateModel;
-            snapshot = candidateSnapshot;
-            selection = UiSelection.none();
-            detailScrollRows = 0;
-            listScrollRows = 0;
-            renderer.resetSystemMapCamera();
-            status = "Сохранённая кампания загружена без повторной генерации.";
+            var candidate = Stage228CampaignAuthority.restore(
+                    Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(savePath));
+            var coordinator = candidate.coordinator();
+            var nextModel = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content());
+            var nextSnapshot = nextModel.capture();
+            var nextProjector = new ProductionUiProjector(coordinator.actors().capture().stream()
+                    .map(actor -> actor.factionContentId()).sorted().findFirst().orElseThrow());
+            var nextProjection = nextProjector.capture(candidate, nextSnapshot);
+            campaign = candidate; model = nextModel; snapshot = nextSnapshot;
+            projector = nextProjector; production = nextProjection; projectionAge = 0;
+            workspace.reset(); renderer.resetSystemMapCamera(); renderer.clearKeyboardFocus();
+            status = "Кампания загружена.";
         } catch (IOException | RuntimeException exception) {
             status = "Ошибка загрузки: " + safeMessage(exception);
         }
         return true;
     }
 
-    private boolean exit() {
-        Gdx.app.exit();
-        return true;
-    }
-
-    /** Advances the composed campaign session and renders its current read-only projection. */
+    /** Advances one authority clock and refreshes slower strategic projections at bounded cadence. */
     @Override
     public void render() {
         float delta = Math.min(0.1f, Math.max(0f, Gdx.graphics.getDeltaTime()));
         try {
             campaign.advanceFrame(delta);
+            snapshot = model.capture();
+            projectionAge += delta;
+            if (projectionAge >= 0.25f) refreshProjection();
         } catch (RuntimeException exception) {
-            status = "Автономная симуляция остановила операцию: " + safeMessage(exception);
+            campaign.coordinator().setPaused(true);
+            status = "Сведения недоступны; симуляция на паузе: " + safeMessage(exception);
         }
-        snapshot = model.capture();
-        renderer.render(snapshot, tab, selection, detailScrollRows, listScrollRows,
-                campaign.coordinator().isPaused(), campaign.coordinator().timeScale(),
+        renderer.bindWorkspace(production, workspace);
+        renderer.render(snapshot, workspace.tab(), workspace.view().selection(), workspace.view().detailScroll(),
+                workspace.view().listScroll(), campaign.coordinator().isPaused(), campaign.coordinator().timeScale(),
                 campaign.coordinator().interpolationAlpha(), status);
-        characterPortraitOverlay.render(snapshot, tab, selection);
+        portraits.render(snapshot, workspace.tab(), workspace.view().selection());
     }
 
-    /** Keeps the UI in logical screen coordinates and regenerates fonts for the new pixel size. */
+    /**
+     * @param width logical width
+     * @param height logical height
+     */
     @Override
     public void resize(int width, int height) {
-        if (renderer != null) {
-            renderer.resize(width, height);
-        }
-        if (characterPortraitOverlay != null) {
-            characterPortraitOverlay.resize(width, height);
-        }
+        if (renderer != null) renderer.resize(width, height);
+        if (portraits != null) portraits.resize(width, height);
     }
 
-    /** Releases all owned graphics resources. */
+    /** Releases graphics resources. */
     @Override
     public void dispose() {
-        if (Gdx.input != null) {
-            Gdx.input.setInputProcessor(null);
-        }
-        if (renderer != null) {
-            renderer.dispose();
-        }
-        if (characterPortraitOverlay != null) {
-            characterPortraitOverlay.dispose();
-        }
+        if (Gdx.input != null) Gdx.input.setInputProcessor(null);
+        if (renderer != null) renderer.dispose();
+        if (portraits != null) portraits.dispose();
     }
 
-    private static String safeMessage(Throwable throwable) {
-        String message = throwable.getMessage();
-        return message == null || message.isBlank() ? throwable.getClass().getSimpleName() : message;
+    private static boolean controlHeld() {
+        return Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT);
+    }
+
+    private static String safeMessage(Throwable exception) {
+        String message = exception.getMessage();
+        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 }

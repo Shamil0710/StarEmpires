@@ -69,6 +69,9 @@ public final class GeneratedWorldCommandUiRenderer {
     private String followedLocalObjectId = "";
     private Tab previousRenderedTab;
     private boolean disposed;
+    private ProductionUiSnapshot production;
+    private ProductionUiWorkspace workspace;
+    private int keyboardFocus = -1;
 
     /** Top-level production UI surfaces. */
     public enum Tab {
@@ -76,7 +79,13 @@ public final class GeneratedWorldCommandUiRenderer {
         /** Generated galaxy topology. */ GALAXY("ГАЛАКТИКА"),
         /** Persistent faction economy and control. */ FACTIONS("ФРАКЦИИ"),
         /** Persistent ordinary combat fleets. */ MILITARY("ВОЕННЫЕ СИЛЫ"),
-        /** Physical freight fleets and orders. */ LOGISTICS("ЛОГИСТИКА");
+        /** Physical freight fleets and orders. */ LOGISTICS("ЛОГИСТИКА"),
+        /** Existing industrial/storage authority. */ INDUSTRY("ПРОМЫШЛЕННОСТЬ"),
+        /** Actor-visible NPCs and contracts. */ CONTACTS("КОНТАКТЫ"),
+        /** Fleet engineering and cargo inspection. */ SHIPS("КОРАБЛИ"),
+        /** Actor-bounded chronological event archive. */ HISTORY("ЖУРНАЛ"),
+        /** Session actions, controls and diagnostics. */ SETTINGS("МЕНЮ"),
+        /** Actor-bounded strategic map facts. */ INTELLIGENCE("РАЗВЕДКА");
 
         private final String label;
 
@@ -97,7 +106,8 @@ public final class GeneratedWorldCommandUiRenderer {
         /** One global system. */ SYSTEM,
         /** One faction. */ FACTION,
         /** One physical freighter. */ FREIGHT,
-        /** One ordinary military fleet. */ MILITARY
+        /** One ordinary military fleet. */ MILITARY,
+        /** A consolidated read-model row. */ SURFACE_ROW
     }
 
     /** Stable current selection. */
@@ -130,7 +140,9 @@ public final class GeneratedWorldCommandUiRenderer {
         /** Select one faction. */ FACTION,
         /** Select one physical freighter. */ FREIGHT,
         /** Select one ordinary military fleet. */ MILITARY,
-        /** Make the selected global system the active inspected system. */ ACTIVATE_SYSTEM
+        /** Make the selected global system the active inspected system. */ ACTIVATE_SYSTEM,
+        /** Select a consolidated read-model row. */ SURFACE_ROW,
+        /** Execute a session or navigation action. */ ACTION
     }
 
     /** One immutable hit result. */
@@ -227,14 +239,64 @@ public final class GeneratedWorldCommandUiRenderer {
             localObjectMotion.reset();
         }
         previousRenderedTab = tab;
-        switch (tab) {
-            case SYSTEM -> drawSystem(snapshot, selection, detailScrollRows, interpolationAlpha);
-            case GALAXY -> drawGalaxy(snapshot, selection, detailScrollRows);
-            case FACTIONS -> drawFactions(snapshot, selection, detailScrollRows, listScrollRows);
-            case MILITARY -> drawMilitary(snapshot, selection, detailScrollRows, listScrollRows);
-            case LOGISTICS -> drawLogistics(snapshot, selection, detailScrollRows, listScrollRows);
+        if (production != null && workspace != null && tab != Tab.SYSTEM && tab != Tab.GALAXY) {
+            drawProductionSurface();
+        } else {
+            switch (tab) {
+                case SYSTEM -> drawSystem(snapshot, selection, detailScrollRows, interpolationAlpha);
+                case GALAXY -> drawGalaxy(snapshot, selection, detailScrollRows);
+                case FACTIONS -> drawFactions(snapshot, selection, detailScrollRows, listScrollRows);
+                case MILITARY -> drawMilitary(snapshot, selection, detailScrollRows, listScrollRows);
+                case LOGISTICS -> drawLogistics(snapshot, selection, detailScrollRows, listScrollRows);
+                default -> drawEmptyInspector(splitListAndInspector().inspector(), tab.label(), "Нет проекции.");
+            }
         }
+        if (workspace != null) drawWorkspaceBar();
+        drawKeyboardFocus();
     }
+
+    /**
+     * Binds consolidated read-only data and presentation navigation.
+     *
+     * @param snapshot current read-only presentation
+     * @param navigation retained workspace preferences
+     */
+    public void bindWorkspace(ProductionUiSnapshot snapshot, ProductionUiWorkspace navigation) {
+        production = Objects.requireNonNull(snapshot);
+        workspace = Objects.requireNonNull(navigation);
+    }
+
+    /**
+     * Moves visible keyboard focus without executing an action.
+     *
+     * @param delta signed focus displacement
+     */
+    public void moveKeyboardFocus(int delta) {
+        if (hitTargets.isEmpty()) return;
+        keyboardFocus = Math.floorMod(keyboardFocus + delta, hitTargets.size());
+    }
+
+    /**
+     * Reads the current visible keyboard focus.
+     *
+     * @return focused action or null before focus enters the interface
+     */
+    public HitTarget keyboardTarget() {
+        return keyboardFocus < 0 || keyboardFocus >= hitTargets.size() ? null : hitTargets.get(keyboardFocus);
+    }
+
+    /** Clears keyboard focus after navigation or data replacement. */
+    public void clearKeyboardFocus() { keyboardFocus = -1; }
+
+    /**
+     * Pans a map through the same controller as middle-button drag.
+     *
+     * @param tab active surface
+     * @param x horizontal pixel displacement
+     * @param y vertical pixel displacement
+     * @return whether a map accepted the pan
+     */
+    public boolean keyboardPan(Tab tab, float x, float y) { return panMap(tab, x, y); }
 
     /**
      * Returns the topmost current hit target at one bottom-left-origin UI coordinate.
@@ -397,51 +459,141 @@ public final class GeneratedWorldCommandUiRenderer {
         shapes.rect(0f, 0f, width, statusHeight);
         shapes.end();
 
-        float titleWidth = metrics.compact(width) ? 185f * metrics.scale() : 260f * metrics.scale();
-        float tabStart = titleWidth;
-        float tabWidth = Math.min(190f * metrics.scale(), (width - tabStart - 14f) / Tab.values().length);
+        int columns = 6;
+        float tabWidth = (width - metrics.outerMargin() * 2f) / columns;
+        float rowHeight = 25f * metrics.scale();
+        batch.begin();
+        fonts.small().setColor(ImperialUiPalette.IVORY);
+        fonts.small().draw(batch, "STAR EMPIRES", metrics.outerMargin(), height - 5f * metrics.scale());
+        fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
+        fonts.small().draw(batch, snapshot.activeSystemName() + "  •  такт " + snapshot.worldTick()
+                        + "  •  " + (paused ? "ПАУЗА" : String.format(Locale.ROOT, "×%.0f", timeScale)),
+                width * 0.35f, height - 5f * metrics.scale(), width * 0.65f - metrics.outerMargin(), Align.right, false);
+        batch.end();
         for (int index = 0; index < Tab.values().length; index++) {
             Tab tab = Tab.values()[index];
-            float x = tabStart + index * tabWidth;
-            Rect bounds = new Rect(x, topY, tabWidth, metrics.topBarHeight());
+            float x = metrics.outerMargin() + (index % columns) * tabWidth;
+            float y = topY + (1 - index / columns) * rowHeight;
+            Rect bounds = new Rect(x, y, tabWidth - 3f * metrics.scale(), rowHeight - 2f * metrics.scale());
             if (tab == active) {
                 shapes.begin(ShapeRenderer.ShapeType.Filled);
                 shapes.setColor(ImperialUiPalette.BURGUNDY);
-                shapes.rect(x, topY, tabWidth, metrics.topBarHeight());
-                shapes.setColor(ImperialUiPalette.BRASS);
-                shapes.rect(x, topY, tabWidth, Math.max(2f, 3f * metrics.scale()));
+                shapes.rect(bounds.x(), bounds.y(), bounds.width(), bounds.height());
                 shapes.end();
             }
             hitTargets.add(new HitTarget(HitKind.TAB, "", tab, bounds));
+            batch.begin();
+            fonts.small().setColor(tab == active ? ImperialUiPalette.IVORY : ImperialUiPalette.MUTED_TEXT);
+            fonts.small().draw(batch, tab.label(), x, y + rowHeight * 0.72f, tabWidth - 3f * metrics.scale(), Align.center, false);
+            batch.end();
         }
-
         batch.begin();
-        fonts.title().setColor(ImperialUiPalette.IVORY);
-        fonts.title().draw(batch, "STAR EMPIRES", metrics.outerMargin(), height - 22f * metrics.scale());
-        fonts.small().setColor(ImperialUiPalette.BRASS);
-        fonts.small().draw(batch, "КОМАНДНЫЙ КОНТУР", metrics.outerMargin(),
-                height - 48f * metrics.scale());
-        for (int index = 0; index < Tab.values().length; index++) {
-            float x = tabStart + index * tabWidth;
-            fonts.body().setColor(Tab.values()[index] == active
-                    ? ImperialUiPalette.IVORY : ImperialUiPalette.MUTED_TEXT);
-            fonts.body().draw(batch, Tab.values()[index].label(), x, topY + metrics.topBarHeight() * 0.58f,
-                    tabWidth, Align.center, false);
-        }
-        fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
-        String clock = "SEED " + snapshot.worldSeed()
-                + "   TICK " + snapshot.worldTick()
-                + "   " + (paused ? "ПАУЗА" : String.format(Locale.ROOT, "×%.0f", timeScale));
-        fonts.small().draw(batch, clock, width - metrics.outerMargin() - 360f * metrics.scale(),
-                height - 24f * metrics.scale(), 350f * metrics.scale(), Align.right, false);
         fonts.small().setColor(ImperialUiPalette.IVORY);
-        fonts.small().draw(batch,
-                status == null || status.isBlank()
-                        ? "F1–F5 вкладки  •  колесо зум  •  СКМ панорама  •  двойной клик: слежение  •  Home: обзор  •  F8/F9 save/load"
-                        : status,
-                metrics.outerMargin(), statusHeight * 0.68f,
+        fonts.small().draw(batch, status == null || status.isBlank() ? "Tab: фокус • Enter: действие • Esc: назад" : status,
+                metrics.outerMargin(), statusHeight * 0.68f, width - metrics.outerMargin() * 2f, Align.left, false);
+        batch.end();
+    }
+
+    private void drawWorkspaceBar() {
+        float y = height - metrics.topBarHeight() - 21f * metrics.scale();
+        batch.begin();
+        fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
+        fonts.small().draw(batch, workspace.breadcrumb(production), metrics.outerMargin(), y,
                 width - metrics.outerMargin() * 2f, Align.left, false);
         batch.end();
+        float x = metrics.outerMargin();
+        y -= 34f * metrics.scale();
+        String[] ids = {"back", "search", "sort", "filter", "density", "pause", "save", "load"};
+        String[] labels = {"НАЗАД", workspace.searching() ? "ПОИСК: " + workspace.view().query() : "ПОИСК",
+                "СОРТ: " + switch (workspace.view().sort()) {
+                    case NAME -> "имя"; case CATEGORY -> "тип"; case RECENT -> "новые";
+                }, "ФИЛЬТР: " + (workspace.view().category().isEmpty() ? "все" : workspace.view().category()),
+                "ПЛОТНОСТЬ", "ПАУЗА", "СОХРАНИТЬ", "ЗАГРУЗИТЬ"};
+        float unit = (width - metrics.outerMargin() * 2f) / 8f;
+        for (int i = 0; i < ids.length; i++) {
+            Rect bounds = new Rect(x + i * unit, y, unit - 4f * metrics.scale(), 28f * metrics.scale());
+            boolean enabled = i != 0 || workspace.canGoBack();
+            button(bounds, labels[i], enabled);
+            if (enabled) hitTargets.add(new HitTarget(HitKind.ACTION, ids[i], null, bounds));
+        }
+    }
+
+    private void drawProductionSurface() {
+        Layout layout = splitListAndInspector();
+        inspectorRect = layout.inspector();
+        listRect = layout.map();
+        panel(listRect, ImperialUiPalette.MAP_SURFACE, ImperialUiPalette.GUNMETAL);
+        panel(inspectorRect, ImperialUiPalette.PANEL_SURFACE, ImperialUiPalette.GUNMETAL);
+        float rowHeight = switch (workspace.density()) {
+            case COMPACT -> 64f; case STANDARD -> 86f; case RELAXED -> 104f;
+        } * metrics.scale();
+        int capacity = Math.max(1, (int) ((listRect.height() - 102f * metrics.scale()) / rowHeight));
+        var page = workspace.page(production, capacity);
+        drawListHeader(listRect, workspace.tab().label(), page.total() + " записей  •  " + production.viewerName());
+        float y = listRect.top() - 76f * metrics.scale();
+        for (var item : page.rows()) {
+            Rect row = new Rect(listRect.x() + 12f * metrics.scale(), y - rowHeight,
+                    listRect.width() - 24f * metrics.scale(), rowHeight - 6f * metrics.scale());
+            listRow(row, item.selection().equals(workspace.view().selection()), ImperialUiPalette.CYAN);
+            batch.begin();
+            fonts.body().setColor(ImperialUiPalette.IVORY);
+            fonts.body().draw(batch, item.name(), row.x() + 14f * metrics.scale(), row.top() - 10f * metrics.scale(),
+                    row.width() - 28f * metrics.scale(), Align.left, false);
+            fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
+            fonts.small().draw(batch, item.category() + " • " + item.summary(), row.x() + 14f * metrics.scale(),
+                    row.y() + 20f * metrics.scale(), row.width() - 28f * metrics.scale(), Align.left, false);
+            batch.end();
+            HitKind kind = switch (item.selection().kind()) {
+                case FACTION -> HitKind.FACTION; case FREIGHT -> HitKind.FREIGHT;
+                case MILITARY -> HitKind.MILITARY; case LOCAL_OBJECT -> HitKind.LOCAL_OBJECT;
+                default -> HitKind.SURFACE_ROW;
+            };
+            // Local objects on a list are not subject to map-only clipping in hitTest.
+            if (kind == HitKind.LOCAL_OBJECT) kind = HitKind.SURFACE_ROW;
+            hitTargets.add(new HitTarget(kind, item.selection().stableId(), null, row));
+            y -= rowHeight;
+        }
+        if (page.total() == 0) {
+            drawEmptyInspector(listRect, "НЕТ ЗАПИСЕЙ", production.rows(workspace.tab()).isEmpty()
+                    ? "В этом разделе пока нет доступных сведений. Состояние мира не изменено."
+                    : "Нет совпадений. Очистите поиск или выберите фильтр «все».");
+        }
+        drawListScrollHint(listRect, page.offset(), page.total());
+        var selected = production.find(workspace.tab(), workspace.view().selection()).orElse(null);
+        if (selected == null) {
+            drawEmptyInspector(inspectorRect, "ВЫБЕРИТЕ ЗАПИСЬ", "Стрелки — выбор; Enter — открыть; Tab — перейти к действию.");
+        } else {
+            boolean navigable = selected.focusFleet() > 0 || selected.focusSystem() != null;
+            Rect details = workspace.tab() == Tab.FACTIONS
+                    ? new Rect(inspectorRect.x(), inspectorRect.y() + 115f * metrics.scale(), inspectorRect.width(),
+                            inspectorRect.height() - 115f * metrics.scale()) : navigable ? new Rect(inspectorRect.x(), inspectorRect.y() + 58f * metrics.scale(),
+                    inspectorRect.width(), inspectorRect.height() - 58f * metrics.scale()) : inspectorRect;
+            drawInspector(details, selected.name(), selected.category(), selected.summary(),
+                    selected.explainedSections(), workspace.view().detailScroll());
+            if (navigable) {
+                Rect focus = new Rect(inspectorRect.x() + 16f * metrics.scale(), inspectorRect.y() + 12f * metrics.scale(),
+                        inspectorRect.width() - 32f * metrics.scale(), 36f * metrics.scale());
+                boolean available = selected.focusSystem() != null;
+                button(focus, available ? "ОТКРЫТЬ НА КАРТЕ" : "НЕТ ЛОКАЛЬНОЙ ПОЗИЦИИ", available);
+                if (available) hitTargets.add(new HitTarget(HitKind.ACTION, "focus", null, focus));
+            }
+        }
+        if (workspace.tab() == Tab.SETTINGS) {
+            Rect exit = new Rect(listRect.x() + 16f * metrics.scale(), listRect.y() + 28f * metrics.scale(),
+                    listRect.width() - 32f * metrics.scale(), 36f * metrics.scale());
+            button(exit, "ВЫЙТИ ИЗ ИГРЫ", true);
+            hitTargets.add(new HitTarget(HitKind.ACTION, "exit", null, exit));
+        }
+    }
+
+    private void drawKeyboardFocus() {
+        HitTarget focused = keyboardTarget();
+        if (focused == null) return;
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(ImperialUiPalette.IVORY);
+        Rect rect = focused.bounds();
+        shapes.rect(rect.x() + 1f, rect.y() + 1f, rect.width() - 2f, rect.height() - 2f);
+        shapes.end();
     }
 
     private void drawSystem(
@@ -905,7 +1057,7 @@ public final class GeneratedWorldCommandUiRenderer {
     private Layout splitMapAndInspector() {
         float gap = 12f * metrics.scale();
         float bottom = metrics.statusBarHeight() + metrics.outerMargin();
-        float top = height - metrics.topBarHeight() - metrics.outerMargin();
+        float top = height - metrics.topBarHeight() - metrics.outerMargin() - (workspace == null ? 0f : 62f * metrics.scale());
         float panelHeight = Math.max(100f, top - bottom);
         float inspectorWidth = Math.min(metrics.inspectorWidth(), width * 0.42f);
         Rect inspector = new Rect(
@@ -924,7 +1076,7 @@ public final class GeneratedWorldCommandUiRenderer {
     private Layout splitListAndInspector() {
         float gap = 12f * metrics.scale();
         float bottom = metrics.statusBarHeight() + metrics.outerMargin();
-        float top = height - metrics.topBarHeight() - metrics.outerMargin();
+        float top = height - metrics.topBarHeight() - metrics.outerMargin() - (workspace == null ? 0f : 62f * metrics.scale());
         float panelHeight = Math.max(100f, top - bottom);
         float listWidth = Math.min(metrics.listWidth(), width * 0.48f);
         Rect list = new Rect(metrics.outerMargin(), bottom, listWidth, panelHeight);
@@ -959,52 +1111,68 @@ public final class GeneratedWorldCommandUiRenderer {
         y -= contextLayout.height + 18f * metrics.scale();
         batch.end();
 
-        int rowIndex = 0;
-        int hiddenBelow = 0;
+        float bodyTop = y;
+        float bodyBottom = rect.y() + 34f * metrics.scale();
+        float contentHeight = inspectorContentHeight(sections, widthAvailable);
+        float scrollPixels = Math.min(Math.max(0f, contentHeight - (bodyTop - bodyBottom)),
+                Math.max(0, scrollRows) * fonts.body().getLineHeight());
+        y += scrollPixels;
+        float sx = (float) Gdx.graphics.getBackBufferWidth() / Gdx.graphics.getWidth();
+        float sy = (float) Gdx.graphics.getBackBufferHeight() / Gdx.graphics.getHeight();
+        Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
+        Gdx.gl.glScissor((int) (rect.x() * sx), (int) (bodyBottom * sy),
+                (int) (rect.width() * sx), Math.max(0, (int) ((bodyTop - bodyBottom) * sy)));
         for (InfoSection section : sections) {
-            if (rowIndex++ < scrollRows) {
-                continue;
-            }
-            float sectionHeight = 30f * metrics.scale();
-            if (y - sectionHeight < rect.y() + 34f * metrics.scale()) {
-                hiddenBelow++;
-                continue;
-            }
-            batch.begin();
-            fonts.body().setColor(ImperialUiPalette.BRASS);
-            fonts.body().draw(batch, section.title().toUpperCase(Locale.ROOT), x, y);
-            batch.end();
-            y -= sectionHeight;
-            for (var line : section.lines()) {
-                if (rowIndex++ < scrollRows) {
-                    continue;
-                }
-                if (y - fonts.body().getLineHeight() * 1.8f < rect.y() + 34f * metrics.scale()) {
-                    hiddenBelow++;
-                    continue;
-                }
+            if (y >= bodyBottom && y - 30f * metrics.scale() <= bodyTop) {
                 batch.begin();
+                fonts.body().setColor(ImperialUiPalette.BRASS);
+                fonts.body().draw(batch, section.title().toUpperCase(Locale.ROOT), x, y);
+                batch.end();
+            }
+            y -= 30f * metrics.scale();
+            for (var line : section.lines()) {
                 if (!line.label().isEmpty()) {
-                    fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
-                    fonts.small().draw(batch, line.label(), x, y);
+                    if (y >= bodyBottom && y - fonts.small().getLineHeight() <= bodyTop) {
+                        batch.begin();
+                        fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
+                        fonts.small().draw(batch, line.label(), x, y);
+                        batch.end();
+                    }
                     y -= fonts.small().getLineHeight() + 2f * metrics.scale();
                 }
-                fonts.body().setColor(ImperialUiPalette.IVORY);
-                GlyphLayout valueLayout = fonts.body().draw(
-                        batch, line.value(), x, y, widthAvailable, Align.left, true);
-                y -= valueLayout.height + 10f * metrics.scale();
-                batch.end();
+                glyph.setText(fonts.body(), line.value(), Color.WHITE, widthAvailable, Align.left, true);
+                float valueHeight = glyph.height;
+                if (y >= bodyBottom && y - valueHeight <= bodyTop) {
+                    batch.begin();
+                    fonts.body().setColor(ImperialUiPalette.IVORY);
+                    fonts.body().draw(batch, line.value(), x, y, widthAvailable, Align.left, true);
+                    batch.end();
+                }
+                y -= valueHeight + 10f * metrics.scale();
             }
             y -= 4f * metrics.scale();
         }
-        if (scrollRows > 0 || hiddenBelow > 0) {
+        Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
+        if (contentHeight > bodyTop - bodyBottom) {
             batch.begin();
             fonts.small().setColor(ImperialUiPalette.AMBER);
-            fonts.small().draw(batch,
-                    "Колесо мыши: прокрутка сведений" + (scrollRows > 0 ? "  •  выше: " + scrollRows : ""),
-                    x, rect.y() + 14f * metrics.scale(), widthAvailable, Align.left, false);
+            fonts.small().draw(batch, "Колесо или Ctrl+PgUp/PgDn: сведения", x,
+                    rect.y() + 14f * metrics.scale(), widthAvailable, Align.left, false);
             batch.end();
         }
+    }
+
+    private float inspectorContentHeight(List<InfoSection> sections, float widthAvailable) {
+        float result = 0;
+        for (InfoSection section : sections) {
+            result += 34f * metrics.scale();
+            for (var line : section.lines()) {
+                if (!line.label().isEmpty()) result += fonts.small().getLineHeight() + 2f * metrics.scale();
+                glyph.setText(fonts.body(), line.value(), Color.WHITE, widthAvailable, Align.left, true);
+                result += glyph.height + 10f * metrics.scale();
+            }
+        }
+        return result;
     }
 
     private void drawEmptyInspector(Rect rect, String title, String body) {
