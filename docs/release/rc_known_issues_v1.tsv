@@ -1,0 +1,5 @@
+issue	kind	scope	severity	release_gate	acceptance_owner	player_impact	workaround	closure_evidence
+#370	DEFERRED_ACCEPTANCE	MUST_SHIP	CRITICAL	YES	23B+23I	Player may fail to understand causal state from production UI	No release waiver; B18 is executed only on the exact production UI/build	Human B18 >=80% on exact candidate with archived evidence
+#375	DEFECT_SEAM	MUST_SHIP	MAJOR	YES	23E	Guided ordnance destruction cannot yet produce lawful event-driven detonation VFX	Keep disappearance visually quiet; never infer explosion from missing body	Authoritative deterministic event seam + one-event/one-trigger regression + no simulation fingerprint change
+#361	DEFERRED_HUMAN_REVIEW	POST_RC	COSMETIC	NO	POST_RC	Possible aesthetic/readability parity debt remains unreviewed by a human	Automated legality/binding/readability checks remain mandatory; make no human-approval claim	Separate post-release human review
+#371	FEATURE_REQUEST	POST_RC	COSMETIC	NO	POST_RC	No faction-specific beam specialization in core RC	Existing generic beam runtime remains reusable foundation	Separate future faction/content architecture package

@@ -1,0 +1,31 @@
+id	tier	player_surface	acceptance_owner	evidence_mode	baseline_evidence
+campaign_boot	MUST_SHIP	generated campaign start/continue	23I	AUTOMATED+MANUAL	GeneratedCampaignProductionBootstrapRegressionTest + clean-package journey
+local_navigation	MUST_SHIP	local system movement/docking/selection	23B	AUTOMATED+MANUAL	GeneratedWorldCommand UI smoke + 23B production UI charter
+intersystem_travel	MUST_SHIP	galaxy routing/jump transit	23B	AUTOMATED+MANUAL	Stage21D fleet movement acceptance + 23B UI path
+trade_markets	MUST_SHIP	cargo/market/manual trade	23I	AUTOMATED+MANUAL	Stage12-14 shared economy tests + trader campaign journey
+mining_extraction	MUST_SHIP	resource extraction/cargo	23I	AUTOMATED+MANUAL	Stage18 extraction authority + miner campaign journey
+industry_construction	MUST_SHIP	industry/shipyard/construction/repair	23B	AUTOMATED+MANUAL	Stage18 + Stage22 production acceptance + 23B surfaces
+fitting_engineering	MUST_SHIP	ship fit/power/thermal/propellant/ammunition/damage	23B	AUTOMATED+MANUAL	Stage17.5H/I capability/persistence tests + inspector charter
+tactical_combat	MUST_SHIP	exact local combat	23I	AUTOMATED+MANUAL	Stage19I/J deterministic combat corpus + mercenary journey
+fleet_command	MUST_SHIP	multiple fleets/orders/readiness	23B	AUTOMATED+MANUAL	Stage15 + Stage21D/E acceptance + military UI charter
+carrier_operations	MUST_SHIP	physical embarked small craft	23I	AUTOMATED+MANUAL	Stage228FinalCarrierAcceptanceTest + carrier journey
+faction_management	MUST_SHIP	policy/treasury/owned assets	23B	AUTOMATED+MANUAL	Stage17F/G + Stage21 projection evidence
+diplomacy_crisis_war	MUST_SHIP	treaties/crises/alliances/war	23I	AUTOMATED+MANUAL	Stage21C/E corpus + faction-founder journey
+territory_peace_recovery	MUST_SHIP	occupation/control/peace/recovery/replacement	23I	AUTOMATED+MANUAL	Stage21F/G corpus + territorial-power journey
+npc_missions_reputation	MUST_SHIP	contacts/missions/reputation	23B	AUTOMATED+MANUAL	Stage21H acceptance + production UI path
+discovery_intelligence	MUST_SHIP	actor-bounded discovery/knowledge	23B	AUTOMATED+MANUAL	Stage20 discovery + Stage21A/H evidence
+save_load_continuation	MUST_SHIP	save/load/migration continuity	23G	AUTOMATED	GameState v4 + ContentBound envelope v2 + campaign v4 fixtures
+production_ui_navigation	MUST_SHIP	all core loops without debug state	23B	AUTOMATED+MANUAL	23B navigation/inspector/action acceptance
+accessibility_localization	MUST_SHIP	controls/readability/RU+EN	23C	AUTOMATED+MANUAL	23C resolution/accessibility/localization matrix
+onboarding	MUST_SHIP	first-session learning	23D	AUTOMATED+MANUAL	23D ordinary-authority tutorial journey
+final_presentation	MUST_SHIP	production art/VFX/audio	23E	AUTOMATED+MANUAL	23E asset/state/readability/audio acceptance
+performance_long_session	MUST_SHIP	bounded performance/memory	23F	AUTOMATED	23F benchmark + 8h/extended soak
+clean_windows_package	MUST_SHIP	distributable launcher/install/save/load	23H	MANUAL+AUTOMATED	23H clean-machine package smoke
+rc_campaign_regression	MUST_SHIP	full campaign journeys/regression	23I	AUTOMATED+MANUAL	23I trader/miner/mercenary/fleet/industrial/faction journeys
+exact_rc_artifact	MUST_SHIP	exact distributable candidate	23J	AUTOMATED+MANUAL	23J exact SHA/package/checksum gate
+cross_platform_package	MAY_SHIP	Linux/macOS packaging	23H	MANUAL	Only if explicitly claimed for v0.7
+optional_music_breadth	MAY_SHIP	non-critical music breadth	23E	MANUAL	May land after mandatory audio hierarchy/cues
+extra_cinematic_vfx	MAY_SHIP	presentation polish beyond readability	23E	MANUAL	Must not delay state-correct mandatory VFX
+postcore_major_factions	POST_RC	Directorate/League/Frontier/Consortium/Nomad Fleet	POST_RC	SEPARATE_ARCHITECTURE_PACKAGE	docs/factions/post_core_faction_horizon.md
+beam_faction_specialization	POST_RC	optional faction beam-weapon content	POST_RC	ISSUE	#371
+human_sprite_approval_debt	POST_RC	human aesthetic approval of current sprites	POST_RC	ISSUE	#361
