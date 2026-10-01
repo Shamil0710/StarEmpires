@@ -192,3 +192,24 @@ unchanged original migration bytes, generated-world cross-reference rejection, e
 recapture and deterministic campaign continuation with a nonzero existing wallet. Local Java-17
 production compilation and a lightweight assertion harness passed; that harness is not a Maven or
 JUnit-engine result. The full exact-head CI gate is required before accepting the batch.
+
+### Ordinary diplomatic deadline integration
+
+The ordinary coordinator now invokes the existing `DiplomaticLifecycleService.expireDueProposals`
+once after each completed campaign tick, before actor reviews. It stores the service result only
+when an actual expiry occurs. Capture, restore, paused/zero/fractional frames and empty diplomacy do
+not normalize or rewrite an unchanged historical sidecar. The service also rejects a linked ordinary
+Stage-17 treaty offer. Accepted proposals/treaties retain their existing semantics and are not
+expired by the response deadline.
+
+`GeneratedCampaignDiplomaticDeadlineTest` covers exact deadline, pause/fractional/capture purity,
+pre-deadline save/load, 8x deterministic continuation, unchanged empty sidecars, linked treaty
+rejection, idempotent expiry, overdue legacy offers and accepted-treaty preservation. This closes a concrete deadline
+lifecycle gap; it does not expose a player/AI negotiation command loop or close #412.
+
+The lifecycle batch passed local Java-17 compilation, strict Javadoc and a lightweight assertion
+harness (seven new deadline methods plus five existing coordinator methods). Re-running the ten new
+player-persistence and five existing native-codec methods against this combined source also passed.
+The real client passed the software-EGL keyboard/mouse/save/load smoke on all eleven surfaces using
+locally compiled combined production sources and the existing packaged dependency set. This is not
+an exact packaged-artifact test or B18 human acceptance. Both batches require full exact-head CI.
