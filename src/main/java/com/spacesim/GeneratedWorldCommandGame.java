@@ -417,8 +417,11 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         return Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT);
     }
 
-    private static String safeMessage(Throwable exception) {
-        String message = exception.getMessage();
-        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
+    static String safeMessage(Throwable exception) {
+        // Exception messages can include absolute paths or save payload fragments.
+        if (exception instanceof IOException) return "Не удалось прочитать или записать файл.";
+        if (exception instanceof IllegalArgumentException) return "Данные или параметры не прошли проверку.";
+        if (exception instanceof IllegalStateException) return "Состояние кампании не прошло проверку.";
+        return "Внутренняя ошибка обработки.";
     }
 }

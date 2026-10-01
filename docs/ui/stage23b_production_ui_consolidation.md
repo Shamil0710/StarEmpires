@@ -114,6 +114,8 @@ Automated regressions added:
   filter/query composition, stable tie ordering under input permutation, large-list virtual pages,
   shrink/overflow clamping, keyboard viewport selection, density information retention, input editing,
   corrupt identity/page rejection and reset;
+- `GeneratedWorldCommandGameErrorTest`: readable error categories never expose exception paths
+  or embedded save payloads;
 - `ProductionUiCampaignIntegrationTest`: ordinary composed campaign, projection non-mutation,
   actor-bounded private economy/freight, honest empty contacts/history, explanations, exact codec
   save/load projection equality and unknown-observer rejection.
